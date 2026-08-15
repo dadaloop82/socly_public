@@ -67,11 +67,12 @@ $assetVer = (string) max(
         <div class="auth-footer-brand">
             <?= socly_word_html('socly-word-footer') ?>
             <?php if ($hasAssoc): ?>
-                <span>· <?= e(__('auth.for')) ?> <?= assoc_lockup_html(['class' => 'assoc-lockup-footer']) ?></span>
+                <span class="auth-footer-assoc">· <?= e(__('auth.for')) ?> <?= assoc_lockup_html(['class' => 'assoc-lockup-footer']) ?></span>
             <?php else: ?>
-                <span>· <?= e(__('auth.for_new_prefix')) ?><span class="footer-new"><?= e(__('auth.for_new_highlight')) ?></span><?= e(__('auth.for_new_suffix')) ?></span>
+                <span class="auth-footer-assoc">· <?= e(__('auth.for_new_prefix')) ?><span class="footer-new"><?= e(__('auth.for_new_highlight')) ?></span><?= e(__('auth.for_new_suffix')) ?></span>
             <?php endif; ?>
-            <span>· © <?= e($year) ?> · v<?= e(app_version()) ?></span>
+            <span class="auth-footer-meta">· © <?= e($year) ?></span>
+            <span class="auth-footer-version">· v<?= e(app_version()) ?></span>
         </div>
         <nav>
             <span><?= credit_line() ?></span>

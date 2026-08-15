@@ -3797,6 +3797,9 @@ function initDashboardTabs() {
       const selected = tab.getAttribute('data-dashboard-tab') === id;
       tab.setAttribute('aria-selected', selected ? 'true' : 'false');
       tab.tabIndex = selected ? 0 : -1;
+      if (selected && typeof tab.scrollIntoView === 'function') {
+        tab.scrollIntoView({ inline: 'center', block: 'nearest', behavior: 'smooth' });
+      }
     });
     panels.forEach((panel) => {
       const match = panel.getAttribute('data-dashboard-panel') === id;

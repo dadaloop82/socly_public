@@ -52,7 +52,8 @@ $defaultTab = $tabs[0]['id'] ?? '';
     <div class="titles">
         <h1 class="page-title page-title-brand">
             <?php if ($showAssocInTitle): ?>
-                <span class="title-lead"><?= e(__('dashboard.title_of')) ?></span>
+                <span class="title-lead title-lead-desktop"><?= e(__('dashboard.title_of')) ?></span>
+                <span class="title-lead title-lead-mobile"><?= e(__('dashboard.title')) ?></span>
                 <?= assoc_lockup_html(['class' => 'assoc-lockup-title']) ?>
             <?php else: ?>
                 <span class="title-lead"><?= e(__('dashboard.title')) ?></span>
