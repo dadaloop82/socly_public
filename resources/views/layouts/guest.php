@@ -1,0 +1,95 @@
+<?php
+/** @var string $content */
+$branding = app()->branding();
+$assocName = trim((string) ($branding['name'] ?? ''));
+$hasAssoc = $assocName !== '' && strcasecmp($assocName, 'SOCLY') !== 0;
+$year = date('Y');
+ $version = app_version();
+ $siteName = (string) __('app.name');
+
+ if ($hasAssoc) {
+     $assocLegal = trim((string) ($branding['legal_name'] ?? ''));
+     $assocPlain = assoc_capitalize_name($assocName) . ($assocLegal !== '' ? ' ' . $assocLegal : '');
+     $assocPart = trim((string) __('auth.for') . ' ' . $assocPlain);
+ } else {
+     $assocPart = trim((string) __('auth.for_new_prefix') . (string) __('auth.for_new_highlight') . (string) __('auth.for_new_suffix'));
+ }
+ $computedTitle = $siteName . ' · ' . $assocPart . ' · © ' . $year . ' · v' . $version;
+?>
+<!DOCTYPE html>
+<html lang="<?= e(app('translator')->getLocale()) ?>">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <?= view_partial('partials/password_i18n_meta') ?>
+    <title><?= e($computedTitle) ?></title>
+    <link rel="icon" href="<?= e(socly_icon_url()) ?>" type="image/png">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,560;9..144,700&family=Manrope:wght@400;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="<?= e(asset('css/app.css')) ?>?v=<?= e((string) (@filemtime(base_path('public/assets/css/app.css')) ?: time())) ?>">
+    <style>:root {
+      <?= brand_root_style_decls($branding['primary'] ?? null, $branding['accent'] ?? null) ?>
+      --brand-socly: #0B4875;
+    }</style>
+</head>
+<body>
+<div class="auth-shell">
+    <div class="auth-main">
+        <aside class="auth-brand">
+            <div class="auth-brand-inner">
+                <?= socly_mark_img('auth-mark', 'SOCLY', 'light') ?>
+                <?php if ($hasAssoc): ?>
+                    <?= assoc_logo_img('auth-assoc-logo') ?>
+                <?php endif; ?>
+                <h1 class="auth-product">
+                    <?php if ($hasAssoc): ?>
+                        <span class="auth-product-line">
+                            <span class="per" data-i18n="auth.for"><?= e(__('auth.for')) ?></span>
+                            <?= assoc_lockup_html(['class' => 'assoc-lockup-auth']) ?>
+                        </span>
+                    <?php else: ?>
+                        <span class="auth-product-line">
+                            <span class="per" data-i18n="auth.for_new_prefix"><?= e(__('auth.for_new_prefix')) ?></span>
+                            <span class="assoc-new" data-i18n="auth.for_new_highlight"><?= e(__('auth.for_new_highlight')) ?></span>
+                            <span class="per" data-i18n="auth.for_new_suffix"><?= e(__('auth.for_new_suffix')) ?></span>
+                        </span>
+                    <?php endif; ?>
+                </h1>
+                <p class="auth-motto" data-i18n-html="auth.motto"><?= with_auth_asterisk(e(__('auth.motto'))) ?></p>
+                <p class="auth-desc" data-i18n-html="auth.product_description"><?= with_auth_asterisk(with_socly_word(__('auth.product_description'))) ?></p>
+            </div>
+            <div class="auth-brand-meta">
+                <p class="auth-license-note" data-i18n-html="auth.license_note"><?= with_auth_asterisk(e(__('auth.license_note'))) ?></p>
+            </div>
+        </aside>
+        <section class="auth-panel">
+            <div class="auth-card">
+                <?php if ($msg = flash('success')): ?><div class="alert alert-success"><?= e((string)$msg) ?></div><?php endif; ?>
+                <?php if ($errors = flash('errors')): ?>
+                    <div class="alert alert-error">
+                        <?php foreach ((array)$errors as $err): ?><div><?= e(is_array($err)?implode(', ',$err):(string)$err) ?></div><?php endforeach; ?>
+                    </div>
+                <?php endif; ?>
+                <?= $content ?>
+            </div>
+        </section>
+    </div>
+    <footer class="auth-footer">
+        <div class="auth-footer-brand">
+            <?= socly_word_html('socly-word-footer') ?>
+            <?php if ($hasAssoc): ?>
+                <span>· <span data-i18n="auth.for"><?= e(__('auth.for')) ?></span> <?= assoc_lockup_html(['class' => 'assoc-lockup-footer']) ?></span>
+            <?php else: ?>
+                <span>· <span data-i18n="auth.for_new_prefix"><?= e(__('auth.for_new_prefix')) ?></span><span class="footer-new" data-i18n="auth.for_new_highlight"><?= e(__('auth.for_new_highlight')) ?></span><span data-i18n="auth.for_new_suffix"><?= e(__('auth.for_new_suffix')) ?></span></span>
+            <?php endif; ?>
+            <span>· © <?= e($year) ?> · v<?= e(app_version()) ?></span>
+        </div>
+        <nav>
+            <span data-i18n-html="auth.footer_tagline"><?= credit_line() ?></span>
+        </nav>
+    </footer>
+</div>
+<script src="<?= e(asset('js/app.js')) ?>?v=<?= e((string) (@filemtime(base_path('public/assets/js/app.js')) ?: time())) ?>"></script>
+</body>
+</html>

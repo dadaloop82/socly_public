@@ -1,0 +1,14 @@
+/vendor/
+.env
+.env.user
+storage/logs/*
+storage/cache/*
+storage/sessions/*
+storage/installed.lock
+storage/maintenance.lock
+storage/uploads/*
+storage/documents/*
+!storage/**/.gitkeep
+.idea/
+.vscode/
+*.log

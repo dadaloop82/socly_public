@@ -1,0 +1,33 @@
+SOCLY SOURCE-AVAILABLE LICENSE
+(Community / Base Edition)
+
+Copyright (c) 2026 Socly. All rights reserved.
+
+1. Grant of use
+   You may download, install, and run this base software on your own servers
+   for your association’s internal membership management, free of charge.
+
+2. What this license does NOT include
+   - Professional installation, configuration, migration, training, or support
+   - Hosted / managed instances operated by Socly or partners
+   - Paid plugins, modules, add-ons, or commercial extensions
+   Those offerings are licensed and priced separately.
+
+3. Restrictions
+   You may not:
+   - Sell, rent, or sublicense this software as a competing multi-tenant service
+     without prior written permission from the copyright holder
+   - Remove or alter copyright notices
+   - Claim that Socly endorses your deployment
+
+4. Contributions
+   Code contributions are accepted only under a separate written agreement.
+   Opening an issue or pull request does not transfer ownership unless agreed.
+
+5. No warranty
+   THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+   IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+   FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+
+6. Contact
+   For installation services, support, or commercial licensing: https://socly.it
