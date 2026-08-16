@@ -42,6 +42,7 @@ final class DashboardController extends BaseController
                 'members_total' => 0,
                 'members_active' => 0,
                 'members_expired' => 0,
+                'members_suspended' => 0,
                 'overdue_count' => 0,
                 'collected_year' => 0.0,
                 'collected_month' => 0.0,

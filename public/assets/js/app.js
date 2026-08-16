@@ -9,6 +9,7 @@ document.addEventListener('DOMContentLoaded', () => {
     sync();
   }
 
+  initPageEnter();
   initMobileNav();
   initTopbarScroll();
   initSidebarDeadlines();
@@ -38,6 +39,128 @@ document.addEventListener('DOMContentLoaded', () => {
   initTreasuryCategory(document);
 });
 
+/**
+ * Soft staggered entrance for page blocks (and as they scroll into view).
+ * Content stays visible without JS / with reduced motion.
+ */
+function initPageEnter() {
+  if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+
+  const roots = [
+    ...document.querySelectorAll('.main'),
+    ...document.querySelectorAll('.auth-layout, .auth-wrap, .install-wrap, .setup-layout, .setup-shell'),
+  ];
+  if (!roots.length) return;
+
+  document.documentElement.classList.add('enter-anim');
+  roots.forEach((root) => enterScope(root));
+}
+
+/** @type {IntersectionObserver | null} */
+let pageEnterObserver = null;
+let pageEnterSeq = 0;
+
+function getPageEnterObserver() {
+  if (pageEnterObserver) return pageEnterObserver;
+  if (!('IntersectionObserver' in window)) return null;
+  pageEnterObserver = new IntersectionObserver(
+    (entries) => {
+      entries.forEach((entry) => {
+        if (!entry.isIntersecting) return;
+        entry.target.classList.add('is-entered');
+        pageEnterObserver?.unobserve(entry.target);
+      });
+    },
+    { root: null, rootMargin: '0px 0px -6% 0px', threshold: 0.06 }
+  );
+  return pageEnterObserver;
+}
+
+function isEnterableVisible(el) {
+  if (!(el instanceof HTMLElement)) return false;
+  if (el.closest('[hidden]')) return false;
+  if (el.getAttribute('aria-hidden') === 'true') return false;
+  const style = window.getComputedStyle(el);
+  if (style.display === 'none' || style.visibility === 'hidden') return false;
+  return true;
+}
+
+/**
+ * Mark and reveal enterable blocks inside a scope (page load, tab change, wizard step).
+ * @param {ParentNode} scope
+ * @param {{ reset?: boolean }} [opts]
+ */
+function enterScope(scope, opts = {}) {
+  if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+  if (!document.documentElement.classList.contains('enter-anim')) {
+    document.documentElement.classList.add('enter-anim');
+  }
+
+  const selector = [
+    '.page-header',
+    '.alert',
+    '.dashboard-tabs-wrap',
+    '.dashboard-tablist',
+    '.stats > .stat',
+    '.charts > .panel',
+    '.panel',
+    '.form-card',
+    '.table-wrap',
+    '.filter-bar',
+    '.empty-state',
+    '.config-accordion',
+    '.wizard-steps',
+    '.wizard-panel.is-active',
+    '.wizard-panel.is-active .field-block',
+    '.member-profile-grid > *',
+    '.tessera-step-layout > *',
+    '.setup-fields-step',
+    '.setup-membership-card',
+    '.auth-mark',
+    '.auth-logo',
+    '.auth-product',
+    '.auth-lede',
+    '.auth-card',
+    '.auth-form > *',
+  ].join(',');
+
+  const seen = new Set();
+  const items = [];
+  scope.querySelectorAll(selector).forEach((el) => {
+    if (seen.has(el)) return;
+    if (!isEnterableVisible(el)) return;
+    seen.add(el);
+    items.push(el);
+  });
+  if (!items.length) return;
+
+  if (opts.reset) {
+    items.forEach((el) => {
+      el.classList.remove('is-entered');
+      el.classList.remove('will-enter');
+    });
+    // Force reflow so re-adding classes retriggers animation.
+    void (scope instanceof HTMLElement ? scope.offsetWidth : document.body.offsetWidth);
+  }
+
+  const base = opts.reset ? 0 : pageEnterSeq;
+  if (!opts.reset) {
+    pageEnterSeq += items.length;
+  }
+
+  const io = getPageEnterObserver();
+  items.forEach((el, i) => {
+    el.classList.add('will-enter');
+    el.style.setProperty('--enter-delay', `${Math.min((base + i) * 40, 480)}ms`);
+    if (!io) {
+      el.classList.add('is-entered');
+      return;
+    }
+    // Re-observe after reset
+    io.unobserve(el);
+    io.observe(el);
+  });
+}
 const PASSWORD_TOGGLE_ICON_SHOW =
   '<svg class="password-toggle-icon password-toggle-icon--show" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path fill="currentColor" d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5zM12 17c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z"/></svg>';
 const PASSWORD_TOGGLE_ICON_HIDE =
@@ -854,6 +977,11 @@ function initMemberWizard() {
   const typeSelect = form.querySelector('[data-member-type]');
   const paymentTypeLabel = form.querySelector('[data-payment-type-label]');
   const paymentAmount = form.querySelector('[data-payment-amount]');
+  const paymentDue = form.querySelector('[data-payment-due]');
+  const paymentStatus = form.querySelector('[name="payment_status"]');
+  const partialAmountInput = form.querySelector('[name="partial_amount"]');
+  const money = (n) =>
+    `${Number(n || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €`;
 
   const syncTesseraPhoto = (src) => {
     if (!photoTarget) return;
@@ -898,9 +1026,22 @@ function initMemberWizard() {
         typeTarget.appendChild(strong);
       }
       if (paymentTypeLabel) paymentTypeLabel.textContent = typeLabel || '—';
+      const price = Number(opt?.dataset.price || 0);
       if (paymentAmount) {
-        const price = Number(opt?.dataset.price || 0);
-        paymentAmount.textContent = `${price.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €`;
+        paymentAmount.textContent = money(price);
+      }
+      if (paymentDue) {
+        const status = paymentStatus?.value || 'unpaid';
+        let due = price;
+        if (status === 'paid') {
+          due = 0;
+        } else if (status === 'partial') {
+          const paid = Math.max(0, Number(partialAmountInput?.value || 0));
+          due = Math.max(0, price - paid);
+        }
+        paymentDue.textContent = money(due);
+        paymentDue.classList.toggle('stat-negative', due > 0);
+        paymentDue.classList.toggle('stat-positive', due <= 0);
       }
     }
     const livePhoto = form.querySelector('.photo-upload .photo-preview, .photo-field .photo-preview');
@@ -912,7 +1053,10 @@ function initMemberWizard() {
     }
   };
 
-  const showStep = (n) => {
+  paymentStatus?.addEventListener('change', syncCard);
+  partialAmountInput?.addEventListener('input', syncCard);
+
+  const showStep = (n, { animateEnter = true } = {}) => {
     step = Math.min(Math.max(n, 1), total);
     panels.forEach((panel) => {
       const id = Number(panel.dataset.wizardPanel);
@@ -942,6 +1086,12 @@ function initMemberWizard() {
     syncCard();
     form.dispatchEvent(new CustomEvent('wizard:step', { detail: { step } }));
     window.scrollTo({ top: 0, behavior: 'smooth' });
+    if (animateEnter) {
+      const activePanel = panels.find((panel) => !panel.hidden);
+      if (activePanel) {
+        window.requestAnimationFrame(() => enterScope(activePanel, { reset: true }));
+      }
+    }
   };
 
   const validateStep = () => {
@@ -1079,7 +1229,7 @@ function initMemberWizard() {
     step = total;
   });
 
-  showStep(1);
+  showStep(1, { animateEnter: false });
 }
 
 function initMemberForm() {
@@ -3831,7 +3981,7 @@ function initDashboardTabs() {
     window.requestAnimationFrame(syncTablistOverflow);
   }, { passive: true });
 
-  const activate = (id, { updateHash = true } = {}) => {
+  const activate = (id, { updateHash = true, animateEnter = true } = {}) => {
     if (!validIds.has(id)) {
       id = defaultTab;
     }
@@ -3859,6 +4009,12 @@ function initDashboardTabs() {
     }
     if (id === 'treasury') {
       window.requestAnimationFrame(() => initTreasuryCharts());
+    }
+    if (animateEnter) {
+      const activePanel = panels.find((panel) => !panel.hidden);
+      if (activePanel) {
+        window.requestAnimationFrame(() => enterScope(activePanel, { reset: true }));
+      }
     }
   };
 
@@ -3904,7 +4060,10 @@ function initDashboardTabs() {
   });
 
   const initial = idFromHash();
-  activate(initial && validIds.has(initial) ? initial : defaultTab, { updateHash: !initial });
+  activate(initial && validIds.has(initial) ? initial : defaultTab, {
+    updateHash: !initial,
+    animateEnter: false,
+  });
   window.requestAnimationFrame(syncTablistOverflow);
 }
 

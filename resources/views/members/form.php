@@ -22,11 +22,14 @@ if ($formSteps === []) {
     ]];
 }
 $fieldStepCount = count($formSteps);
-$totalSteps = $fieldStepCount + 2 + ($isEdit ? 0 : 1) + ($needsEnrollment ? 1 : 0);
+$totalSteps = $fieldStepCount + 2 + ($needsEnrollment ? 1 : 0);
 $tesseraStep = $fieldStepCount + 1;
 $ackStep = $fieldStepCount + 2;
 $enrollmentStep = $needsEnrollment ? ($fieldStepCount + 3) : null;
-$paymentStep = $isEdit ? null : ($needsEnrollment ? ($fieldStepCount + 4) : ($fieldStepCount + 3));
+$paymentStep = null; // quota + stato pagamento sono nello step Tessera
+$oldPaymentStatus = (string) old('payment_status', 'unpaid');
+$oldPartialAmount = (string) old('partial_amount', '0');
+$oldPaymentMethod = (string) old('payment_method', 'cash');
 
 $legalAckKeys = ['privacy_ack', 'statute_ack'];
 $gdprEnabled = (string) (app()->isInstalled() ? (app(\Socly\Services\SettingsService::class)->get('gdpr.enabled', '0') ?: '0') : '0') === '1';
@@ -515,11 +518,6 @@ $paymentExtraHtml = $buildProfileFieldsHtml($paymentExtraFields);
             <span class="wizard-index"><?= (int) $enrollmentStep ?></span>
         </li>
         <?php endif; ?>
-        <?php if ($paymentStep !== null): ?>
-        <li class="wizard-step" data-step-indicator="<?= (int) $paymentStep ?>" aria-label="<?= e(__('members.wizard_step4_title')) ?>" title="<?= e(__('members.wizard_step4_title')) ?>">
-            <span class="wizard-index"><?= (int) $paymentStep ?></span>
-        </li>
-        <?php endif; ?>
     </ol>
 
     <div class="wizard-progress" aria-hidden="true"><span data-wizard-progress></span></div>
@@ -544,7 +542,7 @@ $paymentExtraHtml = $buildProfileFieldsHtml($paymentExtraFields);
     <section class="wizard-panel" data-wizard-panel="<?= (int) $tesseraStep ?>" hidden>
         <div class="wizard-panel-head">
             <h2 class="section-title"><?= e(__('members.wizard_step2_title')) ?></h2>
-            <p class="section-lede"><?= e(__('members.core_data_lede')) ?></p>
+            <p class="section-lede"><?= e(__('members.wizard_step2_lede')) ?></p>
         </div>
         <div class="tessera-step-layout">
             <?php
@@ -639,6 +637,46 @@ $paymentExtraHtml = $buildProfileFieldsHtml($paymentExtraFields);
                         </select>
                     </div>
                 </div>
+
+                <?php if (!$isEdit): ?>
+                <div class="payment-summary" data-tessera-payment-summary>
+                    <div>
+                        <span class="muted"><?= e(__('members.type')) ?></span>
+                        <strong data-payment-type-label>—</strong>
+                    </div>
+                    <div>
+                        <span class="muted"><?= e(__('members.wizard_quota')) ?></span>
+                        <strong data-payment-amount>0,00 €</strong>
+                    </div>
+                    <div data-payment-due-wrap>
+                        <span class="muted"><?= e(__('members.wizard_still_due')) ?></span>
+                        <strong data-payment-due>0,00 €</strong>
+                    </div>
+                </div>
+                <div class="grid-2">
+                    <div class="field-block">
+                        <label class="field-label"><?= e(__('members.payment')) ?></label>
+                        <select name="payment_status" required>
+                            <option value="unpaid" <?= $oldPaymentStatus === 'unpaid' ? 'selected' : '' ?>><?= e(__('members.payment_unpaid')) ?></option>
+                            <option value="partial" <?= $oldPaymentStatus === 'partial' ? 'selected' : '' ?>><?= e(__('members.payment_partial')) ?></option>
+                            <option value="paid" <?= $oldPaymentStatus === 'paid' ? 'selected' : '' ?>><?= e(__('members.payment_paid')) ?></option>
+                        </select>
+                    </div>
+                    <div class="field-block">
+                        <label class="field-label"><?= e(__('members.payment_method')) ?></label>
+                        <select name="payment_method" required>
+                            <option value="cash" <?= $oldPaymentMethod === 'cash' ? 'selected' : '' ?>><?= e(__('payments.cash')) ?></option>
+                            <option value="bank" <?= $oldPaymentMethod === 'bank' ? 'selected' : '' ?>><?= e(__('payments.bank')) ?></option>
+                            <option value="other" <?= $oldPaymentMethod === 'other' ? 'selected' : '' ?>><?= e(__('payments.other')) ?></option>
+                        </select>
+                    </div>
+                </div>
+                <div data-partial-wrap<?= $oldPaymentStatus === 'partial' ? '' : ' hidden' ?> class="field-block">
+                    <label class="field-label"><?= e(__('members.partial_amount')) ?></label>
+                    <input type="number" step="0.01" min="0" name="partial_amount" value="<?= e($oldPartialAmount) ?>">
+                </div>
+                <?php endif; ?>
+
                 <div class="field-block">
                     <label class="field-label"><?= e(__('members.notes')) ?></label>
                     <textarea name="notes" rows="3"><?= e((string)old('notes', $member['notes'] ?? '')) ?></textarea>
@@ -646,6 +684,11 @@ $paymentExtraHtml = $buildProfileFieldsHtml($paymentExtraFields);
                 <?php if ($tesseraExtraHtml !== ''): ?>
                     <div class="member-profile-grid" style="margin-top:0.85rem">
                         <?= $tesseraExtraHtml ?>
+                    </div>
+                <?php endif; ?>
+                <?php if (!$isEdit && $paymentExtraHtml !== ''): ?>
+                    <div class="member-profile-grid" style="margin-top:0.85rem">
+                        <?= $paymentExtraHtml ?>
                     </div>
                 <?php endif; ?>
             </div>
@@ -770,50 +813,6 @@ $paymentExtraHtml = $buildProfileFieldsHtml($paymentExtraFields);
         <?php endif; ?>
     </section>
     <?php endif; ?>
-
-    <section class="wizard-panel" data-wizard-panel="<?= (int) $paymentStep ?>" hidden>
-            <div class="wizard-panel-head">
-            <h2 class="section-title"><?= e(__('members.wizard_step4_title')) ?></h2>
-            <p class="section-lede"><?= e(__('members.wizard_step4_lede')) ?></p>
-        </div>
-        <div class="payment-summary">
-            <div>
-                <span class="muted"><?= e(__('members.type')) ?></span>
-                <strong data-payment-type-label>—</strong>
-            </div>
-            <div>
-                <span class="muted"><?= e(__('members.wizard_quota')) ?></span>
-                <strong data-payment-amount>0,00 €</strong>
-            </div>
-        </div>
-        <div class="grid-2">
-            <div class="field-block">
-                <label class="field-label"><?= e(__('members.payment')) ?></label>
-                <select name="payment_status" required>
-                    <option value="paid"><?= e(__('members.payment_paid')) ?></option>
-                    <option value="partial"><?= e(__('members.payment_partial')) ?></option>
-                    <option value="unpaid"><?= e(__('members.payment_unpaid')) ?></option>
-                </select>
-            </div>
-            <div class="field-block">
-                <label class="field-label"><?= e(__('members.payment_method')) ?></label>
-                <select name="payment_method" required>
-                    <option value="cash"><?= e(__('payments.cash')) ?></option>
-                    <option value="bank"><?= e(__('payments.bank')) ?></option>
-                    <option value="other"><?= e(__('payments.other')) ?></option>
-                </select>
-            </div>
-        </div>
-        <div data-partial-wrap hidden class="field-block">
-            <label class="field-label"><?= e(__('members.partial_amount')) ?></label>
-            <input type="number" step="0.01" name="partial_amount" value="<?= e((string)old('partial_amount', '0')) ?>">
-        </div>
-        <?php if ($paymentExtraHtml !== ''): ?>
-            <div class="member-profile-grid" style="margin-top:0.85rem">
-                <?= $paymentExtraHtml ?>
-            </div>
-        <?php endif; ?>
-    </section>
     <?php endif; ?>
 
     <div class="wizard-actions">

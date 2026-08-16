@@ -33,6 +33,7 @@ final class MemberService
     public function fieldDefinitions(bool $enabledOnly = true): array
     {
         $this->ensureDefaultFormSteps();
+        $this->repairEmptyCustomFormSteps();
         $sql = 'SELECT * FROM member_field_definitions';
         if ($enabledOnly) {
             $sql .= ' WHERE is_enabled = 1';
@@ -192,7 +193,14 @@ final class MemberService
             $sort += 10;
         }
         $this->replaceFormSteps(array_values($steps));
-        return array_values(array_unique([...array_keys($steps), ...self::systemFormStepKeys()]));
+        // replaceFormSteps() always keeps at least "profile" when input is empty —
+        // the return list must include that custom key, otherwise resolveFieldFormStep
+        // falls through to the first system step (tessera) and empties step 1.
+        $customKeys = array_keys($steps);
+        if ($customKeys === []) {
+            $customKeys = ['profile'];
+        }
+        return array_values(array_unique([...$customKeys, ...self::systemFormStepKeys()]));
     }
 
     /**
@@ -206,15 +214,79 @@ final class MemberService
         if (in_array($key, ['privacy_ack', 'statute_ack'], true)) {
             return self::STEP_ACKNOWLEDGEMENTS;
         }
-        $first = $validSteps[0] ?? 'profile';
+        $system = array_fill_keys(self::systemFormStepKeys(), true);
+        $firstCustom = 'profile';
+        foreach ($validSteps as $candidate) {
+            $candidate = (string) $candidate;
+            if ($candidate !== '' && !isset($system[$candidate])) {
+                $firstCustom = $candidate;
+                break;
+            }
+        }
         $requested = trim((string) ($fieldSteps[$key] ?? ''));
         if ($requested !== '' && in_array($requested, $validSteps, true)) {
             return $requested;
         }
-        if ($fallback !== null && in_array($fallback, $validSteps, true)) {
+        if ($fallback !== null && $fallback !== '' && in_array($fallback, $validSteps, true) && !isset($system[$fallback])) {
             return $fallback;
         }
-        return $first;
+        return $firstCustom;
+    }
+
+    /**
+     * If every custom wizard step has zero fields, move non-legal fields off system
+     * steps (usually a bad autosave that parked everything on tessera).
+     */
+    public function repairEmptyCustomFormSteps(): void
+    {
+        try {
+            $steps = $this->db->fetchAll('SELECT `key` FROM member_form_steps ORDER BY sort_order ASC, id ASC');
+        } catch (\Throwable) {
+            return;
+        }
+        $system = array_fill_keys(self::systemFormStepKeys(), true);
+        $customKeys = [];
+        foreach ($steps as $step) {
+            $key = (string) ($step['key'] ?? '');
+            if ($key !== '' && !isset($system[$key])) {
+                $customKeys[] = $key;
+            }
+        }
+        if ($customKeys === []) {
+            $customKeys = ['profile'];
+            try {
+                $this->ensureDefaultFormSteps();
+            } catch (\Throwable) {
+                return;
+            }
+        }
+        $placeholders = implode(',', array_fill(0, count($customKeys), '?'));
+        try {
+            $onCustom = $this->db->fetch(
+                "SELECT COUNT(*) c FROM member_field_definitions
+                 WHERE is_enabled = 1 AND form_step IN ($placeholders)",
+                $customKeys
+            );
+        } catch (\Throwable) {
+            return;
+        }
+        if ((int) ($onCustom['c'] ?? 0) > 0) {
+            return;
+        }
+        $target = $customKeys[0];
+        $systemKeys = self::systemFormStepKeys();
+        $sysPlaceholders = implode(',', array_fill(0, count($systemKeys), '?'));
+        try {
+            $this->db->query(
+                "UPDATE member_field_definitions
+                 SET form_step = ?
+                 WHERE form_step IN ($sysPlaceholders)
+                   AND `key` NOT IN ('privacy_ack', 'statute_ack')",
+                [$target, ...$systemKeys]
+            );
+        } catch (\Throwable) {
+            // ignore
+        }
     }
 
     public function isSystemLockedFieldKey(string $key): bool
@@ -300,12 +372,11 @@ final class MemberService
                 ['key' => '_sys_status', 'label' => __('members.status')],
                 ['key' => '_sys_type', 'label' => __('members.type')],
                 ['key' => '_sys_period', 'label' => __('members.period')],
-                ['key' => '_sys_notes', 'label' => __('members.notes')],
-            ],
-            self::STEP_PAYMENT => [
                 ['key' => '_sys_payment', 'label' => __('members.payment')],
                 ['key' => '_sys_payment_method', 'label' => __('members.payment_method')],
+                ['key' => '_sys_notes', 'label' => __('members.notes')],
             ],
+            self::STEP_PAYMENT => [],
             self::STEP_ACKNOWLEDGEMENTS => [],
         ];
     }
@@ -1000,6 +1071,7 @@ final class MemberService
             'members_total' => (int) ($this->db->fetch('SELECT COUNT(*) c FROM members')['c'] ?? 0),
             'members_active' => (int) ($this->db->fetch("SELECT COUNT(*) c FROM members WHERE status = 'active'")['c'] ?? 0),
             'members_expired' => (int) ($this->db->fetch("SELECT COUNT(*) c FROM members WHERE status = 'expired'")['c'] ?? 0),
+            'members_suspended' => (int) ($this->db->fetch("SELECT COUNT(*) c FROM members WHERE status = 'suspended'")['c'] ?? 0),
             'overdue_count' => (int) ($this->db->fetch('SELECT COUNT(*) c FROM members WHERE balance_due > 0')['c'] ?? 0),
             'members_settled' => (int) ($this->db->fetch('SELECT COUNT(*) c FROM members WHERE balance_due <= 0')['c'] ?? 0),
             'new_members_year' => (int) ($this->db->fetch(

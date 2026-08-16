@@ -125,15 +125,7 @@ $defaultTab = $tabs[0]['id'] ?? '';
                 </div>
             </div>
 
-            <div class="stats">
-                <div class="stat">
-                    <div class="label"><?= e(__('dashboard.members_active')) ?></div>
-                    <div class="value"><?= (int) ($stats['members_active'] ?? 0) ?></div>
-                </div>
-                <div class="stat">
-                    <div class="label"><?= e(__('dashboard.members_expired')) ?></div>
-                    <div class="value"><?= (int) ($stats['members_expired'] ?? 0) ?></div>
-                </div>
+            <div class="stats stats-context-members" data-stats-context="members">
                 <div class="stat">
                     <div class="label"><?= e(__('dashboard.members_total')) ?></div>
                     <div class="value"><?= (int) ($stats['members_total'] ?? 0) ?></div>
@@ -143,20 +135,32 @@ $defaultTab = $tabs[0]['id'] ?? '';
                     <div class="value"><?= (int) ($stats['overdue_count'] ?? 0) ?></div>
                 </div>
                 <div class="stat">
-                    <div class="label"><?= e(__('dashboard.collected_year')) ?></div>
-                    <div class="value"><?= e(number_format((float) ($stats['collected_year'] ?? 0), 2, ',', '.')) ?> €</div>
-                </div>
-                <div class="stat">
                     <div class="label"><?= e(__('dashboard.collected_month')) ?></div>
                     <div class="value"><?= e(number_format((float) ($stats['collected_month'] ?? 0), 2, ',', '.')) ?> €</div>
                 </div>
                 <div class="stat">
-                    <div class="label"><?= e(__('dashboard.new_members_year')) ?></div>
-                    <div class="value"><?= (int) ($stats['new_members_year'] ?? 0) ?></div>
+                    <div class="label"><?= e(__('dashboard.members_active')) ?></div>
+                    <div class="value"><?= (int) ($stats['members_active'] ?? 0) ?></div>
                 </div>
                 <div class="stat">
                     <div class="label"><?= e(__('dashboard.members_settled')) ?></div>
                     <div class="value"><?= (int) ($stats['members_settled'] ?? 0) ?></div>
+                </div>
+                <div class="stat">
+                    <div class="label"><?= e(__('dashboard.collected_year')) ?></div>
+                    <div class="value"><?= e(number_format((float) ($stats['collected_year'] ?? 0), 2, ',', '.')) ?> €</div>
+                </div>
+                <div class="stat">
+                    <div class="label"><?= e(__('dashboard.members_expired')) ?></div>
+                    <div class="value"><?= (int) ($stats['members_expired'] ?? 0) ?></div>
+                </div>
+                <div class="stat">
+                    <div class="label"><?= e(__('dashboard.members_suspended')) ?></div>
+                    <div class="value"><?= (int) ($stats['members_suspended'] ?? 0) ?></div>
+                </div>
+                <div class="stat">
+                    <div class="label"><?= e(__('dashboard.new_members_year')) ?></div>
+                    <div class="value"><?= (int) ($stats['new_members_year'] ?? 0) ?></div>
                 </div>
             </div>
 
@@ -169,7 +173,7 @@ $defaultTab = $tabs[0]['id'] ?? '';
                 </div>
             <?php else: ?>
                 <div class="charts" data-dashboard-charts="<?= e($chartsJson) ?>" data-chart-i18n="<?= e($chartI18n) ?>">
-                    <div class="panel chart-panel chart-panel-wide">
+                    <div class="panel chart-panel chart-panel-wide chart-panel-primary">
                         <div class="panel-header">
                             <div>
                                 <h2 class="section-title"><?= e(__('dashboard.chart_collections_title')) ?></h2>
@@ -234,7 +238,7 @@ $defaultTab = $tabs[0]['id'] ?? '';
                 <a class="btn btn-ghost btn-sm" href="<?= e(url('/treasury')) ?>"><?= e(__('dashboard.open_treasury')) ?></a>
             </div>
 
-            <div class="stats">
+            <div class="stats stats-context-treasury" data-stats-context="treasury">
                 <div class="stat">
                     <div class="label"><?= e(__('dashboard.treasury_balance')) ?></div>
                     <div class="value"><?= e(number_format((float) ($widgets['treasury']['balance'] ?? 0), 2, ',', '.')) ?> €</div>
@@ -254,7 +258,7 @@ $defaultTab = $tabs[0]['id'] ?? '';
                 data-treasury-charts="<?= e($treasuryChartsJson ?? '{}') ?>"
                 data-treasury-chart-i18n="<?= e($treasuryChartI18n ?? '{}') ?>"
             >
-                <div class="panel chart-panel">
+                <div class="panel chart-panel chart-panel-primary">
                     <div class="panel-header">
                         <div>
                             <h3 class="section-title"><?= e(__('dashboard.treasury_chart_flow_title')) ?></h3>
@@ -362,7 +366,7 @@ $defaultTab = $tabs[0]['id'] ?? '';
                 <a class="btn btn-ghost btn-sm" href="<?= e(url('/deadlines')) ?>"><?= e(__('dashboard.open_deadlines')) ?></a>
             </div>
 
-            <div class="stats">
+            <div class="stats stats-context-deadlines" data-stats-context="deadlines">
                 <div class="stat">
                     <div class="label"><?= e(__('dashboard.deadlines_overdue')) ?></div>
                     <div class="value stat-negative"><?= (int) ($widgets['deadlines']['counts']['overdue'] ?? 0) ?></div>
@@ -435,7 +439,7 @@ $defaultTab = $tabs[0]['id'] ?? '';
                 <a class="btn btn-ghost btn-sm" href="<?= e(url('/documents')) ?>"><?= e(__('dashboard.open_documents')) ?></a>
             </div>
 
-            <div class="stats">
+            <div class="stats stats-context-documents" data-stats-context="documents">
                 <div class="stat">
                     <div class="label"><?= e(__('dashboard.documents_total')) ?></div>
                     <div class="value"><?= (int) ($widgets['documents']['total'] ?? 0) ?></div>
@@ -506,7 +510,7 @@ $defaultTab = $tabs[0]['id'] ?? '';
                 <a class="btn btn-ghost btn-sm" href="<?= e(url('/org')) ?>"><?= e(__('dashboard.open_org')) ?></a>
             </div>
 
-            <div class="stats">
+            <div class="stats stats-context-org" data-stats-context="org">
                 <div class="stat">
                     <div class="label"><?= e(__('dashboard.org_people')) ?></div>
                     <div class="value"><?= (int) ($widgets['org']['people_count'] ?? 0) ?></div>
