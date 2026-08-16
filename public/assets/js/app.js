@@ -569,6 +569,27 @@ function initAuthLoginI18nLive() {
 
   const loginLang = document.querySelector('[data-login-lang]');
   const setupLink = document.querySelector('[data-setup-lang-link]');
+  const flagButtons = [...select.querySelectorAll('[data-set-lang]')];
+
+  const currentLang = () => {
+    if (select.tagName === 'SELECT') {
+      return select.value;
+    }
+    return String(select.dataset.langValue || loginLang?.value || 'it');
+  };
+
+  const setCurrentLang = (lang) => {
+    if (select.tagName === 'SELECT') {
+      select.value = lang;
+      return;
+    }
+    select.dataset.langValue = lang;
+    flagButtons.forEach((btn) => {
+      const on = btn.dataset.setLang === lang;
+      btn.classList.toggle('is-active', on);
+      btn.setAttribute('aria-pressed', on ? 'true' : 'false');
+    });
+  };
 
   // Rotazione “Scegli la lingua” (fade).
   const rotator = document.querySelector('.auth-lang-rotate');
@@ -581,7 +602,7 @@ function initAuthLoginI18nLive() {
     rotateItems.forEach((el, n) => el.classList.toggle('is-active', n === rotateIndex));
   };
   if (rotateItems.length > 0) {
-    const selectedIdx = rotateItems.findIndex((el) => el.dataset.rotateLang === select.value);
+    const selectedIdx = rotateItems.findIndex((el) => el.dataset.rotateLang === currentLang());
     showRotate(selectedIdx >= 0 ? selectedIdx : rotateIndex);
     setInterval(() => showRotate(rotateIndex + 1), 2600);
   }
@@ -638,6 +659,21 @@ function initAuthLoginI18nLive() {
       select.setAttribute('aria-label', chooseLabel);
     }
 
+    // Keep flag hover labels translated when available.
+    const flagLabels = {
+      it: getByPath(messages, 'members.lang_it') || 'Italiano',
+      de: getByPath(messages, 'members.lang_de') || 'Deutsch',
+      en: getByPath(messages, 'members.lang_en') || 'English',
+    };
+    flagButtons.forEach((btn) => {
+      const code = btn.dataset.setLang || '';
+      const label = flagLabels[code];
+      if (typeof label === 'string' && label !== '') {
+        btn.title = label;
+        btn.setAttribute('aria-label', label);
+      }
+    });
+
     document.documentElement.setAttribute('lang', lang);
   };
 
@@ -653,9 +689,10 @@ function initAuthLoginI18nLive() {
       }
     }
   };
-  syncLinks(select.value);
+  syncLinks(currentLang());
 
   const load = async (lang) => {
+    setCurrentLang(lang);
     syncLinks(lang);
     try {
       const res = await fetch(`${endpointBase}?lang=${encodeURIComponent(lang)}`, {
@@ -676,7 +713,17 @@ function initAuthLoginI18nLive() {
     }
   };
 
-  select.addEventListener('change', () => load(select.value));
+  if (select.tagName === 'SELECT') {
+    select.addEventListener('change', () => load(select.value));
+  } else {
+    flagButtons.forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const lang = btn.dataset.setLang || 'it';
+        if (lang === currentLang()) return;
+        load(lang);
+      });
+    });
+  }
 }
 
 function initSetupWizard() {

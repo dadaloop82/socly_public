@@ -83,7 +83,7 @@ $labels = [
                 <label><?= e(__('install.locale')) ?></label>
                 <select name="locale">
                     <?php foreach (['it','de','en'] as $loc): ?>
-                        <option value="<?= $loc ?>" <?= old('locale', $data['locale'] ?? 'it') === $loc ? 'selected' : '' ?>><?= strtoupper($loc) ?></option>
+                        <option value="<?= $loc ?>" <?= old('locale', $data['locale'] ?? 'it') === $loc ? 'selected' : '' ?>><?= e(match ($loc) { 'it' => '🇮🇹 Italiano', 'de' => '🇩🇪 Deutsch', default => '🇬🇧 English' }) ?></option>
                     <?php endforeach; ?>
                 </select>
             </div>
