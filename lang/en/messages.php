@@ -115,6 +115,8 @@ return [
         'title' => 'Overview',
         'title_of' => 'Overview of',
         'lede' => 'Pick an enabled module to see its metrics, lists and charts.',
+        'tabs_scroll_prev' => 'Scroll tabs left',
+        'tabs_scroll_next' => 'Scroll tabs right',
         'tab_members_lede' => 'Membership status, dues and trends.',
         'tab_treasury_lede' => 'Balance and latest cash movements.',
         'tab_deadlines_lede' => 'Open deadlines and upcoming priorities.',

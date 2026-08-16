@@ -115,6 +115,8 @@ return [
         'title' => 'Übersicht',
         'title_of' => 'Übersicht von',
         'lede' => 'Wählen Sie ein aktives Modul für Kennzahlen, Listen und Diagramme.',
+        'tabs_scroll_prev' => 'Tabs nach links scrollen',
+        'tabs_scroll_next' => 'Tabs nach rechts scrollen',
         'tab_members_lede' => 'Mitgliederstatus, Beiträge und Trends.',
         'tab_treasury_lede' => 'Saldo und letzte Kassenbewegungen.',
         'tab_deadlines_lede' => 'Offene Fristen und anstehende Prioritäten.',

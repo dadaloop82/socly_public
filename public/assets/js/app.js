@@ -3788,6 +3788,48 @@ function initDashboardTabs() {
 
   const validIds = new Set(tabs.map((tab) => tab.getAttribute('data-dashboard-tab')));
   const defaultTab = root.getAttribute('data-default-tab') || tabs[0].getAttribute('data-dashboard-tab');
+  const tablist = root.querySelector('[data-dashboard-tablist]') || root.querySelector('.dashboard-tablist');
+  const tablistWrap = root.querySelector('[data-dashboard-tablist-wrap]');
+  const prevBtn = root.querySelector('[data-dashboard-tablist-prev]');
+  const nextBtn = root.querySelector('[data-dashboard-tablist-next]');
+
+  const syncTablistOverflow = () => {
+    if (!tablist || !tablistWrap) {
+      return;
+    }
+    const maxScroll = Math.max(0, tablist.scrollWidth - tablist.clientWidth);
+    const canScroll = maxScroll > 4;
+    const atStart = tablist.scrollLeft <= 2;
+    const atEnd = tablist.scrollLeft >= maxScroll - 2;
+    tablistWrap.classList.toggle('is-scrollable', canScroll);
+    tablistWrap.classList.toggle('is-fade-start', canScroll && !atStart);
+    tablistWrap.classList.toggle('is-fade-end', canScroll && !atEnd);
+    if (prevBtn) {
+      prevBtn.hidden = !(canScroll && !atStart);
+    }
+    if (nextBtn) {
+      nextBtn.hidden = !(canScroll && !atEnd);
+    }
+  };
+
+  const scrollTablistBy = (direction) => {
+    if (!tablist) {
+      return;
+    }
+    const amount = Math.max(120, Math.round(tablist.clientWidth * 0.55)) * direction;
+    tablist.scrollBy({ left: amount, behavior: 'smooth' });
+  };
+
+  if (tablist) {
+    tablist.addEventListener('scroll', () => {
+      window.requestAnimationFrame(syncTablistOverflow);
+    }, { passive: true });
+  }
+  prevBtn?.addEventListener('click', () => scrollTablistBy(-1));
+  nextBtn?.addEventListener('click', () => scrollTablistBy(1));
+  window.addEventListener('resize', () => {
+    window.requestAnimationFrame(syncTablistOverflow);
+  }, { passive: true });
 
   const activate = (id, { updateHash = true } = {}) => {
     if (!validIds.has(id)) {
@@ -3811,6 +3853,7 @@ function initDashboardTabs() {
         history.replaceState(null, '', nextHash);
       }
     }
+    window.requestAnimationFrame(syncTablistOverflow);
     if (id === 'members') {
       window.requestAnimationFrame(() => initDashboardCharts());
     }
@@ -3862,6 +3905,7 @@ function initDashboardTabs() {
 
   const initial = idFromHash();
   activate(initial && validIds.has(initial) ? initial : defaultTab, { updateHash: !initial });
+  window.requestAnimationFrame(syncTablistOverflow);
 }
 
 function initDashboardCharts() {

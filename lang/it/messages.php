@@ -117,6 +117,8 @@ return [
         'title' => 'Panoramica',
         'title_of' => 'Panoramica di',
         'lede' => 'Scegli un modulo attivo per vedere metriche, elenchi e grafici dedicati.',
+        'tabs_scroll_prev' => 'Scorri schede a sinistra',
+        'tabs_scroll_next' => 'Scorri schede a destra',
         'tab_members_lede' => 'Stato anagrafica, quote e andamenti.',
         'tab_treasury_lede' => 'Saldo e ultimi movimenti di cassa.',
         'tab_deadlines_lede' => 'Scadenze aperte e priorità imminenti.',

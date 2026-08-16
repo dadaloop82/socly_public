@@ -78,21 +78,29 @@ $defaultTab = $tabs[0]['id'] ?? '';
 <?php else: ?>
 
 <div class="dashboard-tabs" data-dashboard-tabs data-default-tab="<?= e($defaultTab) ?>">
-    <div class="dashboard-tablist" role="tablist" aria-label="<?= e(__('dashboard.title')) ?>">
-        <?php foreach ($tabs as $i => $tab): ?>
-            <button
-                type="button"
-                class="dashboard-tab"
-                role="tab"
-                id="dashboard-tab-<?= e($tab['id']) ?>"
-                data-dashboard-tab="<?= e($tab['id']) ?>"
-                aria-controls="dashboard-panel-<?= e($tab['id']) ?>"
-                aria-selected="<?= $i === 0 ? 'true' : 'false' ?>"
-                tabindex="<?= $i === 0 ? '0' : '-1' ?>"
-            >
-                <?= e($tab['label']) ?>
-            </button>
-        <?php endforeach; ?>
+    <div class="dashboard-tablist-wrap" data-dashboard-tablist-wrap>
+        <button type="button" class="dashboard-tablist-nav dashboard-tablist-nav-prev" data-dashboard-tablist-prev hidden aria-label="<?= e(__('dashboard.tabs_scroll_prev')) ?>">
+            <span aria-hidden="true"></span>
+        </button>
+        <div class="dashboard-tablist" role="tablist" aria-label="<?= e(__('dashboard.title')) ?>" data-dashboard-tablist>
+            <?php foreach ($tabs as $i => $tab): ?>
+                <button
+                    type="button"
+                    class="dashboard-tab"
+                    role="tab"
+                    id="dashboard-tab-<?= e($tab['id']) ?>"
+                    data-dashboard-tab="<?= e($tab['id']) ?>"
+                    aria-controls="dashboard-panel-<?= e($tab['id']) ?>"
+                    aria-selected="<?= $i === 0 ? 'true' : 'false' ?>"
+                    tabindex="<?= $i === 0 ? '0' : '-1' ?>"
+                >
+                    <?= e($tab['label']) ?>
+                </button>
+            <?php endforeach; ?>
+        </div>
+        <button type="button" class="dashboard-tablist-nav dashboard-tablist-nav-next" data-dashboard-tablist-next hidden aria-label="<?= e(__('dashboard.tabs_scroll_next')) ?>">
+            <span aria-hidden="true"></span>
+        </button>
     </div>
 
     <?php if (!empty($enabled['members'])): ?>
