@@ -84,6 +84,7 @@ final class MemberController extends BaseController
             'payments' => [],
             'legal' => $this->legalDocuments(),
             'enrollmentMethod' => $this->enrollment->method(),
+            'hasEnrollmentArtifact' => false,
         ]);
     }
 
@@ -131,10 +132,12 @@ final class MemberController extends BaseController
             return;
         }
         $this->render('members/show', [
-            'title' => __('members.show'),
+            'title' => __('members.scheda'),
             'member' => $member,
-            'fieldDefs' => $this->members->fieldDefinitions(false),
+            'fieldDefs' => $this->members->fieldDefinitions(true),
             'payments' => $this->payments->forMember((int) $id),
+            'enrollmentMethod' => $this->enrollment->method(),
+            'enrollmentArtifact' => $this->enrollment->latestArtifact((int) $id),
         ]);
     }
 
@@ -161,6 +164,8 @@ final class MemberController extends BaseController
             'nextNumber' => $member['member_number'],
             'payments' => $this->payments->forMember((int) $id),
             'legal' => $this->legalDocuments(),
+            'enrollmentMethod' => $this->enrollment->method(),
+            'hasEnrollmentArtifact' => $this->enrollment->hasArtifact((int) $id),
         ]);
     }
 
@@ -171,10 +176,24 @@ final class MemberController extends BaseController
         $fieldData = $data['fields'] ?? [];
         unset($fieldData['photo']);
         $this->rememberOld($data);
-        $result = $this->members->update((int) $id, $data, $fieldData, $request->ip(), $request->nestedFile('fields', 'photo'));
+        $memberId = (int) $id;
+        $needsEnrollment = $this->enrollment->enrollmentRequired()
+            && !$this->enrollment->hasArtifact($memberId);
+        $scan = $request->file('enrollment_scan');
+        if ($needsEnrollment) {
+            $check = $this->enrollment->validateCreatePayload($data, $scan);
+            if (!$check['ok']) {
+                $this->flash('errors', $check['errors'] ?? []);
+                redirect('/members/' . $id . '/edit');
+            }
+        }
+        $result = $this->members->update($memberId, $data, $fieldData, $request->ip(), $request->nestedFile('fields', 'photo'));
         if (!$result['ok']) {
             $this->flash('errors', $result['errors']);
             redirect('/members/' . $id . '/edit');
+        }
+        if ($needsEnrollment) {
+            $this->enrollment->storeArtifact($memberId, $data, $scan, $request->ip());
         }
         $this->clearOld();
         $this->flash('success', __('members.updated'));
@@ -192,6 +211,30 @@ final class MemberController extends BaseController
         }
         $relative = (string) ($member['fields']['photo'] ?? '');
         $absolute = $this->members->memberPhotoAbsolutePath($relative);
+        if (!$absolute) {
+            http_response_code(404);
+            echo 'Not found';
+            return;
+        }
+        $mime = mime_content_type($absolute) ?: 'application/octet-stream';
+        header('Content-Type: ' . $mime);
+        header('Content-Length: ' . (string) filesize($absolute));
+        header('Cache-Control: private, max-age=3600');
+        readfile($absolute);
+    }
+
+    public function enrollmentArtifact(Request $request, string $id): void
+    {
+        $this->guardMembers();
+        $artifact = $this->enrollment->latestArtifact((int) $id);
+        if (!$artifact) {
+            http_response_code(404);
+            echo 'Not found';
+            return;
+        }
+        $absolute = $this->enrollment->absoluteArtifactPath(
+            isset($artifact['storage_path']) ? (string) $artifact['storage_path'] : null
+        );
         if (!$absolute) {
             http_response_code(404);
             echo 'Not found';

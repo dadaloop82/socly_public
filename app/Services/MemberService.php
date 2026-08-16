@@ -592,6 +592,8 @@ final class MemberService
             $item['payment_status'] = $this->paymentStatus($item);
             $item['fields'] = $this->fieldValues((int) $item['id']);
         }
+        unset($item);
+        $this->attachComplianceIssues($items);
         return ['items' => $items, 'total' => $total];
     }
 
@@ -610,7 +612,115 @@ final class MemberService
         }
         $member['payment_status'] = $this->paymentStatus($member);
         $member['fields'] = $this->fieldValues($id);
-        return $member;
+        $list = [$member];
+        $this->attachComplianceIssues($list);
+        return $list[0];
+    }
+
+    /**
+     * Missing required fields / enrollment attestation for existing members
+     * after rules changed (e.g. signature required, new mandatory fields).
+     *
+     * @param array<string,mixed> $member Must include id + fields
+     * @param array<string,mixed>|null $ctx Preloaded defs/enrollment map
+     * @return list<array{code:string,label:string,field?:string}>
+     */
+    public function complianceIssues(array $member, ?array $ctx = null): array
+    {
+        $issues = [];
+        $fields = is_array($member['fields'] ?? null) ? $member['fields'] : [];
+        $defs = $ctx['defs'] ?? $this->fieldDefinitions(true);
+        $gdprEnabled = $ctx['gdpr'] ?? $this->isGdprEnabled();
+        $enrollment = $ctx['enrollment'] ?? null;
+        if (!is_array($enrollment)) {
+            try {
+                $enrollment = app(EnrollmentService::class);
+            } catch (\Throwable) {
+                $enrollment = null;
+            }
+        }
+        $method = is_object($enrollment) ? $enrollment->method() : 'none';
+        $hasArtifact = $ctx['has_artifact'] ?? null;
+        if ($hasArtifact === null && is_object($enrollment) && isset($member['id'])) {
+            $hasArtifact = $enrollment->hasArtifact((int) $member['id']);
+        }
+
+        foreach ($defs as $def) {
+            $key = (string) ($def['key'] ?? '');
+            if ($key === '') {
+                continue;
+            }
+            $type = MemberFieldTypes::resolve((string) ($def['field_type'] ?? 'text'), $key);
+            if ($type === MemberFieldTypes::PHOTO) {
+                continue;
+            }
+            if ($key === 'privacy_ack' && !$gdprEnabled) {
+                continue;
+            }
+            if ((int) ($def['is_required'] ?? 0) !== 1) {
+                continue;
+            }
+            $raw = $fields[$key] ?? null;
+            $label = localized($def['label_json'] ?? $key) ?: $key;
+            $missing = false;
+            if ($type === MemberFieldTypes::CHECKBOX) {
+                $missing = !($raw === true || $raw === 1 || $raw === '1' || $raw === 'on' || $raw === 'yes');
+            } else {
+                $missing = $raw === null || (is_string($raw) && trim($raw) === '');
+            }
+            if ($missing) {
+                $issues[] = [
+                    'code' => 'missing_field',
+                    'field' => $key,
+                    'label' => __('members.anomaly_missing_field', ['field' => $label]),
+                ];
+            }
+        }
+
+        if ($method !== 'none' && !$hasArtifact) {
+            $issues[] = [
+                'code' => 'missing_enrollment',
+                'field' => 'enrollment',
+                'label' => match ($method) {
+                    'tablet_sign' => __('members.anomaly_missing_signature'),
+                    'print_scan' => __('members.anomaly_missing_scan'),
+                    'otp_email' => __('members.anomaly_missing_otp'),
+                    default => __('members.anomaly_missing_enrollment'),
+                },
+            ];
+        }
+
+        return $issues;
+    }
+
+    /**
+     * @param list<array<string,mixed>> $members
+     */
+    public function attachComplianceIssues(array &$members): void
+    {
+        if ($members === []) {
+            return;
+        }
+        $defs = $this->fieldDefinitions(true);
+        $gdpr = $this->isGdprEnabled();
+        $enrollment = null;
+        try {
+            $enrollment = app(EnrollmentService::class);
+        } catch (\Throwable) {
+            $enrollment = null;
+        }
+        $ids = array_map(static fn (array $m): int => (int) ($m['id'] ?? 0), $members);
+        $artifactMap = is_object($enrollment) ? $enrollment->artifactPresenceMap($ids) : [];
+        foreach ($members as &$member) {
+            $mid = (int) ($member['id'] ?? 0);
+            $member['compliance_issues'] = $this->complianceIssues($member, [
+                'defs' => $defs,
+                'gdpr' => $gdpr,
+                'enrollment' => $enrollment,
+                'has_artifact' => $artifactMap[$mid] ?? false,
+            ]);
+        }
+        unset($member);
     }
 
     /** @return array<string,string|null> */

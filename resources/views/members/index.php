@@ -11,19 +11,32 @@
     </div>
 </div>
 
-<form class="panel filter-bar" method="get">
-    <div class="panel-header">
+<form class="panel filter-bar members-filter" method="get">
+    <div class="panel-header members-filter-head">
         <div>
             <h2 class="section-title"><?= e(__('members.search')) ?></h2>
             <p class="section-lede"><?= e(__('members.filter_lede')) ?></p>
         </div>
-        <button class="btn btn-sm" type="submit"><?= e(__('members.search')) ?></button>
+        <button class="btn btn-sm members-filter-submit-desktop" type="submit"><?= e(__('members.search')) ?></button>
     </div>
-    <div class="grid-3">
-        <div>
-            <label><?= e(__('members.search')) ?></label>
-            <input type="text" name="q" value="<?= e($filters['q']) ?>" placeholder="<?= e(__('members.search_placeholder')) ?>">
+    <div class="members-filter-q">
+        <label class="members-filter-q-label" for="members-q"><?= e(__('members.search')) ?></label>
+        <div class="members-filter-q-row">
+            <input
+                id="members-q"
+                type="search"
+                name="q"
+                value="<?= e($filters['q']) ?>"
+                placeholder="<?= e(__('members.search_placeholder')) ?>"
+                data-placeholder-desktop="<?= e(__('members.search_placeholder')) ?>"
+                data-placeholder-mobile="<?= e(__('members.search_placeholder_mobile')) ?>"
+                enterkeyhint="search"
+                autocomplete="off"
+            >
+            <button class="btn btn-sm members-filter-submit-mobile" type="submit"><?= e(__('members.search')) ?></button>
         </div>
+    </div>
+    <div class="members-filter-extra grid-3">
         <div>
             <label><?= e(__('members.status')) ?></label>
             <select name="status">
@@ -42,15 +55,15 @@
                 <?php endforeach; ?>
             </select>
         </div>
-    </div>
-    <div>
-        <label><?= e(__('members.type')) ?></label>
-        <select name="member_type_id">
-            <option value="">—</option>
-            <?php foreach ($types as $type): ?>
-                <option value="<?= (int)$type['id'] ?>" <?= (string)$filters['member_type_id']===(string)$type['id']?'selected':'' ?>><?= e(localized($type['name_json'])) ?></option>
-            <?php endforeach; ?>
-        </select>
+        <div>
+            <label><?= e(__('members.type')) ?></label>
+            <select name="member_type_id">
+                <option value="">—</option>
+                <?php foreach ($types as $type): ?>
+                    <option value="<?= (int)$type['id'] ?>" <?= (string)$filters['member_type_id']===(string)$type['id']?'selected':'' ?>><?= e(localized($type['name_json'])) ?></option>
+                <?php endforeach; ?>
+            </select>
+        </div>
     </div>
 </form>
 
@@ -67,8 +80,8 @@
             <?= e(__('members.empty_text')) ?>
         </div>
     <?php else: ?>
-        <div class="table-wrap embedded">
-            <table>
+        <div class="table-wrap embedded members-table-wrap">
+            <table class="members-table">
                 <thead>
                 <tr>
                     <th><?= e(__('members.member_number')) ?></th>
@@ -81,16 +94,52 @@
                 </thead>
                 <tbody>
                 <?php foreach ($result['items'] as $item): ?>
-                    <tr>
-                        <td>
-                            <a href="<?= e(url('/members/'.$item['id'])) ?>"><?= e($item['member_number']) ?></a>
-                            <div class="muted"><?= e(trim(($item['fields']['first_name'] ?? '').' '.($item['fields']['last_name'] ?? ''))) ?></div>
+                    <?php
+                    $issues = is_array($item['compliance_issues'] ?? null) ? $item['compliance_issues'] : [];
+                    $issueLabels = array_values(array_filter(array_map(
+                        static fn ($i) => trim((string) ($i['label'] ?? '')),
+                        $issues
+                    )));
+                    $issueText = implode("\n", $issueLabels);
+                    $fullName = trim(($item['fields']['first_name'] ?? '') . ' ' . ($item['fields']['last_name'] ?? ''));
+                    ?>
+                    <tr<?= $issueLabels !== [] ? ' class="member-row-anomaly"' : '' ?>>
+                        <td data-label="<?= e(__('members.member_number')) ?>">
+                            <div class="member-list-identity">
+                                <?php if ($issueLabels !== []): ?>
+                                    <span
+                                        class="member-anomaly-mark"
+                                        tabindex="0"
+                                        role="img"
+                                        aria-label="<?= e(__('members.anomaly_aria') . ': ' . implode('; ', $issueLabels)) ?>"
+                                        title="<?= e($issueText) ?>"
+                                    >
+                                        <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true" focusable="false">
+                                            <path fill="currentColor" d="M12 3.2 22 20.5H2L12 3.2zm0 5.3c-.7 0-1.2.5-1.1 1.2l.4 5.1h1.4l.4-5.1c.1-.7-.4-1.2-1.1-1.2zm0 8.3a1.15 1.15 0 1 0 0 2.3 1.15 1.15 0 0 0 0-2.3z"/>
+                                        </svg>
+                                        <span class="member-anomaly-tooltip"><?= e(implode(' · ', $issueLabels)) ?></span>
+                                    </span>
+                                <?php endif; ?>
+                                <div>
+                                    <a class="member-list-name" href="<?= e(url('/members/'.$item['id'])) ?>">
+                                        <?= e($fullName !== '' ? $fullName : $item['member_number']) ?>
+                                    </a>
+                                    <div class="muted member-list-meta">#<?= e($item['member_number']) ?></div>
+                                </div>
+                            </div>
                         </td>
-                        <td><?= e(localized($item['type_name_json'])) ?></td>
-                        <td><span class="badge"><?= e(__('members.status_'.$item['status'])) ?></span></td>
-                        <td><span class="badge <?= $item['payment_status']==='paid'?'badge-ok':($item['payment_status']==='due'?'badge-due':'badge-warn') ?>"><?= e(__('members.payment_'.$item['payment_status'])) ?></span></td>
-                        <td><?= e(number_format((float)$item['balance_due'], 2, ',', '.')) ?></td>
-                        <td><a class="btn btn-ghost btn-sm" href="<?= e(url('/members/'.$item['id'].'/edit')) ?>"><?= e(__('members.edit')) ?></a></td>
+                        <td data-label="<?= e(__('members.type')) ?>"><?= e(localized($item['type_name_json'])) ?></td>
+                        <td data-label="<?= e(__('members.status')) ?>"><span class="badge"><?= e(__('members.status_'.$item['status'])) ?></span></td>
+                        <td data-label="<?= e(__('members.payment')) ?>"><span class="badge <?= $item['payment_status']==='paid'?'badge-ok':($item['payment_status']==='due'?'badge-due':'badge-warn') ?>"><?= e(__('members.payment_'.$item['payment_status'])) ?></span></td>
+                        <td data-label="<?= e(__('members.balance_due')) ?>"><?= e(number_format((float)$item['balance_due'], 2, ',', '.')) ?> €</td>
+                        <td data-label="<?= e(__('members.actions')) ?>">
+                            <div class="member-row-actions">
+                                <a class="btn btn-ghost btn-sm" href="<?= e(url('/members/'.$item['id'])) ?>"><?= e(__('members.scheda')) ?></a>
+                                <?php if (can('members.manage')): ?>
+                                    <a class="btn btn-ghost btn-sm" href="<?= e(url('/members/'.$item['id'].'/edit')) ?>"><?= e(__('members.edit_short')) ?></a>
+                                <?php endif; ?>
+                            </div>
+                        </td>
                     </tr>
                 <?php endforeach; ?>
                 </tbody>

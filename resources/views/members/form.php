@@ -3,7 +3,9 @@ $isEdit = $member !== null;
 $fieldValues = $member['fields'] ?? [];
 $oldFields = $_SESSION['_old']['fields'] ?? [];
 $enrollmentMethod = (string) ($enrollmentMethod ?? 'none');
-$needsEnrollment = !$isEdit && $enrollmentMethod !== '' && $enrollmentMethod !== 'none';
+$hasEnrollmentArtifact = !empty($hasEnrollmentArtifact);
+$needsEnrollment = $enrollmentMethod !== '' && $enrollmentMethod !== 'none'
+    && (!$isEdit || !$hasEnrollmentArtifact);
 
 $formSteps = is_array($formSteps ?? null) ? $formSteps : [];
 $formSteps = array_values(array_filter($formSteps, static function ($step): bool {
@@ -776,12 +778,11 @@ $paymentExtraHtml = $buildProfileFieldsHtml($paymentExtraFields);
         <?php endif; ?>
     </section>
 
-    <?php if (!$isEdit): ?>
     <?php if ($needsEnrollment): ?>
     <section class="wizard-panel" data-wizard-panel="<?= (int) $enrollmentStep ?>" hidden>
         <div class="wizard-panel-head">
             <h2 class="section-title"><?= e(__('members.wizard_enrollment_title')) ?></h2>
-            <p class="section-lede"><?= e(__('members.wizard_enrollment_lede')) ?></p>
+            <p class="section-lede"><?= e($isEdit ? __('members.wizard_enrollment_fix_lede') : __('members.wizard_enrollment_lede')) ?></p>
         </div>
         <input type="hidden" name="enrollment_method" value="<?= e($enrollmentMethod) ?>">
 
@@ -812,7 +813,6 @@ $paymentExtraHtml = $buildProfileFieldsHtml($paymentExtraFields);
             </div>
         <?php endif; ?>
     </section>
-    <?php endif; ?>
     <?php endif; ?>
 
     <div class="wizard-actions">

@@ -144,9 +144,75 @@ final class EnrollmentService
         ];
     }
 
+    public function hasArtifact(int $memberId): bool
+    {
+        try {
+            $row = $this->db->fetch(
+                'SELECT id FROM member_enrollment_artifacts WHERE member_id = :id LIMIT 1',
+                ['id' => $memberId]
+            );
+        } catch (\Throwable) {
+            return false;
+        }
+        return $row !== null;
+    }
+
+    /** @return array<string,mixed>|null */
+    public function latestArtifact(int $memberId): ?array
+    {
+        try {
+            return $this->db->fetch(
+                'SELECT * FROM member_enrollment_artifacts WHERE member_id = :id ORDER BY id DESC LIMIT 1',
+                ['id' => $memberId]
+            );
+        } catch (\Throwable) {
+            return null;
+        }
+    }
+
     /**
-     * @param array{name:string,type:string,tmp_name:string,error:int,size:int} $file
-     * @return array{path?:string,hash?:string}
+     * @param list<int> $memberIds
+     * @return array<int, true> member_id => true when an artifact exists
+     */
+    public function artifactPresenceMap(array $memberIds): array
+    {
+        $ids = array_values(array_unique(array_filter(array_map('intval', $memberIds), static fn (int $id): bool => $id > 0)));
+        if ($ids === []) {
+            return [];
+        }
+        $placeholders = implode(',', array_fill(0, count($ids), '?'));
+        try {
+            $rows = $this->db->fetchAll(
+                "SELECT DISTINCT member_id FROM member_enrollment_artifacts WHERE member_id IN ($placeholders)",
+                $ids
+            );
+        } catch (\Throwable) {
+            return [];
+        }
+        $map = [];
+        foreach ($rows as $row) {
+            $map[(int) ($row['member_id'] ?? 0)] = true;
+        }
+        return $map;
+    }
+
+    public function enrollmentRequired(): bool
+    {
+        return $this->method() !== 'none';
+    }
+
+    public function absoluteArtifactPath(?string $relative): ?string
+    {
+        $relative = trim((string) $relative);
+        if ($relative === '' || str_contains($relative, '..')) {
+            return null;
+        }
+        $absolute = storage_path('uploads/' . ltrim($relative, '/'));
+        return is_file($absolute) ? $absolute : null;
+    }
+
+    /**
+     * @param array{name:string,type:string,tmp_name:string,error:int,size:int}|null $scanFile
      */
     private function storeUpload(int $memberId, array $file, string $prefix): array
     {

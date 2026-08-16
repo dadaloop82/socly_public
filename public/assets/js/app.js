@@ -10,6 +10,7 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   initPageEnter();
+  initMembersFilterMobile();
   initMobileNav();
   initTopbarScroll();
   initSidebarDeadlines();
@@ -38,6 +39,19 @@ document.addEventListener('DOMContentLoaded', () => {
   initDeadlineCategory(document);
   initTreasuryCategory(document);
 });
+
+/** Compact members search placeholder on small screens. */
+function initMembersFilterMobile() {
+  const input = document.querySelector('.members-filter [name="q"]');
+  if (!(input instanceof HTMLInputElement)) return;
+  const desktop = input.dataset.placeholderDesktop || input.placeholder;
+  const mobile = input.dataset.placeholderMobile || desktop;
+  const sync = () => {
+    input.placeholder = window.matchMedia('(max-width: 640px)').matches ? mobile : desktop;
+  };
+  sync();
+  window.matchMedia('(max-width: 640px)').addEventListener('change', sync);
+}
 
 /**
  * Soft staggered entrance for page blocks (and as they scroll into view).
