@@ -1,0 +1,17 @@
+RewriteEngine On
+
+# Friendly page when the demo instance folder is missing / destroyed
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteCond %{DOCUMENT_ROOT}/$1/public/index.php !-f
+RewriteRule ^([a-f0-9]{10})(?:/.*)?$ /demo/expired.php?code=$1 [L,QSA]
+
+# /demo/{10-hex}/assets/... → instance assets
+RewriteCond %{DOCUMENT_ROOT}/$1/public/assets/$2 -f
+RewriteRule ^([a-f0-9]{10})/assets/(.*)$ $1/public/assets/$2 [L]
+
+# /demo/{10-hex}[/...] → instance public front controller
+RewriteCond %{DOCUMENT_ROOT}/$1/public/index.php -f
+RewriteRule ^([a-f0-9]{10})(?:/(.*))?$ $1/public/index.php [L,QSA]
+
+# Fallback if somehow unmatched
+RewriteRule ^([a-f0-9]{10})(?:/.*)?$ /demo/expired.php?code=$1 [L,QSA]

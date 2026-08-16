@@ -5,6 +5,7 @@
 $old = old_input();
 $values = $old !== [] ? $old : [
     'title' => (string) ($document['title'] ?? ''),
+    'document_number' => (string) ($document['document_number'] ?? ''),
     'document_date' => (string) ($document['document_date'] ?? ''),
     'language' => (string) ($document['language'] ?? ''),
     'category' => (string) ($document['category'] ?? 'minutes'),
@@ -29,6 +30,7 @@ $docId = (int) ($document['id'] ?? 0);
         <a class="btn btn-ghost" href="<?= e(url('/documents')) ?>"><?= e(__('common.back')) ?></a>
         <?php if (!empty($document['file_path'])): ?>
             <a class="btn btn-ghost" href="<?= e(url('/documents/' . $docId . '/file')) ?>" target="_blank" rel="noopener"><?= e(__('documents.open_file')) ?></a>
+            <a class="btn btn-ghost" href="<?= e(url('/documents/' . $docId . '/download')) ?>"><?= e(__('documents.download_file')) ?></a>
         <?php endif; ?>
     </div>
 </div>
@@ -39,6 +41,7 @@ $docId = (int) ($document['id'] ?? 0);
     action="<?= e(url('/documents/' . $docId)) ?>"
     enctype="multipart/form-data"
     data-document-form
+    data-leave-guard
     data-upload-url="<?= e(url('/documents/upload')) ?>"
     data-msg-idle="<?= e(__('documents.upload_idle')) ?>"
     data-msg-uploading="<?= e(__('documents.upload_busy')) ?>"
@@ -60,4 +63,8 @@ $docId = (int) ($document['id'] ?? 0);
     $has_existing_file = $hasExisting || (!empty($values['uploaded_path']));
     require __DIR__ . '/_form_fields.php';
     ?>
+    <div class="form-actions form-actions-end">
+        <a class="btn btn-ghost" href="<?= e(url('/documents')) ?>"><?= e(__('common.back')) ?></a>
+        <button class="btn" type="submit"><?= e(__('documents.update')) ?></button>
+    </div>
 </form>

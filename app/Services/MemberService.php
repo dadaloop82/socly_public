@@ -421,8 +421,8 @@ final class MemberService
             $typeRaw = (string) ($types[$key] ?? $field['field_type'] ?? MemberFieldTypes::TEXT);
             $type = $locked ?? MemberFieldTypes::resolve($typeRaw, $key);
             $core = MemberFieldTypes::isCoreArchiveField($key);
-            $isRequired = $core || in_array($key, $required, true);
             $isEnabled = $core || in_array($key, $enabled, true);
+            $isRequired = $isEnabled && ($core || in_array($key, $required, true));
             $payload = [
                 'field_type' => $type,
                 'validation_rule' => MemberFieldTypes::validationRule($type, $isRequired),
@@ -468,7 +468,8 @@ final class MemberService
             return ['ok' => false, 'errors' => ['new_key' => __('setup.fields_key_exists')]];
         }
 
-        $newRequired = !empty($input['new_required']);
+        $newEnabled = array_key_exists('new_enabled', $input) ? !empty($input['new_enabled']) : true;
+        $newRequired = $newEnabled && !empty($input['new_required']);
         $maxSort = (int) ($this->db->fetch('SELECT COALESCE(MAX(sort_order), 0) AS m FROM member_field_definitions')['m'] ?? 0);
         $newStep = $validSteps[0] ?? 'profile';
         $requestedStep = trim((string) ($input['new_step'] ?? ''));
@@ -488,7 +489,7 @@ final class MemberService
             ], JSON_UNESCAPED_UNICODE),
             'is_required' => $newRequired ? 1 : 0,
             'validation_rule' => MemberFieldTypes::validationRule($newType, $newRequired),
-            'is_enabled' => array_key_exists('new_enabled', $input) ? (!empty($input['new_enabled']) ? 1 : 0) : 1,
+            'is_enabled' => $newEnabled ? 1 : 0,
             'sort_order' => $maxSort + 10,
             'form_step' => $newStep,
         ]);

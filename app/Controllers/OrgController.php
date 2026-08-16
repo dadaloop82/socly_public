@@ -7,12 +7,14 @@ namespace Socly\Controllers;
 use Socly\Core\Http\Request;
 use Socly\Core\View;
 use Socly\Services\AssociationPeopleService;
+use Socly\Services\DeadlineService;
 
 final class OrgController extends BaseController
 {
     public function __construct(
         View $view,
-        private readonly AssociationPeopleService $people
+        private readonly AssociationPeopleService $people,
+        private readonly DeadlineService $deadlines
     ) {
         parent::__construct($view);
     }
@@ -116,6 +118,7 @@ final class OrgController extends BaseController
             $role = trim((string) $request->input('role_key', 'board'));
             redirect('/org/people/create?role=' . rawurlencode($role));
         }
+        $this->deadlines->syncSystemDeadlines();
         $this->flash('success', __('org.person_saved'));
         redirect('/org');
     }
@@ -130,6 +133,7 @@ final class OrgController extends BaseController
             $this->rememberOld($request->all());
             redirect('/org/people/' . (int) $id . '/edit');
         }
+        $this->deadlines->syncSystemDeadlines();
         $this->flash('success', __('org.person_saved'));
         redirect('/org');
     }
@@ -143,6 +147,7 @@ final class OrgController extends BaseController
             $this->flash('errors', $result['errors'] ?? []);
             redirect('/org/people/' . (int) $id . '/edit');
         }
+        $this->deadlines->syncSystemDeadlines();
         $this->flash('success', __('org.person_deleted'));
         redirect('/org');
     }

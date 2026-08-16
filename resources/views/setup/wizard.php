@@ -148,6 +148,7 @@ $errorStep = flash('setup_error_step');
                 action="<?= e(url('/setup')) ?>"
                 class="setup-form"
                 data-setup-form
+                data-leave-guard
                 data-cities-url="<?= e(url('/api/geo/cities')) ?>"
                 data-addresses-url="<?= e(url('/api/geo/addresses')) ?>"
                 data-cf-url="<?= e(url('/api/fiscal-code')) ?>"
@@ -188,11 +189,14 @@ $errorStep = flash('setup_error_step');
                             <?php endforeach; ?>
                         </div>
                     <?php endif; ?>
-                    <div class="setup-colors" data-setup-line>
+                    <div class="setup-colors setup-color-picker-grid" data-setup-line>
                         <?php foreach ($step['fields'] as $field): ?>
-                            <label class="setup-field">
+                            <label class="setup-field setup-color-picker-card">
                                 <span><?= e(__($field['label_key'])) ?></span>
-                                <input type="color" name="<?= e($field['key']) ?>" value="<?= e((string) ($value[$field['key']] ?? '#0D6E66')) ?>" required data-brand-color="<?= e($field['key']) ?>">
+                                <span class="setup-color-picker-control">
+                                    <input type="color" name="<?= e($field['key']) ?>" value="<?= e((string) ($value[$field['key']] ?? '#0D6E66')) ?>" required data-brand-color="<?= e($field['key']) ?>">
+                                    <code><?= e(strtoupper((string) ($value[$field['key']] ?? '#0D6E66'))) ?></code>
+                                </span>
                             </label>
                         <?php endforeach; ?>
                     </div>
@@ -226,14 +230,17 @@ $errorStep = flash('setup_error_step');
                     <div class="setup-name-pair" data-setup-line data-setup-name-pair
                          data-preview-template="<?= e(__('setup.full_name_preview')) ?>">
                         <?php foreach ($step['fields'] as $field): ?>
-                            <label class="setup-field<?= ($field['key'] ?? '') === 'legal_name' ? ' setup-field-legal' : ' setup-field-name' ?>">
+                            <label class="setup-field<?= ($field['key'] ?? '') === 'legal_name' ? ' setup-field-legal' : (($field['key'] ?? '') === 'currency' ? ' setup-field-currency' : ' setup-field-name') ?>">
                                 <span><?= e(__($field['label_key'])) ?></span>
                                 <?php if (($field['type'] ?? '') === 'select'): ?>
-                                    <select name="<?= e($field['key']) ?>" required maxlength="6" data-setup-legal-name>
-                                        <option value="" disabled <?= (($value[$field['key']] ?? '') === '') ? 'selected' : '' ?>><?= e(__('setup.legal_form_placeholder')) ?></option>
+                                    <?php $isCurrency = ($field['key'] ?? '') === 'currency'; ?>
+                                    <select name="<?= e($field['key']) ?>" required maxlength="6" <?= $isCurrency ? '' : 'data-setup-legal-name' ?>>
+                                        <?php if (!$isCurrency): ?>
+                                            <option value="" disabled <?= (($value[$field['key']] ?? '') === '') ? 'selected' : '' ?>><?= e(__('setup.legal_form_placeholder')) ?></option>
+                                        <?php endif; ?>
                                         <?php foreach ($field['options'] as $opt): ?>
                                             <option value="<?= e($opt['value']) ?>" <?= (string) ($value[$field['key']] ?? '') === $opt['value'] ? 'selected' : '' ?>>
-                                                <?= e($opt['value']) ?> — <?= e(__($opt['label_key'])) ?>
+                                                <?= e($opt['value']) ?><?= $isCurrency ? '' : ' — ' . e(__($opt['label_key'])) ?>
                                             </option>
                                         <?php endforeach; ?>
                                     </select>
@@ -354,7 +361,7 @@ $errorStep = flash('setup_error_step');
                         <label class="setup-field">
                             <span><?= e(__('setup.field_person_fiscal_code')) ?> *</span>
                             <div class="cf-row">
-                                <input type="text" name="fiscal_code" value="<?= e((string) ($value['fiscal_code'] ?? '')) ?>" required maxlength="16" autocomplete="off" data-fiscal-code placeholder="<?= e(__('members.cf_hint')) ?>">
+                                <input type="text" name="fiscal_code" value="<?= e((string) ($value['fiscal_code'] ?? '')) ?>" required maxlength="16" pattern="[A-Za-z0-9]{16}" autocomplete="off" data-fiscal-code placeholder="<?= e(__('members.cf_hint')) ?>">
                                 <button type="button" class="btn btn-ghost" data-cf-generate><?= e(__('members.cf_generate')) ?></button>
                             </div>
                             <p class="setup-hint muted" data-cf-status
@@ -526,7 +533,7 @@ $errorStep = flash('setup_error_step');
                                     $optVal = (string) ($opt['value'] ?? '');
                                     $otpBlocked = $optVal === 'otp_email' && !$mailReadyForSelect;
                                 ?>
-                                <option value="<?= e($optVal) ?>" <?= (string) $value === $optVal ? 'selected' : '' ?> <?= $otpBlocked ? 'disabled' : '' ?>><?= e(__($opt['label_key'])) ?><?= $otpBlocked ? ' — ' . e(__('mail.required_short')) : '' ?></option>
+                                <option value="<?= e($optVal) ?>" <?= (string) $value === $optVal ? 'selected' : '' ?> <?= $otpBlocked ? 'disabled' : '' ?>><?= ($step['key'] ?? '') === 'app.locale' ? e(match ($optVal) { 'it' => '🇮🇹 ', 'de' => '🇩🇪 ', default => '🇬🇧 ' }) : '' ?><?= e(__($opt['label_key'])) ?><?= $otpBlocked ? ' — ' . e(__('mail.required_short')) : '' ?></option>
                             <?php endforeach; ?>
                         </select>
                     </label>
@@ -554,15 +561,15 @@ $errorStep = flash('setup_error_step');
                                     <div class="setup-membership-card">
                                         <div class="setup-equal-row setup-langs-row">
                                             <label class="setup-field">
-                                                <span><?= e(__('setup.field_type_name')) ?> IT *</span>
+                                                <span><?= e(__('setup.field_type_name')) ?> · 🇮🇹 Italiano *</span>
                                                 <input type="text" name="types[<?= $tid ?>][name_it]" value="<?= e((string) ($typeRow['name_it'] ?? '')) ?>" required>
                                             </label>
                                             <label class="setup-field">
-                                                <span>DE</span>
+                                                <span>🇩🇪 Deutsch</span>
                                                 <input type="text" name="types[<?= $tid ?>][name_de]" value="<?= e((string) ($typeRow['name_de'] ?? '')) ?>">
                                             </label>
                                             <label class="setup-field">
-                                                <span>EN</span>
+                                                <span>🇬🇧 English</span>
                                                 <input type="text" name="types[<?= $tid ?>][name_en]" value="<?= e((string) ($typeRow['name_en'] ?? '')) ?>">
                                             </label>
                                         </div>
@@ -586,15 +593,15 @@ $errorStep = flash('setup_error_step');
                         <div class="setup-membership-card setup-membership-card-new">
                             <div class="setup-equal-row setup-langs-row">
                                 <label class="setup-field">
-                                    <span><?= e(__('setup.field_type_name')) ?> IT<?= $types === [] ? ' *' : '' ?></span>
+                                    <span><?= e(__('setup.field_type_name')) ?> · 🇮🇹 Italiano<?= $types === [] ? ' *' : '' ?></span>
                                     <input type="text" name="name_it" value="<?= e((string) ($value['name_it'] ?? '')) ?>" <?= $types === [] ? 'required' : '' ?> placeholder="<?= e(__('setup.type_name_placeholder')) ?>">
                                 </label>
                                 <label class="setup-field">
-                                    <span>DE</span>
+                                    <span>🇩🇪 Deutsch</span>
                                     <input type="text" name="name_de" value="<?= e((string) ($value['name_de'] ?? '')) ?>">
                                 </label>
                                 <label class="setup-field">
-                                    <span>EN</span>
+                                    <span>🇬🇧 English</span>
                                     <input type="text" name="name_en" value="<?= e((string) ($value['name_en'] ?? '')) ?>">
                                 </label>
                             </div>
@@ -702,11 +709,11 @@ $errorStep = flash('setup_error_step');
                             </div>
                             <div class="setup-equal-row">
                                 <label class="checkbox-row setup-check setup-check-inline">
-                                    <input type="checkbox" name="new_enabled" value="1" <?= !empty($value['new_enabled']) ? 'checked' : '' ?>>
+                                    <input type="checkbox" name="new_enabled" value="1" data-new-field-enabled <?= !empty($value['new_enabled']) ? 'checked' : '' ?>>
                                     <span><?= e(__('setup.fields_col_enabled')) ?></span>
                                 </label>
                                 <label class="checkbox-row setup-check setup-check-inline">
-                                    <input type="checkbox" name="new_required" value="1" <?= !empty($value['new_required']) ? 'checked' : '' ?>>
+                                    <input type="checkbox" name="new_required" value="1" data-new-field-required <?= !empty($value['new_required']) ? 'checked' : '' ?>>
                                     <span><?= e(__('setup.fields_col_required')) ?></span>
                                 </label>
                             </div>
@@ -858,24 +865,20 @@ $errorStep = flash('setup_error_step');
                 <?php elseif ($stepType === 'platform_consents'): ?>
                     <?php
                         $mailReady = !empty($value['mail_ready']);
-                        $anyPlatform = $mailReady && (!empty($value['news_opt_in']) || !empty($value['usage_stats_opt_in']) || !empty($value['showcase_consent']));
+                        $anyPlatform = !empty($value['news_opt_in']) || !empty($value['usage_stats_opt_in']) || !empty($value['showcase_consent']);
                     ?>
                     <div class="setup-platform-consents" data-setup-line data-platform-consents data-mail-ready="<?= $mailReady ? '1' : '0' ?>">
-                        <?php if (!$mailReady): ?>
-                            <p class="setup-hint muted"><?= e(__('setup.platform_mail_required')) ?></p>
-                        <?php else: ?>
-                            <p class="setup-hint muted"><?= e(__('setup.platform_hint')) ?></p>
-                        <?php endif; ?>
+                        <p class="setup-hint muted"><?= e(__('setup.platform_hint')) ?></p>
                         <label class="checkbox-row setup-check">
-                            <input type="checkbox" name="news_opt_in" value="1" data-platform-opt <?= !$mailReady ? 'disabled' : '' ?> <?= $mailReady && !empty($value['news_opt_in']) ? 'checked' : '' ?>>
+                            <input type="checkbox" name="news_opt_in" value="1" data-platform-opt <?= !empty($value['news_opt_in']) ? 'checked' : '' ?>>
                             <span><?= e(__('setup.platform_news')) ?></span>
                         </label>
                         <label class="checkbox-row setup-check">
-                            <input type="checkbox" name="usage_stats_opt_in" value="1" data-platform-opt <?= !$mailReady ? 'disabled' : '' ?> <?= $mailReady && !empty($value['usage_stats_opt_in']) ? 'checked' : '' ?>>
+                            <input type="checkbox" name="usage_stats_opt_in" value="1" data-platform-opt <?= !empty($value['usage_stats_opt_in']) ? 'checked' : '' ?>>
                             <span><?= e(__('setup.platform_stats')) ?></span>
                         </label>
                         <label class="checkbox-row setup-check">
-                            <input type="checkbox" name="showcase_consent" value="1" data-platform-opt <?= !$mailReady ? 'disabled' : '' ?> <?= $mailReady && !empty($value['showcase_consent']) ? 'checked' : '' ?>>
+                            <input type="checkbox" name="showcase_consent" value="1" data-platform-opt <?= !empty($value['showcase_consent']) ? 'checked' : '' ?>>
                             <span><?= e(__('setup.platform_showcase')) ?></span>
                         </label>
                         <p class="setup-hint muted"><?= e(__('setup.platform_showcase_hint')) ?></p>
@@ -919,11 +922,18 @@ $errorStep = flash('setup_error_step');
                                 'minlength' => 8,
                             ]) ?>
                         </div>
+                        <div class="setup-password-tools">
+                            <button type="button" class="btn btn-ghost btn-sm" data-password-generate><?= e(__('setup.admin_password_generate')) ?></button>
+                            <span class="setup-hint muted"><?= e(__('setup.admin_password_rules')) ?></span>
+                        </div>
+                        <div class="password-complexity" data-password-complexity aria-live="polite">
+                            <span></span><span></span><span></span><span></span>
+                        </div>
                         <label class="setup-field">
                             <span><?= e(__('setup.field_admin_locale')) ?></span>
                             <select name="locale">
                                 <?php foreach (['it', 'de', 'en'] as $loc): ?>
-                                    <option value="<?= $loc ?>" <?= (string) ($value['locale'] ?? 'it') === $loc ? 'selected' : '' ?>><?= strtoupper($loc) ?></option>
+                                    <option value="<?= $loc ?>" <?= (string) ($value['locale'] ?? 'it') === $loc ? 'selected' : '' ?>><?= e(match ($loc) { 'it' => '🇮🇹 Italiano', 'de' => '🇩🇪 Deutsch', default => '🇬🇧 English' }) ?></option>
                                 <?php endforeach; ?>
                             </select>
                         </label>

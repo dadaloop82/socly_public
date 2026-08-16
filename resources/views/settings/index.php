@@ -16,6 +16,7 @@
 <form
         method="post"
         action="<?= e(url('/settings/general')) ?>"
+        data-leave-guard
         enctype="multipart/form-data"
         data-cities-url="<?= e(url('/api/geo/cities')) ?>"
         data-addresses-url="<?= e(url('/api/geo/addresses')) ?>"
@@ -144,7 +145,7 @@
                 <label><?= e(__('install.locale')) ?></label>
                 <select name="locale">
                     <?php foreach (['it','de','en'] as $loc): ?>
-                        <option value="<?= $loc ?>" <?= $settings['app.locale']===$loc?'selected':'' ?>><?= strtoupper($loc) ?></option>
+                        <option value="<?= $loc ?>" <?= $settings['app.locale']===$loc?'selected':'' ?>><?= e(match ($loc) { 'it' => '🇮🇹 Italiano', 'de' => '🇩🇪 Deutsch', default => '🇬🇧 English' }) ?></option>
                     <?php endforeach; ?>
                 </select>
             </div>
@@ -162,7 +163,7 @@
     </summary>
     <div class="config-accordion-body">
 
-<form method="post" action="<?= e(url('/settings/people')) ?>" data-cities-url="<?= e(url('/api/geo/cities')) ?>" data-addresses-url="<?= e(url('/api/geo/addresses')) ?>" data-settings-geo>
+<form method="post" action="<?= e(url('/settings/people')) ?>" data-cities-url="<?= e(url('/api/geo/cities')) ?>" data-addresses-url="<?= e(url('/api/geo/addresses')) ?>" data-settings-geo data-leave-guard>
         <?= csrf_field() ?>
         <p class="muted"><?= e(__('settings.people_hint')) ?></p>
         <div class="assoc-people" data-people-list>
@@ -293,7 +294,7 @@
     </summary>
     <div class="config-accordion-body">
 
-<form method="post" action="<?= e(url('/settings/legal')) ?>">
+<form method="post" action="<?= e(url('/settings/legal')) ?>" data-leave-guard>
         <?= csrf_field() ?>
         <h3 class="section-title"><?= e(__('settings.legal_privacy')) ?></h3>
         <p class="muted"><?= e(__('settings.legal_privacy_hint')) ?></p>
@@ -354,7 +355,7 @@
             </tbody>
         </table>
     </div>
-    <form method="post" action="<?= e(url('/settings/types')) ?>">
+    <form method="post" action="<?= e(url('/settings/types')) ?>" data-leave-guard>
         <?= csrf_field() ?>
         <h3 class="section-title"><?= e(__('settings.add_type')) ?></h3>
         <div class="grid-3">
@@ -392,7 +393,7 @@
             </tbody>
         </table>
     </div>
-    <form method="post" action="<?= e(url('/settings/periods')) ?>">
+    <form method="post" action="<?= e(url('/settings/periods')) ?>" data-leave-guard>
         <?= csrf_field() ?>
         <h3 class="section-title"><?= e(__('settings.add_period')) ?></h3>
         <label>Label</label>
@@ -414,7 +415,7 @@
     </summary>
     <div class="config-accordion-body">
 
-<form method="post" action="<?= e(url('/settings/fields')) ?>">
+<form method="post" action="<?= e(url('/settings/fields')) ?>" data-leave-guard>
         <?= csrf_field() ?>
         <?= view_partial('partials/member_fields_editor', [
             'fields' => $fields,
@@ -465,6 +466,7 @@
         <form
             method="post"
             action="<?= e(url('/settings/mail')) ?>"
+            data-leave-guard
             class="setup-smtp"
             data-setup-smtp
             data-smtp-initial-manual="<?= $showManual ? '1' : '0' ?>"
@@ -576,7 +578,7 @@
         <span class="config-accordion-lede"><?= e(__('settings.enrollment_lede')) ?></span>
     </summary>
     <div class="config-accordion-body">
-        <form method="post" action="<?= e(url('/settings/enrollment')) ?>">
+        <form method="post" action="<?= e(url('/settings/enrollment')) ?>" data-leave-guard>
             <?= csrf_field() ?>
             <label for="enrollment_validation"><?= e(__('settings.enrollment_method')) ?></label>
             <select id="enrollment_validation" name="enrollment_validation" required>
@@ -606,30 +608,26 @@
         <span class="config-accordion-lede"><?= e(__('settings.platform_lede')) ?></span>
     </summary>
     <div class="config-accordion-body">
-        <form method="post" action="<?= e(url('/settings/platform')) ?>" data-platform-consents data-mail-ready="<?= !empty($mailReady) ? '1' : '0' ?>">
+        <form method="post" action="<?= e(url('/settings/platform')) ?>" data-platform-consents data-mail-ready="<?= !empty($mailReady) ? '1' : '0' ?>" data-leave-guard>
             <?= csrf_field() ?>
-            <?php if (empty($mailReady)): ?>
-                <p class="muted"><?= e(__('setup.platform_mail_required')) ?></p>
-            <?php endif; ?>
+            <p class="muted"><?= e(__('setup.platform_hint')) ?></p>
             <label class="checkbox-row">
-                <input type="checkbox" name="news_opt_in" value="1" data-platform-opt <?= empty($mailReady) ? 'disabled' : '' ?> <?= (!empty($mailReady) && ($settings['platform.news_opt_in'] ?? '1') !== '0') ? 'checked' : '' ?>>
+                <input type="checkbox" name="news_opt_in" value="1" data-platform-opt <?= ($settings['platform.news_opt_in'] ?? '1') !== '0' ? 'checked' : '' ?>>
                 <?= e(__('settings.platform_news')) ?>
             </label>
             <label class="checkbox-row">
-                <input type="checkbox" name="usage_stats_opt_in" value="1" data-platform-opt <?= empty($mailReady) ? 'disabled' : '' ?> <?= (!empty($mailReady) && ($settings['platform.usage_stats_opt_in'] ?? '1') !== '0') ? 'checked' : '' ?>>
+                <input type="checkbox" name="usage_stats_opt_in" value="1" data-platform-opt <?= ($settings['platform.usage_stats_opt_in'] ?? '1') !== '0' ? 'checked' : '' ?>>
                 <?= e(__('settings.platform_stats')) ?>
             </label>
             <label class="checkbox-row">
-                <input type="checkbox" name="showcase_consent" value="1" data-platform-opt <?= empty($mailReady) ? 'disabled' : '' ?> <?= (!empty($mailReady) && ($settings['platform.showcase_consent'] ?? '1') !== '0') ? 'checked' : '' ?>>
+                <input type="checkbox" name="showcase_consent" value="1" data-platform-opt <?= ($settings['platform.showcase_consent'] ?? '1') !== '0' ? 'checked' : '' ?>>
                 <?= e(__('settings.platform_showcase')) ?>
             </label>
             <p class="muted"><?= e(__('setup.platform_showcase_hint')) ?></p>
             <?php
-                $anyPlatformSettings = !empty($mailReady) && (
-                    (($settings['platform.news_opt_in'] ?? '1') !== '0')
+                $anyPlatformSettings = (($settings['platform.news_opt_in'] ?? '1') !== '0')
                     || (($settings['platform.usage_stats_opt_in'] ?? '1') !== '0')
-                    || (($settings['platform.showcase_consent'] ?? '1') !== '0')
-                );
+                    || (($settings['platform.showcase_consent'] ?? '1') !== '0');
             ?>
             <div class="setup-platform-confirm" data-platform-confirm <?= $anyPlatformSettings ? '' : 'hidden' ?>>
                 <p class="muted"><?= e(__('setup.platform_confirm_hint')) ?></p>
@@ -668,7 +666,7 @@
         <span class="config-accordion-lede"><?= e(__('settings.components_lede')) ?></span>
     </summary>
     <div class="config-accordion-body">
-        <form method="post" action="<?= e(url('/settings/components')) ?>">
+        <form method="post" action="<?= e(url('/settings/components')) ?>" data-leave-guard>
             <?= csrf_field() ?>
             <p class="muted"><?= e(__('settings.components_hint')) ?></p>
             <div class="setup-component-list settings-component-list">

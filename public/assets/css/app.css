@@ -463,10 +463,14 @@ a:hover { text-decoration: underline; color: var(--brand-primary-deep); }
   margin: 0;
   padding: 0;
   overflow: hidden;
+  min-height: 3.35rem;
 }
 .sidebar-deadline-item {
   margin: 0;
+  opacity: 1;
+  transition: opacity 0.22s ease;
 }
+.sidebar-deadline-item.is-fading { opacity: 0; }
 .sidebar-deadline-item[hidden] {
   display: none !important;
 }
@@ -4388,6 +4392,16 @@ button.setup-scrape-logo-frame:focus-visible .setup-scrape-logo-overlay {
   margin-right: 0.45rem;
   vertical-align: middle;
 }
+.doc-category-badge {
+  display: inline-block;
+  padding: 0.18rem 0.5rem;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--brand-primary) 10%, #fff);
+  color: var(--brand-primary);
+  font-size: 0.74rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
 .deadline-row-actions,
 .doc-row-actions .inline-form {
   display: inline-flex;
@@ -4953,6 +4967,85 @@ a.org-node:hover {
 }
 .doc-new-category[hidden] {
   display: none;
+}
+
+.form-actions-end {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 0.65rem;
+  margin-top: 1.25rem;
+}
+.config-accordion-body form[data-leave-guard] > button[type="submit"] {
+  display: block;
+  margin-top: 1rem;
+  margin-left: auto;
+}
+.category-attention {
+  animation: category-attention 0.72s ease-in-out 3;
+}
+@keyframes category-attention {
+  0%, 100% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--brand-accent) 0%, transparent); }
+  50% { box-shadow: 0 0 0 5px color-mix(in srgb, var(--brand-accent) 28%, transparent); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .category-attention {
+    animation: none;
+    outline: 3px solid color-mix(in srgb, var(--brand-accent) 35%, transparent);
+  }
+}
+.setup-color-picker-grid {
+  gap: 0.85rem;
+}
+.setup-color-picker-card {
+  padding: 1rem;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: color-mix(in srgb, var(--brand-paper) 70%, white);
+}
+.setup-color-picker-control {
+  display: grid;
+  grid-template-columns: 4.25rem 1fr;
+  align-items: center;
+  gap: 0.8rem;
+}
+.setup-color-picker-control input[type="color"] {
+  width: 4.25rem;
+  min-height: 3rem;
+  padding: 0.2rem;
+  cursor: pointer;
+}
+.setup-color-picker-control code {
+  font-size: 0.92rem;
+  letter-spacing: 0.04em;
+}
+.setup-password-tools {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  margin-top: 0.85rem;
+}
+.password-complexity {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 0.35rem;
+  margin-top: 0.65rem;
+}
+.password-complexity span {
+  height: 0.35rem;
+  border-radius: 999px;
+  background: var(--line);
+  transition: background 160ms ease;
+}
+.password-complexity span.is-active {
+  background: var(--brand-primary);
+}
+.member-payment-summary {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.5rem 0.8rem;
 }
 .doc-archive {
   display: flex;

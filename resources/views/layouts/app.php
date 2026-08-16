@@ -47,6 +47,7 @@ $configActive = str_contains($uri, '/settings') || str_contains($uri, '/users') 
 <?php
 $temporaryInstance = false;
 $temporaryExpiresLabel = '';
+$temporaryExpiresIso = '';
 try {
     if (app()->isInstalled()) {
         $settings = app(\Socly\Services\SettingsService::class);
@@ -57,6 +58,7 @@ try {
                 $ts = strtotime($exp);
                 if ($ts !== false) {
                     $temporaryExpiresLabel = date('d/m/Y H:i', $ts);
+                    $temporaryExpiresIso = gmdate('c', $ts);
                 }
             }
         }
@@ -65,9 +67,37 @@ try {
 }
 ?>
 <?php if ($temporaryInstance): ?>
-<div style="background:#fff3d6;color:#6b4a00;padding:0.55rem 1rem;text-align:center;font-size:0.9rem;font-weight:700;border-bottom:1px solid #f0d48a">
-  Ambiente di prova<?= $temporaryExpiresLabel !== '' ? ' — scade il ' . e($temporaryExpiresLabel) : '' ?>. Configurazione e aggiornamenti non disponibili.
+<div
+  style="background:#fff3d6;color:#6b4a00;padding:0.55rem 1rem;text-align:center;font-size:0.9rem;font-weight:700;border-bottom:1px solid #f0d48a"
+  data-demo-banner
+  <?php if ($temporaryExpiresIso !== ''): ?>data-demo-expires="<?= e($temporaryExpiresIso) ?>"<?php endif; ?>
+>
+  Ambiente di Demo<?php if ($temporaryExpiresIso !== ''): ?> — resta attiva <span data-demo-countdown><?= e($temporaryExpiresLabel) ?></span><?php elseif ($temporaryExpiresLabel !== ''): ?> — scade il <?= e($temporaryExpiresLabel) ?><?php endif; ?>. Configurazione e aggiornamenti non disponibili.
 </div>
+<script>
+(() => {
+  const root = document.querySelector('[data-demo-banner][data-demo-expires]');
+  const target = root?.querySelector('[data-demo-countdown]');
+  if (!root || !target) return;
+  const ends = Date.parse(root.getAttribute('data-demo-expires') || '');
+  if (!Number.isFinite(ends)) return;
+  const tick = () => {
+    let ms = ends - Date.now();
+    if (ms <= 0) {
+      target.textContent = '0g 0h 0m';
+      return;
+    }
+    const days = Math.floor(ms / 86400000);
+    ms -= days * 86400000;
+    const hours = Math.floor(ms / 3600000);
+    ms -= hours * 3600000;
+    const mins = Math.floor(ms / 60000);
+    target.textContent = `${days}g ${hours}h ${mins}m`;
+  };
+  tick();
+  setInterval(tick, 30000);
+})();
+</script>
 <?php endif; ?>
 <?php if ($user): ?>
 <div class="app-shell" data-app-shell>
@@ -141,7 +171,8 @@ try {
                             $state = 'soon';
                         }
                         $itemId = (int) ($item['id'] ?? 0);
-                        $href = can('deadlines.manage')
+                        $isSystem = str_starts_with((string) ($item['source'] ?? ''), 'system:');
+                        $href = can('deadlines.manage') && !$isSystem
                             ? url('/deadlines/' . $itemId . '/edit')
                             : url('/deadlines');
                         ?>

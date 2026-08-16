@@ -15,6 +15,7 @@ use Socly\Services\AuditService;
 use Socly\Services\BrandingService;
 use Socly\Services\ComponentService;
 use Socly\Services\DocumentService;
+use Socly\Services\DeadlineService;
 use Socly\Services\InstallerService;
 use Socly\Services\MailService;
 use Socly\Services\MemberService;
@@ -36,7 +37,8 @@ final class SettingsController extends BaseController
         private readonly MailService $mail,
         private readonly SetupService $setup,
         private readonly ComponentService $components,
-        private readonly DocumentService $documents
+        private readonly DocumentService $documents,
+        private readonly DeadlineService $deadlines
     ) {
         parent::__construct($view);
     }
@@ -425,6 +427,7 @@ final class SettingsController extends BaseController
             ]);
         }
         $this->settings->set('membership.periods_configured', '1');
+        $this->deadlines->syncSystemDeadlines();
         $this->flash('success', __('settings.saved'));
         redirect('/settings#periods');
     }
@@ -477,10 +480,9 @@ final class SettingsController extends BaseController
     public function savePlatform(Request $request): void
     {
         $data = $request->all();
-        $mailReady = $this->mail->isReady();
-        $news = $mailReady && !empty($data['news_opt_in']);
-        $stats = $mailReady && !empty($data['usage_stats_opt_in']);
-        $showcase = $mailReady && !empty($data['showcase_consent']);
+        $news = !empty($data['news_opt_in']);
+        $stats = !empty($data['usage_stats_opt_in']);
+        $showcase = !empty($data['showcase_consent']);
         if ($news || $stats || $showcase) {
             $confirmError = app(\Socly\Services\SetupService::class)->validatePresidentNameConfirmation($data);
             if ($confirmError !== null) {

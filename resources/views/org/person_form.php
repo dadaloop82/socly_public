@@ -26,6 +26,10 @@ $action = $isEdit
     action="<?= e($action) ?>"
     data-cities-url="<?= e(url('/api/geo/cities')) ?>"
     data-addresses-url="<?= e(url('/api/geo/addresses')) ?>"
+    data-org-person-form
+    data-leave-guard
+    data-cf-url="<?= e(url('/api/fiscal-code')) ?>"
+    data-csrf="<?= e(csrf_token()) ?>"
 >
     <?= csrf_field() ?>
     <div class="panel-header">
@@ -58,49 +62,55 @@ $action = $isEdit
         </div>
         <div>
             <label><?= e(__('setup.field_first_name')) ?> *</label>
-            <input type="text" name="first_name" value="<?= e((string) ($values['first_name'] ?? '')) ?>" required maxlength="120">
+            <input type="text" name="first_name" value="<?= e((string) ($values['first_name'] ?? '')) ?>" required maxlength="120" data-first-name>
         </div>
         <div>
             <label><?= e(__('setup.field_last_name')) ?> *</label>
-            <input type="text" name="last_name" value="<?= e((string) ($values['last_name'] ?? '')) ?>" required maxlength="120">
+            <input type="text" name="last_name" value="<?= e((string) ($values['last_name'] ?? '')) ?>" required maxlength="120" data-last-name>
+        </div>
+    </div>
+
+    <div class="grid-3">
+        <div>
+            <label><?= e(__('setup.field_gender')) ?></label>
+            <select name="gender" data-gender-input>
+                <option value="">—</option>
+                <option value="M" <?= ($values['gender'] ?? '') === 'M' ? 'selected' : '' ?>><?= e(__('members.gender_m')) ?></option>
+                <option value="F" <?= ($values['gender'] ?? '') === 'F' ? 'selected' : '' ?>><?= e(__('members.gender_f')) ?></option>
+                <option value="X" <?= ($values['gender'] ?? '') === 'X' ? 'selected' : '' ?>><?= e(__('members.gender_x')) ?></option>
+            </select>
+        </div>
+        <?= view_partial('partials/geo_birth_place', [
+            'name' => 'birth_place',
+            'value' => (string) ($values['birth_place'] ?? ''),
+        ]) ?>
+        <div>
+            <label><?= e(__('setup.field_birth_date')) ?></label>
+            <input type="date" name="birth_date" value="<?= e((string) ($values['birth_date'] ?? '')) ?>" data-birth-date>
         </div>
     </div>
 
     <div class="grid-3">
         <div>
             <label><?= e(__('setup.field_person_fiscal_code')) ?> *</label>
-            <input type="text" name="fiscal_code" value="<?= e((string) ($values['fiscal_code'] ?? '')) ?>" required maxlength="16">
+            <input type="text" name="fiscal_code" value="<?= e((string) ($values['fiscal_code'] ?? '')) ?>" required maxlength="16" pattern="[A-Za-z0-9]{16}" autocomplete="off" data-fiscal-code placeholder="<?= e(__('members.cf_hint')) ?>">
+            <button class="btn btn-ghost btn-sm" type="button" data-cf-generate><?= e(__('members.cf_generate')) ?></button>
+            <p class="muted" data-cf-status
+               data-ready="<?= e(__('members.cf_ready')) ?>"
+               data-incomplete="<?= e(__('members.cf_incomplete')) ?>"
+               data-gender-other="<?= e(__('members.cf_gender_other')) ?>"
+               hidden></p>
         </div>
-        <div>
-            <label><?= e(__('setup.field_birth_date')) ?></label>
-            <input type="date" name="birth_date" value="<?= e((string) ($values['birth_date'] ?? '')) ?>">
-        </div>
-        <div>
-            <label><?= e(__('setup.field_gender')) ?></label>
-            <select name="gender">
-                <option value="">—</option>
-                <option value="M" <?= ($values['gender'] ?? '') === 'M' ? 'selected' : '' ?>><?= e(__('members.gender_m')) ?></option>
-                <option value="F" <?= ($values['gender'] ?? '') === 'F' ? 'selected' : '' ?>><?= e(__('members.gender_f')) ?></option>
-            </select>
-        </div>
-    </div>
-
-    <div class="grid-2">
-        <?= view_partial('partials/geo_birth_place', [
-            'name' => 'birth_place',
-            'value' => (string) ($values['birth_place'] ?? ''),
-        ]) ?>
         <div>
             <label><?= e(__('setup.field_email')) ?></label>
             <input type="email" name="email" value="<?= e((string) ($values['email'] ?? '')) ?>" maxlength="190">
         </div>
-    </div>
-
-    <div class="grid-2">
         <div>
             <label><?= e(__('setup.field_phone')) ?></label>
             <input type="text" name="phone" value="<?= e((string) ($values['phone'] ?? '')) ?>" maxlength="40">
         </div>
+    </div>
+    <div>
         <div>
             <label><?= e(__('org.notes')) ?></label>
             <input type="text" name="notes" value="<?= e((string) ($values['notes'] ?? '')) ?>">
@@ -138,6 +148,10 @@ $action = $isEdit
             <label><?= e(__('setup.field_mandate_ends_at')) ?><?= $requiresMandate ? ' *' : '' ?></label>
             <input type="date" name="mandate_ends_at" value="<?= e((string) ($values['mandate_ends_at'] ?? '')) ?>" <?= $requiresMandate ? 'required' : '' ?>>
         </div>
+    </div>
+    <div class="form-actions form-actions-end">
+        <a class="btn btn-ghost" href="<?= e(url('/org')) ?>"><?= e(__('common.back')) ?></a>
+        <button class="btn" type="submit"><?= e($isEdit ? __('org.update_person') : __('org.create_person')) ?></button>
     </div>
 </form>
 

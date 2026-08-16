@@ -74,6 +74,19 @@ final class SetupCatalogue
                         'label_key' => 'setup.field_assoc_legal_name',
                         'options' => AssociationLegalForms::options(),
                     ],
+                    [
+                        'key' => 'currency',
+                        'settings_key' => 'app.currency',
+                        'type' => 'select',
+                        'required' => true,
+                        'label_key' => 'setup.field_currency',
+                        'options' => [
+                            ['value' => 'EUR', 'label_key' => 'currency.eur'],
+                            ['value' => 'CHF', 'label_key' => 'currency.chf'],
+                            ['value' => 'USD', 'label_key' => 'currency.usd'],
+                            ['value' => 'GBP', 'label_key' => 'currency.gbp'],
+                        ],
+                    ],
                 ],
             ],
             [

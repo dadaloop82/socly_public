@@ -32,12 +32,15 @@ document.addEventListener('DOMContentLoaded', () => {
   initPlatformConsents(document);
   initResetUserData();
   initPasswordToggles(document);
+  initPasswordGenerators(document);
   initFieldsSortable(document);
   initComponentCards(document);
   initDocumentUpload(document);
   initDocumentRowLinks(document);
+  document.querySelectorAll('[data-org-person-form]').forEach((form) => initFiscalCodeAuto(form));
   initDeadlineCategory(document);
   initTreasuryCategory(document);
+  initLeaveGuards(document);
 });
 
 /** Compact members search placeholder on small screens. */
@@ -233,6 +236,59 @@ function initPasswordToggles(scope = document) {
   });
 }
 
+function initPasswordGenerators(scope = document) {
+  scope.querySelectorAll('[data-password-complexity]').forEach((meter) => {
+    const input = meter.closest('form')?.querySelector('[name="password"]');
+    if (!input || meter.dataset.passwordComplexityBound === '1') return;
+    meter.dataset.passwordComplexityBound = '1';
+    const sync = () => {
+      const value = input.value;
+      const score = [
+        value.length >= 8,
+        /[a-z]/.test(value) && /[A-Z]/.test(value),
+        /\d/.test(value),
+        /[^A-Za-z0-9]/.test(value),
+      ].filter(Boolean).length;
+      meter.dataset.score = String(score);
+      meter.querySelectorAll('span').forEach((bar, index) => {
+        bar.classList.toggle('is-active', index < score);
+      });
+    };
+    input.addEventListener('input', sync);
+    sync();
+  });
+
+  scope.querySelectorAll('[data-password-generate]').forEach((button) => {
+    if (button.dataset.passwordGenerateBound === '1') return;
+    button.dataset.passwordGenerateBound = '1';
+    button.addEventListener('click', () => {
+      const form = button.closest('form');
+      const password = form?.querySelector('[name="password"]');
+      const confirmation = form?.querySelector('[name="password_confirmation"]');
+      if (!password) return;
+      const upper = 'ABCDEFGHJKLMNPQRSTUVWXYZ';
+      const lower = 'abcdefghijkmnopqrstuvwxyz';
+      const digits = '23456789';
+      const symbols = '!@#$%*-_';
+      const all = upper + lower + digits + symbols;
+      const pick = (chars) => chars[crypto.getRandomValues(new Uint32Array(1))[0] % chars.length];
+      const chars = [pick(upper), pick(lower), pick(digits), pick(symbols)];
+      while (chars.length < 16) chars.push(pick(all));
+      for (let i = chars.length - 1; i > 0; i -= 1) {
+        const j = crypto.getRandomValues(new Uint32Array(1))[0] % (i + 1);
+        [chars[i], chars[j]] = [chars[j], chars[i]];
+      }
+      password.value = chars.join('');
+      if (confirmation) confirmation.value = password.value;
+      password.type = 'text';
+      password.dispatchEvent(new Event('input', { bubbles: true }));
+      confirmation?.dispatchEvent(new Event('input', { bubbles: true }));
+      password.focus();
+      password.select();
+    });
+  });
+}
+
 function initResetUserData() {
   const root = document.querySelector('[data-reset-user-data]');
   if (!root) return;
@@ -320,15 +376,6 @@ function initPlatformConsents(scope) {
   roots.forEach((root) => {
     if (root.dataset.platformBound === '1') return;
     root.dataset.platformBound = '1';
-    if (root.dataset.mailReady === '0') {
-      root.querySelectorAll('[data-platform-opt]').forEach((el) => {
-        el.checked = false;
-        el.disabled = true;
-      });
-      const confirm = root.querySelector('[data-platform-confirm]');
-      if (confirm) confirm.hidden = true;
-      return;
-    }
     const opts = [...root.querySelectorAll('[data-platform-opt]')];
     const confirm = root.querySelector('[data-platform-confirm]');
     const inputs = [...root.querySelectorAll('[data-platform-confirm-input]')];
@@ -1519,6 +1566,114 @@ function initMemberLeaveGuard(form) {
   });
 }
 
+function initLeaveGuards(scope = document) {
+  scope.querySelectorAll('form[data-leave-guard]').forEach((form) => {
+    if (form.dataset.leaveGuardBound === '1' || form.hasAttribute('data-member-leave-guard')) return;
+    form.dataset.leaveGuardBound = '1';
+
+    const initial = new FormData(form);
+    const initialState = [...initial.entries()].map(([key, value]) => [
+      key,
+      value instanceof File ? `${value.name}:${value.size}:${value.lastModified}` : String(value),
+    ]);
+    let allowLeave = false;
+    let pendingHref = '';
+
+    const isDirty = () => {
+      const current = [...new FormData(form).entries()].map(([key, value]) => [
+        key,
+        value instanceof File ? `${value.name}:${value.size}:${value.lastModified}` : String(value),
+      ]);
+      return JSON.stringify(current) !== JSON.stringify(initialState);
+    };
+
+    const labels = {
+      it: {
+        title: 'Modifiche non salvate',
+        text: 'Vuoi salvare le modifiche prima di uscire?',
+        save: 'Salva',
+        discard: 'Esci senza salvare',
+        stay: 'Resta',
+      },
+      de: {
+        title: 'Nicht gespeicherte Änderungen',
+        text: 'Möchten Sie die Änderungen vor dem Verlassen speichern?',
+        save: 'Speichern',
+        discard: 'Ohne Speichern verlassen',
+        stay: 'Bleiben',
+      },
+      en: {
+        title: 'Unsaved changes',
+        text: 'Would you like to save your changes before leaving?',
+        save: 'Save',
+        discard: 'Leave without saving',
+        stay: 'Stay',
+      },
+    };
+    const lang = (document.documentElement.lang || 'it').slice(0, 2);
+    const copy = labels[lang] || labels.it;
+    const dialog = document.createElement('dialog');
+    dialog.className = 'member-leave-dialog';
+    dialog.innerHTML = `
+      <div class="member-leave-shell">
+        <h3 class="section-title">${copy.title}</h3>
+        <p class="member-leave-text">${copy.text}</p>
+        <div class="member-leave-actions">
+          <button type="button" class="btn btn-ghost" data-leave-stay>${copy.stay}</button>
+          <button type="button" class="btn btn-ghost" data-leave-discard>${copy.discard}</button>
+          <button type="button" class="btn" data-leave-save>${copy.save}</button>
+        </div>
+      </div>`;
+    document.body.appendChild(dialog);
+
+    const askLeave = (href) => {
+      pendingHref = href;
+      if (typeof dialog.showModal === 'function') {
+        dialog.showModal();
+      } else if (window.confirm(copy.text)) {
+        allowLeave = true;
+        form.requestSubmit();
+      }
+    };
+
+    form.addEventListener('submit', () => { allowLeave = true; });
+    document.addEventListener('click', (event) => {
+      if (allowLeave || !isDirty()) return;
+      const link = event.target.closest?.('a[href]');
+      if (!link || link.closest('dialog') || link.target === '_blank' || link.hasAttribute('download')) return;
+      const href = link.getAttribute('href') || '';
+      if (!href || href.startsWith('#') || href.startsWith('javascript:')) return;
+      try {
+        const url = new URL(href, window.location.href);
+        if (url.href === window.location.href) return;
+      } catch (_) {
+        return;
+      }
+      event.preventDefault();
+      askLeave(href);
+    });
+    dialog.querySelector('[data-leave-save]')?.addEventListener('click', () => {
+      allowLeave = true;
+      form.requestSubmit();
+    });
+    dialog.querySelector('[data-leave-discard]')?.addEventListener('click', () => {
+      allowLeave = true;
+      dialog.close();
+      if (pendingHref) window.location.href = pendingHref;
+    });
+    dialog.querySelector('[data-leave-stay]')?.addEventListener('click', () => dialog.close());
+    dialog.addEventListener('cancel', (event) => {
+      event.preventDefault();
+      dialog.close();
+    });
+    window.addEventListener('beforeunload', (event) => {
+      if (allowLeave || !isDirty()) return;
+      event.preventDefault();
+      event.returnValue = '';
+    });
+  });
+}
+
 function initPhoneInputs(scope = document) {
   scope.querySelectorAll('[data-phone-input]').forEach((input) => {
     const defaultHint = input.dataset.hint || input.getAttribute('placeholder') || '';
@@ -1983,6 +2138,8 @@ function initSetupBrandingPalettes(root) {
     if (accentInput && accentInput.value.toUpperCase() !== accent) {
       accentInput.value = accent;
     }
+    primaryInput?.closest('.setup-color-picker-control')?.querySelector('code')?.replaceChildren(primary);
+    accentInput?.closest('.setup-color-picker-control')?.querySelector('code')?.replaceChildren(accent);
     applyBrandColors(primary, accent);
     if (preview) {
       preview.style.setProperty('--brand-primary', primary);
@@ -3471,13 +3628,17 @@ function initFiscalCodeAuto(form) {
   cfInput.addEventListener('input', () => {
     cfInput.dataset.manual = '1';
     cfInput.value = cfInput.value.toUpperCase();
+    cfInput.classList.remove('input-valid');
+    if (/^[A-Z0-9]{16}$/.test(cfInput.value.trim())) {
+      cfInput.setCustomValidity('');
+      setStatus('');
+    }
   });
 }
 
 function initSidebarDeadlines() {
-  const sidebar = document.querySelector('[data-sidebar]');
-  const box = sidebar?.querySelector('[data-sidebar-deadlines]');
-  if (!sidebar || !box) {
+  const box = document.querySelector('[data-sidebar-deadlines]');
+  if (!box) {
     return;
   }
 
@@ -3489,78 +3650,29 @@ function initSidebarDeadlines() {
   }
 
   const moreTemplate = box.getAttribute('data-more-template') || '+:count';
-  const brand = sidebar.querySelector('.sidebar-brand');
-  const nav = sidebar.querySelector('.nav');
-  const footer = sidebar.querySelector('.sidebar-footer');
-  const head = box.querySelector('.sidebar-deadlines-head');
-  let ticking = false;
-
-  const fit = () => {
-    ticking = false;
-    items.forEach((item) => {
-      item.hidden = false;
+  let current = 0;
+  const show = (index) => {
+    items.forEach((item, i) => {
+      item.hidden = i !== index;
+      item.classList.toggle('is-active', i === index);
     });
-    if (more) {
-      more.hidden = true;
-      more.textContent = '';
-    }
-
-    const sidebarH = sidebar.clientHeight;
-    const brandH = brand ? brand.offsetHeight : 0;
-    const footerH = footer ? footer.offsetHeight : 0;
-    const headH = head ? head.offsetHeight : 0;
-    const moreReserve = 28;
-    const gaps = 28;
-    const minNav = 96;
-    const maxList = Math.max(
-      0,
-      sidebarH - brandH - footerH - headH - moreReserve - gaps - minNav
-    );
-    list.style.maxHeight = `${maxList}px`;
-
-    let hidden = 0;
-    // Hide from the end until the list fits without scrolling.
-    while (list.scrollHeight > list.clientHeight + 1 && hidden < items.length) {
-      const idx = items.length - 1 - hidden;
-      items[idx].hidden = true;
-      hidden += 1;
-    }
-
-    // If even one item overflows, hide the box content items entirely except head.
-    if (hidden === items.length) {
-      box.hidden = true;
-      return;
-    }
-    box.hidden = false;
-
-    if (more && hidden > 0) {
-      more.hidden = false;
-      more.textContent = moreTemplate.replace(':count', String(hidden));
-    }
   };
 
-  const requestFit = () => {
-    if (ticking) {
-      return;
-    }
-    ticking = true;
-    window.requestAnimationFrame(fit);
-  };
-
-  fit();
-  window.addEventListener('resize', requestFit, { passive: true });
-  if (typeof ResizeObserver !== 'undefined') {
-    const ro = new ResizeObserver(requestFit);
-    ro.observe(sidebar);
-    if (nav) {
-      ro.observe(nav);
-    }
-    if (brand) {
-      ro.observe(brand);
-    }
-    if (footer) {
-      ro.observe(footer);
-    }
+  show(current);
+  if (more && items.length > 1) {
+    more.hidden = false;
+    more.textContent = moreTemplate.replace(':count', String(items.length - 1));
+  }
+  if (items.length > 1 && !window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+    window.setInterval(() => {
+      const active = items[current];
+      active.classList.add('is-fading');
+      window.setTimeout(() => {
+        current = (current + 1) % items.length;
+        show(current);
+        active.classList.remove('is-fading');
+      }, 220);
+    }, 5000);
   }
 }
 
@@ -3643,6 +3755,10 @@ function initDeadlineCategory(root = document) {
     }
     const sync = () => {
       const isNew = categorySelect.value === '__new__';
+      categorySelect.hidden = isNew;
+      if (categorySelect.previousElementSibling?.tagName === 'LABEL') {
+        categorySelect.previousElementSibling.hidden = isNew;
+      }
       if (newCategoryWrap) {
         newCategoryWrap.hidden = !isNew;
       }
@@ -3652,9 +3768,34 @@ function initDeadlineCategory(root = document) {
           newCategoryInput.value = '';
         }
       }
+      if (isNew) {
+        newCategoryInput?.classList.remove('category-attention');
+        requestAnimationFrame(() => {
+          newCategoryInput?.classList.add('category-attention');
+          newCategoryInput?.focus();
+        });
+      }
     };
     categorySelect.addEventListener('change', sync);
     sync();
+    form.addEventListener('submit', (event) => {
+      const template = form.getAttribute('data-confirm-template') || '';
+      if (!template) {
+        return;
+      }
+      const title = form.querySelector('[name="title"]')?.value?.trim() || '—';
+      const due = form.querySelector('[name="due_date"]')?.value || '—';
+      const category = categorySelect.value === '__new__'
+        ? (newCategoryInput?.value?.trim() || '—')
+        : (categorySelect.options[categorySelect.selectedIndex]?.text || '—');
+      const summary = template
+        .replace(':title', title)
+        .replace(':date', due)
+        .replace(':category', category);
+      if (!window.confirm(summary)) {
+        event.preventDefault();
+      }
+    });
   });
 }
 
@@ -3663,11 +3804,17 @@ function initTreasuryCategory(root = document) {
     const categorySelect = form.querySelector('[data-treasury-category]');
     const newCategoryWrap = form.querySelector('[data-treasury-new-category]');
     const newCategoryInput = form.querySelector('[data-treasury-new-category-input]');
+    const direction = form.querySelector('[data-treasury-direction]');
+    const invoiceToggle = form.querySelector('[data-treasury-invoice-toggle]');
     if (!categorySelect) {
       return;
     }
     const sync = () => {
       const isNew = categorySelect.value === '__new__';
+      categorySelect.hidden = isNew;
+      if (categorySelect.previousElementSibling?.tagName === 'LABEL') {
+        categorySelect.previousElementSibling.hidden = isNew;
+      }
       if (newCategoryWrap) {
         newCategoryWrap.hidden = !isNew;
       }
@@ -3677,9 +3824,60 @@ function initTreasuryCategory(root = document) {
           newCategoryInput.value = '';
         }
       }
+      if (isNew) {
+        newCategoryInput?.classList.remove('category-attention');
+        requestAnimationFrame(() => {
+          newCategoryInput?.classList.add('category-attention');
+          newCategoryInput?.focus();
+        });
+      }
     };
     categorySelect.addEventListener('change', sync);
     sync();
+
+    const syncDirection = () => {
+      const isExpense = direction?.value === 'expense';
+      form.querySelectorAll('[data-treasury-expense-fields]').forEach((field) => {
+        field.hidden = !isExpense;
+        field.querySelectorAll('input, select, textarea').forEach((input) => {
+          input.disabled = !isExpense;
+        });
+      });
+      const isInvoice = isExpense && !!invoiceToggle?.checked;
+      form.querySelectorAll('[data-treasury-invoice-fields]').forEach((field) => {
+        field.hidden = !isInvoice;
+        field.querySelectorAll('input, select, textarea').forEach((input) => {
+          input.disabled = !isInvoice;
+        });
+      });
+    };
+    direction?.addEventListener('change', syncDirection);
+    invoiceToggle?.addEventListener('change', syncDirection);
+    syncDirection();
+
+    form.addEventListener('submit', (event) => {
+      if (form.dataset.confirmed === '1') {
+        return;
+      }
+      const template = form.dataset.confirmTemplate || '';
+      if (!template) {
+        return;
+      }
+      const directionLabel = direction?.selectedOptions?.[0]?.textContent?.trim() || '';
+      const amount = form.querySelector('[name="amount"]')?.value || '';
+      const date = form.querySelector('[name="movement_date"]')?.value || '';
+      const category = categorySelect.selectedOptions?.[0]?.textContent?.trim() || '';
+      const message = template
+        .replace(':type', directionLabel)
+        .replace(':amount', amount)
+        .replace(':date', date)
+        .replace(':category', category);
+      if (!window.confirm(message)) {
+        event.preventDefault();
+        return;
+      }
+      form.dataset.confirmed = '1';
+    });
   });
 }
 
@@ -3740,6 +3938,10 @@ function initDocumentUpload(root = document) {
   const newCategoryInput = form.querySelector('[data-doc-new-category-input]');
   const syncCategory = () => {
     const isNew = categorySelect?.value === '__new__';
+    if (categorySelect) categorySelect.hidden = isNew;
+    if (categorySelect?.previousElementSibling?.tagName === 'LABEL') {
+      categorySelect.previousElementSibling.hidden = isNew;
+    }
     if (newCategoryWrap) {
       newCategoryWrap.hidden = !isNew;
     }
@@ -3748,6 +3950,13 @@ function initDocumentUpload(root = document) {
       if (!isNew) {
         newCategoryInput.value = '';
       }
+    }
+    if (isNew) {
+      newCategoryInput?.classList.remove('category-attention');
+      requestAnimationFrame(() => {
+        newCategoryInput?.classList.add('category-attention');
+        newCategoryInput?.focus();
+      });
     }
   };
   categorySelect?.addEventListener('change', syncCategory);
@@ -4640,9 +4849,25 @@ function initFieldsSortable(scope = document) {
     editor.addEventListener('change', (event) => {
       const t = event.target;
       if (!(t instanceof HTMLElement) || !editor.contains(t)) return;
+      if (t instanceof HTMLInputElement && t.type === 'checkbox') {
+        const row = t.closest('tr[data-field-key]');
+        const enabled = row?.querySelector('input[name="fields[]"]');
+        const required = row?.querySelector('input[name="required[]"]');
+        if (enabled && required) {
+          if (t === required && required.checked) enabled.checked = true;
+          if (t === enabled && !enabled.checked) required.checked = false;
+          required.disabled = !enabled.checked;
+        }
+      }
       if (t.matches('input[type="checkbox"], select[name^="field_types"]')) {
         queueFieldsAutosave(editor, { immediate: true });
       }
+    });
+
+    editor.querySelectorAll('tr[data-field-key]').forEach((row) => {
+      const enabled = row.querySelector('input[name="fields[]"]');
+      const required = row.querySelector('input[name="required[]"]');
+      if (enabled && required) required.disabled = !enabled.checked;
     });
 
     editor.addEventListener('input', (event) => {
@@ -4704,6 +4929,23 @@ function initFieldsSortable(scope = document) {
       syncFieldOrderInputs(editor);
       queueFieldsAutosave(editor, { immediate: true });
     });
+  });
+
+  scope.querySelectorAll('form').forEach((form) => {
+    const enabled = form.querySelector('[data-new-field-enabled]');
+    const required = form.querySelector('[data-new-field-required]');
+    if (!enabled || !required || enabled.dataset.requiredSyncBound === '1') return;
+    enabled.dataset.requiredSyncBound = '1';
+    const sync = () => {
+      if (!enabled.checked) required.checked = false;
+      required.disabled = !enabled.checked;
+    };
+    enabled.addEventListener('change', sync);
+    required.addEventListener('change', () => {
+      if (required.checked) enabled.checked = true;
+      sync();
+    });
+    sync();
   });
 
   // Legacy single-table sortable (if any remain outside editor)

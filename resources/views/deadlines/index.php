@@ -1,5 +1,5 @@
 <?php
-/** @var list<array{key:string,label:string,items:list<array>}> $deadline_groups */
+/** @var list<array> $deadline_items */
 /** @var array{overdue:int,due_soon:int,open:int} $counts */
 /** @var list<array> $members */
 /** @var list<array{key:string,label:string,builtin:bool}> $categories */
@@ -41,7 +41,7 @@ $canManage = can('deadlines.manage');
 </div>
 
 <?php if ($canManage): ?>
-<form class="panel" method="post" action="<?= e(url('/deadlines')) ?>" data-deadline-form>
+<form class="panel" method="post" action="<?= e(url('/deadlines')) ?>" data-deadline-form data-leave-guard data-confirm-template="<?= e(__('deadlines.confirm_save')) ?>">
     <?= csrf_field() ?>
     <div class="panel-header">
         <div>
@@ -54,6 +54,9 @@ $canManage = can('deadlines.manage');
     $show_status = false;
     require __DIR__ . '/_form_fields.php';
     ?>
+    <div class="form-actions form-actions-end">
+        <button class="btn" type="submit"><?= e(__('deadlines.submit')) ?></button>
+    </div>
 </form>
 <?php endif; ?>
 
@@ -80,7 +83,7 @@ $canManage = can('deadlines.manage');
             <?php endif; ?>
         </form>
     </div>
-    <?php if ($deadline_groups === []): ?>
+    <?php if ($deadline_items === []): ?>
         <div class="empty-state">
             <?php if (trim((string) ($search_query ?? '')) !== ''): ?>
                 <strong><?= e(__('deadlines.search_empty_title')) ?></strong>
@@ -91,25 +94,19 @@ $canManage = can('deadlines.manage');
             <?php endif; ?>
         </div>
     <?php else: ?>
-        <div class="doc-archive">
-            <?php foreach ($deadline_groups as $group): ?>
-                <section class="doc-archive-group">
-                    <header class="doc-archive-group-head">
-                        <h3 class="doc-archive-group-title"><?= e((string) $group['label']) ?></h3>
-                        <span class="doc-archive-group-count muted"><?= e((string) count($group['items'])) ?></span>
-                    </header>
-                    <div class="table-wrap embedded">
-                        <table>
-                            <thead>
-                            <tr>
-                                <th><?= e(__('deadlines.title_field')) ?></th>
-                                <th><?= e(__('deadlines.due_date')) ?></th>
-                                <th><?= e(__('deadlines.member')) ?></th>
-                                <th><?= e(__('deadlines.actions')) ?></th>
-                            </tr>
-                            </thead>
-                            <tbody>
-                            <?php foreach ($group['items'] as $item): ?>
+        <div class="table-wrap embedded">
+            <table>
+                <thead>
+                <tr>
+                    <th><?= e(__('deadlines.title_field')) ?></th>
+                    <th><?= e(__('deadlines.category')) ?></th>
+                    <th><?= e(__('deadlines.due_date')) ?></th>
+                    <th><?= e(__('deadlines.member')) ?></th>
+                    <th><?= e(__('deadlines.actions')) ?></th>
+                </tr>
+                </thead>
+                <tbody>
+                            <?php foreach ($deadline_items as $item): ?>
                                 <?php
                                 $due = (string) ($item['due_date'] ?? '');
                                 $state = 'valid';
@@ -120,11 +117,20 @@ $canManage = can('deadlines.manage');
                                 }
                                 $memberLabel = trim((string) (($item['last_name'] ?? '') . ' ' . ($item['first_name'] ?? '')));
                                 $itemId = (int) ($item['id'] ?? 0);
-                                $editUrl = $canManage ? url('/deadlines/' . $itemId . '/edit') : '';
+                                $isSystem = str_starts_with((string) ($item['source'] ?? ''), 'system:');
+                                $editable = $canManage && !$isSystem;
+                                $editUrl = $editable ? url('/deadlines/' . $itemId . '/edit') : '';
+                                $categoryLabel = '';
+                                foreach ($categories as $category) {
+                                    if ((string) $category['key'] === (string) ($item['category'] ?? 'general')) {
+                                        $categoryLabel = (string) $category['label'];
+                                        break;
+                                    }
+                                }
                                 ?>
                                 <tr
-                                    class="deadline-row deadline-row-<?= e($state) ?><?= $canManage ? ' doc-row-editable' : '' ?>"
-                                    <?php if ($canManage): ?>
+                                    class="deadline-row deadline-row-<?= e($state) ?><?= $editable ? ' doc-row-editable' : '' ?>"
+                                    <?php if ($editable): ?>
                                         data-href="<?= e($editUrl) ?>"
                                         tabindex="0"
                                         role="link"
@@ -134,14 +140,18 @@ $canManage = can('deadlines.manage');
                                     <td>
                                         <span class="deadline-badge deadline-badge-<?= e($state) ?>"><?= e(__('deadlines.badge_' . $state)) ?></span>
                                         <strong><?= e((string) ($item['title'] ?? '')) ?></strong>
+                                        <?php if ($isSystem): ?>
+                                            <span class="doc-status doc-status-approved"><?= e(__('deadlines.system_badge')) ?></span>
+                                        <?php endif; ?>
                                         <?php if (!empty($item['notes'])): ?>
                                             <div class="muted"><?= e((string) $item['notes']) ?></div>
                                         <?php endif; ?>
                                     </td>
+                                    <td><span class="doc-category-badge"><?= e($categoryLabel !== '' ? $categoryLabel : (string) ($item['category'] ?? '')) ?></span></td>
                                     <td><?= e(format_date($due) ?: '—') ?></td>
                                     <td><?= e($memberLabel !== '' ? $memberLabel : '—') ?></td>
                                     <td class="doc-row-actions">
-                                        <?php if ($canManage): ?>
+                                        <?php if ($editable): ?>
                                             <form method="post" action="<?= e(url('/deadlines/' . $itemId . '/done')) ?>" class="inline-form">
                                                 <?= csrf_field() ?>
                                                 <button type="submit" class="btn btn-ghost btn-sm"><?= e(__('deadlines.mark_done')) ?></button>
@@ -149,17 +159,16 @@ $canManage = can('deadlines.manage');
                                             <?php if (!empty($item['member_id']) && component_enabled('members') && can('members.manage')): ?>
                                                 <a class="btn btn-ghost btn-sm" href="<?= e(url('/members/' . (int) $item['member_id'])) ?>"><?= e(__('deadlines.open_member')) ?></a>
                                             <?php endif; ?>
-                                        <?php else: ?>
+                                        <?php elseif (!$isSystem): ?>
                                             <span class="muted">—</span>
+                                        <?php else: ?>
+                                            <span class="muted"><?= e(__('deadlines.system_readonly_short')) ?></span>
                                         <?php endif; ?>
                                     </td>
                                 </tr>
                             <?php endforeach; ?>
-                            </tbody>
-                        </table>
-                    </div>
-                </section>
-            <?php endforeach; ?>
+                </tbody>
+            </table>
         </div>
     <?php endif; ?>
 </div>

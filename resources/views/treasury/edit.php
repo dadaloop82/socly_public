@@ -3,6 +3,8 @@
 /** @var list<array{key:string,label:string,builtin:bool}> $categories */
 /** @var list<array> $members */
 /** @var array{auto_from_payments?:bool} $config */
+/** @var list<string> $beneficiaries */
+/** @var \Socly\Services\CurrencyService $currency */
 $old = old_input();
 $values = $old !== [] ? $old : [
     'direction' => (string) ($movement['direction'] ?? 'income'),
@@ -13,6 +15,10 @@ $values = $old !== [] ? $old : [
     'member_id' => (string) ($movement['member_id'] ?? ''),
     'description' => (string) ($movement['description'] ?? ''),
     'new_category' => '',
+    'invoice_payment' => (string) ($movement['invoice_payment'] ?? ''),
+    'invoice_number' => (string) ($movement['invoice_number'] ?? ''),
+    'beneficiary' => (string) ($movement['beneficiary'] ?? ''),
+    'attachment_path' => (string) ($movement['attachment_path'] ?? ''),
 ];
 $movementId = (int) ($movement['id'] ?? 0);
 ?>
@@ -23,7 +29,8 @@ $movementId = (int) ($movement['id'] ?? 0);
     </div>
 </div>
 
-<form class="panel" method="post" action="<?= e(url('/treasury/' . $movementId)) ?>" data-treasury-form>
+<form class="panel" method="post" action="<?= e(url('/treasury/' . $movementId)) ?>" enctype="multipart/form-data"
+      data-treasury-form data-leave-guard data-confirm-template="<?= e(__('treasury.confirm_summary')) ?>">
     <?= csrf_field() ?>
     <div class="panel-header">
         <div>
@@ -36,4 +43,8 @@ $movementId = (int) ($movement['id'] ?? 0);
         </div>
     </div>
     <?php require __DIR__ . '/_form_fields.php'; ?>
+    <div class="form-actions form-actions-end">
+        <a class="btn btn-ghost" href="<?= e(url('/treasury')) ?>"><?= e(__('common.back')) ?></a>
+        <button class="btn" type="submit"><?= e(__('treasury.update')) ?></button>
+    </div>
 </form>

@@ -22,6 +22,10 @@ $fileReady = $hasExistingFile || trim((string) ($values['uploaded_path'] ?? ''))
         <input type="text" name="title" value="<?= e((string) ($values['title'] ?? '')) ?>" required maxlength="190">
     </div>
     <div>
+        <label><?= e(__('documents.number')) ?></label>
+        <input type="text" name="document_number" value="<?= e((string) ($values['document_number'] ?? '')) ?>" maxlength="80">
+    </div>
+    <div>
         <label><?= e(__('documents.date')) ?></label>
         <input type="date" name="document_date" value="<?= e((string) ($values['document_date'] ?? $today)) ?>">
     </div>

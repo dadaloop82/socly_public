@@ -55,7 +55,8 @@ final class SetupService
 
         if ($type === 'colors' || $type === 'name_pair' || $type === 'field_group' || $type === 'address_block') {
             foreach ($step['fields'] ?? [] as $field) {
-                $val = $this->readValue((string) $field['settings_key'], (string) ($field['env_key'] ?? ''));
+                $default = ($field['settings_key'] ?? '') === 'app.currency' ? 'EUR' : null;
+                $val = $this->readValue((string) $field['settings_key'], (string) ($field['env_key'] ?? ''), $default);
                 $required = array_key_exists('required', $field) ? !empty($field['required']) : !empty($step['required']);
                 if ($required && trim((string) $val) === '') {
                     return false;
@@ -236,6 +237,9 @@ final class SetupService
                 if ($type === 'colors') {
                     $default = $field['key'] === 'primary' ? '#0D6E66' : '#B84A1B';
                 }
+                if (($field['settings_key'] ?? '') === 'app.currency') {
+                    $default = 'EUR';
+                }
                 $out[$field['key']] = (string) $this->readValue(
                     (string) $field['settings_key'],
                     (string) ($field['env_key'] ?? ''),
@@ -347,14 +351,13 @@ final class SetupService
         }
 
         if ($type === 'platform_consents') {
-            $mailReady = $this->mail->isReady();
             return [
-                'news_opt_in' => $mailReady && ((string) $this->settings->get('platform.news_opt_in', '1')) !== '0',
-                'usage_stats_opt_in' => $mailReady && ((string) $this->settings->get('platform.usage_stats_opt_in', '1')) !== '0',
-                'showcase_consent' => $mailReady && ((string) $this->settings->get('platform.showcase_consent', '1')) !== '0',
+                'news_opt_in' => ((string) $this->settings->get('platform.news_opt_in', '1')) !== '0',
+                'usage_stats_opt_in' => ((string) $this->settings->get('platform.usage_stats_opt_in', '1')) !== '0',
+                'showcase_consent' => ((string) $this->settings->get('platform.showcase_consent', '1')) !== '0',
                 'confirm_first_name' => '',
                 'confirm_last_name' => '',
-                'mail_ready' => $mailReady,
+                'mail_ready' => $this->mail->isReady(),
             ];
         }
 
@@ -539,10 +542,9 @@ final class SetupService
         }
 
         if ($type === 'platform_consents') {
-            $mailReady = $this->mail->isReady();
-            $news = $mailReady && !empty($input['news_opt_in']);
-            $stats = $mailReady && !empty($input['usage_stats_opt_in']);
-            $showcase = $mailReady && !empty($input['showcase_consent']);
+            $news = !empty($input['news_opt_in']);
+            $stats = !empty($input['usage_stats_opt_in']);
+            $showcase = !empty($input['showcase_consent']);
             if ($news || $stats || $showcase) {
                 $confirmError = $this->validatePresidentNameConfirmation($input);
                 if ($confirmError !== null) {

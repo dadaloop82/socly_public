@@ -50,6 +50,7 @@ use Socly\Services\AuditService;
 use Socly\Services\AuthService;
 use Socly\Services\BrandingService;
 use Socly\Services\ComponentService;
+use Socly\Services\CurrencyService;
 use Socly\Services\DeadlineService;
 use Socly\Services\DocumentService;
 use Socly\Services\EnrollmentService;
@@ -267,11 +268,13 @@ $app->bind(SetupService::class, fn (App $a) => new SetupService(
     $a->get(ComponentService::class)
 ));
 $app->bind(ComponentService::class, fn (App $a) => new ComponentService($a->get(SettingsService::class)));
+$app->bind(CurrencyService::class, fn (App $a) => new CurrencyService($a->get(SettingsService::class)));
 $app->bind(TreasuryService::class, fn (App $a) => new TreasuryService(
     $a->get(Database::class),
     $a->get(AuditService::class),
     $a->get(Validator::class),
-    $a->get(ComponentService::class)
+    $a->get(ComponentService::class),
+    $a->get(DocumentService::class)
 ));
 $app->bind(DeadlineService::class, fn (App $a) => new DeadlineService(
     $a->get(Database::class),
@@ -317,7 +320,8 @@ $app->bind(DashboardController::class, fn (App $a) => new DashboardController(
     $a->get(TreasuryService::class),
     $a->get(DeadlineService::class),
     $a->get(DocumentService::class),
-    $a->get(AssociationPeopleService::class)
+    $a->get(AssociationPeopleService::class),
+    $a->get(CurrencyService::class)
 ));
 $app->bind(EnrollmentService::class, fn (App $a) => new EnrollmentService(
     $a->get(Database::class),
@@ -344,13 +348,15 @@ $app->bind(SettingsController::class, fn (App $a) => new SettingsController(
     $a->get(MailService::class),
     $a->get(SetupService::class),
     $a->get(ComponentService::class),
-    $a->get(DocumentService::class)
+    $a->get(DocumentService::class),
+    $a->get(DeadlineService::class)
 ));
 $app->bind(TreasuryController::class, fn (App $a) => new TreasuryController(
     $a->get(View::class),
     $a->get(TreasuryService::class),
     $a->get(MemberService::class),
-    $a->get(ComponentService::class)
+    $a->get(ComponentService::class),
+    $a->get(CurrencyService::class)
 ));
 $app->bind(DeadlinesController::class, fn (App $a) => new DeadlinesController(
     $a->get(View::class),
@@ -363,7 +369,8 @@ $app->bind(DocumentsController::class, fn (App $a) => new DocumentsController(
 ));
 $app->bind(OrgController::class, fn (App $a) => new OrgController(
     $a->get(View::class),
-    $a->get(AssociationPeopleService::class)
+    $a->get(AssociationPeopleService::class),
+    $a->get(DeadlineService::class)
 ));
 $app->bind(SetupController::class, fn (App $a) => new SetupController(
     $a->get(View::class),

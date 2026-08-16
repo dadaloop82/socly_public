@@ -27,7 +27,7 @@ $deadlineId = (int) ($deadline['id'] ?? 0);
     </div>
 </div>
 
-<form class="panel" method="post" action="<?= e(url('/deadlines/' . $deadlineId)) ?>" data-deadline-form>
+<form class="panel" method="post" action="<?= e(url('/deadlines/' . $deadlineId)) ?>" data-deadline-form data-leave-guard data-confirm-template="<?= e(__('deadlines.confirm_save')) ?>">
     <?= csrf_field() ?>
     <div class="panel-header">
         <div>
@@ -40,4 +40,8 @@ $deadlineId = (int) ($deadline['id'] ?? 0);
     $show_status = true;
     require __DIR__ . '/_form_fields.php';
     ?>
+    <div class="form-actions form-actions-end">
+        <a class="btn btn-ghost" href="<?= e(url('/deadlines')) ?>"><?= e(__('common.back')) ?></a>
+        <button class="btn" type="submit"><?= e(__('deadlines.update')) ?></button>
+    </div>
 </form>

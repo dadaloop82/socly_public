@@ -6,6 +6,8 @@
 /** @var list<array{key:string,label:string,builtin:bool}> $categories */
 /** @var string $default_category */
 /** @var string $search_query */
+/** @var list<string> $beneficiaries */
+/** @var \Socly\Services\CurrencyService $currency */
 $old = old_input();
 $values = $old !== [] ? $old : [
     'direction' => 'income',
@@ -16,6 +18,9 @@ $values = $old !== [] ? $old : [
     'member_id' => '',
     'description' => '',
     'new_category' => '',
+    'invoice_payment' => '',
+    'invoice_number' => '',
+    'beneficiary' => '',
 ];
 $canManage = can('treasury.manage');
 ?>
@@ -29,29 +34,32 @@ $canManage = can('treasury.manage');
 <div class="stats">
     <div class="stat">
         <div class="label"><?= e(__('treasury.balance')) ?></div>
-        <div class="value"><?= e(number_format((float) $ledger['balance'], 2, ',', '.')) ?> €</div>
+        <div class="value"><?= e($currency->format((float) $ledger['balance'])) ?></div>
     </div>
     <div class="stat">
         <div class="label"><?= e(__('treasury.income_total')) ?></div>
-        <div class="value stat-positive"><?= e(number_format((float) $ledger['income'], 2, ',', '.')) ?> €</div>
+        <div class="value stat-positive"><?= e($currency->format((float) $ledger['income'])) ?></div>
     </div>
     <div class="stat">
         <div class="label"><?= e(__('treasury.expense_total')) ?></div>
-        <div class="value stat-negative"><?= e(number_format((float) $ledger['expense'], 2, ',', '.')) ?> €</div>
+        <div class="value stat-negative"><?= e($currency->format((float) $ledger['expense'])) ?></div>
     </div>
 </div>
 
 <?php if ($canManage): ?>
-<form class="panel" method="post" action="<?= e(url('/treasury')) ?>" data-treasury-form>
+<form class="panel" method="post" action="<?= e(url('/treasury')) ?>" enctype="multipart/form-data" data-treasury-form data-leave-guard
+      data-confirm-template="<?= e(__('treasury.confirm_summary')) ?>">
     <?= csrf_field() ?>
     <div class="panel-header">
         <div>
             <h2 class="section-title"><?= e(__('treasury.add_movement')) ?></h2>
             <p class="section-lede"><?= e(__('treasury.add_lede')) ?></p>
         </div>
-        <button class="btn" type="submit"><?= e(__('treasury.submit')) ?></button>
     </div>
     <?php require __DIR__ . '/_form_fields.php'; ?>
+    <div class="form-actions form-actions-end">
+        <button class="btn" type="submit"><?= e(__('treasury.submit')) ?></button>
+    </div>
 </form>
 <?php endif; ?>
 
@@ -103,6 +111,8 @@ $canManage = can('treasury.manage');
                                 <th><?= e(__('treasury.date')) ?></th>
                                 <th><?= e(__('treasury.description')) ?></th>
                                 <th><?= e(__('treasury.method')) ?></th>
+                                <th><?= e(__('treasury.details')) ?></th>
+                                <th><?= e(__('treasury.created')) ?></th>
                                 <th><?= e(__('treasury.income')) ?></th>
                                 <th><?= e(__('treasury.expense')) ?></th>
                             </tr>
@@ -137,8 +147,19 @@ $canManage = can('treasury.manage');
                                     <td><?= e(format_date($row['movement_date'] ?? null) ?: '—') ?></td>
                                     <td><?= e($desc !== '' ? $desc : '—') ?></td>
                                     <td><?= e($methodLabel) ?></td>
-                                    <td class="amount-income"><?= $isIncome ? e(number_format($amount, 2, ',', '.')) . ' €' : '—' ?></td>
-                                    <td class="amount-expense"><?= !$isIncome ? e(number_format($amount, 2, ',', '.')) . ' €' : '—' ?></td>
+                                    <td>
+                                        <?php if ($memberLabel !== ''): ?><div><?= e($memberLabel) ?></div><?php endif; ?>
+                                        <?php if (!empty($row['beneficiary'])): ?><div><?= e(__('treasury.beneficiary')) ?>: <?= e((string) $row['beneficiary']) ?></div><?php endif; ?>
+                                        <?php if (!empty($row['invoice_number'])): ?><div><?= e(__('treasury.invoice_number')) ?>: <?= e((string) $row['invoice_number']) ?></div><?php endif; ?>
+                                        <?php if (!empty($row['attachment_path'])): ?><div><a href="<?= e(url('/treasury/' . $rowId . '/attachment')) ?>" target="_blank" rel="noopener"><?= e(__('treasury.invoice_pdf')) ?></a></div><?php endif; ?>
+                                        <?php if (empty($row['member_id']) && empty($row['beneficiary']) && empty($row['invoice_number']) && empty($row['attachment_path'])): ?><?= e(__('treasury.none')) ?><?php endif; ?>
+                                    </td>
+                                    <td>
+                                        <div><?= e(format_datetime($row['created_at'] ?? null) ?: '—') ?></div>
+                                        <div class="muted"><?= e((string) ($row['creator_name'] ?? __('treasury.none'))) ?></div>
+                                    </td>
+                                    <td class="amount-income"><?= $isIncome ? e($currency->format($amount)) : '—' ?></td>
+                                    <td class="amount-expense"><?= !$isIncome ? e($currency->format($amount)) : '—' ?></td>
                                 </tr>
                             <?php endforeach; ?>
                             </tbody>

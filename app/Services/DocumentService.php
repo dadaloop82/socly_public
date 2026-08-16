@@ -120,12 +120,14 @@ final class DocumentService
     {
         $like = '%' . $this->escapeLike($query) . '%';
         $params['like_title'] = $like;
+        $params['like_number'] = $like;
         $params['like_summary'] = $like;
         $params['like_category'] = $like;
         $params['like_language'] = $like;
 
         $parts = [
             'd.title LIKE :like_title',
+            'd.document_number LIKE :like_number',
             'd.summary LIKE :like_summary',
             'd.category LIKE :like_category',
             'd.language LIKE :like_language',
@@ -298,6 +300,7 @@ final class DocumentService
         $id = $this->db->insert('association_documents', $data);
         $this->audit->log('document.created', 'document', (string) $id, null, [
             'title' => $data['title'],
+            'document_number' => $data['document_number'],
             'category' => $data['category'],
             'language' => $data['language'],
         ], $ip);
@@ -333,12 +336,22 @@ final class DocumentService
         /** @var array<string,mixed> $data */
         $data = $parsed['data'];
         $this->db->update('association_documents', $data, 'id = :id', ['id' => $id]);
+        $oldPath = trim((string) ($existing['file_path'] ?? ''));
+        $newPath = trim((string) ($data['file_path'] ?? ''));
+        if ($oldPath !== '' && $newPath !== $oldPath && $this->isSafeStoredPath($oldPath)) {
+            $oldFullPath = storage_path($oldPath);
+            if (is_file($oldFullPath)) {
+                @unlink($oldFullPath);
+            }
+        }
         $this->audit->log('document.updated', 'document', (string) $id, [
             'title' => $existing['title'] ?? null,
+            'document_number' => $existing['document_number'] ?? null,
             'category' => $existing['category'] ?? null,
             'language' => $existing['language'] ?? null,
         ], [
             'title' => $data['title'],
+            'document_number' => $data['document_number'],
             'category' => $data['category'],
             'language' => $data['language'],
         ], $ip);
@@ -389,6 +402,7 @@ final class DocumentService
             'ok' => true,
             'data' => [
                 'title' => $title,
+                'document_number' => mb_substr(trim((string) ($input['document_number'] ?? '')), 0, 80),
                 'category' => $category,
                 'language' => $language,
                 'document_date' => $docDate !== '' ? $docDate : null,
@@ -578,7 +592,7 @@ final class DocumentService
                 return;
             }
         }
-        $list[] = ['slug' => $slug, 'label' => mb_substr(trim($label), 0, 80)];
+        $list[] = ['slug' => $slug, 'label' => mb_substr(sentence_case($label), 0, 80)];
         $cfg['custom_categories'] = $list;
         $this->components->saveConfig('documents', $cfg);
     }

@@ -7,6 +7,7 @@ namespace Socly\Controllers;
 use Socly\Core\Http\Request;
 use Socly\Core\View;
 use Socly\Services\ComponentService;
+use Socly\Services\CurrencyService;
 use Socly\Services\MemberService;
 use Socly\Services\TreasuryService;
 
@@ -16,7 +17,8 @@ final class TreasuryController extends BaseController
         View $view,
         private readonly TreasuryService $treasury,
         private readonly MemberService $members,
-        private readonly ComponentService $components
+        private readonly ComponentService $components,
+        private readonly CurrencyService $currency
     ) {
         parent::__construct($view);
     }
@@ -39,6 +41,8 @@ final class TreasuryController extends BaseController
             'categories' => $this->treasury->categoryOptions(),
             'default_category' => $this->treasury->defaultCategory(),
             'search_query' => $query,
+            'beneficiaries' => $this->treasury->beneficiaries(),
+            'currency' => $this->currency,
         ]);
     }
 
@@ -66,13 +70,21 @@ final class TreasuryController extends BaseController
             'categories' => $categories,
             'members' => $this->members->listForSelect(),
             'config' => $this->components->config('treasury', ['auto_from_payments' => true]),
+            'beneficiaries' => $this->treasury->beneficiaries(),
+            'currency' => $this->currency,
         ]);
     }
 
     public function update(Request $request, string $id): void
     {
         require_component('treasury');
-        $result = $this->treasury->update((int) $id, $request->all(), $request->ip());
+        $result = $this->treasury->update(
+            (int) $id,
+            $request->all(),
+            $request->file('invoice_pdf'),
+            $request->ip(),
+            auth_user()['id'] ?? null
+        );
         if (empty($result['ok'])) {
             $this->flash('errors', $result['errors'] ?? []);
             $this->rememberOld($request->all());
@@ -85,7 +97,12 @@ final class TreasuryController extends BaseController
     public function store(Request $request): void
     {
         require_component('treasury');
-        $result = $this->treasury->create($request->all(), $request->ip(), auth_user()['id'] ?? null);
+        $result = $this->treasury->create(
+            $request->all(),
+            $request->file('invoice_pdf'),
+            $request->ip(),
+            auth_user()['id'] ?? null
+        );
         if (empty($result['ok'])) {
             $this->flash('errors', $result['errors'] ?? ['treasury' => __('validation.required')]);
             $this->rememberOld($request->all());
@@ -93,5 +110,19 @@ final class TreasuryController extends BaseController
         }
         $this->flash('success', __('treasury.saved'));
         redirect('/treasury');
+    }
+
+    public function attachment(Request $request, string $id): void
+    {
+        require_component('treasury');
+        $path = $this->treasury->attachmentFilePath((int) $id);
+        if ($path === null) {
+            http_response_code(404);
+            echo 'Not found';
+            return;
+        }
+        header('Content-Type: application/pdf');
+        header('Content-Disposition: inline; filename="' . basename($path) . '"');
+        readfile($path);
     }
 }

@@ -30,7 +30,7 @@ final class DeadlinesController extends BaseController
         $soon = date('Y-m-d', strtotime('+30 days'));
         $this->render('deadlines/index', [
             'title' => __('deadlines.title'),
-            'deadline_groups' => $this->deadlines->groupedByCategory(200, $query),
+            'deadline_items' => $this->deadlines->upcoming(200, $query),
             'counts' => $this->deadlines->counts(),
             'today' => $today,
             'soon' => $soon,
@@ -48,6 +48,10 @@ final class DeadlinesController extends BaseController
         if ($item === null) {
             http_response_code(404);
             $this->flash('errors', ['deadline' => __('errors.404')]);
+            redirect('/deadlines');
+        }
+        if ($this->deadlines->isSystem($item)) {
+            $this->flash('errors', ['deadline' => __('deadlines.system_readonly')]);
             redirect('/deadlines');
         }
         $categories = $this->deadlines->categoryOptions();

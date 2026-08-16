@@ -136,7 +136,7 @@ $defaultTab = $tabs[0]['id'] ?? '';
                 </div>
                 <div class="stat">
                     <div class="label"><?= e(__('dashboard.collected_month')) ?></div>
-                    <div class="value"><?= e(number_format((float) ($stats['collected_month'] ?? 0), 2, ',', '.')) ?> €</div>
+                    <div class="value"><?= e($currency->format((float) ($stats['collected_month'] ?? 0))) ?></div>
                 </div>
                 <div class="stat">
                     <div class="label"><?= e(__('dashboard.members_active')) ?></div>
@@ -148,7 +148,7 @@ $defaultTab = $tabs[0]['id'] ?? '';
                 </div>
                 <div class="stat">
                     <div class="label"><?= e(__('dashboard.collected_year')) ?></div>
-                    <div class="value"><?= e(number_format((float) ($stats['collected_year'] ?? 0), 2, ',', '.')) ?> €</div>
+                    <div class="value"><?= e($currency->format((float) ($stats['collected_year'] ?? 0))) ?></div>
                 </div>
                 <div class="stat">
                     <div class="label"><?= e(__('dashboard.members_expired')) ?></div>
@@ -241,15 +241,15 @@ $defaultTab = $tabs[0]['id'] ?? '';
             <div class="stats stats-context-treasury" data-stats-context="treasury">
                 <div class="stat">
                     <div class="label"><?= e(__('dashboard.treasury_balance')) ?></div>
-                    <div class="value"><?= e(number_format((float) ($widgets['treasury']['balance'] ?? 0), 2, ',', '.')) ?> €</div>
+                    <div class="value"><?= e($currency->format((float) ($widgets['treasury']['balance'] ?? 0))) ?></div>
                 </div>
                 <div class="stat">
                     <div class="label"><?= e(__('dashboard.treasury_income')) ?></div>
-                    <div class="value stat-positive"><?= e(number_format((float) ($widgets['treasury']['income'] ?? 0), 2, ',', '.')) ?> €</div>
+                    <div class="value stat-positive"><?= e($currency->format((float) ($widgets['treasury']['income'] ?? 0))) ?></div>
                 </div>
                 <div class="stat">
                     <div class="label"><?= e(__('dashboard.treasury_expense')) ?></div>
-                    <div class="value stat-negative"><?= e(number_format((float) ($widgets['treasury']['expense'] ?? 0), 2, ',', '.')) ?> €</div>
+                    <div class="value stat-negative"><?= e($currency->format((float) ($widgets['treasury']['expense'] ?? 0))) ?></div>
                 </div>
             </div>
 
@@ -338,7 +338,7 @@ $defaultTab = $tabs[0]['id'] ?? '';
                                         <span class="muted"><?= e(format_date($row['movement_date'] ?? null) ?: '—') ?></span>
                                     </span>
                                     <span class="<?= $isIncome ? 'amount-income' : 'amount-expense' ?>">
-                                        <?= $isIncome ? '+' : '−' ?><?= e(number_format($amount, 2, ',', '.')) ?> €
+                                        <?= $isIncome ? '+' : '−' ?><?= e($currency->format($amount)) ?>
                                     </span>
                                 </a>
                             </li>

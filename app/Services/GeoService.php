@@ -47,23 +47,32 @@ final class GeoService
 
     public function findComune(string $name): ?array
     {
-        $name = mb_strtolower(trim($name));
+        $name = $this->normalizePlace($name);
         if ($name === '') {
             return null;
         }
         foreach ($this->comuni() as $row) {
-            if (mb_strtolower($row['nome']) === $name) {
+            if ($this->normalizePlace($row['nome']) === $name) {
                 return $row;
             }
         }
-        // partial unique match
+        // partial unique match (accent/case insensitive)
         $matches = [];
         foreach ($this->comuni() as $row) {
-            if (str_starts_with(mb_strtolower($row['nome']), $name)) {
+            $n = $this->normalizePlace($row['nome']);
+            if (str_starts_with($n, $name) || str_contains($n, $name)) {
                 $matches[] = $row;
             }
         }
-        return count($matches) === 1 ? $matches[0] : null;
+        if (count($matches) === 1) {
+            return $matches[0];
+        }
+        // Prefer exact-ish starts-with when multiple contains matches
+        $starts = array_values(array_filter(
+            $matches,
+            fn (array $row): bool => str_starts_with($this->normalizePlace($row['nome']), $name)
+        ));
+        return count($starts) === 1 ? $starts[0] : null;
     }
 
     /** @return list<array{label:string,address:string,house_number:string,city:string,postal_code:string,lat:float,lon:float}> */

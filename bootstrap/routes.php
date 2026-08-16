@@ -98,6 +98,7 @@ $router->post('/members/{id}/payments', [MemberController::class, 'storePayment'
 
 $router->get('/treasury', [TreasuryController::class, 'index'], 'treasury.view', ['mw.locale', 'mw.install', 'mw.auth']);
 $router->post('/treasury', [TreasuryController::class, 'store'], 'treasury.manage', ['mw.locale', 'mw.install', 'mw.auth', 'mw.csrf']);
+$router->get('/treasury/{id}/attachment', [TreasuryController::class, 'attachment'], 'treasury.view', ['mw.locale', 'mw.install', 'mw.auth']);
 $router->get('/treasury/{id}/edit', [TreasuryController::class, 'edit'], 'treasury.manage', ['mw.locale', 'mw.install', 'mw.auth']);
 $router->post('/treasury/{id}', [TreasuryController::class, 'update'], 'treasury.manage', ['mw.locale', 'mw.install', 'mw.auth', 'mw.csrf']);
 
@@ -110,9 +111,11 @@ $router->post('/deadlines/{id}/done', [DeadlinesController::class, 'done'], 'dea
 $router->get('/documents', [DocumentsController::class, 'index'], 'documents.view', ['mw.locale', 'mw.install', 'mw.auth']);
 $router->post('/documents', [DocumentsController::class, 'store'], 'documents.manage', ['mw.locale', 'mw.install', 'mw.auth', 'mw.csrf']);
 $router->post('/documents/upload', [DocumentsController::class, 'upload'], 'documents.manage', ['mw.locale', 'mw.install', 'mw.auth', 'mw.csrf']);
+$router->get('/documents/{id}', [DocumentsController::class, 'show'], 'documents.view', ['mw.locale', 'mw.install', 'mw.auth']);
 $router->get('/documents/{id}/edit', [DocumentsController::class, 'edit'], 'documents.manage', ['mw.locale', 'mw.install', 'mw.auth']);
 $router->post('/documents/{id}', [DocumentsController::class, 'update'], 'documents.manage', ['mw.locale', 'mw.install', 'mw.auth', 'mw.csrf']);
 $router->get('/documents/{id}/file', [DocumentsController::class, 'download'], 'documents.view', ['mw.locale', 'mw.install', 'mw.auth']);
+$router->get('/documents/{id}/download', [DocumentsController::class, 'forceDownload'], 'documents.view', ['mw.locale', 'mw.install', 'mw.auth']);
 
 $router->get('/org', [OrgController::class, 'index'], 'org.view', ['mw.locale', 'mw.install', 'mw.auth']);
 $router->post('/org/organs', [OrgController::class, 'storeOrgan'], null, ['mw.locale', 'mw.install', 'mw.auth', 'mw.csrf']);

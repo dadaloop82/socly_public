@@ -89,6 +89,7 @@ final class InstallerService
         $this->settings->set('branding.primary', $data['primary'] ?? '#0D6E66');
         $this->settings->set('branding.accent', $data['accent'] ?? '#B84A1B');
         $this->settings->set('app.locale', $data['locale'] ?? 'it');
+        $this->settings->set('app.currency', 'EUR');
         $this->settings->set('gdpr.enabled', !empty($data['gdpr_enabled']) ? '1' : '0');
         $this->settings->set('app.installed', '1');
     }

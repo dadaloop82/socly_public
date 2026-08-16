@@ -356,6 +356,23 @@ if (!function_exists('localized')) {
     }
 }
 
+if (!function_exists('format_datetime')) {
+    function format_datetime(null|string $value, ?string $locale = null): string
+    {
+        $value = trim((string) $value);
+        if ($value === '' || str_starts_with($value, '0000-00-00')) {
+            return '';
+        }
+        try {
+            $date = new DateTimeImmutable($value);
+        } catch (Throwable) {
+            return '';
+        }
+        $locale = $locale ?? current_locale();
+        return $date->format($locale === 'de' ? 'd.m.Y H:i' : 'd/m/Y H:i');
+    }
+}
+
 if (!function_exists('assoc_capitalize_name')) {
     /** First letter uppercase (UTF-8), rest unchanged. */
     function assoc_capitalize_name(string $name): string
@@ -367,6 +384,20 @@ if (!function_exists('assoc_capitalize_name')) {
         $first = mb_substr($name, 0, 1, 'UTF-8');
         $rest = mb_substr($name, 1, null, 'UTF-8');
         return mb_strtoupper($first, 'UTF-8') . $rest;
+    }
+}
+
+if (!function_exists('sentence_case')) {
+    /** First letter uppercase and the remaining text lowercase (UTF-8). */
+    function sentence_case(string $value): string
+    {
+        $value = trim(preg_replace('/\s+/u', ' ', $value) ?? '');
+        if ($value === '') {
+            return '';
+        }
+        $value = mb_strtolower($value, 'UTF-8');
+        return mb_strtoupper(mb_substr($value, 0, 1, 'UTF-8'), 'UTF-8')
+            . mb_substr($value, 1, null, 'UTF-8');
     }
 }
 

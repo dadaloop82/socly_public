@@ -10,9 +10,9 @@ $needsSetup = !empty($needsSetup);
         <span class="auth-lang-rotate-item h2" data-rotate-lang="en">Choose language</span>
     </div>
     <select id="lang" name="lang" data-lang-select aria-label="<?= e(__('auth.choose_language')) ?>">
-        <option value="it" <?= $currentLocale === 'it' ? 'selected' : '' ?>>Italiano</option>
-        <option value="de" <?= $currentLocale === 'de' ? 'selected' : '' ?>>Deutsch</option>
-        <option value="en" <?= $currentLocale === 'en' ? 'selected' : '' ?>>English</option>
+        <option value="it" <?= $currentLocale === 'it' ? 'selected' : '' ?>>🇮🇹 Italiano</option>
+        <option value="de" <?= $currentLocale === 'de' ? 'selected' : '' ?>>🇩🇪 Deutsch</option>
+        <option value="en" <?= $currentLocale === 'en' ? 'selected' : '' ?>>🇬🇧 English</option>
     </select>
 </div>
 

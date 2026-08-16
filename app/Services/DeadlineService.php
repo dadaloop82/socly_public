@@ -32,6 +32,7 @@ final class DeadlineService
     /** @return list<array<string,mixed>> */
     public function upcoming(int $limit = 200, string $query = '', bool $openOnly = true): array
     {
+        $this->syncSystemDeadlines();
         $limitSql = ' LIMIT ' . max(1, min(500, $limit));
         $base = "SELECT d.*,
                     (SELECT v.value FROM member_field_values v
@@ -102,6 +103,71 @@ final class DeadlineService
             ];
         }
         return $ordered;
+    }
+
+    public function syncSystemDeadlines(): void
+    {
+        $sources = [];
+        $periods = $this->db->fetchAll(
+            'SELECT id, label, ends_on FROM membership_periods WHERE ends_on IS NOT NULL'
+        );
+        foreach ($periods as $period) {
+            $source = 'system:membership_period:' . (int) $period['id'];
+            $sources[] = $source;
+            $this->upsertSystemDeadline($source, [
+                'title' => __('deadlines.auto_membership_period', [
+                    'label' => (string) ($period['label'] ?? ''),
+                ]),
+                'category' => 'membership',
+                'due_date' => (string) $period['ends_on'],
+                'member_id' => null,
+                'notes' => __('deadlines.auto_generated_note'),
+            ]);
+        }
+
+        $people = $this->db->fetchAll(
+            'SELECT p.id, p.first_name, p.last_name, p.mandate_ends_at,
+                    r.label_key, r.custom_label
+             FROM association_people p
+             INNER JOIN association_roles r ON r.`key` = p.role_key
+             WHERE p.is_active = 1 AND p.mandate_ends_at IS NOT NULL'
+        );
+        foreach ($people as $person) {
+            $source = 'system:mandate:' . (int) $person['id'];
+            $sources[] = $source;
+            $role = trim((string) ($person['custom_label'] ?? ''));
+            if ($role === '') {
+                $role = __((string) ($person['label_key'] ?? ''));
+            }
+            $this->upsertSystemDeadline($source, [
+                'title' => __('deadlines.auto_mandate', [
+                    'name' => trim((string) ($person['first_name'] ?? '') . ' ' . (string) ($person['last_name'] ?? '')),
+                    'role' => $role,
+                ]),
+                'category' => 'mandate',
+                'due_date' => (string) $person['mandate_ends_at'],
+                'member_id' => null,
+                'notes' => __('deadlines.auto_generated_note'),
+            ]);
+        }
+
+        $params = [];
+        $keep = [];
+        foreach ($sources as $i => $source) {
+            $key = 'source_' . $i;
+            $params[$key] = $source;
+            $keep[] = ':' . $key;
+        }
+        $sql = "DELETE FROM deadline_items WHERE source LIKE 'system:%'";
+        if ($keep !== []) {
+            $sql .= ' AND source NOT IN (' . implode(', ', $keep) . ')';
+        }
+        $this->db->query($sql, $params);
+    }
+
+    public function isSystem(array $item): bool
+    {
+        return str_starts_with((string) ($item['source'] ?? ''), 'system:');
     }
 
     /** @return array{overdue:int,due_soon:int,open:int} */
@@ -223,6 +289,9 @@ final class DeadlineService
         if ($existing === null) {
             return ['ok' => false, 'errors' => ['id' => __('errors.404')]];
         }
+        if ($this->isSystem($existing)) {
+            return ['ok' => false, 'errors' => ['id' => __('deadlines.system_readonly')]];
+        }
         $parsed = $this->parseInput($input, $existing);
         if (empty($parsed['ok'])) {
             return ['ok' => false, 'errors' => $parsed['errors'] ?? ['title' => __('validation.required')]];
@@ -246,6 +315,10 @@ final class DeadlineService
 
     public function markDone(int $id, string $ip): void
     {
+        $existing = $this->find($id);
+        if ($existing === null || $this->isSystem($existing)) {
+            return;
+        }
         $this->db->update('deadline_items', ['status' => 'done'], 'id = :id', ['id' => $id]);
         $this->audit->log('deadline.done', 'deadline', (string) $id, null, null, $ip);
     }
@@ -422,7 +495,7 @@ final class DeadlineService
                 return;
             }
         }
-        $list[] = ['slug' => $slug, 'label' => mb_substr(trim($label), 0, 80)];
+        $list[] = ['slug' => $slug, 'label' => mb_substr(sentence_case($label), 0, 80)];
         $cfg['custom_categories'] = $list;
         $this->components->saveConfig('deadlines', $cfg);
     }
@@ -448,5 +521,35 @@ final class DeadlineService
     {
         $slug = str_replace('_', ' ', trim($slug));
         return $slug !== '' ? mb_convert_case($slug, MB_CASE_TITLE, 'UTF-8') : __('deadlines.category_general');
+    }
+
+    /** @param array<string,mixed> $data */
+    private function upsertSystemDeadline(string $source, array $data): void
+    {
+        $existing = $this->db->fetch(
+            'SELECT id, title, category, due_date, member_id, notes, status, source
+             FROM deadline_items WHERE source = :source ORDER BY id ASC LIMIT 1',
+            ['source' => $source]
+        );
+        $data['source'] = $source;
+        $data['status'] = 'open';
+        if ($existing === null) {
+            $this->db->insert('deadline_items', $data);
+            return;
+        }
+        $changed = false;
+        foreach ($data as $key => $value) {
+            if ((string) ($existing[$key] ?? '') !== (string) ($value ?? '')) {
+                $changed = true;
+                break;
+            }
+        }
+        if ($changed) {
+            $this->db->update('deadline_items', $data, 'id = :id', ['id' => (int) $existing['id']]);
+        }
+        $this->db->query(
+            'DELETE FROM deadline_items WHERE source = :source AND id <> :id',
+            ['source' => $source, 'id' => (int) $existing['id']]
+        );
     }
 }

@@ -26,7 +26,7 @@ final class DocumentsController extends BaseController
         }
         $this->render('documents/index', [
             'title' => __('documents.title'),
-            'document_groups' => $this->documents->groupedByCategory(200, $query),
+            'documents' => $this->documents->all(200, $query),
             'categories' => $this->documents->categoryOptions(),
             'default_category' => $this->documents->defaultCategory(),
             'languages' => DocumentService::LANGUAGES,
@@ -61,6 +61,22 @@ final class DocumentsController extends BaseController
             'languages' => DocumentService::LANGUAGES,
             'upload_max_mb' => $this->documents->uploadMaxMb(),
             'existing_file_name' => $filePath !== '' ? basename($filePath) : '',
+        ]);
+    }
+
+    public function show(Request $request, string $id): void
+    {
+        require_component('documents');
+        $doc = $this->documents->find((int) $id);
+        if ($doc === null) {
+            http_response_code(404);
+            $this->flash('errors', ['document' => __('errors.404')]);
+            redirect('/documents');
+        }
+        $this->render('documents/show', [
+            'title' => (string) ($doc['title'] ?? __('documents.title')),
+            'document' => $doc,
+            'category_label' => $this->documents->categoryLabel((string) ($doc['category'] ?? 'other')),
         ]);
     }
 
@@ -132,8 +148,18 @@ final class DocumentsController extends BaseController
 
     public function download(Request $request, string $id): void
     {
+        $this->serveFile((int) $id, false);
+    }
+
+    public function forceDownload(Request $request, string $id): void
+    {
+        $this->serveFile((int) $id, true);
+    }
+
+    private function serveFile(int $id, bool $attachment): void
+    {
         require_component('documents');
-        $path = $this->documents->filePath((int) $id);
+        $path = $this->documents->filePath($id);
         if ($path === null) {
             http_response_code(404);
             echo 'Not found';
@@ -141,7 +167,7 @@ final class DocumentsController extends BaseController
         }
         $mime = mime_content_type($path) ?: 'application/octet-stream';
         header('Content-Type: ' . $mime);
-        header('Content-Disposition: inline; filename="' . basename($path) . '"');
+        header('Content-Disposition: ' . ($attachment ? 'attachment' : 'inline') . '; filename="' . basename($path) . '"');
         readfile($path);
     }
 }

@@ -8,7 +8,7 @@
         <a class="btn btn-ghost" href="<?= e(url('/users')) ?>"><?= e(__('common.back')) ?></a>
     </div>
 </div>
-<form class="form-card" method="post" action="<?= e($isEdit ? url('/users/'.$user['id']) : url('/users')) ?>">
+<form class="form-card" method="post" action="<?= e($isEdit ? url('/users/'.$user['id']) : url('/users')) ?>" data-leave-guard>
     <?= csrf_field() ?>
     <div class="grid-2">
         <div>
@@ -23,7 +23,7 @@
             <label><?= e(__('users.locale')) ?></label>
             <select name="locale">
                 <?php foreach (['it','de','en'] as $loc): ?>
-                    <option value="<?= $loc ?>" <?= old('locale', $user['locale'] ?? 'it')===$loc?'selected':'' ?>><?= strtoupper($loc) ?></option>
+                    <option value="<?= $loc ?>" <?= old('locale', $user['locale'] ?? 'it')===$loc?'selected':'' ?>><?= e(match ($loc) { 'it' => '🇮🇹 Italiano', 'de' => '🇩🇪 Deutsch', default => '🇬🇧 English' }) ?></option>
                 <?php endforeach; ?>
             </select>
         </div>
@@ -64,9 +64,9 @@
             </label>
         <?php endforeach; ?>
     <?php endif; ?>
-    <div class="actions">
-        <button class="btn" type="submit"><?= e(__('common.save')) ?></button>
+    <div class="actions form-actions form-actions-end">
         <a class="btn btn-ghost" href="<?= e(url('/users')) ?>"><?= e(__('common.cancel')) ?></a>
+        <button class="btn" type="submit"><?= e(__('common.save')) ?></button>
     </div>
 </form>
 <?php if ($isEdit && empty($user['is_system_admin'])): ?>

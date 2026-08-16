@@ -3,6 +3,8 @@ $issues = is_array($member['compliance_issues'] ?? null) ? $member['compliance_i
 $enrollmentMethod = (string) ($enrollmentMethod ?? 'none');
 $enrollmentArtifact = is_array($enrollmentArtifact ?? null) ? $enrollmentArtifact : null;
 $displayName = trim(($member['fields']['first_name'] ?? '') . ' ' . ($member['fields']['last_name'] ?? ''));
+$totalPaid = array_sum(array_map(static fn (array $payment): float => (float) ($payment['amount'] ?? 0), (array) ($payments ?? [])));
+$balanceDue = (float) ($member['balance_due'] ?? 0);
 ?>
 <div class="page-header">
     <div class="titles">
@@ -74,7 +76,15 @@ $displayName = trim(($member['fields']['first_name'] ?? '') . ' ' . ($member['fi
             </div>
             <div class="detail-item">
                 <div class="label"><?= e(__('members.payment')) ?></div>
-                <div class="value"><span class="badge <?= $member['payment_status']==='paid'?'badge-ok':($member['payment_status']==='due'?'badge-due':'badge-warn') ?>"><?= e(__('members.payment_'.$member['payment_status'])) ?></span> — <?= e(number_format((float)$member['balance_due'], 2, ',', '.')) ?> €</div>
+                <div class="value member-payment-summary">
+                    <span class="badge <?= $member['payment_status']==='paid'?'badge-ok':($member['payment_status']==='due'?'badge-due':'badge-warn') ?>"><?= e(__('members.payment_'.$member['payment_status'])) ?></span>
+                    <?php if ($totalPaid > 0): ?>
+                        <span><?= e(__('members.amount_paid')) ?>: <strong><?= e(number_format($totalPaid, 2, ',', '.')) ?> €</strong></span>
+                    <?php endif; ?>
+                    <?php if ($balanceDue > 0): ?>
+                        <span><?= e(__('members.balance_due')) ?>: <strong><?= e(number_format($balanceDue, 2, ',', '.')) ?> €</strong></span>
+                    <?php endif; ?>
+                </div>
             </div>
             <div class="detail-item">
                 <div class="label"><?= e(__('members.type')) ?></div>

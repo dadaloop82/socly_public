@@ -8,6 +8,7 @@ use Socly\Core\Http\Request;
 use Socly\Core\View;
 use Socly\Services\AssociationPeopleService;
 use Socly\Services\ComponentService;
+use Socly\Services\CurrencyService;
 use Socly\Services\DeadlineService;
 use Socly\Services\DocumentService;
 use Socly\Services\MemberService;
@@ -23,7 +24,8 @@ final class DashboardController extends BaseController
         private readonly TreasuryService $treasury,
         private readonly DeadlineService $deadlines,
         private readonly DocumentService $documents,
-        private readonly AssociationPeopleService $people
+        private readonly AssociationPeopleService $people,
+        private readonly CurrencyService $currency
     ) {
         parent::__construct($view);
     }
@@ -125,11 +127,12 @@ final class DashboardController extends BaseController
                 'documents' => $showDocuments,
                 'org' => $showOrg,
             ],
+            'currency' => $this->currency,
             'chartsJson' => json_encode($stats['charts'], JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR),
             'chartI18n' => json_encode([
                 'collected' => __('dashboard.chart_collected_series'),
                 'newMembers' => __('dashboard.chart_new_members_series'),
-                'currency' => '€',
+                'currency' => $this->currency->display(),
             ], JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR),
             'treasuryChartsJson' => json_encode(
                 $widgets['treasury']['charts'] ?? [
@@ -140,7 +143,7 @@ final class DashboardController extends BaseController
                 JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR
             ),
             'treasuryChartI18n' => json_encode([
-                'currency' => '€',
+                'currency' => $this->currency->display(),
                 'income' => __('treasury.direction_income'),
                 'expense' => __('treasury.direction_expense'),
             ], JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR),

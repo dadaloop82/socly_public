@@ -395,7 +395,7 @@ $buildProfileFieldsHtml = function (array $list) use (
                 . '<div class="cf-row">'
                 . '<input id="field-' . e($key) . '" type="text" name="fields[' . e($key) . ']" value="' . e($val) . '"'
                 . ' placeholder="' . e(__('members.cf_hint')) . '"'
-                . ' data-fiscal-code autocomplete="off" maxlength="16"'
+                . ' data-fiscal-code autocomplete="off" maxlength="16" pattern="[A-Za-z0-9]{16}"'
                 . (!empty($field['is_required']) ? ' required' : '') . '>'
                 . '<button type="button" class="btn btn-ghost" data-cf-generate>'
                 . '<span class="field-icon" data-icon="spark" aria-hidden="true"></span>'

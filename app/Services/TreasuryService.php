@@ -21,13 +21,14 @@ final class TreasuryService
     ];
 
     /** @var list<string> */
-    public const METHODS = ['cash', 'bank', 'pos', 'other'];
+    public const METHODS = ['cash', 'bank', 'pos', 'credit_card', 'other'];
 
     public function __construct(
         private readonly Database $db,
         private readonly AuditService $audit,
         private readonly Validator $validator,
-        private readonly ComponentService $components
+        private readonly ComponentService $components,
+        private readonly DocumentService $documents
     ) {
     }
 
@@ -42,9 +43,11 @@ final class TreasuryService
                     (SELECT v.value FROM member_field_values v
                      INNER JOIN member_field_definitions d ON d.id = v.field_definition_id AND d.`key` = 'last_name'
                      WHERE v.member_id = mem.id LIMIT 1) AS last_name,
-                    mem.member_number
+                    mem.member_number,
+                    u.name AS creator_name
              FROM treasury_movements m
-             LEFT JOIN members mem ON mem.id = m.member_id";
+             LEFT JOIN members mem ON mem.id = m.member_id
+             LEFT JOIN users u ON u.id = m.created_by";
 
         $query = trim($query);
         if ($query !== '') {
@@ -217,6 +220,22 @@ final class TreasuryService
         return $map[$key] ?? $this->humanizeSlug($key);
     }
 
+    /** @return list<string> */
+    public function beneficiaries(): array
+    {
+        $rows = $this->db->fetchAll(
+            "SELECT DISTINCT beneficiary
+             FROM treasury_movements
+             WHERE beneficiary IS NOT NULL AND beneficiary <> ''
+             ORDER BY beneficiary
+             LIMIT 200"
+        );
+        return array_values(array_map(
+            static fn (array $row): string => (string) $row['beneficiary'],
+            $rows
+        ));
+    }
+
     public function defaultCategory(): string
     {
         $cfg = $this->components->config('treasury', ['default_category' => 'membership_fee']);
@@ -239,16 +258,30 @@ final class TreasuryService
                     (SELECT v.value FROM member_field_values v
                      INNER JOIN member_field_definitions d ON d.id = v.field_definition_id AND d.`key` = 'last_name'
                      WHERE v.member_id = mem.id LIMIT 1) AS last_name,
-                    mem.member_number
+                    mem.member_number,
+                    u.name AS creator_name
              FROM treasury_movements m
              LEFT JOIN members mem ON mem.id = m.member_id
+             LEFT JOIN users u ON u.id = m.created_by
              WHERE m.id = :id",
             ['id' => $id]
         );
     }
 
+    public function attachmentFilePath(int $id): ?string
+    {
+        $row = $this->find($id);
+        $relative = trim((string) ($row['attachment_path'] ?? ''));
+        if ($relative === '' || str_contains($relative, '..') || str_contains($relative, '\\')
+            || preg_match('#^documents/[a-zA-Z0-9._-]+\.pdf$#', $relative) !== 1) {
+            return null;
+        }
+        $path = storage_path($relative);
+        return is_file($path) ? $path : null;
+    }
+
     /** @param array<string,mixed> $input */
-    public function create(array $input, string $ip, ?int $userId = null): array
+    public function create(array $input, ?array $file, string $ip, ?int $userId = null): array
     {
         $parsed = $this->parseInput($input, null);
         if (empty($parsed['ok'])) {
@@ -256,6 +289,12 @@ final class TreasuryService
         }
         /** @var array<string,mixed> $data */
         $data = $parsed['data'];
+        $attachment = $this->syncInvoiceDocument($data, $file, $ip, $userId);
+        if (empty($attachment['ok'])) {
+            return ['ok' => false, 'errors' => ['invoice_pdf' => (string) ($attachment['error'] ?? __('documents.upload_fail'))]];
+        }
+        $data['attachment_path'] = $attachment['path'] ?? null;
+        $data['document_id'] = $attachment['document_id'] ?? null;
         $data['created_by'] = $userId;
         $id = $this->db->insert('treasury_movements', $data);
         $this->audit->log('treasury.created', 'treasury', (string) $id, null, $input, $ip);
@@ -263,7 +302,7 @@ final class TreasuryService
     }
 
     /** @param array<string,mixed> $input */
-    public function update(int $id, array $input, string $ip): array
+    public function update(int $id, array $input, ?array $file, string $ip, ?int $userId = null): array
     {
         $existing = $this->find($id);
         if ($existing === null) {
@@ -275,6 +314,12 @@ final class TreasuryService
         }
         /** @var array<string,mixed> $data */
         $data = $parsed['data'];
+        $attachment = $this->syncInvoiceDocument($data, $file, $ip, $userId, $existing);
+        if (empty($attachment['ok'])) {
+            return ['ok' => false, 'errors' => ['invoice_pdf' => (string) ($attachment['error'] ?? __('documents.upload_fail'))]];
+        }
+        $data['attachment_path'] = $attachment['path'] ?? ($existing['attachment_path'] ?? null);
+        $data['document_id'] = $attachment['document_id'] ?? ($existing['document_id'] ?? null);
         $this->db->update('treasury_movements', $data, 'id = :id', ['id' => $id]);
         $this->audit->log('treasury.updated', 'treasury', (string) $id, [
             'direction' => $existing['direction'] ?? null,
@@ -344,6 +389,11 @@ final class TreasuryService
         }
         $memberId = trim((string) ($input['member_id'] ?? ''));
         $memberId = $memberId !== '' ? (int) $memberId : null;
+        $isInvoice = $direction === 'expense' && !empty($input['invoice_payment']);
+        $invoiceNumber = $isInvoice ? mb_substr(trim((string) ($input['invoice_number'] ?? '')), 0, 120) : null;
+        $beneficiary = $direction === 'expense'
+            ? mb_substr(trim((string) ($input['beneficiary'] ?? '')), 0, 190)
+            : '';
 
         return [
             'ok' => true,
@@ -355,8 +405,87 @@ final class TreasuryService
                 'description' => trim((string) ($input['description'] ?? '')),
                 'payment_method' => $method,
                 'member_id' => $memberId,
+                'invoice_payment' => $isInvoice ? 1 : 0,
+                'invoice_number' => $invoiceNumber !== '' ? $invoiceNumber : null,
+                'beneficiary' => $beneficiary !== '' ? $beneficiary : null,
             ],
         ];
+    }
+
+    /**
+     * Store an optional PDF once, then mirror its metadata into Documents when enabled.
+     *
+     * @param array<string,mixed> $data
+     * @param array<string,mixed>|null $file
+     * @param array<string,mixed>|null $existing
+     * @return array{ok:bool,path?:?string,document_id?:?int,error?:string}
+     */
+    private function syncInvoiceDocument(
+        array $data,
+        ?array $file,
+        string $ip,
+        ?int $userId,
+        ?array $existing = null
+    ): array {
+        $hasUpload = is_array($file) && (int) ($file['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_NO_FILE;
+        $documentId = isset($existing['document_id']) ? (int) $existing['document_id'] : 0;
+        if (!$hasUpload && ($documentId < 1 || !$this->components->isEnabled('documents'))) {
+            return [
+                'ok' => true,
+                'path' => $existing['attachment_path'] ?? null,
+                'document_id' => $documentId > 0 ? $documentId : null,
+            ];
+        }
+
+        if ($hasUpload) {
+            if (strtolower((string) ($file['type'] ?? '')) !== 'application/pdf'
+                && !str_ends_with(strtolower((string) ($file['name'] ?? '')), '.pdf')) {
+                return ['ok' => false, 'error' => __('treasury.invoice_pdf_invalid')];
+            }
+            $uploaded = $this->documents->upload($file);
+            if (empty($uploaded['ok'])) {
+                return ['ok' => false, 'error' => (string) ($uploaded['error'] ?? __('documents.upload_fail'))];
+            }
+            $path = (string) $uploaded['path'];
+            $mime = (string) ($uploaded['mime'] ?? 'application/pdf');
+        } else {
+            $path = trim((string) ($existing['attachment_path'] ?? ''));
+            $mime = 'application/pdf';
+        }
+        if ($this->components->isEnabled('documents')) {
+            $description = trim((string) ($data['description'] ?? ''));
+            $beneficiary = trim((string) ($data['beneficiary'] ?? ''));
+            $invoice = trim((string) ($data['invoice_number'] ?? ''));
+            $titleParts = [__('treasury.invoice_document_title')];
+            if ($invoice !== '') {
+                $titleParts[] = $invoice;
+            }
+            if ($beneficiary !== '') {
+                $titleParts[] = $beneficiary;
+            }
+            $docInput = [
+                'title' => implode(' - ', $titleParts),
+                'category' => 'other',
+                'document_date' => (string) ($data['movement_date'] ?? ''),
+                'language' => '',
+                'status' => 'approved',
+                'summary' => $description,
+                'uploaded_path' => $path,
+                'uploaded_mime' => $mime,
+            ];
+            $result = $documentId > 0
+                ? $this->documents->update($documentId, $docInput, null, $ip)
+                : $this->documents->create($docInput, null, $ip, $userId);
+            if (empty($result['ok'])) {
+                if ($hasUpload) {
+                    @unlink(storage_path($path));
+                }
+                $errors = $result['errors'] ?? [];
+                return ['ok' => false, 'error' => (string) (reset($errors) ?: __('documents.upload_fail'))];
+            }
+            $documentId = (int) ($result['id'] ?? $documentId);
+        }
+        return ['ok' => true, 'path' => $path, 'document_id' => $documentId > 0 ? $documentId : null];
     }
 
     /**
@@ -500,7 +629,7 @@ final class TreasuryService
                 return;
             }
         }
-        $list[] = ['slug' => $slug, 'label' => mb_substr(trim($label), 0, 80)];
+        $list[] = ['slug' => $slug, 'label' => mb_substr(sentence_case($label), 0, 80)];
         $cfg['custom_categories'] = $list;
         $this->components->saveConfig('treasury', $cfg);
     }
