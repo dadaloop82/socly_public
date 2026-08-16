@@ -9,41 +9,11 @@ $needsSetup = !empty($needsSetup);
         <span class="auth-lang-rotate-item h2" data-rotate-lang="de">Sprache wählen</span>
         <span class="auth-lang-rotate-item h2" data-rotate-lang="en">Choose language</span>
     </div>
-    <div
-        class="auth-lang-flags"
-        role="group"
-        data-lang-select
-        data-lang-value="<?= e($currentLocale) ?>"
-        aria-label="<?= e(__('auth.choose_language')) ?>"
-    >
-        <button
-            type="button"
-            class="auth-lang-flag<?= $currentLocale === 'it' ? ' is-active' : '' ?>"
-            data-set-lang="it"
-            lang="it"
-            title="Italiano"
-            aria-label="Italiano"
-            aria-pressed="<?= $currentLocale === 'it' ? 'true' : 'false' ?>"
-        >🇮🇹</button>
-        <button
-            type="button"
-            class="auth-lang-flag<?= $currentLocale === 'de' ? ' is-active' : '' ?>"
-            data-set-lang="de"
-            lang="de"
-            title="Deutsch"
-            aria-label="Deutsch"
-            aria-pressed="<?= $currentLocale === 'de' ? 'true' : 'false' ?>"
-        >🇩🇪</button>
-        <button
-            type="button"
-            class="auth-lang-flag<?= $currentLocale === 'en' ? ' is-active' : '' ?>"
-            data-set-lang="en"
-            lang="en"
-            title="English"
-            aria-label="English"
-            aria-pressed="<?= $currentLocale === 'en' ? 'true' : 'false' ?>"
-        >🇬🇧</button>
-    </div>
+    <select id="lang" name="lang" data-lang-select aria-label="<?= e(__('auth.choose_language')) ?>">
+        <option value="it" <?= $currentLocale === 'it' ? 'selected' : '' ?>>🇮🇹 Italiano</option>
+        <option value="de" <?= $currentLocale === 'de' ? 'selected' : '' ?>>🇩🇪 Deutsch</option>
+        <option value="en" <?= $currentLocale === 'en' ? 'selected' : '' ?>>🇬🇧 English</option>
+    </select>
 </div>
 
 <?php if ($needsSetup): ?>

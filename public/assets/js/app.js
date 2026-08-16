@@ -562,34 +562,13 @@ function syncBrandReadableColors(target = document.documentElement) {
 function initAuthLoginI18nLive() {
   const authLang = document.querySelector('.auth-lang[data-i18n-endpoint]');
   const select = document.querySelector('[data-lang-select]');
-  if (!authLang || !select) return;
+  if (!authLang || !select || select.tagName !== 'SELECT') return;
 
   const endpointBase = String(authLang.dataset.i18nEndpoint || '');
   if (!endpointBase) return;
 
   const loginLang = document.querySelector('[data-login-lang]');
   const setupLink = document.querySelector('[data-setup-lang-link]');
-  const flagButtons = [...select.querySelectorAll('[data-set-lang]')];
-
-  const currentLang = () => {
-    if (select.tagName === 'SELECT') {
-      return select.value;
-    }
-    return String(select.dataset.langValue || loginLang?.value || 'it');
-  };
-
-  const setCurrentLang = (lang) => {
-    if (select.tagName === 'SELECT') {
-      select.value = lang;
-      return;
-    }
-    select.dataset.langValue = lang;
-    flagButtons.forEach((btn) => {
-      const on = btn.dataset.setLang === lang;
-      btn.classList.toggle('is-active', on);
-      btn.setAttribute('aria-pressed', on ? 'true' : 'false');
-    });
-  };
 
   // Rotazione “Scegli la lingua” (fade).
   const rotator = document.querySelector('.auth-lang-rotate');
@@ -602,7 +581,7 @@ function initAuthLoginI18nLive() {
     rotateItems.forEach((el, n) => el.classList.toggle('is-active', n === rotateIndex));
   };
   if (rotateItems.length > 0) {
-    const selectedIdx = rotateItems.findIndex((el) => el.dataset.rotateLang === currentLang());
+    const selectedIdx = rotateItems.findIndex((el) => el.dataset.rotateLang === select.value);
     showRotate(selectedIdx >= 0 ? selectedIdx : rotateIndex);
     setInterval(() => showRotate(rotateIndex + 1), 2600);
   }
@@ -659,18 +638,17 @@ function initAuthLoginI18nLive() {
       select.setAttribute('aria-label', chooseLabel);
     }
 
-    // Keep flag hover labels translated when available.
-    const flagLabels = {
+    // Keep option labels as flag + translated language name.
+    const labels = {
       it: getByPath(messages, 'members.lang_it') || 'Italiano',
       de: getByPath(messages, 'members.lang_de') || 'Deutsch',
       en: getByPath(messages, 'members.lang_en') || 'English',
     };
-    flagButtons.forEach((btn) => {
-      const code = btn.dataset.setLang || '';
-      const label = flagLabels[code];
-      if (typeof label === 'string' && label !== '') {
-        btn.title = label;
-        btn.setAttribute('aria-label', label);
+    const flags = { it: '🇮🇹', de: '🇩🇪', en: '🇬🇧' };
+    [...select.options].forEach((opt) => {
+      const code = opt.value;
+      if (labels[code]) {
+        opt.textContent = `${flags[code] || ''} ${labels[code]}`.trim();
       }
     });
 
@@ -689,10 +667,9 @@ function initAuthLoginI18nLive() {
       }
     }
   };
-  syncLinks(currentLang());
+  syncLinks(select.value);
 
   const load = async (lang) => {
-    setCurrentLang(lang);
     syncLinks(lang);
     try {
       const res = await fetch(`${endpointBase}?lang=${encodeURIComponent(lang)}`, {
@@ -713,17 +690,7 @@ function initAuthLoginI18nLive() {
     }
   };
 
-  if (select.tagName === 'SELECT') {
-    select.addEventListener('change', () => load(select.value));
-  } else {
-    flagButtons.forEach((btn) => {
-      btn.addEventListener('click', () => {
-        const lang = btn.dataset.setLang || 'it';
-        if (lang === currentLang()) return;
-        load(lang);
-      });
-    });
-  }
+  select.addEventListener('change', () => load(select.value));
 }
 
 function initSetupWizard() {

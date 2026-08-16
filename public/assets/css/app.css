@@ -1642,37 +1642,6 @@ td .muted { font-size: 0.88rem; margin-top: 0.15rem; }
   transform: translateY(0);
   visibility: visible;
 }
-.auth-lang-flags {
-  display: flex;
-  gap: 0.65rem;
-  flex-wrap: wrap;
-}
-.auth-lang-flag {
-  width: 3.1rem;
-  height: 3.1rem;
-  border-radius: 14px;
-  border: 1px solid color-mix(in srgb, var(--brand-primary) 28%, var(--line));
-  background: rgba(255, 255, 255, 0.94);
-  font-size: 1.55rem;
-  line-height: 1;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  transition: transform 160ms ease, box-shadow 160ms ease, border-color 160ms ease, background 160ms ease;
-}
-.auth-lang-flag:hover,
-.auth-lang-flag:focus-visible {
-  transform: translateY(-1px);
-  border-color: var(--brand-primary);
-  box-shadow: 0 0 0 4px color-mix(in srgb, var(--brand-primary) 16%, transparent);
-  outline: none;
-}
-.auth-lang-flag.is-active {
-  border-color: var(--brand-primary);
-  background: color-mix(in srgb, var(--brand-primary) 12%, white);
-  box-shadow: 0 8px 18px color-mix(in srgb, var(--brand-primary) 14%, transparent);
-}
 .auth-lang select {
   width: 100%;
   margin-bottom: 0;
