@@ -4392,7 +4392,24 @@ button.setup-scrape-logo-frame:focus-visible .setup-scrape-logo-overlay {
   background:
     linear-gradient(135deg, color-mix(in srgb, var(--brand-accent) 10%, white), color-mix(in srgb, var(--brand-primary) 8%, white));
 }
+.update-banner-copy {
+  flex: 1;
+  min-width: min(100%, 16rem);
+}
 .update-banner strong { display: block; margin-bottom: 0.15rem; }
+.update-banner-hint {
+  display: block;
+  margin-top: 0.35rem;
+  font-size: 0.88rem;
+  color: var(--muted);
+}
+.update-banner-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+  align-items: center;
+}
+.update-banner-actions form { margin: 0; }
 @media (max-width: 700px) {
   .setup-colors { grid-template-columns: 1fr; }
   .setup-cta,

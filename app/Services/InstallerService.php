@@ -38,9 +38,11 @@ final class InstallerService
             'APP_LOCALE=' . ($data['app_locale'] ?? 'it'),
             'SESSION_LIFETIME=120',
             '',
+            'UPDATE_NOTIFY=true',
+            'UPDATE_MANIFEST_URL=https://raw.githubusercontent.com/dadaloop82/socly_public/main/latest.json',
             'UPDATE_REPO=git@github.com-socly:dadaloop82/socly.git',
             'UPDATE_CHANNEL=main',
-            'UPDATE_ENABLED=' . ((isset($data['update_enabled']) ? !empty($data['update_enabled']) : true) ? 'true' : 'false'),
+            'UPDATE_ENABLED=' . ((isset($data['update_enabled']) ? !empty($data['update_enabled']) : false) ? 'true' : 'false'),
             '',
         ];
         file_put_contents(base_path('.env'), implode("\n", $lines));

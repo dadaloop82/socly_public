@@ -15,6 +15,7 @@ final class EnvWriter
         'DB_HOST', 'DB_PORT', 'DB_DATABASE', 'DB_USERNAME', 'DB_PASSWORD',
         'SESSION_LIFETIME',
         'UPDATE_REPO', 'UPDATE_CHANNEL', 'UPDATE_ENABLED', 'UPDATE_SSH_HOST',
+        'UPDATE_NOTIFY', 'UPDATE_MANIFEST_URL',
     ];
 
     /** @return array<string, string> */

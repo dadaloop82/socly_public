@@ -107,9 +107,11 @@ $app->setConfig([
         'password' => $_ENV['DB_PASSWORD'] ?? '',
     ],
     'update' => [
+        'notify' => filter_var($_ENV['UPDATE_NOTIFY'] ?? 'true', FILTER_VALIDATE_BOOL),
+        'manifest_url' => $_ENV['UPDATE_MANIFEST_URL'] ?? 'https://raw.githubusercontent.com/dadaloop82/socly_public/main/latest.json',
         'repo' => $_ENV['UPDATE_REPO'] ?? 'git@github.com-socly:dadaloop82/socly.git',
         'channel' => $_ENV['UPDATE_CHANNEL'] ?? 'main',
-        'enabled' => filter_var($_ENV['UPDATE_ENABLED'] ?? 'true', FILTER_VALIDATE_BOOL),
+        'enabled' => filter_var($_ENV['UPDATE_ENABLED'] ?? 'false', FILTER_VALIDATE_BOOL),
     ],
 ]);
 

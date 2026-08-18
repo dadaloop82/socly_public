@@ -780,6 +780,10 @@ return [
     'updates' => [
         'available_title' => 'Update available',
         'available_text' => 'Current v:current · new v:remote',
+        'manual_hint' => 'Download the new version from the public repository and follow the update guide.',
+        'notes' => 'Release notes',
+        'download' => 'Download',
+        'guide' => 'How to update',
         'install' => 'Install',
         'success' => 'Updated to version :version.',
         'failed' => 'Update failed: :error',

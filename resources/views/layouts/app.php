@@ -261,17 +261,38 @@ try {
             ?>
             <?php if (!empty($updateInfo['available'])): ?>
                 <div class="update-banner">
-                    <div>
+                    <div class="update-banner-copy">
                         <strong><?= e(__('updates.available_title')) ?></strong>
                         <span><?= e(__('updates.available_text', [
                             'current' => (string) ($updateInfo['current'] ?? ''),
                             'remote' => (string) ($updateInfo['remote'] ?? ''),
                         ])) ?></span>
+                        <?php if (empty($updateInfo['install_available'])): ?>
+                            <span class="update-banner-hint"><?= e(__('updates.manual_hint')) ?></span>
+                        <?php endif; ?>
                     </div>
-                    <form method="post" action="<?= e(url('/updates/install')) ?>">
-                        <?= csrf_field() ?>
-                        <button class="btn btn-sm" type="submit"><?= e(__('updates.install')) ?></button>
-                    </form>
+                    <div class="update-banner-actions">
+                        <?php
+                        $notesUrl = trim((string) ($updateInfo['notes_url'] ?? ''));
+                        $downloadUrl = trim((string) ($updateInfo['download_url'] ?? ''));
+                        $guideUrl = trim((string) ($updateInfo['install_guide_url'] ?? ''));
+                        ?>
+                        <?php if ($notesUrl !== ''): ?>
+                            <a class="btn btn-sm btn-ghost" href="<?= e($notesUrl) ?>" target="_blank" rel="noopener noreferrer"><?= e(__('updates.notes')) ?></a>
+                        <?php endif; ?>
+                        <?php if ($downloadUrl !== ''): ?>
+                            <a class="btn btn-sm btn-ghost" href="<?= e($downloadUrl) ?>" target="_blank" rel="noopener noreferrer"><?= e(__('updates.download')) ?></a>
+                        <?php endif; ?>
+                        <?php if ($guideUrl !== '' && empty($updateInfo['install_available'])): ?>
+                            <a class="btn btn-sm btn-ghost" href="<?= e($guideUrl) ?>" target="_blank" rel="noopener noreferrer"><?= e(__('updates.guide')) ?></a>
+                        <?php endif; ?>
+                        <?php if (!empty($updateInfo['install_available'])): ?>
+                            <form method="post" action="<?= e(url('/updates/install')) ?>">
+                                <?= csrf_field() ?>
+                                <button class="btn btn-sm" type="submit"><?= e(__('updates.install')) ?></button>
+                            </form>
+                        <?php endif; ?>
+                    </div>
                 </div>
             <?php endif; ?>
             <?= $content ?>

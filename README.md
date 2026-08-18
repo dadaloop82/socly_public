@@ -34,6 +34,18 @@ cp .env.example .env
 
 During the wizard you configure the database, association branding, and the platform **SuperAdmin** account. After install, first-run setup creates the association **Admin** used day to day.
 
+## Aggiornamento
+
+Installed instances check the public release manifest at `latest.json` (HTTPS, no credentials) and notify administrators when a newer version is published.
+
+To update manually:
+
+1. Back up the database and `storage/` (except cache/sessions if you prefer).
+2. Download the latest release from [socly_public](https://github.com/dadaloop82/socly_public) (branch `main` or release ZIP).
+3. Replace application files, keeping your `.env`, `.env.user`, and `storage/` data.
+4. Run `composer install --no-dev` if dependencies changed.
+5. Open the site — pending database migrations run automatically on first request.
+
 ## Project layout
 
 | Path | Purpose |

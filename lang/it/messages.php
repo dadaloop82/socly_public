@@ -782,6 +782,10 @@ return [
     'updates' => [
         'available_title' => 'Aggiornamento disponibile',
         'available_text' => 'Versione attuale v:current · nuova v:remote',
+        'manual_hint' => 'Scarica la nuova versione dal repository pubblico e segui la guida di aggiornamento.',
+        'notes' => 'Novità',
+        'download' => 'Scarica',
+        'guide' => 'Come aggiornare',
         'install' => 'Installa',
         'success' => 'Aggiornato alla versione :version.',
         'failed' => 'Aggiornamento non riuscito: :error',
