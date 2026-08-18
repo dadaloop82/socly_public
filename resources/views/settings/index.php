@@ -91,7 +91,7 @@
             </div>
             <div>
                 <label><?= e(__('setup.field_runts')) ?></label>
-                <input type="text" name="association_runts" value="<?= e((string)($settings['association.runts'] ?? '')) ?>">
+                <input type="text" name="association_runts" value="<?= e((string)($settings['association.runts'] ?? '')) ?>" inputmode="numeric" maxlength="6" autocomplete="off">
             </div>
         </div>
         <div class="setup-logo settings-logo-block" data-setup-logo>

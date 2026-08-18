@@ -12,7 +12,11 @@ final class AssociationWebsiteScrapeService
     private const BUDGET_SECONDS = 55;
     private const PER_REQUEST_TIMEOUT = 12;
     private const MIN_LOGO_PX = 100;
-    private const MAX_LOGO_PROBES = 6;
+    private const MAX_LOGO_PROBES = 12;
+    private const CONFIDENT_LOGO_SCORE = 60;
+
+    /** @var list<string> */
+    private array $logoCandidates = [];
 
     /** @var list<string> */
     private const EXTRA_PATHS = [
@@ -178,6 +182,7 @@ final class AssociationWebsiteScrapeService
             'found' => $found,
             'labels' => $labels,
             'theme_colors' => $this->themeColorsFromFound($found),
+            'logo_candidates' => $this->logoCandidates,
         ];
     }
 
@@ -434,11 +439,18 @@ final class AssociationWebsiteScrapeService
         return $logo['url'] ?? null;
     }
 
+    /** @return list<string> */
+    public function lastLogoCandidates(): array
+    {
+        return $this->logoCandidates;
+    }
+
     /**
      * @return array{url:string,primary?:string,accent?:string}|null
      */
     private function extractUsableLogo(string $html, string $baseUrl): ?array
     {
+        $this->logoCandidates = [];
         $candidates = $this->collectLogoCandidates($html, $baseUrl);
         if ($candidates === []) {
             return null;
@@ -447,7 +459,9 @@ final class AssociationWebsiteScrapeService
         usort($candidates, static fn (array $a, array $b): int => $b['score'] <=> $a['score']);
         $candidates = array_slice($candidates, 0, self::MAX_LOGO_PROBES);
 
-        $bestSvg = null;
+        /** @var list<array{url:string,score:int,primary?:string,accent?:string}> $usable */
+        $usable = [];
+        $chosen = null;
         foreach ($candidates as $candidate) {
             $url = $candidate['url'];
             if ($this->looksLikeFaviconUrl($url) && $candidate['score'] < 40) {
@@ -455,25 +469,51 @@ final class AssociationWebsiteScrapeService
             }
 
             $probed = $this->probeLogoAsset($url);
+            $confident = $candidate['score'] >= self::CONFIDENT_LOGO_SCORE;
             if ($probed === null) {
-                if ($bestSvg === null && ($candidate['svg'] || $candidate['score'] >= 55)) {
-                    $bestSvg = ['url' => $url];
+                if ($candidate['svg'] || $confident) {
+                    $entry = ['url' => $url, 'score' => $candidate['score']];
+                    $usable[] = $entry;
+                    if ($chosen === null && $confident) {
+                        $chosen = ['url' => $url];
+                    }
                 }
                 continue;
             }
-            if ($probed['width'] >= self::MIN_LOGO_PX && $probed['height'] >= self::MIN_LOGO_PX) {
-                $out = ['url' => $url];
-                if (!empty($probed['primary'])) {
-                    $out['primary'] = $probed['primary'];
-                }
-                if (!empty($probed['accent'])) {
-                    $out['accent'] = $probed['accent'];
-                }
-                return $out;
+            if ($probed['width'] < self::MIN_LOGO_PX || $probed['height'] < self::MIN_LOGO_PX) {
+                continue;
+            }
+            $entry = [
+                'url' => $url,
+                'score' => $candidate['score'],
+            ];
+            if (!empty($probed['primary'])) {
+                $entry['primary'] = $probed['primary'];
+            }
+            if (!empty($probed['accent'])) {
+                $entry['accent'] = $probed['accent'];
+            }
+            $usable[] = $entry;
+            if ($chosen === null && $confident) {
+                $chosen = $entry;
             }
         }
 
-        return $bestSvg;
+        if ($chosen !== null) {
+            $this->logoCandidates = [];
+            unset($chosen['score']);
+            return $chosen;
+        }
+
+        $urls = [];
+        foreach ($usable as $item) {
+            $urls[] = $item['url'];
+            if (count($urls) >= 3) {
+                break;
+            }
+        }
+        $this->logoCandidates = $urls;
+        return null;
     }
 
     /**
@@ -481,6 +521,7 @@ final class AssociationWebsiteScrapeService
      */
     private function probeLogoAsset(string $url): ?array
     {
+        $url = $this->normalizeLogoAssetUrl($url);
         if (preg_match('/\.svg(?:$|\?)/i', $url)) {
             return null;
         }
@@ -641,6 +682,7 @@ final class AssociationWebsiteScrapeService
             if ($resolved === null) {
                 return;
             }
+            $resolved = $this->normalizeLogoAssetUrl($resolved);
             $svg = $forceSvg || (bool) preg_match('/\.svg(?:$|\?)/i', $resolved);
             if (isset($byUrl[$resolved])) {
                 $byUrl[$resolved]['score'] = max($byUrl[$resolved]['score'], $score);
@@ -783,23 +825,51 @@ final class AssociationWebsiteScrapeService
 
     private function largestFromSrcset(string $srcset): ?string
     {
+        $parts = preg_split('/,\s*(?=https?:\/\/)/i', trim($srcset)) ?: [];
         $best = null;
-        $bestW = -1;
-        foreach (preg_split('/\s*,\s*/', trim($srcset)) ?: [] as $part) {
+        $bestScore = -1.0;
+        foreach ($parts as $part) {
             $part = trim($part);
             if ($part === '') {
                 continue;
             }
-            if (!preg_match('/^(\S+)(?:\s+(\d+)w)?/i', $part, $m)) {
+            if (preg_match('/^(\S+)\s+(\d+(?:\.\d+)?)x$/i', $part, $m)) {
+                $density = (float) $m[2];
+                if ($density >= $bestScore) {
+                    $bestScore = $density;
+                    $best = html_entity_decode($m[1], ENT_QUOTES | ENT_HTML5, 'UTF-8');
+                }
                 continue;
             }
-            $w = isset($m[2]) ? (int) $m[2] : 0;
-            if ($w >= $bestW) {
-                $bestW = $w;
-                $best = html_entity_decode($m[1], ENT_QUOTES | ENT_HTML5, 'UTF-8');
+            if (preg_match('/^(\S+)\s+(\d+)w$/i', $part, $m)) {
+                $width = (int) $m[2];
+                if ($width >= $bestScore) {
+                    $bestScore = (float) $width;
+                    $best = html_entity_decode($m[1], ENT_QUOTES | ENT_HTML5, 'UTF-8');
+                }
+                continue;
+            }
+            if (preg_match('/^(\S+)/', $part, $m)) {
+                if ($bestScore < 0) {
+                    $best = html_entity_decode($m[1], ENT_QUOTES | ENT_HTML5, 'UTF-8');
+                    $bestScore = 0;
+                }
             }
         }
         return $best;
+    }
+
+    /** Wix and similar CDNs serve tiny /v1/fill/… thumbnails; keep the original media URL for probing. */
+    private function normalizeLogoAssetUrl(string $url): string
+    {
+        $url = trim($url);
+        if (preg_match('#^(https?://static\.wixstatic\.com/media/[^/]+~mv2\.[a-z0-9]+)(?:/v1/.*)?$#i', $url, $m)) {
+            return $m[1];
+        }
+        if (preg_match('#^(https?://static\.parastorage\.com/[^/]+\.(?:jpg|jpeg|png|webp|gif|svg))(?:/|$)#i', $url, $m)) {
+            return $m[1];
+        }
+        return $url;
     }
 
     private function looksLikeFaviconUrl(string $url): bool

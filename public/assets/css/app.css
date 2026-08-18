@@ -796,12 +796,36 @@ a:hover { text-decoration: underline; color: var(--brand-primary-deep); }
 }
 .setup-name-pair .setup-runts-block {
   display: grid;
-  gap: 0.55rem;
+  gap: 0.45rem;
   align-content: start;
-  max-width: 18rem;
+  max-width: none;
 }
 .setup-name-pair .setup-runts-block .setup-field-runts {
   margin: 0;
+}
+.setup-runts-row {
+  display: grid;
+  grid-template-columns: 7.5rem minmax(0, 1fr);
+  gap: 0.75rem;
+  align-items: stretch;
+  width: 100%;
+}
+.setup-runts-row:has(.setup-scrape-btn[hidden]) {
+  grid-template-columns: 7.5rem;
+}
+.setup-runts-row input {
+  margin: 0;
+  width: 100%;
+  max-width: 100%;
+}
+.setup-runts-row .setup-scrape-btn {
+  width: 100%;
+  min-width: 0;
+  min-height: 0;
+  height: 100%;
+  margin: 0;
+  padding: 0.8rem 1rem;
+  box-sizing: border-box;
 }
 .setup-name-pair .setup-field-name {
   grid-column: 1;
@@ -812,11 +836,7 @@ a:hover { text-decoration: underline; color: var(--brand-primary-deep); }
 .setup-name-pair .setup-field-currency {
   max-width: 18rem;
 }
-.setup-runts-lookup {
-  display: grid;
-  gap: 0.55rem;
-}
-.setup-runts-lookup.is-looking .setup-scrape-btn {
+.setup-runts-block.is-looking .setup-scrape-btn {
   opacity: 0.55;
   cursor: wait;
   pointer-events: none;
@@ -871,8 +891,8 @@ a:hover { text-decoration: underline; color: var(--brand-primary-deep); }
   0% { transform: translateX(-110%); }
   100% { transform: translateX(280%); }
 }
-.setup-runts-lookup.is-looking .setup-scrape-spinner { display: block; }
-.setup-runts-lookup:not(.is-looking) .setup-scrape-spinner { display: none; }
+.setup-runts-block.is-looking .setup-scrape-spinner { display: block; }
+.setup-runts-block:not(.is-looking) .setup-scrape-spinner { display: none; }
 .setup-name-pair .setup-full-name-preview {
   margin: 0;
   line-height: 1.45;
@@ -895,6 +915,17 @@ a:hover { text-decoration: underline; color: var(--brand-primary-deep); }
   .setup-name-pair .setup-field-currency {
     grid-column: 1 / -1;
     max-width: none;
+  }
+  .setup-name-pair .setup-runts-block .setup-field-runts {
+    flex-basis: auto;
+    width: auto;
+    max-width: none;
+  }
+  .setup-runts-row {
+    grid-template-columns: 6.5rem minmax(0, 1fr);
+  }
+  .setup-runts-row:has(.setup-scrape-btn[hidden]) {
+    grid-template-columns: 6.5rem;
   }
 }
 .page-lede {
@@ -3363,6 +3394,11 @@ html:has(.setup-body) {
 .setup-scrape-live[hidden],
 .setup-scrape-results[hidden] { display: none !important; }
 .setup-scrape-live-copy { display: grid; gap: 0.2rem; min-width: 0; }
+.setup-scrape-retry {
+  justify-self: start;
+  margin-top: 0.35rem;
+}
+.setup-scrape-retry[hidden] { display: none !important; }
 .setup-scrape-elapsed { margin: 0; font-size: 0.82rem; font-variant-numeric: tabular-nums; }
 .setup-scrape-spinner {
   width: 1.55rem;
@@ -3385,8 +3421,17 @@ html:has(.setup-body) {
   cursor: not-allowed;
 }
 [data-setup-wizard].is-scrape-busy [data-setup-website-input],
-[data-setup-wizard].is-runts-busy [data-setup-runts-input] {
+[data-setup-wizard].is-runts-busy [data-setup-runts-input],
+[data-setup-wizard].is-runts-busy [data-setup-assoc-name],
+[data-setup-wizard].is-runts-busy [data-setup-legal-name] {
   cursor: wait;
+}
+[data-setup-wizard].is-runts-busy [data-setup-assoc-name],
+[data-setup-wizard].is-runts-busy [data-setup-legal-name],
+[data-setup-wizard].is-runts-busy .setup-field-name,
+[data-setup-wizard].is-runts-busy .setup-field-legal {
+  opacity: 0.55;
+  pointer-events: none;
 }
 .setup-scrape-results {
   display: grid;
@@ -3440,7 +3485,55 @@ html:has(.setup-body) {
   min-width: 0;
 }
 .setup-scrape-logo-card[hidden],
-.setup-scrape-palette-card[hidden] { display: none !important; }
+.setup-scrape-palette-card[hidden],
+.setup-scrape-logo-picks[hidden] { display: none !important; }
+.setup-scrape-logo-picks {
+  grid-column: 1 / -1;
+  display: grid;
+  gap: 0.55rem;
+  padding: 0.8rem 0.9rem;
+  border-radius: 14px;
+  background: color-mix(in srgb, white 88%, var(--brand-paper));
+  border: 1px solid color-mix(in srgb, var(--brand-primary) 12%, var(--line));
+}
+.setup-scrape-logo-pick-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.65rem;
+}
+.setup-scrape-logo-pick {
+  display: grid;
+  place-items: center;
+  min-height: 5.5rem;
+  padding: 0.55rem;
+  border: 1px solid color-mix(in srgb, var(--brand-primary) 16%, var(--line));
+  border-radius: 12px;
+  background: color-mix(in srgb, white 92%, var(--brand-paper));
+  cursor: pointer;
+  appearance: none;
+  font: inherit;
+  transition: transform 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease;
+}
+.setup-scrape-logo-pick:hover,
+.setup-scrape-logo-pick:focus-visible {
+  transform: translateY(-1px);
+  border-color: color-mix(in srgb, var(--brand-primary) 45%, var(--line));
+  box-shadow: 0 10px 22px color-mix(in srgb, var(--brand-primary) 16%, transparent);
+  outline: 2px solid color-mix(in srgb, var(--brand-primary) 45%, white);
+  outline-offset: 2px;
+}
+.setup-scrape-logo-pick.is-busy {
+  opacity: 0.55;
+  pointer-events: none;
+}
+.setup-scrape-logo-pick img {
+  max-width: 100%;
+  max-height: 4.6rem;
+  object-fit: contain;
+}
+.setup-scrape-logo-picks .btn {
+  justify-self: start;
+}
 .setup-scrape-brand-label {
   font-size: 0.72rem;
   font-weight: 750;
@@ -3598,6 +3691,9 @@ button.setup-scrape-logo-frame:focus-visible .setup-scrape-logo-overlay {
   .setup-scrape-brand,
   .setup-scrape-found-item {
     grid-template-columns: 1fr;
+  }
+  .setup-scrape-logo-pick-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 }
 .setup-membership {
@@ -4001,12 +4097,14 @@ button.setup-scrape-logo-frame:focus-visible .setup-scrape-logo-overlay {
   border-radius: 14px;
   border: 1px solid var(--line);
   background: color-mix(in srgb, var(--brand-paper) 60%, white);
+  transition: --brand-primary 0.9s ease, --brand-accent 0.9s ease;
 }
 .setup-brand-preview-primary,
 .setup-brand-preview-accent {
   flex: 1;
   height: 2.75rem;
   border-radius: 10px;
+  transition: background 0.9s ease;
 }
 .setup-brand-preview-primary {
   background: var(--brand-primary);
@@ -4063,6 +4161,33 @@ button.setup-scrape-logo-frame:focus-visible .setup-scrape-logo-overlay {
   max-width: min(100%, 220px);
   max-height: 120px;
   object-fit: contain;
+  transition: opacity 0.45s ease;
+}
+.setup-logo-preview.is-loading img,
+.setup-logo-preview.is-uploading img {
+  opacity: 0.45;
+}
+.setup-logo-preview.is-uploading {
+  position: relative;
+}
+.setup-logo-preview.is-uploading::after {
+  content: '';
+  position: absolute;
+  inset: auto 50% 0.75rem auto;
+  width: 1.25rem;
+  height: 1.25rem;
+  margin-right: -0.625rem;
+  border: 2px solid color-mix(in srgb, var(--brand-primary) 22%, transparent);
+  border-top-color: var(--brand-primary);
+  border-radius: 50%;
+  animation: setup-scrape-spin 0.75s linear infinite;
+}
+.setup-logo-remove {
+  margin: 0;
+}
+.setup-logo-status.is-error {
+  color: var(--danger);
+  font-weight: 600;
 }
 .setup-logo-preview img[hidden],
 .setup-logo-preview:has(img[hidden]) {

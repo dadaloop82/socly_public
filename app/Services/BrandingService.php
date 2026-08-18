@@ -88,13 +88,13 @@ final class BrandingService
     }
 
     /** @return array{ok:bool,path?:string,error?:string} */
-    public function downloadLogoFromUrl(string $url): array
+    public function downloadLogoFromUrl(string $url, bool $replace = false): array
     {
         $url = trim($url);
         if ($url === '' || !filter_var($url, FILTER_VALIDATE_URL)) {
             return ['ok' => false, 'error' => 'invalid_url'];
         }
-        if ($this->logoRelativePath() !== '') {
+        if ($this->logoRelativePath() !== '' && !$replace) {
             return ['ok' => true, 'path' => $this->logoRelativePath()];
         }
 

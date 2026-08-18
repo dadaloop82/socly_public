@@ -153,7 +153,6 @@ $errorStep = flash('setup_error_step');
                 data-addresses-url="<?= e(url('/api/geo/addresses')) ?>"
                 data-cf-url="<?= e(url('/api/fiscal-code')) ?>"
                 data-csrf="<?= e(csrf_token()) ?>"
-                <?= $stepType === 'logo' ? 'enctype="multipart/form-data"' : '' ?>
             >
                 <?= csrf_field() ?>
                 <input type="hidden" name="step_index" value="<?= (int) $stepIndex ?>">
@@ -201,29 +200,36 @@ $errorStep = flash('setup_error_step');
                         <?php endforeach; ?>
                     </div>
                 <?php elseif ($stepType === 'logo'): ?>
-                    <div class="setup-logo" data-setup-line data-setup-logo>
-                        <?php $logoUrl = is_array($value) ? (string) ($value['logo_url'] ?? '') : ''; ?>
-                        <?php if ($logoUrl !== ''): ?>
-                            <div class="setup-logo-preview" data-setup-logo-preview>
-                                <img src="<?= e($logoUrl) ?>?v=<?= e((string) time()) ?>" alt="<?= e(__('setup.field_logo')) ?>" data-setup-logo-img>
-                            </div>
-                            <label class="checkbox-row setup-check">
-                                <input type="checkbox" name="remove_logo" value="1">
-                                <span><?= e(__('setup.logo_remove')) ?></span>
-                            </label>
-                        <?php else: ?>
-                            <div class="setup-logo-preview" data-setup-logo-preview hidden>
-                                <img alt="<?= e(__('setup.field_logo')) ?>" data-setup-logo-img hidden>
-                            </div>
-                        <?php endif; ?>
+                    <?php
+                    $logoUrl = is_array($value) ? (string) ($value['logo_url'] ?? '') : '';
+                    $hasLogo = $logoUrl !== '';
+                    ?>
+                    <div class="setup-logo" data-setup-line data-setup-logo
+                         data-logo-upload-url="<?= e(url('/setup/logo')) ?>"
+                         data-csrf="<?= e(csrf_token()) ?>"
+                         data-msg-fail="<?= e(__('setup.scrape_logo_fail')) ?>"
+                         data-msg-uploading="<?= e(__('setup.logo_uploading')) ?>">
+                        <div class="setup-logo-preview" data-setup-logo-preview<?= $hasLogo ? '' : ' hidden' ?>>
+                            <img
+                                <?php if ($hasLogo): ?>
+                                    src="<?= e($logoUrl) ?>?v=<?= e((string) time()) ?>"
+                                <?php endif; ?>
+                                alt="<?= e(__('setup.field_logo')) ?>"
+                                data-setup-logo-img<?= $hasLogo ? '' : ' hidden' ?>
+                            >
+                        </div>
                         <div class="setup-logo-actions">
                             <label class="btn btn-ghost file-btn">
                                 <span class="field-icon" data-icon="upload" aria-hidden="true"></span>
                                 <?= e(__('setup.logo_upload')) ?>
-                                <input type="file" name="logo" accept="image/png,image/jpeg,image/webp,image/gif,image/svg+xml" data-setup-logo-input hidden>
+                                <input type="file" accept="image/png,image/jpeg,image/webp,image/gif,image/svg+xml" data-setup-logo-input hidden>
                             </label>
+                            <button type="button" class="btn btn-ghost setup-logo-remove" data-setup-logo-remove<?= $hasLogo ? '' : ' hidden' ?>>
+                                <?= e(__('setup.logo_remove')) ?>
+                            </button>
                             <span class="setup-logo-filename muted" data-setup-logo-filename><?= e(__('setup.logo_no_file')) ?></span>
                         </div>
+                        <p class="setup-logo-status muted" data-setup-logo-status hidden></p>
                         <p class="setup-hint muted"><?= e(__('setup.logo_hint')) ?></p>
                     </div>
                 <?php elseif ($stepType === 'name_pair'): ?>
@@ -232,47 +238,7 @@ $errorStep = flash('setup_error_step');
                         <?php foreach ($step['fields'] as $field): ?>
                             <?php $fieldKey = (string) ($field['key'] ?? ''); ?>
                             <?php if ($fieldKey === 'runts'): ?>
-                                <div class="setup-runts-block">
-                            <?php endif; ?>
-                            <label class="setup-field<?= $fieldKey === 'legal_name' ? ' setup-field-legal' : ($fieldKey === 'currency' ? ' setup-field-currency' : ($fieldKey === 'runts' ? ' setup-field-runts' : ' setup-field-name')) ?>">
-                                <span><?= e(__($field['label_key'])) ?></span>
-                                <?php if (($field['type'] ?? '') === 'select'): ?>
-                                    <?php $isCurrency = $fieldKey === 'currency'; ?>
-                                    <select name="<?= e($fieldKey) ?>" required maxlength="6" <?= $isCurrency ? '' : 'data-setup-legal-name' ?>>
-                                        <?php if (!$isCurrency): ?>
-                                            <option value="" disabled <?= (($value[$fieldKey] ?? '') === '') ? 'selected' : '' ?>><?= e(__('setup.legal_form_placeholder')) ?></option>
-                                        <?php endif; ?>
-                                        <?php foreach ($field['options'] as $opt): ?>
-                                            <option value="<?= e($opt['value']) ?>" <?= (string) ($value[$fieldKey] ?? '') === $opt['value'] ? 'selected' : '' ?>>
-                                                <?= e($opt['value']) ?><?= $isCurrency ? '' : ' — ' . e(__($opt['label_key'])) ?>
-                                            </option>
-                                        <?php endforeach; ?>
-                                    </select>
-                                <?php elseif ($fieldKey === 'runts'): ?>
-                                    <input
-                                        type="text"
-                                        name="runts"
-                                        value="<?= e((string) ($value['runts'] ?? '')) ?>"
-                                        inputmode="numeric"
-                                        autocomplete="off"
-                                        spellcheck="false"
-                                        maxlength="20"
-                                        placeholder="<?= e(__('setup.field_runts_placeholder')) ?>"
-                                        data-setup-runts-input
-                                    >
-                                <?php else: ?>
-                                    <input
-                                        type="text"
-                                        name="<?= e($fieldKey) ?>"
-                                        value="<?= e((string) ($value[$fieldKey] ?? '')) ?>"
-                                        <?= !empty($field['required']) ? 'required' : '' ?>
-                                        autocomplete="organization"
-                                        data-setup-assoc-name
-                                    >
-                                <?php endif; ?>
-                            </label>
-                            <?php if ($fieldKey === 'runts'): ?>
-                                <div class="setup-runts-lookup" data-setup-runts
+                                <div class="setup-runts-block" data-setup-runts
                                      data-runts-url="<?= e(url('/setup/runts-lookup')) ?>"
                                      data-csrf="<?= e(csrf_token()) ?>"
                                      data-label-template="<?= e(__('setup.runts_button')) ?>"
@@ -290,9 +256,26 @@ $errorStep = flash('setup_error_step');
                                      data-msg-phase-search-cancelled="<?= e(__('setup.runts_phase_search_cancelled')) ?>"
                                      data-msg-phase-apply="<?= e(__('setup.runts_phase_apply')) ?>"
                                 >
-                                    <button type="button" class="btn setup-scrape-btn" data-setup-runts-btn hidden disabled aria-hidden="true">
-                                        <span data-setup-runts-label><?= e(__('setup.runts_button_fallback')) ?></span>
-                                    </button>
+                                    <label class="setup-field setup-field-runts" for="setup-runts-number">
+                                        <span><?= e(__($field['label_key'])) ?></span>
+                                    </label>
+                                    <div class="setup-runts-row">
+                                        <input
+                                            id="setup-runts-number"
+                                            type="text"
+                                            name="runts"
+                                            value="<?= e((string) ($value['runts'] ?? '')) ?>"
+                                            inputmode="numeric"
+                                            autocomplete="off"
+                                            spellcheck="false"
+                                            maxlength="6"
+                                            placeholder="<?= e(__('setup.field_runts_placeholder')) ?>"
+                                            data-setup-runts-input
+                                        >
+                                        <button type="button" class="btn setup-scrape-btn" data-setup-runts-btn hidden disabled aria-hidden="true">
+                                            <span data-setup-runts-label><?= e(__('setup.runts_button_fallback')) ?></span>
+                                        </button>
+                                    </div>
                                     <div class="setup-runts-live" data-setup-runts-live hidden>
                                         <div class="setup-scrape-spinner" aria-hidden="true"></div>
                                         <div class="setup-runts-live-copy">
@@ -304,8 +287,33 @@ $errorStep = flash('setup_error_step');
                                         </div>
                                     </div>
                                 </div>
-                                </div>
+                                <?php continue; ?>
                             <?php endif; ?>
+                            <label class="setup-field<?= $fieldKey === 'legal_name' ? ' setup-field-legal' : ($fieldKey === 'currency' ? ' setup-field-currency' : ' setup-field-name') ?>">
+                                <span><?= e(__($field['label_key'])) ?></span>
+                                <?php if (($field['type'] ?? '') === 'select'): ?>
+                                    <?php $isCurrency = $fieldKey === 'currency'; ?>
+                                    <select name="<?= e($fieldKey) ?>" required maxlength="6" <?= $isCurrency ? '' : 'data-setup-legal-name' ?>>
+                                        <?php if (!$isCurrency): ?>
+                                            <option value="" disabled <?= (($value[$fieldKey] ?? '') === '') ? 'selected' : '' ?>><?= e(__('setup.legal_form_placeholder')) ?></option>
+                                        <?php endif; ?>
+                                        <?php foreach ($field['options'] as $opt): ?>
+                                            <option value="<?= e($opt['value']) ?>" <?= (string) ($value[$fieldKey] ?? '') === $opt['value'] ? 'selected' : '' ?>>
+                                                <?= e($opt['value']) ?><?= $isCurrency ? '' : ' — ' . e(__($opt['label_key'])) ?>
+                                            </option>
+                                        <?php endforeach; ?>
+                                    </select>
+                                <?php else: ?>
+                                    <input
+                                        type="text"
+                                        name="<?= e($fieldKey) ?>"
+                                        value="<?= e((string) ($value[$fieldKey] ?? '')) ?>"
+                                        <?= !empty($field['required']) ? 'required' : '' ?>
+                                        autocomplete="organization"
+                                        data-setup-assoc-name
+                                    >
+                                <?php endif; ?>
+                            </label>
                         <?php endforeach; ?>
                         <p class="setup-hint setup-full-name-preview muted" data-setup-full-name-preview hidden></p>
                     </div>
@@ -377,6 +385,18 @@ $errorStep = flash('setup_error_step');
                             'value' => (string) ($value['birth_place'] ?? ''),
                             'required' => true,
                         ]) ?>
+                        <label class="setup-field">
+                            <span><?= e(__('setup.field_person_fiscal_code')) ?> *</span>
+                            <div class="cf-row">
+                                <input type="text" name="fiscal_code" value="<?= e((string) ($value['fiscal_code'] ?? '')) ?>" required maxlength="16" pattern="[A-Za-z0-9]{16}" autocomplete="off" data-fiscal-code placeholder="<?= e(__('members.cf_hint')) ?>">
+                                <button type="button" class="btn btn-ghost" data-cf-generate><?= e(__('members.cf_generate')) ?></button>
+                            </div>
+                            <p class="setup-hint muted" data-cf-status
+                               data-incomplete="<?= e(__('members.cf_incomplete')) ?>"
+                               data-ready="<?= e(__('members.cf_ready')) ?>"
+                               data-gender-other="<?= e(__('members.cf_gender_other')) ?>"
+                               hidden></p>
+                        </label>
                         <p class="setup-subhead"><?= e(__('setup.field_residence')) ?></p>
                         <?= view_partial('partials/geo_address', [
                             'names' => [
@@ -409,18 +429,6 @@ $errorStep = flash('setup_error_step');
                                 <input type="date" name="mandate_ends_at" value="<?= e((string) ($value['mandate_ends_at'] ?? '')) ?>" required>
                             </label>
                         </div>
-                        <label class="setup-field">
-                            <span><?= e(__('setup.field_person_fiscal_code')) ?> *</span>
-                            <div class="cf-row">
-                                <input type="text" name="fiscal_code" value="<?= e((string) ($value['fiscal_code'] ?? '')) ?>" required maxlength="16" pattern="[A-Za-z0-9]{16}" autocomplete="off" data-fiscal-code placeholder="<?= e(__('members.cf_hint')) ?>">
-                                <button type="button" class="btn btn-ghost" data-cf-generate><?= e(__('members.cf_generate')) ?></button>
-                            </div>
-                            <p class="setup-hint muted" data-cf-status
-                               data-incomplete="<?= e(__('members.cf_incomplete')) ?>"
-                               data-ready="<?= e(__('members.cf_ready')) ?>"
-                               data-gender-other="<?= e(__('members.cf_gender_other')) ?>"
-                               hidden></p>
-                        </label>
                     </div>
                 <?php elseif ($stepType === 'people_list'): ?>
                     <div class="setup-people" data-setup-line data-people-list>
@@ -499,8 +507,10 @@ $errorStep = flash('setup_error_step');
                          data-msg-phase-apply="<?= e(__('setup.scrape_phase_apply')) ?>"
                          data-msg-found-title="<?= e(__('setup.scrape_found_title')) ?>"
                          data-msg-elapsed="<?= e(__('setup.scrape_elapsed')) ?>"
-                         data-msg-palette="<?= e(__('setup.scrape_palette_label')) ?>"
                          data-msg-logo-fail="<?= e(__('setup.scrape_logo_fail')) ?>"
+                         data-msg-logo-guess="<?= e(__('setup.scrape_logo_guess_title')) ?>"
+                         data-msg-logo-guess-hint="<?= e(__('setup.scrape_logo_guess_hint')) ?>"
+                         data-msg-logo-none="<?= e(__('setup.scrape_logo_guess_none')) ?>"
                          data-msg-ask="<?= e(__('setup.scrape_ask')) ?>"
                          data-msg-ask-yes="<?= e(__('setup.scrape_ask_yes')) ?>"
                          data-msg-ask-no="<?= e(__('setup.scrape_ask_no')) ?>"
@@ -513,6 +523,9 @@ $errorStep = flash('setup_error_step');
                             <div class="setup-scrape-live-copy">
                                 <p class="setup-scrape-status" data-setup-scrape-status></p>
                                 <p class="setup-scrape-elapsed muted" data-setup-scrape-elapsed></p>
+                                <button type="button" class="btn btn-ghost setup-scrape-retry" data-setup-scrape-retry hidden>
+                                    <?= e(__('setup.scrape_retry')) ?>
+                                </button>
                             </div>
                         </div>
                         <div class="setup-scrape-results" data-setup-scrape-results hidden>
@@ -522,6 +535,14 @@ $errorStep = flash('setup_error_step');
                                 <p class="setup-scrape-results-status muted" data-setup-scrape-results-status hidden></p>
                             </div>
                             <div class="setup-scrape-brand" data-setup-scrape-brand hidden>
+                                <div class="setup-scrape-logo-picks" data-setup-scrape-logo-picks hidden>
+                                    <span class="setup-scrape-brand-label"><?= e(__('setup.scrape_logo_guess_title')) ?></span>
+                                    <p class="setup-hint muted setup-scrape-logo-hint"><?= e(__('setup.scrape_logo_guess_hint')) ?></p>
+                                    <div class="setup-scrape-logo-pick-grid" data-setup-scrape-logo-pick-grid></div>
+                                    <button type="button" class="btn btn-ghost btn-sm" data-setup-scrape-logo-none>
+                                        <?= e(__('setup.scrape_logo_guess_none')) ?>
+                                    </button>
+                                </div>
                                 <div class="setup-scrape-logo-card" data-setup-scrape-logo hidden>
                                     <span class="setup-scrape-brand-label"><?= e(__('setup.field_logo')) ?></span>
                                     <button type="button" class="setup-scrape-logo-frame is-replaceable" data-setup-scrape-logo-pick
@@ -533,14 +554,6 @@ $errorStep = flash('setup_error_step');
                                     <input type="file" accept="image/png,image/jpeg,image/webp,image/gif,image/svg+xml"
                                            class="setup-scrape-logo-file" data-setup-scrape-logo-input>
                                     <p class="setup-hint muted setup-scrape-logo-hint"><?= e(__('setup.scrape_logo_change_hint')) ?></p>
-                                </div>
-                                <div class="setup-scrape-palette-card" data-setup-scrape-palette hidden>
-                                    <span class="setup-scrape-brand-label"><?= e(__('setup.scrape_palette_label')) ?></span>
-                                    <div class="setup-scrape-palette-swatches" aria-hidden="true">
-                                        <span class="setup-scrape-palette-swatch is-primary" data-setup-scrape-swatch-primary></span>
-                                        <span class="setup-scrape-palette-swatch is-accent" data-setup-scrape-swatch-accent></span>
-                                    </div>
-                                    <div class="setup-scrape-palette-bar" data-setup-scrape-palette-bar></div>
                                 </div>
                             </div>
                             <div class="setup-scrape-groups" data-setup-scrape-groups>

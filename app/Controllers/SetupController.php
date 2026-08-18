@@ -554,7 +554,26 @@ final class SetupController extends BaseController
             return;
         }
 
-        $result = $this->setup->replaceSetupLogo($request->file('logo'));
+        if (!empty($request->input('remove'))) {
+            $result = $this->setup->removeSetupLogo();
+        } else {
+            $logoUrl = trim((string) $request->input('logo_url', ''));
+            if ($logoUrl !== '') {
+                $allowed = $_SESSION['_setup_logo_candidates'] ?? [];
+                if (!is_array($allowed) || !in_array($logoUrl, $allowed, true)) {
+                    http_response_code(422);
+                    header('Content-Type: application/json; charset=utf-8');
+                    echo json_encode([
+                        'ok' => false,
+                        'error' => (string) __('setup.scrape_logo_fail'),
+                    ], JSON_UNESCAPED_UNICODE);
+                    return;
+                }
+                $result = $this->setup->importSetupLogoFromUrl($logoUrl);
+            } else {
+                $result = $this->setup->replaceSetupLogo($request->file('logo'));
+            }
+        }
         if (empty($result['ok'])) {
             http_response_code(422);
             header('Content-Type: application/json; charset=utf-8');
@@ -762,7 +781,7 @@ final class SetupController extends BaseController
         }
         try {
             $branding = app(\Socly\Services\BrandingService::class);
-            if ($branding->logoUrl() !== null) {
+            if (!empty($found['logo_url']) && $branding->logoUrl() !== null) {
                 $result['logo_url'] = $branding->logoUrl();
             }
             $primary = strtoupper(trim((string) app(\Socly\Services\SettingsService::class)->get('branding.primary', '')));
@@ -786,6 +805,24 @@ final class SetupController extends BaseController
             $result['accent'] = null;
         }
 
+        $candidates = [];
+        if (empty($result['logo_url'])) {
+            $rawCandidates = $result['logo_candidates'] ?? [];
+            if (is_array($rawCandidates)) {
+                foreach ($rawCandidates as $candidateUrl) {
+                    $candidateUrl = trim((string) $candidateUrl);
+                    if ($candidateUrl !== '' && filter_var($candidateUrl, FILTER_VALIDATE_URL)) {
+                        $candidates[] = $candidateUrl;
+                    }
+                    if (count($candidates) >= 3) {
+                        break;
+                    }
+                }
+            }
+        }
+        $_SESSION['_setup_logo_candidates'] = $candidates;
+        $result['logo_candidates'] = $candidates;
+
         $emit([
             'type' => 'done',
             'ok' => true,
@@ -797,6 +834,7 @@ final class SetupController extends BaseController
             'elapsed_ms' => $result['elapsed_ms'] ?? null,
             'pages_fetched' => $result['pages_fetched'] ?? null,
             'logo_url' => $result['logo_url'] ?? null,
+            'logo_candidates' => $result['logo_candidates'] ?? [],
             'primary' => $result['primary'] ?? null,
             'accent' => $result['accent'] ?? null,
             'palettes' => $result['palettes'] ?? [],
@@ -834,7 +872,15 @@ final class SetupController extends BaseController
         };
 
         $number = (string) $request->input('runts', '');
-        $result = $this->runts->lookup($number, $emit);
+        try {
+            $result = $this->runts->lookup($number, $emit);
+        } catch (\Throwable $e) {
+            $emit([
+                'type' => 'error',
+                'error' => __('setup.runts_fail'),
+            ]);
+            return;
+        }
         if (empty($result['ok'])) {
             $emit([
                 'type' => 'error',

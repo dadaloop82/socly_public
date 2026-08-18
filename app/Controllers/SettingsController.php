@@ -185,7 +185,7 @@ final class SettingsController extends BaseController
             'association_house_number' => 'required|string|max:20',
             'association_pec' => 'required|email|max:190',
             'association_email' => 'required|email|max:190',
-            'association_runts' => 'nullable|string|max:120',
+            'association_runts' => 'nullable|string|max:6',
             'primary' => 'required|color',
             'accent' => 'required|color',
             'locale' => 'required|in:it,de,en',

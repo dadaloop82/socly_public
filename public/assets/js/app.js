@@ -2122,9 +2122,29 @@ function initLogoFilePickers(scope = document) {
     if (!input || input.dataset.logoPickerBound === '1') return;
     input.dataset.logoPickerBound = '1';
 
+    const uploadUrl = root.dataset.logoUploadUrl || '';
+    const csrf = root.dataset.csrf || '';
+    const msgFail = root.dataset.msgFail || '';
+    const msgUploading = root.dataset.msgUploading || '';
     const preview = root.querySelector('[data-setup-logo-preview]');
     const img = root.querySelector('[data-setup-logo-img]');
+    const removeBtn = root.querySelector('[data-setup-logo-remove]');
+    const statusEl = root.querySelector('[data-setup-logo-status]');
     const noFileText = filename?.textContent?.trim() || '';
+    let uploading = false;
+
+    const setStatus = (text, isError = false) => {
+      if (!statusEl) return;
+      if (!text) {
+        statusEl.hidden = true;
+        statusEl.textContent = '';
+        statusEl.classList.remove('is-error');
+        return;
+      }
+      statusEl.hidden = false;
+      statusEl.textContent = text;
+      statusEl.classList.toggle('is-error', isError);
+    };
 
     const hidePreview = () => {
       if (preview) preview.hidden = true;
@@ -2132,9 +2152,37 @@ function initLogoFilePickers(scope = document) {
         img.hidden = true;
         img.removeAttribute('src');
       }
+      removeBtn?.setAttribute('hidden', '');
     };
 
-    input.addEventListener('change', () => {
+    const showPreview = (url) => {
+      if (!img || !preview || !url) return;
+      preview.classList.add('is-loading');
+      preview.hidden = false;
+      img.hidden = true;
+      img.onload = () => {
+        img.hidden = false;
+        preview.hidden = false;
+        preview.classList.remove('is-loading');
+        removeBtn?.removeAttribute('hidden');
+      };
+      img.onerror = () => {
+        preview.classList.remove('is-loading');
+        hidePreview();
+      };
+      img.src = url;
+    };
+
+    const applyLogoResponse = (data) => {
+      const url = data.logo_url ? `${data.logo_url}?v=${Date.now()}` : '';
+      if (url) {
+        showPreview(url);
+      } else {
+        hidePreview();
+      }
+    };
+
+    input.addEventListener('change', async () => {
       const file = input.files && input.files[0] ? input.files[0] : null;
       if (filename) {
         filename.textContent = file ? file.name : noFileText;
@@ -2144,23 +2192,92 @@ function initLogoFilePickers(scope = document) {
         return;
       }
       if (!file.type.startsWith('image/') && !/\.svg$/i.test(file.name)) {
+        setStatus(msgFail, true);
         hidePreview();
+        input.value = '';
         return;
       }
-      if (!img || !preview) return;
-      const url = URL.createObjectURL(file);
-      img.onload = () => {
-        URL.revokeObjectURL(url);
-        img.hidden = false;
-        preview.hidden = false;
-      };
-      img.onerror = () => {
-        URL.revokeObjectURL(url);
+
+      setStatus('');
+      const localUrl = URL.createObjectURL(file);
+      showPreview(localUrl);
+
+      if (!uploadUrl) {
+        return;
+      }
+
+      uploading = true;
+      preview?.classList.add('is-uploading');
+      setStatus(msgUploading);
+      try {
+        const body = new FormData();
+        body.set('_token', csrf);
+        body.set('logo', file);
+        const res = await fetch(uploadUrl, {
+          method: 'POST',
+          headers: {
+            Accept: 'application/json',
+            'X-Requested-With': 'XMLHttpRequest',
+            'X-CSRF-TOKEN': csrf,
+          },
+          body,
+          credentials: 'same-origin',
+        });
+        const data = await res.json().catch(() => ({}));
+        URL.revokeObjectURL(localUrl);
+        if (!res.ok || !data.ok) {
+          setStatus(typeof data.error === 'string' ? data.error : msgFail, true);
+          hidePreview();
+          return;
+        }
+        setStatus('');
+        applyLogoResponse(data);
+      } catch (err) {
+        URL.revokeObjectURL(localUrl);
+        setStatus(msgFail, true);
         hidePreview();
-      };
-      img.hidden = true;
-      preview.hidden = true;
-      img.src = url;
+      } finally {
+        uploading = false;
+        preview?.classList.remove('is-uploading');
+        input.value = '';
+      }
+    });
+
+    removeBtn?.addEventListener('click', async () => {
+      if (uploading || !uploadUrl) return;
+      uploading = true;
+      removeBtn.disabled = true;
+      setStatus(msgUploading);
+      try {
+        const body = new URLSearchParams();
+        body.set('_token', csrf);
+        body.set('remove', '1');
+        const res = await fetch(uploadUrl, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
+            Accept: 'application/json',
+            'X-Requested-With': 'XMLHttpRequest',
+            'X-CSRF-TOKEN': csrf,
+          },
+          body,
+          credentials: 'same-origin',
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok || !data.ok) {
+          setStatus(typeof data.error === 'string' ? data.error : msgFail, true);
+          return;
+        }
+        if (filename) filename.textContent = noFileText;
+        input.value = '';
+        setStatus('');
+        applyLogoResponse(data);
+      } catch (err) {
+        setStatus(msgFail, true);
+      } finally {
+        uploading = false;
+        removeBtn.disabled = false;
+      }
     });
   });
 }
@@ -2867,6 +2984,11 @@ function initSetupRuntsLookup(root) {
     if (nextBtn) nextBtn.disabled = lookingUp;
     if (exitBtn) exitBtn.disabled = lookingUp;
     input.readOnly = lookingUp;
+    if (nameInput) {
+      nameInput.readOnly = lookingUp;
+      nameInput.disabled = lookingUp;
+    }
+    if (legalSelect) legalSelect.disabled = lookingUp;
     btn.disabled = true;
     if (lookingUp) {
       btn.setAttribute('aria-busy', 'true');
@@ -2876,6 +2998,22 @@ function initSetupRuntsLookup(root) {
       btn.disabled = digits() === '';
     }
   };
+
+  const blockNavWhileLooking = (event) => {
+    if (!lookingUp) return;
+    const target = event.target;
+    if (!(target instanceof Element)) return;
+    if (target.closest('.setup-back, .setup-cta, [data-setup-exit]')) {
+      event.preventDefault();
+      event.stopPropagation();
+    }
+  };
+  root.addEventListener('click', blockNavWhileLooking, true);
+  form?.addEventListener('submit', (event) => {
+    if (!lookingUp) return;
+    event.preventDefault();
+    event.stopPropagation();
+  }, true);
 
   const applyFields = (fields) => {
     if (fields.runts && input) {
@@ -3038,9 +3176,10 @@ function initSetupWebsiteScrape(root) {
   const logoImg = box.querySelector('[data-setup-scrape-logo-img]');
   const logoPickBtn = box.querySelector('[data-setup-scrape-logo-pick]');
   const logoFileInput = box.querySelector('[data-setup-scrape-logo-input]');
-  const paletteCard = box.querySelector('[data-setup-scrape-palette]');
-  const swatchPrimary = box.querySelector('[data-setup-scrape-swatch-primary]');
-  const swatchAccent = box.querySelector('[data-setup-scrape-swatch-accent]');
+  const logoPicks = box.querySelector('[data-setup-scrape-logo-picks]');
+  const logoPickGrid = box.querySelector('[data-setup-scrape-logo-pick-grid]');
+  const logoNoneBtn = box.querySelector('[data-setup-scrape-logo-none]');
+  const retryBtn = box.querySelector('[data-setup-scrape-retry]');
   const form = root.querySelector('[data-setup-form]');
   if (!input || !btn || !labelEl) return;
 
@@ -3103,7 +3242,6 @@ function initSetupWebsiteScrape(root) {
     if (!legal || nameContainsLegal(name, legal)) return name;
     return `${name} ${legal}`;
   })();
-  const foundColors = { primary: '', accent: '' };
   const seatParts = { address: '', house_number: '', postal_code: '', city: '' };
   const escapeHtml = (value) => String(value)
     .replaceAll('&', '&amp;')
@@ -3133,22 +3271,7 @@ function initSetupWebsiteScrape(root) {
     seatParts.house_number = '';
     seatParts.postal_code = '';
     seatParts.city = '';
-  };
-
-  const normalizeHex = (value) => {
-    const raw = String(value || '').trim();
-    if (/^#[0-9A-Fa-f]{6}$/.test(raw)) return raw.toUpperCase();
-    if (/^#[0-9A-Fa-f]{3}$/.test(raw)) {
-      const r = raw[1];
-      const g = raw[2];
-      const b = raw[3];
-      return `#${r}${r}${g}${g}${b}${b}`.toUpperCase();
-    }
-    return '';
-  };
-
-  const applyLiveBrand = (primary, accent) => {
-    applyBrandColors(primary || '', accent || '');
+    hideLogoPicks();
   };
 
   const showBrandPanel = () => {
@@ -3159,6 +3282,7 @@ function initSetupWebsiteScrape(root) {
 
   const showLogoPreview = (url) => {
     if (!logoCard || !logoImg || !url) return;
+    hideLogoPicks();
     showBrandPanel();
     logoCard.hidden = false;
     logoImg.src = url;
@@ -3169,18 +3293,86 @@ function initSetupWebsiteScrape(root) {
     logoImg.style.transition = 'opacity 0.45s ease';
   };
 
+  const hideLogoPicks = () => {
+    if (logoPicks) logoPicks.hidden = true;
+    if (logoPickGrid) logoPickGrid.innerHTML = '';
+  };
+
+  const showLogoPicks = (urls) => {
+    const list = Array.isArray(urls) ? urls.map((u) => String(u || '').trim()).filter(Boolean).slice(0, 3) : [];
+    if (!logoPicks || !logoPickGrid || list.length === 0) return;
+    if (logoCard) logoCard.hidden = true;
+    showBrandPanel();
+    logoPicks.hidden = false;
+    logoPickGrid.innerHTML = '';
+    list.forEach((url, index) => {
+      const btnEl = document.createElement('button');
+      btnEl.type = 'button';
+      btnEl.className = 'setup-scrape-logo-pick';
+      btnEl.dataset.logoUrl = url;
+      btnEl.setAttribute('aria-label', `${box.dataset.msgLogoGuess || ''} ${index + 1}`);
+      const img = document.createElement('img');
+      img.alt = '';
+      img.loading = 'lazy';
+      img.referrerPolicy = 'no-referrer';
+      img.src = url;
+      img.onerror = () => {
+        btnEl.hidden = true;
+      };
+      btnEl.appendChild(img);
+      btnEl.addEventListener('click', () => pickScrapedLogo(url, btnEl));
+      logoPickGrid.appendChild(btnEl);
+    });
+  };
+
+  const pickScrapedLogo = async (url, btnEl) => {
+    const uploadUrl = box.dataset.logoUploadUrl || '';
+    if (!uploadUrl || !url) {
+      showLogoReplaceError();
+      return;
+    }
+    logoPickGrid?.querySelectorAll('.setup-scrape-logo-pick').forEach((el) => el.classList.add('is-busy'));
+    if (btnEl) btnEl.classList.add('is-busy');
+    try {
+      const body = new URLSearchParams();
+      body.set('_token', box.dataset.csrf || '');
+      body.set('logo_url', url);
+      const res = await fetch(uploadUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
+          Accept: 'application/json',
+          'X-Requested-With': 'XMLHttpRequest',
+          'X-CSRF-TOKEN': box.dataset.csrf || '',
+        },
+        body,
+        credentials: 'same-origin',
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || !data.ok) {
+        showLogoReplaceError(typeof data.error === 'string' ? data.error : '');
+        logoPickGrid?.querySelectorAll('.setup-scrape-logo-pick').forEach((el) => el.classList.remove('is-busy'));
+        return;
+      }
+      hideLogoPicks();
+      applyReplacedLogo(data);
+      if (results) results.hidden = false;
+    } catch (err) {
+      showLogoReplaceError();
+      logoPickGrid?.querySelectorAll('.setup-scrape-logo-pick').forEach((el) => el.classList.remove('is-busy'));
+    }
+  };
+
+  logoNoneBtn?.addEventListener('click', () => {
+    hideLogoPicks();
+    if (brandPanel && logoCard?.hidden) {
+      brandPanel.hidden = true;
+    }
+  });
+
   const applyReplacedLogo = (data) => {
     const url = data.logo_url ? `${data.logo_url}?v=${Date.now()}` : '';
     if (url) showLogoPreview(url);
-    const firstPalette = Array.isArray(data.palettes) ? data.palettes[0] : null;
-    const primary = normalizeHex((firstPalette && firstPalette.primary) || data.primary || '');
-    const accent = normalizeHex((firstPalette && firstPalette.accent) || data.accent || '');
-    if (primary) foundColors.primary = primary;
-    if (accent) foundColors.accent = accent;
-    if (primary || accent) {
-      showPalettePreview();
-      applyLiveBrand(primary || null, accent || null);
-    }
   };
 
   const showLogoReplaceError = (message) => {
@@ -3237,10 +3429,6 @@ function initSetupWebsiteScrape(root) {
       }
       applyReplacedLogo(data);
       if (results) results.hidden = false;
-      if (resultsStatus) {
-        resultsStatus.hidden = false;
-        resultsStatus.textContent = box.dataset.msgPalette || '';
-      }
     } catch (err) {
       URL.revokeObjectURL(localUrl);
       showLogoReplaceError();
@@ -3249,29 +3437,6 @@ function initSetupWebsiteScrape(root) {
       logoFileInput.value = '';
     }
   });
-
-  const showPalettePreview = () => {
-    if (!paletteCard) return;
-    if (foundColors.primary || foundColors.accent) {
-      const [primary, accent] = brandEnsureDistinctColors(
-        foundColors.primary || foundColors.accent,
-        foundColors.accent || foundColors.primary
-      );
-      foundColors.primary = primary;
-      foundColors.accent = accent;
-    }
-    showBrandPanel();
-    paletteCard.hidden = false;
-    if (swatchPrimary && foundColors.primary) {
-      swatchPrimary.style.setProperty('--swatch', foundColors.primary);
-      swatchPrimary.style.background = foundColors.primary;
-    }
-    if (swatchAccent && foundColors.accent) {
-      swatchAccent.style.setProperty('--swatch', foundColors.accent);
-      swatchAccent.style.background = foundColors.accent;
-    }
-    applyLiveBrand(foundColors.primary || null, foundColors.accent || null);
-  };
 
   const applyNormalized = () => {
     const normalized = normalizeWebsiteInput(input.value);
@@ -3282,11 +3447,15 @@ function initSetupWebsiteScrape(root) {
   const syncLabel = () => {
     const scraping = box.classList.contains('is-scraping');
     const attempted = box.dataset.scrapeAttempted === '1';
+    const failed = box.dataset.scrapeFailed === '1';
     const valid = hasValidWebsite();
     const liveOpen = !!(live && !live.hidden);
     const resultsOpen = !!(results && !results.hidden);
+    const retryOpen = failed && !scraping;
 
-    if (attempted && !scraping) {
+    if (failed && !scraping) {
+      hideScrapeButton();
+    } else if (attempted && !scraping) {
       hideScrapeButton();
     } else if (!valid && !scraping) {
       hideScrapeButton();
@@ -3300,12 +3469,21 @@ function initSetupWebsiteScrape(root) {
       btn.disabled = scraping || !valid;
     }
 
-    const showShell = !btn.hidden || scraping || liveOpen || resultsOpen;
+    const showShell = !btn.hidden || scraping || liveOpen || resultsOpen || retryOpen;
     box.hidden = !showShell;
     if (showShell) box.removeAttribute('aria-hidden');
     else box.setAttribute('aria-hidden', 'true');
   };
-  input.addEventListener('input', syncLabel);
+  input.addEventListener('input', () => {
+    if (box.dataset.scrapeFailed === '1') {
+      clearScrapeRetry();
+      box.dataset.scrapeAttempted = '0';
+      if (live) live.hidden = true;
+      setPhase('');
+      setElapsed('');
+    }
+    syncLabel();
+  });
   input.addEventListener('blur', () => {
     applyNormalized();
     syncLabel();
@@ -3324,7 +3502,24 @@ function initSetupWebsiteScrape(root) {
 
   const setElapsed = (sec) => {
     if (!elapsedEl) return;
+    if (sec === '' || sec === null || sec === undefined) {
+      elapsedEl.textContent = '';
+      return;
+    }
     elapsedEl.textContent = (box.dataset.msgElapsed || ':sec s').replaceAll(':sec', String(sec));
+  };
+
+  const showScrapeRetry = () => {
+    box.dataset.scrapeFailed = '1';
+    if (retryBtn) retryBtn.hidden = false;
+    if (elapsedEl) elapsedEl.hidden = true;
+    hideScrapeButton();
+  };
+
+  const clearScrapeRetry = () => {
+    delete box.dataset.scrapeFailed;
+    if (retryBtn) retryBtn.hidden = true;
+    if (elapsedEl) elapsedEl.hidden = false;
   };
 
   const upsertRow = (list, key, label, value) => {
@@ -3370,20 +3565,9 @@ function initSetupWebsiteScrape(root) {
 
     if (key === 'logo_url') {
       showLogoPreview(value);
-      if (foundColors.primary || foundColors.accent) {
-        showPalettePreview();
-      }
       return;
     }
     if (key === 'theme_primary' || key === 'theme_accent') {
-      const hex = normalizeHex(value);
-      if (!hex) return;
-      if (key === 'theme_primary') foundColors.primary = hex;
-      if (key === 'theme_accent') foundColors.accent = hex;
-      // Show as soon as we have colors; logo may arrive just before/after in the stream.
-      if (logoCard && !logoCard.hidden) {
-        showPalettePreview();
-      }
       return;
     }
     if (key === 'website') {
@@ -3441,8 +3625,8 @@ function initSetupWebsiteScrape(root) {
   const hasVisibleFindings = () => {
     const hasRows = !!box.querySelector('[data-scrape-group-list] [data-found-key]');
     const hasLogo = !!(logoCard && !logoCard.hidden);
-    const hasPalette = !!(paletteCard && !paletteCard.hidden);
-    return hasRows || hasLogo || hasPalette;
+    const hasLogoGuess = !!(logoPicks && !logoPicks.hidden);
+    return hasRows || hasLogo || hasLogoGuess;
   };
 
   const finishSuccess = (data, foundCountHint = 0, startedAtMs = Date.now()) => {
@@ -3452,47 +3636,14 @@ function initSetupWebsiteScrape(root) {
     }
     if (data.logo_url) {
       showLogoPreview(`${data.logo_url}?v=${Date.now()}`);
-      const logoRoot = document.querySelector('[data-setup-logo]');
-      const logoImg = logoRoot?.querySelector('[data-setup-logo-img]');
-      const logoPreview = logoRoot?.querySelector('[data-setup-logo-preview]');
-      if (logoImg && logoPreview) {
-        logoImg.onload = () => {
-          logoImg.hidden = false;
-          logoPreview.hidden = false;
-        };
-        logoImg.onerror = () => {
-          logoImg.hidden = true;
-          logoPreview.hidden = true;
-          logoImg.removeAttribute('src');
-        };
-        logoImg.src = `${data.logo_url}?v=${Date.now()}`;
-      }
-    }
-    const theme = data.found || {};
-    const primary = normalizeHex(data.primary || theme.theme_primary || foundColors.primary);
-    const accent = normalizeHex(data.accent || theme.theme_accent || foundColors.accent);
-    if (data.logo_url || (logoCard && !logoCard.hidden)) {
-      if (primary) foundColors.primary = primary;
-      if (accent) foundColors.accent = accent;
-      if (foundColors.primary || foundColors.accent) {
-        showPalettePreview();
-      }
-    }
-    if (Array.isArray(data.palettes) && data.palettes[0]) {
-      const first = data.palettes[0];
-      const p = normalizeHex(first.primary);
-      const a = normalizeHex(first.accent);
-      if (p) foundColors.primary = p;
-      if (a) foundColors.accent = a;
-      if (foundColors.primary || foundColors.accent) {
-        showPalettePreview();
-      }
+    } else if (Array.isArray(data.logo_candidates) && data.logo_candidates.length) {
+      showLogoPicks(data.logo_candidates);
     }
     const foundKeys = Object.keys(data.found || {}).filter(
       (key) => !['logo_url', 'theme_primary', 'theme_accent', 'website'].includes(key)
     );
     const visualCount = (logoCard && !logoCard.hidden ? 1 : 0)
-      + (paletteCard && !paletteCard.hidden ? 1 : 0)
+      + (logoPicks && !logoPicks.hidden ? 1 : 0)
       + foundKeys.length;
     const liveCount = box.querySelectorAll('[data-scrape-group-list] [data-found-key]').length;
     const sec = Math.max(1, Math.round((data.elapsed_ms || (Date.now() - startedAtMs)) / 1000));
@@ -3500,8 +3651,10 @@ function initSetupWebsiteScrape(root) {
     if (count === 0 && !hasVisibleFindings()) {
       setPhase(box.dataset.msgEmpty || '');
       if (results) results.hidden = true;
-      return;
+      showScrapeRetry();
+      return false;
     }
+    clearScrapeRetry();
     const summary = (box.dataset.msgOk || '')
       .replaceAll(':count', String(Math.max(1, count)))
       .replaceAll(':sec', String(sec))
@@ -3515,9 +3668,10 @@ function initSetupWebsiteScrape(root) {
       resultsStatus.textContent = summary;
     }
     if (results) results.hidden = false;
+    return true;
   };
 
-  btn.addEventListener('click', async () => {
+  const runScrape = async () => {
     const website = applyNormalized() || input.value.trim();
     if (!website) {
       if (live) live.hidden = false;
@@ -3526,8 +3680,10 @@ function initSetupWebsiteScrape(root) {
     }
     syncLabel();
     box.dataset.scrapeAttempted = '1';
+    clearScrapeRetry();
     setScrapeNavLocked(true);
     btn.disabled = true;
+    if (retryBtn) retryBtn.disabled = true;
     if (live) live.hidden = false;
     if (results) results.hidden = true;
     if (resultsStatus) {
@@ -3537,12 +3693,10 @@ function initSetupWebsiteScrape(root) {
     clearFoundGroups();
     if (brandPanel) brandPanel.hidden = true;
     if (logoCard) logoCard.hidden = true;
-    if (paletteCard) paletteCard.hidden = true;
     if (logoImg) logoImg.removeAttribute('src');
-    foundColors.primary = '';
-    foundColors.accent = '';
     setPhase(box.dataset.msgPhaseConnect || box.dataset.msgLoading || '…');
     setElapsed(0);
+    if (elapsedEl) elapsedEl.hidden = false;
     syncLabel();
 
     const startedAt = Date.now();
@@ -3555,6 +3709,7 @@ function initSetupWebsiteScrape(root) {
     let donePayload = null;
     let foundCount = 0;
     let streamError = null;
+    let succeeded = false;
     try {
       const body = new URLSearchParams();
       body.set('_token', box.dataset.csrf || '');
@@ -3634,23 +3789,23 @@ function initSetupWebsiteScrape(root) {
       }
 
       if (donePayload && donePayload.ok) {
-        finishSuccess(donePayload, foundCount, startedAt);
+        succeeded = finishSuccess(donePayload, foundCount, startedAt);
       } else if (foundCount > 0 || hasVisibleFindings()) {
-        // Stream showed useful data but final "done" never arrived (timeout / buffering).
-        finishSuccess({
+        succeeded = finishSuccess({
           ok: true,
           found: donePayload?.found || {},
           applied_count: foundCount,
           elapsed_ms: donePayload?.elapsed_ms || (Date.now() - startedAt),
           website: donePayload?.website || website,
           logo_url: donePayload?.logo_url,
+          logo_candidates: donePayload?.logo_candidates || [],
         }, foundCount, startedAt);
       } else {
         throw new Error(streamError || (donePayload && donePayload.error) || 'fail');
       }
     } catch (err) {
       if (foundCount > 0 || hasVisibleFindings()) {
-        finishSuccess({
+        succeeded = finishSuccess({
           ok: true,
           found: {},
           applied_count: foundCount,
@@ -3662,16 +3817,27 @@ function initSetupWebsiteScrape(root) {
         if (results && !hasVisibleFindings()) {
           results.hidden = true;
         }
+        showScrapeRetry();
       }
     } finally {
       clearTimeout(timer);
       clearInterval(tick);
       setScrapeNavLocked(false);
-      hideScrapeButton();
+      if (retryBtn) retryBtn.disabled = false;
+      if (succeeded) {
+        hideScrapeButton();
+      }
       syncLabel();
     }
+  };
+
+  btn.addEventListener('click', () => {
+    runScrape();
   });
-}
+  retryBtn?.addEventListener('click', () => {
+    runScrape();
+  });
+};
 
 function initSetupPeopleList(root) {
   root.querySelectorAll('[data-people-list]').forEach((list) => initPeopleList(list));

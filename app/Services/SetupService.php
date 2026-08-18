@@ -499,25 +499,7 @@ final class SetupService
         }
 
         if ($type === 'logo') {
-            $remove = !empty($input['remove_logo']);
-            if ($remove) {
-                $relative = $this->branding->logoRelativePath();
-                if ($relative !== '') {
-                    $absolute = storage_path('uploads/' . $relative);
-                    if (is_file($absolute)) {
-                        @unlink($absolute);
-                    }
-                    $this->settings->set('branding.logo', '');
-                }
-            } else {
-                $file = is_array($input['logo_file'] ?? null) ? $input['logo_file'] : null;
-                if ($file !== null) {
-                    $stored = $this->branding->storeLogoUpload($file);
-                    if (!$stored['ok']) {
-                        return ['ok' => false, 'errors' => ['logo' => (string) ($stored['error'] ?? __('validation.photo'))]];
-                    }
-                }
-            }
+            // Upload and removal are handled live via POST /setup/logo.
             $this->settings->set('branding.logo_configured', '1');
             return ['ok' => true];
         }
@@ -808,6 +790,83 @@ final class SetupService
     }
 
     /**
+     * Remove association logo during setup and reset palette to SOCLY defaults.
+     *
+     * @return array{ok:bool,error?:string,logo_url?:null,primary:string,accent:string,palettes:list<array<string,mixed>>}
+     */
+    public function removeSetupLogo(): array
+    {
+        $relative = $this->branding->logoRelativePath();
+        if ($relative !== '') {
+            $absolute = storage_path('uploads/' . $relative);
+            if (is_file($absolute)) {
+                @unlink($absolute);
+            }
+            $this->settings->set('branding.logo', '');
+        }
+
+        $primary = '#0D6E66';
+        $accent = '#B84A1B';
+        $this->settings->set('branding.primary', $primary);
+        $this->settings->set('branding.accent', $accent);
+        $palettes = $this->branding->storePaletteSuggestions([
+            [
+                'id' => 'socly_default',
+                'name' => __('setup.palette_socly'),
+                'primary' => $primary,
+                'accent' => $accent,
+                'source' => 'default',
+            ],
+        ]);
+        EnvWriter::setUserValues([
+            'BRANDING_PRIMARY' => $primary,
+            'BRANDING_ACCENT' => $accent,
+        ]);
+
+        return [
+            'ok' => true,
+            'logo_url' => null,
+            'primary' => $primary,
+            'accent' => $accent,
+            'palettes' => $palettes,
+        ];
+    }
+
+    /**
+     * Import a scraped logo candidate URL during setup and refresh palette suggestions.
+     *
+     * @return array{ok:bool,error?:string,logo_url?:string|null,primary?:string,accent?:string,palettes?:list<array<string,mixed>>}
+     */
+    public function importSetupLogoFromUrl(string $url): array
+    {
+        $stored = $this->branding->downloadLogoFromUrl($url, true);
+        if (empty($stored['ok'])) {
+            return ['ok' => false, 'error' => (string) ($stored['error'] ?? __('validation.photo'))];
+        }
+
+        $primary = strtoupper(trim((string) $this->settings->get('branding.primary', '')));
+        $accent = strtoupper(trim((string) $this->settings->get('branding.accent', '')));
+        $env = [];
+        if ($primary !== '') {
+            $env['BRANDING_PRIMARY'] = $primary;
+        }
+        if ($accent !== '') {
+            $env['BRANDING_ACCENT'] = $accent;
+        }
+        if ($env !== []) {
+            EnvWriter::setUserValues($env);
+        }
+
+        return [
+            'ok' => true,
+            'logo_url' => $this->branding->logoUrl(),
+            'primary' => $primary,
+            'accent' => $accent,
+            'palettes' => $this->branding->paletteSuggestions(),
+        ];
+    }
+
+    /**
      * Persist RUNTS lookup results. Name / legal form / RUNTS overwrite; other empty fields are filled.
      *
      * @param array<string, string> $fields
@@ -1003,8 +1062,8 @@ final class SetupService
             }
             if ($key === 'runts') {
                 $value = preg_replace('/\D+/', '', $value) ?? '';
-                if (strlen($value) > 20) {
-                    $errors[$key] = __('validation.max_string', ['max' => '20']);
+                if (strlen($value) > 6) {
+                    $errors[$key] = __('validation.max_string', ['max' => '6']);
                     continue;
                 }
                 $pending[] = [

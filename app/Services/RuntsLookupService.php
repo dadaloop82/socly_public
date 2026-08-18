@@ -38,6 +38,7 @@ final class RuntsLookupService
 
         $emit = $emit ?? static function (): void {};
         $started = microtime(true);
+        @set_time_limit(self::TIMEOUT_SECONDS + 5);
         $emit([
             'type' => 'start',
             'number' => $number,
@@ -45,7 +46,16 @@ final class RuntsLookupService
         ]);
         $emit(['type' => 'progress', 'phase' => 'connect', 'percent' => 4]);
 
-        $ensured = $this->ensureLists($emit);
+        try {
+            $ensured = $this->ensureLists($emit);
+        } catch (\Throwable $e) {
+            $ensured = ['ok' => false, 'error' => __('setup.runts_fail')];
+            $hasCache = $this->isValidList($this->listPath('iscritti'), 100000)
+                && $this->isValidList($this->listPath('cancellati'), 10000);
+            if ($hasCache) {
+                $ensured = ['ok' => true, 'cache_used' => true];
+            }
+        }
         if (empty($ensured['ok'])) {
             return ['ok' => false, 'error' => (string) ($ensured['error'] ?? __('setup.runts_fail'))];
         }
@@ -178,14 +188,16 @@ final class RuntsLookupService
 
         $iscritti = $this->listPath('iscritti');
         $cancellati = $this->listPath('cancellati');
-        // Always try to refresh from the official source.
-        $downloaded = $this->downloadLists($emit);
+        $hasCache = $this->isValidList($iscritti, 100000) && $this->isValidList($cancellati, 10000);
+        try {
+            $downloaded = $this->downloadLists($emit);
+        } catch (\Throwable $e) {
+            $downloaded = ['ok' => false, 'error' => __('setup.runts_fail')];
+        }
         if (!empty($downloaded['ok'])) {
             return ['ok' => true];
         }
 
-        // Fallback to cache only if we have valid files and the remote fetch failed.
-        $hasCache = $this->isValidList($iscritti, 100000) && $this->isValidList($cancellati, 10000);
         if ($hasCache) {
             return ['ok' => true, 'cache_used' => true];
         }
@@ -199,62 +211,64 @@ final class RuntsLookupService
      */
     private function downloadLists(callable $emit): array
     {
-        $cookie = $this->cacheDir() . '/cookies.txt';
-        @unlink($cookie);
-
-        $emit(['type' => 'progress', 'phase' => 'connect', 'percent' => 6]);
-        $page = $this->http('GET', self::LIST_URL, null, $cookie, 20, null);
-        if ($page['status'] !== 200 || trim($page['body']) === '') {
-            return ['ok' => false, 'error' => __('setup.runts_fail')];
-        }
-
-        $iscrittiBtn = $this->findDownloadButton($page['body'], 'Enti iscritti (formato Excel)');
-        $cancellatiBtn = $this->findDownloadButton($page['body'], 'Enti cancellati (formato Excel)');
-        if ($iscrittiBtn === '' || $cancellatiBtn === '') {
-            return ['ok' => false, 'error' => __('setup.runts_fail')];
-        }
-
-        $emit(['type' => 'progress', 'phase' => 'download_active', 'percent' => 10]);
-        $lastPct = 10;
-        $iscritti = $this->postDownload($page['body'], $iscrittiBtn, $cookie, static function (float $ratio) use ($emit, &$lastPct): void {
-            $pct = 10 + (int) round($ratio * 32);
-            if ($pct <= $lastPct) {
-                return;
+        $cookie = $this->cacheDir() . '/cookies-' . getmypid() . '-' . bin2hex(random_bytes(3)) . '.txt';
+        try {
+            $emit(['type' => 'progress', 'phase' => 'connect', 'percent' => 6]);
+            $page = $this->http('GET', self::LIST_URL, null, $cookie, 12, null);
+            if ($page['status'] !== 200 || trim($page['body']) === '') {
+                return ['ok' => false, 'error' => __('setup.runts_fail')];
             }
-            $lastPct = $pct;
-            $emit(['type' => 'progress', 'phase' => 'download_active', 'percent' => $pct]);
-        });
-        if (empty($iscritti['ok']) || !$this->storeList('iscritti', (string) ($iscritti['body'] ?? ''))) {
-            return ['ok' => false, 'error' => __('setup.runts_fail')];
-        }
 
-        $emit(['type' => 'progress', 'phase' => 'download_cancelled', 'percent' => 44]);
-        $page2 = $this->http('GET', self::LIST_URL, null, $cookie, 20, null);
-        if ($page2['status'] !== 200 || trim($page2['body']) === '') {
-            return ['ok' => false, 'error' => __('setup.runts_fail')];
-        }
-        $cancellatiBtn = $this->findDownloadButton($page2['body'], 'Enti cancellati (formato Excel)') ?: $cancellatiBtn;
-        $lastPct = 44;
-        $cancellati = $this->postDownload($page2['body'], $cancellatiBtn, $cookie, static function (float $ratio) use ($emit, &$lastPct): void {
-            $pct = 44 + (int) round($ratio * 12);
-            if ($pct <= $lastPct) {
-                return;
+            $iscrittiBtn = $this->findDownloadButton($page['body'], 'Enti iscritti (formato Excel)');
+            $cancellatiBtn = $this->findDownloadButton($page['body'], 'Enti cancellati (formato Excel)');
+            if ($iscrittiBtn === '' || $cancellatiBtn === '') {
+                return ['ok' => false, 'error' => __('setup.runts_fail')];
             }
-            $lastPct = $pct;
-            $emit(['type' => 'progress', 'phase' => 'download_cancelled', 'percent' => $pct]);
-        });
-        if (empty($cancellati['ok']) || !$this->storeList('cancellati', (string) ($cancellati['body'] ?? ''))) {
-            return ['ok' => false, 'error' => __('setup.runts_fail')];
+
+            $emit(['type' => 'progress', 'phase' => 'download_active', 'percent' => 10]);
+            $lastPct = 10;
+            $iscritti = $this->postDownload($page['body'], $iscrittiBtn, $cookie, static function (float $ratio) use ($emit, &$lastPct): void {
+                $pct = 10 + (int) round($ratio * 32);
+                if ($pct <= $lastPct) {
+                    return;
+                }
+                $lastPct = $pct;
+                $emit(['type' => 'progress', 'phase' => 'download_active', 'percent' => $pct]);
+            });
+            if (empty($iscritti['ok']) || !$this->storeList('iscritti', (string) ($iscritti['body'] ?? ''))) {
+                return ['ok' => false, 'error' => __('setup.runts_fail')];
+            }
+
+            $emit(['type' => 'progress', 'phase' => 'download_cancelled', 'percent' => 44]);
+            $page2 = $this->http('GET', self::LIST_URL, null, $cookie, 12, null);
+            if ($page2['status'] !== 200 || trim($page2['body']) === '') {
+                return ['ok' => false, 'error' => __('setup.runts_fail')];
+            }
+            $cancellatiBtn = $this->findDownloadButton($page2['body'], 'Enti cancellati (formato Excel)') ?: $cancellatiBtn;
+            $lastPct = 44;
+            $cancellati = $this->postDownload($page2['body'], $cancellatiBtn, $cookie, static function (float $ratio) use ($emit, &$lastPct): void {
+                $pct = 44 + (int) round($ratio * 12);
+                if ($pct <= $lastPct) {
+                    return;
+                }
+                $lastPct = $pct;
+                $emit(['type' => 'progress', 'phase' => 'download_cancelled', 'percent' => $pct]);
+            });
+            if (empty($cancellati['ok']) || !$this->storeList('cancellati', (string) ($cancellati['body'] ?? ''))) {
+                return ['ok' => false, 'error' => __('setup.runts_fail')];
+            }
+
+            $this->replaceFile($this->cacheDir() . '/meta.json', json_encode([
+                'fetched_at' => time(),
+                'iscritti_name' => $iscritti['filename'] ?? '',
+                'cancellati_name' => $cancellati['filename'] ?? '',
+            ], JSON_UNESCAPED_UNICODE) ?: '{}');
+
+            $emit(['type' => 'progress', 'phase' => 'lists_ready', 'percent' => 58]);
+            return ['ok' => true];
+        } finally {
+            @unlink($cookie);
         }
-
-        file_put_contents($this->cacheDir() . '/meta.json', json_encode([
-            'fetched_at' => time(),
-            'iscritti_name' => $iscritti['filename'] ?? '',
-            'cancellati_name' => $cancellati['filename'] ?? '',
-        ], JSON_UNESCAPED_UNICODE));
-
-        $emit(['type' => 'progress', 'phase' => 'lists_ready', 'percent' => 58]);
-        return ['ok' => true];
     }
 
     private function findDownloadButton(string $html, string $title): string
@@ -285,7 +299,7 @@ final class RuntsLookupService
             '__EVENTVALIDATION' => $this->hiddenValue($html, '__EVENTVALIDATION'),
             $buttonName => 'Scarica',
         ];
-        $res = $this->http('POST', self::LIST_URL, $fields, $cookieFile, 55, $onProgress);
+        $res = $this->http('POST', self::LIST_URL, $fields, $cookieFile, 40, $onProgress);
         if ($res['status'] !== 200 || strlen($res['body']) < 1000) {
             return ['ok' => false];
         }
@@ -449,6 +463,8 @@ final class RuntsLookupService
             CURLOPT_MAXREDIRS => 5,
             CURLOPT_CONNECTTIMEOUT => 12,
             CURLOPT_TIMEOUT => max(8, $timeout),
+            CURLOPT_LOW_SPEED_LIMIT => 1024,
+            CURLOPT_LOW_SPEED_TIME => 10,
             CURLOPT_USERAGENT => self::UA,
             CURLOPT_COOKIEJAR => $cookieFile,
             CURLOPT_COOKIEFILE => $cookieFile,
@@ -496,19 +512,51 @@ final class RuntsLookupService
             return false;
         }
         $path = $this->listPath($kind);
-        $tmp = $path . '.tmp';
-        if (file_put_contents($tmp, $body) === false) {
+        $tmp = $path . '.tmp.' . getmypid();
+        if (@file_put_contents($tmp, $body) === false) {
             return false;
         }
+        @chmod($tmp, 0664);
         if (!$this->isValidList($tmp, 1000)) {
             @unlink($tmp);
             return false;
         }
-        if (!@rename($tmp, $path)) {
+        if (!$this->replacePath($tmp, $path)) {
             @unlink($tmp);
             return false;
         }
         return true;
+    }
+
+    private function replaceFile(string $path, string $body): bool
+    {
+        $tmp = $path . '.tmp.' . getmypid();
+        if (@file_put_contents($tmp, $body) === false) {
+            return false;
+        }
+        @chmod($tmp, 0664);
+        if (!$this->replacePath($tmp, $path)) {
+            @unlink($tmp);
+            return false;
+        }
+        return true;
+    }
+
+    private function replacePath(string $tmp, string $path): bool
+    {
+        if (is_file($path) && !is_writable($path)) {
+            @unlink($path);
+        }
+        if (@rename($tmp, $path)) {
+            @chmod($path, 0664);
+            return true;
+        }
+        @unlink($path);
+        if (@rename($tmp, $path)) {
+            @chmod($path, 0664);
+            return true;
+        }
+        return false;
     }
 
     private function isValidList(string $path, int $minBytes): bool
