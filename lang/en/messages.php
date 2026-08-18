@@ -497,7 +497,7 @@ return [
         'runts_button_fallback' => 'Try to recover data from RUNTS',
         'runts_need_number' => 'Enter the RUNTS repertory number first.',
         'runts_loading' => 'Looking up the entity in the RUNTS register…',
-        'runts_ok' => 'Found :name. I updated the legal name and form; other register data will be used in the next steps.',
+        'runts_ok' => 'Found :name.',
         'runts_fail' => 'Could not query RUNTS. Check the number or continue manually.',
         'runts_not_found' => 'No entity found with repertory :number. Check the number and try again.',
         'runts_cancelled' => ':name was removed from RUNTS on :date (:reason). Official data is still applied, but the entity is no longer registered.',

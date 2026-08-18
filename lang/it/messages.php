@@ -499,7 +499,7 @@ return [
         'runts_button_fallback' => 'Prova a recuperare i dati dal RUNTS',
         'runts_need_number' => 'Inserisci prima il numero di repertorio RUNTS.',
         'runts_loading' => 'Sto cercando l’ente nel registro RUNTS…',
-        'runts_ok' => 'Trovato :name. Ho aggiornato denominazione e ragione sociale; gli altri dati del registro saranno usati nei prossimi passi.',
+        'runts_ok' => 'Trovato :name.',
         'runts_fail' => 'Non sono riuscito a interrogare il RUNTS. Controlla il numero o continua manualmente.',
         'runts_not_found' => 'Nessun ente trovato con repertorio :number. Controlla il numero e riprova.',
         'runts_cancelled' => ':name risulta cancellato dal RUNTS il :date (:reason). I dati restano quelli ufficiali, ma l’ente non è più iscritto.',

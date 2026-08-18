@@ -497,7 +497,7 @@ return [
         'runts_button_fallback' => 'Versuchen, Daten aus dem RUNTS zu laden',
         'runts_need_number' => 'Bitte zuerst die RUNTS-Repertoriumsnummer eingeben.',
         'runts_loading' => 'Suche die Körperschaft im RUNTS…',
-        'runts_ok' => ':name gefunden. Bezeichnung und Rechtsform wurden aktualisiert; weitere Registerdaten folgen in den nächsten Schritten.',
+        'runts_ok' => ':name gefunden.',
         'runts_fail' => 'RUNTS konnte nicht abgefragt werden. Nummer prüfen oder manuell fortfahren.',
         'runts_not_found' => 'Kein Eintrag mit Repertorium :number. Nummer prüfen und erneut versuchen.',
         'runts_cancelled' => ':name wurde am :date aus dem RUNTS gelöscht (:reason). Die Amtsdaten werden trotzdem übernommen, die Körperschaft ist aber nicht mehr eingetragen.',

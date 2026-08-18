@@ -818,9 +818,9 @@ a:hover { text-decoration: underline; color: var(--brand-primary-deep); }
 }
 .setup-runts-live[hidden] { display: none !important; }
 .setup-runts-live-copy { display: grid; gap: 0.4rem; min-width: 0; }
-.setup-runts-status {
-  margin: 0;
-  line-height: 1.45;
+.setup-runts-status strong {
+  color: var(--ink);
+  font-weight: 800;
 }
 .setup-runts-status.is-error {
   color: var(--danger, #9b1c1c);

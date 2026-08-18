@@ -867,7 +867,12 @@ final class SetupController extends BaseController
             'elapsed_ms' => $result['elapsed_ms'] ?? null,
             'message' => !empty($result['cancelled'])
                 ? (string) ($result['warning'] ?? '')
-                : __('setup.runts_ok', ['name' => (string) ($fields['name'] ?? '')]),
+                : __('setup.runts_ok', [
+                    'name' => assoc_display_name(
+                        (string) ($fields['name'] ?? ''),
+                        (string) ($fields['legal_name'] ?? '')
+                    ) ?: (string) ($fields['name'] ?? ''),
+                ]),
         ]);
     }
 

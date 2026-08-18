@@ -2686,18 +2686,41 @@ function initSetupRuntsLookup(root) {
     labelEl.textContent = tpl.includes(':name') ? tpl.replaceAll(':name', name) : (tpl || labelEl.textContent);
   };
 
-  const showStatus = (text, kind) => {
+  const escapeHtml = (s) => String(s)
+    .replaceAll('&', '&amp;')
+    .replaceAll('<', '&lt;')
+    .replaceAll('>', '&gt;')
+    .replaceAll('"', '&quot;')
+    .replaceAll("'", '&#39;');
+
+  const showStatus = (text, kind, html) => {
     if (!status) return;
     const msg = String(text || '').trim();
     const isError = kind === 'error';
     const isWarn = kind === 'warn';
-    status.hidden = msg === '';
-    status.textContent = msg;
+    status.hidden = msg === '' && !html;
+    if (html) status.innerHTML = html;
+    else status.textContent = msg;
     status.classList.toggle('is-error', isError);
     status.classList.toggle('is-warn', isWarn);
     status.classList.toggle('muted', !isError && !isWarn);
     status.classList.toggle('alert', isError || isWarn);
     status.classList.toggle('alert-error', isError);
+  };
+
+  const foundLabel = (fields) => {
+    const name = String(fields?.name || '').trim();
+    const legal = String(fields?.legal_name || '').trim();
+    if (name === '') return legal;
+    if (legal === '') return name;
+    if (name.toUpperCase().includes(legal.toUpperCase())) return name;
+    return `${name} ${legal}`;
+  };
+
+  const foundHtml = (fields) => {
+    const display = foundLabel(fields);
+    const tpl = box.dataset.msgOk || 'Trovato :name.';
+    return escapeHtml(tpl).replaceAll(':name', `<strong>${escapeHtml(display)}</strong>`);
   };
 
   const setElapsed = (sec) => {
@@ -2875,10 +2898,11 @@ function initSetupRuntsLookup(root) {
         applyFields(donePayload.fields || {});
         setProgress(100);
         const warning = String(donePayload.warning || '').trim();
-        showStatus(
-          warning || donePayload.message || box.dataset.msgOk || '',
-          donePayload.cancelled ? 'warn' : ''
-        );
+        if (warning) {
+          showStatus(warning, donePayload.cancelled ? 'warn' : '');
+        } else {
+          showStatus(foundLabel(donePayload.fields || {}), '', foundHtml(donePayload.fields || {}));
+        }
       } else {
         showStatus(streamError || donePayload?.error || box.dataset.msgFail || '', 'error');
       }
