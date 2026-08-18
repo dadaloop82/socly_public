@@ -13,7 +13,6 @@ use ZipArchive;
 final class RuntsLookupService
 {
     private const LIST_URL = 'https://servizi.lavoro.gov.it/runts/it-it/Lista-enti';
-    private const CACHE_TTL = 20 * 3600;
     private const TIMEOUT_SECONDS = 120;
     private const UA = 'Mozilla/5.0 (compatible; SOCLY/1.0; +https://www.socly.it/)';
 
@@ -50,6 +49,7 @@ final class RuntsLookupService
         if (empty($ensured['ok'])) {
             return ['ok' => false, 'error' => (string) ($ensured['error'] ?? __('setup.runts_fail'))];
         }
+        $cacheUsed = !empty($ensured['cache_used']);
 
         $activePath = $this->listPath('iscritti');
         $cancelledPath = $this->listPath('cancellati');
@@ -61,6 +61,10 @@ final class RuntsLookupService
         if ($active !== null) {
             $emit(['type' => 'progress', 'phase' => 'apply', 'percent' => 96]);
             $result = $this->hydrate($active, false);
+            if ($cacheUsed) {
+                $warning = __('setup.runts_cache_fallback');
+                $result['warning'] = trim($warning . ' ' . trim((string) ($result['warning'] ?? '')));
+            }
             $result['elapsed_ms'] = (int) round((microtime(true) - $started) * 1000);
             return $result;
         }
@@ -80,6 +84,10 @@ final class RuntsLookupService
             $result['warning'] = trim((string) ($result['warning'] ?? '')) !== ''
                 ? $cancelMsg . ' ' . $result['warning']
                 : $cancelMsg;
+            if ($cacheUsed) {
+                $warning = __('setup.runts_cache_fallback');
+                $result['warning'] = trim($warning . ' ' . trim((string) ($result['warning'] ?? '')));
+            }
             $result['elapsed_ms'] = (int) round((microtime(true) - $started) * 1000);
             return $result;
         }
@@ -168,32 +176,20 @@ final class RuntsLookupService
             return ['ok' => false, 'error' => __('setup.runts_fail')];
         }
 
-        $metaFile = $dir . '/meta.json';
-        $meta = [];
-        if (is_file($metaFile)) {
-            $decoded = json_decode((string) file_get_contents($metaFile), true);
-            $meta = is_array($decoded) ? $decoded : [];
-        }
-        $fetchedAt = (int) ($meta['fetched_at'] ?? 0);
         $iscritti = $this->listPath('iscritti');
         $cancellati = $this->listPath('cancellati');
-        $fresh = $fetchedAt > 0
-            && (time() - $fetchedAt) < self::CACHE_TTL
-            && $this->isValidList($iscritti, 100000)
-            && $this->isValidList($cancellati, 10000);
-        if ($fresh) {
-            $emit(['type' => 'progress', 'phase' => 'lists_ready', 'percent' => 20]);
-            return ['ok' => true];
-        }
-
+        // Always try to refresh from the official source.
         $downloaded = $this->downloadLists($emit);
         if (!empty($downloaded['ok'])) {
             return ['ok' => true];
         }
-        if ($this->isValidList($iscritti, 100000)) {
-            $emit(['type' => 'progress', 'phase' => 'lists_ready', 'percent' => 20]);
-            return ['ok' => true];
+
+        // Fallback to cache only if we have valid files and the remote fetch failed.
+        $hasCache = $this->isValidList($iscritti, 100000) && $this->isValidList($cancellati, 10000);
+        if ($hasCache) {
+            return ['ok' => true, 'cache_used' => true];
         }
+
         return $downloaded;
     }
 

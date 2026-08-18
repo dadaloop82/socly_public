@@ -503,6 +503,7 @@ return [
         'runts_not_found' => 'Kein Eintrag mit Repertorium :number. Nummer prüfen und erneut versuchen.',
         'runts_cancelled' => ':name wurde am :date aus dem RUNTS gelöscht (:reason). Die Amtsdaten werden trotzdem übernommen, die Körperschaft ist aber nicht mehr eingetragen.',
         'runts_legal_unknown' => 'Die Rechtsform konnte nicht automatisch gesetzt werden (RUNTS-Sektion: :section). Bitte selbst wählen.',
+        'runts_cache_fallback' => 'Konnte die aktualisierte RUNTS-Liste nicht herunterladen. Verwende gespeicherte Daten (möglicherweise veraltet).',
         'runts_timeout' => 'Die RUNTS-Suche hat 2 Minuten überschritten. Bitte erneut versuchen — der nächste Versuch ist meist schneller.',
         'runts_elapsed' => ':sec s',
         'runts_phase_connect' => 'Verbinde mit dem RUNTS-Register…',

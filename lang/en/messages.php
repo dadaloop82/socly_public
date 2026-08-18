@@ -503,6 +503,7 @@ return [
         'runts_not_found' => 'No entity found with repertory :number. Check the number and try again.',
         'runts_cancelled' => ':name was removed from RUNTS on :date (:reason). Official data is still applied, but the entity is no longer registered.',
         'runts_legal_unknown' => 'I could not set the legal form automatically (RUNTS section: :section). Please choose it.',
+        'runts_cache_fallback' => 'Could not download the updated RUNTS list. Using cached data (may be outdated).',
         'runts_timeout' => 'The RUNTS lookup exceeded 2 minutes. Try again — the next attempt is usually faster.',
         'runts_elapsed' => ':sec s',
         'runts_phase_connect' => 'Connecting to the RUNTS register…',

@@ -505,6 +505,7 @@ return [
         'runts_not_found' => 'Nessun ente trovato con repertorio :number. Controlla il numero e riprova.',
         'runts_cancelled' => ':name risulta cancellato dal RUNTS il :date (:reason). I dati restano quelli ufficiali, ma l’ente non è più iscritto.',
         'runts_legal_unknown' => 'Non ho potuto impostare automaticamente la ragione sociale (sezione RUNTS: :section). Sceglila tu.',
+        'runts_cache_fallback' => 'Impossibile scaricare l’elenco aggiornato dal RUNTS. Sto usando i dati in cache (potrebbero non essere aggiornati).',
         'runts_timeout' => 'La ricerca nel RUNTS ha superato i 2 minuti. Riprova: di solito la volta successiva è più veloce.',
         'runts_elapsed' => ':sec s',
         'runts_phase_connect' => 'Mi collego al registro RUNTS…',
