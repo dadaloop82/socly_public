@@ -58,6 +58,14 @@ final class SetupCatalogue
                 'description_key' => 'setup.step_assoc_name_desc',
                 'fields' => [
                     [
+                        'key' => 'runts',
+                        'env_key' => 'ASSOCIATION_RUNTS',
+                        'settings_key' => 'association.runts',
+                        'type' => 'text',
+                        'required' => false,
+                        'label_key' => 'setup.field_runts',
+                    ],
+                    [
                         'key' => 'name',
                         'env_key' => 'ASSOCIATION_NAME',
                         'settings_key' => 'association.name',
@@ -73,14 +81,6 @@ final class SetupCatalogue
                         'required' => true,
                         'label_key' => 'setup.field_assoc_legal_name',
                         'options' => AssociationLegalForms::options(),
-                    ],
-                    [
-                        'key' => 'runts',
-                        'env_key' => 'ASSOCIATION_RUNTS',
-                        'settings_key' => 'association.runts',
-                        'type' => 'text',
-                        'required' => false,
-                        'label_key' => 'setup.field_runts',
                     ],
                     [
                         'key' => 'currency',

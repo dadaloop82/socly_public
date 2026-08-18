@@ -790,7 +790,9 @@ a:hover { text-decoration: underline; color: var(--brand-primary-deep); }
   align-items: end;
 }
 .setup-name-pair .setup-field-runts,
-.setup-name-pair .setup-runts-lookup,
+.setup-name-pair .setup-runts-lookup {
+  grid-column: 1 / 2;
+}
 .setup-name-pair .setup-field-currency,
 .setup-name-pair .setup-full-name-preview {
   grid-column: 1 / -1;

@@ -90,7 +90,7 @@
                 <input type="text" name="association_phone" value="<?= e((string)($settings['association.phone'] ?? '')) ?>">
             </div>
             <div>
-                <label><?= e(__('setup.step_runts_title')) ?></label>
+                <label><?= e(__('setup.field_runts')) ?></label>
                 <input type="text" name="association_runts" value="<?= e((string)($settings['association.runts'] ?? '')) ?>">
             </div>
         </div>
