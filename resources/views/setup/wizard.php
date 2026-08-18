@@ -231,6 +231,9 @@ $errorStep = flash('setup_error_step');
                          data-preview-template="<?= e(__('setup.full_name_preview')) ?>">
                         <?php foreach ($step['fields'] as $field): ?>
                             <?php $fieldKey = (string) ($field['key'] ?? ''); ?>
+                            <?php if ($fieldKey === 'runts'): ?>
+                                <div class="setup-runts-block">
+                            <?php endif; ?>
                             <label class="setup-field<?= $fieldKey === 'legal_name' ? ' setup-field-legal' : ($fieldKey === 'currency' ? ' setup-field-currency' : ($fieldKey === 'runts' ? ' setup-field-runts' : ' setup-field-name')) ?>">
                                 <span><?= e(__($field['label_key'])) ?></span>
                                 <?php if (($field['type'] ?? '') === 'select'): ?>
@@ -300,6 +303,7 @@ $errorStep = flash('setup_error_step');
                                             <p class="setup-runts-elapsed muted" data-setup-runts-elapsed hidden></p>
                                         </div>
                                     </div>
+                                </div>
                                 </div>
                             <?php endif; ?>
                         <?php endforeach; ?>
