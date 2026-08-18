@@ -807,46 +807,68 @@ final class SetupController extends BaseController
 
     public function lookupRunts(Request $request): void
     {
-        header('Content-Type: application/json; charset=utf-8');
         if ($this->setup->isComplete() && !$this->setup->isAdmin()) {
             http_response_code(403);
-            echo json_encode(['ok' => false, 'error' => 'forbidden'], JSON_UNESCAPED_UNICODE);
+            header('Content-Type: application/x-ndjson; charset=utf-8');
+            echo json_encode(['type' => 'error', 'error' => 'forbidden'], JSON_UNESCAPED_UNICODE) . "\n";
             return;
         }
 
-        @set_time_limit(120);
+        @set_time_limit(125);
+        @ignore_user_abort(true);
+        @ini_set('zlib.output_compression', '0');
+        @ini_set('output_buffering', '0');
+        while (ob_get_level() > 0) {
+            ob_end_flush();
+        }
+        header('Content-Type: application/x-ndjson; charset=utf-8');
+        header('Cache-Control: no-cache, no-store');
+        header('X-Accel-Buffering: no');
+        if (function_exists('apache_setenv')) {
+            @apache_setenv('no-gzip', '1');
+        }
+
+        $emit = static function (array $event): void {
+            echo json_encode($event, JSON_UNESCAPED_UNICODE) . "\n";
+            flush();
+        };
+
         $number = (string) $request->input('runts', '');
-        $result = $this->runts->lookup($number);
+        $result = $this->runts->lookup($number, $emit);
         if (empty($result['ok'])) {
-            echo json_encode([
-                'ok' => false,
+            $emit([
+                'type' => 'error',
                 'error' => (string) ($result['error'] ?? __('setup.runts_fail')),
-            ], JSON_UNESCAPED_UNICODE);
+                'elapsed_ms' => $result['elapsed_ms'] ?? null,
+            ]);
             return;
         }
 
         $fields = is_array($result['fields'] ?? null) ? $result['fields'] : [];
         $applied = [];
         try {
+            $emit(['type' => 'progress', 'phase' => 'apply', 'percent' => 98]);
             $applied = $this->setup->applyRuntsHints($fields);
         } catch (\Throwable $e) {
-            echo json_encode([
-                'ok' => false,
+            $emit([
+                'type' => 'error',
                 'error' => __('setup.runts_fail'),
-            ], JSON_UNESCAPED_UNICODE);
+            ]);
             return;
         }
 
-        echo json_encode([
+        $emit([
+            'type' => 'done',
             'ok' => true,
             'cancelled' => !empty($result['cancelled']),
             'warning' => (string) ($result['warning'] ?? ''),
             'fields' => $fields,
             'applied' => $applied,
+            'elapsed_ms' => $result['elapsed_ms'] ?? null,
             'message' => !empty($result['cancelled'])
                 ? (string) ($result['warning'] ?? '')
                 : __('setup.runts_ok', ['name' => (string) ($fields['name'] ?? '')]),
-        ], JSON_UNESCAPED_UNICODE);
+        ]);
     }
 
     /** @return array<string, mixed> */

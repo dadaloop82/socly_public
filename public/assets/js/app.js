@@ -2650,15 +2650,24 @@ function initSetupRuntsLookup(root) {
   const input = root.querySelector('[data-setup-runts-input]');
   const btn = box?.querySelector('[data-setup-runts-btn]');
   const labelEl = btn?.querySelector('[data-setup-runts-label]') || btn;
+  const live = box?.querySelector('[data-setup-runts-live]');
   const status = box?.querySelector('[data-setup-runts-status]');
+  const elapsedEl = box?.querySelector('[data-setup-runts-elapsed]');
+  const progress = box?.querySelector('[data-setup-runts-progress]');
+  const progressBar = box?.querySelector('[data-setup-runts-progress-bar]');
   if (!box || !input || !btn || !labelEl) return;
 
   const pair = root.querySelector('[data-setup-name-pair]') || input.closest('[data-setup-name-pair]');
   const nameInput = pair?.querySelector('[data-setup-assoc-name]');
   const legalSelect = pair?.querySelector('[data-setup-legal-name]');
+  const form = root.querySelector('[data-setup-form]');
+  const backLink = form?.querySelector('.setup-back');
+  const nextBtn = form?.querySelector('.setup-cta');
+  const exitBtn = root.querySelector('[data-setup-exit]');
 
   const digits = () => String(input.value || '').replace(/\D+/g, '');
   let lookingUp = false;
+  const TIMEOUT_MS = 120000;
 
   const hideBtn = () => {
     btn.hidden = true;
@@ -2677,11 +2686,6 @@ function initSetupRuntsLookup(root) {
     labelEl.textContent = tpl.includes(':name') ? tpl.replaceAll(':name', name) : (tpl || labelEl.textContent);
   };
 
-  const form = root.querySelector('[data-setup-form]');
-  const backLink = form?.querySelector('.setup-back');
-  const nextBtn = form?.querySelector('.setup-cta');
-  const exitBtn = root.querySelector('[data-setup-exit]');
-
   const showStatus = (text, kind) => {
     if (!status) return;
     const msg = String(text || '').trim();
@@ -2691,12 +2695,48 @@ function initSetupRuntsLookup(root) {
     status.textContent = msg;
     status.classList.toggle('is-error', isError);
     status.classList.toggle('is-warn', isWarn);
+    status.classList.toggle('muted', !isError && !isWarn);
     status.classList.toggle('alert', isError || isWarn);
     status.classList.toggle('alert-error', isError);
   };
 
+  const setElapsed = (sec) => {
+    if (!elapsedEl) return;
+    elapsedEl.hidden = false;
+    elapsedEl.textContent = (box.dataset.msgElapsed || ':sec s').replaceAll(':sec', String(sec));
+  };
+
+  const setProgress = (percent) => {
+    if (!progress || !progressBar) return;
+    progress.hidden = false;
+    const n = Number(percent);
+    if (!Number.isFinite(n) || n <= 0) {
+      progress.classList.add('is-indeterminate');
+      progressBar.style.width = '';
+      return;
+    }
+    progress.classList.remove('is-indeterminate');
+    progressBar.style.width = `${Math.max(4, Math.min(100, n))}%`;
+  };
+
+  const phaseText = (phase, number) => {
+    const n = String(number || digits() || '');
+    const map = {
+      connect: box.dataset.msgPhaseConnect,
+      download_active: box.dataset.msgPhaseDownloadActive,
+      download_cancelled: box.dataset.msgPhaseDownloadCancelled,
+      lists_ready: box.dataset.msgPhaseSearchActive,
+      search_active: box.dataset.msgPhaseSearchActive,
+      search_cancelled: box.dataset.msgPhaseSearchCancelled,
+      apply: box.dataset.msgPhaseApply,
+    };
+    const tpl = map[phase] || box.dataset.msgLoading || '…';
+    return String(tpl).replaceAll(':number', n);
+  };
+
   const setLookupBusy = (busy) => {
     lookingUp = !!busy;
+    box.classList.toggle('is-looking', lookingUp);
     root.classList.toggle('is-runts-busy', lookingUp);
     form?.classList.toggle('is-runts-busy', lookingUp);
     if (backLink) {
@@ -2707,11 +2747,41 @@ function initSetupRuntsLookup(root) {
     if (nextBtn) nextBtn.disabled = lookingUp;
     if (exitBtn) exitBtn.disabled = lookingUp;
     input.readOnly = lookingUp;
-    btn.disabled = lookingUp || digits() === '';
+    btn.disabled = true;
+    if (lookingUp) {
+      btn.setAttribute('aria-busy', 'true');
+      if (live) live.hidden = false;
+    } else {
+      btn.removeAttribute('aria-busy');
+      btn.disabled = digits() === '';
+    }
+  };
+
+  const applyFields = (fields) => {
+    if (fields.runts && input) {
+      input.value = fields.runts;
+    }
+    if (fields.name && nameInput) {
+      nameInput.value = fields.name;
+      nameInput.dispatchEvent(new Event('input', { bubbles: true }));
+      nameInput.dispatchEvent(new Event('change', { bubbles: true }));
+    }
+    if (fields.legal_name && legalSelect) {
+      const opt = [...legalSelect.options].find((o) => o.value === fields.legal_name);
+      if (opt) {
+        legalSelect.value = fields.legal_name;
+        legalSelect.dispatchEvent(new Event('change', { bubbles: true }));
+      }
+    }
+    syncLabel();
   };
 
   const sync = () => {
     syncLabel();
+    if (lookingUp) {
+      showBtn();
+      return;
+    }
     if (digits() === '') hideBtn();
     else showBtn();
   };
@@ -2722,14 +2792,29 @@ function initSetupRuntsLookup(root) {
   sync();
 
   btn.addEventListener('click', async () => {
+    if (lookingUp) return;
     const number = digits();
     if (!number) {
+      if (live) live.hidden = false;
       showStatus(box.dataset.msgNeed || '', 'error');
       return;
     }
-    btn.setAttribute('aria-busy', 'true');
     setLookupBusy(true);
-    showStatus(box.dataset.msgLoading || '…', '');
+    showBtn();
+    setProgress(4);
+    showStatus(phaseText('connect', number), '');
+    setElapsed(0);
+
+    const startedAt = Date.now();
+    const tick = setInterval(() => {
+      setElapsed(Math.floor((Date.now() - startedAt) / 1000));
+    }, 250);
+
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
+    let donePayload = null;
+    let streamError = null;
+
     try {
       const body = new URLSearchParams();
       body.set('_token', box.dataset.csrf || '');
@@ -2738,43 +2823,78 @@ function initSetupRuntsLookup(root) {
         method: 'POST',
         headers: {
           'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
-          Accept: 'application/json',
+          Accept: 'application/x-ndjson, application/json',
+          'X-Requested-With': 'XMLHttpRequest',
           'X-CSRF-Token': box.dataset.csrf || '',
         },
         body,
         credentials: 'same-origin',
+        signal: controller.signal,
       });
-      const data = await res.json();
-      if (!data?.ok) {
-        showStatus(data?.error || box.dataset.msgFail || '', 'error');
-        return;
+      if (!res.ok) {
+        throw new Error('fail');
       }
-      const fields = data.fields || {};
-      if (fields.runts && input) {
-        input.value = fields.runts;
-      }
-      if (fields.name && nameInput) {
-        nameInput.value = fields.name;
-        nameInput.dispatchEvent(new Event('input', { bubbles: true }));
-        nameInput.dispatchEvent(new Event('change', { bubbles: true }));
-      }
-      if (fields.legal_name && legalSelect) {
-        const opt = [...legalSelect.options].find((o) => o.value === fields.legal_name);
-        if (opt) {
-          legalSelect.value = fields.legal_name;
-          legalSelect.dispatchEvent(new Event('change', { bubbles: true }));
+
+      const contentType = res.headers.get('content-type') || '';
+      if (contentType.includes('ndjson') && res.body && res.body.getReader) {
+        const reader = res.body.getReader();
+        const decoder = new TextDecoder();
+        let buffer = '';
+        while (true) {
+          const { value, done } = await reader.read();
+          if (done) break;
+          buffer += decoder.decode(value, { stream: true });
+          const lines = buffer.split('\n');
+          buffer = lines.pop() || '';
+          for (const line of lines) {
+            const trimmed = line.trim();
+            if (!trimmed) continue;
+            let event;
+            try {
+              event = JSON.parse(trimmed);
+            } catch {
+              continue;
+            }
+            if (event.type === 'progress') {
+              if (event.percent != null) setProgress(event.percent);
+              showStatus(phaseText(String(event.phase || ''), event.number || number), '');
+            } else if (event.type === 'start') {
+              showStatus(phaseText('connect', number), '');
+            } else if (event.type === 'error') {
+              streamError = String(event.error || box.dataset.msgFail || '');
+            } else if (event.type === 'done') {
+              donePayload = event;
+            }
+          }
         }
+      } else {
+        donePayload = await res.json();
       }
-      const warning = String(data.warning || '').trim();
-      showStatus(
-        warning || data.message || box.dataset.msgOk || '',
-        data.cancelled ? 'warn' : ''
-      );
-      syncLabel();
+
+      if (donePayload?.ok) {
+        applyFields(donePayload.fields || {});
+        setProgress(100);
+        const warning = String(donePayload.warning || '').trim();
+        showStatus(
+          warning || donePayload.message || box.dataset.msgOk || '',
+          donePayload.cancelled ? 'warn' : ''
+        );
+      } else {
+        showStatus(streamError || donePayload?.error || box.dataset.msgFail || '', 'error');
+      }
     } catch (err) {
-      showStatus(box.dataset.msgFail || '', 'error');
+      const timedOut = err && (err.name === 'AbortError' || controller.signal.aborted);
+      showStatus(
+        timedOut ? (box.dataset.msgTimeout || box.dataset.msgFail || '') : (box.dataset.msgFail || ''),
+        'error'
+      );
     } finally {
-      btn.removeAttribute('aria-busy');
+      clearInterval(tick);
+      clearTimeout(timer);
+      setElapsed(Math.max(1, Math.floor((Date.now() - startedAt) / 1000)));
+      if (progress && status?.classList.contains('is-error')) {
+        progress.hidden = true;
+      }
       setLookupBusy(false);
     }
   });

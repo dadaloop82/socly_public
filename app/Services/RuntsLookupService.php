@@ -14,6 +14,7 @@ final class RuntsLookupService
 {
     private const LIST_URL = 'https://servizi.lavoro.gov.it/runts/it-it/Lista-enti';
     private const CACHE_TTL = 20 * 3600;
+    private const TIMEOUT_SECONDS = 120;
     private const UA = 'Mozilla/5.0 (compatible; SOCLY/1.0; +https://www.socly.it/)';
 
     /**
@@ -26,14 +27,26 @@ final class RuntsLookupService
      *   fields?:array<string,string>
      * }
      */
-    public function lookup(string $repertory): array
+    /**
+     * @param callable(array<string, mixed>):void|null $emit
+     */
+    public function lookup(string $repertory, ?callable $emit = null): array
     {
         $number = $this->normalizeRepertory($repertory);
         if ($number === '') {
             return ['ok' => false, 'error' => __('setup.runts_need_number')];
         }
 
-        $ensured = $this->ensureLists();
+        $emit = $emit ?? static function (): void {};
+        $started = microtime(true);
+        $emit([
+            'type' => 'start',
+            'number' => $number,
+            'timeout_seconds' => self::TIMEOUT_SECONDS,
+        ]);
+        $emit(['type' => 'progress', 'phase' => 'connect', 'percent' => 4]);
+
+        $ensured = $this->ensureLists($emit);
         if (empty($ensured['ok'])) {
             return ['ok' => false, 'error' => (string) ($ensured['error'] ?? __('setup.runts_fail'))];
         }
@@ -41,13 +54,23 @@ final class RuntsLookupService
         $activePath = $this->listPath('iscritti');
         $cancelledPath = $this->listPath('cancellati');
 
-        $active = is_file($activePath) ? $this->findInXlsx($activePath, $number) : null;
+        $emit(['type' => 'progress', 'phase' => 'search_active', 'percent' => 58, 'number' => $number]);
+        $active = is_file($activePath)
+            ? $this->findInXlsx($activePath, $number, $emit, 'search_active', 58, 88)
+            : null;
         if ($active !== null) {
-            return $this->hydrate($active, false);
+            $emit(['type' => 'progress', 'phase' => 'apply', 'percent' => 96]);
+            $result = $this->hydrate($active, false);
+            $result['elapsed_ms'] = (int) round((microtime(true) - $started) * 1000);
+            return $result;
         }
 
-        $cancelled = is_file($cancelledPath) ? $this->findInXlsx($cancelledPath, $number) : null;
+        $emit(['type' => 'progress', 'phase' => 'search_cancelled', 'percent' => 90, 'number' => $number]);
+        $cancelled = is_file($cancelledPath)
+            ? $this->findInXlsx($cancelledPath, $number, $emit, 'search_cancelled', 90, 97)
+            : null;
         if ($cancelled !== null) {
+            $emit(['type' => 'progress', 'phase' => 'apply', 'percent' => 98]);
             $result = $this->hydrate($cancelled, true);
             $cancelMsg = __('setup.runts_cancelled', [
                 'name' => (string) ($result['fields']['name'] ?? $cancelled['denominazione'] ?? ''),
@@ -57,10 +80,15 @@ final class RuntsLookupService
             $result['warning'] = trim((string) ($result['warning'] ?? '')) !== ''
                 ? $cancelMsg . ' ' . $result['warning']
                 : $cancelMsg;
+            $result['elapsed_ms'] = (int) round((microtime(true) - $started) * 1000);
             return $result;
         }
 
-        return ['ok' => false, 'error' => __('setup.runts_not_found', ['number' => $number])];
+        return [
+            'ok' => false,
+            'error' => __('setup.runts_not_found', ['number' => $number]),
+            'elapsed_ms' => (int) round((microtime(true) - $started) * 1000),
+        ];
     }
 
     public function normalizeRepertory(string $value): string
@@ -129,8 +157,11 @@ final class RuntsLookupService
         return trim(implode(' ', $parts) . ' ' . $last);
     }
 
-    /** @return array{ok:bool,error?:string} */
-    private function ensureLists(): array
+    /**
+     * @param callable(array<string, mixed>):void $emit
+     * @return array{ok:bool,error?:string}
+     */
+    private function ensureLists(callable $emit): array
     {
         $dir = $this->cacheDir();
         if (!is_dir($dir) && !@mkdir($dir, 0775, true) && !is_dir($dir)) {
@@ -148,31 +179,35 @@ final class RuntsLookupService
         $cancellati = $this->listPath('cancellati');
         $fresh = $fetchedAt > 0
             && (time() - $fetchedAt) < self::CACHE_TTL
-            && is_file($iscritti)
-            && is_file($cancellati)
-            && filesize($iscritti) > 100000
-            && filesize($cancellati) > 10000;
+            && $this->isValidList($iscritti, 100000)
+            && $this->isValidList($cancellati, 10000);
         if ($fresh) {
+            $emit(['type' => 'progress', 'phase' => 'lists_ready', 'percent' => 20]);
             return ['ok' => true];
         }
 
-        $downloaded = $this->downloadLists();
+        $downloaded = $this->downloadLists($emit);
         if (!empty($downloaded['ok'])) {
             return ['ok' => true];
         }
-        if (is_file($iscritti) && filesize($iscritti) > 100000) {
+        if ($this->isValidList($iscritti, 100000)) {
+            $emit(['type' => 'progress', 'phase' => 'lists_ready', 'percent' => 20]);
             return ['ok' => true];
         }
         return $downloaded;
     }
 
-    /** @return array{ok:bool,error?:string} */
-    private function downloadLists(): array
+    /**
+     * @param callable(array<string, mixed>):void $emit
+     * @return array{ok:bool,error?:string}
+     */
+    private function downloadLists(callable $emit): array
     {
         $cookie = $this->cacheDir() . '/cookies.txt';
         @unlink($cookie);
 
-        $page = $this->http('GET', self::LIST_URL, null, $cookie);
+        $emit(['type' => 'progress', 'phase' => 'connect', 'percent' => 6]);
+        $page = $this->http('GET', self::LIST_URL, null, $cookie, 20, null);
         if ($page['status'] !== 200 || trim($page['body']) === '') {
             return ['ok' => false, 'error' => __('setup.runts_fail')];
         }
@@ -183,29 +218,46 @@ final class RuntsLookupService
             return ['ok' => false, 'error' => __('setup.runts_fail')];
         }
 
-        $iscritti = $this->postDownload($page['body'], $iscrittiBtn, $cookie);
-        if (empty($iscritti['ok'])) {
+        $emit(['type' => 'progress', 'phase' => 'download_active', 'percent' => 10]);
+        $lastPct = 10;
+        $iscritti = $this->postDownload($page['body'], $iscrittiBtn, $cookie, static function (float $ratio) use ($emit, &$lastPct): void {
+            $pct = 10 + (int) round($ratio * 32);
+            if ($pct <= $lastPct) {
+                return;
+            }
+            $lastPct = $pct;
+            $emit(['type' => 'progress', 'phase' => 'download_active', 'percent' => $pct]);
+        });
+        if (empty($iscritti['ok']) || !$this->storeList('iscritti', (string) ($iscritti['body'] ?? ''))) {
             return ['ok' => false, 'error' => __('setup.runts_fail')];
         }
 
-        $page2 = $this->http('GET', self::LIST_URL, null, $cookie);
+        $emit(['type' => 'progress', 'phase' => 'download_cancelled', 'percent' => 44]);
+        $page2 = $this->http('GET', self::LIST_URL, null, $cookie, 20, null);
         if ($page2['status'] !== 200 || trim($page2['body']) === '') {
             return ['ok' => false, 'error' => __('setup.runts_fail')];
         }
         $cancellatiBtn = $this->findDownloadButton($page2['body'], 'Enti cancellati (formato Excel)') ?: $cancellatiBtn;
-        $cancellati = $this->postDownload($page2['body'], $cancellatiBtn, $cookie);
-        if (empty($cancellati['ok'])) {
+        $lastPct = 44;
+        $cancellati = $this->postDownload($page2['body'], $cancellatiBtn, $cookie, static function (float $ratio) use ($emit, &$lastPct): void {
+            $pct = 44 + (int) round($ratio * 12);
+            if ($pct <= $lastPct) {
+                return;
+            }
+            $lastPct = $pct;
+            $emit(['type' => 'progress', 'phase' => 'download_cancelled', 'percent' => $pct]);
+        });
+        if (empty($cancellati['ok']) || !$this->storeList('cancellati', (string) ($cancellati['body'] ?? ''))) {
             return ['ok' => false, 'error' => __('setup.runts_fail')];
         }
 
-        file_put_contents($this->listPath('iscritti'), $iscritti['body']);
-        file_put_contents($this->listPath('cancellati'), $cancellati['body']);
         file_put_contents($this->cacheDir() . '/meta.json', json_encode([
             'fetched_at' => time(),
             'iscritti_name' => $iscritti['filename'] ?? '',
             'cancellati_name' => $cancellati['filename'] ?? '',
         ], JSON_UNESCAPED_UNICODE));
 
+        $emit(['type' => 'progress', 'phase' => 'lists_ready', 'percent' => 58]);
         return ['ok' => true];
     }
 
@@ -223,9 +275,10 @@ final class RuntsLookupService
     }
 
     /**
+     * @param callable(float):void|null $onProgress
      * @return array{ok:bool,body?:string,filename?:string}
      */
-    private function postDownload(string $html, string $buttonName, string $cookieFile): array
+    private function postDownload(string $html, string $buttonName, string $cookieFile, ?callable $onProgress = null): array
     {
         $fields = [
             '__EVENTTARGET' => '',
@@ -236,7 +289,7 @@ final class RuntsLookupService
             '__EVENTVALIDATION' => $this->hiddenValue($html, '__EVENTVALIDATION'),
             $buttonName => 'Scarica',
         ];
-        $res = $this->http('POST', self::LIST_URL, $fields, $cookieFile);
+        $res = $this->http('POST', self::LIST_URL, $fields, $cookieFile, 55, $onProgress);
         if ($res['status'] !== 200 || strlen($res['body']) < 1000) {
             return ['ok' => false];
         }
@@ -263,14 +316,23 @@ final class RuntsLookupService
     }
 
     /**
+     * @param callable(array<string, mixed>):void $emit
      * @return array<string, string>|null
      */
-    private function findInXlsx(string $path, string $number): ?array
-    {
+    private function findInXlsx(
+        string $path,
+        string $number,
+        callable $emit,
+        string $phase,
+        int $pctFrom,
+        int $pctTo
+    ): ?array {
         $zip = new ZipArchive();
         if ($zip->open($path) !== true) {
             return null;
         }
+        $stat = $zip->statName('xl/worksheets/sheet1.xml');
+        $total = (int) ($stat['size'] ?? 0);
         $stream = $zip->getStream('xl/worksheets/sheet1.xml');
         if (!is_resource($stream)) {
             $zip->close();
@@ -280,12 +342,26 @@ final class RuntsLookupService
         $needle = '<is><t>' . $number . '</t></is></c>';
         $buffer = '';
         $found = null;
+        $read = 0;
+        $lastEmit = 0.0;
         while (!feof($stream)) {
-            $chunk = fread($stream, 512 * 1024);
+            $chunk = fread($stream, 256 * 1024);
             if ($chunk === false || $chunk === '') {
                 break;
             }
+            $read += strlen($chunk);
             $buffer .= $chunk;
+            $now = microtime(true);
+            if ($total > 0 && ($now - $lastEmit) >= 0.3) {
+                $ratio = min(1, $read / $total);
+                $emit([
+                    'type' => 'progress',
+                    'phase' => $phase,
+                    'percent' => $pctFrom + (int) round(($pctTo - $pctFrom) * $ratio),
+                    'number' => $number,
+                ]);
+                $lastEmit = $now;
+            }
             $pos = strpos($buffer, $needle);
             if ($pos !== false) {
                 $rowStart = strrpos(substr($buffer, 0, $pos), '<row ');
@@ -304,7 +380,6 @@ final class RuntsLookupService
                         }
                     }
                 }
-                // Skip this occurrence (wrong column or parse) and keep scanning.
                 $buffer = substr($buffer, $pos + strlen($needle));
                 continue;
             }
@@ -355,21 +430,29 @@ final class RuntsLookupService
 
     /**
      * @param array<string, string>|null $fields
+     * @param callable(float):void|null $onProgress
      * @return array{status:int,body:string,headers:string}
      */
-    private function http(string $method, string $url, ?array $fields, string $cookieFile): array
-    {
+    private function http(
+        string $method,
+        string $url,
+        ?array $fields,
+        string $cookieFile,
+        int $timeout,
+        ?callable $onProgress
+    ): array {
         if (!function_exists('curl_init')) {
             return ['status' => 0, 'body' => '', 'headers' => ''];
         }
         $ch = curl_init($url);
         $headers = '';
+        $lastProgress = 0.0;
         curl_setopt_array($ch, [
             CURLOPT_RETURNTRANSFER => true,
             CURLOPT_FOLLOWLOCATION => true,
             CURLOPT_MAXREDIRS => 5,
             CURLOPT_CONNECTTIMEOUT => 12,
-            CURLOPT_TIMEOUT => 90,
+            CURLOPT_TIMEOUT => max(8, $timeout),
             CURLOPT_USERAGENT => self::UA,
             CURLOPT_COOKIEJAR => $cookieFile,
             CURLOPT_COOKIEFILE => $cookieFile,
@@ -381,6 +464,21 @@ final class RuntsLookupService
                 'Accept: text/html,application/xhtml+xml,application/octet-stream,*/*',
             ],
         ]);
+        if ($onProgress !== null) {
+            curl_setopt($ch, CURLOPT_NOPROGRESS, false);
+            curl_setopt($ch, CURLOPT_PROGRESSFUNCTION, static function ($ch, $downloadSize, $downloaded) use ($onProgress, &$lastProgress): int {
+                if ($downloadSize <= 0) {
+                    return 0;
+                }
+                $ratio = min(1.0, (float) $downloaded / (float) $downloadSize);
+                if (($ratio - $lastProgress) < 0.02 && $ratio < 1) {
+                    return 0;
+                }
+                $lastProgress = $ratio;
+                $onProgress($ratio);
+                return 0;
+            });
+        }
         if ($method === 'POST') {
             curl_setopt($ch, CURLOPT_POST, true);
             curl_setopt($ch, CURLOPT_POSTFIELDS, http_build_query($fields ?? []));
@@ -394,6 +492,41 @@ final class RuntsLookupService
             'body' => is_string($body) ? $body : '',
             'headers' => $headers,
         ];
+    }
+
+    private function storeList(string $kind, string $body): bool
+    {
+        if ($body === '' || !str_starts_with($body, 'PK')) {
+            return false;
+        }
+        $path = $this->listPath($kind);
+        $tmp = $path . '.tmp';
+        if (file_put_contents($tmp, $body) === false) {
+            return false;
+        }
+        if (!$this->isValidList($tmp, 1000)) {
+            @unlink($tmp);
+            return false;
+        }
+        if (!@rename($tmp, $path)) {
+            @unlink($tmp);
+            return false;
+        }
+        return true;
+    }
+
+    private function isValidList(string $path, int $minBytes): bool
+    {
+        if (!is_file($path) || filesize($path) < $minBytes) {
+            return false;
+        }
+        $zip = new ZipArchive();
+        if ($zip->open($path) !== true) {
+            return false;
+        }
+        $ok = $zip->statName('xl/worksheets/sheet1.xml') !== false;
+        $zip->close();
+        return $ok;
     }
 
     private function cacheDir(): string

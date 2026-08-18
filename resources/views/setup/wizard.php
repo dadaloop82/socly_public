@@ -278,11 +278,28 @@ $errorStep = flash('setup_error_step');
                                      data-msg-ok="<?= e(__('setup.runts_ok')) ?>"
                                      data-msg-fail="<?= e(__('setup.runts_fail')) ?>"
                                      data-msg-not-found="<?= e(__('setup.runts_not_found')) ?>"
+                                     data-msg-timeout="<?= e(__('setup.runts_timeout')) ?>"
+                                     data-msg-elapsed="<?= e(__('setup.runts_elapsed')) ?>"
+                                     data-msg-phase-connect="<?= e(__('setup.runts_phase_connect')) ?>"
+                                     data-msg-phase-download-active="<?= e(__('setup.runts_phase_download_active')) ?>"
+                                     data-msg-phase-download-cancelled="<?= e(__('setup.runts_phase_download_cancelled')) ?>"
+                                     data-msg-phase-search-active="<?= e(__('setup.runts_phase_search_active')) ?>"
+                                     data-msg-phase-search-cancelled="<?= e(__('setup.runts_phase_search_cancelled')) ?>"
+                                     data-msg-phase-apply="<?= e(__('setup.runts_phase_apply')) ?>"
                                 >
                                     <button type="button" class="btn setup-scrape-btn" data-setup-runts-btn hidden disabled aria-hidden="true">
                                         <span data-setup-runts-label><?= e(__('setup.runts_button_fallback')) ?></span>
                                     </button>
-                                    <p class="setup-runts-status muted" data-setup-runts-status hidden></p>
+                                    <div class="setup-runts-live" data-setup-runts-live hidden>
+                                        <div class="setup-scrape-spinner" aria-hidden="true"></div>
+                                        <div class="setup-runts-live-copy">
+                                            <p class="setup-runts-status muted" data-setup-runts-status></p>
+                                            <div class="setup-runts-progress" data-setup-runts-progress hidden>
+                                                <div class="setup-runts-progress-bar" data-setup-runts-progress-bar></div>
+                                            </div>
+                                            <p class="setup-runts-elapsed muted" data-setup-runts-elapsed hidden></p>
+                                        </div>
+                                    </div>
                                 </div>
                             <?php endif; ?>
                         <?php endforeach; ?>
