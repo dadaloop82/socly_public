@@ -51,4 +51,40 @@ final class AssociationLegalForms
         $code = strtoupper(trim($code));
         return isset(self::all()[$code]) && strlen($code) <= 6;
     }
+
+    /**
+     * Map a RUNTS section label to a legal-form abbreviation, if possible.
+     */
+    public static function fromRuntsSection(string $section, string $denomination = ''): ?string
+    {
+        $hay = mb_strtoupper(trim($section . ' ' . $denomination), 'UTF-8');
+        if ($hay === '') {
+            return null;
+        }
+        if (str_contains($hay, 'PROMOZIONE SOCIALE') || preg_match('/\bAPS\b/', $hay)) {
+            return 'APS';
+        }
+        if (str_contains($hay, 'ORGANIZZAZIONI DI VOLONTARIATO') || preg_match('/\bODV\b/', $hay)) {
+            return 'ODV';
+        }
+        if (str_contains($hay, 'IMPRESE SOCIALI') || str_contains($hay, 'IMPRESA SOCIALE')) {
+            if (str_contains($hay, 'COOPERATIV')) {
+                return 'COOP';
+            }
+            return 'ETS';
+        }
+        if (str_contains($hay, 'MUTUO SOCCORSO')) {
+            return 'ETS';
+        }
+        if (str_contains($hay, 'FILANTROPIC')) {
+            return 'ETS';
+        }
+        if (str_contains($hay, 'TERZO SETTORE') || preg_match('/\bETS\b/', $hay)) {
+            return 'ETS';
+        }
+        if (str_contains($hay, 'COOPERATIV')) {
+            return 'COOP';
+        }
+        return null;
+    }
 }

@@ -67,6 +67,7 @@ $router->post('/setup/thanks', [SetupController::class, 'thanks'], null, ['mw.lo
 $router->post('/setup/discard', [SetupController::class, 'discard'], null, ['mw.locale', 'mw.install', 'mw.setup_open', 'mw.csrf']);
 $router->post('/setup/exit', [SetupController::class, 'exitSetup'], null, ['mw.locale', 'mw.install', 'mw.setup_open', 'mw.csrf']);
 $router->post('/setup/scrape', [SetupController::class, 'scrape'], null, ['mw.locale', 'mw.install', 'mw.setup_open', 'mw.csrf']);
+$router->post('/setup/runts-lookup', [SetupController::class, 'lookupRunts'], null, ['mw.locale', 'mw.install', 'mw.setup_open', 'mw.csrf']);
 $router->post('/setup/mail/discover', [SetupController::class, 'discoverMail'], null, ['mw.locale', 'mw.install', 'mw.setup_open', 'mw.csrf']);
 $router->post('/setup/mail/test', [SetupController::class, 'testMail'], null, ['mw.locale', 'mw.install', 'mw.setup_open', 'mw.csrf']);
 $router->post('/setup/fields/autosave', [SetupController::class, 'autosaveFields'], null, ['mw.locale', 'mw.install', 'mw.setup_open', 'mw.csrf']);

@@ -716,6 +716,7 @@ function initSetupWizard() {
   }
   initSetupPeopleList(root);
   initSetupWebsiteScrape(root);
+  initSetupRuntsLookup(root);
   initSetupBrandingPalettes(root);
   initLogoFilePickers(root);
   initSetupNamePairPreview(root);
@@ -2640,6 +2641,141 @@ function initSetupSmtp(root) {
     } finally {
       testBtn.disabled = !!skip?.checked;
       testBtn.removeAttribute('aria-busy');
+    }
+  });
+}
+
+function initSetupRuntsLookup(root) {
+  const box = root.querySelector('[data-setup-runts]');
+  const input = root.querySelector('[data-setup-runts-input]');
+  const btn = box?.querySelector('[data-setup-runts-btn]');
+  const labelEl = btn?.querySelector('[data-setup-runts-label]') || btn;
+  const status = box?.querySelector('[data-setup-runts-status]');
+  if (!box || !input || !btn || !labelEl) return;
+
+  const pair = root.querySelector('[data-setup-name-pair]') || input.closest('[data-setup-name-pair]');
+  const nameInput = pair?.querySelector('[data-setup-assoc-name]');
+  const legalSelect = pair?.querySelector('[data-setup-legal-name]');
+
+  const digits = () => String(input.value || '').replace(/\D+/g, '');
+  let lookingUp = false;
+
+  const hideBtn = () => {
+    btn.hidden = true;
+    btn.disabled = true;
+    btn.setAttribute('aria-hidden', 'true');
+  };
+  const showBtn = () => {
+    btn.hidden = false;
+    btn.removeAttribute('aria-hidden');
+    btn.disabled = lookingUp || digits() === '';
+  };
+
+  const syncLabel = () => {
+    const tpl = box.dataset.labelTemplate || '';
+    const name = (nameInput?.value || '').trim() || 'associazione';
+    labelEl.textContent = tpl.includes(':name') ? tpl.replaceAll(':name', name) : (tpl || labelEl.textContent);
+  };
+
+  const form = root.querySelector('[data-setup-form]');
+  const backLink = form?.querySelector('.setup-back');
+  const nextBtn = form?.querySelector('.setup-cta');
+  const exitBtn = root.querySelector('[data-setup-exit]');
+
+  const showStatus = (text, kind) => {
+    if (!status) return;
+    const msg = String(text || '').trim();
+    const isError = kind === 'error';
+    const isWarn = kind === 'warn';
+    status.hidden = msg === '';
+    status.textContent = msg;
+    status.classList.toggle('is-error', isError);
+    status.classList.toggle('is-warn', isWarn);
+    status.classList.toggle('alert', isError || isWarn);
+    status.classList.toggle('alert-error', isError);
+  };
+
+  const setLookupBusy = (busy) => {
+    lookingUp = !!busy;
+    root.classList.toggle('is-runts-busy', lookingUp);
+    form?.classList.toggle('is-runts-busy', lookingUp);
+    if (backLink) {
+      backLink.setAttribute('aria-disabled', lookingUp ? 'true' : 'false');
+      if (lookingUp) backLink.setAttribute('tabindex', '-1');
+      else backLink.removeAttribute('tabindex');
+    }
+    if (nextBtn) nextBtn.disabled = lookingUp;
+    if (exitBtn) exitBtn.disabled = lookingUp;
+    input.readOnly = lookingUp;
+    btn.disabled = lookingUp || digits() === '';
+  };
+
+  const sync = () => {
+    syncLabel();
+    if (digits() === '') hideBtn();
+    else showBtn();
+  };
+
+  input.addEventListener('input', sync);
+  input.addEventListener('change', sync);
+  nameInput?.addEventListener('input', syncLabel);
+  sync();
+
+  btn.addEventListener('click', async () => {
+    const number = digits();
+    if (!number) {
+      showStatus(box.dataset.msgNeed || '', 'error');
+      return;
+    }
+    btn.setAttribute('aria-busy', 'true');
+    setLookupBusy(true);
+    showStatus(box.dataset.msgLoading || '…', '');
+    try {
+      const body = new URLSearchParams();
+      body.set('_token', box.dataset.csrf || '');
+      body.set('runts', number);
+      const res = await fetch(box.dataset.runtsUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
+          Accept: 'application/json',
+          'X-CSRF-Token': box.dataset.csrf || '',
+        },
+        body,
+        credentials: 'same-origin',
+      });
+      const data = await res.json();
+      if (!data?.ok) {
+        showStatus(data?.error || box.dataset.msgFail || '', 'error');
+        return;
+      }
+      const fields = data.fields || {};
+      if (fields.runts && input) {
+        input.value = fields.runts;
+      }
+      if (fields.name && nameInput) {
+        nameInput.value = fields.name;
+        nameInput.dispatchEvent(new Event('input', { bubbles: true }));
+        nameInput.dispatchEvent(new Event('change', { bubbles: true }));
+      }
+      if (fields.legal_name && legalSelect) {
+        const opt = [...legalSelect.options].find((o) => o.value === fields.legal_name);
+        if (opt) {
+          legalSelect.value = fields.legal_name;
+          legalSelect.dispatchEvent(new Event('change', { bubbles: true }));
+        }
+      }
+      const warning = String(data.warning || '').trim();
+      showStatus(
+        warning || data.message || box.dataset.msgOk || '',
+        data.cancelled ? 'warn' : ''
+      );
+      syncLabel();
+    } catch (err) {
+      showStatus(box.dataset.msgFail || '', 'error');
+    } finally {
+      btn.removeAttribute('aria-busy');
+      setLookupBusy(false);
     }
   });
 }

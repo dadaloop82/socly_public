@@ -75,6 +75,14 @@ final class SetupCatalogue
                         'options' => AssociationLegalForms::options(),
                     ],
                     [
+                        'key' => 'runts',
+                        'env_key' => 'ASSOCIATION_RUNTS',
+                        'settings_key' => 'association.runts',
+                        'type' => 'text',
+                        'required' => false,
+                        'label_key' => 'setup.field_runts',
+                    ],
+                    [
                         'key' => 'currency',
                         'settings_key' => 'app.currency',
                         'type' => 'select',
@@ -163,16 +171,6 @@ final class SetupCatalogue
                         'autocomplete' => 'off',
                     ],
                 ],
-            ],
-            [
-                'key' => 'association.runts',
-                'env_key' => 'ASSOCIATION_RUNTS',
-                'settings_key' => 'association.runts',
-                'storage' => 'both',
-                'type' => 'text',
-                'required' => false,
-                'title_key' => 'setup.step_runts_title',
-                'description_key' => 'setup.step_runts_desc',
             ],
             [
                 'key' => 'association.seat',

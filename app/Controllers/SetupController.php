@@ -9,6 +9,7 @@ use Socly\Core\View;
 use Socly\Services\AssociationWebsiteScrapeService;
 use Socly\Services\AuthService;
 use Socly\Services\MailService;
+use Socly\Services\RuntsLookupService;
 use Socly\Services\SetupService;
 use Socly\Setup\SetupCatalogue;
 
@@ -19,7 +20,8 @@ final class SetupController extends BaseController
         private readonly SetupService $setup,
         private readonly AuthService $auth,
         private readonly AssociationWebsiteScrapeService $scrape,
-        private readonly MailService $mail
+        private readonly MailService $mail,
+        private readonly RuntsLookupService $runts
     ) {
         parent::__construct($view);
     }
@@ -693,8 +695,12 @@ final class SetupController extends BaseController
 
         $website = trim((string) $request->input('website', ''));
         $name = trim((string) ($request->input('name', '') ?: app()->branding()['name'] ?? ''));
+        $locked = $this->setup->runtsLockedKeys();
 
-        $emit = static function (array $event): void {
+        $emit = static function (array $event) use ($locked): void {
+            if (($event['type'] ?? '') === 'found' && isset($locked[(string) ($event['key'] ?? '')])) {
+                return;
+            }
             echo json_encode($event, JSON_UNESCAPED_UNICODE) . "\n";
             flush();
         };
@@ -718,6 +724,12 @@ final class SetupController extends BaseController
         $canonical = $this->scrape->normalizeUrl((string) ($result['canonical_url'] ?? $result['source_url'] ?? $website))
             ?? trim($website);
         $found = is_array($result['found'] ?? null) ? $result['found'] : [];
+        foreach (array_keys($this->setup->runtsLockedKeys()) as $lockedKey) {
+            unset($found[$lockedKey]);
+            if (isset($result['found']) && is_array($result['found'])) {
+                unset($result['found'][$lockedKey]);
+            }
+        }
         $applied = [];
         try {
             $applied = $this->setup->applyScrapedHints($found, $canonical, true);
@@ -791,6 +803,50 @@ final class SetupController extends BaseController
             'source_url' => $result['source_url'] ?? null,
             'canonical_url' => $result['canonical_url'] ?? $canonical,
         ]);
+    }
+
+    public function lookupRunts(Request $request): void
+    {
+        header('Content-Type: application/json; charset=utf-8');
+        if ($this->setup->isComplete() && !$this->setup->isAdmin()) {
+            http_response_code(403);
+            echo json_encode(['ok' => false, 'error' => 'forbidden'], JSON_UNESCAPED_UNICODE);
+            return;
+        }
+
+        @set_time_limit(120);
+        $number = (string) $request->input('runts', '');
+        $result = $this->runts->lookup($number);
+        if (empty($result['ok'])) {
+            echo json_encode([
+                'ok' => false,
+                'error' => (string) ($result['error'] ?? __('setup.runts_fail')),
+            ], JSON_UNESCAPED_UNICODE);
+            return;
+        }
+
+        $fields = is_array($result['fields'] ?? null) ? $result['fields'] : [];
+        $applied = [];
+        try {
+            $applied = $this->setup->applyRuntsHints($fields);
+        } catch (\Throwable $e) {
+            echo json_encode([
+                'ok' => false,
+                'error' => __('setup.runts_fail'),
+            ], JSON_UNESCAPED_UNICODE);
+            return;
+        }
+
+        echo json_encode([
+            'ok' => true,
+            'cancelled' => !empty($result['cancelled']),
+            'warning' => (string) ($result['warning'] ?? ''),
+            'fields' => $fields,
+            'applied' => $applied,
+            'message' => !empty($result['cancelled'])
+                ? (string) ($result['warning'] ?? '')
+                : __('setup.runts_ok', ['name' => (string) ($fields['name'] ?? '')]),
+        ], JSON_UNESCAPED_UNICODE);
     }
 
     /** @return array<string, mixed> */

@@ -62,6 +62,7 @@ use Socly\Services\SmtpDiscoveryService;
 use Socly\Services\PaymentService;
 use Socly\Services\PluginAdminService;
 use Socly\Services\RateLimiter;
+use Socly\Services\RuntsLookupService;
 use Socly\Services\SettingsService;
 use Socly\Services\SetupService;
 use Socly\Services\TreasuryService;
@@ -255,6 +256,7 @@ $app->bind('mw.setup_or_auth', fn (App $a) => $a->get(SetupOrAuthMiddleware::cla
 
 $app->bind(AssociationPeopleService::class, fn (App $a) => new AssociationPeopleService($a->get(Database::class)));
 $app->bind(AssociationWebsiteScrapeService::class, fn () => new AssociationWebsiteScrapeService());
+$app->bind(RuntsLookupService::class, fn () => new RuntsLookupService());
 $app->bind(MailService::class, fn (App $a) => new MailService($a->get(SettingsService::class)));
 $app->bind(SmtpDiscoveryService::class, fn (App $a) => new SmtpDiscoveryService($a->get(MailService::class)));
 $app->bind(SetupService::class, fn (App $a) => new SetupService(
@@ -377,7 +379,8 @@ $app->bind(SetupController::class, fn (App $a) => new SetupController(
     $a->get(SetupService::class),
     $a->get(AuthService::class),
     $a->get(AssociationWebsiteScrapeService::class),
-    $a->get(MailService::class)
+    $a->get(MailService::class),
+    $a->get(RuntsLookupService::class)
 ));
 $app->bind(UpdateController::class, fn (App $a) => new UpdateController(
     $a->get(View::class),

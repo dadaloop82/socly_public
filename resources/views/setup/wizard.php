@@ -230,31 +230,61 @@ $errorStep = flash('setup_error_step');
                     <div class="setup-name-pair" data-setup-line data-setup-name-pair
                          data-preview-template="<?= e(__('setup.full_name_preview')) ?>">
                         <?php foreach ($step['fields'] as $field): ?>
-                            <label class="setup-field<?= ($field['key'] ?? '') === 'legal_name' ? ' setup-field-legal' : (($field['key'] ?? '') === 'currency' ? ' setup-field-currency' : ' setup-field-name') ?>">
+                            <?php $fieldKey = (string) ($field['key'] ?? ''); ?>
+                            <label class="setup-field<?= $fieldKey === 'legal_name' ? ' setup-field-legal' : ($fieldKey === 'currency' ? ' setup-field-currency' : ($fieldKey === 'runts' ? ' setup-field-runts' : ' setup-field-name')) ?>">
                                 <span><?= e(__($field['label_key'])) ?></span>
                                 <?php if (($field['type'] ?? '') === 'select'): ?>
-                                    <?php $isCurrency = ($field['key'] ?? '') === 'currency'; ?>
-                                    <select name="<?= e($field['key']) ?>" required maxlength="6" <?= $isCurrency ? '' : 'data-setup-legal-name' ?>>
+                                    <?php $isCurrency = $fieldKey === 'currency'; ?>
+                                    <select name="<?= e($fieldKey) ?>" required maxlength="6" <?= $isCurrency ? '' : 'data-setup-legal-name' ?>>
                                         <?php if (!$isCurrency): ?>
-                                            <option value="" disabled <?= (($value[$field['key']] ?? '') === '') ? 'selected' : '' ?>><?= e(__('setup.legal_form_placeholder')) ?></option>
+                                            <option value="" disabled <?= (($value[$fieldKey] ?? '') === '') ? 'selected' : '' ?>><?= e(__('setup.legal_form_placeholder')) ?></option>
                                         <?php endif; ?>
                                         <?php foreach ($field['options'] as $opt): ?>
-                                            <option value="<?= e($opt['value']) ?>" <?= (string) ($value[$field['key']] ?? '') === $opt['value'] ? 'selected' : '' ?>>
+                                            <option value="<?= e($opt['value']) ?>" <?= (string) ($value[$fieldKey] ?? '') === $opt['value'] ? 'selected' : '' ?>>
                                                 <?= e($opt['value']) ?><?= $isCurrency ? '' : ' — ' . e(__($opt['label_key'])) ?>
                                             </option>
                                         <?php endforeach; ?>
                                     </select>
+                                <?php elseif ($fieldKey === 'runts'): ?>
+                                    <input
+                                        type="text"
+                                        name="runts"
+                                        value="<?= e((string) ($value['runts'] ?? '')) ?>"
+                                        inputmode="numeric"
+                                        autocomplete="off"
+                                        spellcheck="false"
+                                        maxlength="20"
+                                        placeholder="<?= e(__('setup.field_runts_placeholder')) ?>"
+                                        data-setup-runts-input
+                                    >
                                 <?php else: ?>
                                     <input
                                         type="text"
-                                        name="<?= e($field['key']) ?>"
-                                        value="<?= e((string) ($value[$field['key']] ?? '')) ?>"
+                                        name="<?= e($fieldKey) ?>"
+                                        value="<?= e((string) ($value[$fieldKey] ?? '')) ?>"
                                         <?= !empty($field['required']) ? 'required' : '' ?>
                                         autocomplete="organization"
                                         data-setup-assoc-name
                                     >
                                 <?php endif; ?>
                             </label>
+                            <?php if ($fieldKey === 'runts'): ?>
+                                <div class="setup-runts-lookup" data-setup-runts
+                                     data-runts-url="<?= e(url('/setup/runts-lookup')) ?>"
+                                     data-csrf="<?= e(csrf_token()) ?>"
+                                     data-label-template="<?= e(__('setup.runts_button')) ?>"
+                                     data-msg-need="<?= e(__('setup.runts_need_number')) ?>"
+                                     data-msg-loading="<?= e(__('setup.runts_loading')) ?>"
+                                     data-msg-ok="<?= e(__('setup.runts_ok')) ?>"
+                                     data-msg-fail="<?= e(__('setup.runts_fail')) ?>"
+                                     data-msg-not-found="<?= e(__('setup.runts_not_found')) ?>"
+                                >
+                                    <button type="button" class="btn setup-scrape-btn" data-setup-runts-btn hidden disabled aria-hidden="true">
+                                        <span data-setup-runts-label><?= e(__('setup.runts_button_fallback')) ?></span>
+                                    </button>
+                                    <p class="setup-runts-status muted" data-setup-runts-status hidden></p>
+                                </div>
+                            <?php endif; ?>
                         <?php endforeach; ?>
                         <p class="setup-hint setup-full-name-preview muted" data-setup-full-name-preview hidden></p>
                     </div>

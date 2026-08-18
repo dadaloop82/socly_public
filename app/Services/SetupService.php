@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Socly\Services;
 
 use Socly\Components\ComponentRegistry;
+use Socly\Setup\AssociationLegalForms;
 use Socly\Setup\SetupCatalogue;
 use Socly\Services\BrandingService;
 use Socly\Support\EnvWriter;
@@ -662,6 +663,7 @@ final class SetupService
         $applied = [];
         $env = [];
         $website = trim($website);
+        $locked = $this->runtsLockedKeys();
         if ($website !== '') {
             $currentWeb = trim((string) $this->settings->get('association.website', ''));
             if ($updateWebsite || $currentWeb === '') {
@@ -672,6 +674,9 @@ final class SetupService
         }
 
         foreach ($map as $key => $meta) {
+            if (isset($locked[$key])) {
+                continue;
+            }
             $value = trim((string) ($found[$key] ?? ''));
             if ($value === '') {
                 continue;
@@ -685,7 +690,7 @@ final class SetupService
             $applied[] = $key;
         }
 
-        $applied = array_merge($applied, $this->applyScrapedPeopleHints($found));
+        $applied = array_merge($applied, $this->applyScrapedPeopleHints($found, $locked));
 
         if (
             isset($found['address'], $found['house_number'], $found['postal_code'], $found['city'])
@@ -803,12 +808,113 @@ final class SetupService
     }
 
     /**
+     * Persist RUNTS lookup results. Name / legal form / RUNTS overwrite; other empty fields are filled.
+     *
+     * @param array<string, string> $fields
+     * @return list<string>
+     */
+    public function applyRuntsHints(array $fields): array
+    {
+        $applied = [];
+        $env = [];
+        $lock = [];
+
+        $name = trim((string) ($fields['name'] ?? ''));
+        if ($name !== '') {
+            $name = assoc_capitalize_name($name);
+            $this->settings->set('association.name', $name);
+            $env['ASSOCIATION_NAME'] = $name;
+            $applied[] = 'name';
+            $lock['name'] = $name;
+        }
+
+        $legal = strtoupper(trim((string) ($fields['legal_name'] ?? '')));
+        if ($legal !== '' && AssociationLegalForms::isValid($legal)) {
+            $this->settings->set('association.legal_name', $legal);
+            $env['ASSOCIATION_LEGAL_NAME'] = $legal;
+            $applied[] = 'legal_name';
+            $lock['legal_name'] = $legal;
+        }
+
+        $runts = preg_replace('/\D+/', '', (string) ($fields['runts'] ?? '')) ?? '';
+        if ($runts !== '') {
+            $this->settings->set('association.runts', $runts);
+            $env['ASSOCIATION_RUNTS'] = $runts;
+            $applied[] = 'runts';
+            $lock['runts'] = $runts;
+        }
+
+        $optional = [
+            'fiscal_code' => ['settings' => 'association.fiscal_code', 'env' => 'ASSOCIATION_FISCAL_CODE'],
+            'city' => ['settings' => 'association.city', 'env' => 'ASSOCIATION_CITY'],
+        ];
+        foreach ($optional as $key => $meta) {
+            $value = trim((string) ($fields[$key] ?? ''));
+            if ($value === '') {
+                continue;
+            }
+            if ($key === 'fiscal_code') {
+                $value = strtoupper(preg_replace('/\s+/', '', $value) ?? '');
+            } elseif ($key === 'city') {
+                $value = assoc_capitalize_name($value);
+            }
+            $this->settings->set($meta['settings'], $value);
+            $env[$meta['env']] = $value;
+            $applied[] = $key;
+            $lock[$key] = $value;
+        }
+
+        $personKey = 'president_name';
+        if (trim((string) ($fields[$personKey] ?? '')) !== '') {
+            $peopleApplied = $this->applyScrapedPeopleHints([$personKey => (string) $fields[$personKey]]);
+            foreach ($peopleApplied as $key) {
+                $applied[] = $key;
+                $lock[$key] = trim((string) $fields[$personKey]);
+            }
+        }
+
+        $this->settings->set('association.runts_lock', $lock);
+        if ($env !== []) {
+            EnvWriter::setUserValues($env);
+        }
+        return $applied;
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    public function runtsLockedKeys(): array
+    {
+        $raw = $this->settings->get('association.runts_lock', '');
+        if (is_array($raw)) {
+            $out = [];
+            foreach ($raw as $key => $value) {
+                $out[(string) $key] = is_scalar($value) ? (string) $value : '';
+            }
+            return $out;
+        }
+        if (!is_string($raw) || $raw === '') {
+            return [];
+        }
+        $decoded = json_decode($raw, true);
+        if (!is_array($decoded)) {
+            return [];
+        }
+        $out = [];
+        foreach ($decoded as $key => $value) {
+            $out[(string) $key] = is_scalar($value) ? (string) $value : '';
+        }
+        return $out;
+    }
+
+    /**
      * Prefill association people from scrape when those roles are still empty.
      *
      * @param array<string, string> $found
+     * @param array<string, string> $locked
      * @return list<string>
      */
-    private function applyScrapedPeopleHints(array $found): array
+    private function applyScrapedPeopleHints(array $found, array $locked = []): array
     {
         $applied = [];
         $roleMap = [
@@ -819,6 +925,9 @@ final class SetupService
         ];
 
         foreach ($roleMap as $foundKey => $role) {
+            if (isset($locked[$foundKey])) {
+                continue;
+            }
             $person = $this->splitScrapedPersonName((string) ($found[$foundKey] ?? ''));
             if ($person === null) {
                 continue;
@@ -890,6 +999,19 @@ final class SetupService
             $required = array_key_exists('required', $field) ? !empty($field['required']) : !empty($step['required']);
             if ($required && $value === '') {
                 $errors[$key] = __('validation.required');
+                continue;
+            }
+            if ($key === 'runts') {
+                $value = preg_replace('/\D+/', '', $value) ?? '';
+                if (strlen($value) > 20) {
+                    $errors[$key] = __('validation.max_string', ['max' => '20']);
+                    continue;
+                }
+                $pending[] = [
+                    'settings_key' => (string) $field['settings_key'],
+                    'env_key' => (string) ($field['env_key'] ?? ''),
+                    'value' => $value,
+                ];
                 continue;
             }
             if ($value === '') {

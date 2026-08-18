@@ -789,6 +789,27 @@ a:hover { text-decoration: underline; color: var(--brand-primary-deep); }
   gap: 0.85rem;
   align-items: end;
 }
+.setup-name-pair .setup-field-runts,
+.setup-name-pair .setup-runts-lookup,
+.setup-name-pair .setup-field-currency,
+.setup-name-pair .setup-full-name-preview {
+  grid-column: 1 / -1;
+}
+.setup-runts-lookup {
+  display: grid;
+  gap: 0.55rem;
+  margin-top: -0.25rem;
+}
+.setup-runts-status {
+  margin: 0;
+  line-height: 1.45;
+}
+.setup-runts-status.is-error {
+  color: var(--danger, #9b1c1c);
+}
+.setup-runts-status.is-warn {
+  color: var(--warn, #9a6700);
+}
 .setup-name-pair .setup-full-name-preview {
   grid-column: 1 / -1;
   margin: 0;
@@ -3286,12 +3307,16 @@ html:has(.setup-body) {
 .setup-scrape:not(.is-scraping) .setup-scrape-spinner { display: none; }
 [data-setup-wizard].is-scrape-busy .setup-back,
 [data-setup-wizard].is-scrape-busy .setup-cta,
-[data-setup-wizard].is-scrape-busy [data-setup-exit] {
+[data-setup-wizard].is-scrape-busy [data-setup-exit],
+[data-setup-wizard].is-runts-busy .setup-back,
+[data-setup-wizard].is-runts-busy .setup-cta,
+[data-setup-wizard].is-runts-busy [data-setup-exit] {
   opacity: 0.45;
   pointer-events: none;
   cursor: not-allowed;
 }
-[data-setup-wizard].is-scrape-busy [data-setup-website-input] {
+[data-setup-wizard].is-scrape-busy [data-setup-website-input],
+[data-setup-wizard].is-runts-busy [data-setup-runts-input] {
   cursor: wait;
 }
 .setup-scrape-results {
