@@ -440,6 +440,7 @@ return [
         'active' => 'Active',
         'system_admin' => 'SuperAdmin',
         'cannot_delete_admin' => 'The SuperAdmin cannot be deleted.',
+        'confirm_delete' => 'Delete this user?',
         'password' => 'Password',
         'password_confirmation' => 'Confirm password',
         'password_optional' => 'Leave blank to keep unchanged',

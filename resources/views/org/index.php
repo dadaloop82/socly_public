@@ -99,7 +99,7 @@ $renderGroupBlock = static function (
             <div class="org-group-head">
                 <h3 class="org-group-title"><?= e($label) ?></h3>
                 <?php if ($editable && $isCustom && $people === []): ?>
-                    <form method="post" action="<?= e(url('/org/organs/' . rawurlencode($roleKey) . '/delete')) ?>" class="org-group-delete" onsubmit="return confirm(<?= e(json_encode(__('org.delete_organ_confirm'))) ?>);">
+                    <form method="post" action="<?= e(url('/org/organs/' . rawurlencode($roleKey) . '/delete')) ?>" class="org-group-delete" data-confirm="<?= e(__('org.delete_organ_confirm')) ?>" data-confirm-danger="1">
                         <?= csrf_field() ?>
                         <button type="submit" class="btn btn-ghost btn-sm"><?= e(__('org.delete_organ')) ?></button>
                     </form>

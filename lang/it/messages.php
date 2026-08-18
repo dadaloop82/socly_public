@@ -442,6 +442,7 @@ return [
         'active' => 'Attivo',
         'system_admin' => 'SuperAdmin',
         'cannot_delete_admin' => 'Il SuperAdmin non può essere eliminato.',
+        'confirm_delete' => 'Eliminare questo utente?',
         'password' => 'Password',
         'password_confirmation' => 'Conferma password',
         'password_optional' => 'Lascia vuoto per non cambiare',

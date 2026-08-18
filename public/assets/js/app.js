@@ -1,3 +1,95 @@
+/** Styled in-app confirm — never uses the browser native dialog. */
+let appConfirmDialog = null;
+
+function appConfirmLabels() {
+  const lang = (document.documentElement.lang || 'it').slice(0, 2);
+  const map = {
+    it: { confirm: 'Conferma', cancel: 'Annulla' },
+    en: { confirm: 'Confirm', cancel: 'Cancel' },
+    de: { confirm: 'Bestätigen', cancel: 'Abbrechen' },
+  };
+  return map[lang] || map.it;
+}
+
+function ensureAppConfirmDialog() {
+  if (appConfirmDialog) return appConfirmDialog;
+  appConfirmDialog = document.createElement('dialog');
+  appConfirmDialog.className = 'setup-exit-dialog';
+  appConfirmDialog.dataset.appConfirm = '1';
+  appConfirmDialog.innerHTML = `
+    <div class="setup-exit-shell">
+      <p class="setup-exit-text" data-app-confirm-text></p>
+      <div class="setup-exit-actions">
+        <button type="button" class="btn btn-ghost" data-app-confirm-cancel></button>
+        <button type="button" class="btn" data-app-confirm-ok></button>
+      </div>
+    </div>`;
+  document.body.appendChild(appConfirmDialog);
+  return appConfirmDialog;
+}
+
+function appConfirm(message, options = {}) {
+  const labels = appConfirmLabels();
+  const dialog = ensureAppConfirmDialog();
+  const textEl = dialog.querySelector('[data-app-confirm-text]');
+  const okBtn = dialog.querySelector('[data-app-confirm-ok]');
+  const cancelBtn = dialog.querySelector('[data-app-confirm-cancel]');
+  const confirmLabel = options.confirmLabel || labels.confirm;
+  const cancelLabel = options.cancelLabel || labels.cancel;
+  const danger = !!options.danger;
+
+  if (textEl) textEl.textContent = String(message || '').trim();
+  if (okBtn) {
+    okBtn.textContent = confirmLabel;
+    okBtn.className = danger ? 'btn btn-danger' : 'btn';
+  }
+  if (cancelBtn) cancelBtn.textContent = cancelLabel;
+
+  return new Promise((resolve) => {
+    let settled = false;
+    const finish = (result) => {
+      if (settled) return;
+      settled = true;
+      okBtn?.removeEventListener('click', onOk);
+      cancelBtn?.removeEventListener('click', onCancel);
+      dialog.removeEventListener('cancel', onCancelEvent);
+      dialog.close();
+      resolve(result);
+    };
+    const onOk = () => finish(true);
+    const onCancel = () => finish(false);
+    const onCancelEvent = (event) => {
+      event.preventDefault();
+      finish(false);
+    };
+    okBtn?.addEventListener('click', onOk);
+    cancelBtn?.addEventListener('click', onCancel);
+    dialog.addEventListener('cancel', onCancelEvent);
+    if (typeof dialog.showModal === 'function') {
+      dialog.showModal();
+    } else {
+      finish(false);
+    }
+  });
+}
+
+function initConfirmForms(scope = document) {
+  scope.querySelectorAll('form[data-confirm]').forEach((form) => {
+    if (form.dataset.confirmBound === '1') return;
+    form.dataset.confirmBound = '1';
+    form.addEventListener('submit', async (event) => {
+      if (form.dataset.confirmed === '1') return;
+      event.preventDefault();
+      const ok = await appConfirm(form.dataset.confirm || '', {
+        danger: form.dataset.confirmDanger === '1',
+      });
+      if (!ok) return;
+      form.dataset.confirmed = '1';
+      HTMLFormElement.prototype.submit.call(form);
+    });
+  });
+}
+
 document.addEventListener('DOMContentLoaded', () => {
   const payment = document.querySelector('[name="payment_status"]');
   const partial = document.querySelector('[data-partial-wrap]');
@@ -41,6 +133,7 @@ document.addEventListener('DOMContentLoaded', () => {
   initDeadlineCategory(document);
   initTreasuryCategory(document);
   initLeaveGuards(document);
+  initConfirmForms(document);
 });
 
 /** Compact members search placeholder on small screens. */
@@ -311,20 +404,22 @@ function initResetUserData() {
     confirm2.value = '0';
   };
 
-  openBtn.addEventListener('click', () => {
+  openBtn.addEventListener('click', async () => {
     resetFlags();
     if (typeof dialog1.showModal === 'function') {
       dialog1.showModal();
       return;
     }
-    if (window.confirm(dialog1.querySelector('.config-reset-text')?.textContent?.trim() || '')) {
-      confirm1.value = '1';
-      if (window.confirm(dialog2.querySelector('.config-reset-text')?.textContent?.trim() || '')) {
-        confirm2.value = '1';
-        form.submit();
-      } else {
-        resetFlags();
-      }
+    const text1 = dialog1.querySelector('.config-reset-text')?.textContent?.trim() || '';
+    if (!(await appConfirm(text1, { danger: true }))) {
+      resetFlags();
+      return;
+    }
+    confirm1.value = '1';
+    const text2 = dialog2.querySelector('.config-reset-text')?.textContent?.trim() || '';
+    if (await appConfirm(text2, { danger: true })) {
+      confirm2.value = '1';
+      form.submit();
     } else {
       resetFlags();
     }
@@ -895,7 +990,7 @@ function initSetupWizard() {
     logoutNow();
   };
 
-  exitBtn?.addEventListener('click', (event) => {
+  exitBtn?.addEventListener('click', async (event) => {
     event.preventDefault();
     event.stopPropagation();
     if (!shouldConfirmExit()) {
@@ -906,19 +1001,19 @@ function initSetupWizard() {
       exitDialog.showModal();
       return;
     }
-    // Fallback confirm: OK = keep, Cancel = leave without discarding.
-    if (window.confirm(exitDialog?.querySelector('.setup-exit-text')?.textContent?.trim() || '')) {
+    const text = exitDialog?.querySelector('.setup-exit-text')?.textContent?.trim() || '';
+    if (await appConfirm(text)) {
       keepAndExit();
     } else {
       logoutNow();
     }
   });
 
-  exitDialog?.querySelector('[data-setup-exit-discard]')?.addEventListener('click', () => {
+  exitDialog?.querySelector('[data-setup-exit-discard]')?.addEventListener('click', async () => {
     const confirmMsg =
       exitDialog.querySelector('[data-setup-exit-discard]')?.dataset.confirm ||
       '';
-    if (confirmMsg && !window.confirm(confirmMsg)) {
+    if (confirmMsg && !(await appConfirm(confirmMsg, { danger: true }))) {
       return;
     }
     exitDialog.close();
@@ -1512,7 +1607,7 @@ function initMemberLeaveGuard(form) {
     dirty = false;
   });
 
-  const askLeave = (href) => {
+  const askLeave = async (href) => {
     pendingHref = href || '';
     if (dialog && typeof dialog.showModal === 'function') {
       dialog.showModal();
@@ -1520,7 +1615,7 @@ function initMemberLeaveGuard(form) {
     }
     const text = dialog?.querySelector('.member-leave-text')?.textContent?.trim()
       || 'Stai per abbandonare l’inserimento. Sei sicuro?';
-    if (window.confirm(text)) {
+    if (await appConfirm(text)) {
       allowLeave = true;
       if (pendingHref) window.location.href = pendingHref;
     }
@@ -1634,11 +1729,13 @@ function initLeaveGuards(scope = document) {
       </div>`;
     document.body.appendChild(dialog);
 
-    const askLeave = (href) => {
+    const askLeave = async (href) => {
       pendingHref = href;
       if (typeof dialog.showModal === 'function') {
         dialog.showModal();
-      } else if (window.confirm(copy.text)) {
+        return;
+      }
+      if (await appConfirm(copy.text)) {
         allowLeave = true;
         form.requestSubmit();
       }
@@ -4060,11 +4157,15 @@ function initDeadlineCategory(root = document) {
     };
     categorySelect.addEventListener('change', sync);
     sync();
-    form.addEventListener('submit', (event) => {
+    form.addEventListener('submit', async (event) => {
       const template = form.getAttribute('data-confirm-template') || '';
       if (!template) {
         return;
       }
+      if (form.dataset.confirmed === '1') {
+        return;
+      }
+      event.preventDefault();
       const title = form.querySelector('[name="title"]')?.value?.trim() || '—';
       const due = form.querySelector('[name="due_date"]')?.value || '—';
       const category = categorySelect.value === '__new__'
@@ -4074,9 +4175,11 @@ function initDeadlineCategory(root = document) {
         .replace(':title', title)
         .replace(':date', due)
         .replace(':category', category);
-      if (!window.confirm(summary)) {
-        event.preventDefault();
+      if (!(await appConfirm(summary))) {
+        return;
       }
+      form.dataset.confirmed = '1';
+      form.requestSubmit();
     });
   });
 }
@@ -4137,7 +4240,7 @@ function initTreasuryCategory(root = document) {
     invoiceToggle?.addEventListener('change', syncDirection);
     syncDirection();
 
-    form.addEventListener('submit', (event) => {
+    form.addEventListener('submit', async (event) => {
       if (form.dataset.confirmed === '1') {
         return;
       }
@@ -4145,6 +4248,7 @@ function initTreasuryCategory(root = document) {
       if (!template) {
         return;
       }
+      event.preventDefault();
       const directionLabel = direction?.selectedOptions?.[0]?.textContent?.trim() || '';
       const amount = form.querySelector('[name="amount"]')?.value || '';
       const date = form.querySelector('[name="movement_date"]')?.value || '';
@@ -4154,11 +4258,11 @@ function initTreasuryCategory(root = document) {
         .replace(':amount', amount)
         .replace(':date', date)
         .replace(':category', category);
-      if (!window.confirm(message)) {
-        event.preventDefault();
+      if (!(await appConfirm(message))) {
         return;
       }
       form.dataset.confirmed = '1';
+      form.requestSubmit();
     });
   });
 }

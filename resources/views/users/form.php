@@ -70,7 +70,7 @@
     </div>
 </form>
 <?php if ($isEdit && empty($user['is_system_admin'])): ?>
-<form method="post" action="<?= e(url('/users/'.$user['id'].'/delete')) ?>" onsubmit="return confirm('OK?')" style="margin-top:1rem">
+<form method="post" action="<?= e(url('/users/'.$user['id'].'/delete')) ?>" data-confirm="<?= e(__('users.confirm_delete')) ?>" data-confirm-danger="1" style="margin-top:1rem">
     <?= csrf_field() ?>
     <button class="btn btn-danger" type="submit"><?= e(__('members.delete')) ?></button>
 </form>

@@ -156,7 +156,7 @@ $action = $isEdit
 </form>
 
 <?php if ($isEdit): ?>
-    <form class="panel" method="post" action="<?= e(url('/org/people/' . (int) ($person['id'] ?? 0) . '/delete')) ?>" onsubmit="return confirm('<?= e(__('org.delete_confirm')) ?>');">
+    <form class="panel" method="post" action="<?= e(url('/org/people/' . (int) ($person['id'] ?? 0) . '/delete')) ?>" data-confirm="<?= e(__('org.delete_confirm')) ?>" data-confirm-danger="1">
         <?= csrf_field() ?>
         <div class="panel-header">
             <div>

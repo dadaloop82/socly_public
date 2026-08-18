@@ -17,7 +17,7 @@ $balanceDue = (float) ($member['balance_due'] ?? 0);
         <?php endif; ?>
         <a class="btn btn-ghost" href="<?= e(url('/members')) ?>"><?= e(__('common.back')) ?></a>
         <?php if (can('members.delete')): ?>
-        <form method="post" action="<?= e(url('/members/'.$member['id'].'/delete')) ?>" onsubmit="return confirm('<?= e(__('members.confirm_delete')) ?>')">
+        <form method="post" action="<?= e(url('/members/'.$member['id'].'/delete')) ?>" data-confirm="<?= e(__('members.confirm_delete')) ?>" data-confirm-danger="1">
             <?= csrf_field() ?>
             <button class="btn btn-danger" type="submit"><?= e(__('members.delete')) ?></button>
         </form>
