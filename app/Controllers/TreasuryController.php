@@ -78,6 +78,13 @@ final class TreasuryController extends BaseController
     public function update(Request $request, string $id): void
     {
         require_component('treasury');
+        if (upload_post_too_large()) {
+            $this->flash('errors', [
+                'invoice_pdf' => __('documents.upload_too_large', ['max' => upload_max_mb()]),
+            ]);
+            $this->rememberOld($request->all());
+            redirect('/treasury/' . (int) $id . '/edit');
+        }
         $result = $this->treasury->update(
             (int) $id,
             $request->all(),
@@ -97,6 +104,13 @@ final class TreasuryController extends BaseController
     public function store(Request $request): void
     {
         require_component('treasury');
+        if (upload_post_too_large()) {
+            $this->flash('errors', [
+                'invoice_pdf' => __('documents.upload_too_large', ['max' => upload_max_mb()]),
+            ]);
+            $this->rememberOld($request->all());
+            redirect('/treasury');
+        }
         $result = $this->treasury->create(
             $request->all(),
             $request->file('invoice_pdf'),

@@ -25,7 +25,8 @@ final class MemberService
         private readonly Database $db,
         private readonly AuditService $audit,
         private readonly Validator $validator,
-        private readonly PluginManager $plugins
+        private readonly PluginManager $plugins,
+        private readonly TreasuryService $treasury
     ) {
     }
 
@@ -829,8 +830,9 @@ final class MemberService
                 }
             }
             $this->saveFieldValues($id, $fieldData);
+            $paymentId = null;
             if ($paidAmount > 0) {
-                $this->db->insert('payments', [
+                $paymentId = $this->db->insert('payments', [
                     'member_id' => $id,
                     'amount' => $paidAmount,
                     'method' => $data['payment_method'] ?? 'cash',
@@ -838,6 +840,13 @@ final class MemberService
                     'note' => $data['payment_note'] ?? null,
                     'created_by' => auth_user()['id'] ?? null,
                 ]);
+                $this->treasury->autoRegisterFromPayment(
+                    (int) $paymentId,
+                    (int) $id,
+                    $paidAmount,
+                    (string) ($data['payment_method'] ?? 'cash'),
+                    date('Y-m-d')
+                );
             }
             $this->db->commit();
         } catch (\Throwable $e) {

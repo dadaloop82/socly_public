@@ -33,7 +33,15 @@ $year = date('Y');
       --brand-socly: #0B4875;
     }</style>
 </head>
-<body>
+<body
+    <?php if (!empty($demoLoginNotice)): ?>
+    data-demo-login-notice="1"
+    data-demo-expires="<?= e((string) ($demoLoginNotice['expires_label'] ?? '')) ?>"
+    data-demo-login-notice-text="<?= e(__('auth.demo_login_notice')) ?>"
+    data-demo-login-notice-ok="<?= e(__('auth.demo_login_notice_ok')) ?>"
+    <?php endif; ?>
+    data-max-upload-bytes="<?= (int) upload_limit_bytes() ?>"
+>
 <div class="auth-shell">
     <div class="auth-main">
         <aside class="auth-brand">

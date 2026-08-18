@@ -93,6 +93,7 @@ $today = date('Y-m-d');
 <div data-treasury-expense-fields data-treasury-invoice-fields>
     <label><?= e(__('treasury.invoice_pdf')) ?></label>
     <input type="file" name="invoice_pdf" accept="application/pdf,.pdf">
+    <p class="muted"><?= e(__('documents.upload_hint', ['max' => upload_max_mb()])) ?></p>
     <?php if (!empty($values['attachment_path'])): ?>
         <p class="muted"><?= e(__('treasury.invoice_pdf_attached')) ?></p>
     <?php endif; ?>

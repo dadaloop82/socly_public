@@ -226,6 +226,313 @@ final class GeoService
         );
     }
 
+    /** @return list<array{label:string,city:string,belfiore:string,provincia:string,cap:string}> */
+    private function fuzzySearchComuni(string $query, int $limit = 5): array
+    {
+        $query = trim($query);
+        if (mb_strlen($query) < 3) {
+            return [];
+        }
+        $typedNorm = $this->normalizePlace($query);
+        if ($typedNorm === '') {
+            return [];
+        }
+
+        $candidates = [];
+        foreach ($this->comuni() as $row) {
+            $nameNorm = $this->normalizePlace($row['nome']);
+            if ($nameNorm === $typedNorm || abs(mb_strlen($nameNorm) - mb_strlen($typedNorm)) > 3) {
+                continue;
+            }
+            if (strlen($typedNorm) > 64 || strlen($nameNorm) > 64) {
+                continue;
+            }
+            $dist = levenshtein($typedNorm, $nameNorm);
+            if ($dist <= 2) {
+                $candidates[] = [
+                    'dist' => $dist,
+                    'prefix' => $this->prefixMatchScore($typedNorm, $nameNorm),
+                    'row' => $row,
+                ];
+            }
+        }
+
+        usort($candidates, static function (array $a, array $b): int {
+            if ($a['dist'] !== $b['dist']) {
+                return $a['dist'] <=> $b['dist'];
+            }
+            if ($a['prefix'] !== $b['prefix']) {
+                return $b['prefix'] <=> $a['prefix'];
+            }
+            return 0;
+        });
+        $out = [];
+        foreach (array_slice($candidates, 0, $limit) as $candidate) {
+            $out[] = $this->formatComuneItem($candidate['row']);
+        }
+        return $out;
+    }
+
+    /**
+     * Resolve a typed city/comune on blur (local registry + optional geocoder fallback).
+     *
+     * @return array{action:'none'|'apply'|'confirm'|'not_found',item?:array<string,mixed>,label?:string}
+     */
+    public function resolveComuneQuery(string $query, bool $allowForeign = false): array
+    {
+        $query = trim($query);
+        if (mb_strlen($query) < 2) {
+            return ['action' => 'none'];
+        }
+
+        $typedNorm = $this->normalizePlace($query);
+        $exact = $this->findComune($query);
+        if ($exact !== null) {
+            $item = $this->formatComuneItem($exact);
+            if ($item['city'] === $query) {
+                return ['action' => 'none'];
+            }
+            return ['action' => 'apply', 'item' => $item, 'label' => $item['label']];
+        }
+
+        $results = $this->searchComuni($query, 5);
+        if ($results === []) {
+            $results = $this->fuzzySearchComuni($query, 5);
+        }
+        if ($allowForeign) {
+            $results = $this->mergeForeignGeoResult(
+                $typedNorm,
+                $results,
+                $this->searchCityNominatim($query, false)
+            );
+        } elseif ($results === []) {
+            $external = $this->searchCityNominatim($query, true);
+            if ($external !== null) {
+                $results = [$external];
+            }
+        }
+        if ($results === []) {
+            return ['action' => 'not_found'];
+        }
+
+        return $this->resolvePlaceChoice($typedNorm, $query, $results, static fn (array $row): string => (string) ($row['city'] ?? ''));
+    }
+
+    /**
+     * Resolve a typed street on blur (scoped to the selected city).
+     *
+     * @return array{action:'none'|'apply'|'confirm',item?:array<string,mixed>,label?:string}
+     */
+    public function resolveAddressQuery(string $query, string $city, string $houseNumber = ''): array
+    {
+        $query = trim($query);
+        $city = trim($city);
+        if ($city === '' || mb_strlen($query) < 3) {
+            return ['action' => 'none'];
+        }
+
+        $typedNorm = $this->normalizePlace($query);
+        $results = $this->searchAddresses($query, $city, 5);
+        if ($results === []) {
+            return ['action' => 'none'];
+        }
+
+        return $this->resolvePlaceChoice(
+            $typedNorm,
+            $query,
+            $results,
+            static fn (array $row): string => (string) ($row['address'] ?? ''),
+            static fn (array $row): string => (string) ($row['label'] ?? '')
+        );
+    }
+
+    /**
+     * @param list<array<string,mixed>> $results
+     * @param callable(array<string,mixed>):string $valueFromRow
+     * @param callable(array<string,mixed>):string|null $labelFromRow
+     * @return array{action:'none'|'apply'|'confirm',item?:array<string,mixed>,label?:string}
+     */
+    private function resolvePlaceChoice(
+        string $typedNorm,
+        string $typedRaw,
+        array $results,
+        callable $valueFromRow,
+        ?callable $labelFromRow = null
+    ): array {
+        $top = $results[0];
+        $canonical = trim($valueFromRow($top));
+        $canonicalNorm = $this->normalizePlace($canonical);
+        $label = $labelFromRow !== null ? trim($labelFromRow($top)) : $canonical;
+        if ($label === '') {
+            $label = $canonical;
+        }
+
+        if ($canonicalNorm === $typedNorm && $canonical === $typedRaw) {
+            return ['action' => 'none'];
+        }
+
+        if ($canonicalNorm === $typedNorm || $this->placesSimilar($typedNorm, $canonicalNorm)) {
+            return ['action' => 'apply', 'item' => $top, 'label' => $label];
+        }
+
+        $closeMatches = array_values(array_filter(
+            $results,
+            fn (array $row): bool => $this->placesSimilar(
+                $typedNorm,
+                $this->normalizePlace($valueFromRow($row))
+            )
+        ));
+        if (count($closeMatches) === 1) {
+            $match = $closeMatches[0];
+            $matchLabel = $labelFromRow !== null ? trim($labelFromRow($match)) : trim($valueFromRow($match));
+            return [
+                'action' => 'apply',
+                'item' => $match,
+                'label' => $matchLabel !== '' ? $matchLabel : trim($valueFromRow($match)),
+            ];
+        }
+
+        if (mb_strlen($typedNorm) < 4 && count($results) > 1) {
+            return ['action' => 'confirm', 'item' => $top, 'label' => $label];
+        }
+
+        return ['action' => 'confirm', 'item' => $top, 'label' => $label];
+    }
+
+    /** @param list<array<string,mixed>> $local @param array<string,mixed>|null $external @return list<array<string,mixed>> */
+    private function mergeForeignGeoResult(string $typedNorm, array $local, ?array $external): array
+    {
+        if ($external === null) {
+            return $local;
+        }
+        if ($local === []) {
+            return [$external];
+        }
+
+        $extNorm = $this->normalizePlace((string) ($external['city'] ?? ''));
+        if ($extNorm === '' || strlen($typedNorm) > 64 || strlen($extNorm) > 64) {
+            return $local;
+        }
+        $extDist = levenshtein($typedNorm, $extNorm);
+
+        $localTop = $local[0];
+        $localNorm = $this->normalizePlace((string) ($localTop['city'] ?? ''));
+        $localDist = $localNorm !== '' && strlen($localNorm) <= 64
+            ? levenshtein($typedNorm, $localNorm)
+            : 99;
+
+        $localIsItalian = trim((string) ($localTop['belfiore'] ?? '')) !== '';
+        $preferExternal = $extDist < $localDist
+            || ($extDist <= $localDist + 1 && $localIsItalian && trim((string) ($external['belfiore'] ?? '')) === '');
+
+        if (!$preferExternal) {
+            if ($extDist <= 3 && !$this->resultsContainCity($local, (string) ($external['city'] ?? ''))) {
+                $local[] = $external;
+            }
+            return $local;
+        }
+
+        $merged = [$external];
+        foreach ($local as $item) {
+            if ($this->normalizePlace((string) ($item['city'] ?? '')) !== $extNorm) {
+                $merged[] = $item;
+            }
+        }
+        return $merged;
+    }
+
+    /** @param list<array<string,mixed>> $results */
+    private function resultsContainCity(array $results, string $city): bool
+    {
+        $needle = $this->normalizePlace($city);
+        foreach ($results as $row) {
+            if ($this->normalizePlace((string) ($row['city'] ?? '')) === $needle) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /** @param array{nome:string,belfiore:string,provincia:string,cap:string} $row */
+    private function formatComuneItem(array $row): array
+    {
+        return [
+            'label' => $row['nome'] . ' (' . $row['provincia'] . ')',
+            'city' => $row['nome'],
+            'belfiore' => $row['belfiore'],
+            'provincia' => $row['provincia'],
+            'cap' => $row['cap'],
+        ];
+    }
+
+    /** @return array{label:string,city:string,belfiore:string,provincia:string,cap:string}|null */
+    private function searchCityNominatim(string $query, bool $italyOnly): ?array
+    {
+        $params = [
+            'q' => $query,
+            'format' => 'jsonv2',
+            'addressdetails' => 1,
+            'limit' => 1,
+        ];
+        if ($italyOnly) {
+            $params['countrycodes'] = 'it';
+        }
+        $url = 'https://nominatim.openstreetmap.org/search?' . http_build_query($params);
+        $json = $this->httpGet($url);
+        if ($json === null) {
+            return null;
+        }
+        $data = json_decode($json, true);
+        if (!is_array($data) || !isset($data[0]) || !is_array($data[0])) {
+            return null;
+        }
+        $row = $data[0];
+        $addr = is_array($row['address'] ?? null) ? $row['address'] : [];
+        $city = trim((string) ($addr['city'] ?? $addr['town'] ?? $addr['village'] ?? $addr['municipality'] ?? ''));
+        if ($city === '') {
+            return null;
+        }
+        $state = trim((string) ($addr['state'] ?? $addr['county'] ?? ''));
+        $label = $state !== '' ? $city . ' (' . $state . ')' : $city;
+        return [
+            'label' => $label,
+            'city' => $city,
+            'belfiore' => '',
+            'provincia' => $state,
+            'cap' => trim((string) ($addr['postcode'] ?? '')),
+        ];
+    }
+
+    private function prefixMatchScore(string $typed, string $candidate): int
+    {
+        $max = min(strlen($typed), strlen($candidate));
+        $score = 0;
+        for ($i = 0; $i < $max; $i++) {
+            if ($typed[$i] !== $candidate[$i]) {
+                break;
+            }
+            $score++;
+        }
+        return $score;
+    }
+
+    private function placesSimilar(string $a, string $b): bool
+    {
+        if ($a === '' || $b === '') {
+            return false;
+        }
+        if ($a === $b) {
+            return true;
+        }
+        if (str_starts_with($b, $a) || str_starts_with($a, $b)) {
+            return abs(mb_strlen($a) - mb_strlen($b)) <= 3;
+        }
+        if (strlen($a) <= 64 && strlen($b) <= 64) {
+            return levenshtein($a, $b) <= 2;
+        }
+        return false;
+    }
+
     /** @return array{ok:bool,fiscal_code?:string,error?:string} */
     public function computeFiscalCode(string $firstName, string $lastName, string $birthDate, string $gender, string $birthPlace): array
     {

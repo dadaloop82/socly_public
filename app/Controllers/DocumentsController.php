@@ -103,6 +103,14 @@ final class DocumentsController extends BaseController
     {
         require_component('documents');
         header('Content-Type: application/json; charset=utf-8');
+        if (upload_post_too_large()) {
+            http_response_code(413);
+            echo json_encode([
+                'ok' => false,
+                'error' => __('documents.upload_too_large', ['max' => $this->documents->uploadMaxMb()]),
+            ], JSON_UNESCAPED_UNICODE);
+            return;
+        }
         $file = $_FILES['document_file'] ?? null;
         if (!is_array($file)) {
             http_response_code(422);

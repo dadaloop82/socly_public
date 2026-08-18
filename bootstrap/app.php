@@ -193,7 +193,8 @@ $app->bind(MemberService::class, fn (App $a) => new MemberService(
     $a->get(Database::class),
     $a->get(AuditService::class),
     $a->get(Validator::class),
-    $a->get(PluginManager::class)
+    $a->get(PluginManager::class),
+    $a->get(TreasuryService::class)
 ));
 $app->bind(PaymentService::class, fn (App $a) => new PaymentService(
     $a->get(Database::class),

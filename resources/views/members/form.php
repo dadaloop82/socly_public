@@ -878,8 +878,8 @@ $paymentExtraHtml = $buildProfileFieldsHtml($paymentExtraFields);
             <div>
                 <label><?= e(__('payments.type')) ?></label>
                 <select name="type">
+                    <option value="membership" selected><?= e(__('payments.membership')) ?></option>
                     <option value="debt"><?= e(__('payments.debt')) ?></option>
-                    <option value="membership"><?= e(__('payments.membership')) ?></option>
                     <option value="adjustment"><?= e(__('payments.adjustment')) ?></option>
                 </select>
             </div>

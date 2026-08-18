@@ -38,12 +38,18 @@ function appConfirm(message, options = {}) {
   const cancelLabel = options.cancelLabel || labels.cancel;
   const danger = !!options.danger;
 
-  if (textEl) textEl.textContent = String(message || '').trim();
+  if (textEl) {
+    textEl.textContent = String(message || '').trim();
+    textEl.style.whiteSpace = 'pre-line';
+  }
   if (okBtn) {
     okBtn.textContent = confirmLabel;
     okBtn.className = danger ? 'btn btn-danger' : 'btn';
   }
-  if (cancelBtn) cancelBtn.textContent = cancelLabel;
+  if (cancelBtn) {
+    cancelBtn.textContent = cancelLabel;
+    cancelBtn.hidden = !!options.alert;
+  }
 
   return new Promise((resolve) => {
     let settled = false;
@@ -127,9 +133,13 @@ document.addEventListener('DOMContentLoaded', () => {
   initPasswordGenerators(document);
   initFieldsSortable(document);
   initComponentCards(document);
+  initDemoLoginNotice();
   initDocumentUpload(document);
   initDocumentRowLinks(document);
-  document.querySelectorAll('[data-org-person-form]').forEach((form) => initFiscalCodeAuto(form));
+  document.querySelectorAll('[data-org-person-form]').forEach((form) => {
+    initPlaceSuggest(form);
+    initFiscalCodeAuto(form);
+  });
   initDeadlineCategory(document);
   initTreasuryCategory(document);
   initLeaveGuards(document);
@@ -3902,19 +3912,105 @@ function geoScopeFor(cityInput) {
     || document;
 }
 
+function geoConfirmMessage(template, suggestion) {
+  const label = String(suggestion || '').trim();
+  const tpl = String(template || 'Intendevi :suggestion?');
+  return tpl.replaceAll(':suggestion', label);
+}
+
+function geoConfirmLabelsFromBody() {
+  return {
+    yes: document.body?.dataset?.msgGeoConfirmYes || 'Sì, usa questo',
+    no: document.body?.dataset?.msgGeoConfirmNo || 'No, lascio così',
+  };
+}
+
+async function resolveGeoQuery(url, params) {
+  const qs = new URLSearchParams({ resolve: '1', ...params });
+  const res = await fetch(`${url}?${qs.toString()}`);
+  if (!res.ok) return null;
+  return res.json().catch(() => null);
+}
+
+function geoCityNotFoundMessage(template, city) {
+  const label = String(city || '').trim();
+  const tpl = String(template || 'La città ":city" non è stata trovata.');
+  return tpl.replaceAll(':city', label);
+}
+
+function clearGeoCityError(input) {
+  if (!input) return;
+  input.classList.remove('input-invalid');
+  input.setCustomValidity('');
+}
+
+async function showGeoCityNotFound(input, template) {
+  if (!input) return;
+  const message = geoCityNotFoundMessage(template, input.value.trim());
+  input.dataset.geoPicked = '0';
+  input.classList.add('input-invalid');
+  input.setCustomValidity(message);
+  const okLabel = document.body?.dataset?.msgGeoCityNotFoundOk || 'Ok, la correggo';
+  await appConfirm(message, { alert: true, confirmLabel: okLabel });
+  input.value = '';
+  clearGeoCityError(input);
+  if (input.matches('[data-birth-place-input]')) {
+    input.closest('form')?.dispatchEvent(new Event('cf:refresh'));
+  }
+  input.focus();
+}
+
+async function handleGeoResolveResult(data, input, applyItem, confirmTemplate, options = {}) {
+  if (!data || !input || typeof applyItem !== 'function') return;
+  if (data.action === 'none') {
+    clearGeoCityError(input);
+    return;
+  }
+  if (data.action === 'not_found') {
+    await showGeoCityNotFound(input, options.notFoundTemplate);
+    return;
+  }
+  if (data.action === 'apply' && data.item) {
+    applyItem(data.item);
+    input.dataset.geoPicked = '1';
+    clearGeoCityError(input);
+    return;
+  }
+  if (data.action !== 'confirm' || !data.item) return;
+  const suggestion = data.label || data.item.label || data.item.city || data.item.address || '';
+  const labels = geoConfirmLabelsFromBody();
+  const confirmed = await appConfirm(
+    geoConfirmMessage(confirmTemplate, suggestion),
+    { confirmLabel: labels.yes, cancelLabel: labels.no }
+  );
+  if (confirmed) {
+    applyItem(data.item);
+    input.dataset.geoPicked = '1';
+    clearGeoCityError(input);
+  } else {
+    await showGeoCityNotFound(input, options.notFoundTemplate);
+  }
+}
+
 function initPlaceSuggest(root = document) {
   const urls = resolveGeoUrls(root);
   if (!urls) return;
   const { citiesUrl, addressesUrl } = urls;
   const scopeRoot = root && root.querySelectorAll ? root : document;
+  const confirmCityTpl = document.body?.dataset?.msgGeoConfirmCity || 'Intendevi :suggestion?';
+  const confirmAddressTpl = document.body?.dataset?.msgGeoConfirmAddress || 'Intendevi :suggestion?';
+  const confirmBirthTpl = document.body?.dataset?.msgGeoConfirmBirth || confirmCityTpl;
+  const cityNotFoundTpl = document.body?.dataset?.msgGeoCityNotFound || 'La città ":city" non è stata trovata.';
 
-  const birthInput = scopeRoot.querySelector?.('[data-birth-place-input]') || null;
-  if (birthInput && birthInput.dataset.suggestBound !== '1') {
+  scopeRoot.querySelectorAll('[data-birth-place-input]').forEach((birthInput) => {
+    if (birthInput.dataset.suggestBound === '1') return;
     birthInput.dataset.suggestBound = '1';
-    const birthHost = birthInput.closest('form') || scopeRoot;
+    const birthList = birthInput.closest('.suggest-wrap, .suggest-field, label, .field-block')
+      ?.querySelector('[data-birth-place-suggest]')
+      || birthInput.closest('form')?.querySelector('[data-birth-place-suggest]');
     bindSuggest({
       input: birthInput,
-      list: birthHost.querySelector('[data-birth-place-suggest]'),
+      list: birthList,
       fetchItems: async (q) => {
         const res = await fetch(`${citiesUrl}?q=${encodeURIComponent(q)}`);
         const data = await res.json();
@@ -3924,8 +4020,18 @@ function initPlaceSuggest(root = document) {
         }));
       },
       onPick: () => birthInput.closest('form')?.dispatchEvent(new Event('cf:refresh')),
+      resolve: {
+        minChars: 2,
+        run: async (raw) => {
+          const data = await resolveGeoQuery(citiesUrl, { q: raw, foreign: '1' });
+          await handleGeoResolveResult(data, birthInput, (item) => {
+            birthInput.value = item.city || item.label || raw;
+            birthInput.closest('form')?.dispatchEvent(new Event('cf:refresh'));
+          }, confirmBirthTpl, { notFoundTemplate: cityNotFoundTpl });
+        },
+      },
     });
-  }
+  });
 
   const scopes = [];
   scopeRoot.querySelectorAll('[data-city-input]').forEach((cityInput) => {
@@ -3970,10 +4076,24 @@ function initPlaceSuggest(root = document) {
           }));
         },
         onPick: () => {
-          // Keep address suggestions tied to the newly selected city.
           if (addressInput) {
             addressInput.dispatchEvent(new Event('input', { bubbles: true }));
           }
+        },
+        resolve: {
+          minChars: 2,
+          run: async (raw) => {
+            const data = await resolveGeoQuery(citiesUrl, { q: raw });
+            await handleGeoResolveResult(data, cityInput, (item) => {
+              cityInput.value = item.city || item.label || raw;
+              if (postalInput && item.cap) {
+                postalInput.value = item.cap;
+              }
+              if (addressInput) {
+                addressInput.dispatchEvent(new Event('input', { bubbles: true }));
+              }
+            }, confirmCityTpl, { notFoundTemplate: cityNotFoundTpl });
+          },
         },
       });
       cityInput.addEventListener('change', () => {
@@ -4018,7 +4138,6 @@ function initPlaceSuggest(root = document) {
                 if (houseNumberInput && item.house_number) {
                   houseNumberInput.value = item.house_number;
                 }
-                // Never overwrite the preselected city with Nominatim's city label.
                 if (postalInput && item.postal_code) postalInput.value = item.postal_code;
                 if (houseNumberInput && !item.house_number) {
                   houseNumberInput.focus();
@@ -4027,16 +4146,40 @@ function initPlaceSuggest(root = document) {
             }];
           });
         },
+        resolve: {
+          minChars: 3,
+          skipIf: () => !(pairedCity?.value?.trim() || ''),
+          run: async (raw) => {
+            const city = pairedCity?.value?.trim() || '';
+            if (!city) return;
+            const data = await resolveGeoQuery(addressesUrl, {
+              q: raw,
+              city,
+              house_number: houseNumberInput?.value?.trim() || '',
+            });
+            await handleGeoResolveResult(data, addressInput, (item) => {
+              addressInput.value = item.address || item.label || raw;
+              if (houseNumberInput && item.house_number) {
+                houseNumberInput.value = item.house_number;
+              }
+              if (postalInput && item.postal_code) {
+                postalInput.value = item.postal_code;
+              }
+            }, confirmAddressTpl);
+          },
+        },
       });
     }
   });
 }
 
-function bindSuggest({ input, list, fetchItems, minChars = 2, onPick }) {
+function bindSuggest({ input, list, fetchItems, minChars = 2, onPick, resolve = null }) {
   if (!input || !list) return;
   let active = -1;
   let items = [];
+  let pickedFromList = false;
   const field = input.closest('.suggest-field');
+  input.dataset.geoPicked = input.dataset.geoPicked || '0';
 
   const hide = () => {
     list.hidden = true;
@@ -4056,6 +4199,9 @@ function bindSuggest({ input, list, fetchItems, minChars = 2, onPick }) {
       btn.addEventListener('mousedown', (e) => {
         e.preventDefault();
         item.apply();
+        pickedFromList = true;
+        input.dataset.geoPicked = '1';
+        clearGeoCityError(input);
         hide();
         onPick?.();
       });
@@ -4080,7 +4226,12 @@ function bindSuggest({ input, list, fetchItems, minChars = 2, onPick }) {
     }
   }, 300);
 
-  input.addEventListener('input', run);
+  input.addEventListener('input', () => {
+    pickedFromList = false;
+    input.dataset.geoPicked = '0';
+    clearGeoCityError(input);
+    run();
+  });
   input.addEventListener('keydown', (e) => {
     if (list.hidden) return;
     const buttons = [...list.querySelectorAll('button')];
@@ -4095,13 +4246,30 @@ function bindSuggest({ input, list, fetchItems, minChars = 2, onPick }) {
     } else if (e.key === 'Enter' && active >= 0 && items[active]) {
       e.preventDefault();
       items[active].apply();
+      pickedFromList = true;
+      input.dataset.geoPicked = '1';
+      clearGeoCityError(input);
       hide();
       onPick?.();
     } else if (e.key === 'Escape') {
       hide();
     }
   });
-  input.addEventListener('blur', () => setTimeout(hide, 150));
+  input.addEventListener('blur', () => {
+    setTimeout(async () => {
+      hide();
+      if (pickedFromList || input.dataset.geoPicked === '1' || !resolve) return;
+      const raw = input.value.trim();
+      const resolveMin = resolve.minChars ?? minChars;
+      if (raw.length < resolveMin) return;
+      if (typeof resolve.skipIf === 'function' && resolve.skipIf(raw)) return;
+      try {
+        await resolve.run(raw);
+      } catch (err) {
+        /* ignore resolve errors on blur */
+      }
+    }, 180);
+  });
 }
 
 function initFiscalCodeAuto(form) {
@@ -4350,6 +4518,67 @@ function initDeadlineCategory(root = document) {
   });
 }
 
+function formatTreasuryConfirmMessage(form, template) {
+  const direction = form.querySelector('[data-treasury-direction]');
+  const categorySelect = form.querySelector('[data-treasury-category]');
+  const newCategoryInput = form.querySelector('[data-treasury-new-category-input]');
+  const amountRaw = String(form.querySelector('[name="amount"]')?.value || '').trim();
+  const dateRaw = String(form.querySelector('[name="movement_date"]')?.value || '').trim();
+
+  const directionLabel = direction?.selectedOptions?.[0]?.textContent?.trim() || '—';
+  let categoryLabel = '—';
+  if (categorySelect?.value === '__new__') {
+    categoryLabel = String(newCategoryInput?.value || '').trim() || '—';
+  } else {
+    categoryLabel = categorySelect?.selectedOptions?.[0]?.textContent?.trim() || '—';
+  }
+
+  let amountLabel = amountRaw;
+  const amountNum = Number(amountRaw.replace(',', '.'));
+  if (Number.isFinite(amountNum)) {
+    amountLabel = amountNum.toLocaleString('it-IT', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  }
+
+  let dateLabel = dateRaw;
+  if (/^\d{4}-\d{2}-\d{2}$/.test(dateRaw)) {
+    const [y, m, d] = dateRaw.split('-');
+    dateLabel = `${d}/${m}/${y}`;
+  }
+
+  const tpl = String(template || '').trim();
+  if (!tpl) {
+    return [
+      'Confermi il movimento?',
+      '',
+      `Tipo: ${directionLabel}`,
+      `Importo: ${amountLabel}`,
+      `Data: ${dateLabel}`,
+      `Categoria: ${categoryLabel}`,
+    ].join('\n');
+  }
+
+  return tpl
+    .replace(':type', directionLabel)
+    .replace(':amount', amountLabel)
+    .replace(':date', dateLabel)
+    .replace(':category', categoryLabel);
+}
+
+function initDemoLoginNotice() {
+  const body = document.body;
+  if (!body || body.dataset.demoLoginShown === '1' || body.dataset.demoLoginNotice !== '1') {
+    return;
+  }
+  body.dataset.demoLoginShown = '1';
+  const tpl = body.dataset.demoLoginNoticeText || '';
+  const expires = body.dataset.demoExpires || '';
+  const message = tpl.replaceAll(':expires', expires).trim();
+  const okLabel = body.dataset.demoLoginNoticeOk || 'Ho capito';
+  window.setTimeout(() => {
+    appConfirm(message, { alert: true, confirmLabel: okLabel });
+  }, 120);
+}
+
 function initTreasuryCategory(root = document) {
   root.querySelectorAll('[data-treasury-form]').forEach((form) => {
     const categorySelect = form.querySelector('[data-treasury-category]');
@@ -4415,15 +4644,17 @@ function initTreasuryCategory(root = document) {
         return;
       }
       event.preventDefault();
-      const directionLabel = direction?.selectedOptions?.[0]?.textContent?.trim() || '';
-      const amount = form.querySelector('[name="amount"]')?.value || '';
-      const date = form.querySelector('[name="movement_date"]')?.value || '';
-      const category = categorySelect.selectedOptions?.[0]?.textContent?.trim() || '';
-      const message = template
-        .replace(':type', directionLabel)
-        .replace(':amount', amount)
-        .replace(':date', date)
-        .replace(':category', category);
+
+      const pdfInput = form.querySelector('input[name="invoice_pdf"]');
+      const pdfFile = pdfInput?.files?.[0];
+      const maxBytes = Number(form.dataset.maxUploadBytes || bodyMaxUploadBytes() || 0);
+      const tooLargeMsg = form.dataset.msgUploadTooLarge || 'File troppo grande.';
+      if (pdfFile && maxBytes > 0 && pdfFile.size > maxBytes) {
+        await appConfirm(tooLargeMsg.replace(':max', String(Math.ceil(maxBytes / (1024 * 1024)))), { alert: true });
+        return;
+      }
+
+      const message = formatTreasuryConfirmMessage(form, template);
       if (!(await appConfirm(message))) {
         return;
       }
@@ -4431,6 +4662,12 @@ function initTreasuryCategory(root = document) {
       form.requestSubmit();
     });
   });
+}
+
+function bodyMaxUploadBytes() {
+  const raw = document.body?.dataset?.maxUploadBytes || '';
+  const n = Number(raw);
+  return Number.isFinite(n) && n > 0 ? n : 0;
 }
 
 function initDocumentRowLinks(root = document) {
@@ -4601,7 +4838,10 @@ function initDocumentUpload(root = document) {
       if (!res.ok || !res.data.ok) {
         if (pathInput) pathInput.value = '';
         if (mimeInput) mimeInput.value = '';
-        const errMsg = res.data && res.data.error ? String(res.data.error) : msgFail;
+        let errMsg = res.data && res.data.error ? String(res.data.error) : msgFail;
+        if (res.status === 413) {
+          errMsg = form.getAttribute('data-msg-too-large') || errMsg;
+        }
         setState('error', file.name, errMsg);
         return;
       }

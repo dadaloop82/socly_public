@@ -58,7 +58,14 @@ $assetVer = (string) max(
 <body class="setup-body"
       data-cities-url="<?= e(url('/api/geo/cities')) ?>"
       data-addresses-url="<?= e(url('/api/geo/addresses')) ?>"
-      data-msg-city-first="<?= e(__('members.address_city_first')) ?>">
+      data-msg-city-first="<?= e(__('members.address_city_first')) ?>"
+      data-msg-geo-confirm-city="<?= e(__('members.geo_confirm_city')) ?>"
+      data-msg-geo-confirm-address="<?= e(__('members.geo_confirm_address')) ?>"
+      data-msg-geo-confirm-birth="<?= e(__('members.geo_confirm_birth')) ?>"
+      data-msg-geo-city-not-found="<?= e(__('members.geo_city_not_found')) ?>"
+      data-msg-geo-city-not-found-ok="<?= e(__('members.geo_city_not_found_ok')) ?>"
+      data-msg-geo-confirm-yes="<?= e(__('members.geo_confirm_yes')) ?>"
+      data-msg-geo-confirm-no="<?= e(__('members.geo_confirm_no')) ?>">
 <div class="setup-page">
     <main class="setup-shell">
         <?= $content ?>

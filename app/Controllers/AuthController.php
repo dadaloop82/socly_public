@@ -9,6 +9,7 @@ use Socly\Core\Validator;
 use Socly\Core\View;
 use Socly\Services\AuthService;
 use Socly\Services\SetupService;
+use Socly\Services\SettingsService;
 
 final class AuthController extends BaseController
 {
@@ -34,6 +35,7 @@ final class AuthController extends BaseController
         $this->render('auth/login', [
             'title' => __('auth.welcome_title'),
             'needsSetup' => $this->setup->allowsAnonymousSetup(),
+            'demoLoginNotice' => $this->demoLoginNotice(),
         ], 'layouts/guest');
     }
 
@@ -148,5 +150,26 @@ final class AuthController extends BaseController
         }
         $this->flash('success', __('auth.reset_success'));
         redirect('/login');
+    }
+
+    /** @return array{expires_label:string}|null */
+    private function demoLoginNotice(): ?array
+    {
+        try {
+            if (!app()->isInstalled() || !is_temporary_instance()) {
+                return null;
+            }
+            $exp = trim((string) app(SettingsService::class)->get('app.instance_expires_at', ''));
+            $label = '';
+            if ($exp !== '') {
+                $ts = strtotime($exp);
+                if ($ts !== false) {
+                    $label = date('d/m/Y H:i', $ts);
+                }
+            }
+            return ['expires_label' => $label];
+        } catch (\Throwable) {
+            return null;
+        }
     }
 }

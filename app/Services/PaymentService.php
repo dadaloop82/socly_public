@@ -65,6 +65,15 @@ final class PaymentService
                 'created_by' => auth_user()['id'] ?? null,
             ]);
             $this->db->update('members', ['balance_due' => $newBalance], 'id = :id', ['id' => $memberId]);
+            if (in_array($data['type'], ['membership', 'debt'], true)) {
+                $this->treasury->autoRegisterFromPayment(
+                    (int) $paymentId,
+                    $memberId,
+                    $amount,
+                    (string) $data['method'],
+                    date('Y-m-d')
+                );
+            }
             $this->db->commit();
         } catch (\Throwable $e) {
             $this->db->rollBack();
@@ -75,15 +84,6 @@ final class PaymentService
         $after = $this->db->fetch('SELECT * FROM members WHERE id = :id', ['id' => $memberId]);
         $this->audit->log('payment.recorded', 'payment', (string) $paymentId, $before, $after, $ip);
         $this->plugins->fire('payment.recorded', $payment);
-        if ($data['type'] === 'membership') {
-            $this->treasury->autoRegisterFromPayment(
-                (int) $paymentId,
-                $memberId,
-                $amount,
-                (string) $data['method'],
-                date('Y-m-d')
-            );
-        }
         return ['ok' => true];
     }
 }

@@ -22,16 +22,33 @@ final class ApiController extends BaseController
 
     public function cities(Request $request): void
     {
+        $query = (string) $request->input('q', '');
+        if ((string) $request->input('resolve', '') === '1') {
+            $this->json($this->geo->resolveComuneQuery(
+                $query,
+                (string) $request->input('foreign', '') === '1'
+            ));
+            return;
+        }
         $this->json([
-            'items' => $this->geo->searchComuni((string) $request->input('q', '')),
+            'items' => $this->geo->searchComuni($query),
         ]);
     }
 
     public function addresses(Request $request): void
     {
+        $query = (string) $request->input('q', '');
+        if ((string) $request->input('resolve', '') === '1') {
+            $this->json($this->geo->resolveAddressQuery(
+                $query,
+                (string) $request->input('city', ''),
+                (string) $request->input('house_number', '')
+            ));
+            return;
+        }
         $this->json([
             'items' => $this->geo->searchAddresses(
-                (string) $request->input('q', ''),
+                $query,
                 (string) $request->input('city', '')
             ),
         ]);

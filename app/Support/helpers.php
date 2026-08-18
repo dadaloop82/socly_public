@@ -259,6 +259,37 @@ if (!function_exists('component_enabled')) {
     }
 }
 
+if (!function_exists('upload_limit_bytes')) {
+    function upload_limit_bytes(): int
+    {
+        try {
+            if (app()->isInstalled()) {
+                return app(\Socly\Services\DocumentService::class)->uploadLimitBytes();
+            }
+        } catch (\Throwable) {
+        }
+        return 25 * 1024 * 1024;
+    }
+}
+
+if (!function_exists('upload_max_mb')) {
+    function upload_max_mb(): int
+    {
+        return max(1, (int) ceil(upload_limit_bytes() / (1024 * 1024)));
+    }
+}
+
+if (!function_exists('upload_post_too_large')) {
+    function upload_post_too_large(): bool
+    {
+        $length = (int) ($_SERVER['CONTENT_LENGTH'] ?? 0);
+        if ($length < 1) {
+            return false;
+        }
+        return $length > upload_limit_bytes();
+    }
+}
+
 if (!function_exists('require_component')) {
     function require_component(string $key): void
     {

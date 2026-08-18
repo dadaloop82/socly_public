@@ -503,12 +503,6 @@ final class TreasuryService
             'm.payment_method LIKE :like_method',
         ];
 
-        $boolean = $this->toBooleanFulltext($query);
-        if ($boolean !== '') {
-            $params['ft'] = $boolean;
-            $parts[] = 'MATCH(m.description, m.category, m.payment_method) AGAINST (:ft IN BOOLEAN MODE)';
-        }
-
         $needle = mb_strtolower($query);
         $catKeys = [];
         foreach ($this->categoryOptions() as $opt) {

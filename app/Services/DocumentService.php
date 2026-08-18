@@ -622,7 +622,7 @@ final class DocumentService
 
     private function uploadMaxBytes(): int
     {
-        $appCap = 10 * 1024 * 1024;
+        $appCap = 25 * 1024 * 1024;
         $ini = min(
             $this->parseIniBytes((string) ini_get('upload_max_filesize')),
             $this->parseIniBytes((string) ini_get('post_max_size'))
@@ -633,6 +633,11 @@ final class DocumentService
     public function uploadMaxMb(): int
     {
         return max(1, (int) ceil($this->uploadMaxBytes() / (1024 * 1024)));
+    }
+
+    public function uploadLimitBytes(): int
+    {
+        return $this->uploadMaxBytes();
     }
 
     private function parseIniBytes(string $value): int

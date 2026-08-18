@@ -30,7 +30,9 @@ $movementId = (int) ($movement['id'] ?? 0);
 </div>
 
 <form class="panel" method="post" action="<?= e(url('/treasury/' . $movementId)) ?>" enctype="multipart/form-data"
-      data-treasury-form data-leave-guard data-confirm-template="<?= e(__('treasury.confirm_summary')) ?>">
+      data-treasury-form data-leave-guard data-confirm-template="<?= e(__('treasury.confirm_summary')) ?>"
+      data-max-upload-bytes="<?= (int) upload_limit_bytes() ?>"
+      data-msg-upload-too-large="<?= e(__('documents.upload_too_large', ['max' => upload_max_mb()])) ?>">
     <?= csrf_field() ?>
     <div class="panel-header">
         <div>
