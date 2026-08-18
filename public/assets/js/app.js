@@ -1492,11 +1492,14 @@ function initMemberLeaveGuard(form) {
   const yesBtn = dialog?.querySelector('[data-member-leave-yes]');
   const noBtn = dialog?.querySelector('[data-member-leave-no]');
   let dirty = false;
+  let ready = false;
   let allowLeave = false;
   let pendingHref = '';
 
+  window.setTimeout(() => { ready = true; }, 400);
+
   const markDirty = () => {
-    dirty = true;
+    if (ready) dirty = true;
   };
 
   form.addEventListener('input', markDirty, true);
@@ -1524,7 +1527,7 @@ function initMemberLeaveGuard(form) {
 
   document.querySelectorAll('[data-member-leave]').forEach((link) => {
     link.addEventListener('click', (e) => {
-      if (allowLeave) return;
+      if (allowLeave || !dirty) return;
       e.preventDefault();
       askLeave(link.getAttribute('href') || '');
     });
@@ -1532,7 +1535,7 @@ function initMemberLeaveGuard(form) {
 
   // Also catch sidebar / other in-app links while the form is open.
   document.addEventListener('click', (e) => {
-    if (allowLeave) return;
+    if (allowLeave || !dirty) return;
     const link = e.target.closest?.('a[href]');
     if (!link) return;
     if (link.matches('[data-member-leave]')) return; // handled above
@@ -1572,12 +1575,6 @@ function initMemberLeaveGuard(form) {
     pendingHref = '';
     dialog.close();
   });
-
-  window.addEventListener('beforeunload', (e) => {
-    if (!dirty || allowLeave) return;
-    e.preventDefault();
-    e.returnValue = '';
-  });
 }
 
 function initLeaveGuards(scope = document) {
@@ -1585,21 +1582,17 @@ function initLeaveGuards(scope = document) {
     if (form.dataset.leaveGuardBound === '1' || form.hasAttribute('data-member-leave-guard')) return;
     form.dataset.leaveGuardBound = '1';
 
-    const initial = new FormData(form);
-    const initialState = [...initial.entries()].map(([key, value]) => [
-      key,
-      value instanceof File ? `${value.name}:${value.size}:${value.lastModified}` : String(value),
-    ]);
+    let dirty = false;
+    let ready = false;
     let allowLeave = false;
     let pendingHref = '';
-
-    const isDirty = () => {
-      const current = [...new FormData(form).entries()].map(([key, value]) => [
-        key,
-        value instanceof File ? `${value.name}:${value.size}:${value.lastModified}` : String(value),
-      ]);
-      return JSON.stringify(current) !== JSON.stringify(initialState);
+    window.setTimeout(() => { ready = true; }, 400);
+    const markDirty = () => {
+      if (ready) dirty = true;
     };
+    form.addEventListener('input', markDirty, true);
+    form.addEventListener('change', markDirty, true);
+    const isDirty = () => dirty;
 
     const labels = {
       it: {
@@ -1679,11 +1672,6 @@ function initLeaveGuards(scope = document) {
     dialog.addEventListener('cancel', (event) => {
       event.preventDefault();
       dialog.close();
-    });
-    window.addEventListener('beforeunload', (event) => {
-      if (allowLeave || !isDirty()) return;
-      event.preventDefault();
-      event.returnValue = '';
     });
   });
 }
