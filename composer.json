@@ -16,7 +16,8 @@
             "Socly\\": "app/"
         },
         "files": [
-            "app/Support/helpers.php"
+            "app/Support/helpers.php",
+            "app/Support/legal_samples.php"
         ]
     },
     "config": {

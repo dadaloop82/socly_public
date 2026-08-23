@@ -4383,6 +4383,12 @@ button.setup-scrape-logo-frame:focus-visible .setup-scrape-logo-overlay {
 .setup-defer-link:hover {
   color: var(--brand-accent);
 }
+.setup-period-label {
+  margin: 0 0 0.5rem;
+  font-size: 0.92rem;
+  font-weight: 700;
+}
+.setup-logo-filename {
   display: none !important;
 }
 .setup-logo-upload-progress {

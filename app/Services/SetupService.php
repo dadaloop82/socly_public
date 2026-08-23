@@ -324,11 +324,12 @@ final class SetupService
             }
             return [
                 'types' => $types,
-                'name_it' => '',
-                'name_de' => '',
-                'name_en' => '',
-                'price' => '',
+                'name_it' => $types === [] ? 'Ordinaria' : '',
+                'name_de' => $types === [] ? 'Ordentlich' : '',
+                'name_en' => $types === [] ? 'Ordinary' : '',
+                'price' => $types === [] ? '0' : '',
                 'is_active' => true,
+                'single_type' => count($types) === 1,
             ];
         }
 
@@ -471,7 +472,12 @@ final class SetupService
 
         if (in_array($step['key'] ?? '', ['legal.privacy', 'legal.statute'], true)) {
             $raw = $this->settings->get((string) $step['settings_key'], '');
-            return localized(is_string($raw) ? $raw : (is_array($raw) ? $raw : ''));
+            $text = localized(is_string($raw) ? $raw : (is_array($raw) ? $raw : ''));
+            if (($step['key'] ?? '') === 'legal.privacy' && trim($text) === '' && $this->isGdprEnabled()) {
+                return privacy_sample_draft();
+            }
+
+            return $text;
         }
         if ($type === 'checkbox') {
             $default = (($step['key'] ?? '') === 'gdpr.enabled') ? '1' : '0';
@@ -1580,10 +1586,15 @@ final class SetupService
                 'de' => $nameDe !== '' ? $nameDe : $nameIt,
                 'en' => $nameEn !== '' ? $nameEn : $nameIt,
             ];
+            $allTypes = $this->members->types(false);
+            $isActive = !empty($row['is_active']) ? 1 : 0;
+            if (count($allTypes) === 1) {
+                $isActive = 1;
+            }
             $this->db->update('member_types', [
                 'name_json' => json_encode($names, JSON_UNESCAPED_UNICODE),
                 'price' => (float) $priceRaw,
-                'is_active' => !empty($row['is_active']) ? 1 : 0,
+                'is_active' => $isActive,
             ], 'id = :id', ['id' => $id]);
         }
 
@@ -1605,13 +1616,18 @@ final class SetupService
             $this->db->insert('member_types', [
                 'name_json' => json_encode($names, JSON_UNESCAPED_UNICODE),
                 'price' => (float) $priceRaw,
-                'is_active' => !empty($input['is_active']) ? 1 : 0,
+                'is_active' => 1,
                 'sort_order' => count($this->members->types(false)),
             ]);
         }
 
         if (count($this->members->types(false)) === 0) {
             return ['ok' => false, 'errors' => ['types' => __('setup.validation_need_type')]];
+        }
+
+        $allTypes = $this->members->types(false);
+        if (count($allTypes) === 1 && empty($allTypes[0]['is_active'])) {
+            $this->db->update('member_types', ['is_active' => 1], 'id = :id', ['id' => (int) $allTypes[0]['id']]);
         }
 
         $this->settings->set('membership.types_configured', '1');
@@ -1641,9 +1657,10 @@ final class SetupService
             $label = trim((string) ($row['label'] ?? ''));
             $starts = trim((string) ($row['starts_on'] ?? ''));
             $ends = trim((string) ($row['ends_on'] ?? ''));
-            if ($label === '' || !$this->isValidDate($starts) || !$this->isValidDate($ends) || $ends < $starts) {
+            if ($starts === '' || !$this->isValidDate($starts) || !$this->isValidDate($ends) || $ends < $starts) {
                 return ['ok' => false, 'errors' => ['periods' => __('validation.date')]];
             }
+            $label = $this->members->autoPeriodLabel($starts, $ends);
             if (!empty($row['is_current'])) {
                 $currentId = $id;
             }
@@ -1655,10 +1672,9 @@ final class SetupService
             ], 'id = :id', ['id' => $id]);
         }
 
-        $label = trim((string) ($input['label'] ?? ''));
         $starts = trim((string) ($input['starts_on'] ?? ''));
         $ends = trim((string) ($input['ends_on'] ?? ''));
-        $adding = $label !== '';
+        $adding = $starts !== '' && $ends !== '';
         $newId = 0;
 
         if ($adding) {
@@ -1666,15 +1682,16 @@ final class SetupService
                 return ['ok' => false, 'errors' => ['starts_on' => __('validation.date')]];
             }
             if ($ends < $starts) {
-                return ['ok' => false, 'errors' => ['ends_on' => __('validation.date')]];
+                return ['ok' => false, 'errors' => ['ends_on' => __('validation.period_end_before_start')]];
             }
+            $label = $this->members->autoPeriodLabel($starts, $ends);
             $newId = $this->db->insert('membership_periods', [
                 'label' => $label,
                 'starts_on' => $starts,
                 'ends_on' => $ends,
                 'is_current' => 0,
             ]);
-            if (!empty($input['is_current'])) {
+            if (!empty($input['is_current']) || count($this->members->periods()) === 1) {
                 $currentId = (int) $newId;
             }
         }

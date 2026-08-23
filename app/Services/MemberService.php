@@ -539,7 +539,58 @@ final class MemberService
 
     public function currentPeriod(): ?array
     {
+        $this->ensureMembershipPeriodRollover();
+
         return $this->db->fetch('SELECT * FROM membership_periods WHERE is_current = 1 LIMIT 1');
+    }
+
+    /** When the current period has ended, open the next window automatically (same duration, +1 year). */
+    public function ensureMembershipPeriodRollover(): void
+    {
+        $current = $this->db->fetch('SELECT * FROM membership_periods WHERE is_current = 1 LIMIT 1');
+        if (!$current) {
+            return;
+        }
+        $ends = (string) ($current['ends_on'] ?? '');
+        if ($ends === '' || $ends >= date('Y-m-d')) {
+            return;
+        }
+        $starts = (string) ($current['starts_on'] ?? '');
+        if ($starts === '' || !$this->isValidPeriodDate($starts) || !$this->isValidPeriodDate($ends)) {
+            return;
+        }
+
+        $nextStarts = date('Y-m-d', strtotime($starts . ' +1 year'));
+        $nextEnds = date('Y-m-d', strtotime($ends . ' +1 year'));
+        if (!$this->isValidPeriodDate($nextStarts) || !$this->isValidPeriodDate($nextEnds)) {
+            return;
+        }
+
+        $this->db->query('UPDATE membership_periods SET is_current = 0');
+        $this->db->insert('membership_periods', [
+            'label' => $this->autoPeriodLabel($nextStarts, $nextEnds),
+            'starts_on' => $nextStarts,
+            'ends_on' => $nextEnds,
+            'is_current' => 1,
+        ]);
+    }
+
+    public function autoPeriodLabel(string $starts, string $ends): string
+    {
+        $ts1 = strtotime($starts);
+        $ts2 = strtotime($ends);
+        if ($ts1 === false || $ts2 === false) {
+            return trim($starts);
+        }
+        $y1 = date('Y', $ts1);
+        $y2 = date('Y', $ts2);
+
+        return $y1 === $y2 ? $y1 : $y1 . '/' . $y2;
+    }
+
+    private function isValidPeriodDate(string $date): bool
+    {
+        return (bool) preg_match('/^\d{4}-\d{2}-\d{2}$/', $date);
     }
 
     /**

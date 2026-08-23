@@ -845,6 +845,8 @@ function initSetupWizard() {
     initGeoSubmitValidation(setupForm);
   }
   initSetupPeopleList(root);
+  initSetupMemberTypes(root);
+  initSetupMembershipPeriods(root);
   initSetupWebsiteScrape(root);
   initSetupRuntsLookup(root);
   initSetupBrandingPalettes(root);
@@ -4076,6 +4078,89 @@ function initSetupWebsiteScrape(root) {
 
 function initSetupPeopleList(root) {
   root.querySelectorAll('[data-people-list]').forEach((list) => initPeopleList(list));
+}
+
+const MEMBER_TYPE_I18N = {
+  ordinaria: { de: 'Ordentlich', en: 'Ordinary' },
+  ordinario: { de: 'Ordentlich', en: 'Ordinary' },
+  sostenitore: { de: 'Fördernd', en: 'Supporting' },
+  sostenitrice: { de: 'Fördernd', en: 'Supporting' },
+  onorario: { de: 'Ehrenmitglied', en: 'Honorary' },
+  onoraria: { de: 'Ehrenmitglied', en: 'Honorary' },
+  fondatore: { de: 'Gründungsmitglied', en: 'Founding member' },
+  fondatrice: { de: 'Gründungsmitglied', en: 'Founding member' },
+  junior: { de: 'Junior', en: 'Junior' },
+  familiare: { de: 'Familienmitglied', en: 'Family member' },
+};
+
+function suggestMemberTypeTranslations(nameIt) {
+  const key = String(nameIt || '').trim().toLowerCase();
+  if (!key) return null;
+  if (MEMBER_TYPE_I18N[key]) return MEMBER_TYPE_I18N[key];
+  const normalized = key.normalize('NFD').replace(/\p{M}/gu, '');
+  if (MEMBER_TYPE_I18N[normalized]) return MEMBER_TYPE_I18N[normalized];
+  return { de: nameIt.trim(), en: nameIt.trim() };
+}
+
+function initSetupMemberTypes(root = document) {
+  root.querySelectorAll('[data-setup-member-types]').forEach((block) => {
+    if (block.dataset.memberTypesBound === '1') return;
+    block.dataset.memberTypesBound = '1';
+
+    block.querySelectorAll('[data-type-name-it]').forEach((itInput) => {
+      if (itInput.dataset.typeI18nBound === '1') return;
+      itInput.dataset.typeI18nBound = '1';
+      const row = itInput.closest('.setup-membership-card, .setup-langs-row, [data-setup-member-types]');
+      const deInput = row?.querySelector('[data-type-name-de]');
+      const enInput = row?.querySelector('[data-type-name-en]');
+      if (!deInput || !enInput) return;
+
+      itInput.addEventListener('blur', () => {
+        const value = itInput.value.trim();
+        if (!value) return;
+        const touched = (deInput.dataset.userTouched === '1' && deInput.value.trim() !== '')
+          || (enInput.dataset.userTouched === '1' && enInput.value.trim() !== '');
+        if (touched) return;
+        const tr = suggestMemberTypeTranslations(value);
+        if (!tr) return;
+        if (deInput.value.trim() === '') deInput.value = tr.de;
+        if (enInput.value.trim() === '') enInput.value = tr.en;
+      });
+
+      deInput.addEventListener('input', () => { deInput.dataset.userTouched = '1'; });
+      enInput.addEventListener('input', () => { enInput.dataset.userTouched = '1'; });
+    });
+  });
+}
+
+function initSetupMembershipPeriods(root = document) {
+  const msg = document.body?.dataset?.msgPeriodEndBeforeStart
+    || 'La data di fine deve essere uguale o successiva alla data di inizio.';
+
+  root.querySelectorAll('[data-setup-membership-periods]').forEach((block) => {
+    if (block.dataset.periodsBound === '1') return;
+    block.dataset.periodsBound = '1';
+
+    const bindPair = (startInput, endInput) => {
+      if (!startInput || !endInput) return;
+      const validate = () => {
+        const start = startInput.value;
+        const end = endInput.value;
+        endInput.setCustomValidity('');
+        if (start && end && end < start) {
+          endInput.setCustomValidity(msg);
+        }
+      };
+      startInput.addEventListener('change', validate);
+      endInput.addEventListener('change', validate);
+      startInput.addEventListener('input', validate);
+      endInput.addEventListener('input', validate);
+    };
+
+    block.querySelectorAll('.setup-membership-card').forEach((card) => {
+      bindPair(card.querySelector('[data-period-start]'), card.querySelector('[data-period-end]'));
+    });
+  });
 }
 
 function initPeopleList(list) {
