@@ -107,6 +107,9 @@ final class SetupService
         }
 
         if ($type === 'smtp_config') {
+            if ($this->isStepDeferred($step)) {
+                return true;
+            }
             if ($this->mail->isOutboundDisabled()) {
                 return $this->rawStored('mail.configured', '') !== null;
             }
@@ -417,6 +420,8 @@ final class SetupService
                 $defaultFrom = $domain !== '' ? 'noreply@' . $domain : $assocEmail;
             }
 
+            $neverConfigured = $this->rawStored('mail.configured', '') === null;
+
             return [
                 'host' => $cfg['host'],
                 'port' => $cfg['port'] > 0 ? (string) $cfg['port'] : '587',
@@ -430,7 +435,7 @@ final class SetupService
                 'last_test_ok' => $cfg['last_test_ok'],
                 'last_test_at' => $cfg['last_test_at'],
                 'show_manual' => $cfg['host'] !== '' || !empty($_SESSION['_flash']['smtp_needs_manual']),
-                'outbound_disabled' => $this->mail->isOutboundDisabled(),
+                'outbound_disabled' => $neverConfigured ? true : $this->mail->isOutboundDisabled(),
             ];
         }
 

@@ -849,12 +849,12 @@ $errorStep = flash('setup_error_step');
                             'formSteps' => $formSteps,
                             'typeOptions' => $typeOptions,
                             'allowTypeEdit' => true,
+                            'setupMode' => true,
                             'autosaveUrl' => url('/setup/fields/autosave'),
                         ]) ?>
 
                         <div class="setup-membership-card setup-membership-card-new setup-fields-add">
                             <h3 class="setup-subhead"><?= e(__('settings.add_field')) ?></h3>
-                            <p class="setup-hint muted"><?= e(__('setup.fields_add_hint')) ?></p>
                             <div class="setup-equal-row">
                                 <label class="setup-field setup-field-grow">
                                     <span><?= e(__('setup.fields_new_label')) ?></span>
@@ -921,8 +921,8 @@ $errorStep = flash('setup_error_step');
                         <div class="setup-smtp-fields" data-smtp-fields <?= $mailSkipped ? 'hidden' : '' ?>>
                             <div class="setup-smtp-section">
                                 <p class="setup-hint muted"><?= e(__('setup.mail_simple_hint')) ?></p>
-                                <div class="setup-equal-row">
-                                    <label class="setup-field">
+                                <div class="setup-equal-row setup-smtp-credentials">
+                                    <label class="setup-field setup-field-grow">
                                         <span><?= e(__('mail.from_address')) ?> *</span>
                                         <input type="email" name="from_address" value="<?= e((string) ($value['from_address'] ?? '')) ?>" required autocomplete="off" placeholder="noreply@tuodominio.it" data-smtp-from>
                                         <p class="field-hint setup-field-hint" data-smtp-from-hint hidden></p>
@@ -937,10 +937,15 @@ $errorStep = flash('setup_error_step');
                                         'hint_attrs' => 'data-smtp-password-hint',
                                     ]) ?>
                                 </div>
-                                <div class="setup-smtp-actions" data-smtp-simple-actions <?= $showManual ? 'hidden' : '' ?>>
-                                    <button type="button" class="btn btn-ghost" data-smtp-discover-btn><?= e(__('setup.mail_discover_btn')) ?></button>
+                                <div class="setup-smtp-discover-row" data-smtp-discover-row>
+                                    <button type="button" class="btn setup-scrape-btn" data-smtp-discover-btn>
+                                        <span data-smtp-discover-label><?= e(__('setup.mail_discover_btn')) ?></span>
+                                    </button>
                                 </div>
-                                <p class="setup-hint muted" data-smtp-discover-status hidden></p>
+                                <div class="setup-smtp-live" data-smtp-live hidden>
+                                    <div class="setup-scrape-spinner" aria-hidden="true"></div>
+                                    <p class="setup-hint muted setup-smtp-live-status" data-smtp-discover-status hidden></p>
+                                </div>
                             </div>
 
                             <div class="setup-smtp-manual" data-smtp-manual <?= $showManual ? '' : 'hidden' ?>>
@@ -1133,7 +1138,7 @@ $errorStep = flash('setup_error_step');
                     </div>
                 <?php endif; ?>
 
-                <?php if (in_array($stepType, ['president', 'people_list', 'textarea'], true)): ?>
+                <?php if (in_array($stepType, ['president', 'people_list', 'textarea', 'smtp_config'], true)): ?>
                     <p class="setup-defer-wrap" data-setup-line>
                         <button type="button" class="setup-defer-link" data-setup-defer-step><?= e(__('setup.defer_step')) ?></button>
                     </p>

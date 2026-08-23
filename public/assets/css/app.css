@@ -3374,6 +3374,49 @@ html:has(.setup-body) {
   padding-top: 0.25rem;
   border-top: 1px solid color-mix(in srgb, var(--ink) 8%, transparent);
 }
+.setup-smtp-discover-row {
+  margin-top: 0.25rem;
+}
+.setup-smtp-discover-row .setup-scrape-btn {
+  width: 100%;
+  min-height: 2.85rem;
+}
+.setup-smtp-live {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 0.85rem;
+  align-items: center;
+  padding: 0.85rem 0.95rem;
+  border-radius: 14px;
+  background: color-mix(in srgb, white 72%, var(--brand-paper));
+  border: 1px solid color-mix(in srgb, var(--brand-primary) 18%, var(--line));
+}
+.setup-smtp-live[hidden] { display: none !important; }
+.setup-smtp-live-status { margin: 0; }
+.setup-smtp.is-smtp-busy .setup-scrape-btn {
+  opacity: 0.55;
+  cursor: wait;
+  pointer-events: none;
+}
+[data-setup-wizard].is-smtp-busy .setup-form input:not([data-smtp-from]):not([data-smtp-password]),
+[data-setup-wizard].is-smtp-busy .setup-form select,
+[data-setup-wizard].is-smtp-busy .setup-form textarea,
+[data-setup-wizard].is-smtp-busy .setup-form button:not([data-smtp-discover-btn]):not([data-smtp-verify-btn]) {
+  pointer-events: none;
+  opacity: 0.55;
+}
+.setup-fields-editor-compact .setup-fields-editor-meta > div {
+  display: grid;
+  gap: 0.35rem;
+}
+.setup-fields-editor-compact .setup-fields-step {
+  border: none;
+  padding: 0;
+  background: transparent;
+}
+.setup-fields-editor-compact .setup-fields-table-wrap {
+  margin-top: 0;
+}
 .setup-meta {
   color: var(--muted);
   font-size: 0.86rem;

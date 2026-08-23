@@ -6,16 +6,28 @@
  * @var list<array<string,mixed>> $formSteps
  * @var list<string> $typeOptions
  * @var bool $allowTypeEdit
+ * @var bool $setupMode
  * @var string $autosaveUrl
  */
 $fields = is_array($fields ?? null) ? $fields : [];
 $formSteps = is_array($formSteps ?? null) ? $formSteps : [];
 $typeOptions = is_array($typeOptions ?? null) ? $typeOptions : \Socly\Support\MemberFieldTypes::keys();
 $allowTypeEdit = !isset($allowTypeEdit) || (bool) $allowTypeEdit;
+$setupMode = !empty($setupMode);
 $autosaveUrl = trim((string) ($autosaveUrl ?? ''));
 
 $members = app(\Socly\Services\MemberService::class);
 $editorSteps = $members->editorFormSteps($formSteps);
+if ($setupMode) {
+    $editorSteps = array_values(array_filter(
+        $editorSteps,
+        static fn (array $step): bool => empty($step['is_system'])
+    ));
+}
+$isSetupToggleableField = static function (string $key) use ($members): bool {
+    return !\Socly\Support\MemberFieldTypes::isCoreArchiveField($key)
+        && !$members->isSystemLockedFieldKey($key);
+};
 $placeholders = $members->systemStepPlaceholders();
 $defaultStepKey = (string) ($editorSteps[0]['key'] ?? 'profile');
 
@@ -50,7 +62,8 @@ $renderFieldRow = static function (
     bool $allowTypeEdit,
     array $typeOptions,
     string $dragIcon,
-    bool $locked
+    bool $locked,
+    bool $setupMode = false
 ) use ($members): void {
     $fkey = (string) ($field['key'] ?? '');
     $flabel = localized($field['label_json'] ?? '');
@@ -81,6 +94,7 @@ $renderFieldRow = static function (
             <input type="hidden" name="field_step[<?= e($fkey) ?>]" value="<?= e($stepKey) ?>" data-field-step-input>
         </td>
         <th scope="row"><span class="setup-fields-name"><?= e($flabel) ?></span></th>
+        <?php if (!$setupMode): ?>
         <td>
             <?php if (!$allowTypeEdit || $lockedType !== null): ?>
                 <input type="hidden" name="field_types[<?= e($fkey) ?>]" value="<?= e($lockedType ?? $resolvedType) ?>">
@@ -97,6 +111,9 @@ $renderFieldRow = static function (
                 </label>
             <?php endif; ?>
         </td>
+        <?php else: ?>
+            <input type="hidden" name="field_types[<?= e($fkey) ?>]" value="<?= e($lockedType ?? $resolvedType) ?>">
+        <?php endif; ?>
         <td class="setup-fields-col-check">
             <?php if ($coreLocked): ?>
                 <input type="hidden" name="fields[]" value="<?= e($fkey) ?>">
@@ -133,8 +150,9 @@ foreach ($editorSteps as $s) {
 }
 ?>
 <div
-    class="setup-fields-editor"
+    class="setup-fields-editor<?= $setupMode ? ' setup-fields-editor-compact' : '' ?>"
     data-fields-editor
+    <?= $setupMode ? 'data-fields-setup-mode="1"' : '' ?>
     data-step-prefix="step_"
     data-autosave-url="<?= e($autosaveUrl) ?>"
     data-csrf="<?= e(csrf_token()) ?>"
@@ -151,9 +169,13 @@ foreach ($editorSteps as $s) {
 >
     <div class="setup-fields-editor-meta">
         <div>
-            <p class="setup-hint muted"><?= e(__('setup.fields_reorder_hint')) ?></p>
-            <p class="setup-hint muted"><?= e(__('setup.fields_steps_hint')) ?></p>
-            <p class="setup-hint muted"><?= e(__('setup.fields_autosave_hint')) ?></p>
+            <?php if ($setupMode): ?>
+                <p class="setup-hint muted"><?= e(__('setup.fields_setup_hint')) ?></p>
+            <?php else: ?>
+                <p class="setup-hint muted"><?= e(__('setup.fields_reorder_hint')) ?></p>
+                <p class="setup-hint muted"><?= e(__('setup.fields_steps_hint')) ?></p>
+                <p class="setup-hint muted"><?= e(__('setup.fields_autosave_hint')) ?></p>
+            <?php endif; ?>
         </div>
         <p class="setup-fields-autosave-status muted" data-fields-autosave-status aria-live="polite"></p>
     </div>
@@ -185,7 +207,7 @@ foreach ($editorSteps as $s) {
                 data-step-key="<?= e($stepKey) ?>"
                 <?= $isSystem ? 'data-fields-step-system="1"' : '' ?>
             >
-                <header class="setup-fields-step-head">
+                <header class="setup-fields-step-head"<?= $setupMode ? ' hidden' : '' ?>>
                     <div class="setup-fields-step-badge">
                         <span class="setup-fields-step-index" data-step-index><?= (int) $stepIndex + 1 ?></span>
                         <strong class="setup-fields-step-name" data-step-display-name><?= e($displayTitle) ?></strong>
@@ -201,20 +223,26 @@ foreach ($editorSteps as $s) {
                 </header>
                 <?php if (!$isSystem): ?>
                     <input type="hidden" name="form_steps[]" value="<?= e($stepKey) ?>" data-step-key-input>
-                    <div class="setup-fields-step-titles">
-                        <label class="setup-field">
-                            <span><?= e(__('setup.fields_step_title_it')) ?></span>
-                            <input type="text" name="form_step_title_it[<?= e($stepKey) ?>]" value="<?= e($titleIt) ?>" data-step-title="it" required>
-                        </label>
-                        <label class="setup-field">
-                            <span><?= e(__('setup.fields_step_title_de')) ?></span>
-                            <input type="text" name="form_step_title_de[<?= e($stepKey) ?>]" value="<?= e($titleDe) ?>" data-step-title="de">
-                        </label>
-                        <label class="setup-field">
-                            <span><?= e(__('setup.fields_step_title_en')) ?></span>
-                            <input type="text" name="form_step_title_en[<?= e($stepKey) ?>]" value="<?= e($titleEn) ?>" data-step-title="en">
-                        </label>
-                    </div>
+                    <?php if (!$setupMode): ?>
+                        <div class="setup-fields-step-titles">
+                            <label class="setup-field">
+                                <span><?= e(__('setup.fields_step_title_it')) ?></span>
+                                <input type="text" name="form_step_title_it[<?= e($stepKey) ?>]" value="<?= e($titleIt) ?>" data-step-title="it" required>
+                            </label>
+                            <label class="setup-field">
+                                <span><?= e(__('setup.fields_step_title_de')) ?></span>
+                                <input type="text" name="form_step_title_de[<?= e($stepKey) ?>]" value="<?= e($titleDe) ?>" data-step-title="de">
+                            </label>
+                            <label class="setup-field">
+                                <span><?= e(__('setup.fields_step_title_en')) ?></span>
+                                <input type="text" name="form_step_title_en[<?= e($stepKey) ?>]" value="<?= e($titleEn) ?>" data-step-title="en">
+                            </label>
+                        </div>
+                    <?php else: ?>
+                        <input type="hidden" name="form_step_title_it[<?= e($stepKey) ?>]" value="<?= e($titleIt !== '' ? $titleIt : $displayTitle) ?>" data-step-title="it">
+                        <input type="hidden" name="form_step_title_de[<?= e($stepKey) ?>]" value="<?= e($titleDe) ?>">
+                        <input type="hidden" name="form_step_title_en[<?= e($stepKey) ?>]" value="<?= e($titleEn) ?>">
+                    <?php endif; ?>
                 <?php endif; ?>
                 <div class="setup-fields-table-wrap">
                     <table class="setup-fields-table" data-fields-sortable>
@@ -222,38 +250,51 @@ foreach ($editorSteps as $s) {
                             <tr>
                                 <th scope="col" class="setup-fields-col-drag"><span class="visually-hidden"><?= e(__('setup.fields_col_order')) ?></span></th>
                                 <th scope="col"><?= e(__('setup.fields_col_name')) ?></th>
-                                <th scope="col"><?= e(__('setup.fields_col_type')) ?></th>
+                                <?php if (!$setupMode): ?>
+                                    <th scope="col"><?= e(__('setup.fields_col_type')) ?></th>
+                                <?php endif; ?>
                                 <th scope="col" class="setup-fields-col-check"><?= e(__('setup.fields_col_enabled')) ?></th>
                                 <th scope="col" class="setup-fields-col-check"><?= e(__('setup.fields_col_required')) ?></th>
                             </tr>
                         </thead>
                         <tbody data-fields-step-body>
-                            <?php foreach ($stepPlaceholders as $ph): ?>
-                                <tr class="setup-fields-system-row" data-field-locked="1">
-                                    <td class="setup-fields-col-drag">
-                                        <span class="setup-fields-drag-locked" title="<?= e(__('setup.fields_system_locked')) ?>" aria-hidden="true">•</span>
-                                    </td>
-                                    <th scope="row"><span class="setup-fields-name"><?= e((string) $ph['label']) ?></span></th>
-                                    <td><span class="setup-fields-type-locked"><?= e(__('setup.fields_system_type')) ?></span></td>
-                                    <td class="setup-fields-col-check">—</td>
-                                    <td class="setup-fields-col-check">—</td>
-                                </tr>
-                            <?php endforeach; ?>
-                            <?php if ($stepFields === [] && $stepPlaceholders === []): ?>
+                            <?php if (!$setupMode): ?>
+                                <?php foreach ($stepPlaceholders as $ph): ?>
+                                    <tr class="setup-fields-system-row" data-field-locked="1">
+                                        <td class="setup-fields-col-drag">
+                                            <span class="setup-fields-drag-locked" title="<?= e(__('setup.fields_system_locked')) ?>" aria-hidden="true">•</span>
+                                        </td>
+                                        <th scope="row"><span class="setup-fields-name"><?= e((string) $ph['label']) ?></span></th>
+                                        <td><span class="setup-fields-type-locked"><?= e(__('setup.fields_system_type')) ?></span></td>
+                                        <td class="setup-fields-col-check">—</td>
+                                        <td class="setup-fields-col-check">—</td>
+                                    </tr>
+                                <?php endforeach; ?>
+                            <?php endif; ?>
+                            <?php
+                            $visibleStepFields = $setupMode
+                                ? array_values(array_filter(
+                                    $stepFields,
+                                    static fn (array $field): bool => $isSetupToggleableField((string) ($field['key'] ?? ''))
+                                ))
+                                : $stepFields;
+                            ?>
+                            <?php if ($visibleStepFields === [] && ($setupMode || $stepPlaceholders === [])): ?>
                                 <tr class="setup-fields-empty-row" data-fields-empty-row>
-                                    <td colspan="5" class="muted"><?= e(__('setup.fields_step_empty')) ?></td>
+                                    <td colspan="<?= $setupMode ? 4 : 5 ?>" class="muted"><?= e(__('setup.fields_step_empty')) ?></td>
                                 </tr>
                             <?php else: ?>
-                                <?php foreach ($stepFields as $field): ?>
+                                <?php foreach ($visibleStepFields as $field): ?>
                                     <?php
                                     $fkey = (string) ($field['key'] ?? '');
                                     $renderFieldRow(
                                         $field,
                                         $stepKey,
-                                        $allowTypeEdit,
+                                        $setupMode ? false : $allowTypeEdit,
                                         $typeOptions,
                                         $dragIcon,
-                                        $members->isSystemLockedFieldKey($fkey)
+                                        $members->isSystemLockedFieldKey($fkey),
+                                        $setupMode
                                     );
                                     ?>
                                 <?php endforeach; ?>
@@ -262,7 +303,7 @@ foreach ($editorSteps as $s) {
                     </table>
                 </div>
             </section>
-            <?php if (!$isSystem && $stepIndex + 1 === $customStepCount): ?>
+            <?php if (!$setupMode && !$isSystem && $stepIndex + 1 === $customStepCount): ?>
                 <div class="setup-fields-step-actions">
                     <button type="button" class="btn btn-ghost" data-fields-step-add><?= e(__('setup.fields_add_step')) ?></button>
                 </div>

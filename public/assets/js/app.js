@@ -2656,7 +2656,8 @@ function initSetupSmtp(root) {
   const skip = box.querySelector('[data-smtp-skip]');
   const skipHint = box.querySelector('[data-smtp-skip-hint]');
   const fields = box.querySelector('[data-smtp-fields]');
-  const simpleActions = box.querySelector('[data-smtp-simple-actions]');
+  const discoverRow = box.querySelector('[data-smtp-discover-row]');
+  const smtpLive = box.querySelector('[data-smtp-live]');
   const discoverBtn = box.querySelector('[data-smtp-discover-btn]');
   const verifyBtn = box.querySelector('[data-smtp-verify-btn]');
   const testBtn = box.querySelector('[data-smtp-test-btn]');
@@ -2696,10 +2697,37 @@ function initSetupSmtp(root) {
   let savedConnectionOk = connectionOk;
   const initialManual = box.dataset.smtpInitialManual === '1';
   let manualRevealedByFailure = false;
+  const wizardRoot = root.matches?.('[data-setup-wizard]') ? root : root.querySelector?.('[data-setup-wizard]');
+
+  const setSmtpBusy = (busy) => {
+    box.classList.toggle('is-smtp-busy', !!busy);
+    wizardRoot?.classList.toggle('is-smtp-busy', !!busy);
+    if (smtpLive) smtpLive.hidden = !busy;
+    const disable = !!busy || !!skip?.checked;
+    box.querySelectorAll('input, select, textarea, button').forEach((el) => {
+      if (el === skip) return;
+      if (busy) {
+        el.dataset.smtpBusyWasDisabled = el.disabled ? '1' : '';
+        el.disabled = true;
+      } else if (el.dataset.smtpBusyWasDisabled !== undefined) {
+        el.disabled = el.dataset.smtpBusyWasDisabled === '1';
+        delete el.dataset.smtpBusyWasDisabled;
+      }
+    });
+    if (!busy && discoverBtn && !skip?.checked && !manual?.hidden) {
+      discoverBtn.disabled = false;
+    }
+    if (!busy && verifyBtn && !skip?.checked) {
+      verifyBtn.disabled = false;
+    }
+    if (!busy && testBtn) {
+      testBtn.disabled = !connectionOk || !!skip?.checked;
+    }
+  };
 
   const setManualMode = (visible) => {
     if (manual) manual.hidden = !visible;
-    if (simpleActions) simpleActions.hidden = visible;
+    if (discoverRow) discoverRow.hidden = visible;
   };
 
   // Never show the test block until SMTP was validated in this session / previously.
@@ -2720,6 +2748,9 @@ function initSetupSmtp(root) {
     el.classList.toggle('setup-hint-warn', !!isError && !!message);
     el.classList.toggle('setup-smtp-status-ok', !isError && !!message);
     el.classList.toggle('is-error', !!isError && !!message);
+    if (smtpLive && el === discoverStatus) {
+      smtpLive.hidden = !message && !box.classList.contains('is-smtp-busy');
+    }
   };
 
   const clearFieldHints = () => {
@@ -2948,6 +2979,7 @@ function initSetupSmtp(root) {
     if (!validateSimpleFields()) return;
 
     discovering = true;
+    setSmtpBusy(true);
     discoverBtn.disabled = true;
     discoverBtn.setAttribute('aria-busy', 'true');
     discoverBtn.setAttribute('aria-disabled', 'true');
@@ -2971,6 +3003,8 @@ function initSetupSmtp(root) {
       showStatus(discoverStatus, discoverFail.replace(':tried', '0'), true);
     } finally {
       discovering = false;
+      setSmtpBusy(false);
+      setSkipped(!!skip?.checked);
       discoverBtn.removeAttribute('aria-busy');
       discoverBtn.removeAttribute('aria-disabled');
       if (!manual?.hidden || !!skip?.checked) {
@@ -2996,6 +3030,7 @@ function initSetupSmtp(root) {
     }
 
     verifying = true;
+    setSmtpBusy(true);
     verifyBtn.disabled = true;
     verifyBtn.setAttribute('aria-busy', 'true');
     verifyBtn.setAttribute('aria-disabled', 'true');
@@ -3019,6 +3054,8 @@ function initSetupSmtp(root) {
       showStatus(verifyStatus, discoverFail.replace(':tried', '0'), true);
     } finally {
       verifying = false;
+      setSmtpBusy(false);
+      setSkipped(!!skip?.checked);
       verifyBtn.removeAttribute('aria-busy');
       verifyBtn.removeAttribute('aria-disabled');
       verifyBtn.disabled = !!skip?.checked;
@@ -6030,7 +6067,7 @@ function syncFieldOrderInputs(scope = document) {
       tr.className = 'setup-fields-empty-row';
       tr.setAttribute('data-fields-empty-row', '');
       const td = document.createElement('td');
-      td.colSpan = 5;
+      td.colSpan = root.dataset.fieldsSetupMode === '1' ? 4 : 5;
       td.className = 'muted';
       td.textContent = root.dataset.stepEmpty || '';
       tr.appendChild(td);
