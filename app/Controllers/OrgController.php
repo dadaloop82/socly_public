@@ -8,13 +8,15 @@ use Socly\Core\Http\Request;
 use Socly\Core\View;
 use Socly\Services\AssociationPeopleService;
 use Socly\Services\DeadlineService;
+use Socly\Services\MemberService;
 
 final class OrgController extends BaseController
 {
     public function __construct(
         View $view,
         private readonly AssociationPeopleService $people,
-        private readonly DeadlineService $deadlines
+        private readonly DeadlineService $deadlines,
+        private readonly MemberService $members
     ) {
         parent::__construct($view);
     }
@@ -50,6 +52,7 @@ final class OrgController extends BaseController
             'assocLegalCode' => $legalCode,
             'assocLegalLabel' => $legalLabel,
             'canEdit' => $this->canEditOrg(),
+            'votingMembersCount' => (int) ($this->members->dashboardStats()['members_active'] ?? 0),
         ]);
     }
 

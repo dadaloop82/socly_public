@@ -6,6 +6,7 @@
  * @var string $assocLegalLabel
  * @var bool $canEdit
  * @var list<array> $customOrgans
+ * @var int $votingMembersCount
  */
 $canEdit = !empty($canEdit);
 $assocLegalCode = strtoupper(trim((string) ($assocLegalCode ?? '')));
@@ -87,14 +88,15 @@ $renderGroupBlock = static function (
     array $group,
     string $variant,
     bool $editable,
-    bool $isCustom = false
+    bool $isCustom = false,
+    bool $wrapTier = true
 ) use ($roleLabel, $renderPersonCard, $renderVacant, $renderAddNode): void {
     $label = $roleLabel($group);
     $roleKey = (string) (($group['role']['key'] ?? ''));
     $people = $group['people'] ?? [];
     $mod = $variant !== '' ? ' org-group--' . $variant : '';
-    ?>
-    <div class="org-tier org-tier--group">
+    $inner = static function () use ($label, $roleKey, $people, $mod, $variant, $editable, $isCustom, $renderPersonCard, $renderVacant, $renderAddNode): void {
+        ?>
         <div class="org-group<?= e($mod) ?>">
             <div class="org-group-head">
                 <h3 class="org-group-title"><?= e($label) ?></h3>
@@ -120,15 +122,47 @@ $renderGroupBlock = static function (
                 ?>
             </div>
         </div>
+        <?php
+    };
+    if (!$wrapTier) {
+        $inner();
+        return;
+    }
+    ?>
+    <div class="org-tier org-tier--group">
+        <?php $inner(); ?>
     </div>
     <?php
 };
 
-$president = $byRole['president'] ?? ['role' => ['key' => 'president', 'label_key' => 'association.role_president'], 'people' => []];
-$execKeys = ['vice_president', 'secretary', 'treasurer'];
-$board = $byRole['board'] ?? ['role' => ['key' => 'board', 'label_key' => 'association.role_board'], 'people' => []];
-$auditor = $byRole['auditor'] ?? ['role' => ['key' => 'auditor', 'label_key' => 'association.role_auditor'], 'people' => []];
+$renderRoleSlot = static function (
+    string $roleKey,
+    string $variant,
+    bool $editable
+) use ($byRole, $roleLabel, $renderPersonCard, $renderVacant, $renderAddNode): void {
+    if (!isset($byRole[$roleKey])) {
+        return;
+    }
+    $group = $byRole[$roleKey];
+    $label = $roleLabel($group);
+    $people = $group['people'] ?? [];
+    if ($people === []) {
+        $renderVacant($label, $roleKey, $variant, $editable);
+        return;
+    }
+    foreach ($people as $person) {
+        $renderPersonCard($person, $label, $variant, $editable);
+    }
+    if ($editable) {
+        $renderAddNode($label, $roleKey);
+    }
+};
+
+$directorOfficerKeys = ['president', 'vice_president', 'secretary', 'treasurer'];
+$independentKeys = ['auditor', 'ombudsman'];
+$board = $byRole['board'] ?? ['role' => ['key' => 'board', 'label_key' => 'association.role_board_director'], 'people' => []];
 $customOrgans = $customOrgans ?? [];
+$votingMembersCount = (int) ($votingMembersCount ?? 0);
 ?>
 <div class="page-header">
     <div class="titles">
@@ -175,66 +209,89 @@ $customOrgans = $customOrgans ?? [];
 
         <div class="org-spine" aria-hidden="true"></div>
 
-        <div class="org-tier org-tier--president">
-            <?php
-            $presPeople = $president['people'] ?? [];
-            $presLabel = $roleLabel($president);
-            if ($presPeople === []) {
-                $renderVacant($presLabel, 'president', 'president', $canEdit);
-            } else {
-                foreach ($presPeople as $person) {
-                    $renderPersonCard($person, $presLabel, 'president', $canEdit);
-                }
-            }
-            ?>
+        <div class="org-tier org-tier--assembly">
+            <article class="org-node org-node--assembly">
+                <p class="org-node-role"><?= e(__('org.general_assembly')) ?></p>
+                <h3 class="org-node-name"><?= e(__('org.general_assembly_title')) ?></h3>
+                <?php if ($votingMembersCount > 0): ?>
+                    <p class="org-node-meta"><?= e(__('org.voting_members_count', ['count' => (string) $votingMembersCount])) ?></p>
+                <?php else: ?>
+                    <p class="org-node-meta muted"><?= e(__('org.voting_members_empty')) ?></p>
+                <?php endif; ?>
+            </article>
         </div>
 
-        <div class="org-fork" aria-hidden="true">
-            <div class="org-fork-stem"></div>
-            <div class="org-fork-bar">
-                <span class="org-fork-corner org-fork-corner--left"></span>
-                <span class="org-fork-junction"></span>
-                <span class="org-fork-corner org-fork-corner--right"></span>
-            </div>
-            <div class="org-fork-legs">
-                <span class="org-fork-leg"></span>
-                <span class="org-fork-leg"></span>
-                <span class="org-fork-leg"></span>
-            </div>
-        </div>
+        <div class="org-spine" aria-hidden="true"></div>
 
-        <div class="org-tier org-tier--exec">
-            <?php foreach ($execKeys as $key): ?>
-                <?php if (!isset($byRole[$key])) {
-                    continue;
-                } ?>
-                <?php
-                $execGroup = $byRole[$key];
-                $execLabel = $roleLabel($execGroup);
-                $execPeople = $execGroup['people'] ?? [];
-                ?>
-                <div class="org-tier-slot">
-                    <?php
-                    if ($execPeople === []) {
-                        $renderVacant($execLabel, $key, 'exec', $canEdit);
-                    } else {
-                        foreach ($execPeople as $person) {
-                            $renderPersonCard($person, $execLabel, 'exec', $canEdit);
-                        }
-                        if ($canEdit) {
-                            $renderAddNode($execLabel, $key);
-                        }
-                    }
-                    ?>
+        <div class="org-tier org-tier--group">
+            <div class="org-group org-group--directors">
+                <div class="org-group-head">
+                    <h3 class="org-group-title"><?= e(__('org.board_of_directors')) ?></h3>
+                    <p class="org-group-lede"><?= e(__('org.board_of_directors_lede')) ?></p>
                 </div>
-            <?php endforeach; ?>
+                <div class="org-board-officers">
+                    <?php foreach ($directorOfficerKeys as $officerKey): ?>
+                        <div class="org-board-officer-slot">
+                            <?php $renderRoleSlot($officerKey, 'exec', $canEdit); ?>
+                        </div>
+                    <?php endforeach; ?>
+                </div>
+                <div class="org-board-members">
+                    <h4 class="org-board-members-title"><?= e(__('org.board_members_section')) ?></h4>
+                    <div class="org-group-nodes">
+                        <?php
+                        $boardLabel = $roleLabel($board);
+                        $boardPeople = $board['people'] ?? [];
+                        if ($boardPeople === []) {
+                            $renderVacant($boardLabel, 'board', 'board', $canEdit);
+                        } else {
+                            foreach ($boardPeople as $person) {
+                                $renderPersonCard($person, $boardLabel, 'board', $canEdit);
+                            }
+                            if ($canEdit) {
+                                $renderAddNode($boardLabel, 'board');
+                            }
+                        }
+                        ?>
+                    </div>
+                </div>
+            </div>
         </div>
 
         <div class="org-spine" aria-hidden="true"></div>
-        <?php $renderGroupBlock($board, 'board', $canEdit, false); ?>
 
-        <div class="org-spine" aria-hidden="true"></div>
-        <?php $renderGroupBlock($auditor, 'audit', $canEdit, false); ?>
+        <div class="org-tier org-tier--independent">
+            <p class="org-independent-label"><?= e(__('org.independent_organs')) ?></p>
+            <div class="org-independent-fork" aria-hidden="true">
+                <span class="org-independent-fork-stem"></span>
+                <span class="org-independent-fork-bar"></span>
+                <span class="org-independent-fork-leg org-independent-fork-leg--left"></span>
+                <span class="org-independent-fork-leg org-independent-fork-leg--right"></span>
+            </div>
+            <div class="org-independent-split">
+                <?php foreach ($independentKeys as $indKey): ?>
+                    <?php
+                    $indGroup = $byRole[$indKey] ?? [
+                        'role' => [
+                            'key' => $indKey,
+                            'label_key' => 'association.role_' . ($indKey === 'ombudsman' ? 'ombudsman' : 'auditor'),
+                        ],
+                        'people' => [],
+                    ];
+                    ?>
+                    <div class="org-independent-branch">
+                        <?php $renderGroupBlock($indGroup, $indKey === 'auditor' ? 'audit' : 'ombudsman', $canEdit, false, false); ?>
+                    </div>
+                <?php endforeach; ?>
+            </div>
+        </div>
+
+        <?php if ($customOrgans !== []): ?>
+            <div class="org-spine" aria-hidden="true"></div>
+            <div class="org-tier org-tier--commissions">
+                <p class="org-commissions-label"><?= e(__('org.operational_commissions')) ?></p>
+            </div>
+        <?php endif; ?>
 
         <?php foreach ($customOrgans as $organRole): ?>
             <?php
