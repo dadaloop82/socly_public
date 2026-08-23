@@ -392,12 +392,16 @@ final class SetupService
         }
 
         if ($type === 'platform_consents') {
+            $neverConfigured = $this->rawStored('platform.consents_configured', '') === null;
+            $president = $this->people->getPresident();
             return [
-                'news_opt_in' => ((string) $this->settings->get('platform.news_opt_in', '1')) !== '0',
-                'usage_stats_opt_in' => ((string) $this->settings->get('platform.usage_stats_opt_in', '1')) !== '0',
-                'showcase_consent' => ((string) $this->settings->get('platform.showcase_consent', '1')) !== '0',
+                'news_opt_in' => $neverConfigured || ((string) $this->settings->get('platform.news_opt_in', '1')) !== '0',
+                'usage_stats_opt_in' => $neverConfigured || ((string) $this->settings->get('platform.usage_stats_opt_in', '1')) !== '0',
+                'showcase_consent' => $neverConfigured || ((string) $this->settings->get('platform.showcase_consent', '1')) !== '0',
                 'confirm_first_name' => '',
                 'confirm_last_name' => '',
+                'president_first_placeholder' => trim((string) ($president['first_name'] ?? '')),
+                'president_last_placeholder' => trim((string) ($president['last_name'] ?? '')),
                 'mail_ready' => $this->mail->isReady(),
             ];
         }
@@ -597,6 +601,15 @@ final class SetupService
                 $this->settings->set('platform.consents_confirmed_name', trim(
                     (string) ($input['confirm_first_name'] ?? '') . ' ' . (string) ($input['confirm_last_name'] ?? '')
                 ));
+            }
+            try {
+                $platform = app(\Socly\Services\PlatformService::class);
+                if ($stats) {
+                    $platform->maybeSendTelemetry();
+                }
+                $platform->syncShowcase();
+            } catch (\Throwable) {
+                // non-blocking
             }
             return ['ok' => true];
         }

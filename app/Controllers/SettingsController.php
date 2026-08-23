@@ -19,6 +19,7 @@ use Socly\Services\DeadlineService;
 use Socly\Services\InstallerService;
 use Socly\Services\MailService;
 use Socly\Services\MemberService;
+use Socly\Services\PlatformService;
 use Socly\Services\SettingsService;
 use Socly\Services\SetupService;
 
@@ -38,7 +39,8 @@ final class SettingsController extends BaseController
         private readonly SetupService $setup,
         private readonly ComponentService $components,
         private readonly DocumentService $documents,
-        private readonly DeadlineService $deadlines
+        private readonly DeadlineService $deadlines,
+        private readonly PlatformService $platform
     ) {
         parent::__construct($view);
     }
@@ -96,6 +98,8 @@ final class SettingsController extends BaseController
             'defaultFields' => InstallerService::defaultFields(),
             'mailConfig' => $this->mail->config(),
             'mailReady' => $this->mail->isReady(),
+            'presidentFirstPlaceholder' => trim((string) (($this->people->getPresident() ?? [])['first_name'] ?? '')),
+            'presidentLastPlaceholder' => trim((string) (($this->people->getPresident() ?? [])['last_name'] ?? '')),
             'components' => ComponentRegistry::all(),
             'enabledComponents' => array_fill_keys($this->components->enabledKeys(), true),
             'componentConfigs' => [
@@ -508,6 +512,13 @@ final class SettingsController extends BaseController
         $this->settings->set('platform.usage_stats_opt_in', $stats ? '1' : '0');
         $this->settings->set('platform.showcase_consent', $showcase ? '1' : '0');
         $this->settings->set('platform.consents_configured', '1');
+        try {
+            if ($stats) {
+                $this->platform->maybeSendTelemetry();
+            }
+            $this->platform->syncShowcase();
+        } catch (\Throwable) {
+        }
         $this->audit->log('settings.saved', 'settings', 'platform', null, [
             'news' => $news,
             'stats' => $stats,

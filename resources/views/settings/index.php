@@ -649,11 +649,11 @@
                 <div class="grid-2">
                     <div>
                         <label><?= e(__('setup.platform_confirm_first')) ?> *</label>
-                        <input type="text" name="confirm_first_name" autocomplete="off" data-platform-confirm-input <?= $anyPlatformSettings ? 'required' : '' ?>>
+                        <input type="text" name="confirm_first_name" value="" autocomplete="off" data-platform-confirm-input placeholder="<?= e((string) ($presidentFirstPlaceholder ?? '')) ?>" <?= $anyPlatformSettings ? 'required' : '' ?>>
                     </div>
                     <div>
                         <label><?= e(__('setup.platform_confirm_last')) ?> *</label>
-                        <input type="text" name="confirm_last_name" autocomplete="off" data-platform-confirm-input <?= $anyPlatformSettings ? 'required' : '' ?>>
+                        <input type="text" name="confirm_last_name" value="" autocomplete="off" data-platform-confirm-input placeholder="<?= e((string) ($presidentLastPlaceholder ?? '')) ?>" <?= $anyPlatformSettings ? 'required' : '' ?>>
                     </div>
                 </div>
             </div>

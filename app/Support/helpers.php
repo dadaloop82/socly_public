@@ -436,6 +436,14 @@ if (!function_exists('socly_news_api_url')) {
     }
 }
 
+if (!function_exists('socly_platform_api_url')) {
+    function socly_platform_api_url(): string
+    {
+        $url = trim((string) ($_ENV['SOCLY_PLATFORM_API_URL'] ?? 'https://www.socly.it/api/platform.php'));
+        return $url !== '' ? $url : 'https://www.socly.it/api/platform.php';
+    }
+}
+
 if (!function_exists('resolve_upload_absolute_path')) {
     /** Resolve a stored relative upload path to an absolute filesystem path. */
     function resolve_upload_absolute_path(string $relative): ?string

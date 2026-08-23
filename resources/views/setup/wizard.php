@@ -1079,11 +1079,11 @@ $errorStep = flash('setup_error_step');
                             <div class="setup-equal-row">
                                 <label class="setup-field">
                                     <span><?= e(__('setup.platform_confirm_first')) ?> *</span>
-                                    <input type="text" name="confirm_first_name" value="<?= e((string) ($value['confirm_first_name'] ?? '')) ?>" autocomplete="off" data-platform-confirm-input <?= $anyPlatform ? 'required' : '' ?>>
+                                    <input type="text" name="confirm_first_name" value="" autocomplete="off" data-platform-confirm-input placeholder="<?= e((string) ($value['president_first_placeholder'] ?? '')) ?>" <?= $anyPlatform ? 'required' : '' ?>>
                                 </label>
                                 <label class="setup-field">
                                     <span><?= e(__('setup.platform_confirm_last')) ?> *</span>
-                                    <input type="text" name="confirm_last_name" value="<?= e((string) ($value['confirm_last_name'] ?? '')) ?>" autocomplete="off" data-platform-confirm-input <?= $anyPlatform ? 'required' : '' ?>>
+                                    <input type="text" name="confirm_last_name" value="" autocomplete="off" data-platform-confirm-input placeholder="<?= e((string) ($value['president_last_placeholder'] ?? '')) ?>" <?= $anyPlatform ? 'required' : '' ?>>
                                 </label>
                             </div>
                         </div>

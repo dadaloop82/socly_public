@@ -60,6 +60,7 @@ use Socly\Services\MailService;
 use Socly\Services\MemberService;
 use Socly\Services\SmtpDiscoveryService;
 use Socly\Services\PaymentService;
+use Socly\Services\PlatformService;
 use Socly\Services\PluginAdminService;
 use Socly\Services\RateLimiter;
 use Socly\Services\RuntsLookupService;
@@ -246,7 +247,7 @@ $app->bind('mw.locale', fn (App $a) => $a->get(LocaleMiddleware::class));
 $app->bind('mw.security', fn (App $a) => $a->get(SecurityHeadersMiddleware::class));
 $app->bind('mw.idle', fn (App $a) => $a->get(SessionIdleMiddleware::class));
 $app->bind('mw.instance_expired', fn (App $a) => $a->get(InstanceExpiredMiddleware::class));
-$app->bind(SessionController::class, fn (App $a) => new SessionController($a->get(View::class)));
+$app->bind(SessionController::class, fn (App $a) => new SessionController($a->get(View::class), $a->get(PlatformService::class)));
 $app->bind(SetupGate::class, fn (App $a) => new SetupGate($a->get(SetupService::class)));
 $app->bind('mw.setup', fn (App $a) => $a->get(SetupGate::class));
 $app->bind(SetupBootstrapMiddleware::class, fn (App $a) => new SetupBootstrapMiddleware($a->get(SetupService::class)));
@@ -261,6 +262,13 @@ $app->bind(AssociationPeopleService::class, fn (App $a) => new AssociationPeople
 $app->bind(AssociationWebsiteScrapeService::class, fn () => new AssociationWebsiteScrapeService());
 $app->bind(RuntsLookupService::class, fn () => new RuntsLookupService());
 $app->bind(MailService::class, fn (App $a) => new MailService($a->get(SettingsService::class)));
+$app->bind(PlatformService::class, fn (App $a) => new PlatformService(
+    $a->get(SettingsService::class),
+    $a->get(BrandingService::class),
+    $a->get(ComponentService::class),
+    $a->get(MemberService::class),
+    $a->get(Database::class)
+));
 $app->bind(SmtpDiscoveryService::class, fn (App $a) => new SmtpDiscoveryService($a->get(MailService::class)));
 $app->bind(SetupService::class, fn (App $a) => new SetupService(
     $a->get(SettingsService::class),
@@ -354,7 +362,8 @@ $app->bind(SettingsController::class, fn (App $a) => new SettingsController(
     $a->get(SetupService::class),
     $a->get(ComponentService::class),
     $a->get(DocumentService::class),
-    $a->get(DeadlineService::class)
+    $a->get(DeadlineService::class),
+    $a->get(PlatformService::class)
 ));
 $app->bind(TreasuryController::class, fn (App $a) => new TreasuryController(
     $a->get(View::class),
