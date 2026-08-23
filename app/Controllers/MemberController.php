@@ -62,6 +62,7 @@ final class MemberController extends BaseController
             'filters' => $filters,
             'page' => $page,
             'types' => $this->members->types(),
+            'hasAnyMembers' => $this->members->totalCount() > 0,
         ]);
     }
 

@@ -105,8 +105,11 @@ final class App
                 /** @var PluginManager $plugins */
                 $plugins = $this->get('plugins');
                 $plugins->bootEnabled();
-            } catch (\Throwable) {
-                // DB may be misconfigured; route handlers will surface errors.
+            } catch (\Throwable $e) {
+                try {
+                    $this->get('logger')->error('migrate.failed', ['error' => $e->getMessage()]);
+                } catch (\Throwable) {
+                }
             }
         }
 

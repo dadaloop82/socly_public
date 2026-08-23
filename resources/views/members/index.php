@@ -11,6 +11,7 @@
     </div>
 </div>
 
+<?php if (!empty($hasAnyMembers)): ?>
 <form class="panel filter-bar members-filter" method="get">
     <div class="panel-header members-filter-head">
         <div>
@@ -66,6 +67,7 @@
         </div>
     </div>
 </form>
+<?php endif; ?>
 
 <div class="panel">
     <div class="panel-header">

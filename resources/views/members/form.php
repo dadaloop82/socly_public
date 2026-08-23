@@ -65,7 +65,15 @@ foreach ($formSteps as $step) {
         $profileFields[] = $field;
     }
 }
-$ackFields = $fieldsByFormStep[\Socly\Services\MemberService::STEP_ACKNOWLEDGEMENTS] ?? [];
+$ackFields = [];
+foreach ($fields as $field) {
+    $fkey = (string) ($field['key'] ?? '');
+    if ($fkey === 'statute_ack' || ($fkey === 'privacy_ack' && $gdprEnabled)) {
+        if (!empty($field['is_enabled'])) {
+            $ackFields[] = $field;
+        }
+    }
+}
 $tesseraExtraFields = $fieldsByFormStep[\Socly\Services\MemberService::STEP_TESSERA] ?? [];
 $paymentExtraFields = $fieldsByFormStep[\Socly\Services\MemberService::STEP_PAYMENT] ?? [];
 
@@ -628,6 +636,26 @@ $paymentExtraHtml = $buildProfileFieldsHtml($paymentExtraFields);
                             <?php endforeach; ?>
                         </select>
                     </div>
+                </div>
+
+                <?php if (!$isEdit): ?>
+                <div class="payment-summary" data-tessera-payment-summary>
+                    <div>
+                        <span class="muted"><?= e(__('members.type')) ?></span>
+                        <strong data-payment-type-label>—</strong>
+                    </div>
+                    <div>
+                        <span class="muted"><?= e(__('members.wizard_quota')) ?></span>
+                        <strong data-payment-amount>0,00 €</strong>
+                    </div>
+                    <div data-payment-due-wrap>
+                        <span class="muted"><?= e(__('members.wizard_still_due')) ?></span>
+                        <strong data-payment-due>0,00 €</strong>
+                    </div>
+                </div>
+                <?php endif; ?>
+
+                <div class="grid-2">
                     <div class="field-block">
                         <label class="field-label"><?= e(__('members.type')) ?></label>
                         <select name="member_type_id" data-member-type required>
@@ -656,20 +684,6 @@ $paymentExtraHtml = $buildProfileFieldsHtml($paymentExtraFields);
                 </div>
 
                 <?php if (!$isEdit): ?>
-                <div class="payment-summary" data-tessera-payment-summary>
-                    <div>
-                        <span class="muted"><?= e(__('members.type')) ?></span>
-                        <strong data-payment-type-label>—</strong>
-                    </div>
-                    <div>
-                        <span class="muted"><?= e(__('members.wizard_quota')) ?></span>
-                        <strong data-payment-amount>0,00 €</strong>
-                    </div>
-                    <div data-payment-due-wrap>
-                        <span class="muted"><?= e(__('members.wizard_still_due')) ?></span>
-                        <strong data-payment-due>0,00 €</strong>
-                    </div>
-                </div>
                 <div class="grid-2">
                     <div class="field-block">
                         <label class="field-label"><?= e(__('members.payment')) ?></label>

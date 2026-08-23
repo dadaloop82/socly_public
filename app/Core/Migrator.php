@@ -23,6 +23,8 @@ final class Migrator
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci'
         );
 
+        $this->repairLegacyMigrationNames();
+
         $ran = array_column($this->db->fetchAll('SELECT migration FROM migrations'), 'migration');
         $batch = (int) ($this->db->fetch('SELECT MAX(batch) AS m FROM migrations')['m'] ?? 0) + 1;
         $files = glob($this->path . '/*.sql') ?: [];
@@ -76,6 +78,45 @@ final class Migrator
                 'plugin_id' => $pluginId,
                 'version' => (string) $version,
             ]);
+        }
+    }
+
+    /** Some installs applied treasury invoice columns under the old filename 015_treasury_invoice_details.sql. */
+    private function repairLegacyMigrationNames(): void
+    {
+        try {
+            $ran = array_column($this->db->fetchAll('SELECT migration FROM migrations'), 'migration');
+        } catch (\Throwable) {
+            return;
+        }
+        if (in_array('016_treasury_invoice_details.sql', $ran, true)) {
+            return;
+        }
+        if (!in_array('015_treasury_invoice_details.sql', $ran, true)) {
+            return;
+        }
+        try {
+            $col = $this->db->fetch(
+                "SELECT 1 AS x FROM information_schema.COLUMNS
+                 WHERE TABLE_SCHEMA = DATABASE()
+                   AND TABLE_NAME = 'treasury_movements'
+                   AND COLUMN_NAME = 'invoice_payment'
+                 LIMIT 1"
+            );
+        } catch (\Throwable) {
+            return;
+        }
+        if (!$col) {
+            return;
+        }
+        $batch = (int) ($this->db->fetch('SELECT MAX(batch) AS m FROM migrations')['m'] ?? 0);
+        try {
+            $this->db->insert('migrations', [
+                'migration' => '016_treasury_invoice_details.sql',
+                'batch' => $batch > 0 ? $batch : 1,
+            ]);
+        } catch (\Throwable) {
+            // Already recorded by a parallel request.
         }
     }
 }

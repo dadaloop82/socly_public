@@ -21,6 +21,7 @@ final class EmailTemplateService
 
     public function ensureDefaults(): void
     {
+        $this->ensureTables();
         $count = (int) ($this->db->fetch('SELECT COUNT(*) AS c FROM email_templates')['c'] ?? 0);
         if ($count > 0) {
             return;
@@ -94,6 +95,29 @@ final class EmailTemplateService
                     'created_at' => $now,
                     'updated_at' => $now,
                 ]);
+            }
+        }
+    }
+
+    public function ensureTables(): void
+    {
+        try {
+            $this->db->fetch('SELECT 1 FROM email_templates LIMIT 1');
+            return;
+        } catch (\Throwable) {
+        }
+        $path = dirname(__DIR__, 2) . '/database/migrations/018_email_templates_workflow.sql';
+        if (!is_file($path)) {
+            return;
+        }
+        $sql = file_get_contents($path);
+        if ($sql === false) {
+            return;
+        }
+        $parts = array_filter(array_map('trim', explode(';', preg_replace('/^\s*--.*$/m', '', $sql) ?? $sql)));
+        foreach ($parts as $statement) {
+            if ($statement !== '') {
+                $this->db->pdo()->exec($statement);
             }
         }
     }

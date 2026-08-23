@@ -35,6 +35,7 @@ final class MemberService
     {
         $this->ensureDefaultFormSteps();
         $this->repairEmptyCustomFormSteps();
+        $this->normalizeProfileFieldPlacement();
         $sql = 'SELECT * FROM member_field_definitions';
         if ($enabledOnly) {
             $sql .= ' WHERE is_enabled = 1';
@@ -287,6 +288,55 @@ final class MemberService
             );
         } catch (\Throwable) {
             // ignore
+        }
+    }
+
+    /** Keep core anagrafica fields on a custom wizard step, not tessera/payment system steps. */
+    public function normalizeProfileFieldPlacement(): void
+    {
+        $profileKeys = [
+            'photo', 'first_name', 'last_name', 'gender', 'preferred_language',
+            'birth_place', 'birth_date', 'fiscal_code',
+            'city', 'address', 'house_number', 'postal_code',
+            'email', 'phone',
+        ];
+        try {
+            $steps = $this->db->fetchAll('SELECT `key` FROM member_form_steps ORDER BY sort_order ASC, id ASC');
+        } catch (\Throwable) {
+            return;
+        }
+        $system = array_fill_keys(self::systemFormStepKeys(), true);
+        $target = 'profile';
+        foreach ($steps as $step) {
+            $key = (string) ($step['key'] ?? '');
+            if ($key !== '' && !isset($system[$key])) {
+                $target = $key;
+                break;
+            }
+        }
+        $sysKeys = self::systemFormStepKeys();
+        $sysPlaceholders = implode(',', array_fill(0, count($sysKeys), '?'));
+        $keyPlaceholders = implode(',', array_fill(0, count($profileKeys), '?'));
+        try {
+            $this->db->query(
+                "UPDATE member_field_definitions
+                 SET form_step = ?
+                 WHERE is_enabled = 1
+                   AND form_step IN ($sysPlaceholders)
+                   AND `key` IN ($keyPlaceholders)",
+                [$target, ...$sysKeys, ...$profileKeys]
+            );
+        } catch (\Throwable) {
+            // ignore
+        }
+    }
+
+    public function totalCount(): int
+    {
+        try {
+            return (int) ($this->db->fetch('SELECT COUNT(*) AS c FROM members')['c'] ?? 0);
+        } catch (\Throwable) {
+            return 0;
         }
     }
 
