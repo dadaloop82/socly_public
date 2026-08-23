@@ -417,7 +417,6 @@ $errorStep = flash('setup_error_step');
                                     <option value="">—</option>
                                     <option value="M" <?= (string) ($value['gender'] ?? '') === 'M' ? 'selected' : '' ?>><?= e(__('members.gender_m')) ?></option>
                                     <option value="F" <?= (string) ($value['gender'] ?? '') === 'F' ? 'selected' : '' ?>><?= e(__('members.gender_f')) ?></option>
-                                    <option value="X" <?= (string) ($value['gender'] ?? '') === 'X' ? 'selected' : '' ?>><?= e(__('members.gender_x')) ?></option>
                                 </select>
                             </label>
                         </div>

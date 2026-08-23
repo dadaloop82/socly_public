@@ -160,7 +160,6 @@ $renderTextField = static function (array $field) use ($fieldValue, $icons): str
             . '<option value="">—</option>'
             . '<option value="M"' . ($val === 'M' ? ' selected' : '') . '>' . e(__('members.gender_m')) . '</option>'
             . '<option value="F"' . ($val === 'F' ? ' selected' : '') . '>' . e(__('members.gender_f')) . '</option>'
-            . '<option value="X"' . ($val === 'X' ? ' selected' : '') . '>' . e(__('members.gender_x')) . '</option>'
             . '</select></div>';
     }
 

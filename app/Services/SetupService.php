@@ -1319,7 +1319,7 @@ final class SetupService
         }
         if ($person['gender'] !== '') {
             $person['gender'] = strtoupper($person['gender']);
-            if (!in_array($person['gender'], ['M', 'F', 'X'], true)) {
+            if (!in_array($person['gender'], ['M', 'F'], true)) {
                 $errors['gender'] = __('validation.in');
             }
         }

@@ -77,7 +77,6 @@ $action = $isEdit
                 <option value="">—</option>
                 <option value="M" <?= ($values['gender'] ?? '') === 'M' ? 'selected' : '' ?>><?= e(__('members.gender_m')) ?></option>
                 <option value="F" <?= ($values['gender'] ?? '') === 'F' ? 'selected' : '' ?>><?= e(__('members.gender_f')) ?></option>
-                <option value="X" <?= ($values['gender'] ?? '') === 'X' ? 'selected' : '' ?>><?= e(__('members.gender_x')) ?></option>
             </select>
         </div>
         <?= view_partial('partials/geo_birth_place', [

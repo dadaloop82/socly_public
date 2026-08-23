@@ -5,7 +5,11 @@
     </div>
 </div>
 
-<div class="config-accordions" data-config-accordions>
+<div class="config-accordions" data-config-accordions
+     data-autosave-busy="<?= e(__('settings.autosave_busy')) ?>"
+     data-autosave-ok="<?= e(__('settings.autosaved')) ?>"
+     data-autosave-fail="<?= e(__('settings.autosave_failed')) ?>"
+     data-autosave-ago="<?= e(__('settings.autosave_ago')) ?>">
 <details class="config-accordion" id="general" data-config-accordion>
     <summary class="config-accordion-summary">
         <span class="config-accordion-title"><?= e(__('settings.general')) ?></span>
@@ -17,6 +21,7 @@
         method="post"
         action="<?= e(url('/settings/general')) ?>"
         data-leave-guard
+        data-settings-autosave
         enctype="multipart/form-data"
         data-cities-url="<?= e(url('/api/geo/cities')) ?>"
         data-addresses-url="<?= e(url('/api/geo/addresses')) ?>"
@@ -72,7 +77,7 @@
             'required' => [
                 'city' => true,
                 'postal_code' => true,
-                'province' => false,
+                'province' => true,
                 'address' => true,
                 'house_number' => true,
             ],
@@ -153,25 +158,38 @@
             <span class="setup-brand-preview-primary"></span>
             <span class="setup-brand-preview-accent"></span>
         </div>
-        <div class="grid-3">
-            <div><label><?= e(__('install.primary')) ?></label><input type="color" name="primary" value="<?= e((string)$settings['branding.primary']) ?>" data-brand-color="primary"></div>
-            <div><label><?= e(__('install.accent')) ?></label><input type="color" name="accent" value="<?= e((string)$settings['branding.accent']) ?>" data-brand-color="accent"></div>
-            <div>
-                <label><?= e(__('install.locale')) ?></label>
-                <select name="locale">
-                    <?php foreach (['it','de','en'] as $loc): ?>
-                        <option value="<?= $loc ?>" <?= $settings['app.locale']===$loc?'selected':'' ?>><?= e(match ($loc) { 'it' => '🇮🇹 Italiano', 'de' => '🇩🇪 Deutsch', default => '🇬🇧 English' }) ?></option>
-                    <?php endforeach; ?>
-                </select>
-            </div>
+        <div class="setup-colors setup-color-picker-grid" data-setup-line>
+            <label class="setup-field setup-color-picker-card">
+                <span><?= e(__('install.primary')) ?></span>
+                <span class="setup-color-picker-control">
+                    <input type="color" name="primary" value="<?= e((string)$settings['branding.primary']) ?>" required data-brand-color="primary">
+                    <code><?= e(strtoupper((string)$settings['branding.primary'])) ?></code>
+                </span>
+            </label>
+            <label class="setup-field setup-color-picker-card">
+                <span><?= e(__('install.accent')) ?></span>
+                <span class="setup-color-picker-control">
+                    <input type="color" name="accent" value="<?= e((string)$settings['branding.accent']) ?>" required data-brand-color="accent">
+                    <code><?= e(strtoupper((string)$settings['branding.accent'])) ?></code>
+                </span>
+            </label>
         </div>
-        <label class="checkbox-row"><input type="checkbox" name="gdpr_enabled" value="1" <?= $settings['gdpr.enabled']==='1'?'checked':'' ?>> <?= e(__('install.gdpr')) ?></label>
-        <button class="btn" type="submit"><?= e(__('common.save')) ?></button>
+        <fieldset class="setup-locale-grid" data-setup-line>
+            <legend class="setup-field-label"><?= e(__('install.locale')) ?></legend>
+            <?php foreach (['it','de','en'] as $loc): ?>
+                <label class="setup-locale-card">
+                    <input type="radio" name="locale" value="<?= $loc ?>" <?= $settings['app.locale']===$loc?'checked':'' ?> required>
+                    <img src="<?= e(locale_flag_url($loc)) ?>" width="28" height="21" alt="" loading="lazy" decoding="async">
+                    <span><?= e(match ($loc) { 'it' => 'Italiano', 'de' => 'Deutsch', default => 'English' }) ?></span>
+                </label>
+            <?php endforeach; ?>
+        </fieldset>
+        <p class="settings-autosave-status muted" data-settings-autosave-status aria-live="polite"></p>
     </form>
     </div>
 </details>
 
-<details class="config-accordion" id="people" data-config-accordion>
+<details class="config-accordion" id="people" data-config-accordion hidden>
     <summary class="config-accordion-summary">
         <span class="config-accordion-title"><?= e(__('settings.people')) ?></span>
         <span class="config-accordion-lede"><?= e(__('settings.people_lede')) ?></span>
@@ -309,9 +327,14 @@
     </summary>
     <div class="config-accordion-body">
 
-<form method="post" action="<?= e(url('/settings/legal')) ?>" data-leave-guard>
+<form method="post" action="<?= e(url('/settings/legal')) ?>" data-leave-guard data-settings-autosave>
         <?= csrf_field() ?>
-        <h3 class="section-title"><?= e(__('settings.legal_privacy')) ?></h3>
+        <label class="setup-check setup-check-prominent">
+            <input type="checkbox" name="gdpr_enabled" value="1" <?= $settings['gdpr.enabled']==='1'?'checked':'' ?>>
+            <span><?= e(__('setup.gdpr_label')) ?></span>
+        </label>
+        <p class="setup-hint muted"><?= e(__('setup.step_gdpr_desc')) ?></p>
+        <h3 class="section-title" style="margin-top:1.25rem"><?= e(__('settings.legal_privacy')) ?></h3>
         <p class="muted"><?= e(__('settings.legal_privacy_hint')) ?></p>
         <div class="legal-langs">
             <div>
@@ -344,7 +367,7 @@
                 <textarea name="statute_en" rows="8"><?= e((string)($settings['legal.statute']['en'] ?? '')) ?></textarea>
             </div>
         </div>
-        <button class="btn" type="submit"><?= e(__('common.save')) ?></button>
+        <p class="settings-autosave-status muted" data-settings-autosave-status aria-live="polite"></p>
     </form>
     </div>
 </details>
@@ -593,7 +616,7 @@
         <span class="config-accordion-lede"><?= e(__('settings.enrollment_lede')) ?></span>
     </summary>
     <div class="config-accordion-body">
-        <form method="post" action="<?= e(url('/settings/enrollment')) ?>" data-leave-guard>
+        <form method="post" action="<?= e(url('/settings/enrollment')) ?>" data-leave-guard data-settings-autosave>
             <?= csrf_field() ?>
             <label for="enrollment_validation"><?= e(__('settings.enrollment_method')) ?></label>
             <select id="enrollment_validation" name="enrollment_validation" required>
@@ -612,7 +635,7 @@
                 <?php endforeach; ?>
             </select>
             <p class="muted" style="margin-top:0.75rem"><?= e(__('setup.step_enrollment_desc')) ?></p>
-            <button class="btn" type="submit"><?= e(__('common.save')) ?></button>
+            <p class="settings-autosave-status muted" data-settings-autosave-status aria-live="polite"></p>
         </form>
     </div>
 </details>
@@ -623,20 +646,20 @@
         <span class="config-accordion-lede"><?= e(__('settings.platform_lede')) ?></span>
     </summary>
     <div class="config-accordion-body">
-        <form method="post" action="<?= e(url('/settings/platform')) ?>" data-platform-consents data-mail-ready="<?= !empty($mailReady) ? '1' : '0' ?>" data-leave-guard>
+        <form method="post" action="<?= e(url('/settings/platform')) ?>" data-platform-consents data-mail-ready="<?= !empty($mailReady) ? '1' : '0' ?>" data-leave-guard data-settings-autosave>
             <?= csrf_field() ?>
             <p class="muted"><?= e(__('setup.platform_hint')) ?></p>
-            <label class="checkbox-row">
+            <label class="setup-check setup-check-prominent">
                 <input type="checkbox" name="news_opt_in" value="1" data-platform-opt <?= ($settings['platform.news_opt_in'] ?? '1') !== '0' ? 'checked' : '' ?>>
-                <?= e(__('settings.platform_news')) ?>
+                <span><?= e(__('settings.platform_news')) ?></span>
             </label>
-            <label class="checkbox-row">
+            <label class="setup-check setup-check-prominent">
                 <input type="checkbox" name="usage_stats_opt_in" value="1" data-platform-opt <?= ($settings['platform.usage_stats_opt_in'] ?? '1') !== '0' ? 'checked' : '' ?>>
-                <?= e(__('settings.platform_stats')) ?>
+                <span><?= e(__('settings.platform_stats')) ?></span>
             </label>
-            <label class="checkbox-row">
+            <label class="setup-check setup-check-prominent">
                 <input type="checkbox" name="showcase_consent" value="1" data-platform-opt <?= ($settings['platform.showcase_consent'] ?? '1') !== '0' ? 'checked' : '' ?>>
-                <?= e(__('settings.platform_showcase')) ?>
+                <span><?= e(__('settings.platform_showcase')) ?></span>
             </label>
             <p class="muted"><?= e(__('setup.platform_showcase_hint')) ?></p>
             <?php
@@ -657,7 +680,7 @@
                     </div>
                 </div>
             </div>
-            <button class="btn" type="submit"><?= e(__('common.save')) ?></button>
+            <p class="settings-autosave-status muted" data-settings-autosave-status aria-live="polite"></p>
         </form>
     </div>
 </details>

@@ -168,13 +168,17 @@ final class SettingsController extends BaseController
         ];
         $this->settings->set('legal.privacy', $privacy);
         $this->settings->set('legal.statute', $statute);
+        $this->settings->set('gdpr.enabled', !empty($data['gdpr_enabled']) ? '1' : '0');
+        \Socly\Support\EnvWriter::setUserValues([
+            'GDPR_ENABLED' => !empty($data['gdpr_enabled']) ? '1' : '0',
+        ]);
         $this->audit->log('settings.saved', 'settings', 'legal', null, [
             'privacy_len' => array_map('mb_strlen', $privacy),
             'statute_len' => array_map('mb_strlen', $statute),
+            'gdpr' => !empty($data['gdpr_enabled']),
         ], $request->ip());
-        $this->plugins->fire('settings.saved', ['legal.privacy', 'legal.statute']);
-        $this->flash('success', __('settings.saved'));
-        redirect('/settings#legal');
+        $this->plugins->fire('settings.saved', ['legal.privacy', 'legal.statute', 'gdpr.enabled']);
+        $this->settingsFinish($request, 'legal');
     }
 
     public function saveGeneral(Request $request): void
@@ -186,6 +190,7 @@ final class SettingsController extends BaseController
             'association_fiscal_code' => 'required|string|max:16',
             'association_city' => 'required|string|max:120',
             'association_postal_code' => 'required|string|max:12',
+            'association_province' => 'required|string|max:4',
             'association_address' => 'required|string|max:255',
             'association_house_number' => 'required|string|max:20',
             'association_pec' => 'required|email|max:190',
@@ -195,8 +200,7 @@ final class SettingsController extends BaseController
             'accent' => 'required|color',
             'locale' => 'required|in:it,de,en',
         ])) {
-            $this->flash('errors', $this->validator->firstErrors());
-            redirect('/settings');
+            $this->settingsFail($request, $this->validator->firstErrors(), 'general');
         }
         $legal = strtoupper(trim((string) $data['association_legal_name']));
         $name = assoc_capitalize_name((string) $data['association_name']);
@@ -229,8 +233,7 @@ final class SettingsController extends BaseController
         $this->settings->set('association.email', $data['association_email']);
         $phone = normalize_phone_value($data['association_phone'] ?? '');
         if ($phone !== '' && !is_valid_phone_value($phone)) {
-            $this->flash('errors', ['association_phone' => __('validation.phone')]);
-            redirect('/settings');
+            $this->settingsFail($request, ['association_phone' => __('validation.phone')], 'general');
         }
         $this->settings->set('association.phone', $phone);
         $this->settings->set('association.runts', $data['association_runts']);
@@ -244,7 +247,6 @@ final class SettingsController extends BaseController
         if (in_array((string) $data['locale'], ['it', 'de', 'en'], true)) {
             $_SESSION['locale'] = (string) $data['locale'];
         }
-        $this->settings->set('gdpr.enabled', !empty($data['gdpr_enabled']) ? '1' : '0');
         if (!empty($data['remove_logo'])) {
             $relative = $this->branding->logoRelativePath();
             if ($relative !== '') {
@@ -259,8 +261,7 @@ final class SettingsController extends BaseController
             if ($logoFile !== null) {
                 $stored = $this->branding->storeLogoUpload($logoFile);
                 if (!$stored['ok']) {
-                    $this->flash('errors', ['logo' => (string) ($stored['error'] ?? __('validation.photo'))]);
-                    redirect('/settings');
+                    $this->settingsFail($request, ['logo' => (string) ($stored['error'] ?? __('validation.photo'))], 'general');
                 }
             }
         }
@@ -281,12 +282,10 @@ final class SettingsController extends BaseController
             'BRANDING_PRIMARY' => $data['primary'],
             'BRANDING_ACCENT' => $data['accent'],
             'APP_LOCALE' => $data['locale'],
-            'GDPR_ENABLED' => !empty($data['gdpr_enabled']) ? '1' : '0',
         ]);
         $this->audit->log('settings.saved', 'settings', 'general', $before, $data, $request->ip());
         $this->plugins->fire('settings.saved', array_keys($data));
-        $this->flash('success', __('settings.saved'));
-        redirect('/settings');
+        $this->settingsFinish($request, 'general');
     }
 
     public function savePeople(Request $request): void
@@ -478,17 +477,14 @@ final class SettingsController extends BaseController
         $method = (string) $request->input('enrollment_validation', 'none');
         $allowed = ['none', 'print_scan', 'tablet_sign', 'otp_email'];
         if (!in_array($method, $allowed, true)) {
-            $this->flash('errors', ['enrollment_validation' => __('validation.in')]);
-            redirect('/settings#enrollment');
+            $this->settingsFail($request, ['enrollment_validation' => __('validation.in')], 'enrollment');
         }
         if ($method === 'otp_email' && !$this->mail->isReady()) {
-            $this->flash('errors', ['enrollment_validation' => __('mail.required_for_otp')]);
-            redirect('/settings#enrollment');
+            $this->settingsFail($request, ['enrollment_validation' => __('mail.required_for_otp')], 'enrollment');
         }
         $this->settings->set('membership.enrollment_validation', $method);
         $this->audit->log('settings.saved', 'settings', 'enrollment', null, ['method' => $method], $request->ip());
-        $this->flash('success', __('settings.saved'));
-        redirect('/settings#enrollment');
+        $this->settingsFinish($request, 'enrollment');
     }
 
     public function savePlatform(Request $request): void
@@ -500,8 +496,7 @@ final class SettingsController extends BaseController
         if ($news || $stats || $showcase) {
             $confirmError = app(\Socly\Services\SetupService::class)->validatePresidentNameConfirmation($data);
             if ($confirmError !== null) {
-                $this->flash('errors', $confirmError);
-                redirect('/settings#platform');
+                $this->settingsFail($request, $confirmError, 'platform');
             }
             $this->settings->set('platform.consents_confirmed_at', date('c'));
             $this->settings->set('platform.consents_confirmed_name', trim(
@@ -524,8 +519,7 @@ final class SettingsController extends BaseController
             'stats' => $stats,
             'showcase' => $showcase,
         ], $request->ip());
-        $this->flash('success', __('settings.saved'));
-        redirect('/settings#platform');
+        $this->settingsFinish($request, 'platform');
     }
 
     public function saveMail(Request $request): void
@@ -636,5 +630,38 @@ final class SettingsController extends BaseController
         $this->setup->resetAssociationConfiguration();
         $this->flash('success', __('settings.reset_done'));
         redirect('/setup?intro=1');
+    }
+
+    private function settingsWantsJson(Request $request): bool
+    {
+        return strtolower((string) $request->header('X-Requested-With')) === 'xmlhttprequest';
+    }
+
+    private function settingsFinish(Request $request, string $anchor = ''): never
+    {
+        if ($this->settingsWantsJson($request)) {
+            header('Content-Type: application/json; charset=utf-8');
+            echo json_encode(['ok' => true, 'message' => __('settings.autosaved')], JSON_UNESCAPED_UNICODE);
+            exit;
+        }
+        $this->flash('success', __('settings.saved'));
+        redirect('/settings' . ($anchor !== '' ? '#' . $anchor : ''));
+    }
+
+    /** @param array<string,string> $errors */
+    private function settingsFail(Request $request, array $errors, string $anchor = ''): never
+    {
+        if ($this->settingsWantsJson($request)) {
+            header('Content-Type: application/json; charset=utf-8');
+            http_response_code(422);
+            echo json_encode([
+                'ok' => false,
+                'message' => __('settings.autosave_failed'),
+                'errors' => $errors,
+            ], JSON_UNESCAPED_UNICODE);
+            exit;
+        }
+        $this->flash('errors', $errors);
+        redirect('/settings' . ($anchor !== '' ? '#' . $anchor : ''));
     }
 }

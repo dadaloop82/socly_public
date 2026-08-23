@@ -128,6 +128,7 @@ document.addEventListener('DOMContentLoaded', () => {
   initSetupWizard();
   initSetupSmtp(document);
   initSettingsAssociationForms();
+  initSettingsAutosave();
   initLogoFilePickers(document);
   initPlaceSuggest(document);
   initDashboardTabs();
@@ -1727,7 +1728,7 @@ function initMemberLeaveGuard(form) {
 
 function initLeaveGuards(scope = document) {
   scope.querySelectorAll('form[data-leave-guard]').forEach((form) => {
-    if (form.dataset.leaveGuardBound === '1' || form.hasAttribute('data-member-leave-guard')) return;
+    if (form.dataset.leaveGuardBound === '1' || form.hasAttribute('data-member-leave-guard') || form.hasAttribute('data-settings-autosave')) return;
     form.dataset.leaveGuardBound = '1';
 
     let dirty = false;
@@ -2465,8 +2466,92 @@ function initSettingsAssociationForms() {
   document.querySelectorAll('[data-settings-brand]').forEach((scope) => {
     initSetupBrandingPalettes(scope.closest('form') || scope);
   });
+  document.querySelectorAll('form[data-settings-autosave]').forEach((form) => {
+    initSetupBrandingPalettes(form);
+  });
   document.querySelectorAll('[data-people-list]').forEach((list) => {
     initPeopleList(list);
+  });
+}
+
+function initSettingsAutosave(scope = document) {
+  const root = scope.querySelector('[data-config-accordions]');
+  const busyMsg = root?.dataset.autosaveBusy || 'Saving…';
+  const okMsg = root?.dataset.autosaveOk || 'Saved';
+  const failMsg = root?.dataset.autosaveFail || 'Could not save';
+  const agoTemplate = root?.dataset.autosaveAgo || 'Saved :time ago';
+
+  const formatAgo = (seconds) => {
+    if (seconds < 60) {
+      return `${seconds}s`;
+    }
+    const mins = Math.floor(seconds / 60);
+    return `${mins} min`;
+  };
+
+  scope.querySelectorAll('form[data-settings-autosave]').forEach((form) => {
+    if (form.dataset.settingsAutosaveBound === '1') {
+      return;
+    }
+    form.dataset.settingsAutosaveBound = '1';
+
+    const statusEl = form.querySelector('[data-settings-autosave-status]');
+    let timer = null;
+    let agoTimer = null;
+    let lastSavedAt = 0;
+
+    const setStatus = (kind, text) => {
+      if (!statusEl) {
+        return;
+      }
+      statusEl.textContent = text;
+      statusEl.classList.remove('is-ok', 'is-error', 'is-busy');
+      if (kind) {
+        statusEl.classList.add(`is-${kind}`);
+      }
+    };
+
+    const updateAgo = () => {
+      if (!lastSavedAt || !statusEl) {
+        return;
+      }
+      const secs = Math.max(1, Math.floor((Date.now() - lastSavedAt) / 1000));
+      setStatus('ok', agoTemplate.replace(':time', formatAgo(secs)));
+    };
+
+    const saveNow = async () => {
+      window.clearTimeout(timer);
+      setStatus('busy', busyMsg);
+      const fd = new FormData(form);
+      try {
+        const res = await fetch(form.action, {
+          method: 'POST',
+          body: fd,
+          headers: { 'X-Requested-With': 'XMLHttpRequest' },
+          credentials: 'same-origin',
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok || !data.ok) {
+          setStatus('error', data.message || failMsg);
+          return;
+        }
+        lastSavedAt = Date.now();
+        setStatus('ok', okMsg);
+        window.clearInterval(agoTimer);
+        agoTimer = window.setInterval(updateAgo, 5000);
+        updateAgo();
+      } catch {
+        setStatus('error', failMsg);
+      }
+    };
+
+    const scheduleSave = () => {
+      window.clearTimeout(timer);
+      timer = window.setTimeout(saveNow, 800);
+    };
+
+    form.addEventListener('input', scheduleSave, true);
+    form.addEventListener('change', scheduleSave, true);
   });
 }
 
