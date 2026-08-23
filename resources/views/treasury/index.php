@@ -4,13 +4,18 @@
 /** @var array{auto_from_payments?:bool} $config */
 /** @var list<array> $members */
 /** @var list<array{key:string,label:string,builtin:bool}> $categories */
+/** @var list<array{label:string,keys:list<string>}> $category_groups */
+/** @var list<array{key:string,directions:string,default:string}> $movement_kinds */
+/** @var list<array{label:string,keys:list<string>}> $payment_method_groups */
 /** @var string $default_category */
 /** @var string $search_query */
 /** @var list<string> $beneficiaries */
+/** @var bool $hasAnyMovements */
 /** @var \Socly\Services\CurrencyService $currency */
 $old = old_input();
 $values = $old !== [] ? $old : [
     'direction' => 'income',
+    'movement_kind' => 'operating',
     'amount' => '',
     'movement_date' => date('Y-m-d'),
     'category' => (string) ($default_category ?? 'membership_fee'),
@@ -23,6 +28,7 @@ $values = $old !== [] ? $old : [
     'beneficiary' => '',
 ];
 $canManage = can('treasury.manage');
+$formOpen = $old !== [];
 ?>
 <div class="page-header">
     <div class="titles">
@@ -31,7 +37,7 @@ $canManage = can('treasury.manage');
     </div>
 </div>
 
-<div class="stats">
+<div class="stats stats-context-treasury">
     <div class="stat">
         <div class="label"><?= e(__('treasury.balance')) ?></div>
         <div class="value"><?= e($currency->format((float) $ledger['balance'])) ?></div>
@@ -46,33 +52,18 @@ $canManage = can('treasury.manage');
     </div>
 </div>
 
-<?php if ($canManage): ?>
-<form class="panel" method="post" action="<?= e(url('/treasury')) ?>" enctype="multipart/form-data" data-treasury-form data-leave-guard
-      data-confirm-template="<?= e(__('treasury.confirm_summary')) ?>"
-      data-max-upload-bytes="<?= (int) upload_limit_bytes() ?>"
-      data-msg-upload-too-large="<?= e(__('documents.upload_too_large', ['max' => upload_max_mb()])) ?>">
-    <?= csrf_field() ?>
-    <div class="panel-header">
+<?php if (!empty($hasAnyMovements)): ?>
+<form class="panel filter-bar treasury-filter" method="get" action="<?= e(url('/treasury')) ?>" role="search">
+    <div class="panel-header treasury-filter-head">
         <div>
-            <h2 class="section-title"><?= e(__('treasury.add_movement')) ?></h2>
-            <p class="section-lede"><?= e(__('treasury.add_lede')) ?></p>
+            <h2 class="section-title"><?= e(__('treasury.search')) ?></h2>
+            <p class="section-lede"><?= e(__('treasury.search_lede')) ?></p>
         </div>
+        <button class="btn btn-sm treasury-filter-submit-desktop" type="submit"><?= e(__('treasury.search')) ?></button>
     </div>
-    <?php require __DIR__ . '/_form_fields.php'; ?>
-    <div class="form-actions form-actions-end">
-        <button class="btn" type="submit"><?= e(__('treasury.submit')) ?></button>
-    </div>
-</form>
-<?php endif; ?>
-
-<div class="panel">
-    <div class="panel-header">
-        <div>
-            <h2 class="section-title"><?= e(__('treasury.ledger')) ?></h2>
-            <p class="section-lede"><?= e(__('treasury.ledger_lede')) ?></p>
-        </div>
-        <form class="doc-archive-search" method="get" action="<?= e(url('/treasury')) ?>" role="search">
-            <label class="visually-hidden" for="treasury-q"><?= e(__('treasury.search')) ?></label>
+    <div class="treasury-filter-q">
+        <label class="treasury-filter-q-label" for="treasury-q"><?= e(__('treasury.search')) ?></label>
+        <div class="treasury-filter-q-row">
             <input
                 id="treasury-q"
                 type="search"
@@ -81,12 +72,45 @@ $canManage = can('treasury.manage');
                 placeholder="<?= e(__('treasury.search_placeholder')) ?>"
                 maxlength="120"
                 autocomplete="off"
+                enterkeyhint="search"
             >
-            <button class="btn btn-sm" type="submit"><?= e(__('treasury.search')) ?></button>
+            <button class="btn btn-sm treasury-filter-submit-mobile" type="submit"><?= e(__('treasury.search')) ?></button>
             <?php if (trim((string) ($search_query ?? '')) !== ''): ?>
                 <a class="btn btn-ghost btn-sm" href="<?= e(url('/treasury')) ?>"><?= e(__('treasury.search_clear')) ?></a>
             <?php endif; ?>
-        </form>
+        </div>
+    </div>
+</form>
+<?php endif; ?>
+
+<?php if ($canManage): ?>
+<details class="panel treasury-form-panel" data-treasury-form-panel <?= $formOpen ? 'open' : '' ?>>
+    <summary class="treasury-form-summary">
+        <span class="treasury-form-summary-text">
+            <span class="section-title"><?= e(__('treasury.add_movement')) ?></span>
+            <span class="section-lede"><?= e(__('treasury.add_lede')) ?></span>
+        </span>
+        <span class="treasury-form-chevron" aria-hidden="true"></span>
+    </summary>
+    <form class="treasury-form-body" method="post" action="<?= e(url('/treasury')) ?>" enctype="multipart/form-data" data-treasury-form data-leave-guard
+          data-confirm-template="<?= e(__('treasury.confirm_summary')) ?>"
+          data-max-upload-bytes="<?= (int) upload_limit_bytes() ?>"
+          data-msg-upload-too-large="<?= e(__('documents.upload_too_large', ['max' => upload_max_mb()])) ?>">
+        <?= csrf_field() ?>
+        <?php require __DIR__ . '/_form_fields.php'; ?>
+        <div class="form-actions form-actions-end">
+            <button class="btn" type="submit"><?= e(__('treasury.submit')) ?></button>
+        </div>
+    </form>
+</details>
+<?php endif; ?>
+
+<div class="panel">
+    <div class="panel-header">
+        <div>
+            <h2 class="section-title"><?= e(__('treasury.ledger')) ?></h2>
+            <p class="section-lede"><?= e(__('treasury.ledger_lede')) ?></p>
+        </div>
     </div>
     <?php if ($movement_groups === []): ?>
         <div class="empty-state">
@@ -110,7 +134,7 @@ $canManage = can('treasury.manage');
                         <table class="treasury-ledger">
                             <thead>
                             <tr>
-                                <th><?= e(__('treasury.date')) ?></th>
+                                <th><?= e(__('treasury.operation_date')) ?></th>
                                 <th><?= e(__('treasury.description')) ?></th>
                                 <th><?= e(__('treasury.method')) ?></th>
                                 <th><?= e(__('treasury.details')) ?></th>
@@ -131,7 +155,7 @@ $canManage = can('treasury.manage');
                                 }
                                 $rowId = (int) ($row['id'] ?? 0);
                                 $editUrl = $canManage ? url('/treasury/' . $rowId . '/edit') : '';
-                                $methodKey = (string) ($row['payment_method'] ?? 'cash');
+                                $methodKey = \Socly\Services\TreasuryService::normalizePaymentMethod((string) ($row['payment_method'] ?? 'cash'));
                                 $methodLabel = __('treasury.method_' . $methodKey);
                                 if ($methodLabel === 'treasury.method_' . $methodKey) {
                                     $methodLabel = $methodKey;

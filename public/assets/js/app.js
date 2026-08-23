@@ -5485,13 +5485,18 @@ function initDeadlineCategory(root = document) {
 }
 
 function formatTreasuryConfirmMessage(form, template) {
-  const direction = form.querySelector('[data-treasury-direction]');
+  const directionHidden = form.querySelector('[data-treasury-direction]');
+  const signSelect = form.querySelector('[data-treasury-sign]');
+  const kindSelect = form.querySelector('[data-treasury-kind]');
   const categorySelect = form.querySelector('[data-treasury-category]');
   const newCategoryInput = form.querySelector('[data-treasury-new-category-input]');
   const amountRaw = String(form.querySelector('[name="amount"]')?.value || '').trim();
   const dateRaw = String(form.querySelector('[name="movement_date"]')?.value || '').trim();
 
-  const directionLabel = direction?.selectedOptions?.[0]?.textContent?.trim() || '—';
+  const directionValue = directionHidden?.value || signSelect?.value || 'income';
+  const directionLabel = signSelect?.selectedOptions?.[0]?.textContent?.trim()
+    || (directionValue === 'expense' ? 'Uscita' : 'Entrata');
+  const kindLabel = kindSelect?.selectedOptions?.[0]?.textContent?.trim() || '';
   let categoryLabel = '—';
   if (categorySelect?.value === '__new__') {
     categoryLabel = String(newCategoryInput?.value || '').trim() || '—';
@@ -5525,6 +5530,7 @@ function formatTreasuryConfirmMessage(form, template) {
 
   return tpl
     .replace(':type', directionLabel)
+    .replace(':kind', kindLabel)
     .replace(':amount', amountLabel)
     .replace(':date', dateLabel)
     .replace(':category', categoryLabel);
@@ -5822,11 +5828,50 @@ function initTreasuryCategory(root = document) {
     const categorySelect = form.querySelector('[data-treasury-category]');
     const newCategoryWrap = form.querySelector('[data-treasury-new-category]');
     const newCategoryInput = form.querySelector('[data-treasury-new-category-input]');
-    const direction = form.querySelector('[data-treasury-direction]');
+    const directionHidden = form.querySelector('[data-treasury-direction]');
+    const kindSelect = form.querySelector('[data-treasury-kind]');
+    const signSelect = form.querySelector('[data-treasury-sign]');
+    const signWrap = form.querySelector('[data-treasury-sign-wrap]');
     const invoiceToggle = form.querySelector('[data-treasury-invoice-toggle]');
     if (!categorySelect) {
       return;
     }
+
+    const syncKindSign = () => {
+      if (!kindSelect || !directionHidden) {
+        return;
+      }
+      const option = kindSelect.selectedOptions?.[0];
+      const directions = option?.dataset?.directions || 'both';
+      const defaultDir = option?.dataset?.defaultDirection || 'income';
+      if (signSelect) {
+        if (directions === 'income') {
+          signSelect.value = 'income';
+          signSelect.disabled = true;
+          if (signWrap) signWrap.hidden = true;
+        } else if (directions === 'expense') {
+          signSelect.value = 'expense';
+          signSelect.disabled = true;
+          if (signWrap) signWrap.hidden = true;
+        } else {
+          signSelect.disabled = false;
+          if (signWrap) signWrap.hidden = false;
+          if (!signSelect.value || (signSelect.value !== 'income' && signSelect.value !== 'expense')) {
+            signSelect.value = defaultDir;
+          }
+        }
+      }
+      directionHidden.value = signSelect?.value || defaultDir;
+    };
+    kindSelect?.addEventListener('change', syncKindSign);
+    signSelect?.addEventListener('change', () => {
+      if (directionHidden && signSelect) {
+        directionHidden.value = signSelect.value;
+      }
+      syncDirection();
+    });
+    syncKindSign();
+
     const sync = () => {
       const isNew = categorySelect.value === '__new__';
       categorySelect.hidden = isNew;
@@ -5854,7 +5899,8 @@ function initTreasuryCategory(root = document) {
     sync();
 
     const syncDirection = () => {
-      const isExpense = direction?.value === 'expense';
+      const dir = directionHidden?.value || signSelect?.value || 'income';
+      const isExpense = dir === 'expense';
       form.querySelectorAll('[data-treasury-expense-fields]').forEach((field) => {
         field.hidden = !isExpense;
         field.querySelectorAll('input, select, textarea').forEach((input) => {
@@ -5869,7 +5915,7 @@ function initTreasuryCategory(root = document) {
         });
       });
     };
-    direction?.addEventListener('change', syncDirection);
+    directionHidden?.addEventListener('change', syncDirection);
     invoiceToggle?.addEventListener('change', syncDirection);
     syncDirection();
 

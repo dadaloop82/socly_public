@@ -8,6 +8,7 @@
 $old = old_input();
 $values = $old !== [] ? $old : [
     'direction' => (string) ($movement['direction'] ?? 'income'),
+    'movement_kind' => 'operating',
     'amount' => (string) ($movement['amount'] ?? ''),
     'movement_date' => (string) ($movement['movement_date'] ?? date('Y-m-d')),
     'category' => (string) ($movement['category'] ?? 'membership_fee'),

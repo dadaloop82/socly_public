@@ -39,10 +39,14 @@ final class TreasuryController extends BaseController
             'config' => $config,
             'members' => $this->members->listForSelect(),
             'categories' => $this->treasury->categoryOptions(),
+            'category_groups' => $this->treasury->categoryGroups(),
+            'movement_kinds' => TreasuryService::movementKindMeta(),
+            'payment_method_groups' => $this->treasury->paymentMethodGroups(),
             'default_category' => $this->treasury->defaultCategory(),
             'search_query' => $query,
             'beneficiaries' => $this->treasury->beneficiaries(),
             'currency' => $this->currency,
+            'hasAnyMovements' => $this->treasury->movementCount() > 0,
         ]);
     }
 
@@ -68,6 +72,9 @@ final class TreasuryController extends BaseController
             'title' => __('treasury.edit'),
             'movement' => $movement,
             'categories' => $categories,
+            'category_groups' => $this->treasury->categoryGroups(),
+            'movement_kinds' => TreasuryService::movementKindMeta(),
+            'payment_method_groups' => $this->treasury->paymentMethodGroups(),
             'members' => $this->members->listForSelect(),
             'config' => $this->components->config('treasury', ['auto_from_payments' => true]),
             'beneficiaries' => $this->treasury->beneficiaries(),

@@ -11,17 +11,25 @@ final class TreasuryService
 {
     /** @var list<string> */
     public const BUILTIN_CATEGORIES = [
-        'membership_fee',
-        'donation',
-        'rent',
-        'utilities',
-        'events',
-        'supplies',
+        'membership_fee', 'donation', 'five_per_thousand', 'public_grants', 'institutional_activities',
+        'events', 'sponsorship', 'commercial_sales', 'financial_income',
+        'rent', 'utilities', 'supplies', 'event_costs', 'volunteer_reimbursement', 'personnel',
+        'services_consulting', 'insurance', 'bank_fees', 'maintenance', 'equipment', 'marketing_promo', 'taxes',
+        'internal_transfer', 'cash_deposit_withdrawal', 'member_loan', 'security_deposit',
         'other',
     ];
 
     /** @var list<string> */
-    public const METHODS = ['cash', 'bank', 'pos', 'credit_card', 'other'];
+    public const MOVEMENT_KINDS = [
+        'operating', 'internal_transfer', 'advance', 'refund', 'loan', 'deposit', 'reversal', 'adjustment',
+    ];
+
+    /** @var list<string> */
+    public const METHODS = [
+        'cash', 'bank', 'bank_transfer', 'pos', 'pos_card', 'credit_card', 'satispay', 'paypal',
+        'online_gateway', 'sepa_direct_debit', 'postal_slip', 'check', 'internal_transfer',
+        'offset_compensation', 'other',
+    ];
 
     public function __construct(
         private readonly Database $db,
@@ -30,6 +38,118 @@ final class TreasuryService
         private readonly ComponentService $components,
         private readonly DocumentService $documents
     ) {
+    }
+
+    public function movementCount(): int
+    {
+        return (int) ($this->db->fetch('SELECT COUNT(*) AS c FROM treasury_movements')['c'] ?? 0);
+    }
+
+    /** @return list<string> */
+    public static function movementKinds(): array
+    {
+        return self::MOVEMENT_KINDS;
+    }
+
+    /**
+     * UI metadata for movement kind + income/expense sign.
+     *
+     * @return list<array{key:string,directions:string,default:string}>
+     */
+    public static function movementKindMeta(): array
+    {
+        $defs = [
+            'operating' => ['directions' => 'both', 'default' => 'income'],
+            'internal_transfer' => ['directions' => 'both', 'default' => 'income'],
+            'advance' => ['directions' => 'both', 'default' => 'expense'],
+            'refund' => ['directions' => 'both', 'default' => 'income'],
+            'loan' => ['directions' => 'both', 'default' => 'income'],
+            'deposit' => ['directions' => 'both', 'default' => 'income'],
+            'reversal' => ['directions' => 'both', 'default' => 'expense'],
+            'adjustment' => ['directions' => 'both', 'default' => 'income'],
+        ];
+        $out = [];
+        foreach (self::MOVEMENT_KINDS as $key) {
+            $meta = $defs[$key] ?? ['directions' => 'both', 'default' => 'income'];
+            $out[] = ['key' => $key, 'directions' => $meta['directions'], 'default' => $meta['default']];
+        }
+        return $out;
+    }
+
+    /**
+     * @return list<array{label:string,keys:list<string>}>
+     */
+    public function paymentMethodGroups(): array
+    {
+        $groups = [
+            ['label_key' => 'treasury.method_group_digital', 'keys' => [
+                'bank_transfer', 'pos_card', 'satispay', 'paypal', 'online_gateway', 'sepa_direct_debit',
+            ]],
+            ['label_key' => 'treasury.method_group_traditional', 'keys' => ['cash', 'postal_slip', 'check']],
+            ['label_key' => 'treasury.method_group_internal', 'keys' => ['internal_transfer', 'offset_compensation']],
+            ['label_key' => 'treasury.method_group_other', 'keys' => ['other']],
+        ];
+        $out = [];
+        foreach ($groups as $group) {
+            $keys = [];
+            foreach ($group['keys'] as $key) {
+                if (in_array($key, self::METHODS, true)) {
+                    $keys[] = $key;
+                }
+            }
+            if ($keys !== []) {
+                $out[] = ['label' => __($group['label_key']), 'keys' => $keys];
+            }
+        }
+        return $out;
+    }
+
+    /**
+     * @return list<array{label:string,keys:list<string>}>
+     */
+    public function categoryGroups(): array
+    {
+        $groups = [
+            ['label_key' => 'treasury.cat_group_income', 'keys' => [
+                'membership_fee', 'donation', 'five_per_thousand', 'public_grants', 'institutional_activities',
+                'events', 'sponsorship', 'commercial_sales', 'financial_income',
+            ]],
+            ['label_key' => 'treasury.cat_group_expense', 'keys' => [
+                'rent', 'utilities', 'supplies', 'event_costs', 'volunteer_reimbursement', 'personnel',
+                'services_consulting', 'insurance', 'bank_fees', 'maintenance', 'equipment', 'marketing_promo', 'taxes',
+            ]],
+            ['label_key' => 'treasury.cat_group_financial', 'keys' => [
+                'internal_transfer', 'cash_deposit_withdrawal', 'member_loan', 'security_deposit',
+            ]],
+            ['label_key' => 'treasury.cat_group_other', 'keys' => ['other']],
+        ];
+        $out = [];
+        foreach ($groups as $group) {
+            $keys = [];
+            foreach ($group['keys'] as $key) {
+                if (in_array($key, self::BUILTIN_CATEGORIES, true)) {
+                    $keys[] = $key;
+                }
+            }
+            if ($keys !== []) {
+                $out[] = ['label' => __($group['label_key']), 'keys' => $keys];
+            }
+        }
+        return $out;
+    }
+
+    public static function normalizePaymentMethod(string $method): string
+    {
+        $method = trim($method);
+        $aliases = [
+            'bank' => 'bank_transfer',
+            'pos' => 'pos_card',
+            'credit_card' => 'pos_card',
+        ];
+        if (isset($aliases[$method])) {
+            $method = $aliases[$method];
+        }
+        return in_array($method, self::METHODS, true) ? $method : 'other';
     }
 
     /** @return array{movements:list<array<string,mixed>>,balance:float,income:float,expense:float} */
@@ -373,10 +493,7 @@ final class TreasuryService
         if (!$this->validator->validate(['movement_date' => $date], ['movement_date' => 'date'])) {
             $date = date('Y-m-d');
         }
-        $method = trim((string) ($input['payment_method'] ?? 'cash'));
-        if (!in_array($method, self::METHODS, true)) {
-            $method = 'cash';
-        }
+        $method = self::normalizePaymentMethod(trim((string) ($input['payment_method'] ?? 'cash')));
         $category = trim((string) ($input['category'] ?? 'membership_fee'));
         if ($category === '' || $category === '__new__') {
             $category = 'membership_fee';
@@ -420,10 +537,7 @@ final class TreasuryService
         if (empty($categoryResult['ok'])) {
             return ['ok' => false, 'errors' => ['category' => (string) ($categoryResult['error'] ?? __('validation.required'))]];
         }
-        $method = trim((string) ($input['payment_method'] ?? 'cash'));
-        if (!in_array($method, self::METHODS, true)) {
-            $method = 'cash';
-        }
+        $method = self::normalizePaymentMethod(trim((string) ($input['payment_method'] ?? 'cash')));
         $memberId = trim((string) ($input['member_id'] ?? ''));
         $memberId = $memberId !== '' ? (int) $memberId : null;
         $isInvoice = $direction === 'expense' && !empty($input['invoice_payment']);
