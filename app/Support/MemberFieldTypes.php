@@ -138,7 +138,7 @@ final class MemberFieldTypes
         return self::catalogue()[$type]['rule'] ?? 'string|max:255';
     }
 
-    public static function validationRule(string $type, bool $required = false): string
+    public static function validationRule(string $type, bool $required = false, string $key = ''): string
     {
         if ($type === self::CHECKBOX) {
             return $required ? 'accepted' : 'boolean';
@@ -147,6 +147,9 @@ final class MemberFieldTypes
             return self::baseRule($type);
         }
         $base = self::baseRule($type);
+        if ($key === 'birth_date') {
+            $base = 'date|adult_birth_date';
+        }
         if ($required && !str_contains($base, 'required') && !str_contains($base, 'accepted')) {
             return 'required|' . $base;
         }

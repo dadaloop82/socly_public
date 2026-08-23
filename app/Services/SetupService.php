@@ -1252,6 +1252,12 @@ final class SetupService
                 $errors[$dateKey] = __('validation.date');
             }
         }
+        if ($person['birth_date'] !== '') {
+            $birthErr = validate_adult_birth_date($person['birth_date']);
+            if ($birthErr !== null) {
+                $errors['birth_date'] = __($birthErr);
+            }
+        }
         if ($errors) {
             return ['ok' => false, 'errors' => $errors];
         }

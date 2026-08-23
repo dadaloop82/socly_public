@@ -145,6 +145,8 @@ document.addEventListener('DOMContentLoaded', () => {
   initDemoLoginNotice();
   initAuthNewsWidget();
   initAuthUpdateCheck();
+  initBirthDateFields(document);
+  initGeoSubmitValidation(document);
   initDocumentUpload(document);
   initDocumentRowLinks(document);
   document.querySelectorAll('[data-org-person-form]').forEach((form) => {
@@ -839,6 +841,8 @@ function initSetupWizard() {
   if (setupForm) {
     initPlaceSuggest(setupForm);
     initFiscalCodeAuto(setupForm);
+    initBirthDateFields(setupForm);
+    initGeoSubmitValidation(setupForm);
   }
   initSetupPeopleList(root);
   initSetupWebsiteScrape(root);
@@ -4643,6 +4647,117 @@ function initAuthNewsWidget() {
       enterScope(slot, { reset: true });
     })
     .catch(() => {});
+}
+
+function initBirthDateFields(root = document) {
+  const scope = root && root.querySelectorAll ? root : document;
+  const today = new Date();
+  const maxAdult = new Date(today.getFullYear() - 18, today.getMonth(), today.getDate());
+  const maxStr = maxAdult.toISOString().slice(0, 10);
+  const todayStr = today.toISOString().slice(0, 10);
+  const msgFuture = document.body?.dataset?.msgBirthFuture || 'La data di nascita non può essere nel futuro.';
+  const msgMinor = document.body?.dataset?.msgBirthMinor || 'La persona deve avere almeno 18 anni.';
+
+  scope.querySelectorAll('[data-birth-date]').forEach((input) => {
+    if (!(input instanceof HTMLInputElement) || input.dataset.birthBound === '1') return;
+    input.dataset.birthBound = '1';
+    input.max = maxStr;
+    const validate = () => {
+      const v = input.value;
+      if (!v) {
+        input.setCustomValidity('');
+        return true;
+      }
+      if (v > todayStr) {
+        input.setCustomValidity(msgFuture);
+        return false;
+      }
+      if (v > maxStr) {
+        input.setCustomValidity(msgMinor);
+        return false;
+      }
+      input.setCustomValidity('');
+      return true;
+    };
+    input.addEventListener('change', validate);
+    input.addEventListener('input', validate);
+  });
+}
+
+async function resolvePendingGeoFields(form) {
+  const urls = resolveGeoUrls(form);
+  if (!urls) return;
+  const { citiesUrl, addressesUrl } = urls;
+  const confirmCityTpl = document.body?.dataset?.msgGeoConfirmCity || '';
+  const confirmAddressTpl = document.body?.dataset?.msgGeoConfirmAddress || '';
+  const cityNotFoundTpl = document.body?.dataset?.msgGeoCityNotFound || '';
+
+  for (const cityInput of form.querySelectorAll('[data-city-input]')) {
+    if (!(cityInput instanceof HTMLInputElement) || cityInput.dataset.geoPicked === '1') continue;
+    const raw = cityInput.value.trim();
+    if (raw.length < 2) continue;
+    const data = await resolveGeoQuery(citiesUrl, { q: raw });
+    await handleGeoResolveResult(data, cityInput, (item) => {
+      cityInput.value = item.city || item.label || raw;
+      const postalInput = cityInput.closest('form')?.querySelector('[data-postal-code]');
+      if (postalInput instanceof HTMLInputElement && item.cap) {
+        postalInput.value = item.cap;
+      }
+    }, confirmCityTpl, { notFoundTemplate: cityNotFoundTpl });
+  }
+
+  for (const addressInput of form.querySelectorAll('[data-address-input]')) {
+    if (!(addressInput instanceof HTMLInputElement) || addressInput.dataset.geoPicked === '1') continue;
+    const raw = addressInput.value.trim();
+    if (raw.length < 3) continue;
+    const scope = addressInput.closest('[data-geo-scope], [data-people-row], .setup-address, .setup-president, [data-member-form], form') || form;
+    const city = scope.querySelector('[data-city-input]')?.value?.trim() || '';
+    if (!city) continue;
+    const houseNumberInput = scope.querySelector('[data-house-number]');
+    const postalInput = scope.querySelector('[data-postal-code]');
+    const data = await resolveGeoQuery(addressesUrl, {
+      q: raw,
+      city,
+      house_number: houseNumberInput instanceof HTMLInputElement ? houseNumberInput.value.trim() : '',
+    });
+    await handleGeoResolveResult(data, addressInput, (item) => {
+      addressInput.value = item.address || item.label || raw;
+      if (houseNumberInput instanceof HTMLInputElement && item.house_number) {
+        houseNumberInput.value = item.house_number;
+      }
+      if (postalInput instanceof HTMLInputElement && item.postal_code) {
+        postalInput.value = item.postal_code;
+      }
+    }, confirmAddressTpl);
+  }
+}
+
+function initGeoSubmitValidation(root = document) {
+  const scope = root && root.querySelectorAll ? root : document;
+  scope.querySelectorAll('form').forEach((form) => {
+    if (!(form instanceof HTMLFormElement) || form.dataset.geoSubmitBound === '1') return;
+    if (!form.querySelector('[data-address-input], [data-city-input]')) return;
+    form.dataset.geoSubmitBound = '1';
+    form.addEventListener('submit', async (event) => {
+      if (form.dataset.geoResolved === '1') {
+        delete form.dataset.geoResolved;
+        return;
+      }
+      event.preventDefault();
+      event.stopPropagation();
+      try {
+        await resolvePendingGeoFields(form);
+        form.dataset.geoResolved = '1';
+        if (typeof form.requestSubmit === 'function') {
+          form.requestSubmit();
+        } else {
+          HTMLFormElement.prototype.submit.call(form);
+        }
+      } catch {
+        delete form.dataset.geoResolved;
+      }
+    }, { capture: true });
+  });
 }
 
 function initAuthUpdateCheck() {

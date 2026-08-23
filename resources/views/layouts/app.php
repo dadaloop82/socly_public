@@ -51,6 +51,8 @@ $configActive = str_contains($uri, '/settings') || str_contains($uri, '/users') 
     data-msg-geo-city-not-found-ok="<?= e(__('members.geo_city_not_found_ok')) ?>"
     data-msg-geo-confirm-yes="<?= e(__('members.geo_confirm_yes')) ?>"
     data-msg-geo-confirm-no="<?= e(__('members.geo_confirm_no')) ?>"
+    data-msg-birth-future="<?= e(__('validation.birth_date_future')) ?>"
+    data-msg-birth-minor="<?= e(__('validation.birth_date_minor')) ?>"
 >
 <?php
 $temporaryInstance = false;

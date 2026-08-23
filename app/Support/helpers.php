@@ -258,6 +258,33 @@ if (!function_exists('is_user_upload_relative_path')) {
     }
 }
 
+if (!function_exists('validate_adult_birth_date')) {
+    /** @return string|null Validation message key or null if valid/empty */
+    function validate_adult_birth_date(?string $date): ?string
+    {
+        $date = trim((string) $date);
+        if ($date === '') {
+            return null;
+        }
+        if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $date)) {
+            return 'validation.date';
+        }
+        $ts = strtotime($date);
+        if ($ts === false) {
+            return 'validation.date';
+        }
+        $today = strtotime('today');
+        if ($ts > $today) {
+            return 'validation.birth_date_future';
+        }
+        $minAdult = strtotime('-18 years', $today);
+        if ($ts > $minAdult) {
+            return 'validation.birth_date_minor';
+        }
+        return null;
+    }
+}
+
 if (!function_exists('socly_news_api_url')) {
     function socly_news_api_url(): string
     {

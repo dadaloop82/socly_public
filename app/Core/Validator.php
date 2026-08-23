@@ -110,6 +110,14 @@ final class Validator
                     $fail(__('validation.date'));
                 }
                 break;
+            case 'adult_birth_date':
+                if ($value !== null && $value !== '') {
+                    $birthErr = validate_adult_birth_date((string) $value);
+                    if ($birthErr !== null) {
+                        $fail(__($birthErr));
+                    }
+                }
+                break;
             case 'in':
                 if ($value !== null && $value !== '' && !in_array((string) $value, $params, true)) {
                     $fail(__('validation.in'));

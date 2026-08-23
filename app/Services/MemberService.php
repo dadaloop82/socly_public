@@ -978,7 +978,7 @@ final class MemberService
                         $value = null;
                     }
                 }
-                $rule = \Socly\Support\MemberFieldTypes::validationRule($type, $required);
+                $rule = \Socly\Support\MemberFieldTypes::validationRule($type, $required, $key);
             }
 
             if (!$this->validator->validate([$key => $value], [$key => $rule])) {

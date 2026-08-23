@@ -1016,6 +1016,25 @@ $errorStep = flash('setup_error_step');
                     </label>
                 <?php endif; ?>
 
+                <?php
+                $setupWhyText = '';
+                if (!empty($step['description_key'])) {
+                    $setupWhyKey = preg_replace('/_desc/', '_why', (string) $step['description_key']) ?? '';
+                    if ($setupWhyKey !== '' && $setupWhyKey !== (string) $step['description_key']) {
+                        $candidate = __($setupWhyKey);
+                        if ($candidate !== $setupWhyKey) {
+                            $setupWhyText = $candidate;
+                        }
+                    }
+                }
+                ?>
+                <?php if ($setupWhyText !== ''): ?>
+                    <div class="setup-why-note" data-setup-line>
+                        <p class="setup-why-title"><?= e(__('setup.why_title')) ?></p>
+                        <p class="setup-why-text muted"><?= e($setupWhyText) ?></p>
+                    </div>
+                <?php endif; ?>
+
                 <div class="setup-actions" data-setup-line>
                     <?php if (!empty($backHref)): ?>
                         <a class="btn btn-ghost setup-back" href="<?= e((string) $backHref) ?>"><?= e(__('common.back')) ?></a>
