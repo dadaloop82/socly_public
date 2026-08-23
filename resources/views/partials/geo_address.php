@@ -15,18 +15,21 @@
 $names = array_merge([
     'city' => 'city',
     'postal_code' => 'postal_code',
+    'province' => 'province',
     'address' => 'address',
     'house_number' => 'house_number',
 ], is_array($names ?? null) ? $names : []);
 $values = array_merge([
     'city' => '',
     'postal_code' => '',
+    'province' => '',
     'address' => '',
     'house_number' => '',
 ], is_array($values ?? null) ? $values : []);
 $required = array_merge([
     'city' => false,
     'postal_code' => false,
+    'province' => false,
     'address' => false,
     'house_number' => false,
 ], is_array($required ?? null) ? $required : []);
@@ -34,6 +37,7 @@ $ids = is_array($ids ?? null) ? $ids : [];
 $enabled = array_merge([
     'city' => true,
     'postal_code' => true,
+    'province' => false,
     'address' => true,
     'house_number' => true,
 ], is_array($enabled ?? null) ? $enabled : []);
@@ -43,7 +47,7 @@ $layout = (($layout ?? 'rows') === 'inline') ? 'inline' : 'rows';
 $star = static fn (bool $need): string => $need ? ' *' : '';
 $req = static fn (bool $need): string => $need ? ' required' : '';
 $rootClass = trim('geo-address setup-address geo-layout-' . $layout . ' ' . $extraClass);
-$anyEnabled = !empty($enabled['city']) || !empty($enabled['postal_code']) || !empty($enabled['address']) || !empty($enabled['house_number']);
+$anyEnabled = !empty($enabled['city']) || !empty($enabled['postal_code']) || !empty($enabled['province']) || !empty($enabled['address']) || !empty($enabled['house_number']);
 ?>
 <?php if ($anyEnabled): ?>
 <div class="<?= e($rootClass) ?>"<?= $withScope ? ' data-geo-scope' : '' ?>>
@@ -115,9 +119,25 @@ $anyEnabled = !empty($enabled['city']) || !empty($enabled['postal_code']) || !em
                 >
             </label>
             <?php endif; ?>
+            <?php if (!empty($enabled['province'])): ?>
+            <label class="setup-field setup-field-province geo-field">
+                <span><?= e(__('setup.field_province')) ?><?= e($star((bool) $required['province'])) ?></span>
+                <input
+                    type="text"
+                    name="<?= e($names['province']) ?>"
+                    value="<?= e((string) $values['province']) ?>"
+                    data-province-input
+                    autocomplete="address-level1"
+                    maxlength="4"
+                    placeholder="<?= e(__('setup.field_province_placeholder')) ?>"
+                    <?= !empty($ids['province']) ? 'id="' . e($ids['province']) . '"' : '' ?>
+                    <?= $req((bool) $required['province']) ?>
+                >
+            </label>
+            <?php endif; ?>
         </div>
     <?php else: ?>
-        <?php if (!empty($enabled['city']) || !empty($enabled['postal_code'])): ?>
+        <?php if (!empty($enabled['city']) || !empty($enabled['postal_code']) || !empty($enabled['province'])): ?>
         <div class="geo-address-row setup-address-row">
             <?php if (!empty($enabled['city'])): ?>
             <label class="setup-field suggest-field setup-field-grow geo-field">
@@ -149,6 +169,22 @@ $anyEnabled = !empty($enabled['city']) || !empty($enabled['postal_code']) || !em
                     autocomplete="postal-code"
                     <?= !empty($ids['postal_code']) ? 'id="' . e($ids['postal_code']) . '"' : '' ?>
                     <?= $req((bool) $required['postal_code']) ?>
+                >
+            </label>
+            <?php endif; ?>
+            <?php if (!empty($enabled['province'])): ?>
+            <label class="setup-field setup-field-province geo-field">
+                <span><?= e(__('setup.field_province')) ?><?= e($star((bool) $required['province'])) ?></span>
+                <input
+                    type="text"
+                    name="<?= e($names['province']) ?>"
+                    value="<?= e((string) $values['province']) ?>"
+                    data-province-input
+                    autocomplete="address-level1"
+                    maxlength="4"
+                    placeholder="<?= e(__('setup.field_province_placeholder')) ?>"
+                    <?= !empty($ids['province']) ? 'id="' . e($ids['province']) . '"' : '' ?>
+                    <?= $req((bool) $required['province']) ?>
                 >
             </label>
             <?php endif; ?>

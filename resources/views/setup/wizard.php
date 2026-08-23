@@ -106,6 +106,9 @@ $errorStep = flash('setup_error_step');
             $showComponentsLockup = $stepKey === 'components.select'
                 && $websiteTitleName !== ''
                 && strcasecmp($websiteTitleName, 'SOCLY') !== 0;
+            $showColorsLockup = $stepKey === 'branding.colors'
+                && $websiteTitleName !== ''
+                && strcasecmp($websiteTitleName, 'SOCLY') !== 0;
             ?>
             <?php if ($showWebsiteLockup): ?>
                 <h1 class="h1 h1-brand setup-title" data-setup-line>
@@ -119,6 +122,15 @@ $errorStep = flash('setup_error_step');
             <?php elseif ($showComponentsLockup): ?>
                 <h1 class="h1 h1-brand setup-title" data-setup-line>
                     <?= e(__('setup.step_components_of')) ?>
+                    <?= assoc_lockup_html([
+                        'name' => $websiteTitleName,
+                        'legal_name' => (string) ($assocLegal ?? ''),
+                        'class' => 'assoc-lockup-setup-title',
+                    ]) ?>
+                </h1>
+            <?php elseif ($showColorsLockup): ?>
+                <h1 class="h1 h1-brand setup-title" data-setup-line>
+                    <?= e(__('setup.step_colors_of')) ?>
                     <?= assoc_lockup_html([
                         'name' => $websiteTitleName,
                         'legal_name' => (string) ($assocLegal ?? ''),
@@ -227,7 +239,9 @@ $errorStep = flash('setup_error_step');
                             <button type="button" class="btn btn-ghost setup-logo-remove" data-setup-logo-remove<?= $hasLogo ? '' : ' hidden' ?>>
                                 <?= e(__('setup.logo_remove')) ?>
                             </button>
-                            <span class="setup-logo-filename muted" data-setup-logo-filename><?= e(__('setup.logo_no_file')) ?></span>
+                        </div>
+                        <div class="setup-logo-upload-progress" data-setup-logo-progress hidden>
+                            <span class="setup-logo-upload-progress-bar" data-setup-logo-progress-bar style="--progress: 0%"></span>
                         </div>
                         <p class="setup-logo-status muted" data-setup-logo-status hidden></p>
                         <p class="setup-hint muted"><?= e(__('setup.logo_hint')) ?></p>
@@ -324,16 +338,28 @@ $errorStep = flash('setup_error_step');
                 <?php elseif ($stepType === 'field_group'): ?>
                     <div class="setup-field-group" data-setup-line>
                         <?php foreach ($step['fields'] as $field): ?>
+                            <?php $fieldType = (string) ($field['type'] ?? 'text'); ?>
+                            <?php if ($fieldType === 'tel'): ?>
+                                <div class="setup-field">
+                                    <span><?= e(__($field['label_key'])) ?><?= !empty($field['required']) ? ' *' : '' ?></span>
+                                    <?= view_partial('partials/phone_field', [
+                                        'name' => (string) ($field['key'] ?? 'phone'),
+                                        'value' => (string) ($value[$field['key']] ?? ''),
+                                        'required' => !empty($field['required']),
+                                    ]) ?>
+                                </div>
+                            <?php else: ?>
                             <label class="setup-field">
                                 <span><?= e(__($field['label_key'])) ?><?= !empty($field['required']) ? ' *' : '' ?></span>
                                 <input
-                                    type="<?= e(($field['type'] ?? '') === 'tel' ? 'tel' : (($field['type'] ?? '') === 'email' ? 'email' : 'text')) ?>"
+                                    type="<?= e($fieldType === 'email' ? 'email' : 'text') ?>"
                                     name="<?= e($field['key']) ?>"
                                     value="<?= e((string) ($value[$field['key']] ?? '')) ?>"
                                     <?= !empty($field['required']) ? 'required' : '' ?>
                                     autocomplete="<?= e((string) ($field['autocomplete'] ?? 'off')) ?>"
                                 >
                             </label>
+                            <?php endif; ?>
                         <?php endforeach; ?>
                     </div>
                 <?php elseif ($stepType === 'address_block'): ?>
@@ -341,18 +367,28 @@ $errorStep = flash('setup_error_step');
                         'names' => [
                             'city' => 'city',
                             'postal_code' => 'postal_code',
+                            'province' => 'province',
                             'address' => 'address',
                             'house_number' => 'house_number',
                         ],
                         'values' => [
                             'city' => (string) ($value['city'] ?? ''),
                             'postal_code' => (string) ($value['postal_code'] ?? ''),
+                            'province' => (string) ($value['province'] ?? ''),
                             'address' => (string) ($value['address'] ?? ''),
                             'house_number' => (string) ($value['house_number'] ?? ''),
                         ],
                         'required' => [
                             'city' => true,
                             'postal_code' => true,
+                            'province' => false,
+                            'address' => true,
+                            'house_number' => true,
+                        ],
+                        'enabled' => [
+                            'city' => true,
+                            'postal_code' => true,
+                            'province' => true,
                             'address' => true,
                             'house_number' => true,
                         ],

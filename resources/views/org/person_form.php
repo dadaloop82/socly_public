@@ -107,7 +107,10 @@ $action = $isEdit
         </div>
         <div>
             <label><?= e(__('setup.field_phone')) ?></label>
-            <input type="text" name="phone" value="<?= e((string) ($values['phone'] ?? '')) ?>" maxlength="40">
+            <?= view_partial('partials/phone_field', [
+                'name' => 'phone',
+                'value' => (string) ($values['phone'] ?? ''),
+            ]) ?>
         </div>
     </div>
     <div>

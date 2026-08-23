@@ -69,6 +69,7 @@ final class SettingsController extends BaseController
                 'association.vat_number' => $this->settings->get('association.vat_number'),
                 'association.city' => $this->settings->get('association.city'),
                 'association.postal_code' => $this->settings->get('association.postal_code'),
+                'association.province' => $this->settings->get('association.province'),
                 'association.address' => $this->settings->get('association.address'),
                 'association.house_number' => $this->settings->get('association.house_number'),
                 'association.pec' => $this->settings->get('association.pec'),
@@ -208,18 +209,26 @@ final class SettingsController extends BaseController
         $this->settings->set('association.vat_number', $vat);
         $this->settings->set('association.city', $data['association_city']);
         $this->settings->set('association.postal_code', $data['association_postal_code']);
+        $province = strtoupper(preg_replace('/[^A-Za-z]/', '', (string) ($data['association_province'] ?? '')) ?? '');
+        $this->settings->set('association.province', $province);
         $this->settings->set('association.address', $data['association_address']);
         $this->settings->set('association.house_number', $data['association_house_number']);
         $this->settings->set('association.address_full', trim(sprintf(
-            '%s %s, %s %s',
+            '%s %s, %s %s %s',
             $data['association_address'],
             $data['association_house_number'],
             $data['association_postal_code'],
-            $data['association_city']
+            $data['association_city'],
+            $province
         )));
         $this->settings->set('association.pec', $data['association_pec']);
         $this->settings->set('association.email', $data['association_email']);
-        $this->settings->set('association.phone', $data['association_phone'] ?? '');
+        $phone = normalize_phone_value($data['association_phone'] ?? '');
+        if ($phone !== '' && !is_valid_phone_value($phone)) {
+            $this->flash('errors', ['association_phone' => __('validation.phone')]);
+            redirect('/settings');
+        }
+        $this->settings->set('association.phone', $phone);
         $this->settings->set('association.runts', $data['association_runts']);
         [$primary, $accent] = $this->branding->ensureDistinctColors(
             (string) $data['primary'],
@@ -258,11 +267,12 @@ final class SettingsController extends BaseController
             'ASSOCIATION_VAT' => $vat,
             'ASSOCIATION_CITY' => $data['association_city'],
             'ASSOCIATION_POSTAL_CODE' => $data['association_postal_code'],
+            'ASSOCIATION_PROVINCE' => $province,
             'ASSOCIATION_ADDRESS' => $data['association_address'],
             'ASSOCIATION_HOUSE_NUMBER' => $data['association_house_number'],
             'ASSOCIATION_PEC' => $data['association_pec'],
             'ASSOCIATION_EMAIL' => $data['association_email'],
-            'ASSOCIATION_PHONE' => $data['association_phone'] ?? '',
+            'ASSOCIATION_PHONE' => $phone,
             'ASSOCIATION_RUNTS' => $data['association_runts'],
             'BRANDING_PRIMARY' => $data['primary'],
             'BRANDING_ACCENT' => $data['accent'],

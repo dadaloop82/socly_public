@@ -197,6 +197,14 @@ final class SetupCatalogue
                         'label_key' => 'setup.field_postal_code',
                     ],
                     [
+                        'key' => 'province',
+                        'env_key' => 'ASSOCIATION_PROVINCE',
+                        'settings_key' => 'association.province',
+                        'type' => 'text',
+                        'required' => false,
+                        'label_key' => 'setup.field_province',
+                    ],
+                    [
                         'key' => 'address',
                         'env_key' => 'ASSOCIATION_ADDRESS',
                         'settings_key' => 'association.address',

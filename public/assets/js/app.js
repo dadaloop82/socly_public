@@ -1339,13 +1339,19 @@ function initMemberWizard() {
         return;
       }
       if (el.matches('[data-phone-input]')) {
-        el.value = formatItalianPhone(el.value);
+        const field = el.closest('[data-phone-field]');
+        const dial = field?.querySelector('[data-phone-dial]')?.value || el.dataset.defaultDial || '39';
+        el.value = stripDialFromNational(el.value, dial);
+        el.value = formatNationalPhone(dial, el.value);
         const value = el.value.trim();
-        const phoneOk = value === '' || isValidItalianPhone(value);
+        const phoneOk = value === '' || isValidPhone(dial, value);
         if (value !== '' && !phoneOk) {
           el.setCustomValidity(el.dataset.invalid || 'Invalid phone');
         } else if (!el.required || value !== '') {
           el.setCustomValidity('');
+        }
+        if (field && value !== '') {
+          el.value = `+${dial} ${value}`;
         }
       }
       if (el.matches('[data-email-input]')) {
@@ -1810,76 +1816,200 @@ function initLeaveGuards(scope = document) {
 }
 
 function initPhoneInputs(scope = document) {
-  scope.querySelectorAll('[data-phone-input]').forEach((input) => {
-    const defaultHint = input.dataset.hint || input.getAttribute('placeholder') || '';
+  scope.querySelectorAll('[data-phone-field]').forEach((field) => {
+    if (field.dataset.phoneBound === '1') return;
+    field.dataset.phoneBound = '1';
+
+    const dialSelect = field.querySelector('[data-phone-dial]');
+    const input = field.querySelector('[data-phone-input]');
+    if (!input) return;
+
     const invalidMsg = input.dataset.invalid || '';
-    if (defaultHint && !input.getAttribute('placeholder')) {
-      input.setAttribute('placeholder', defaultHint);
-    }
+    const defaultDial = (input.dataset.defaultDial || '39').replace(/\D/g, '') || '39';
+
+    const decorateDial = () => {
+      if (!dialSelect) return;
+      const opt = dialSelect.options[dialSelect.selectedIndex];
+      const flag = opt?.dataset?.flag || '';
+      dialSelect.style.backgroundImage = flag ? `url("${flag}")` : '';
+    };
+
+    dialSelect?.addEventListener('change', () => {
+      decorateDial();
+      validate();
+    });
+    decorateDial();
 
     const validate = () => {
-      input.value = formatItalianPhone(input.value);
-      const value = input.value.trim();
-      const ok = value === '' || isValidItalianPhone(value);
-      input.classList.toggle('input-valid', value !== '' && ok);
-      input.classList.toggle('input-invalid', value !== '' && !ok);
-      if (value !== '' && !ok) {
+      const dial = dialSelect?.value || defaultDial;
+      let national = stripDialFromNational(input.value, dial);
+      national = formatNationalPhone(dial, national);
+      input.value = national;
+      const ok = national === '' || isValidPhone(dial, national);
+      input.classList.toggle('input-valid', national !== '' && ok);
+      input.classList.toggle('input-invalid', national !== '' && !ok);
+      if (national !== '' && !ok) {
         input.setCustomValidity(invalidMsg || 'Invalid phone');
       } else {
         input.setCustomValidity('');
       }
     };
 
-    input.addEventListener('blur', validate);
-    input.addEventListener('change', validate);
+    const syncCombined = () => {
+      const dial = dialSelect?.value || defaultDial;
+      const national = stripDialFromNational(input.value, dial);
+      if (national === '') {
+        input.dataset.combinedPhone = '';
+        return;
+      }
+      input.dataset.combinedPhone = `+${dial} ${formatNationalPhone(dial, national)}`;
+    };
+
+    input.addEventListener('blur', () => {
+      validate();
+      syncCombined();
+    });
+    input.addEventListener('change', () => {
+      validate();
+      syncCombined();
+    });
     input.addEventListener('input', () => {
       input.setCustomValidity('');
       input.classList.remove('input-valid', 'input-invalid');
     });
+
+    field.closest('form')?.addEventListener('submit', () => {
+      validate();
+      const combined = input.dataset.combinedPhone
+        || (input.value.trim() !== ''
+          ? `+${dialSelect?.value || defaultDial} ${formatNationalPhone(dialSelect?.value || defaultDial, stripDialFromNational(input.value, dialSelect?.value || defaultDial))}`
+          : '');
+      input.value = combined;
+    }, { capture: true });
+
     if (input.value.trim() !== '') {
       validate();
     }
   });
+
+  // Legacy bare inputs (no dial wrapper)
+  scope.querySelectorAll('[data-phone-input]').forEach((input) => {
+    if (input.closest('[data-phone-field]')) return;
+    if (input.dataset.phoneLegacyBound === '1') return;
+    input.dataset.phoneLegacyBound = '1';
+    const invalidMsg = input.dataset.invalid || '';
+    const validate = () => {
+      input.value = formatNationalPhone('39', stripDialFromNational(input.value, '39'));
+      const value = input.value.trim();
+      const ok = value === '' || isValidPhone('39', value);
+      input.classList.toggle('input-valid', value !== '' && ok);
+      input.classList.toggle('input-invalid', value !== '' && !ok);
+      input.setCustomValidity(value !== '' && !ok ? (invalidMsg || 'Invalid phone') : '');
+    };
+    input.addEventListener('blur', validate);
+    input.addEventListener('change', validate);
+    if (input.value.trim() !== '') validate();
+  });
+}
+
+const PHONE_DIAL_CODES = [
+  '351', '353', '358', '359', '370', '371', '372', '373', '375', '380', '385', '386', '387', '389', '420', '421',
+  '49', '43', '41', '33', '34', '44', '39', '32', '31', '48', '36', '40', '30', '381', '382', '355', '46', '47',
+  '45', '354', '90', '7', '1', '52', '55', '54', '56', '57', '51', '61', '64', '81', '86', '82', '91', '65', '852',
+  '886', '971', '966', '972', '20', '27', '212', '216',
+];
+
+function stripDialFromNational(raw, dial) {
+  let value = String(raw || '').trim();
+  if (!value) return '';
+  const code = String(dial || '39').replace(/\D/g, '');
+  value = value.replace(/[^\d+\s]/g, '');
+  if (value.startsWith('+')) {
+    const digits = value.replace(/\D/g, '');
+    for (const prefix of PHONE_DIAL_CODES) {
+      if (digits.startsWith(prefix) && digits.length > prefix.length + 3) {
+        return digits.slice(prefix.length).replace(/(\d{3,4})(?=\d)/g, '$1 ').trim();
+      }
+    }
+  }
+  if (value.startsWith('00')) {
+    const digits = value.replace(/\D/g, '').slice(2);
+    for (const prefix of PHONE_DIAL_CODES) {
+      if (digits.startsWith(prefix) && digits.length > prefix.length + 3) {
+        return digits.slice(prefix.length).replace(/(\d{3,4})(?=\d)/g, '$1 ').trim();
+      }
+    }
+  }
+  const digits = value.replace(/\D/g, '');
+  if (code && digits.startsWith(code) && digits.length > code.length + 3) {
+    return digits.slice(code.length).replace(/(\d{3,4})(?=\d)/g, '$1 ').trim();
+  }
+  return value.replace(/\D/g, '').replace(/(\d{3,4})(?=\d)/g, '$1 ').trim();
+}
+
+function formatNationalPhone(dial, raw) {
+  const code = String(dial || '39').replace(/\D/g, '') || '39';
+  let digits = stripDialFromNational(raw, code).replace(/\D/g, '');
+  if (!digits) return '';
+  if (code === '39') {
+    if (digits.startsWith('3') && digits.length >= 9) {
+      return digits.replace(/^(\d{3})(\d{3})(\d+)$/, '$1 $2 $3');
+    }
+    if (digits.length >= 6) {
+      return digits.replace(/^(\d{2,4})(\d{0,3})(\d*)$/, (_, a, b, c) => [a, b, c].filter(Boolean).join(' '));
+    }
+  }
+  return digits.replace(/(\d{3,4})(?=\d)/g, '$1 ').trim();
+}
+
+function isValidPhone(dial, raw) {
+  const code = String(dial || '39').replace(/\D/g, '') || '39';
+  const digits = stripDialFromNational(raw, code).replace(/\D/g, '');
+  if (!digits || digits.length < 4 || digits.length > 14) return false;
+  if (code === '39') {
+    return /^(?:3\d{8,9}|0\d{5,10})$/.test(digits);
+  }
+  return /^\d{4,14}$/.test(digits);
 }
 
 function isValidItalianPhone(raw) {
-  let digits = String(raw || '').replace(/\D+/g, '');
-  if (digits.startsWith('39') && digits.length > 10) {
-    digits = digits.slice(2);
-  }
-  return /^3\d{8,9}$/.test(digits) || /^0\d{5,10}$/.test(digits);
+  return isValidPhone('39', raw);
 }
 
 function formatItalianPhone(raw) {
-  const cleaned = String(raw || '').trim();
-  if (!cleaned) {
-    return '';
-  }
-  let digits = cleaned.replace(/[^\d+]/g, '');
-  let prefix = '';
-  if (digits.startsWith('+39')) {
-    prefix = '+39';
-    digits = digits.slice(3);
-  } else if (digits.startsWith('0039')) {
-    prefix = '+39';
-    digits = digits.slice(4);
-  } else if (digits.startsWith('39') && digits.length > 10) {
-    prefix = '+39';
-    digits = digits.slice(2);
-  }
-  digits = digits.replace(/\D/g, '');
-  if (!digits) {
-    return cleaned;
-  }
+  const national = stripDialFromNational(raw, '39');
+  return national === '' ? '' : `+39 ${formatNationalPhone('39', national)}`;
+}
 
-  let body = digits;
-  if (digits.startsWith('3') && digits.length >= 9) {
-    body = digits.replace(/^(\d{3})(\d{3})(\d+)$/, '$1 $2 $3');
-  } else if (digits.length >= 6) {
-    body = digits.replace(/^(\d{2,4})(\d{0,3})(\d*)$/, (_, a, b, c) => [a, b, c].filter(Boolean).join(' '));
-  }
-
-  return prefix ? `${prefix} ${body}`.trim() : body.trim();
+function uploadLogoWithProgress(url, formData, csrf, onProgress) {
+  return new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    xhr.open('POST', url);
+    xhr.setRequestHeader('Accept', 'application/json');
+    xhr.setRequestHeader('X-Requested-With', 'XMLHttpRequest');
+    xhr.setRequestHeader('X-CSRF-TOKEN', csrf);
+    xhr.upload.onprogress = (event) => {
+      if (event.lengthComputable && typeof onProgress === 'function') {
+        onProgress(event.loaded / event.total);
+      }
+    };
+    xhr.onload = () => {
+      let data = {};
+      try {
+        data = JSON.parse(xhr.responseText || '{}');
+      } catch (err) {
+        reject(err);
+        return;
+      }
+      if (xhr.status >= 200 && xhr.status < 300 && data.ok) {
+        resolve(data);
+        return;
+      }
+      reject(new Error(typeof data.error === 'string' ? data.error : 'upload failed'));
+    };
+    xhr.onerror = () => reject(new Error('upload failed'));
+    xhr.send(formData);
+  });
 }
 
 function initEmailValidation(scope) {
@@ -2153,7 +2283,6 @@ function debounce(fn, wait = 280) {
 function initLogoFilePickers(scope = document) {
   scope.querySelectorAll('[data-setup-logo]').forEach((root) => {
     const input = root.querySelector('[data-setup-logo-input]');
-    const filename = root.querySelector('[data-setup-logo-filename]');
     if (!input || input.dataset.logoPickerBound === '1') return;
     input.dataset.logoPickerBound = '1';
 
@@ -2165,8 +2294,20 @@ function initLogoFilePickers(scope = document) {
     const img = root.querySelector('[data-setup-logo-img]');
     const removeBtn = root.querySelector('[data-setup-logo-remove]');
     const statusEl = root.querySelector('[data-setup-logo-status]');
-    const noFileText = filename?.textContent?.trim() || '';
+    const progressWrap = root.querySelector('[data-setup-logo-progress]');
+    const progressBar = root.querySelector('[data-setup-logo-progress-bar]');
     let uploading = false;
+
+    const setProgress = (ratio) => {
+      if (!progressWrap || !progressBar) return;
+      if (ratio == null || ratio < 0) {
+        progressWrap.hidden = true;
+        progressBar.style.setProperty('--progress', '0%');
+        return;
+      }
+      progressWrap.hidden = false;
+      progressBar.style.setProperty('--progress', `${Math.max(0, Math.min(100, Math.round(ratio * 100)))}%`);
+    };
 
     const setStatus = (text, isError = false) => {
       if (!statusEl) return;
@@ -2215,13 +2356,13 @@ function initLogoFilePickers(scope = document) {
       } else {
         hidePreview();
       }
+      if (data.primary || data.accent) {
+        applyBrandColors(data.primary, data.accent);
+      }
     };
 
     input.addEventListener('change', async () => {
       const file = input.files && input.files[0] ? input.files[0] : null;
-      if (filename) {
-        filename.textContent = file ? file.name : noFileText;
-      }
       if (!file) {
         hidePreview();
         return;
@@ -2244,32 +2385,20 @@ function initLogoFilePickers(scope = document) {
       uploading = true;
       preview?.classList.add('is-uploading');
       setStatus(msgUploading);
+      setProgress(0);
       try {
         const body = new FormData();
         body.set('_token', csrf);
         body.set('logo', file);
-        const res = await fetch(uploadUrl, {
-          method: 'POST',
-          headers: {
-            Accept: 'application/json',
-            'X-Requested-With': 'XMLHttpRequest',
-            'X-CSRF-TOKEN': csrf,
-          },
-          body,
-          credentials: 'same-origin',
-        });
-        const data = await res.json().catch(() => ({}));
+        const data = await uploadLogoWithProgress(uploadUrl, body, csrf, setProgress);
         URL.revokeObjectURL(localUrl);
-        if (!res.ok || !data.ok) {
-          setStatus(typeof data.error === 'string' ? data.error : msgFail, true);
-          hidePreview();
-          return;
-        }
+        setProgress(null);
         setStatus('');
         applyLogoResponse(data);
       } catch (err) {
         URL.revokeObjectURL(localUrl);
-        setStatus(msgFail, true);
+        setProgress(null);
+        setStatus(typeof err?.message === 'string' && err.message !== 'upload failed' ? err.message : msgFail, true);
         hidePreview();
       } finally {
         uploading = false;
@@ -4140,7 +4269,18 @@ function initPlaceSuggest(root = document) {
     const addressInput = scope.querySelector('[data-address-input]');
     const houseNumberInput = scope.querySelector('[data-house-number]');
     const postalInput = scope.querySelector('[data-postal-code]');
+    const provinceInput = scope.querySelector('[data-province-input]');
     const form = (cityInput || addressInput)?.closest('form') || scope;
+
+    const applyProvince = (item) => {
+      if (!provinceInput || !item?.provincia) return;
+      const raw = String(item.provincia).trim();
+      if (!raw) return;
+      const code = raw.length <= 3 ? raw.toUpperCase() : raw.slice(0, 2).toUpperCase();
+      if (!provinceInput.value) {
+        provinceInput.value = code;
+      }
+    };
 
     if (cityInput && cityInput.dataset.suggestBound !== '1') {
       cityInput.dataset.suggestBound = '1';
@@ -4159,6 +4299,7 @@ function initPlaceSuggest(root = document) {
               if (postalInput && item.cap && !postalInput.value) {
                 postalInput.value = item.cap;
               }
+              applyProvince(item);
               addressInput?.focus();
             },
           }));
@@ -4177,6 +4318,7 @@ function initPlaceSuggest(root = document) {
               if (postalInput && item.cap) {
                 postalInput.value = item.cap;
               }
+              applyProvince(item);
               if (addressInput) {
                 addressInput.dispatchEvent(new Event('input', { bubbles: true }));
               }

@@ -189,6 +189,22 @@ $renderTextField = static function (array $field) use ($fieldValue, $icons): str
             . '</label></div>';
     }
 
+    if ($type === 'phone') {
+        return '<div class="field-block" data-field="' . e($key) . '">'
+            . '<label class="field-label" for="field-' . e($key) . '">'
+            . '<span class="field-icon" data-icon="' . e($icon) . '" aria-hidden="true"></span>'
+            . e($label) . ($required ? ' *' : '')
+            . '</label>'
+            . view_partial('partials/phone_field', [
+                'name' => 'fields[' . $key . ']',
+                'value' => $val,
+                'required' => $required,
+                'id' => 'field-' . $key,
+                'class' => 'input-emphasis',
+            ])
+            . '</div>';
+    }
+
     return '<div class="field-block" data-field="' . e($key) . '">'
         . '<label class="field-label" for="field-' . e($key) . '">'
         . '<span class="field-icon" data-icon="' . e($icon) . '" aria-hidden="true"></span>'

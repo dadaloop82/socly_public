@@ -640,6 +640,7 @@ final class SetupService
             'vat_number' => ['settings' => 'association.vat_number', 'env' => 'ASSOCIATION_VAT'],
             'city' => ['settings' => 'association.city', 'env' => 'ASSOCIATION_CITY'],
             'postal_code' => ['settings' => 'association.postal_code', 'env' => 'ASSOCIATION_POSTAL_CODE'],
+            'province' => ['settings' => 'association.province', 'env' => 'ASSOCIATION_PROVINCE'],
             'address' => ['settings' => 'association.address', 'env' => 'ASSOCIATION_ADDRESS'],
             'house_number' => ['settings' => 'association.house_number', 'env' => 'ASSOCIATION_HOUSE_NUMBER'],
             'runts' => ['settings' => 'association.runts', 'env' => 'ASSOCIATION_RUNTS'],
@@ -909,6 +910,7 @@ final class SetupService
         $optional = [
             'fiscal_code' => ['settings' => 'association.fiscal_code', 'env' => 'ASSOCIATION_FISCAL_CODE'],
             'city' => ['settings' => 'association.city', 'env' => 'ASSOCIATION_CITY'],
+            'province' => ['settings' => 'association.province', 'env' => 'ASSOCIATION_PROVINCE'],
         ];
         foreach ($optional as $key => $meta) {
             $value = trim((string) ($fields[$key] ?? ''));
@@ -919,6 +921,8 @@ final class SetupService
                 $value = strtoupper(preg_replace('/\s+/', '', $value) ?? '');
             } elseif ($key === 'city') {
                 $value = assoc_capitalize_name($value);
+            } elseif ($key === 'province') {
+                $value = strtoupper(preg_replace('/[^A-Za-z]/', '', $value) ?? '');
             }
             $this->settings->set($meta['settings'], $value);
             $env[$meta['env']] = $value;
@@ -1157,6 +1161,13 @@ final class SetupService
                     continue;
                 }
             }
+            if ($fieldType === 'tel') {
+                $value = normalize_phone_value($value);
+                if ($value !== '' && !is_valid_phone_value($value)) {
+                    $errors[$key] = __('validation.phone');
+                    continue;
+                }
+            }
             $this->settings->set((string) $field['settings_key'], $value);
             if (!empty($field['env_key'])) {
                 $env[(string) $field['env_key']] = $value;
@@ -1190,6 +1201,9 @@ final class SetupService
                 $errors[$key] = __('validation.required');
                 continue;
             }
+            if ($key === 'province') {
+                $value = strtoupper(preg_replace('/[^A-Za-z]/', '', $value) ?? '');
+            }
             $this->settings->set((string) $field['settings_key'], $value);
             if (!empty($field['env_key'])) {
                 $env[(string) $field['env_key']] = $value;
@@ -1203,11 +1217,12 @@ final class SetupService
         }
         // Composite line for legacy consumers of association.address display
         $composite = trim(sprintf(
-            '%s %s, %s %s',
+            '%s %s, %s %s %s',
             $parts['address'] ?? '',
             $parts['house_number'] ?? '',
             $parts['postal_code'] ?? '',
-            $parts['city'] ?? ''
+            $parts['city'] ?? '',
+            $parts['province'] ?? ''
         ));
         $this->settings->set('association.address_full', $composite);
         if ($env !== []) {

@@ -124,12 +124,14 @@ final class RuntsLookupService
         $section = trim((string) ($row['sezione'] ?? ''));
         $legal = AssociationLegalForms::fromRuntsSection($section, $denomination) ?? '';
         $city = $this->prettyName((string) ($row['comune_sede_legale'] ?? ''));
+        $province = strtoupper(preg_replace('/[^A-Za-z]/', '', (string) ($row['provincia_sede_legale'] ?? '')) ?? '');
         $fields = array_filter([
             'runts' => (string) ($row['repertorio'] ?? ''),
             'name' => $denomination,
             'legal_name' => $legal,
             'fiscal_code' => strtoupper(preg_replace('/\s+/', '', (string) ($row['codice_fiscale'] ?? '')) ?? ''),
             'city' => $city,
+            'province' => $province,
             'president_name' => $this->personFromRunts((string) ($row['legale_rappresentante'] ?? '')),
             'section' => $section,
         ], static fn ($v) => is_string($v) && trim($v) !== '');

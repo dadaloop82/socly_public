@@ -4366,6 +4366,46 @@ button.setup-scrape-logo-frame:focus-visible .setup-scrape-logo-overlay {
   clip: rect(0, 0, 0, 0);
 }
 .setup-logo-filename {
+  display: none !important;
+}
+.setup-logo-upload-progress {
+  height: 0.35rem;
+  margin: 0.35rem 0 0.85rem;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--brand-primary) 12%, transparent);
+  overflow: hidden;
+}
+.setup-logo-upload-progress-bar {
+  display: block;
+  height: 100%;
+  width: var(--progress, 0%);
+  border-radius: inherit;
+  background: linear-gradient(90deg, var(--brand-primary), var(--brand-accent));
+  transition: width 0.15s ease;
+}
+.phone-field {
+  display: flex;
+  align-items: stretch;
+  gap: 0.55rem;
+}
+.phone-dial-select {
+  flex: 0 0 min(11.5rem, 42%);
+  padding-left: 2rem;
+  background-repeat: no-repeat;
+  background-position: 0.55rem center;
+  background-size: 1.15rem auto;
+}
+.phone-national-input {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.setup-field-province {
+  flex: 0 0 5.5rem;
+  max-width: 6rem;
+}
+.geo-layout-rows .setup-field-province input {
+  text-transform: uppercase;
+}
   font-size: 0.92rem;
   font-weight: 600;
   min-width: 0;

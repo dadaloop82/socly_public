@@ -266,6 +266,141 @@ if (!function_exists('locale_flag_url')) {
     }
 }
 
+if (!function_exists('dial_flag_url')) {
+    function dial_flag_url(string $iso): string
+    {
+        $code = strtolower(substr(preg_replace('/[^a-z]/i', '', $iso) ?: 'it', 0, 2));
+
+        return 'https://flagcdn.com/w20/' . rawurlencode($code) . '.png';
+    }
+}
+
+if (!function_exists('phone_dial_codes')) {
+    /** @return list<array{iso:string,dial:string,name:string}> */
+    function phone_dial_codes(): array
+    {
+        static $codes = null;
+        if ($codes === null) {
+            /** @var list<array{iso:string,dial:string,name:string}> $codes */
+            $codes = require code_path('app/Support/phone_dial_codes.php');
+        }
+
+        return $codes;
+    }
+}
+
+if (!function_exists('phone_dial_sort_keys')) {
+    /** @return list<string> Dial codes longest-first for parsing. */
+    function phone_dial_sort_keys(): array
+    {
+        static $keys = null;
+        if ($keys === null) {
+            $keys = array_values(array_unique(array_map(
+                static fn (array $row): string => (string) $row['dial'],
+                phone_dial_codes()
+            )));
+            usort($keys, static fn (string $a, string $b): int => strlen($b) <=> strlen($a));
+        }
+
+        return $keys;
+    }
+}
+
+if (!function_exists('parse_stored_phone')) {
+    /**
+     * @return array{dial:string,national:string}
+     */
+    function parse_stored_phone(?string $raw, string $defaultDial = '39'): array
+    {
+        $cleaned = trim((string) $raw);
+        if ($cleaned === '') {
+            return ['dial' => $defaultDial, 'national' => ''];
+        }
+
+        $digits = preg_replace('/\D+/', '', $cleaned) ?? '';
+        $dial = $defaultDial;
+        $national = $cleaned;
+
+        if (str_starts_with($cleaned, '+')) {
+            foreach (phone_dial_sort_keys() as $code) {
+                if ($digits !== '' && str_starts_with($digits, $code) && strlen($digits) > strlen($code) + 3) {
+                    $dial = $code;
+                    $national = substr($digits, strlen($code));
+                    break;
+                }
+            }
+        } elseif (str_starts_with($digits, '00')) {
+            $rest = substr($digits, 2);
+            foreach (phone_dial_sort_keys() as $code) {
+                if ($rest !== '' && str_starts_with($rest, $code) && strlen($rest) > strlen($code) + 3) {
+                    $dial = $code;
+                    $national = substr($rest, strlen($code));
+                    break;
+                }
+            }
+        } elseif ($defaultDial === '39' && str_starts_with($digits, '39') && strlen($digits) > 11) {
+            $dial = '39';
+            $national = substr($digits, 2);
+        } else {
+            $national = preg_replace('/\D+/', '', $cleaned) ?? '';
+        }
+
+        $national = trim(preg_replace('/\s+/', ' ', preg_replace('/\D/', ' ', (string) $national) ?? '') ?? '');
+
+        return ['dial' => $dial, 'national' => $national];
+    }
+}
+
+if (!function_exists('format_stored_phone')) {
+    function format_stored_phone(string $dial, string $national): string
+    {
+        $dial = preg_replace('/\D+/', '', $dial) ?? '';
+        $national = trim(preg_replace('/\s+/', ' ', preg_replace('/[^\d\s]/', '', $national) ?? '') ?? '');
+        if ($dial === '' || $national === '') {
+            return '';
+        }
+
+        return '+' . $dial . ' ' . $national;
+    }
+}
+
+if (!function_exists('normalize_phone_value')) {
+    function normalize_phone_value(?string $raw, string $defaultDial = '39'): string
+    {
+        $parsed = parse_stored_phone($raw, $defaultDial);
+        if ($parsed['national'] === '') {
+            return '';
+        }
+
+        return format_stored_phone($parsed['dial'], $parsed['national']);
+    }
+}
+
+if (!function_exists('is_valid_phone_value')) {
+    function is_valid_phone_value(?string $raw, string $defaultDial = '39'): bool
+    {
+        $parsed = parse_stored_phone($raw, $defaultDial);
+        if ($parsed['national'] === '') {
+            return true;
+        }
+
+        $digits = preg_replace('/\D+/', '', $parsed['national']) ?? '';
+        if ($digits === '' || strlen($digits) < 4 || strlen($digits) > 14) {
+            return false;
+        }
+
+        if ($parsed['dial'] === '39') {
+            if (str_starts_with($digits, '39') && strlen($digits) > 10) {
+                $digits = substr($digits, 2);
+            }
+
+            return (bool) preg_match('/^(?:3\d{8,9}|0\d{5,10})$/', $digits);
+        }
+
+        return (bool) preg_match('/^\d{4,14}$/', $digits);
+    }
+}
+
 if (!function_exists('validate_adult_birth_date')) {
     /** @return string|null Validation message key or null if valid/empty */
     function validate_adult_birth_date(?string $date): ?string

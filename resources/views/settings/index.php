@@ -58,18 +58,28 @@
             'names' => [
                 'city' => 'association_city',
                 'postal_code' => 'association_postal_code',
+                'province' => 'association_province',
                 'address' => 'association_address',
                 'house_number' => 'association_house_number',
             ],
             'values' => [
                 'city' => (string) ($settings['association.city'] ?? ''),
                 'postal_code' => (string) ($settings['association.postal_code'] ?? ''),
+                'province' => (string) ($settings['association.province'] ?? ''),
                 'address' => (string) ($settings['association.address'] ?? ''),
                 'house_number' => (string) ($settings['association.house_number'] ?? ''),
             ],
             'required' => [
                 'city' => true,
                 'postal_code' => true,
+                'province' => false,
+                'address' => true,
+                'house_number' => true,
+            ],
+            'enabled' => [
+                'city' => true,
+                'postal_code' => true,
+                'province' => true,
                 'address' => true,
                 'house_number' => true,
             ],
@@ -87,7 +97,10 @@
         <div class="grid-2">
             <div>
                 <label><?= e(__('setup.field_phone')) ?></label>
-                <input type="text" name="association_phone" value="<?= e((string)($settings['association.phone'] ?? '')) ?>">
+                <?= view_partial('partials/phone_field', [
+                    'name' => 'association_phone',
+                    'value' => (string) ($settings['association.phone'] ?? ''),
+                ]) ?>
             </div>
             <div>
                 <label><?= e(__('setup.field_runts')) ?></label>
@@ -115,7 +128,9 @@
                     <?= e(__('setup.logo_upload')) ?>
                     <input type="file" name="logo" accept="image/png,image/jpeg,image/webp,image/gif,image/svg+xml" data-setup-logo-input hidden>
                 </label>
-                <span class="setup-logo-filename muted" data-setup-logo-filename><?= e(__('setup.logo_no_file')) ?></span>
+            </div>
+            <div class="setup-logo-upload-progress" data-setup-logo-progress hidden>
+                <span class="setup-logo-upload-progress-bar" data-setup-logo-progress-bar style="--progress: 0%"></span>
             </div>
             <p class="setup-hint muted"><?= e(__('setup.logo_hint')) ?></p>
         </div>
