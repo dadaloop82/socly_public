@@ -130,6 +130,9 @@ final class SetupService
         }
 
         if ($type === 'president') {
+            if ($this->isStepDeferred($step)) {
+                return true;
+            }
             $p = $this->people->getPresident();
             if ($p === null) {
                 return false;
@@ -150,6 +153,9 @@ final class SetupService
 
         if ($type === 'people_list') {
             // Scraped names alone must not skip the step — require explicit confirm.
+            if ($this->isStepDeferred($step)) {
+                return true;
+            }
             if (!empty($step['settings_key'])) {
                 return $this->rawStored((string) $step['settings_key'], '') !== null;
             }
@@ -199,6 +205,33 @@ final class SetupService
     {
         $key = trim((string) ($step['key'] ?? ''));
         return $key !== '' ? 'setup.reviewed.' . $key : '';
+    }
+
+    /** @param array<string, mixed> $step */
+    private function isStepDeferred(array $step): bool
+    {
+        $key = trim((string) ($step['key'] ?? ''));
+        if ($key === '') {
+            return false;
+        }
+
+        return $this->rawStored('setup.deferred.' . $key, '') === '1';
+    }
+
+    /** @param array<string, mixed> $step */
+    private function deferStep(array $step): array
+    {
+        $key = trim((string) ($step['key'] ?? ''));
+        if ($key !== '') {
+            $this->settings->set('setup.deferred.' . $key, '1');
+        }
+        $type = (string) ($step['type'] ?? '');
+        if ($type === 'people_list' && !empty($step['settings_key'])) {
+            $this->settings->set((string) $step['settings_key'], 'deferred');
+        }
+        $this->markStepReviewed($step);
+
+        return ['ok' => true];
     }
 
     /** @param array<string, mixed> $step */
@@ -432,6 +465,7 @@ final class SetupService
                 'first_name' => (string) ($r['first_name'] ?? ''),
                 'last_name' => (string) ($r['last_name'] ?? ''),
                 'fiscal_code' => (string) ($r['fiscal_code'] ?? ''),
+                'organ_type' => (string) ($r['notes'] ?? ''),
             ], $rows);
         }
 
@@ -440,7 +474,9 @@ final class SetupService
             return localized(is_string($raw) ? $raw : (is_array($raw) ? $raw : ''));
         }
         if ($type === 'checkbox') {
-            return (string) $this->readValue((string) ($step['settings_key'] ?? ''), (string) ($step['env_key'] ?? ''), '0') === '1';
+            $default = (($step['key'] ?? '') === 'gdpr.enabled') ? '1' : '0';
+
+            return (string) $this->readValue((string) ($step['settings_key'] ?? ''), (string) ($step['env_key'] ?? ''), $default) === '1';
         }
         return (string) $this->readValue((string) ($step['settings_key'] ?? ''), (string) ($step['env_key'] ?? ''), '');
     }
@@ -452,6 +488,10 @@ final class SetupService
      */
     public function saveStep(array $step, array $input): array
     {
+        if (!empty($input['setup_defer'])) {
+            return $this->deferStep($step);
+        }
+
         $type = (string) ($step['type'] ?? '');
 
         if ($type === 'name_pair') {
@@ -1276,6 +1316,20 @@ final class SetupService
                 $errors['birth_date'] = __($birthErr);
             }
         }
+        $today = date('Y-m-d');
+        if ($person['appointed_at'] !== '' && $person['appointed_at'] > $today) {
+            $errors['appointed_at'] = __('validation.appointed_future');
+        }
+        if ($person['mandate_ends_at'] !== '' && $person['mandate_ends_at'] <= $today) {
+            $errors['mandate_ends_at'] = __('validation.mandate_past');
+        }
+        if (
+            $person['appointed_at'] !== ''
+            && $person['mandate_ends_at'] !== ''
+            && $person['appointed_at'] >= $person['mandate_ends_at']
+        ) {
+            $errors['mandate_ends_at'] = __('validation.mandate_before_appointment');
+        }
         if ($errors) {
             return ['ok' => false, 'errors' => $errors];
         }
@@ -1320,6 +1374,7 @@ final class SetupService
                 'first_name' => $first,
                 'last_name' => $last,
                 'fiscal_code' => $cf,
+                'notes' => trim((string) ($row['organ_type'] ?? '')),
             ];
         }
         if (!empty($step['required']) && count($people) < max(1, $min)) {

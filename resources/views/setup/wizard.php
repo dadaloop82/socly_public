@@ -170,6 +170,7 @@ $errorStep = flash('setup_error_step');
                 <input type="hidden" name="step_index" value="<?= (int) $stepIndex ?>">
                 <input type="hidden" name="step_key" value="<?= e((string) ($step['key'] ?? '')) ?>">
                 <input type="hidden" name="setup_exit" value="0" data-setup-exit-flag>
+                <input type="hidden" name="setup_defer" value="0" data-setup-defer-flag>
 
                 <?php if ($stepType === 'colors'): ?>
                     <?php
@@ -462,19 +463,44 @@ $errorStep = flash('setup_error_step');
                         <div class="setup-equal-row">
                             <label class="setup-field">
                                 <span><?= e(__('setup.field_appointed_at')) ?> *</span>
-                                <input type="date" name="appointed_at" value="<?= e((string) ($value['appointed_at'] ?? '')) ?>" required>
+                                <input type="date" name="appointed_at" value="<?= e((string) ($value['appointed_at'] ?? '')) ?>" required data-appointed-date max="<?= e(date('Y-m-d')) ?>">
                             </label>
                             <label class="setup-field">
                                 <span><?= e(__('setup.field_mandate_ends_at')) ?> *</span>
-                                <input type="date" name="mandate_ends_at" value="<?= e((string) ($value['mandate_ends_at'] ?? '')) ?>" required>
+                                <input type="date" name="mandate_ends_at" value="<?= e((string) ($value['mandate_ends_at'] ?? '')) ?>" required data-mandate-ends-date min="<?= e(date('Y-m-d', strtotime('+1 day'))) ?>">
                             </label>
                         </div>
                     </div>
                 <?php elseif ($stepType === 'people_list'): ?>
+                    <?php $peopleRole = (string) ($step['role'] ?? ''); ?>
+                    <?php $showOrganType = $peopleRole === 'auditor'; ?>
+                    <?php
+                    $organTypes = [
+                        'revisore_conti' => 'setup.organ_revisore_conti',
+                        'collegio_revisori' => 'setup.organ_collegio_revisori',
+                        'sindaco_unico' => 'setup.organ_sindaco_unico',
+                        'collegio_sindacale' => 'setup.organ_collegio_sindacale',
+                        'odv' => 'setup.organ_odv',
+                        'altro' => 'setup.organ_altro',
+                    ];
+                    ?>
                     <div class="setup-people" data-setup-line data-people-list>
                         <div class="setup-people-rows" data-people-rows>
                             <?php foreach ((array) $value as $i => $person): ?>
                                 <div class="setup-people-row" data-people-row>
+                                    <?php if ($showOrganType): ?>
+                                    <label class="setup-field setup-field-organ-type">
+                                        <span><?= e(__('setup.field_organ_type')) ?></span>
+                                        <select name="people[<?= (int) $i ?>][organ_type]">
+                                            <option value="">—</option>
+                                            <?php foreach ($organTypes as $organKey => $organLabelKey): ?>
+                                                <option value="<?= e($organKey) ?>" <?= (string) ($person['organ_type'] ?? $person['notes'] ?? '') === $organKey ? 'selected' : '' ?>>
+                                                    <?= e(__($organLabelKey)) ?>
+                                                </option>
+                                            <?php endforeach; ?>
+                                        </select>
+                                    </label>
+                                    <?php endif; ?>
                                     <label class="setup-field">
                                         <span><?= e(__('setup.field_first_name')) ?></span>
                                         <input type="text" name="people[<?= (int) $i ?>][first_name]" value="<?= e((string) ($person['first_name'] ?? '')) ?>" autocomplete="given-name">
@@ -494,6 +520,17 @@ $errorStep = flash('setup_error_step');
                         <button type="button" class="btn btn-ghost" data-people-add><?= e(__('setup.add_person')) ?></button>
                         <template data-people-template>
                             <div class="setup-people-row" data-people-row>
+                                <?php if ($showOrganType): ?>
+                                <label class="setup-field setup-field-organ-type">
+                                    <span><?= e(__('setup.field_organ_type')) ?></span>
+                                    <select name="people[__i__][organ_type]">
+                                        <option value="">—</option>
+                                        <?php foreach ($organTypes as $organKey => $organLabelKey): ?>
+                                            <option value="<?= e($organKey) ?>"><?= e(__($organLabelKey)) ?></option>
+                                        <?php endforeach; ?>
+                                    </select>
+                                </label>
+                                <?php endif; ?>
                                 <label class="setup-field">
                                     <span><?= e(__('setup.field_first_name')) ?></span>
                                     <input type="text" name="people[__i__][first_name]" value="" autocomplete="given-name">
@@ -1088,6 +1125,12 @@ $errorStep = flash('setup_error_step');
                         <p class="setup-why-title"><?= e(__('setup.why_title')) ?></p>
                         <p class="setup-why-text muted"><?= e($setupWhyText) ?></p>
                     </div>
+                <?php endif; ?>
+
+                <?php if (in_array($stepType, ['president', 'people_list', 'textarea'], true)): ?>
+                    <p class="setup-defer-wrap" data-setup-line>
+                        <button type="button" class="setup-defer-link" data-setup-defer-step><?= e(__('setup.defer_step')) ?></button>
+                    </p>
                 <?php endif; ?>
 
                 <div class="setup-actions" data-setup-line>

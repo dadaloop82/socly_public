@@ -852,6 +852,14 @@ function initSetupWizard() {
   initSetupNamePairPreview(root);
   initPlatformConsents(root);
 
+  setupForm?.querySelectorAll('[data-setup-defer-step]').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      const flag = setupForm?.querySelector('[data-setup-defer-flag]');
+      if (flag) flag.value = '1';
+      setupForm?.requestSubmit();
+    });
+  });
+
   const fadeInKeyframes = [
     { opacity: 0, transform: 'translateY(28px)' },
     { opacity: 1, transform: 'translateY(0px)' },
@@ -4071,6 +4079,9 @@ function initSetupPeopleList(root) {
 }
 
 function initPeopleList(list) {
+  if (list.dataset.peopleListBound === '1') return;
+  list.dataset.peopleListBound = '1';
+
   const rows = list.querySelector('[data-people-rows]');
   const template = list.querySelector('[data-people-template]');
   const addBtn = list.querySelector('[data-people-add]');
@@ -4886,6 +4897,39 @@ function initBirthDateFields(root = document) {
     };
     input.addEventListener('change', validate);
     input.addEventListener('input', validate);
+  });
+
+  const msgAppointedFuture = document.body?.dataset?.msgAppointedFuture || 'La data di nomina non può essere nel futuro.';
+  const msgMandatePast = document.body?.dataset?.msgMandatePast || 'La scadenza del mandato deve essere una data futura.';
+  const msgMandateOrder = document.body?.dataset?.msgMandateOrder || 'La scadenza del mandato deve essere successiva alla data di nomina.';
+
+  scope.querySelectorAll('[data-appointed-date]').forEach((appointedInput) => {
+    if (!(appointedInput instanceof HTMLInputElement) || appointedInput.dataset.mandateBound === '1') return;
+    appointedInput.dataset.mandateBound = '1';
+    const form = appointedInput.closest('form');
+    const mandateInput = form?.querySelector('[data-mandate-ends-date]');
+    if (!(mandateInput instanceof HTMLInputElement)) return;
+
+    const validateMandate = () => {
+      const appointed = appointedInput.value;
+      const mandate = mandateInput.value;
+      appointedInput.setCustomValidity('');
+      mandateInput.setCustomValidity('');
+      if (appointed && appointed > todayStr) {
+        appointedInput.setCustomValidity(msgAppointedFuture);
+      }
+      if (mandate && mandate <= todayStr) {
+        mandateInput.setCustomValidity(msgMandatePast);
+      }
+      if (appointed && mandate && appointed >= mandate) {
+        mandateInput.setCustomValidity(msgMandateOrder);
+      }
+    };
+
+    appointedInput.addEventListener('change', validateMandate);
+    appointedInput.addEventListener('input', validateMandate);
+    mandateInput.addEventListener('change', validateMandate);
+    mandateInput.addEventListener('input', validateMandate);
   });
 }
 
