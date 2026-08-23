@@ -28,7 +28,7 @@ final class EnrollmentService
      * @param array{name:string,type:string,tmp_name:string,error:int,size:int}|null $scanFile
      * @return array{ok:bool,errors?:array<string,string>}
      */
-    public function validateCreatePayload(array $data, ?array $scanFile): array
+    public function validateCreatePayload(array $data, ?array $scanFile, bool $requireScan = true): array
     {
         $method = $this->method();
         if ($method === 'none') {
@@ -36,8 +36,12 @@ final class EnrollmentService
         }
 
         if ($method === 'print_scan') {
-            if ($scanFile === null || ($scanFile['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_OK) {
-                return ['ok' => false, 'errors' => ['enrollment_scan' => __('members.enrollment_scan_required')]];
+            $hasScan = $scanFile !== null && ($scanFile['error'] ?? UPLOAD_ERR_NO_FILE) === UPLOAD_ERR_OK;
+            if (!$hasScan) {
+                if ($requireScan) {
+                    return ['ok' => false, 'errors' => ['enrollment_scan' => __('members.enrollment_scan_required')]];
+                }
+                return ['ok' => true];
             }
             $size = (int) ($scanFile['size'] ?? 0);
             if ($size <= 0 || $size > 8 * 1024 * 1024) {

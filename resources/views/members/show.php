@@ -178,6 +178,14 @@ $balanceDue = (float) ($member['balance_due'] ?? 0);
         <?php elseif (($enrollmentArtifact['method'] ?? '') === 'otp_email'): ?>
             <p class="muted"><?= e(__('members.enrollment_otp_recorded')) ?></p>
         <?php endif; ?>
+    <?php elseif ($enrollmentMethod === 'print_scan'): ?>
+        <p class="muted"><?= e(__('members.enrollment_missing_on_file')) ?></p>
+        <div class="actions">
+            <a class="btn btn-sm" href="<?= e(url('/members/'.$member['id'].'/enrollment-form')) ?>" target="_blank" rel="noopener"><?= e(__('members.enrollment_print_form')) ?></a>
+            <?php if (can('members.manage')): ?>
+                <a class="btn btn-sm btn-ghost" href="<?= e(url('/members/'.$member['id'].'/edit')) ?>"><?= e(__('members.anomaly_fix')) ?></a>
+            <?php endif; ?>
+        </div>
     <?php elseif ($enrollmentMethod !== 'none'): ?>
         <p class="muted"><?= e(__('members.enrollment_missing_on_file')) ?></p>
         <?php if (can('members.manage')): ?>

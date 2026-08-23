@@ -6,6 +6,8 @@ namespace Socly\Controllers;
 
 use Socly\Core\Http\Request;
 use Socly\Core\View;
+use Socly\Services\ComponentService;
+use Socly\Services\EnrollmentFormService;
 use Socly\Services\EnrollmentService;
 use Socly\Services\MemberService;
 use Socly\Services\PaymentService;
@@ -18,7 +20,9 @@ final class MemberController extends BaseController
         private readonly MemberService $members,
         private readonly PaymentService $payments,
         private readonly SettingsService $settings,
-        private readonly EnrollmentService $enrollment
+        private readonly EnrollmentService $enrollment,
+        private readonly ComponentService $components,
+        private readonly EnrollmentFormService $enrollmentForms
     ) {
         parent::__construct($view);
     }
@@ -86,6 +90,7 @@ final class MemberController extends BaseController
             'legal' => $this->legalDocuments(),
             'enrollmentMethod' => $this->enrollment->method(),
             'hasEnrollmentArtifact' => false,
+            'treasuryEnabled' => $this->components->isEnabled('treasury'),
         ]);
     }
 
@@ -97,7 +102,8 @@ final class MemberController extends BaseController
         unset($fieldData['photo']);
         $this->rememberOld($data);
         $scan = $request->file('enrollment_scan');
-        $check = $this->enrollment->validateCreatePayload($data, $scan);
+        $requireScan = $this->enrollment->method() !== 'print_scan';
+        $check = $this->enrollment->validateCreatePayload($data, $scan, $requireScan);
         if (!$check['ok']) {
             $this->flash('errors', $check['errors'] ?? []);
             redirect('/members/create');
@@ -109,7 +115,11 @@ final class MemberController extends BaseController
         }
         $this->enrollment->storeArtifact((int) $result['id'], $data, $scan, $request->ip());
         $this->clearOld();
-        $this->flash('success', __('members.created'));
+        if ($this->enrollment->method() === 'print_scan' && !$this->enrollment->hasArtifact((int) $result['id'])) {
+            $this->flash('success', __('members.enrollment_created_print'));
+        } else {
+            $this->flash('success', __('members.created'));
+        }
         redirect('/members/' . $result['id']);
     }
 
@@ -167,6 +177,7 @@ final class MemberController extends BaseController
             'legal' => $this->legalDocuments(),
             'enrollmentMethod' => $this->enrollment->method(),
             'hasEnrollmentArtifact' => $this->enrollment->hasArtifact((int) $id),
+            'treasuryEnabled' => $this->components->isEnabled('treasury'),
         ]);
     }
 
@@ -246,6 +257,18 @@ final class MemberController extends BaseController
         header('Content-Length: ' . (string) filesize($absolute));
         header('Cache-Control: private, max-age=3600');
         readfile($absolute);
+    }
+
+    public function enrollmentForm(Request $request, string $id): void
+    {
+        $this->guardMembers();
+        $context = $this->enrollmentForms->build((int) $id);
+        if (!$context) {
+            http_response_code(404);
+            $this->render('errors/404');
+            return;
+        }
+        echo $this->view->render('members/enrollment_form_print', $context, null);
     }
 
     public function destroy(Request $request, string $id): void

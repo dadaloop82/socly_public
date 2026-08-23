@@ -1657,6 +1657,72 @@ function initMemberWizard() {
       }
     }
     step = total;
+
+    if (form.dataset.memberLeaveGuard === 'create' && form.dataset.treasuryEnabled === '1' && !form.dataset.treasuryResolved) {
+      const status = paymentStatus?.value || 'unpaid';
+      const opt = typeSelect?.selectedOptions?.[0];
+      const price = Number(opt?.dataset.price || 0);
+      let paid = 0;
+      if (status === 'paid') paid = price;
+      else if (status === 'partial') paid = Math.max(0, Number(partialAmountInput?.value || 0));
+      if (paid > 0) {
+        e.preventDefault();
+        form.dataset.treasuryPendingAmount = String(paid);
+        const askDialog = document.querySelector('[data-treasury-ask-dialog]');
+        askDialog?.showModal?.();
+        return;
+      }
+    }
+  });
+
+  const resolveTreasuryAndSubmit = (mode) => {
+    const skipInput = form.querySelector('[data-treasury-skip]');
+    const registerInput = form.querySelector('[data-treasury-register]');
+    const dateInput = form.querySelector('[data-treasury-movement-date]');
+    const descInput = form.querySelector('[data-treasury-description]');
+    if (mode === 'skip') {
+      if (skipInput) skipInput.value = '1';
+      if (registerInput) registerInput.value = '';
+    } else if (mode === 'register') {
+      if (skipInput) skipInput.value = '';
+      if (registerInput) registerInput.value = '1';
+      const detailDate = document.querySelector('[data-treasury-detail-date]');
+      const detailDesc = document.querySelector('[data-treasury-detail-description]');
+      if (dateInput && detailDate) dateInput.value = detailDate.value || '';
+      if (descInput && detailDesc) descInput.value = detailDesc.value || '';
+    }
+    form.dataset.treasuryResolved = '1';
+    form.requestSubmit(submitBtn || undefined);
+  };
+
+  document.querySelector('[data-treasury-ask-no]')?.addEventListener('click', () => {
+    document.querySelector('[data-treasury-ask-dialog]')?.close?.();
+    resolveTreasuryAndSubmit('skip');
+  });
+  document.querySelector('[data-treasury-ask-yes]')?.addEventListener('click', () => {
+    document.querySelector('[data-treasury-ask-dialog]')?.close?.();
+    const paid = Number(form.dataset.treasuryPendingAmount || 0);
+    const amountField = document.querySelector('[data-treasury-detail-amount]');
+    const descField = document.querySelector('[data-treasury-detail-description]');
+    const first = form.querySelector('[data-first-name]')?.value?.trim() || '';
+    const last = form.querySelector('[data-last-name]')?.value?.trim() || '';
+    const name = [first, last].filter(Boolean).join(' ');
+    if (amountField) {
+      amountField.value = `${paid.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €`;
+    }
+    if (descField && !descField.value) {
+      descField.placeholder = name ? `Quota socio ${name}` : '';
+      descField.value = name ? `Quota socio ${name}` : '';
+    }
+    document.querySelector('[data-treasury-detail-dialog]')?.showModal?.();
+  });
+  document.querySelector('[data-treasury-detail-cancel]')?.addEventListener('click', () => {
+    document.querySelector('[data-treasury-detail-dialog]')?.close?.();
+    delete form.dataset.treasuryResolved;
+  });
+  document.querySelector('[data-treasury-detail-confirm]')?.addEventListener('click', () => {
+    document.querySelector('[data-treasury-detail-dialog]')?.close?.();
+    resolveTreasuryAndSubmit('register');
   });
 
   showStep(1, { animateEnter: false });

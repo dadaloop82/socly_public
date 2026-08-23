@@ -625,6 +625,13 @@ if (!function_exists('sanitize_app_version')) {
     }
 }
 
+if (!function_exists('app_locale')) {
+    function app_locale(): string
+    {
+        return (string) (auth_user()['locale'] ?? config('app.locale', 'it'));
+    }
+}
+
 if (!function_exists('format_date')) {
     /**
      * Display a stored ISO date (Y-m-d or datetime) in the active locale.
@@ -645,7 +652,7 @@ if (!function_exists('format_date')) {
                 return $value;
             }
         }
-        $locale = $locale ?? (string) (auth_user()['locale'] ?? config('app.locale', 'it'));
+        $locale = $locale ?? app_locale();
         return match ($locale) {
             'de' => $dt->format('d.m.Y'),
             default => $dt->format('d/m/Y'),
@@ -682,7 +689,7 @@ if (!function_exists('format_datetime')) {
         } catch (Throwable) {
             return '';
         }
-        $locale = $locale ?? current_locale();
+        $locale = $locale ?? app_locale();
         return $date->format($locale === 'de' ? 'd.m.Y H:i' : 'd/m/Y H:i');
     }
 }

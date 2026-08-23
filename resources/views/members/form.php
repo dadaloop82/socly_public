@@ -32,6 +32,7 @@ $paymentStep = null; // quota + stato pagamento sono nello step Tessera
 $oldPaymentStatus = (string) old('payment_status', 'unpaid');
 $oldPartialAmount = (string) old('partial_amount', '0');
 $oldPaymentMethod = (string) old('payment_method', 'cash');
+$treasuryEnabled = !empty($treasuryEnabled);
 
 $legalAckKeys = ['privacy_ack', 'statute_ack'];
 $gdprEnabled = (string) (app()->isInstalled() ? (app(\Socly\Services\SettingsService::class)->get('gdpr.enabled', '0') ?: '0') : '0') === '1';
@@ -518,9 +519,16 @@ $paymentExtraHtml = $buildProfileFieldsHtml($paymentExtraFields);
     data-csrf="<?= e(csrf_token()) ?>"
     data-enrollment-method="<?= e($enrollmentMethod) ?>"
     data-otp-url="<?= e(url('/members/enrollment/otp')) ?>"
+    data-treasury-enabled="<?= $treasuryEnabled ? '1' : '0' ?>"
     autocomplete="off"
 >
     <?= csrf_field() ?>
+    <?php if (!$isEdit && $treasuryEnabled): ?>
+        <input type="hidden" name="treasury_skip" value="" data-treasury-skip>
+        <input type="hidden" name="treasury_register" value="" data-treasury-register>
+        <input type="hidden" name="treasury_movement_date" value="" data-treasury-movement-date>
+        <input type="hidden" name="treasury_description" value="" data-treasury-description>
+    <?php endif; ?>
 
     <ol class="wizard-steps" data-wizard-steps aria-label="<?= e(__('members.wizard_nav')) ?>">
         <?php foreach ($formSteps as $i => $step): ?>
@@ -817,9 +825,17 @@ $paymentExtraHtml = $buildProfileFieldsHtml($paymentExtraFields);
 
         <?php if ($enrollmentMethod === 'print_scan'): ?>
             <p class="muted"><?= e(__('members.enrollment_print_hint')) ?></p>
+            <p class="actions" style="margin:0 0 0.75rem">
+                <?php if ($isEdit && !empty($member['id'])): ?>
+                    <a class="btn btn-ghost btn-sm" href="<?= e(url('/members/' . (int) $member['id'] . '/enrollment-form')) ?>" target="_blank" rel="noopener"><?= e(__('members.enrollment_print_form')) ?></a>
+                <?php endif; ?>
+            </p>
             <div class="field-block">
                 <label class="field-label"><?= e(__('members.enrollment_scan')) ?></label>
-                <input type="file" name="enrollment_scan" accept="image/*,application/pdf" required>
+                <input type="file" name="enrollment_scan" accept="image/*,application/pdf"<?= ($isEdit && $needsEnrollment) ? ' required' : '' ?>>
+                <?php if (!$isEdit): ?>
+                    <p class="muted"><?= e(__('members.enrollment_scan_optional')) ?></p>
+                <?php endif; ?>
             </div>
         <?php elseif ($enrollmentMethod === 'tablet_sign'): ?>
             <p class="muted"><?= e(__('members.enrollment_tablet_hint')) ?></p>
@@ -867,6 +883,42 @@ $paymentExtraHtml = $buildProfileFieldsHtml($paymentExtraFields);
         </div>
     </div>
 </dialog>
+
+<?php if (!$isEdit && $treasuryEnabled): ?>
+<dialog class="member-treasury-dialog" data-treasury-ask-dialog>
+    <div class="member-leave-shell">
+        <h3 class="section-title"><?= e(__('members.treasury_wizard_ask_title')) ?></h3>
+        <p class="member-leave-text"><?= e(__('members.treasury_wizard_ask_lede')) ?></p>
+        <div class="member-leave-actions">
+            <button type="button" class="btn btn-ghost" data-treasury-ask-no><?= e(__('members.treasury_wizard_no')) ?></button>
+            <button type="button" class="btn" data-treasury-ask-yes><?= e(__('members.treasury_wizard_yes')) ?></button>
+        </div>
+    </div>
+</dialog>
+<dialog class="member-treasury-dialog" data-treasury-detail-dialog>
+    <div class="member-leave-shell">
+        <h3 class="section-title"><?= e(__('members.treasury_wizard_details_title')) ?></h3>
+        <div class="grid-2" style="margin-top:0.75rem">
+            <div class="field-block">
+                <label class="field-label"><?= e(__('treasury.amount')) ?></label>
+                <input type="text" data-treasury-detail-amount readonly>
+            </div>
+            <div class="field-block">
+                <label class="field-label"><?= e(__('treasury.date')) ?></label>
+                <input type="date" data-treasury-detail-date value="<?= e(date('Y-m-d')) ?>">
+            </div>
+            <div class="field-block" style="grid-column:1/-1">
+                <label class="field-label"><?= e(__('treasury.description')) ?></label>
+                <input type="text" data-treasury-detail-description maxlength="500">
+            </div>
+        </div>
+        <div class="member-leave-actions">
+            <button type="button" class="btn btn-ghost" data-treasury-detail-cancel><?= e(__('common.cancel')) ?></button>
+            <button type="button" class="btn" data-treasury-detail-confirm><?= e(__('members.treasury_wizard_confirm')) ?></button>
+        </div>
+    </div>
+</dialog>
+<?php endif; ?>
 
 <dialog class="camera-dialog" data-camera-dialog>
     <div class="camera-shell">

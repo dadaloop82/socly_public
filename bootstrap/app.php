@@ -54,6 +54,7 @@ use Socly\Services\CurrencyService;
 use Socly\Services\DeadlineService;
 use Socly\Services\DocumentService;
 use Socly\Services\EmailTemplateService;
+use Socly\Services\EnrollmentFormService;
 use Socly\Services\EnrollmentService;
 use Socly\Services\GeoService;
 use Socly\Services\InstallerService;
@@ -350,6 +351,10 @@ $app->bind(DashboardController::class, fn (App $a) => new DashboardController(
     $a->get(AssociationPeopleService::class),
     $a->get(CurrencyService::class)
 ));
+$app->bind(EnrollmentFormService::class, fn (App $a) => new EnrollmentFormService(
+    $a->get(SettingsService::class),
+    $a->get(MemberService::class)
+));
 $app->bind(EnrollmentService::class, fn (App $a) => new EnrollmentService(
     $a->get(Database::class),
     $a->get(SettingsService::class),
@@ -361,7 +366,9 @@ $app->bind(MemberController::class, fn (App $a) => new MemberController(
     $a->get(MemberService::class),
     $a->get(PaymentService::class),
     $a->get(SettingsService::class),
-    $a->get(EnrollmentService::class)
+    $a->get(EnrollmentService::class),
+    $a->get(ComponentService::class),
+    $a->get(EnrollmentFormService::class)
 ));
 $app->bind(SettingsController::class, fn (App $a) => new SettingsController(
     $a->get(View::class),

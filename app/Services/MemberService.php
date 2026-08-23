@@ -1116,13 +1116,29 @@ final class MemberService
                     'note' => $data['payment_note'] ?? null,
                     'created_by' => auth_user()['id'] ?? null,
                 ]);
-                $this->treasury->autoRegisterFromPayment(
-                    (int) $paymentId,
-                    (int) $id,
-                    $paidAmount,
-                    (string) ($data['payment_method'] ?? 'cash'),
-                    date('Y-m-d')
-                );
+                $skipTreasury = !empty($data['treasury_skip']);
+                $manualTreasury = !empty($data['treasury_register']);
+                if ($manualTreasury) {
+                    $this->treasury->registerMembershipIncome(
+                        (int) $paymentId,
+                        (int) $id,
+                        [
+                            'amount' => $paidAmount,
+                            'movement_date' => trim((string) ($data['treasury_movement_date'] ?? date('Y-m-d'))),
+                            'payment_method' => (string) ($data['payment_method'] ?? 'cash'),
+                            'description' => trim((string) ($data['treasury_description'] ?? '')),
+                            'category' => 'membership_fee',
+                        ]
+                    );
+                } elseif (!$skipTreasury) {
+                    $this->treasury->autoRegisterFromPayment(
+                        (int) $paymentId,
+                        (int) $id,
+                        $paidAmount,
+                        (string) ($data['payment_method'] ?? 'cash'),
+                        date('Y-m-d')
+                    );
+                }
             }
             $this->db->commit();
         } catch (\Throwable $e) {

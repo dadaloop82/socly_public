@@ -344,16 +344,53 @@ final class TreasuryService
         if (empty($cfg['auto_from_payments'])) {
             return;
         }
+        $this->registerMembershipIncome($paymentId, $memberId, [
+            'amount' => $amount,
+            'movement_date' => $date,
+            'payment_method' => $method,
+            'description' => __('treasury.auto_membership_payment'),
+            'category' => 'membership_fee',
+        ]);
+    }
+
+    /**
+     * @param array{amount:float|int|string,movement_date?:string,payment_method?:string,description?:string,category?:string} $input
+     */
+    public function registerMembershipIncome(int $paymentId, int $memberId, array $input): void
+    {
+        if (!$this->components->isEnabled('treasury')) {
+            return;
+        }
         $exists = $this->db->fetch('SELECT id FROM treasury_movements WHERE payment_id = :p', ['p' => $paymentId]);
         if ($exists) {
             return;
         }
+        $amount = (float) ($input['amount'] ?? 0);
+        if ($amount <= 0) {
+            return;
+        }
+        $date = trim((string) ($input['movement_date'] ?? date('Y-m-d')));
+        if (!$this->validator->validate(['movement_date' => $date], ['movement_date' => 'date'])) {
+            $date = date('Y-m-d');
+        }
+        $method = trim((string) ($input['payment_method'] ?? 'cash'));
+        if (!in_array($method, self::METHODS, true)) {
+            $method = 'cash';
+        }
+        $category = trim((string) ($input['category'] ?? 'membership_fee'));
+        if ($category === '' || $category === '__new__') {
+            $category = 'membership_fee';
+        }
+        $description = trim((string) ($input['description'] ?? ''));
+        if ($description === '') {
+            $description = (string) __('treasury.auto_membership_payment');
+        }
         $this->db->insert('treasury_movements', [
             'movement_date' => $date,
             'direction' => 'income',
-            'category' => 'membership_fee',
+            'category' => $category,
             'amount' => $amount,
-            'description' => __('treasury.auto_membership_payment'),
+            'description' => mb_substr($description, 0, 500),
             'payment_method' => $method,
             'member_id' => $memberId,
             'payment_id' => $paymentId,

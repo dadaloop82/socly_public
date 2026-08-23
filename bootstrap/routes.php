@@ -94,6 +94,7 @@ $router->post('/members/enrollment/otp', [MemberController::class, 'sendEnrollme
 $router->get('/members/{id}', [MemberController::class, 'show'], 'members.view', ['mw.locale', 'mw.install', 'mw.auth']);
 $router->get('/members/{id}/photo', [MemberController::class, 'photo'], 'members.view', ['mw.locale', 'mw.install', 'mw.auth']);
 $router->get('/members/{id}/enrollment', [MemberController::class, 'enrollmentArtifact'], 'members.view', ['mw.locale', 'mw.install', 'mw.auth']);
+$router->get('/members/{id}/enrollment-form', [MemberController::class, 'enrollmentForm'], 'members.view', ['mw.locale', 'mw.install', 'mw.auth']);
 $router->get('/members/{id}/edit', [MemberController::class, 'edit'], 'members.manage', ['mw.locale', 'mw.install', 'mw.auth']);
 $router->post('/members/{id}', [MemberController::class, 'update'], 'members.manage', ['mw.locale', 'mw.install', 'mw.auth', 'mw.csrf']);
 $router->post('/members/{id}/delete', [MemberController::class, 'destroy'], 'members.delete', ['mw.locale', 'mw.install', 'mw.auth', 'mw.csrf']);
