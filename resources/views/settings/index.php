@@ -557,6 +557,36 @@
     </div>
 </details>
 
+<details class="config-accordion" id="email-templates" data-config-accordion>
+    <summary class="config-accordion-summary">
+        <span class="config-accordion-title"><?= e(__('settings.email_templates_title')) ?></span>
+        <span class="config-accordion-lede"><?= e(__('settings.email_templates_lede')) ?></span>
+    </summary>
+    <div class="config-accordion-body">
+        <?= view_partial('partials/email_templates_panel', [
+            'emailTemplates' => $emailTemplates ?? [],
+            'editingTemplate' => $editingTemplate ?? null,
+            'emailSampleJson' => $emailSampleJson ?? '{}',
+            'mailReady' => !empty($mailReady),
+            'defaultTestEmail' => (string) ($settings['association.email'] ?? ''),
+        ]) ?>
+    </div>
+</details>
+
+<details class="config-accordion" id="workflow" data-config-accordion>
+    <summary class="config-accordion-summary">
+        <span class="config-accordion-title"><?= e(__('settings.workflow_title')) ?></span>
+        <span class="config-accordion-lede"><?= e(__('settings.workflow_lede')) ?></span>
+    </summary>
+    <div class="config-accordion-body">
+        <?= view_partial('partials/workflow_panel', [
+            'workflowRules' => $workflowRules ?? [],
+            'emailTemplates' => $emailTemplates ?? [],
+            'editingWorkflow' => $editingWorkflow ?? null,
+        ]) ?>
+    </div>
+</details>
+
 <details class="config-accordion" id="enrollment" data-config-accordion>
     <summary class="config-accordion-summary">
         <span class="config-accordion-title"><?= e(__('settings.enrollment')) ?></span>

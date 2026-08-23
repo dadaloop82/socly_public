@@ -13,7 +13,8 @@ final class EnrollmentService
     public function __construct(
         private readonly Database $db,
         private readonly SettingsService $settings,
-        private readonly AuditService $audit
+        private readonly AuditService $audit,
+        private readonly WorkflowService $workflow
     ) {
     }
 
@@ -113,7 +114,7 @@ final class EnrollmentService
     }
 
     /** @return array{ok:bool,error?:string,message?:string} */
-    public function sendOtp(string $email, string $ip): array
+    public function sendOtp(string $email, string $ip, string $memberName = ''): array
     {
         if (!app(MailService::class)->isReady()) {
             return ['ok' => false, 'error' => __('mail.required_for_otp')];
@@ -127,14 +128,25 @@ final class EnrollmentService
         $_SESSION['enrollment_otp_expires'] = time() + 900;
         $_SESSION['enrollment_otp_email'] = $email;
 
-        $sent = app(MailService::class)->send(
-            $email,
-            __('members.enrollment_otp_mail_subject'),
-            __('members.enrollment_otp_mail_body', ['code' => $code])
-        );
-        if (!$sent['ok']) {
-            unset($_SESSION['enrollment_otp_hash'], $_SESSION['enrollment_otp_expires'], $_SESSION['enrollment_otp_email']);
-            return ['ok' => false, 'error' => (string) ($sent['error'] ?? __('mail.send_failed'))];
+        $vars = [
+            'email' => $email,
+            'member_email' => $email,
+            'member_name' => $memberName !== '' ? $memberName : UserService::deriveDisplayNameFromEmail($email),
+            'otp_code' => $code,
+            'association_name' => (string) $this->settings->get('association.name', ''),
+            'if_member_email' => '1',
+        ];
+        $sentViaWorkflow = $this->workflow->dispatch('member.enrollment_otp', $vars, 'it', $ip);
+        if ($sentViaWorkflow === 0) {
+            $sent = app(MailService::class)->send(
+                $email,
+                __('members.enrollment_otp_mail_subject'),
+                __('members.enrollment_otp_mail_body', ['code' => $code])
+            );
+            if (!$sent['ok']) {
+                unset($_SESSION['enrollment_otp_hash'], $_SESSION['enrollment_otp_expires'], $_SESSION['enrollment_otp_email']);
+                return ['ok' => false, 'error' => (string) ($sent['error'] ?? __('mail.send_failed'))];
+            }
         }
         $this->audit->log('member.enrollment_otp_sent', 'member', null, null, ['email' => $email], $ip);
 

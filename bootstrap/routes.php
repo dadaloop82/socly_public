@@ -141,6 +141,8 @@ $router->post('/settings/fields/autosave', [SettingsController::class, 'autosave
 $router->post('/settings/enrollment', [SettingsController::class, 'saveEnrollment'], 'settings.manage', ['mw.locale', 'mw.install', 'mw.auth', 'mw.csrf']);
 $router->post('/settings/platform', [SettingsController::class, 'savePlatform'], 'settings.manage', ['mw.locale', 'mw.install', 'mw.auth', 'mw.csrf']);
 $router->post('/settings/mail', [SettingsController::class, 'saveMail'], 'settings.manage', ['mw.locale', 'mw.install', 'mw.auth', 'mw.csrf']);
+$router->post('/settings/email-templates', [SettingsController::class, 'saveEmailTemplate'], 'settings.manage', ['mw.locale', 'mw.install', 'mw.auth', 'mw.csrf']);
+$router->post('/settings/workflow', [SettingsController::class, 'saveWorkflow'], 'settings.manage', ['mw.locale', 'mw.install', 'mw.auth', 'mw.csrf']);
 $router->post('/settings/components', [SettingsController::class, 'saveComponents'], 'settings.manage', ['mw.locale', 'mw.install', 'mw.auth', 'mw.csrf']);
 $router->post('/settings/reset-user-data', [SettingsController::class, 'resetUserData'], 'settings.manage', ['mw.locale', 'mw.install', 'mw.auth', 'mw.csrf']);
 

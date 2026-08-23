@@ -24,7 +24,22 @@ $treasuryFlowValues = $treasuryCharts['flow']['values'] ?? [0, 0];
 $hasTreasuryFlow = ((float) ($treasuryFlowValues[0] ?? 0) + (float) ($treasuryFlowValues[1] ?? 0)) > 0;
 $hasTreasuryExpenseCats = array_sum($treasuryCharts['expense_by_category']['values'] ?? []) > 0;
 $hasTreasuryIncomeCats = array_sum($treasuryCharts['income_by_category']['values'] ?? []) > 0;
-$needsChartJs = (!empty($enabled['members']) && $hasMembers) || !empty($enabled['treasury']);
+$treasuryWidget = is_array($widgets['treasury'] ?? null) ? $widgets['treasury'] : null;
+$hasTreasuryData = $treasuryWidget !== null && (
+    !empty($treasuryWidget['recent'])
+    || abs((float) ($treasuryWidget['balance'] ?? 0)) > 0.001
+    || (float) ($treasuryWidget['income'] ?? 0) > 0
+    || (float) ($treasuryWidget['expense'] ?? 0) > 0
+);
+$deadlineWidget = is_array($widgets['deadlines'] ?? null) ? $widgets['deadlines'] : null;
+$deadlineCounts = $deadlineWidget['counts'] ?? [];
+$hasDeadlines = $deadlineWidget !== null && (
+    !empty($deadlineWidget['items'])
+    || ((int) ($deadlineCounts['overdue'] ?? 0) + (int) ($deadlineCounts['due_soon'] ?? 0) + (int) ($deadlineCounts['open'] ?? 0)) > 0
+);
+$documentWidget = is_array($widgets['documents'] ?? null) ? $widgets['documents'] : null;
+$hasDocuments = $documentWidget !== null && (int) ($documentWidget['total'] ?? 0) > 0;
+$needsChartJs = (!empty($enabled['members']) && $hasMembers) || (!empty($enabled['treasury']) && $hasTreasuryData);
 $assocName = (string) (app()->branding()['name'] ?? 'SOCLY');
 $showAssocInTitle = $assocName !== '' && strcasecmp($assocName, 'SOCLY') !== 0;
 $today = date('Y-m-d');
@@ -125,6 +140,7 @@ $defaultTab = $tabs[0]['id'] ?? '';
                 </div>
             </div>
 
+            <?php if ($hasMembers): ?>
             <div class="stats stats-context-members" data-stats-context="members">
                 <div class="stat">
                     <div class="label"><?= e(__('dashboard.members_total')) ?></div>
@@ -163,12 +179,18 @@ $defaultTab = $tabs[0]['id'] ?? '';
                     <div class="value"><?= (int) ($stats['new_members_year'] ?? 0) ?></div>
                 </div>
             </div>
+            <?php endif; ?>
 
             <?php if (!$hasMembers): ?>
                 <div class="panel">
                     <div class="empty-state">
                         <strong><?= e(__('dashboard.empty_title')) ?></strong>
-                        <?= e(__('dashboard.empty_text')) ?>
+                        <p><?= e(__('dashboard.empty_text')) ?></p>
+                        <?php if (can('members.manage')): ?>
+                            <div style="margin-top:1rem">
+                                <a class="btn" href="<?= e(url('/members/create')) ?>"><?= e(__('dashboard.empty_create_member')) ?></a>
+                            </div>
+                        <?php endif; ?>
                     </div>
                 </div>
             <?php else: ?>
@@ -238,6 +260,7 @@ $defaultTab = $tabs[0]['id'] ?? '';
                 <a class="btn btn-ghost btn-sm" href="<?= e(url('/treasury')) ?>"><?= e(__('dashboard.open_treasury')) ?></a>
             </div>
 
+            <?php if ($hasTreasuryData): ?>
             <div class="stats stats-context-treasury" data-stats-context="treasury">
                 <div class="stat">
                     <div class="label"><?= e(__('dashboard.treasury_balance')) ?></div>
@@ -346,6 +369,19 @@ $defaultTab = $tabs[0]['id'] ?? '';
                     </ul>
                 <?php endif; ?>
             </div>
+            <?php else: ?>
+                <div class="panel">
+                    <div class="empty-state">
+                        <strong><?= e(__('dashboard.treasury_empty_title')) ?></strong>
+                        <p><?= e(__('dashboard.treasury_empty_text')) ?></p>
+                        <?php if (can('treasury.manage')): ?>
+                            <div style="margin-top:1rem">
+                                <a class="btn" href="<?= e(url('/treasury')) ?>"><?= e(__('dashboard.treasury_empty_create')) ?></a>
+                            </div>
+                        <?php endif; ?>
+                    </div>
+                </div>
+            <?php endif; ?>
         </section>
     <?php endif; ?>
 
@@ -366,6 +402,7 @@ $defaultTab = $tabs[0]['id'] ?? '';
                 <a class="btn btn-ghost btn-sm" href="<?= e(url('/deadlines')) ?>"><?= e(__('dashboard.open_deadlines')) ?></a>
             </div>
 
+            <?php if ($hasDeadlines): ?>
             <div class="stats stats-context-deadlines" data-stats-context="deadlines">
                 <div class="stat">
                     <div class="label"><?= e(__('dashboard.deadlines_overdue')) ?></div>
@@ -380,6 +417,7 @@ $defaultTab = $tabs[0]['id'] ?? '';
                     <div class="value"><?= (int) ($widgets['deadlines']['counts']['open'] ?? 0) ?></div>
                 </div>
             </div>
+            <?php endif; ?>
 
             <div class="panel">
                 <div class="panel-header">
@@ -388,7 +426,17 @@ $defaultTab = $tabs[0]['id'] ?? '';
                         <p class="section-lede"><?= e(__('dashboard.deadlines_lede')) ?></p>
                     </div>
                 </div>
-                <?php if (empty($widgets['deadlines']['items'])): ?>
+                <?php if (!$hasDeadlines): ?>
+                    <div class="empty-state">
+                        <strong><?= e(__('dashboard.deadlines_empty_title')) ?></strong>
+                        <p><?= e(__('dashboard.deadlines_empty_text')) ?></p>
+                        <?php if (can('deadlines.manage')): ?>
+                            <div style="margin-top:1rem">
+                                <a class="btn" href="<?= e(url('/deadlines')) ?>"><?= e(__('dashboard.deadlines_empty_create')) ?></a>
+                            </div>
+                        <?php endif; ?>
+                    </div>
+                <?php elseif (empty($widgets['deadlines']['items'])): ?>
                     <div class="empty-state compact"><?= e(__('dashboard.deadlines_empty')) ?></div>
                 <?php else: ?>
                     <ul class="deadline-list compact">
@@ -439,12 +487,14 @@ $defaultTab = $tabs[0]['id'] ?? '';
                 <a class="btn btn-ghost btn-sm" href="<?= e(url('/documents')) ?>"><?= e(__('dashboard.open_documents')) ?></a>
             </div>
 
+            <?php if ($hasDocuments): ?>
             <div class="stats stats-context-documents" data-stats-context="documents">
                 <div class="stat">
                     <div class="label"><?= e(__('dashboard.documents_total')) ?></div>
                     <div class="value"><?= (int) ($widgets['documents']['total'] ?? 0) ?></div>
                 </div>
             </div>
+            <?php endif; ?>
 
             <div class="panel">
                 <div class="panel-header">
@@ -453,7 +503,17 @@ $defaultTab = $tabs[0]['id'] ?? '';
                         <p class="section-lede"><?= e(__('dashboard.documents_lede', ['count' => (string) (int) ($widgets['documents']['total'] ?? 0)])) ?></p>
                     </div>
                 </div>
-                <?php if (empty($widgets['documents']['recent'])): ?>
+                <?php if (!$hasDocuments): ?>
+                    <div class="empty-state">
+                        <strong><?= e(__('dashboard.documents_empty_title')) ?></strong>
+                        <p><?= e(__('dashboard.documents_empty_text')) ?></p>
+                        <?php if (can('documents.manage')): ?>
+                            <div style="margin-top:1rem">
+                                <a class="btn" href="<?= e(url('/documents')) ?>"><?= e(__('dashboard.documents_empty_create')) ?></a>
+                            </div>
+                        <?php endif; ?>
+                    </div>
+                <?php elseif (empty($widgets['documents']['recent'])): ?>
                     <div class="empty-state compact"><?= e(__('dashboard.documents_empty')) ?></div>
                 <?php else: ?>
                     <ul class="dashboard-list">

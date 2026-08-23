@@ -7,14 +7,18 @@ namespace Socly\Controllers;
 use Socly\Core\Http\Request;
 use Socly\Core\View;
 use Socly\Services\MailService;
+use Socly\Services\SettingsService;
 use Socly\Services\UserService;
+use Socly\Services\WorkflowService;
 
 final class UserController extends BaseController
 {
     public function __construct(
         View $view,
         private readonly UserService $users,
-        private readonly MailService $mail
+        private readonly MailService $mail,
+        private readonly WorkflowService $workflow,
+        private readonly SettingsService $settings
     ) {
         parent::__construct($view);
     }
@@ -40,11 +44,19 @@ final class UserController extends BaseController
             $this->redirectUsers('settings');
         }
         if ($this->mail->isReady() && $plainPassword !== '') {
-            $this->mail->sendUserWelcome(
-                (string) $data['email'],
-                $plainPassword,
-                (string) ($data['locale'] ?? 'it')
-            );
+            $locale = (string) ($data['locale'] ?? 'it');
+            $email = (string) $data['email'];
+            $sent = $this->workflow->dispatch('user.created', [
+                'email' => $email,
+                'lang' => $locale,
+                'operator_email' => $email,
+                'operator_password' => $plainPassword,
+                'login_url' => url('/login'),
+                'association_name' => (string) $this->settings->get('association.name', ''),
+            ], $locale, $request->ip());
+            if ($sent === 0) {
+                $this->mail->sendUserWelcome($email, $plainPassword, $locale);
+            }
         }
         $this->clearOld();
         $this->flash('success', __('users.created'));

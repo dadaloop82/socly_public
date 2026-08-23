@@ -53,6 +53,7 @@ use Socly\Services\ComponentService;
 use Socly\Services\CurrencyService;
 use Socly\Services\DeadlineService;
 use Socly\Services\DocumentService;
+use Socly\Services\EmailTemplateService;
 use Socly\Services\EnrollmentService;
 use Socly\Services\GeoService;
 use Socly\Services\InstallerService;
@@ -69,6 +70,7 @@ use Socly\Services\SetupService;
 use Socly\Services\TreasuryService;
 use Socly\Services\UpdateService;
 use Socly\Services\UserService;
+use Socly\Services\WorkflowService;
 use Socly\Support\EnvWriter;
 
 $codePath = defined('SOCLY_CODE_PATH') ? (string) SOCLY_CODE_PATH : dirname(__DIR__);
@@ -262,6 +264,18 @@ $app->bind(AssociationPeopleService::class, fn (App $a) => new AssociationPeople
 $app->bind(AssociationWebsiteScrapeService::class, fn () => new AssociationWebsiteScrapeService());
 $app->bind(RuntsLookupService::class, fn () => new RuntsLookupService());
 $app->bind(MailService::class, fn (App $a) => new MailService($a->get(SettingsService::class)));
+$app->bind(EmailTemplateService::class, fn (App $a) => new EmailTemplateService(
+    $a->get(Database::class),
+    $a->get(Validator::class),
+    $a->get(SettingsService::class)
+));
+$app->bind(WorkflowService::class, fn (App $a) => new WorkflowService(
+    $a->get(Database::class),
+    $a->get(Validator::class),
+    $a->get(EmailTemplateService::class),
+    $a->get(MailService::class),
+    $a->get(AuditService::class)
+));
 $app->bind(PlatformService::class, fn (App $a) => new PlatformService(
     $a->get(SettingsService::class),
     $a->get(BrandingService::class),
@@ -339,7 +353,8 @@ $app->bind(DashboardController::class, fn (App $a) => new DashboardController(
 $app->bind(EnrollmentService::class, fn (App $a) => new EnrollmentService(
     $a->get(Database::class),
     $a->get(SettingsService::class),
-    $a->get(AuditService::class)
+    $a->get(AuditService::class),
+    $a->get(WorkflowService::class)
 ));
 $app->bind(MemberController::class, fn (App $a) => new MemberController(
     $a->get(View::class),
@@ -364,7 +379,9 @@ $app->bind(SettingsController::class, fn (App $a) => new SettingsController(
     $a->get(DocumentService::class),
     $a->get(DeadlineService::class),
     $a->get(PlatformService::class),
-    $a->get(UserService::class)
+    $a->get(UserService::class),
+    $a->get(EmailTemplateService::class),
+    $a->get(WorkflowService::class)
 ));
 $app->bind(TreasuryController::class, fn (App $a) => new TreasuryController(
     $a->get(View::class),
@@ -403,7 +420,9 @@ $app->bind(UpdateController::class, fn (App $a) => new UpdateController(
 $app->bind(UserController::class, fn (App $a) => new UserController(
     $a->get(View::class),
     $a->get(UserService::class),
-    $a->get(MailService::class)
+    $a->get(MailService::class),
+    $a->get(WorkflowService::class),
+    $a->get(SettingsService::class)
 ));
 $app->bind(PluginController::class, fn (App $a) => new PluginController(
     $a->get(View::class),

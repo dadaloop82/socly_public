@@ -143,6 +143,7 @@ document.addEventListener('DOMContentLoaded', () => {
   initPasswordToggles(document);
   initPasswordGenerators(document);
   initPermissionTemplates(document);
+  initEmailTemplateEditor(document);
   initFieldsSortable(document);
   initComponentCards(document);
   initDemoLoginNotice();
@@ -443,6 +444,182 @@ function initPermissionTemplates(scope = document) {
       });
     });
   });
+}
+
+function initEmailTemplateEditor(scope = document) {
+  const form = scope.querySelector('[data-email-template-form]');
+  const previewRoot = scope.querySelector('[data-email-template-preview]');
+  if (!form || !previewRoot || form.dataset.emailTemplateBound === '1') return;
+  form.dataset.emailTemplateBound = '1';
+  let samples = {};
+  try {
+    samples = JSON.parse(previewRoot.dataset.samples || '{}');
+  } catch {
+    samples = {};
+  }
+  const langs = ['it', 'en', 'de'];
+  let activeLang = 'it';
+  const formatSelect = form.querySelector('[data-tpl-body-format]');
+  const actionField = form.querySelector('[data-tpl-action-field]');
+  const htmlViewMode = { it: 'source', en: 'source', de: 'source' };
+
+  const field = (lang, kind) => form.querySelector(`[data-tpl-${kind}="${lang}"]`);
+  const sourceField = (lang) => form.querySelector(`[data-tpl-body-source="${lang}"]`);
+
+  const truthy = (v) => {
+    if (v === true || v === 1) return true;
+    const s = String(v ?? '').trim().toLowerCase();
+    if (!s || s === '0') return false;
+    return !['no', 'nein', 'false', 'off', 'n'].includes(s);
+  };
+
+  const renderConditionals = (tpl, vars) => {
+    let out = String(tpl || '');
+    const positive = /\{\{#\s*([a-z0-9_]+)\s*\}\}([\s\S]*?)\{\{\/\s*\1\s*\}\}/gi;
+    const negative = /\{\{\^\s*([a-z0-9_]+)\s*\}\}([\s\S]*?)\{\{\/\s*\1\s*\}\}/gi;
+    for (let pass = 0; pass < 12; pass += 1) {
+      const prev = out;
+      out = out.replace(positive, (_, key, inner) => (truthy(vars[String(key).toLowerCase()]) ? inner : ''));
+      out = out.replace(negative, (_, key, inner) => (truthy(vars[String(key).toLowerCase()]) ? '' : inner));
+      if (out === prev) break;
+    }
+    return out;
+  };
+
+  const render = (tpl, vars) => renderConditionals(tpl, vars).replace(/\{\{\s*([a-z0-9_]+)\s*\}\}/gi, (_, key) => {
+    const k = String(key).toLowerCase();
+    return Object.prototype.hasOwnProperty.call(vars, k) ? String(vars[k]) : '';
+  });
+
+  const isHtmlMode = () => formatSelect?.value === 'html';
+
+  const syncSourceToHidden = (lang) => {
+    const ta = field(lang, 'body');
+    const source = sourceField(lang);
+    if (ta && source && isHtmlMode()) ta.value = source.value;
+  };
+
+  const loadSourceFromHidden = (lang) => {
+    const ta = field(lang, 'body');
+    const source = sourceField(lang);
+    if (ta && source) source.value = ta.value;
+  };
+
+  const bodyValue = (lang) => {
+    if (isHtmlMode()) syncSourceToHidden(lang);
+    return field(lang, 'body')?.value || '';
+  };
+
+  const updatePreview = () => {
+    const vars = samples[activeLang] || samples.it || {};
+    const subject = field(activeLang, 'subject')?.value || '';
+    const body = bodyValue(activeLang);
+    previewRoot.querySelector('[data-preview-lang]')?.replaceChildren(document.createTextNode(activeLang.toUpperCase()));
+    previewRoot.querySelector('[data-preview-format]')?.replaceChildren(document.createTextNode(isHtmlMode() ? 'HTML' : 'TESTO'));
+    previewRoot.querySelector('[data-preview-subject]')?.replaceChildren(document.createTextNode(render(subject, vars) || '—'));
+    const rendered = render(body, vars) || '—';
+    const textEl = previewRoot.querySelector('[data-preview-body-text]');
+    const htmlEl = previewRoot.querySelector('[data-preview-body-html]');
+    if (isHtmlMode()) {
+      if (textEl) textEl.hidden = true;
+      if (htmlEl) {
+        htmlEl.hidden = false;
+        htmlEl.innerHTML = rendered === '—' ? '<span class="muted">—</span>' : rendered;
+      }
+    } else if (textEl) {
+      textEl.hidden = false;
+      textEl.textContent = rendered;
+      if (htmlEl) htmlEl.hidden = true;
+    }
+  };
+
+  const setHtmlViewMode = (lang, mode) => {
+    htmlViewMode[lang] = mode;
+    const sourceWrap = form.querySelector(`[data-tpl-html-wrap="${lang}"] [data-tpl-body-source="${lang}"]`)?.parentElement;
+    const preview = form.querySelector(`[data-tpl-inline-preview="${lang}"]`);
+    form.querySelectorAll(`[data-html-mode][data-lang="${lang}"]`).forEach((btn) => {
+      btn.classList.toggle('is-active', btn.getAttribute('data-html-mode') === mode);
+    });
+    if (mode === 'preview') {
+      syncSourceToHidden(lang);
+      if (preview) {
+        const vars = samples[lang] || samples.it || {};
+        preview.innerHTML = render(sourceField(lang)?.value || '', vars) || '<span class="muted">—</span>';
+        preview.hidden = false;
+      }
+      if (sourceField(lang)) sourceField(lang).hidden = true;
+    } else {
+      loadSourceFromHidden(lang);
+      if (sourceField(lang)) sourceField(lang).hidden = false;
+      if (preview) preview.hidden = true;
+    }
+    updatePreview();
+  };
+
+  const applyFormatMode = () => {
+    langs.forEach((lang) => {
+      const ta = field(lang, 'body');
+      const wrap = form.querySelector(`[data-tpl-html-wrap="${lang}"]`);
+      if (!ta || !wrap) return;
+      if (isHtmlMode()) {
+        wrap.hidden = false;
+        ta.hidden = true;
+        ta.required = false;
+        setHtmlViewMode(lang, htmlViewMode[lang] || 'source');
+      } else {
+        syncSourceToHidden(lang);
+        wrap.hidden = true;
+        ta.hidden = false;
+        if (lang === 'it') ta.required = true;
+      }
+    });
+    updatePreview();
+  };
+
+  form.querySelectorAll('[data-lang-tab]').forEach((tab) => {
+    tab.addEventListener('click', () => {
+      activeLang = tab.getAttribute('data-lang-tab') || 'it';
+      form.querySelectorAll('[data-lang-tab]').forEach((t) => t.classList.toggle('is-active', t === tab));
+      form.querySelectorAll('[data-lang-pane]').forEach((pane) => {
+        pane.classList.toggle('is-active', pane.getAttribute('data-lang-pane') === activeLang);
+      });
+      updatePreview();
+    });
+  });
+
+  form.querySelectorAll('[data-html-mode]').forEach((btn) => {
+    btn.addEventListener('click', () => setHtmlViewMode(btn.getAttribute('data-lang') || 'it', btn.getAttribute('data-html-mode') || 'source'));
+  });
+
+  formatSelect?.addEventListener('change', applyFormatMode);
+  form.querySelectorAll('[data-tpl-subject], [data-tpl-body], [data-tpl-body-source]').forEach((el) => {
+    el.addEventListener('input', updatePreview);
+  });
+
+  form.querySelectorAll('[data-insert-ph]').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      const key = btn.getAttribute('data-insert-ph') || '';
+      const token = `{{${key}}}`;
+      const target = isHtmlMode() && htmlViewMode[activeLang] === 'source'
+        ? sourceField(activeLang)
+        : field(activeLang, 'body');
+      if (!target) return;
+      const start = target.selectionStart ?? target.value.length;
+      const end = target.selectionEnd ?? target.value.length;
+      target.value = target.value.slice(0, start) + token + target.value.slice(end);
+      target.dispatchEvent(new Event('input', { bubbles: true }));
+      target.focus();
+    });
+  });
+
+  form.querySelectorAll('[data-tpl-submit]').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      if (actionField) actionField.value = btn.getAttribute('data-tpl-submit') || 'save';
+      if (isHtmlMode()) langs.forEach(syncSourceToHidden);
+    });
+  });
+
+  applyFormatMode();
 }
 
 function initResetUserData() {

@@ -16,6 +16,7 @@ use Socly\Services\BrandingService;
 use Socly\Services\ComponentService;
 use Socly\Services\DocumentService;
 use Socly\Services\DeadlineService;
+use Socly\Services\EmailTemplateService;
 use Socly\Services\InstallerService;
 use Socly\Services\MailService;
 use Socly\Services\MemberService;
@@ -23,6 +24,7 @@ use Socly\Services\PlatformService;
 use Socly\Services\SettingsService;
 use Socly\Services\SetupService;
 use Socly\Services\UserService;
+use Socly\Services\WorkflowService;
 
 final class SettingsController extends BaseController
 {
@@ -42,7 +44,9 @@ final class SettingsController extends BaseController
         private readonly DocumentService $documents,
         private readonly DeadlineService $deadlines,
         private readonly PlatformService $platform,
-        private readonly UserService $users
+        private readonly UserService $users,
+        private readonly EmailTemplateService $emailTemplates,
+        private readonly WorkflowService $workflow
     ) {
         parent::__construct($view);
     }
@@ -50,6 +54,7 @@ final class SettingsController extends BaseController
     public function index(Request $request): void
     {
         $this->members->ensureMembershipPeriodRollover();
+        $this->emailTemplates->ensureDefaults();
         $people = $this->people->all();
         if ($people === []) {
             $people = [[
@@ -116,6 +121,11 @@ final class SettingsController extends BaseController
             ],
             'plugin_catalog' => $this->pluginCatalogForSettings(),
             'panelUsers' => $this->users->panelUsers(),
+            'emailTemplates' => $this->emailTemplates->all(),
+            'workflowRules' => $this->workflow->all(),
+            'editingTemplate' => $this->resolveEditingTemplate($request),
+            'editingWorkflow' => $this->resolveEditingWorkflow($request),
+            'emailSampleJson' => json_encode($this->emailTemplates->sampleVarsByLang(), JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?: '{}',
         ]);
     }
 
@@ -558,6 +568,112 @@ final class SettingsController extends BaseController
         $this->audit->log('settings.saved', 'settings', 'components', null, ['enabled' => $keys], $request->ip());
         $this->flash('success', __('settings.saved'));
         redirect('/settings#components');
+    }
+
+    public function saveEmailTemplate(Request $request): void
+    {
+        $data = $request->all();
+        $action = (string) ($data['action'] ?? 'save');
+        if ($action === 'delete') {
+            $id = (int) ($data['id'] ?? 0);
+            $result = $this->emailTemplates->delete($id);
+            if (!$result['ok']) {
+                $this->flash('errors', ['template' => $result['error'] ?? __('email_templates.save_failed')]);
+            } else {
+                $this->flash('success', __('email_templates.deleted'));
+            }
+            redirect('/settings#email-templates');
+        }
+        if ($action === 'send_test') {
+            $this->rememberOld($data);
+            $to = trim((string) ($data['test_email'] ?? ''));
+            if ($to === '' || !filter_var($to, FILTER_VALIDATE_EMAIL)) {
+                $this->flash('errors', ['test_email' => __('email_templates.test_email_invalid')]);
+                redirect('/settings?edit_template=' . (int) ($data['id'] ?? 0) . '#email-templates');
+            }
+            if (!$this->mail->isReady()) {
+                $this->flash('errors', ['mail' => __('mail.not_configured')]);
+                redirect('/settings#email-templates');
+            }
+            $lang = $this->emailTemplates->normalizeLang((string) ($data['test_lang'] ?? 'it'));
+            $rendered = $this->emailTemplates->renderTemplate($data, $lang, $this->emailTemplates->sampleVars($lang));
+            $subject = '[TEST] ' . ltrim($rendered['subject']);
+            $html = ($rendered['body_format'] ?? 'text') === 'html';
+            $body = $rendered['body'];
+            $plain = $html ? strip_tags(preg_replace('/<\s*br\s*\/?>/i', "\n", $body) ?? $body) : $body;
+            $sent = $this->mail->send($to, $subject, $plain, $html ? $body : null);
+            if (!$sent['ok']) {
+                $this->flash('errors', ['mail' => $sent['error'] ?? __('mail.send_failed')]);
+            } else {
+                $this->flash('success', __('email_templates.test_sent', ['email' => $to]));
+            }
+            redirect('/settings?edit_template=' . (int) ($data['id'] ?? 0) . '#email-templates');
+        }
+        $this->rememberOld($data);
+        $result = $this->emailTemplates->save($data);
+        if (!$result['ok']) {
+            $this->flash('errors', $result['errors'] ?? ['template' => __('email_templates.save_failed')]);
+            redirect('/settings?edit_template=' . (int) ($data['id'] ?? 0) . '#email-templates');
+        }
+        $this->clearOld();
+        $this->audit->log('settings.saved', 'settings', 'email_template', null, [
+            'id' => $result['id'] ?? null,
+            'slug' => (string) ($data['slug'] ?? ''),
+        ], $request->ip());
+        $this->flash('success', __('email_templates.saved'));
+        redirect('/settings?edit_template=' . (int) ($result['id'] ?? 0) . '#email-templates');
+    }
+
+    public function saveWorkflow(Request $request): void
+    {
+        $data = $request->all();
+        $action = (string) ($data['action'] ?? 'save');
+        if ($action === 'delete') {
+            $id = (int) ($data['id'] ?? 0);
+            $result = $this->workflow->delete($id);
+            if (!$result['ok']) {
+                $this->flash('errors', ['workflow' => $result['error'] ?? __('workflow.save_failed')]);
+            } else {
+                $this->flash('success', __('workflow.deleted'));
+            }
+            redirect('/settings#workflow');
+        }
+        if ($action === 'toggle') {
+            $this->workflow->toggle((int) ($data['id'] ?? 0));
+            $this->flash('success', __('workflow.toggled'));
+            redirect('/settings#workflow');
+        }
+        $this->rememberOld($data);
+        $result = $this->workflow->save($data);
+        if (!$result['ok']) {
+            $this->flash('errors', $result['errors'] ?? ['workflow' => __('workflow.save_failed')]);
+            redirect('/settings?edit_workflow=' . (int) ($data['id'] ?? 0) . '#workflow');
+        }
+        $this->clearOld();
+        $this->audit->log('settings.saved', 'settings', 'workflow', null, [
+            'id' => $result['id'] ?? null,
+            'event' => (string) ($data['event_key'] ?? ''),
+        ], $request->ip());
+        $this->flash('success', __('workflow.saved'));
+        redirect('/settings?edit_workflow=' . (int) ($result['id'] ?? 0) . '#workflow');
+    }
+
+    private function resolveEditingTemplate(Request $request): ?array
+    {
+        $id = (int) $request->input('edit_template', 0);
+        if ($id <= 0) {
+            return null;
+        }
+        return $this->emailTemplates->find($id);
+    }
+
+    private function resolveEditingWorkflow(Request $request): ?array
+    {
+        $id = (int) $request->input('edit_workflow', 0);
+        if ($id <= 0) {
+            return null;
+        }
+        return $this->workflow->find($id);
     }
 
     public function resetUserData(Request $request): void
