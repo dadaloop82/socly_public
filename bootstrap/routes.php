@@ -130,6 +130,7 @@ $router->post('/org/organs/{key}/delete', [OrgController::class, 'destroyOrgan']
 $router->get('/org/people/create', [OrgController::class, 'create'], null, ['mw.locale', 'mw.install', 'mw.auth']);
 $router->post('/org/people', [OrgController::class, 'store'], null, ['mw.locale', 'mw.install', 'mw.auth', 'mw.csrf']);
 $router->get('/org/people/{id}/edit', [OrgController::class, 'edit'], null, ['mw.locale', 'mw.install', 'mw.auth']);
+$router->get('/api/org/members/{id}/profile', [OrgController::class, 'memberProfile'], null, ['mw.locale', 'mw.install', 'mw.auth']);
 $router->post('/org/people/{id}', [OrgController::class, 'update'], null, ['mw.locale', 'mw.install', 'mw.auth', 'mw.csrf']);
 $router->post('/org/people/{id}/delete', [OrgController::class, 'destroy'], null, ['mw.locale', 'mw.install', 'mw.auth', 'mw.csrf']);
 

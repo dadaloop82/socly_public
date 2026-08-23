@@ -1820,4 +1820,100 @@ final class MemberService
              LIMIT 500"
         );
     }
+
+    /**
+     * Active members eligible for org-chart assignment (membership fee settled).
+     *
+     * @return list<array{id:int,member_number:string,first_name:string,last_name:string,display_name:string}>
+     */
+    public function listActiveForOrgSelect(): array
+    {
+        $rows = $this->db->fetchAll(
+            "SELECT m.id, m.member_number, m.balance_due,
+                    COALESCE((
+                        SELECT v.value FROM member_field_values v
+                        INNER JOIN member_field_definitions d ON d.id = v.field_definition_id AND d.`key` = 'last_name'
+                        WHERE v.member_id = m.id LIMIT 1
+                    ), '') AS last_name,
+                    COALESCE((
+                        SELECT v.value FROM member_field_values v
+                        INNER JOIN member_field_definitions d ON d.id = v.field_definition_id AND d.`key` = 'first_name'
+                        WHERE v.member_id = m.id LIMIT 1
+                    ), '') AS first_name
+             FROM members m
+             WHERE m.status = 'active' AND m.balance_due <= 0
+             ORDER BY last_name ASC, first_name ASC, m.id ASC
+             LIMIT 500"
+        );
+        foreach ($rows as &$row) {
+            $name = trim((string) (($row['last_name'] ?? '') . ' ' . ($row['first_name'] ?? '')));
+            $num = trim((string) ($row['member_number'] ?? ''));
+            $row['display_name'] = $name !== ''
+                ? ($num !== '' ? $name . ' (' . $num . ')' : $name)
+                : ($num !== '' ? $num : '#' . (string) ($row['id'] ?? ''));
+        }
+        unset($row);
+        return $rows;
+    }
+
+    /**
+     * @return array{ok:bool,message?:string}
+     */
+    public function orgEligibility(int $memberId): array
+    {
+        if ($memberId < 1) {
+            return ['ok' => false, 'message' => __('org.member_required')];
+        }
+        $member = $this->db->fetch(
+            'SELECT id, status, balance_due FROM members WHERE id = :id LIMIT 1',
+            ['id' => $memberId]
+        );
+        if (!$member) {
+            return ['ok' => false, 'message' => __('org.member_not_found')];
+        }
+        if ((string) ($member['status'] ?? '') !== 'active') {
+            return ['ok' => false, 'message' => __('org.member_not_active')];
+        }
+        if ((float) ($member['balance_due'] ?? 0) > 0) {
+            return ['ok' => false, 'message' => __('org.member_fee_due')];
+        }
+        return ['ok' => true];
+    }
+
+    /**
+     * Identity/residence snapshot from member record for org-chart forms.
+     *
+     * @return array<string, mixed>|null
+     */
+    public function orgPersonProfile(int $memberId): ?array
+    {
+        $member = $this->db->fetch(
+            'SELECT m.id, m.status, m.balance_due FROM members m WHERE m.id = :id LIMIT 1',
+            ['id' => $memberId]
+        );
+        if (!$member || (string) ($member['status'] ?? '') !== 'active') {
+            return null;
+        }
+        $fields = $this->fieldValues($memberId);
+        $pick = static fn (string $key): string => trim((string) ($fields[$key] ?? ''));
+        $gender = strtoupper($pick('gender'));
+        if ($gender !== 'M' && $gender !== 'F') {
+            $gender = '';
+        }
+        return [
+            'member_id' => $memberId,
+            'first_name' => $pick('first_name'),
+            'last_name' => $pick('last_name'),
+            'fiscal_code' => strtoupper(preg_replace('/\s+/', '', $pick('fiscal_code')) ?? ''),
+            'birth_date' => $pick('birth_date'),
+            'gender' => $gender,
+            'birth_place' => $pick('birth_place'),
+            'email' => $pick('email'),
+            'phone' => $pick('phone'),
+            'city' => $pick('city'),
+            'postal_code' => $pick('postal_code'),
+            'address' => $pick('address'),
+            'house_number' => $pick('house_number'),
+        ];
+    }
 }

@@ -157,12 +157,51 @@ final class OrgController extends BaseController
         redirect('/org');
     }
 
+    public function memberProfile(Request $request, string $id): void
+    {
+        require_component('org_roles');
+        $this->requireOrgEdit();
+        $memberId = (int) $id;
+        $roleKey = trim((string) $request->input('role', ''));
+        $excludePersonId = (int) $request->input('exclude_person_id', 0);
+        $eligibility = $this->members->orgEligibility($memberId);
+        $profile = $this->members->orgPersonProfile($memberId);
+        $existingRoles = $memberId > 0
+            ? $this->people->memberActiveRoles($memberId, $excludePersonId > 0 ? $excludePersonId : null)
+            : [];
+        header('Content-Type: application/json; charset=utf-8');
+        if ($profile === null) {
+            http_response_code(404);
+            echo json_encode([
+                'ok' => false,
+                'eligible' => $eligibility,
+            ], JSON_UNESCAPED_UNICODE);
+            return;
+        }
+        $incompatible = [];
+        if ($roleKey !== '') {
+            foreach ($existingRoles as $item) {
+                if ($this->people->rolesIncompatible($roleKey, (string) ($item['role_key'] ?? ''))) {
+                    $incompatible[] = $item;
+                }
+            }
+        }
+        echo json_encode([
+            'ok' => true,
+            'eligible' => $eligibility,
+            'profile' => $profile,
+            'existing_roles' => $existingRoles,
+            'incompatible_roles' => $incompatible,
+        ], JSON_UNESCAPED_UNICODE);
+    }
+
     /** @param array<string,mixed>|null $person */
     private function renderPersonForm(?array $person, string $roleKey): void
     {
         $old = old_input();
         $values = $old !== [] ? $old : ($person ?? [
             'role_key' => $roleKey,
+            'member_id' => '',
             'first_name' => '',
             'last_name' => '',
             'fiscal_code' => '',
@@ -182,6 +221,37 @@ final class OrgController extends BaseController
         if (empty($values['role_key'])) {
             $values['role_key'] = $roleKey;
         }
+        if ($person !== null && empty($values['member_id']) && !empty($person['member_id'])) {
+            $values['member_id'] = (string) $person['member_id'];
+        }
+        $memberOptions = $this->members->listActiveForOrgSelect();
+        if (!empty($values['member_id'])) {
+            $selectedId = (int) $values['member_id'];
+            $found = false;
+            foreach ($memberOptions as $opt) {
+                if ((int) ($opt['id'] ?? 0) === $selectedId) {
+                    $found = true;
+                    break;
+                }
+            }
+            if (!$found) {
+                $current = $this->members->find($selectedId);
+                if ($current) {
+                    $fields = is_array($current['fields'] ?? null) ? $current['fields'] : [];
+                    $name = trim((string) (($fields['last_name'] ?? '') . ' ' . ($fields['first_name'] ?? '')));
+                    $num = trim((string) ($current['member_number'] ?? ''));
+                    array_unshift($memberOptions, [
+                        'id' => $selectedId,
+                        'member_number' => $num,
+                        'first_name' => (string) ($fields['first_name'] ?? ''),
+                        'last_name' => (string) ($fields['last_name'] ?? ''),
+                        'display_name' => $name !== ''
+                            ? ($num !== '' ? $name . ' (' . $num . ')' : $name)
+                            : ($num !== '' ? $num : '#' . $selectedId),
+                    ]);
+                }
+            }
+        }
         $roleMeta = $this->people->role((string) $values['role_key']) ?? $this->people->role($roleKey);
         $roleConflict = flash('role_conflict');
         $this->render('org/person_form', [
@@ -192,6 +262,7 @@ final class OrgController extends BaseController
             'roleMeta' => $roleMeta,
             'roleConflict' => is_array($roleConflict) ? $roleConflict : null,
             'isEdit' => $person !== null,
+            'memberOptions' => $memberOptions,
         ]);
     }
 

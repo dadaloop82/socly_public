@@ -6,8 +6,11 @@
  * @var array<string,mixed>|null $roleMeta
  * @var array<string,mixed>|null $roleConflict
  * @var bool $isEdit
+ * @var list<array> $memberOptions
  */
 $roleKey = (string) ($values['role_key'] ?? 'board');
+$memberId = (string) ($values['member_id'] ?? '');
+$memberOptions = $memberOptions ?? [];
 $requiresResidence = !empty($roleMeta['requires_residence']);
 $requiresMandate = !empty($roleMeta['requires_mandate']);
 $action = $isEdit
@@ -28,6 +31,11 @@ $action = $isEdit
     data-cities-url="<?= e(url('/api/geo/cities')) ?>"
     data-addresses-url="<?= e(url('/api/geo/addresses')) ?>"
     data-org-person-form
+    data-org-member-profile-url="<?= e(url('/api/org/members/__ID__/profile')) ?>"
+    data-msg-role-incompatible="<?= e(__('org.role_incompatible_warn')) ?>"
+    <?php if ($isEdit && !empty($person['id'])): ?>
+    data-org-person-id="<?= (int) $person['id'] ?>"
+    <?php endif; ?>
     data-leave-guard
     data-cf-url="<?= e(url('/api/fiscal-code')) ?>"
     data-csrf="<?= e(csrf_token()) ?>"
@@ -70,20 +78,51 @@ $action = $isEdit
                 <?php endforeach; ?>
             </select>
         </div>
+    </div>
+
+    <div style="margin-bottom:1rem">
+        <label><?= e(__('org.field_member')) ?> *</label>
+        <select name="member_id" required data-org-member-select>
+                <option value=""><?= e(__('org.member_select_placeholder')) ?></option>
+                <?php foreach ($memberOptions as $memberOption): ?>
+                    <?php
+                    $optId = (int) ($memberOption['id'] ?? 0);
+                    $optLabel = trim((string) ($memberOption['display_name'] ?? ''));
+                    if ($optLabel === '') {
+                        $optLabel = trim((string) (($memberOption['last_name'] ?? '') . ' ' . ($memberOption['first_name'] ?? '')));
+                    }
+                    ?>
+                    <option value="<?= $optId ?>" <?= $memberId === (string) $optId ? 'selected' : '' ?>><?= e($optLabel) ?></option>
+                <?php endforeach; ?>
+            </select>
+            <p class="muted"><?= e(__('org.member_select_lede')) ?></p>
+    </div>
+
+    <div class="grid-3">
         <div>
             <label><?= e(__('setup.field_first_name')) ?> *</label>
-            <input type="text" name="first_name" value="<?= e((string) ($values['first_name'] ?? '')) ?>" required maxlength="120" data-first-name>
+            <input type="text" name="first_name" value="<?= e((string) ($values['first_name'] ?? '')) ?>" required maxlength="120" data-first-name data-org-member-field>
         </div>
         <div>
             <label><?= e(__('setup.field_last_name')) ?> *</label>
-            <input type="text" name="last_name" value="<?= e((string) ($values['last_name'] ?? '')) ?>" required maxlength="120" data-last-name>
+            <input type="text" name="last_name" value="<?= e((string) ($values['last_name'] ?? '')) ?>" required maxlength="120" data-last-name data-org-member-field>
+        </div>
+        <div>
+            <label><?= e(__('setup.field_person_fiscal_code')) ?> *</label>
+            <input type="text" name="fiscal_code" value="<?= e((string) ($values['fiscal_code'] ?? '')) ?>" required maxlength="16" pattern="[A-Za-z0-9]{16}" autocomplete="off" data-fiscal-code data-org-member-field placeholder="<?= e(__('members.cf_hint')) ?>">
+            <button class="btn btn-ghost btn-sm" type="button" data-cf-generate hidden><?= e(__('members.cf_generate')) ?></button>
+            <p class="muted" data-cf-status
+               data-ready="<?= e(__('members.cf_ready')) ?>"
+               data-incomplete="<?= e(__('members.cf_incomplete')) ?>"
+               data-gender-other="<?= e(__('members.cf_gender_other')) ?>"
+               hidden></p>
         </div>
     </div>
 
     <div class="grid-3">
         <div>
             <label><?= e(__('setup.field_gender')) ?></label>
-            <select name="gender" data-gender-input>
+            <select name="gender" data-gender-input data-org-member-field>
                 <option value="">—</option>
                 <option value="M" <?= ($values['gender'] ?? '') === 'M' ? 'selected' : '' ?>><?= e(__('members.gender_m')) ?></option>
                 <option value="F" <?= ($values['gender'] ?? '') === 'F' ? 'selected' : '' ?>><?= e(__('members.gender_f')) ?></option>
@@ -95,24 +134,14 @@ $action = $isEdit
         ]) ?>
         <div>
             <label><?= e(__('setup.field_birth_date')) ?></label>
-            <input type="date" name="birth_date" value="<?= e((string) ($values['birth_date'] ?? '')) ?>" data-birth-date>
+            <input type="date" name="birth_date" value="<?= e((string) ($values['birth_date'] ?? '')) ?>" data-birth-date data-org-member-field>
         </div>
     </div>
 
     <div class="grid-3">
         <div>
-            <label><?= e(__('setup.field_person_fiscal_code')) ?> *</label>
-            <input type="text" name="fiscal_code" value="<?= e((string) ($values['fiscal_code'] ?? '')) ?>" required maxlength="16" pattern="[A-Za-z0-9]{16}" autocomplete="off" data-fiscal-code placeholder="<?= e(__('members.cf_hint')) ?>">
-            <button class="btn btn-ghost btn-sm" type="button" data-cf-generate><?= e(__('members.cf_generate')) ?></button>
-            <p class="muted" data-cf-status
-               data-ready="<?= e(__('members.cf_ready')) ?>"
-               data-incomplete="<?= e(__('members.cf_incomplete')) ?>"
-               data-gender-other="<?= e(__('members.cf_gender_other')) ?>"
-               hidden></p>
-        </div>
-        <div>
             <label><?= e(__('org.field_email')) ?></label>
-            <input type="email" name="email" value="<?= e((string) ($values['email'] ?? '')) ?>" maxlength="190">
+            <input type="email" name="email" value="<?= e((string) ($values['email'] ?? '')) ?>" maxlength="190" data-org-member-field>
         </div>
         <div>
             <label><?= e(__('setup.field_phone')) ?></label>
@@ -121,8 +150,6 @@ $action = $isEdit
                 'value' => (string) ($values['phone'] ?? ''),
             ]) ?>
         </div>
-    </div>
-    <div>
         <div>
             <label><?= e(__('org.notes')) ?></label>
             <input type="text" name="notes" value="<?= e((string) ($values['notes'] ?? '')) ?>">

@@ -126,7 +126,7 @@ final class DeadlineService
         }
 
         $people = $this->db->fetchAll(
-            'SELECT p.id, p.first_name, p.last_name, p.mandate_ends_at,
+            'SELECT p.id, p.first_name, p.last_name, p.mandate_ends_at, p.member_id,
                     r.label_key, r.custom_label
              FROM association_people p
              INNER JOIN association_roles r ON r.`key` = p.role_key
@@ -139,6 +139,7 @@ final class DeadlineService
             if ($role === '') {
                 $role = __((string) ($person['label_key'] ?? ''));
             }
+            $memberId = (int) ($person['member_id'] ?? 0);
             $this->upsertSystemDeadline($source, [
                 'title' => __('deadlines.auto_mandate', [
                     'name' => trim((string) ($person['first_name'] ?? '') . ' ' . (string) ($person['last_name'] ?? '')),
@@ -146,8 +147,8 @@ final class DeadlineService
                 ]),
                 'category' => 'mandate',
                 'due_date' => (string) $person['mandate_ends_at'],
-                'member_id' => null,
-                'notes' => __('deadlines.auto_generated_note'),
+                'member_id' => $memberId > 0 ? $memberId : null,
+                'notes' => __('deadlines.auto_mandate_note'),
             ]);
         }
 

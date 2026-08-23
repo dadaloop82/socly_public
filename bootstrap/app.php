@@ -263,7 +263,10 @@ $app->bind(SetupOrAuthMiddleware::class, fn (App $a) => new SetupOrAuthMiddlewar
 ));
 $app->bind('mw.setup_or_auth', fn (App $a) => $a->get(SetupOrAuthMiddleware::class));
 
-$app->bind(AssociationPeopleService::class, fn (App $a) => new AssociationPeopleService($a->get(Database::class)));
+$app->bind(AssociationPeopleService::class, fn (App $a) => new AssociationPeopleService(
+    $a->get(Database::class),
+    $a->get(MemberService::class)
+));
 $app->bind(AssociationWebsiteScrapeService::class, fn () => new AssociationWebsiteScrapeService());
 $app->bind(RuntsLookupService::class, fn () => new RuntsLookupService());
 $app->bind(MailService::class, fn (App $a) => new MailService($a->get(SettingsService::class)));

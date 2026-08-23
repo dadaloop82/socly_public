@@ -18,6 +18,21 @@ final class AssociationPeopleService
     public const ROLE_BOARD = 'board';
     public const ROLE_AUDITOR = 'auditor';
 
+    /** @var list<string> Consiglio direttivo (incompatibile con organi di controllo). */
+    public const DIRECTOR_ROLE_KEYS = [
+        self::ROLE_PRESIDENT,
+        self::ROLE_VICE_PRESIDENT,
+        self::ROLE_SECRETARY,
+        self::ROLE_TREASURER,
+        self::ROLE_BOARD,
+    ];
+
+    /** @var list<string> Organi di controllo indipendenti (incompatibili con il CD). */
+    public const CONTROL_ROLE_KEYS = [
+        self::ROLE_AUDITOR,
+        'ombudsman',
+    ];
+
     /** @var list<string> */
     public const SYSTEM_ROLE_KEYS = [
         self::ROLE_PRESIDENT,
@@ -32,7 +47,8 @@ final class AssociationPeopleService
     public const ROLE_PRESIDENT_ALIAS = self::ROLE_PRESIDENT;
 
     public function __construct(
-        private readonly Database $db
+        private readonly Database $db,
+        private readonly MemberService $members
     ) {
     }
 
@@ -249,11 +265,30 @@ final class AssociationPeopleService
             return ['ok' => false, 'errors' => ['role_key' => __('validation.in')]];
         }
 
+        $memberId = (int) ($input['member_id'] ?? 0);
+        $eligibility = $this->members->orgEligibility($memberId);
+        if (!$eligibility['ok']) {
+            return ['ok' => false, 'errors' => ['member_id' => $eligibility['message'] ?? __('org.member_required')]];
+        }
+
+        $profile = $this->members->orgPersonProfile($memberId);
+        if ($profile === null) {
+            return ['ok' => false, 'errors' => ['member_id' => __('org.member_not_found')]];
+        }
+
+        $roleConflict = $this->memberRoleConflict($memberId, $role, $id);
+        if ($roleConflict !== null) {
+            return $roleConflict;
+        }
+
+        $input = array_merge($profile, $input);
+        $input['member_id'] = $memberId;
+
         $first = trim((string) ($input['first_name'] ?? ''));
         $last = trim((string) ($input['last_name'] ?? ''));
         $cf = strtoupper(preg_replace('/\s+/', '', (string) ($input['fiscal_code'] ?? '')) ?? '');
         if ($first === '' || $last === '' || $cf === '') {
-            return ['ok' => false, 'errors' => ['first_name' => __('validation.required')]];
+            return ['ok' => false, 'errors' => ['member_id' => __('org.member_profile_incomplete')]];
         }
 
         $roleMeta = $this->role($role) ?? [];
@@ -366,6 +401,74 @@ final class AssociationPeopleService
         return $row ? (int) $row['id'] : null;
     }
 
+    public function rolesIncompatible(string $roleA, string $roleB): bool
+    {
+        if ($roleA === $roleB) {
+            return false;
+        }
+        $aDirector = in_array($roleA, self::DIRECTOR_ROLE_KEYS, true);
+        $bDirector = in_array($roleB, self::DIRECTOR_ROLE_KEYS, true);
+        $aControl = in_array($roleA, self::CONTROL_ROLE_KEYS, true);
+        $bControl = in_array($roleB, self::CONTROL_ROLE_KEYS, true);
+
+        return ($aDirector && $bControl) || ($aControl && $bDirector);
+    }
+
+    /**
+     * @return list<array{role_key:string,role_label:string}>
+     */
+    public function memberActiveRoles(int $memberId, ?int $excludePersonId = null): array
+    {
+        if ($memberId < 1) {
+            return [];
+        }
+        $rows = $this->db->fetchAll(
+            'SELECT p.role_key, r.label_key, r.custom_label
+             FROM association_people p
+             INNER JOIN association_roles r ON r.`key` = p.role_key
+             WHERE p.member_id = :mid AND p.is_active = 1
+               AND (:exclude = 0 OR p.id <> :exclude2)
+             ORDER BY r.hierarchy_level ASC, p.sort_order ASC, p.id ASC',
+            ['mid' => $memberId, 'exclude' => $excludePersonId ?? 0, 'exclude2' => $excludePersonId ?? 0]
+        );
+        $out = [];
+        foreach ($rows as $row) {
+            $out[] = [
+                'role_key' => (string) ($row['role_key'] ?? ''),
+                'role_label' => $this->roleLabel($row),
+            ];
+        }
+        return $out;
+    }
+
+    /**
+     * @return array{ok:false,errors:array<string,string>}|null
+     */
+    private function memberRoleConflict(int $memberId, string $role, ?int $excludePersonId = null): ?array
+    {
+        foreach ($this->memberActiveRoles($memberId, $excludePersonId) as $item) {
+            $existingKey = (string) ($item['role_key'] ?? '');
+            if ($existingKey === $role) {
+                return [
+                    'ok' => false,
+                    'errors' => ['member_id' => __('org.member_already_assigned')],
+                ];
+            }
+            if ($this->rolesIncompatible($role, $existingKey)) {
+                return [
+                    'ok' => false,
+                    'errors' => [
+                        'member_id' => __('org.role_incompatible', [
+                            'existing' => (string) ($item['role_label'] ?? $existingKey),
+                            'role' => $this->roleLabel($this->role($role) ?? ['key' => $role]),
+                        ]),
+                    ],
+                ];
+            }
+        }
+        return null;
+    }
+
     /**
      * Replace every person for one role.
      *
@@ -449,6 +552,9 @@ final class AssociationPeopleService
 
         return [
             'role_key' => $role,
+            'member_id' => isset($person['member_id']) && (int) $person['member_id'] > 0
+                ? (int) $person['member_id']
+                : null,
             'first_name' => $first,
             'last_name' => $last,
             'fiscal_code' => $cf,

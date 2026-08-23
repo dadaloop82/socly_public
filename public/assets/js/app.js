@@ -5652,8 +5652,131 @@ function formatTreasuryConfirmMessage(form, template) {
 
 function initOrgPersonForm(form) {
   const roleSelect = form.querySelector('[data-org-role-select]');
+  const memberSelect = form.querySelector('[data-org-member-select]');
   const residenceWrap = form.querySelector('[data-org-residence-fields]');
   const replaceInput = form.querySelector('[data-org-replace-unique]');
+  const profileUrlTemplate = form.dataset.orgMemberProfileUrl || '';
+  const memberFields = form.querySelectorAll('[data-org-member-field]');
+  const birthPlaceInput = form.querySelector('[data-birth-place-input]');
+  const phoneInput = form.querySelector('[data-phone-field] input[type="tel"], [name="phone"]');
+
+  const setMemberFieldsLocked = (locked) => {
+    memberFields.forEach((el) => {
+      if (el instanceof HTMLSelectElement) {
+        if (locked) {
+          el.setAttribute('disabled', 'disabled');
+        } else {
+          el.removeAttribute('disabled');
+        }
+        return;
+      }
+      if (locked) {
+        el.setAttribute('readonly', 'readonly');
+      } else {
+        el.removeAttribute('readonly');
+      }
+    });
+    if (birthPlaceInput instanceof HTMLInputElement) {
+      if (locked) {
+        birthPlaceInput.setAttribute('readonly', 'readonly');
+      } else {
+        birthPlaceInput.removeAttribute('readonly');
+      }
+    }
+    if (phoneInput instanceof HTMLInputElement) {
+      if (locked) {
+        phoneInput.setAttribute('readonly', 'readonly');
+      } else {
+        phoneInput.removeAttribute('readonly');
+      }
+    }
+  };
+
+  const applyMemberProfile = (profile) => {
+    if (!profile || typeof profile !== 'object') {
+      return;
+    }
+    const setValue = (name, value) => {
+      const el = form.querySelector(`[name="${name}"]`);
+      if (el instanceof HTMLInputElement || el instanceof HTMLSelectElement || el instanceof HTMLTextAreaElement) {
+        el.value = value ?? '';
+      }
+    };
+    setValue('first_name', profile.first_name || '');
+    setValue('last_name', profile.last_name || '');
+    setValue('fiscal_code', profile.fiscal_code || '');
+    setValue('gender', profile.gender || '');
+    setValue('birth_date', profile.birth_date || '');
+    setValue('email', profile.email || '');
+    setValue('phone', profile.phone || '');
+    if (birthPlaceInput instanceof HTMLInputElement) {
+      birthPlaceInput.value = profile.birth_place || '';
+    }
+    setValue('city', profile.city || '');
+    setValue('postal_code', profile.postal_code || '');
+    setValue('address', profile.address || '');
+    setValue('house_number', profile.house_number || '');
+  };
+
+  const loadMemberProfile = async (memberId, lockFields = true) => {
+    if (!memberId || !profileUrlTemplate) {
+      setMemberFieldsLocked(false);
+      return;
+    }
+    const params = new URLSearchParams();
+    const roleKey = roleSelect?.value || '';
+    if (roleKey) {
+      params.set('role', roleKey);
+    }
+    const personId = form.dataset.orgPersonId || '';
+    if (personId) {
+      params.set('exclude_person_id', personId);
+    }
+    const query = params.toString();
+    const url = profileUrlTemplate.replace('__ID__', encodeURIComponent(String(memberId)))
+      + (query ? `?${query}` : '');
+    try {
+      const res = await fetch(url, { credentials: 'same-origin' });
+      const data = await res.json();
+      if (!data?.ok || !data.profile) {
+        setMemberFieldsLocked(false);
+        return;
+      }
+      applyMemberProfile(data.profile);
+      if (lockFields) {
+        setMemberFieldsLocked(true);
+      }
+      if (Array.isArray(data.incompatible_roles) && data.incompatible_roles.length > 0) {
+        const tpl = form.dataset.msgRoleIncompatible || '';
+        const existing = data.incompatible_roles.map((item) => item.role_label || item.role_key).join(', ');
+        const message = tpl.replace(':existing', existing || '—');
+        if (message) {
+          appConfirm(message, { alert: true, confirmLabel: 'OK' });
+        }
+      }
+    } catch {
+      setMemberFieldsLocked(false);
+    }
+  };
+
+  memberSelect?.addEventListener('change', () => {
+    const memberId = memberSelect.value;
+    if (!memberId) {
+      setMemberFieldsLocked(false);
+      return;
+    }
+    loadMemberProfile(memberId, true);
+  });
+
+  roleSelect?.addEventListener('change', () => {
+    if (memberSelect?.value) {
+      loadMemberProfile(memberSelect.value, true);
+    }
+  });
+
+  if (memberSelect?.value) {
+    loadMemberProfile(memberSelect.value, true);
+  }
 
   const syncResidence = () => {
     const option = roleSelect?.selectedOptions?.[0];
@@ -5698,6 +5821,13 @@ function initOrgPersonForm(form) {
   form.addEventListener('submit', (event) => {
     if (replaceInput?.value === '1') {
       return;
+    }
+    memberFields.forEach((el) => el.removeAttribute('disabled'));
+    if (birthPlaceInput instanceof HTMLInputElement) {
+      birthPlaceInput.removeAttribute('readonly');
+    }
+    if (phoneInput instanceof HTMLInputElement) {
+      phoneInput.removeAttribute('readonly');
     }
     const option = roleSelect?.selectedOptions?.[0];
     if (option?.dataset?.requiresResidence !== '1' && residenceWrap) {
