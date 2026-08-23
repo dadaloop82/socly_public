@@ -33,6 +33,8 @@ $oldPaymentStatus = (string) old('payment_status', 'unpaid');
 $oldPartialAmount = (string) old('partial_amount', '0');
 $oldPaymentMethod = (string) old('payment_method', 'cash');
 $treasuryEnabled = !empty($treasuryEnabled);
+$guardianCandidates = is_array($guardianCandidates ?? null) ? $guardianCandidates : [];
+$oldGuardianId = (string) old('guardian_member_id', (string) ($member['guardian_member_id'] ?? ''));
 
 $legalAckKeys = ['privacy_ack', 'statute_ack'];
 $gdprEnabled = (string) (app()->isInstalled() ? (app(\Socly\Services\SettingsService::class)->get('gdpr.enabled', '0') ?: '0') : '0') === '1';
@@ -689,6 +691,20 @@ $paymentExtraHtml = $buildProfileFieldsHtml($paymentExtraFields);
                             <?php endforeach; ?>
                         </select>
                     </div>
+                </div>
+
+                <div class="field-block" data-guardian-field>
+                    <label class="field-label"><?= e(__('members.guardian_label')) ?></label>
+                    <select name="guardian_member_id" data-guardian-select>
+                        <option value=""><?= e(__('members.guardian_none')) ?></option>
+                        <?php foreach ($guardianCandidates as $candidate): ?>
+                            <option
+                                value="<?= (int) $candidate['id'] ?>"
+                                <?= $oldGuardianId === (string) $candidate['id'] ? 'selected' : '' ?>
+                            ><?= e((string) ($candidate['display_name'] ?? $candidate['member_number'])) ?></option>
+                        <?php endforeach; ?>
+                    </select>
+                    <p class="muted"><?= e(__('members.guardian_hint')) ?></p>
                 </div>
 
                 <?php if (!$isEdit): ?>

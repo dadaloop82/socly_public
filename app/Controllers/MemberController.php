@@ -100,6 +100,7 @@ final class MemberController extends BaseController
             'enrollmentMethod' => $this->enrollment->method(),
             'hasEnrollmentArtifact' => false,
             'treasuryEnabled' => $this->components->isEnabled('treasury'),
+            'guardianCandidates' => $this->members->guardianPickerOptions(null),
         ]);
     }
 
@@ -158,6 +159,7 @@ final class MemberController extends BaseController
             'payments' => $this->payments->forMember((int) $id),
             'enrollmentMethod' => $this->enrollment->method(),
             'enrollmentArtifact' => $this->enrollment->latestArtifact((int) $id),
+            'needsGuardian' => $this->members->memberNeedsGuardian($member),
         ]);
     }
 
@@ -187,6 +189,7 @@ final class MemberController extends BaseController
             'enrollmentMethod' => $this->enrollment->method(),
             'hasEnrollmentArtifact' => $this->enrollment->hasArtifact((int) $id),
             'treasuryEnabled' => $this->components->isEnabled('treasury'),
+            'guardianCandidates' => $this->members->guardianPickerOptions((int) $id),
         ]);
     }
 

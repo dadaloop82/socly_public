@@ -82,6 +82,96 @@ final class MemberService
         return $badges;
     }
 
+    /** @param array<string,mixed>|null $member */
+    public function memberNeedsGuardian(?array $member, ?array $type = null, ?array $fields = null): bool
+    {
+        if ($type !== null) {
+            $typeLabel = strtolower(localized($type['name_json'] ?? ''));
+        } else {
+            $typeLabel = strtolower(localized($member['type_name_json'] ?? ''));
+        }
+        if (str_contains($typeLabel, 'junior') || str_contains($typeLabel, 'minoren')) {
+            return true;
+        }
+        $fields ??= is_array($member['fields'] ?? null) ? $member['fields'] : [];
+        $dob = trim((string) ($fields['birth_date'] ?? ''));
+        if ($dob === '') {
+            return false;
+        }
+        try {
+            $birth = new \DateTimeImmutable($dob);
+            return $birth->diff(new \DateTimeImmutable('today'))->y < 18;
+        } catch (\Throwable) {
+            return false;
+        }
+    }
+
+    /** @return list<array<string,mixed>> */
+    public function guardianPickerOptions(?int $excludeMemberId = null): array
+    {
+        $sql = "SELECT m.id, m.member_number, m.status FROM members m WHERE m.status IN ('active','pending')";
+        $params = [];
+        if ($excludeMemberId !== null && $excludeMemberId > 0) {
+            $sql .= ' AND m.id <> :id';
+            $params['id'] = $excludeMemberId;
+        }
+        $sql .= ' ORDER BY m.member_number ASC LIMIT 500';
+        $rows = $this->db->fetchAll($sql, $params);
+        foreach ($rows as &$row) {
+            $row['fields'] = $this->fieldValues((int) $row['id']);
+            $row['display_name'] = $this->memberDisplayName($row);
+        }
+        unset($row);
+        return $rows;
+    }
+
+    /** @param array<string,mixed> $member */
+    private function memberDisplayName(array $member): string
+    {
+        $fields = is_array($member['fields'] ?? null)
+            ? $member['fields']
+            : $this->fieldValues((int) ($member['id'] ?? 0));
+        $name = trim((string) ($fields['first_name'] ?? '') . ' ' . (string) ($fields['last_name'] ?? ''));
+        $number = (string) ($member['member_number'] ?? '');
+        return $name !== '' ? trim($name . ($number !== '' ? ' #' . $number : '')) : ($number !== '' ? '#' . $number : '—');
+    }
+
+    /** @param array<string,mixed> $member */
+    private function attachGuardian(array &$member): void
+    {
+        $guardianId = (int) ($member['guardian_member_id'] ?? 0);
+        if ($guardianId <= 0) {
+            $member['guardian'] = null;
+            return;
+        }
+        $guardian = $this->db->fetch(
+            'SELECT id, member_number, status FROM members WHERE id = :id',
+            ['id' => $guardianId]
+        );
+        if (!$guardian) {
+            $member['guardian'] = null;
+            return;
+        }
+        $guardian['fields'] = $this->fieldValues($guardianId);
+        $guardian['display_name'] = $this->memberDisplayName($guardian);
+        $member['guardian'] = $guardian;
+    }
+
+    /** @param array<string,mixed> $data */
+    private function resolveGuardianMemberId(array $data, ?int $memberId): ?int
+    {
+        $raw = trim((string) ($data['guardian_member_id'] ?? ''));
+        if ($raw === '') {
+            return null;
+        }
+        $guardianId = (int) $raw;
+        if ($guardianId <= 0 || ($memberId !== null && $guardianId === $memberId)) {
+            return null;
+        }
+        $exists = $this->db->fetch('SELECT id FROM members WHERE id = :id', ['id' => $guardianId]);
+        return $exists ? $guardianId : null;
+    }
+
     private function syncAdmittedAt(int $memberId, string $beforeStatus, string $afterStatus, ?string $existingAdmitted): void
     {
         if ($afterStatus !== 'active') {
@@ -972,6 +1062,7 @@ final class MemberService
         $this->attachComplianceIssues($list);
         $member = $list[0];
         $member['gdpr_badges'] = $this->gdprBadges($member);
+        $this->attachGuardian($member);
         return $member;
     }
 
@@ -1045,6 +1136,14 @@ final class MemberService
                     'otp_email' => __('members.anomaly_missing_otp'),
                     default => __('members.anomaly_missing_enrollment'),
                 },
+            ];
+        }
+
+        if ($this->memberNeedsGuardian($member) && empty($member['guardian_member_id'])) {
+            $issues[] = [
+                'code' => 'missing_guardian',
+                'field' => 'guardian',
+                'label' => __('members.anomaly_missing_guardian'),
             ];
         }
 
@@ -1155,6 +1254,7 @@ final class MemberService
         }
 
         $price = (float) $type['price'];
+        $guardianId = $this->resolveGuardianMemberId($data, null);
         $paidAmount = 0.0;
         if ($data['payment_status'] === 'paid') {
             $paidAmount = $price;
@@ -1171,6 +1271,7 @@ final class MemberService
             $id = $this->db->insert('members', [
                 'member_number' => $data['member_number'],
                 'member_type_id' => (int) $data['member_type_id'],
+                'guardian_member_id' => $guardianId,
                 'membership_period_id' => (int) $data['membership_period_id'],
                 'status' => $data['status'],
                 'admitted_at' => ($data['status'] ?? '') === 'active' ? date('Y-m-d') : null,
@@ -1291,6 +1392,7 @@ final class MemberService
         $this->db->update('members', [
             'member_number' => $data['member_number'],
             'member_type_id' => (int) $data['member_type_id'],
+            'guardian_member_id' => $this->resolveGuardianMemberId($data, $id),
             'membership_period_id' => (int) $data['membership_period_id'],
             'status' => $data['status'],
             'notes' => $data['notes'] ?? null,

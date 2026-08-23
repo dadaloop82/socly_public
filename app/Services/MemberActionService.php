@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Socly\Services;
 
+use Socly\Core\Database;
+
 final class MemberActionService
 {
     public function __construct(

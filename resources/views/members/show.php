@@ -90,6 +90,18 @@ $balanceDue = (float) ($member['balance_due'] ?? 0);
                 <div class="value"><?= e(format_date((string) $member['admitted_at'])) ?></div>
             </div>
             <?php endif; ?>
+            <?php if (!empty($member['guardian']) || !empty($needsGuardian)): ?>
+            <div class="detail-item">
+                <div class="label"><?= e(__('members.guardian_label')) ?></div>
+                <div class="value">
+                    <?php if (!empty($member['guardian'])): ?>
+                        <a href="<?= e(url('/members/' . (int) $member['guardian']['id'])) ?>"><?= e((string) $member['guardian']['display_name']) ?></a>
+                    <?php else: ?>
+                        <span class="badge badge-due"><?= e(__('members.guardian_missing')) ?></span>
+                    <?php endif; ?>
+                </div>
+            </div>
+            <?php endif; ?>
             <div class="detail-item">
                 <div class="label"><?= e(__('members.payment')) ?></div>
                 <div class="value member-payment-summary">
