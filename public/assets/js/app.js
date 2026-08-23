@@ -129,6 +129,7 @@ document.addEventListener('DOMContentLoaded', () => {
   initSetupSmtp(document);
   initSettingsAssociationForms();
   initSettingsAutosave();
+  initLegalDocEditors(document);
   initLogoFilePickers(document);
   initPlaceSuggest(document);
   initDashboardTabs();
@@ -2471,6 +2472,81 @@ function initSettingsAssociationForms() {
   });
   document.querySelectorAll('[data-people-list]').forEach((list) => {
     initPeopleList(list);
+  });
+}
+
+function initLegalDocEditors(scope = document) {
+  scope.querySelectorAll('[data-legal-doc-editor]').forEach((root) => {
+    if (root.dataset.legalDocBound === '1') {
+      return;
+    }
+    root.dataset.legalDocBound = '1';
+
+    const tabs = Array.from(root.querySelectorAll('[data-legal-tab]'));
+    const panels = Array.from(root.querySelectorAll('[data-legal-panel]'));
+    const activate = (code) => {
+      tabs.forEach((tab) => {
+        const active = tab.dataset.legalTab === code;
+        tab.setAttribute('aria-selected', active ? 'true' : 'false');
+        tab.tabIndex = active ? 0 : -1;
+      });
+      panels.forEach((panel) => {
+        panel.hidden = panel.dataset.legalPanel !== code;
+      });
+    };
+    tabs.forEach((tab) => {
+      tab.addEventListener('click', () => activate(tab.dataset.legalTab || 'it'));
+    });
+
+    const translateBtn = root.querySelector('[data-legal-translate]');
+    const source = root.querySelector('[data-legal-textarea="it"]');
+    const targetDe = root.querySelector('[data-legal-textarea="de"]');
+    const targetEn = root.querySelector('[data-legal-textarea="en"]');
+    if (!translateBtn || !source || !targetDe || !targetEn) {
+      return;
+    }
+
+    const url = translateBtn.dataset.translateUrl || '';
+    const busyMsg = translateBtn.dataset.msgBusy || '…';
+    const emptyMsg = translateBtn.dataset.msgEmpty || '';
+    const failMsg = translateBtn.dataset.msgFail || '';
+    const csrf = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
+
+    translateBtn.addEventListener('click', async () => {
+      const text = String(source.value || '').trim();
+      if (!text) {
+        window.alert(emptyMsg || failMsg);
+        return;
+      }
+      const original = translateBtn.textContent;
+      translateBtn.disabled = true;
+      translateBtn.textContent = busyMsg;
+      try {
+        for (const [target, el] of [['de', targetDe], ['en', targetEn]]) {
+          const res = await fetch(url, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'X-Requested-With': 'XMLHttpRequest',
+              'X-CSRF-Token': csrf,
+            },
+            credentials: 'same-origin',
+            body: JSON.stringify({ text, target }),
+          });
+          const data = await res.json().catch(() => ({}));
+          if (!res.ok || !data.ok || !data.text) {
+            throw new Error(data.message || failMsg);
+          }
+          el.value = data.text;
+          el.dispatchEvent(new Event('input', { bubbles: true }));
+        }
+      } catch {
+        window.alert(failMsg);
+      } finally {
+        translateBtn.disabled = false;
+        translateBtn.textContent = original;
+      }
+    });
   });
 }
 

@@ -336,37 +336,19 @@
         <p class="setup-hint muted"><?= e(__('setup.step_gdpr_desc')) ?></p>
         <h3 class="section-title" style="margin-top:1.25rem"><?= e(__('settings.legal_privacy')) ?></h3>
         <p class="muted"><?= e(__('settings.legal_privacy_hint')) ?></p>
-        <div class="legal-langs">
-            <div>
-                <label>IT</label>
-                <textarea name="privacy_it" rows="8" placeholder="<?= e(__('settings.legal_privacy_placeholder')) ?>"><?= e((string)($settings['legal.privacy']['it'] ?? '')) ?></textarea>
-            </div>
-            <div>
-                <label>DE</label>
-                <textarea name="privacy_de" rows="8"><?= e((string)($settings['legal.privacy']['de'] ?? '')) ?></textarea>
-            </div>
-            <div>
-                <label>EN</label>
-                <textarea name="privacy_en" rows="8"><?= e((string)($settings['legal.privacy']['en'] ?? '')) ?></textarea>
-            </div>
-        </div>
+        <?= view_partial('partials/legal_doc_editor', [
+            'namePrefix' => 'privacy',
+            'values' => $settings['legal.privacy'] ?? [],
+            'placeholder' => __('settings.legal_privacy_placeholder'),
+        ]) ?>
 
         <h3 class="section-title" style="margin-top:1.5rem"><?= e(__('settings.legal_statute')) ?></h3>
         <p class="muted"><?= e(__('settings.legal_statute_hint')) ?></p>
-        <div class="legal-langs">
-            <div>
-                <label>IT</label>
-                <textarea name="statute_it" rows="8" placeholder="<?= e(__('settings.legal_statute_placeholder')) ?>"><?= e((string)($settings['legal.statute']['it'] ?? '')) ?></textarea>
-            </div>
-            <div>
-                <label>DE</label>
-                <textarea name="statute_de" rows="8"><?= e((string)($settings['legal.statute']['de'] ?? '')) ?></textarea>
-            </div>
-            <div>
-                <label>EN</label>
-                <textarea name="statute_en" rows="8"><?= e((string)($settings['legal.statute']['en'] ?? '')) ?></textarea>
-            </div>
-        </div>
+        <?= view_partial('partials/legal_doc_editor', [
+            'namePrefix' => 'statute',
+            'values' => $settings['legal.statute'] ?? [],
+            'placeholder' => __('settings.legal_statute_placeholder'),
+        ]) ?>
         <p class="settings-autosave-status muted" data-settings-autosave-status aria-live="polite"></p>
     </form>
     </div>
