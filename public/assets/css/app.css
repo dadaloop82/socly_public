@@ -4585,6 +4585,11 @@ button.setup-scrape-logo-frame:focus-visible .setup-scrape-logo-overlay {
   border-color: color-mix(in srgb, var(--brand-primary) 22%, var(--line));
   background: color-mix(in srgb, var(--brand-primary) 4%, white);
 }
+.setup-lang-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+}
 .setup-check:hover {
   border-color: color-mix(in srgb, var(--brand-primary) 35%, var(--line));
   transform: translateY(-1px);

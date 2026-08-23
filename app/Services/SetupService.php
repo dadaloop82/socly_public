@@ -1576,78 +1576,10 @@ final class SetupService
      */
     private function saveMemberTypesStep(array $input): array
     {
-        $existing = $input['types'] ?? [];
-        if (!is_array($existing)) {
-            $existing = [];
+        $result = $this->members->persistTypesConfig($input);
+        if (empty($result['ok'])) {
+            return $result;
         }
-
-        foreach ($existing as $id => $row) {
-            if (!is_array($row)) {
-                continue;
-            }
-            $id = (int) $id;
-            if ($id <= 0 || !$this->db->fetch('SELECT id FROM member_types WHERE id = :id', ['id' => $id])) {
-                continue;
-            }
-            $nameIt = trim((string) ($row['name_it'] ?? ''));
-            $nameDe = trim((string) ($row['name_de'] ?? ''));
-            $nameEn = trim((string) ($row['name_en'] ?? ''));
-            $priceRaw = trim((string) ($row['price'] ?? ''));
-            if ($nameIt === '') {
-                return ['ok' => false, 'errors' => ['types' => __('validation.required')]];
-            }
-            if ($priceRaw === '' || !is_numeric($priceRaw) || (float) $priceRaw < 0) {
-                return ['ok' => false, 'errors' => ['price' => __('validation.required')]];
-            }
-            $names = [
-                'it' => $nameIt,
-                'de' => $nameDe !== '' ? $nameDe : $nameIt,
-                'en' => $nameEn !== '' ? $nameEn : $nameIt,
-            ];
-            $allTypes = $this->members->types(false);
-            $isActive = !empty($row['is_active']) ? 1 : 0;
-            if (count($allTypes) === 1) {
-                $isActive = 1;
-            }
-            $this->db->update('member_types', [
-                'name_json' => json_encode($names, JSON_UNESCAPED_UNICODE),
-                'price' => (float) $priceRaw,
-                'is_active' => $isActive,
-            ], 'id = :id', ['id' => $id]);
-        }
-
-        $nameIt = trim((string) ($input['name_it'] ?? ''));
-        $nameDe = trim((string) ($input['name_de'] ?? ''));
-        $nameEn = trim((string) ($input['name_en'] ?? ''));
-        $priceRaw = trim((string) ($input['price'] ?? ''));
-        $adding = $nameIt !== '';
-
-        if ($adding) {
-            if ($priceRaw === '' || !is_numeric($priceRaw) || (float) $priceRaw < 0) {
-                return ['ok' => false, 'errors' => ['price' => __('validation.required')]];
-            }
-            $names = [
-                'it' => $nameIt,
-                'de' => $nameDe !== '' ? $nameDe : $nameIt,
-                'en' => $nameEn !== '' ? $nameEn : $nameIt,
-            ];
-            $this->db->insert('member_types', [
-                'name_json' => json_encode($names, JSON_UNESCAPED_UNICODE),
-                'price' => (float) $priceRaw,
-                'is_active' => 1,
-                'sort_order' => count($this->members->types(false)),
-            ]);
-        }
-
-        if (count($this->members->types(false)) === 0) {
-            return ['ok' => false, 'errors' => ['types' => __('setup.validation_need_type')]];
-        }
-
-        $allTypes = $this->members->types(false);
-        if (count($allTypes) === 1 && empty($allTypes[0]['is_active'])) {
-            $this->db->update('member_types', ['is_active' => 1], 'id = :id', ['id' => (int) $allTypes[0]['id']]);
-        }
-
         $this->settings->set('membership.types_configured', '1');
         return ['ok' => true];
     }
@@ -1658,81 +1590,13 @@ final class SetupService
      */
     private function saveMembershipPeriodsStep(array $input): array
     {
-        $existing = $input['periods'] ?? [];
-        if (!is_array($existing)) {
-            $existing = [];
+        $result = $this->members->persistPeriodsConfig($input);
+        if (empty($result['ok'])) {
+            return $result;
         }
-
-        $currentId = 0;
-        foreach ($existing as $id => $row) {
-            if (!is_array($row)) {
-                continue;
-            }
-            $id = (int) $id;
-            if ($id <= 0 || !$this->db->fetch('SELECT id FROM membership_periods WHERE id = :id', ['id' => $id])) {
-                continue;
-            }
-            $label = trim((string) ($row['label'] ?? ''));
-            $starts = trim((string) ($row['starts_on'] ?? ''));
-            $ends = trim((string) ($row['ends_on'] ?? ''));
-            if ($starts === '' || !$this->isValidDate($starts) || !$this->isValidDate($ends) || $ends < $starts) {
-                return ['ok' => false, 'errors' => ['periods' => __('validation.date')]];
-            }
-            $label = $this->members->autoPeriodLabel($starts, $ends);
-            if (!empty($row['is_current'])) {
-                $currentId = $id;
-            }
-            $this->db->update('membership_periods', [
-                'label' => $label,
-                'starts_on' => $starts,
-                'ends_on' => $ends,
-                'is_current' => 0,
-            ], 'id = :id', ['id' => $id]);
-        }
-
-        $starts = trim((string) ($input['starts_on'] ?? ''));
-        $ends = trim((string) ($input['ends_on'] ?? ''));
-        $adding = $starts !== '' && $ends !== '';
-        $newId = 0;
-
-        if ($adding) {
-            if (!$this->isValidDate($starts) || !$this->isValidDate($ends)) {
-                return ['ok' => false, 'errors' => ['starts_on' => __('validation.date')]];
-            }
-            if ($ends < $starts) {
-                return ['ok' => false, 'errors' => ['ends_on' => __('validation.period_end_before_start')]];
-            }
-            $label = $this->members->autoPeriodLabel($starts, $ends);
-            $newId = $this->db->insert('membership_periods', [
-                'label' => $label,
-                'starts_on' => $starts,
-                'ends_on' => $ends,
-                'is_current' => 0,
-            ]);
-            if (!empty($input['is_current']) || count($this->members->periods()) === 1) {
-                $currentId = (int) $newId;
-            }
-        }
-
-        if (count($this->members->periods()) === 0) {
-            return ['ok' => false, 'errors' => ['periods' => __('setup.validation_need_period')]];
-        }
-
-        if (!$this->hasPeriodForYear((int) date('Y'))) {
+        if (!$this->members->hasPeriodForYear((int) date('Y'))) {
             return ['ok' => false, 'errors' => ['periods' => __('setup.periods_need_current_year')]];
         }
-
-        $this->db->query('UPDATE membership_periods SET is_current = 0');
-        if ($currentId > 0) {
-            $this->db->update('membership_periods', ['is_current' => 1], 'id = :id', ['id' => $currentId]);
-        } else {
-            // Keep at least one current period (prefer the newest).
-            $latest = $this->db->fetch('SELECT id FROM membership_periods ORDER BY starts_on DESC, id DESC LIMIT 1');
-            if ($latest) {
-                $this->db->update('membership_periods', ['is_current' => 1], 'id = :id', ['id' => (int) $latest['id']]);
-            }
-        }
-
         $this->settings->set('membership.periods_configured', '1');
         return ['ok' => true];
     }

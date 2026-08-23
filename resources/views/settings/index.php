@@ -361,32 +361,10 @@
     </summary>
     <div class="config-accordion-body">
 
-<div class="table-wrap embedded" style="margin-bottom:1rem">
-        <table>
-            <thead><tr><th>Name</th><th>Price</th><th>Active</th></tr></thead>
-            <tbody>
-            <?php foreach ($types as $type): ?>
-                <tr>
-                    <td><?= e(localized($type['name_json'])) ?></td>
-                    <td><?= e(number_format((float)$type['price'], 2, ',', '.')) ?></td>
-                    <td><?= $type['is_active'] ? __('common.yes') : __('common.no') ?></td>
-                </tr>
-            <?php endforeach; ?>
-            </tbody>
-        </table>
-    </div>
-    <form method="post" action="<?= e(url('/settings/types')) ?>" data-leave-guard>
+    <form method="post" action="<?= e(url('/settings/types')) ?>" data-leave-guard data-settings-autosave>
         <?= csrf_field() ?>
-        <h3 class="section-title"><?= e(__('settings.add_type')) ?></h3>
-        <div class="grid-3">
-            <div><label>IT</label><input name="name_it" required></div>
-            <div><label>DE</label><input name="name_de"></div>
-            <div><label>EN</label><input name="name_en"></div>
-        </div>
-        <label><?= e(__('install.type_price')) ?></label>
-        <input type="number" step="0.01" name="price" value="0" required>
-        <label class="checkbox-row"><input type="checkbox" name="is_active" value="1" checked> <?= e(__('settings.is_active')) ?></label>
-        <button class="btn" type="submit"><?= e(__('common.save')) ?></button>
+        <?= view_partial('partials/member_types_editor', ['types' => $types]) ?>
+        <p class="settings-autosave-status muted" data-settings-autosave-status aria-live="polite"></p>
     </form>
     </div>
 </details>
@@ -398,32 +376,10 @@
     </summary>
     <div class="config-accordion-body">
 
-<div class="table-wrap embedded" style="margin-bottom:1rem">
-        <table>
-            <thead><tr><th>Label</th><th>From</th><th>To</th><th>Current</th></tr></thead>
-            <tbody>
-            <?php foreach ($periods as $period): ?>
-                <tr>
-                    <td><?= e($period['label']) ?></td>
-                    <td><?= e($period['starts_on']) ?></td>
-                    <td><?= e($period['ends_on']) ?></td>
-                    <td><?= $period['is_current'] ? '★' : '' ?></td>
-                </tr>
-            <?php endforeach; ?>
-            </tbody>
-        </table>
-    </div>
-    <form method="post" action="<?= e(url('/settings/periods')) ?>" data-leave-guard>
+    <form method="post" action="<?= e(url('/settings/periods')) ?>" data-leave-guard data-settings-autosave>
         <?= csrf_field() ?>
-        <h3 class="section-title"><?= e(__('settings.add_period')) ?></h3>
-        <label>Label</label>
-        <input name="label" required>
-        <div class="grid-2">
-            <div><label><?= e(__('install.starts_on')) ?></label><input type="date" name="starts_on" required></div>
-            <div><label><?= e(__('install.ends_on')) ?></label><input type="date" name="ends_on" required></div>
-        </div>
-        <label class="checkbox-row"><input type="checkbox" name="is_current" value="1"> <?= e(__('settings.is_current')) ?></label>
-        <button class="btn" type="submit"><?= e(__('common.save')) ?></button>
+        <?= view_partial('partials/member_periods_editor', ['periods' => $periods]) ?>
+        <p class="settings-autosave-status muted" data-settings-autosave-status aria-live="polite"></p>
     </form>
     </div>
 </details>

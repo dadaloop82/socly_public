@@ -2473,6 +2473,8 @@ function initSettingsAssociationForms() {
   document.querySelectorAll('[data-people-list]').forEach((list) => {
     initPeopleList(list);
   });
+  initSetupMemberTypes(document);
+  initSetupMembershipPeriods(document);
 }
 
 function initLegalDocEditors(scope = document) {
@@ -4306,6 +4308,29 @@ function initSetupMemberTypes(root = document) {
     if (block.dataset.memberTypesBound === '1') return;
     block.dataset.memberTypesBound = '1';
 
+    const translateUrl = block.dataset.translateUrl || '';
+    const csrf = document.querySelector('meta[name="csrf-token"]')?.content || '';
+
+    const fetchTranslation = async (text, target) => {
+      if (!translateUrl || !text) return null;
+      try {
+        const res = await fetch(translateUrl, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-Requested-With': 'XMLHttpRequest',
+            'X-CSRF-Token': csrf,
+          },
+          credentials: 'same-origin',
+          body: JSON.stringify({ text, target, source: 'it' }),
+        });
+        const data = await res.json().catch(() => ({}));
+        return res.ok && data.ok && data.text ? String(data.text) : null;
+      } catch {
+        return null;
+      }
+    };
+
     block.querySelectorAll('[data-type-name-it]').forEach((itInput) => {
       if (itInput.dataset.typeI18nBound === '1') return;
       itInput.dataset.typeI18nBound = '1';
@@ -4314,16 +4339,34 @@ function initSetupMemberTypes(root = document) {
       const enInput = row?.querySelector('[data-type-name-en]');
       if (!deInput || !enInput) return;
 
-      itInput.addEventListener('blur', () => {
+      itInput.addEventListener('blur', async () => {
         const value = itInput.value.trim();
         if (!value) return;
         const touched = (deInput.dataset.userTouched === '1' && deInput.value.trim() !== '')
           || (enInput.dataset.userTouched === '1' && enInput.value.trim() !== '');
         if (touched) return;
+
         const tr = suggestMemberTypeTranslations(value);
-        if (!tr) return;
-        if (deInput.value.trim() === '') deInput.value = tr.de;
-        if (enInput.value.trim() === '') enInput.value = tr.en;
+        const dictHit = tr && (tr.de !== value || tr.en !== value);
+        if (dictHit) {
+          if (deInput.value.trim() === '') deInput.value = tr.de;
+          if (enInput.value.trim() === '') enInput.value = tr.en;
+          deInput.dispatchEvent(new Event('input', { bubbles: true }));
+          enInput.dispatchEvent(new Event('input', { bubbles: true }));
+          return;
+        }
+
+        for (const [target, el] of [['de', deInput], ['en', enInput]]) {
+          if (el.value.trim() !== '') continue;
+          const translated = await fetchTranslation(value, target);
+          if (translated) {
+            el.value = translated;
+            el.dispatchEvent(new Event('input', { bubbles: true }));
+          } else if (tr) {
+            el.value = target === 'de' ? tr.de : tr.en;
+            el.dispatchEvent(new Event('input', { bubbles: true }));
+          }
+        }
       });
 
       deInput.addEventListener('input', () => { deInput.dataset.userTouched = '1'; });

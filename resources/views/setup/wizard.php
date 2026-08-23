@@ -734,7 +734,7 @@ $errorStep = flash('setup_error_step');
                     $types = is_array($value['types'] ?? null) ? $value['types'] : [];
                     $singleType = !empty($value['single_type']) || count($types) === 1;
                     ?>
-                    <div class="setup-membership" data-setup-line data-setup-member-types>
+                    <div class="setup-membership" data-setup-line data-setup-member-types data-translate-url="<?= e(url('/api/translate')) ?>">
                         <?php if ($types !== []): ?>
                             <p class="setup-hint muted"><?= e(__('setup.types_edit_hint')) ?></p>
                             <div class="setup-membership-list">

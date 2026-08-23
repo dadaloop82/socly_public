@@ -47,6 +47,7 @@ final class SettingsController extends BaseController
 
     public function index(Request $request): void
     {
+        $this->members->ensureMembershipPeriodRollover();
         $people = $this->people->all();
         if ($people === []) {
             $people = [[
@@ -377,72 +378,25 @@ final class SettingsController extends BaseController
 
     public function saveType(Request $request): void
     {
-        $data = $request->all();
-        if (!$this->validator->validate($data, [
-            'name_it' => 'required|string|max:120',
-            'price' => 'required|numeric|min:0',
-        ])) {
-            $this->flash('errors', $this->validator->firstErrors());
-            redirect('/settings#types');
-        }
-        $names = json_encode([
-            'it' => $data['name_it'],
-            'de' => $data['name_de'] ?? $data['name_it'],
-            'en' => $data['name_en'] ?? $data['name_it'],
-        ], JSON_UNESCAPED_UNICODE);
-        if (!empty($data['id'])) {
-            $this->db->update('member_types', [
-                'name_json' => $names,
-                'price' => $data['price'],
-                'is_active' => !empty($data['is_active']) ? 1 : 0,
-                'sort_order' => (int) ($data['sort_order'] ?? 0),
-            ], 'id = :id', ['id' => (int) $data['id']]);
-        } else {
-            $this->db->insert('member_types', [
-                'name_json' => $names,
-                'price' => $data['price'],
-                'is_active' => 1,
-                'sort_order' => (int) ($data['sort_order'] ?? 0),
-            ]);
+        $result = $this->members->persistTypesConfig($request->all());
+        if (empty($result['ok'])) {
+            $this->settingsFail($request, $result['errors'] ?? ['types' => __('validation.required')], 'types');
         }
         $this->settings->set('membership.types_configured', '1');
-        $this->flash('success', __('settings.saved'));
-        redirect('/settings#types');
+        $this->audit->log('settings.saved', 'settings', 'types', null, null, $request->ip());
+        $this->settingsFinish($request, 'types');
     }
 
     public function savePeriod(Request $request): void
     {
-        $data = $request->all();
-        if (!$this->validator->validate($data, [
-            'label' => 'required|string|max:120',
-            'starts_on' => 'required|date',
-            'ends_on' => 'required|date',
-        ])) {
-            $this->flash('errors', $this->validator->firstErrors());
-            redirect('/settings#periods');
-        }
-        if (!empty($data['is_current'])) {
-            $this->db->query('UPDATE membership_periods SET is_current = 0');
-        }
-        if (!empty($data['id'])) {
-            $this->db->update('membership_periods', [
-                'label' => $data['label'],
-                'starts_on' => $data['starts_on'],
-                'ends_on' => $data['ends_on'],
-                'is_current' => !empty($data['is_current']) ? 1 : 0,
-            ], 'id = :id', ['id' => (int) $data['id']]);
-        } else {
-            $this->db->insert('membership_periods', [
-                'label' => $data['label'],
-                'starts_on' => $data['starts_on'],
-                'ends_on' => $data['ends_on'],
-                'is_current' => !empty($data['is_current']) ? 1 : 0,
-            ]);
+        $result = $this->members->persistPeriodsConfig($request->all());
+        if (empty($result['ok'])) {
+            $this->settingsFail($request, $result['errors'] ?? ['periods' => __('validation.required')], 'periods');
         }
         $this->settings->set('membership.periods_configured', '1');
         $this->deadlines->syncSystemDeadlines();
-        $this->flash('success', __('settings.saved'));
-        redirect('/settings#periods');
+        $this->audit->log('settings.saved', 'settings', 'periods', null, null, $request->ip());
+        $this->settingsFinish($request, 'periods');
     }
 
     public function saveFields(Request $request): void
