@@ -22,6 +22,7 @@ use Socly\Services\MemberService;
 use Socly\Services\PlatformService;
 use Socly\Services\SettingsService;
 use Socly\Services\SetupService;
+use Socly\Services\UserService;
 
 final class SettingsController extends BaseController
 {
@@ -40,7 +41,8 @@ final class SettingsController extends BaseController
         private readonly ComponentService $components,
         private readonly DocumentService $documents,
         private readonly DeadlineService $deadlines,
-        private readonly PlatformService $platform
+        private readonly PlatformService $platform,
+        private readonly UserService $users
     ) {
         parent::__construct($view);
     }
@@ -113,6 +115,7 @@ final class SettingsController extends BaseController
                 ),
             ],
             'plugin_catalog' => $this->pluginCatalogForSettings(),
+            'panelUsers' => $this->users->panelUsers(),
         ]);
     }
 

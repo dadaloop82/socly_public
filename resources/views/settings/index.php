@@ -642,12 +642,14 @@
 <?php if (can('users.manage')): ?>
 <details class="config-accordion" id="users" data-config-accordion>
     <summary class="config-accordion-summary">
-        <span class="config-accordion-title"><?= e(__('nav.users')) ?></span>
+        <span class="config-accordion-title"><?= e(__('settings.users_manage_title')) ?></span>
         <span class="config-accordion-lede"><?= e(__('users.lede')) ?></span>
     </summary>
     <div class="config-accordion-body">
-        <p class="muted"><?= e(__('settings.users_panel_hint')) ?></p>
-        <a class="btn" href="<?= e(url('/users')) ?>"><?= e(__('settings.open_users')) ?></a>
+        <?= view_partial('partials/users_panel', [
+            'panelUsers' => $panelUsers ?? [],
+            'mailReady' => !empty($mailReady),
+        ]) ?>
     </div>
 </details>
 <?php endif; ?>
@@ -745,7 +747,7 @@
             <button class="btn" type="submit"><?= e(__('common.save')) ?></button>
         </form>
 
-        <?php if (can('plugins.manage')): ?>
+        <?php if (false && can('plugins.manage')): ?>
             <?php $pluginCatalog = $plugin_catalog ?? []; ?>
             <div class="settings-plugins-block">
                 <h3 class="section-title"><?= e(__('settings.plugins_section_title')) ?></h3>

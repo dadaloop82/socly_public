@@ -19,6 +19,31 @@ final class UserService
     }
 
     /** @return list<array<string,mixed>> */
+    public function panelUsers(): array
+    {
+        $rows = $this->all(false);
+        return array_values(array_filter($rows, static function (array $user): bool {
+            $name = trim((string) ($user['name'] ?? ''));
+            if ($name === 'SOCLY Platform') {
+                return false;
+            }
+            return true;
+        }));
+    }
+
+    public static function deriveDisplayNameFromEmail(string $email): string
+    {
+        $local = trim((string) strtok(strtolower(trim($email)), '@'));
+        if ($local === '') {
+            return 'Operatore';
+        }
+        $parts = preg_split('/[._+-]+/', $local) ?: [$local];
+        $parts = array_map(static fn (string $p): string => $p !== '' ? mb_convert_case($p, MB_CASE_TITLE, 'UTF-8') : '', $parts);
+
+        return trim(implode(' ', array_filter($parts))) ?: 'Operatore';
+    }
+
+    /** @return list<array<string,mixed>> */
     public function all(bool $includeSystemAdmins = false): array
     {
         $sql = 'SELECT id, email, name, locale, is_system_admin, is_active, created_at FROM users';
@@ -78,18 +103,22 @@ final class UserService
     public function create(array $data, array $permissionKeys, string $ip): array
     {
         if (!$this->validator->validate($data, [
-            'name' => 'required|string|max:120',
+            'name' => 'nullable|string|max:120',
             'email' => 'required|email|max:190',
             'password' => 'required|string|min:8|confirmed',
             'locale' => 'required|in:it,de,en',
         ])) {
             return ['ok' => false, 'errors' => $this->validator->firstErrors()];
         }
+        $name = trim((string) ($data['name'] ?? ''));
+        if ($name === '') {
+            $name = self::deriveDisplayNameFromEmail((string) $data['email']);
+        }
         if ($this->db->fetch('SELECT id FROM users WHERE email = :e', ['e' => $data['email']])) {
             return ['ok' => false, 'errors' => ['email' => __('validation.unique')]];
         }
         $id = $this->db->insert('users', [
-            'name' => $data['name'],
+            'name' => $name,
             'email' => $data['email'],
             'password' => password_hash($data['password'], PASSWORD_DEFAULT),
             'locale' => $data['locale'],
@@ -109,7 +138,7 @@ final class UserService
             return ['ok' => false, 'errors' => ['id' => __('validation.required')]];
         }
         $rules = [
-            'name' => 'required|string|max:120',
+            'name' => 'nullable|string|max:120',
             'email' => 'required|email|max:190',
             'locale' => 'required|in:it,de,en',
         ];
@@ -124,7 +153,9 @@ final class UserService
             return ['ok' => false, 'errors' => ['email' => __('validation.unique')]];
         }
         $payload = [
-            'name' => $data['name'],
+            'name' => trim((string) ($data['name'] ?? '')) !== ''
+                ? trim((string) $data['name'])
+                : self::deriveDisplayNameFromEmail((string) $data['email']),
             'email' => $data['email'],
             'locale' => $data['locale'],
             'is_active' => !empty($before['is_system_admin']) ? 1 : (!empty($data['is_active']) ? 1 : 0),

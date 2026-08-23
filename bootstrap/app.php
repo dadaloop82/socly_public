@@ -363,7 +363,8 @@ $app->bind(SettingsController::class, fn (App $a) => new SettingsController(
     $a->get(ComponentService::class),
     $a->get(DocumentService::class),
     $a->get(DeadlineService::class),
-    $a->get(PlatformService::class)
+    $a->get(PlatformService::class),
+    $a->get(UserService::class)
 ));
 $app->bind(TreasuryController::class, fn (App $a) => new TreasuryController(
     $a->get(View::class),
@@ -399,7 +400,11 @@ $app->bind(UpdateController::class, fn (App $a) => new UpdateController(
     $a->get(UpdateService::class),
     $a->get(SetupService::class)
 ));
-$app->bind(UserController::class, fn (App $a) => new UserController($a->get(View::class), $a->get(UserService::class)));
+$app->bind(UserController::class, fn (App $a) => new UserController(
+    $a->get(View::class),
+    $a->get(UserService::class),
+    $a->get(MailService::class)
+));
 $app->bind(PluginController::class, fn (App $a) => new PluginController(
     $a->get(View::class),
     $a->get(PluginAdminService::class)

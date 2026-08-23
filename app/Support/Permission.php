@@ -50,4 +50,51 @@ final class Permission
             self::DOCUMENTS_MANAGE => 'Manage documents',
         ];
     }
+
+    public static function labelKey(string $key): string
+    {
+        return 'permissions.' . str_replace('.', '_', $key);
+    }
+
+    /** @return list<array{key:string,label_key:string,keys:list<string>}> */
+    public static function groups(): array
+    {
+        return [
+            [
+                'key' => 'overview',
+                'label_key' => 'permissions.group_overview',
+                'keys' => [self::DASHBOARD_VIEW],
+            ],
+            [
+                'key' => 'members',
+                'label_key' => 'permissions.group_members',
+                'keys' => [self::MEMBERS_VIEW, self::MEMBERS_MANAGE, self::MEMBERS_DELETE, self::PAYMENTS_MANAGE],
+            ],
+            [
+                'key' => 'treasury',
+                'label_key' => 'permissions.group_treasury',
+                'keys' => [self::TREASURY_VIEW, self::TREASURY_MANAGE],
+            ],
+            [
+                'key' => 'org',
+                'label_key' => 'permissions.group_org',
+                'keys' => [self::ORG_VIEW, self::ORG_MANAGE],
+            ],
+            [
+                'key' => 'deadlines',
+                'label_key' => 'permissions.group_deadlines',
+                'keys' => [self::DEADLINES_VIEW, self::DEADLINES_MANAGE],
+            ],
+            [
+                'key' => 'documents',
+                'label_key' => 'permissions.group_documents',
+                'keys' => [self::DOCUMENTS_VIEW, self::DOCUMENTS_MANAGE],
+            ],
+            [
+                'key' => 'admin',
+                'label_key' => 'permissions.group_admin',
+                'keys' => [self::SETTINGS_MANAGE, self::USERS_MANAGE, self::PLUGINS_MANAGE, self::AUDIT_VIEW],
+            ],
+        ];
+    }
 }

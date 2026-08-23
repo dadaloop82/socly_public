@@ -370,6 +370,30 @@ final class MailService
     }
 
     /** @return array{ok:bool,error?:string} */
+    public function sendUserWelcome(string $email, string $plainPassword, string $locale = 'it'): array
+    {
+        if (!$this->isReady()) {
+            return ['ok' => false, 'error' => 'mail_not_ready'];
+        }
+        $prev = $_SESSION['locale'] ?? null;
+        $_SESSION['locale'] = in_array($locale, ['it', 'de', 'en'], true) ? $locale : 'it';
+        $loginUrl = url('/login');
+        $subject = __('users.welcome_email_subject');
+        $body = __('users.welcome_email_body', [
+            'url' => $loginUrl,
+            'email' => $email,
+            'password' => $plainPassword,
+        ]);
+        if ($prev !== null) {
+            $_SESSION['locale'] = $prev;
+        } else {
+            unset($_SESSION['locale']);
+        }
+
+        return $this->send($email, $subject, $body);
+    }
+
+    /** @return array{ok:bool,error?:string} */
     public function send(string $to, string $subject, string $bodyText, ?string $bodyHtml = null): array
     {
         if (!$this->isConfigured()) {

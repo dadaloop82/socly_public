@@ -3960,6 +3960,52 @@ button.setup-scrape-logo-frame:focus-visible .setup-scrape-logo-overlay {
   align-self: end;
   margin-bottom: 0.35rem;
 }
+.user-permissions-editor {
+  margin-top: 1.25rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--border-subtle, rgba(0, 0, 0, 0.08));
+}
+.user-permissions-templates {
+  margin-bottom: 1rem;
+}
+.user-permissions-template-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+}
+.user-permissions-template-list .btn.is-active {
+  border-color: var(--brand-primary, #2563eb);
+  background: color-mix(in srgb, var(--brand-primary, #2563eb) 12%, transparent);
+}
+.user-permissions-groups {
+  display: grid;
+  gap: 1rem;
+}
+.user-permissions-group {
+  padding: 0.85rem 1rem;
+  border: 1px solid var(--border-subtle, rgba(0, 0, 0, 0.08));
+  border-radius: var(--radius-md, 0.5rem);
+  background: var(--surface-muted, rgba(0, 0, 0, 0.02));
+}
+.user-permissions-group-title {
+  margin: 0 0 0.65rem;
+  font-size: 0.92rem;
+  font-weight: 600;
+}
+.user-permissions-group-items {
+  display: grid;
+  gap: 0.35rem 1rem;
+  grid-template-columns: repeat(auto-fill, minmax(14rem, 1fr));
+}
+.user-permission-item {
+  margin: 0;
+}
+.settings-users-table {
+  margin-bottom: 1.25rem;
+}
+.settings-user-create {
+  margin-top: 0.5rem;
+}
 .setup-hint-warn {
   color: var(--brand-accent-ink);
   font-weight: 600;

@@ -142,6 +142,7 @@ document.addEventListener('DOMContentLoaded', () => {
   initResetUserData();
   initPasswordToggles(document);
   initPasswordGenerators(document);
+  initPermissionTemplates(document);
   initFieldsSortable(document);
   initComponentCards(document);
   initDemoLoginNotice();
@@ -413,6 +414,33 @@ function initPasswordGenerators(scope = document) {
       confirmation?.dispatchEvent(new Event('input', { bubbles: true }));
       password.focus();
       password.select();
+    });
+  });
+}
+
+function initPermissionTemplates(scope = document) {
+  scope.querySelectorAll('[data-user-permissions-editor]').forEach((editor) => {
+    if (editor.dataset.permissionTemplatesBound === '1') return;
+    editor.dataset.permissionTemplatesBound = '1';
+    editor.querySelectorAll('[data-permission-template]').forEach((button) => {
+      button.addEventListener('click', () => {
+        let keys = [];
+        try {
+          keys = JSON.parse(button.dataset.permissionKeys || '[]');
+        } catch {
+          keys = [];
+        }
+        if (!Array.isArray(keys)) keys = [];
+        const keySet = new Set(keys.map(String));
+        editor.querySelectorAll('[data-permission-key]').forEach((input) => {
+          if (input instanceof HTMLInputElement && input.type === 'checkbox' && !input.disabled) {
+            input.checked = keySet.has(input.value);
+          }
+        });
+        editor.querySelectorAll('[data-permission-template]').forEach((btn) => {
+          btn.classList.toggle('is-active', btn === button);
+        });
+      });
     });
   });
 }
