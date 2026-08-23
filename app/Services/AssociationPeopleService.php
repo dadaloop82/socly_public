@@ -283,14 +283,30 @@ final class AssociationPeopleService
 
         if ($isUnique) {
             $existingUnique = $this->db->fetch(
-                'SELECT id FROM association_people
+                'SELECT id, first_name, last_name FROM association_people
                  WHERE role_key = :role AND is_active = 1
                    AND (:id = 0 OR id <> :id2)
                  LIMIT 1',
                 ['role' => $role, 'id' => $id ?? 0, 'id2' => $id ?? 0]
             );
-            if ($existingUnique) {
-                return ['ok' => false, 'errors' => ['role_key' => __('org.unique_role')]];
+            if ($existingUnique && empty($input['replace_unique_role'])) {
+                $existingName = trim((string) (($existingUnique['first_name'] ?? '') . ' ' . ($existingUnique['last_name'] ?? '')));
+                return [
+                    'ok' => false,
+                    'errors' => ['role_key' => __('org.unique_role')],
+                    'role_conflict' => [
+                        'existing_id' => (int) ($existingUnique['id'] ?? 0),
+                        'existing_name' => $existingName,
+                        'new_name' => trim($first . ' ' . $last),
+                        'role_key' => $role,
+                        'role_label' => $this->roleLabel($roleMeta),
+                    ],
+                ];
+            }
+            if ($existingUnique && !empty($input['replace_unique_role'])) {
+                $this->db->query('DELETE FROM association_people WHERE id = :id', [
+                    'id' => (int) ($existingUnique['id'] ?? 0),
+                ]);
             }
         }
 
@@ -313,7 +329,7 @@ final class AssociationPeopleService
             $newId = $this->db->insert('association_people', $row);
             return ['ok' => true, 'id' => $newId];
         } catch (\Throwable) {
-            return ['ok' => false, 'errors' => ['role_key' => __('org.unique_role')]];
+            return ['ok' => false, 'errors' => ['form' => __('org.save_failed')]];
         }
     }
 

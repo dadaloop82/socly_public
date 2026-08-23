@@ -87,10 +87,6 @@ final class OrgController extends BaseController
         if ($this->people->role($roleKey) === null) {
             $roleKey = AssociationPeopleService::ROLE_BOARD;
         }
-        $uniqueId = $this->people->uniquePersonId($roleKey);
-        if ($uniqueId !== null) {
-            redirect('/org/people/' . $uniqueId . '/edit');
-        }
         $this->renderPersonForm(null, $roleKey);
     }
 
@@ -113,6 +109,9 @@ final class OrgController extends BaseController
         $this->requireOrgEdit();
         $result = $this->people->savePerson($request->all(), null);
         if (empty($result['ok'])) {
+            if (!empty($result['role_conflict'])) {
+                $this->flash('role_conflict', $result['role_conflict']);
+            }
             $this->flash('errors', $result['errors'] ?? []);
             $this->rememberOld($request->all());
             $role = trim((string) $request->input('role_key', 'board'));
@@ -129,6 +128,9 @@ final class OrgController extends BaseController
         $this->requireOrgEdit();
         $result = $this->people->savePerson($request->all(), (int) $id);
         if (empty($result['ok'])) {
+            if (!empty($result['role_conflict'])) {
+                $this->flash('role_conflict', $result['role_conflict']);
+            }
             $this->flash('errors', $result['errors'] ?? []);
             $this->rememberOld($request->all());
             redirect('/org/people/' . (int) $id . '/edit');
@@ -178,12 +180,14 @@ final class OrgController extends BaseController
             $values['role_key'] = $roleKey;
         }
         $roleMeta = $this->people->role((string) $values['role_key']) ?? $this->people->role($roleKey);
+        $roleConflict = flash('role_conflict');
         $this->render('org/person_form', [
             'title' => $person ? __('org.edit_person') : __('org.add_person'),
             'person' => $person,
             'values' => $values,
             'roles' => $this->people->roles(),
             'roleMeta' => $roleMeta,
+            'roleConflict' => is_array($roleConflict) ? $roleConflict : null,
             'isEdit' => $person !== null,
         ]);
     }

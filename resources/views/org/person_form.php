@@ -4,6 +4,7 @@
  * @var array<string,mixed> $values
  * @var list<array> $roles
  * @var array<string,mixed>|null $roleMeta
+ * @var array<string,mixed>|null $roleConflict
  * @var bool $isEdit
  */
 $roleKey = (string) ($values['role_key'] ?? 'board');
@@ -30,6 +31,11 @@ $action = $isEdit
     data-leave-guard
     data-cf-url="<?= e(url('/api/fiscal-code')) ?>"
     data-csrf="<?= e(csrf_token()) ?>"
+    <?php if (!empty($roleConflict)): ?>
+    data-role-conflict="<?= e(json_encode($roleConflict, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP)) ?>"
+    data-msg-role-conflict="<?= e(__('org.role_conflict_message')) ?>"
+    data-msg-role-replace="<?= e(__('org.role_conflict_replace')) ?>"
+    <?php endif; ?>
 >
     <?= csrf_field() ?>
     <div class="panel-header">
@@ -46,17 +52,21 @@ $action = $isEdit
     <div class="grid-3">
         <div>
             <label><?= e(__('settings.people_role')) ?> *</label>
-            <select name="role_key" required>
+            <select name="role_key" required data-org-role-select>
                 <?php foreach ($roles as $role): ?>
                     <?php
                     $optLabel = trim((string) ($role['custom_label'] ?? ''));
                     if ($optLabel === '') {
                         $optLabel = __((string) ($role['label_key'] ?? ''));
                     }
+                    $optKey = (string) ($role['key'] ?? '');
+                    $needsResidence = !empty($role['requires_residence']) ? '1' : '0';
                     ?>
-                    <option value="<?= e((string) $role['key']) ?>" <?= $roleKey === (string) $role['key'] ? 'selected' : '' ?>>
-                        <?= e($optLabel) ?>
-                    </option>
+                    <option
+                        value="<?= e($optKey) ?>"
+                        data-requires-residence="<?= e($needsResidence) ?>"
+                        <?= $roleKey === $optKey ? 'selected' : '' ?>
+                    ><?= e($optLabel) ?></option>
                 <?php endforeach; ?>
             </select>
         </div>
@@ -101,7 +111,7 @@ $action = $isEdit
                hidden></p>
         </div>
         <div>
-            <label><?= e(__('setup.field_email')) ?></label>
+            <label><?= e(__('org.field_email')) ?></label>
             <input type="email" name="email" value="<?= e((string) ($values['email'] ?? '')) ?>" maxlength="190">
         </div>
         <div>
@@ -119,6 +129,9 @@ $action = $isEdit
         </div>
     </div>
 
+    <input type="hidden" name="replace_unique_role" value="" data-org-replace-unique>
+
+    <div data-org-residence-fields <?= $requiresResidence ? '' : 'hidden' ?>>
     <?= view_partial('partials/geo_address', [
         'show_hint' => true,
         'required' => [
@@ -140,6 +153,7 @@ $action = $isEdit
             'house_number' => (string) ($values['house_number'] ?? ''),
         ],
     ]) ?>
+    </div>
 
     <div class="grid-2" style="margin-top:1rem">
         <div>

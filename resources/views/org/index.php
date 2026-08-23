@@ -145,21 +145,7 @@ $customOrgans = $customOrgans ?? [];
         </div>
         <?php if ($canEdit): ?>
             <div class="actions org-chart-actions">
-                <form class="org-add-organ-form" method="post" action="<?= e(url('/org/organs')) ?>">
-                    <?= csrf_field() ?>
-                    <label class="visually-hidden" for="org-organ-label"><?= e(__('org.add_organ')) ?></label>
-                    <input
-                        id="org-organ-label"
-                        type="text"
-                        name="label"
-                        maxlength="80"
-                        required
-                        placeholder="<?= e(__('org.add_organ_placeholder')) ?>"
-                        autocomplete="off"
-                    >
-                    <button class="btn btn-ghost" type="submit"><?= e(__('org.add_organ')) ?></button>
-                </form>
-                <a class="btn" href="<?= e(url('/settings#people')) ?>"><?= e(__('org.edit_officers')) ?></a>
+                <a class="btn" href="<?= e(url('/org/people/create')) ?>"><?= e(__('org.add_person')) ?></a>
             </div>
         <?php endif; ?>
     </div>
@@ -261,5 +247,25 @@ $customOrgans = $customOrgans ?? [];
             <div class="org-spine" aria-hidden="true"></div>
             <?php $renderGroupBlock($organGroup, 'custom', $canEdit, true); ?>
         <?php endforeach; ?>
+
+        <?php if ($canEdit): ?>
+            <div class="org-spine" aria-hidden="true"></div>
+            <div class="org-tier org-tier--add-organ">
+                <form class="org-add-organ-form org-add-organ-footer" method="post" action="<?= e(url('/org/organs')) ?>">
+                    <?= csrf_field() ?>
+                    <label class="visually-hidden" for="org-organ-label"><?= e(__('org.add_organ')) ?></label>
+                    <input
+                        id="org-organ-label"
+                        type="text"
+                        name="label"
+                        maxlength="80"
+                        required
+                        placeholder="<?= e(__('org.add_organ_placeholder')) ?>"
+                        autocomplete="off"
+                    >
+                    <button class="btn btn-ghost" type="submit"><?= e(__('org.add_organ')) ?></button>
+                </form>
+            </div>
+        <?php endif; ?>
     </div>
 </div>

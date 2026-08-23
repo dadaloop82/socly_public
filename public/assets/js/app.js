@@ -157,6 +157,7 @@ document.addEventListener('DOMContentLoaded', () => {
   document.querySelectorAll('[data-org-person-form]').forEach((form) => {
     initPlaceSuggest(form);
     initFiscalCodeAuto(form);
+    initOrgPersonForm(form);
   });
   initDeadlineCategory(document);
   initTreasuryCategory(document);
@@ -5647,6 +5648,64 @@ function formatTreasuryConfirmMessage(form, template) {
     .replace(':amount', amountDisplay)
     .replace(':date', dateLabel)
     .replace(':category', categoryLabel);
+}
+
+function initOrgPersonForm(form) {
+  const roleSelect = form.querySelector('[data-org-role-select]');
+  const residenceWrap = form.querySelector('[data-org-residence-fields]');
+  const replaceInput = form.querySelector('[data-org-replace-unique]');
+
+  const syncResidence = () => {
+    const option = roleSelect?.selectedOptions?.[0];
+    const needs = option?.dataset?.requiresResidence === '1';
+    if (residenceWrap) {
+      residenceWrap.hidden = !needs;
+      residenceWrap.querySelectorAll('input, select, textarea').forEach((el) => {
+        if (needs) {
+          el.removeAttribute('disabled');
+        } else {
+          el.setAttribute('disabled', 'disabled');
+        }
+      });
+    }
+  };
+  roleSelect?.addEventListener('change', syncResidence);
+  syncResidence();
+
+  let conflictRaw = form.dataset.roleConflict || '';
+  if (conflictRaw) {
+    try {
+      const conflict = JSON.parse(conflictRaw);
+      const tpl = form.dataset.msgRoleConflict || '';
+      const message = tpl
+        .replace(':existing', conflict.existing_name || '—')
+        .replace(':new', conflict.new_name || '—')
+        .replace(':role', conflict.role_label || conflict.role_key || '—');
+      window.setTimeout(async () => {
+        if (await appConfirm(message, { confirmLabel: form.dataset.msgRoleReplace || 'Sostituisci' })) {
+          if (replaceInput) {
+            replaceInput.value = '1';
+          }
+          form.requestSubmit();
+        }
+      }, 80);
+    } catch {
+      /* ignore malformed conflict payload */
+    }
+    delete form.dataset.roleConflict;
+  }
+
+  form.addEventListener('submit', (event) => {
+    if (replaceInput?.value === '1') {
+      return;
+    }
+    const option = roleSelect?.selectedOptions?.[0];
+    if (option?.dataset?.requiresResidence !== '1' && residenceWrap) {
+      residenceWrap.querySelectorAll('input, select, textarea').forEach((el) => {
+        el.removeAttribute('disabled');
+      });
+    }
+  });
 }
 
 function initDemoLoginNotice() {

@@ -5380,6 +5380,20 @@ img.org-assoc-logo-img {
   min-width: 11rem;
   max-width: 16rem;
 }
+.org-add-organ-footer {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem 0.75rem;
+  width: 100%;
+  max-width: 36rem;
+  margin: 0 auto;
+  padding: 0.5rem 0 0.25rem;
+}
+.org-tier--add-organ {
+  width: 100%;
+}
 .org-group-head {
   display: flex;
   flex-wrap: wrap;
