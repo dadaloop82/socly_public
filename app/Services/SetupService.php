@@ -1771,6 +1771,11 @@ final class SetupService
         if ($keys === []) {
             return ['ok' => false, 'errors' => ['components' => __('setup.components_required')]];
         }
+        foreach (['members', 'org_roles'] as $required) {
+            if (!in_array($required, $keys, true)) {
+                $keys[] = $required;
+            }
+        }
         $this->components->setEnabled($keys);
         $this->components->markConfigured();
         return ['ok' => true];
@@ -1793,9 +1798,16 @@ final class SetupService
             }
         }
 
+        $email = strtolower(trim((string) ($input['email'] ?? '')));
+        $name = trim((string) ($input['name'] ?? ''));
+        if ($name === '' && $email !== '') {
+            $local = str_contains($email, '@') ? strstr($email, '@', true) : $email;
+            $name = is_string($local) && $local !== '' ? ucfirst($local) : 'Admin';
+        }
+
         $result = $this->users->createAssociationAdmin([
-            'name' => trim((string) ($input['name'] ?? '')),
-            'email' => strtolower(trim((string) ($input['email'] ?? ''))),
+            'name' => $name,
+            'email' => $email,
             'password' => (string) ($input['password'] ?? ''),
             'password_confirmation' => (string) ($input['password_confirmation'] ?? ''),
             'locale' => (string) ($input['locale'] ?? $this->readValue('app.locale', 'APP_LOCALE', 'it')),

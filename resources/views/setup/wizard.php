@@ -679,6 +679,29 @@ $errorStep = flash('setup_error_step');
                             </label>
                         <?php endforeach; ?>
                     </fieldset>
+                    <?php elseif (($step['key'] ?? '') === 'membership.enrollment_validation'): ?>
+                    <div class="setup-enrollment" data-setup-enrollment data-setup-line>
+                        <label class="setup-field">
+                            <span><?= e(__($step['title_key'])) ?></span>
+                            <select name="value" required data-enrollment-select>
+                                <?php foreach ($step['options'] as $opt): ?>
+                                    <?php
+                                        $optVal = (string) ($opt['value'] ?? '');
+                                        $otpBlocked = $optVal === 'otp_email' && !$mailReadyForSelect;
+                                    ?>
+                                    <option value="<?= e($optVal) ?>" <?= (string) $value === $optVal ? 'selected' : '' ?> <?= $otpBlocked ? 'disabled' : '' ?>><?= e(__($opt['label_key'])) ?><?= $otpBlocked ? ' — ' . e(__('setup.mail_required_short')) : '' ?></option>
+                                <?php endforeach; ?>
+                            </select>
+                        </label>
+                        <?php foreach ($step['options'] as $opt): ?>
+                            <?php $optVal = (string) ($opt['value'] ?? ''); ?>
+                            <template data-enrollment-detail-for="<?= e($optVal) ?>"><?= e(__('setup.enrollment_detail_' . $optVal)) ?></template>
+                        <?php endforeach; ?>
+                        <p class="setup-enrollment-detail muted" data-enrollment-detail aria-live="polite"></p>
+                    </div>
+                    <?php if (!$mailReadyForSelect): ?>
+                        <p class="setup-hint muted" data-setup-line><?= e(__('setup.mail_required_for_otp')) ?></p>
+                    <?php endif; ?>
                     <?php else: ?>
                     <label class="setup-field" data-setup-line>
                         <span><?= e(__($step['title_key'])) ?></span>
@@ -688,13 +711,10 @@ $errorStep = flash('setup_error_step');
                                     $optVal = (string) ($opt['value'] ?? '');
                                     $otpBlocked = $optVal === 'otp_email' && !$mailReadyForSelect;
                                 ?>
-                                <option value="<?= e($optVal) ?>" <?= (string) $value === $optVal ? 'selected' : '' ?> <?= $otpBlocked ? 'disabled' : '' ?>><?= e(__($opt['label_key'])) ?><?= $otpBlocked ? ' — ' . e(__('mail.required_short')) : '' ?></option>
+                                <option value="<?= e($optVal) ?>" <?= (string) $value === $optVal ? 'selected' : '' ?> <?= $otpBlocked ? 'disabled' : '' ?>><?= e(__($opt['label_key'])) ?><?= $otpBlocked ? ' — ' . e(__('setup.mail_required_short')) : '' ?></option>
                             <?php endforeach; ?>
                         </select>
                     </label>
-                    <?php endif; ?>
-                    <?php if (!$mailReadyForSelect && ($step['key'] ?? '') === 'membership.enrollment_validation'): ?>
-                        <p class="setup-hint muted" data-setup-line><?= e(__('mail.required_for_otp')) ?></p>
                     <?php endif; ?>
                 <?php elseif ($stepType === 'checkbox'): ?>
                     <label class="checkbox-row setup-check" data-setup-line>
@@ -1006,15 +1026,20 @@ $errorStep = flash('setup_error_step');
                             <?php foreach ($components as $component): ?>
                                 <?php
                                     $cKey = (string) ($component['key'] ?? '');
-                                    $checked = !empty($component['enabled']);
+                                    $locked = in_array($cKey, ['members', 'org_roles'], true);
+                                    $checked = $locked || !empty($component['enabled']);
                                 ?>
-                                <label class="setup-component-row<?= $checked ? ' is-selected' : '' ?>">
+                                <label class="setup-component-row<?= $checked ? ' is-selected' : '' ?><?= $locked ? ' setup-component-row-locked' : '' ?>">
                                     <input
                                         type="checkbox"
                                         name="components[]"
                                         value="<?= e($cKey) ?>"
                                         <?= $checked ? 'checked' : '' ?>
+                                        <?= $locked ? 'disabled' : '' ?>
                                     >
+                                    <?php if ($locked): ?>
+                                        <input type="hidden" name="components[]" value="<?= e($cKey) ?>">
+                                    <?php endif; ?>
                                     <span class="setup-component-row-body">
                                         <span class="setup-component-row-top">
                                             <strong class="setup-component-name"><?= e(__((string) ($component['name'] ?? ''))) ?></strong>
@@ -1065,10 +1090,7 @@ $errorStep = flash('setup_error_step');
                     </div>
                 <?php elseif ($stepType === 'admin_account'): ?>
                     <div class="setup-admin-account" data-setup-line>
-                        <label class="setup-field">
-                            <span><?= e(__('setup.field_admin_name')) ?> *</span>
-                            <input type="text" name="name" value="<?= e((string) ($value['name'] ?? '')) ?>" required autocomplete="name">
-                        </label>
+                        <p class="setup-hint muted"><?= e(__('setup.admin_access_hint')) ?></p>
                         <label class="setup-field">
                             <span><?= e(__('setup.field_admin_email')) ?> *</span>
                             <input type="email" name="email" value="<?= e((string) ($value['email'] ?? '')) ?>" required autocomplete="email">
@@ -1093,10 +1115,13 @@ $errorStep = flash('setup_error_step');
                             <button type="button" class="btn btn-ghost btn-sm" data-password-generate><?= e(__('setup.admin_password_generate')) ?></button>
                             <span class="setup-hint muted"><?= e(__('setup.admin_password_rules')) ?></span>
                         </div>
-                        <div class="password-complexity" data-password-complexity aria-live="polite">
-                            <span></span><span></span><span></span><span></span>
+                        <div class="setup-password-strength">
+                            <p class="setup-field-label"><?= e(__('setup.admin_password_strength')) ?></p>
+                            <div class="password-complexity" data-password-complexity aria-live="polite">
+                                <span></span><span></span><span></span><span></span>
+                            </div>
                         </div>
-                        <label class="setup-field">
+                        <label class="setup-field setup-admin-locale">
                             <span><?= e(__('setup.field_admin_locale')) ?></span>
                             <select name="locale">
                                 <?php foreach (['it', 'de', 'en'] as $loc): ?>
@@ -1104,7 +1129,6 @@ $errorStep = flash('setup_error_step');
                                 <?php endforeach; ?>
                             </select>
                         </label>
-                        <p class="setup-hint muted"><?= e(__('setup.admin_hint')) ?></p>
                     </div>
                 <?php else: ?>
                     <label class="setup-field" data-setup-line>

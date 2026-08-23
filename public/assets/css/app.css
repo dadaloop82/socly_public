@@ -5542,17 +5542,46 @@ a.org-node:hover {
   gap: 0.75rem;
   margin-top: 0.85rem;
 }
+.setup-component-row-locked {
+  opacity: 0.92;
+}
+.setup-component-row-locked input[type="checkbox"]:disabled {
+  opacity: 1;
+}
+.setup-enrollment-detail {
+  margin: 0.35rem 0 0;
+  padding: 0.75rem 0.85rem;
+  border-radius: 0.65rem;
+  background: color-mix(in srgb, var(--brand-paper) 55%, white);
+  border: 1px solid color-mix(in srgb, var(--brand-primary) 14%, var(--line));
+  line-height: 1.55;
+}
+.setup-enrollment-detail[hidden] { display: none !important; }
+.setup-password-strength {
+  display: grid;
+  gap: 0.45rem;
+  margin-top: 0.35rem;
+}
+.setup-password-strength .setup-field-label {
+  margin: 0;
+  font-size: 0.9rem;
+  font-weight: 600;
+}
 .password-complexity {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
   gap: 0.35rem;
-  margin-top: 0.65rem;
+  margin-top: 0;
+}
+.setup-admin-locale {
+  margin-top: 1.25rem;
 }
 .password-complexity span {
   height: 0.35rem;
   border-radius: 999px;
   background: var(--line);
   transition: background 160ms ease;
+}
 }
 .password-complexity span.is-active {
   background: var(--brand-primary);

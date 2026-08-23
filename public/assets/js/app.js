@@ -847,6 +847,7 @@ function initSetupWizard() {
   initSetupPeopleList(root);
   initSetupMemberTypes(root);
   initSetupMembershipPeriods(root);
+  initSetupEnrollment(root);
   initSetupWebsiteScrape(root);
   initSetupRuntsLookup(root);
   initSetupBrandingPalettes(root);
@@ -4168,6 +4169,24 @@ function initSetupMemberTypes(root = document) {
       enInput.addEventListener('input', () => { enInput.dataset.userTouched = '1'; });
     });
   });
+}
+
+function initSetupEnrollment(root = document) {
+  const box = root.querySelector('[data-setup-enrollment]');
+  if (!box || box.dataset.enrollmentReady === '1') return;
+  box.dataset.enrollmentReady = '1';
+  const select = box.querySelector('[data-enrollment-select]');
+  const detail = box.querySelector('[data-enrollment-detail]');
+  const sync = () => {
+    const val = select?.value || 'none';
+    const tpl = box.querySelector(`[data-enrollment-detail-for="${val}"]`);
+    if (detail) {
+      detail.textContent = tpl?.textContent?.trim() || '';
+      detail.hidden = detail.textContent === '';
+    }
+  };
+  select?.addEventListener('change', sync);
+  sync();
 }
 
 function initSetupMembershipPeriods(root = document) {
