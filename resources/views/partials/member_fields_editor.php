@@ -281,7 +281,7 @@ foreach ($editorSteps as $s) {
                             ?>
                             <?php if ($visibleStepFields === [] && ($setupMode || $stepPlaceholders === [])): ?>
                                 <tr class="setup-fields-empty-row" data-fields-empty-row>
-                                    <td colspan="<?= $setupMode ? 4 : 5 ?>" class="muted"><?= e(__('setup.fields_step_empty')) ?></td>
+                                    <td colspan="<?= $setupMode ? 4 : 5 ?>" class="muted"><?= e($setupMode ? __('setup.fields_settings_empty') : __('setup.fields_step_empty')) ?></td>
                                 </tr>
                             <?php else: ?>
                                 <?php foreach ($visibleStepFields as $field): ?>

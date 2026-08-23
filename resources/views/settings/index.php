@@ -398,6 +398,7 @@
             'formSteps' => $formSteps ?? [],
             'typeOptions' => \Socly\Support\MemberFieldTypes::keys(),
             'allowTypeEdit' => false,
+            'setupMode' => true,
             'autosaveUrl' => url('/settings/fields/autosave'),
         ]) ?>
         <div class="setup-membership-card setup-membership-card-new setup-fields-add">
@@ -436,8 +437,10 @@
                 'last_test_ok' => false, 'last_test_at' => '',
             ];
             $mailReady = !empty($mailReady);
-        $showManual = !empty($mailCfg['host']) || !empty(flash('smtp_needs_manual'));
-        $mailSkipped = !empty($mailCfg['outbound_disabled']);
+            $showManual = !empty($mailCfg['host']) || !empty(flash('smtp_needs_manual'));
+            $mailSkipped = !empty($mailCfg['outbound_disabled']);
+            $mailEnc = (string) ($mailCfg['encryption'] ?? 'tls');
+            $assocEmail = (string) ($mailCfg['from_address'] ?: '');
         ?>
         <form
             method="post"
@@ -461,7 +464,7 @@
             data-csrf="<?= e(csrf_token()) ?>"
         >
             <?= csrf_field() ?>
-            <label class="checkbox-row setup-check setup-smtp-skip">
+            <label class="setup-check setup-check-prominent setup-smtp-skip">
                 <input type="checkbox" name="outbound_disabled" value="1" data-smtp-skip <?= $mailSkipped ? 'checked' : '' ?>>
                 <span><?= e(__('setup.mail_skip_outbound')) ?></span>
             </label>
@@ -474,70 +477,76 @@
             <div class="setup-smtp-fields" data-smtp-fields <?= $mailSkipped ? 'hidden' : '' ?>>
                 <div class="setup-smtp-section">
                     <p class="setup-hint muted"><?= e(__('setup.mail_simple_hint')) ?></p>
-                    <div class="setup-equal-row">
-                        <label class="setup-field">
+                    <div class="setup-equal-row setup-smtp-credentials">
+                        <label class="setup-field setup-field-grow">
                             <span><?= e(__('mail.from_address')) ?> *</span>
-                            <input type="email" name="from_address" value="<?= e((string) $mailCfg['from_address']) ?>" required placeholder="noreply@example.com" data-smtp-from>
+                            <input type="email" name="from_address" value="<?= e((string) $mailCfg['from_address']) ?>" required autocomplete="off" placeholder="noreply@tuodominio.it" data-smtp-from>
                             <p class="field-hint setup-field-hint" data-smtp-from-hint hidden></p>
                         </label>
                         <?= view_partial('partials/password_input', [
                             'name' => 'password',
                             'label' => (string) __('mail.password'),
-                            'required' => false,
+                            'required' => empty($mailCfg['has_password']),
                             'placeholder' => !empty($mailCfg['has_password']) ? (string) __('mail.password_keep') : '',
                             'autocomplete' => 'new-password',
                             'input_attrs' => 'data-smtp-password',
                             'hint_attrs' => 'data-smtp-password-hint',
                         ]) ?>
                     </div>
-                    <div class="setup-smtp-actions" data-smtp-simple-actions <?= $showManual ? 'hidden' : '' ?>>
-                        <button type="button" class="btn btn-ghost" data-smtp-discover-btn><?= e(__('setup.mail_discover_btn')) ?></button>
+                    <div class="setup-smtp-discover-row" data-smtp-discover-row>
+                        <button type="button" class="btn setup-scrape-btn" data-smtp-discover-btn>
+                            <span data-smtp-discover-label><?= e(__('setup.mail_discover_btn')) ?></span>
+                        </button>
                     </div>
-                    <p class="setup-hint muted" data-smtp-discover-status hidden></p>
+                    <div class="setup-smtp-live" data-smtp-live hidden>
+                        <div class="setup-scrape-spinner" aria-hidden="true"></div>
+                        <p class="setup-hint muted setup-smtp-live-status" data-smtp-discover-status hidden></p>
+                    </div>
                 </div>
                 <div class="setup-smtp-manual" data-smtp-manual <?= $showManual ? '' : 'hidden' ?>>
                     <p class="setup-smtp-manual-title"><?= e(__('setup.mail_manual_title')) ?></p>
                     <p class="setup-hint muted"><?= e(__('setup.mail_manual_hint')) ?></p>
-                    <div class="grid-2">
-                        <div>
-                            <label><?= e(__('mail.host')) ?> *</label>
-                            <input type="text" name="host" value="<?= e((string) $mailCfg['host']) ?>" placeholder="smtp.example.com" data-smtp-host>
-                        </div>
-                        <div>
-                            <label><?= e(__('mail.port')) ?> *</label>
+                    <div class="setup-equal-row">
+                        <label class="setup-field">
+                            <span><?= e(__('mail.host')) ?> *</span>
+                            <input type="text" name="host" value="<?= e((string) $mailCfg['host']) ?>" placeholder="smtp.example.com" autocomplete="off" data-smtp-host>
+                        </label>
+                        <label class="setup-field">
+                            <span><?= e(__('mail.port')) ?> *</span>
                             <input type="number" name="port" value="<?= e((string) ($mailCfg['port'] ?: 587)) ?>" min="1" max="65535" data-smtp-port>
-                        </div>
+                        </label>
                     </div>
-                    <label><?= e(__('mail.encryption')) ?> *</label>
-                    <select name="encryption" data-smtp-encryption>
-                        <?php $enc = (string) ($mailCfg['encryption'] ?? 'tls'); ?>
-                        <option value="tls" <?= $enc === 'tls' ? 'selected' : '' ?>><?= e(__('mail.encryption_tls')) ?></option>
-                        <option value="ssl" <?= $enc === 'ssl' ? 'selected' : '' ?>><?= e(__('mail.encryption_ssl')) ?></option>
-                        <option value="none" <?= $enc === 'none' ? 'selected' : '' ?>><?= e(__('mail.encryption_none')) ?></option>
-                    </select>
-                    <label><?= e(__('mail.username')) ?> *</label>
-                    <input type="text" name="username" value="<?= e((string) $mailCfg['username']) ?>" autocomplete="off" placeholder="<?= e(__('mail.username_default_hint')) ?>" data-smtp-username>
-                    <label><?= e(__('mail.from_name')) ?></label>
-                    <input type="text" name="from_name" value="<?= e((string) $mailCfg['from_name']) ?>" data-smtp-from-name>
-                    <div class="setup-smtp-actions" style="margin-top:0.75rem">
+                    <label class="setup-field">
+                        <span><?= e(__('mail.encryption')) ?> *</span>
+                        <select name="encryption" data-smtp-encryption>
+                            <option value="tls" <?= $mailEnc === 'tls' ? 'selected' : '' ?>><?= e(__('mail.encryption_tls')) ?></option>
+                            <option value="ssl" <?= $mailEnc === 'ssl' ? 'selected' : '' ?>><?= e(__('mail.encryption_ssl')) ?></option>
+                            <option value="none" <?= $mailEnc === 'none' ? 'selected' : '' ?>><?= e(__('mail.encryption_none')) ?></option>
+                        </select>
+                    </label>
+                    <label class="setup-field">
+                        <span><?= e(__('mail.username')) ?> *</span>
+                        <input type="text" name="username" value="<?= e((string) $mailCfg['username']) ?>" autocomplete="off" placeholder="<?= e(__('mail.username_default_hint')) ?>" data-smtp-username>
+                    </label>
+                    <label class="setup-field">
+                        <span><?= e(__('mail.from_name')) ?></span>
+                        <input type="text" name="from_name" value="<?= e((string) $mailCfg['from_name']) ?>" autocomplete="organization" data-smtp-from-name>
+                    </label>
+                    <div class="setup-smtp-actions">
                         <button type="button" class="btn btn-ghost" data-smtp-verify-btn><?= e(__('setup.mail_verify_btn')) ?></button>
                     </div>
                     <p class="setup-hint muted" data-smtp-verify-status hidden></p>
                 </div>
-                <div class="setup-smtp-section setup-smtp-test" data-smtp-test-section <?= !empty($mailCfg['last_test_ok']) ? '' : 'hidden' ?>>
+                <div class="setup-smtp-section setup-smtp-test" data-smtp-test-section <?= $mailReady ? '' : 'hidden' ?>>
                     <label class="setup-field">
                         <span><?= e(__('mail.test_to')) ?> *</span>
-                        <input type="email" name="test_to" value="<?= e((string) ($mailCfg['from_address'] ?: '')) ?>" <?= !empty($mailCfg['last_test_ok']) ? 'required' : '' ?> data-smtp-test-to <?= !empty($mailCfg['last_test_ok']) ? '' : 'disabled' ?>>
+                        <input type="email" name="test_to" value="<?= e($assocEmail) ?>" <?= $mailReady ? 'required' : '' ?> autocomplete="off" data-smtp-test-to <?= $mailReady ? '' : 'disabled' ?>>
                     </label>
                     <div class="setup-smtp-actions">
-                        <button type="button" class="btn btn-ghost" data-smtp-test-btn <?= !empty($mailCfg['last_test_ok']) ? '' : 'disabled' ?>><?= e(__('setup.mail_test_btn')) ?></button>
+                        <button type="button" class="btn btn-ghost" data-smtp-test-btn <?= $mailReady ? '' : 'disabled' ?>><?= e(__('setup.mail_test_btn')) ?></button>
                     </div>
-                    <p class="setup-hint muted" data-smtp-test-status <?= !empty($mailCfg['last_test_ok']) ? '' : 'hidden' ?>>
-                        <?php if (!empty($mailCfg['last_test_ok'])): ?>
-                            <?= e(__('mail.test_ok_badge')) ?><?= !empty($mailCfg['last_test_at']) ? ' · ' . e((string) $mailCfg['last_test_at']) : '' ?>
-                        <?php endif; ?>
-                    </p>
-                    <p class="setup-hint muted"><?= e(__('settings.mail_save_hint')) ?></p>
+                    <p class="setup-hint muted" data-smtp-test-status <?= $mailReady ? '' : 'hidden' ?>><?= $mailReady ? e(__('mail.test_ok_badge')) : '' ?></p>
+                    <p class="setup-hint muted"><?= e(__('setup.mail_save_hint')) ?></p>
                 </div>
             </div>
             <div class="actions setup-smtp-actions" style="margin-top:0.25rem">
@@ -556,8 +565,10 @@
     <div class="config-accordion-body">
         <form method="post" action="<?= e(url('/settings/enrollment')) ?>" data-leave-guard data-settings-autosave>
             <?= csrf_field() ?>
-            <label for="enrollment_validation"><?= e(__('settings.enrollment_method')) ?></label>
-            <select id="enrollment_validation" name="enrollment_validation" required>
+            <div class="setup-enrollment" data-setup-enrollment>
+                <label class="setup-field">
+                    <span><?= e(__('settings.enrollment_method')) ?></span>
+                    <select name="enrollment_validation" required data-enrollment-select>
                 <?php
                 $enroll = (string) ($settings['membership.enrollment_validation'] ?? 'none');
                 $enrollOpts = [
@@ -569,10 +580,15 @@
                 foreach ($enrollOpts as $val => $labelKey):
                     $otpBlocked = $val === 'otp_email' && empty($mailReady);
                 ?>
-                    <option value="<?= e($val) ?>" <?= $enroll === $val ? 'selected' : '' ?> <?= $otpBlocked ? 'disabled' : '' ?>><?= e(__($labelKey)) ?><?= $otpBlocked ? ' — ' . e(__('mail.required_short')) : '' ?></option>
+                    <option value="<?= e($val) ?>" <?= $enroll === $val ? 'selected' : '' ?> <?= $otpBlocked ? 'disabled' : '' ?>><?= e(__($labelKey)) ?><?= $otpBlocked ? ' — ' . e(__('setup.mail_required_short')) : '' ?></option>
                 <?php endforeach; ?>
-            </select>
-            <p class="muted" style="margin-top:0.75rem"><?= e(__('setup.step_enrollment_desc')) ?></p>
+                    </select>
+                </label>
+                <?php foreach ($enrollOpts as $val => $labelKey): ?>
+                    <template data-enrollment-detail-for="<?= e($val) ?>"><?= e(__('setup.enrollment_detail_' . $val)) ?></template>
+                <?php endforeach; ?>
+                <p class="setup-enrollment-detail muted" data-enrollment-detail aria-live="polite"></p>
+            </div>
             <p class="settings-autosave-status muted" data-settings-autosave-status aria-live="polite"></p>
         </form>
     </div>
@@ -586,7 +602,7 @@
     <div class="config-accordion-body">
         <form method="post" action="<?= e(url('/settings/platform')) ?>" data-platform-consents data-mail-ready="<?= !empty($mailReady) ? '1' : '0' ?>" data-leave-guard data-settings-autosave>
             <?= csrf_field() ?>
-            <p class="muted"><?= e(__('setup.platform_hint')) ?></p>
+            <p class="setup-hint muted"><?= e(__('setup.platform_hint')) ?></p>
             <label class="setup-check setup-check-prominent">
                 <input type="checkbox" name="news_opt_in" value="1" data-platform-opt <?= ($settings['platform.news_opt_in'] ?? '1') !== '0' ? 'checked' : '' ?>>
                 <span><?= e(__('settings.platform_news')) ?></span>
@@ -599,23 +615,23 @@
                 <input type="checkbox" name="showcase_consent" value="1" data-platform-opt <?= ($settings['platform.showcase_consent'] ?? '1') !== '0' ? 'checked' : '' ?>>
                 <span><?= e(__('settings.platform_showcase')) ?></span>
             </label>
-            <p class="muted"><?= e(__('setup.platform_showcase_hint')) ?></p>
+            <p class="setup-hint muted"><?= e(__('setup.platform_showcase_hint')) ?></p>
             <?php
                 $anyPlatformSettings = (($settings['platform.news_opt_in'] ?? '1') !== '0')
                     || (($settings['platform.usage_stats_opt_in'] ?? '1') !== '0')
                     || (($settings['platform.showcase_consent'] ?? '1') !== '0');
             ?>
             <div class="setup-platform-confirm" data-platform-confirm <?= $anyPlatformSettings ? '' : 'hidden' ?>>
-                <p class="muted"><?= e(__('setup.platform_confirm_hint')) ?></p>
-                <div class="grid-2">
-                    <div>
-                        <label><?= e(__('setup.platform_confirm_first')) ?> *</label>
+                <p class="setup-hint muted"><?= e(__('setup.platform_confirm_hint')) ?></p>
+                <div class="setup-equal-row">
+                    <label class="setup-field">
+                        <span><?= e(__('setup.platform_confirm_first')) ?> *</span>
                         <input type="text" name="confirm_first_name" value="" autocomplete="off" data-platform-confirm-input placeholder="<?= e((string) ($presidentFirstPlaceholder ?? '')) ?>" <?= $anyPlatformSettings ? 'required' : '' ?>>
-                    </div>
-                    <div>
-                        <label><?= e(__('setup.platform_confirm_last')) ?> *</label>
+                    </label>
+                    <label class="setup-field">
+                        <span><?= e(__('setup.platform_confirm_last')) ?> *</span>
                         <input type="text" name="confirm_last_name" value="" autocomplete="off" data-platform-confirm-input placeholder="<?= e((string) ($presidentLastPlaceholder ?? '')) ?>" <?= $anyPlatformSettings ? 'required' : '' ?>>
-                    </div>
+                    </label>
                 </div>
             </div>
             <p class="settings-autosave-status muted" data-settings-autosave-status aria-live="polite"></p>

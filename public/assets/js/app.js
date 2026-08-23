@@ -2475,6 +2475,7 @@ function initSettingsAssociationForms() {
   });
   initSetupMemberTypes(document);
   initSetupMembershipPeriods(document);
+  initSetupEnrollment(document);
 }
 
 function initLegalDocEditors(scope = document) {
