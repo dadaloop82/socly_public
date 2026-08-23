@@ -2035,6 +2035,22 @@ td .muted { font-size: 0.88rem; margin-top: 0.15rem; }
 .checkbox-row { display: flex; gap: 0.55rem; align-items: flex-start; margin-bottom: 0.75rem; }
 .checkbox-row input { width: auto; margin: 0.15rem 0 0; flex-shrink: 0; }
 .checkbox-row label, .checkbox-row { color: var(--ink); }
+.checkbox-row-lg {
+  align-items: center;
+  gap: 0.65rem;
+  font-size: 1rem;
+  line-height: 1.45;
+  margin-bottom: 0.85rem;
+}
+.checkbox-row-lg input[type="checkbox"] {
+  width: 1.15rem;
+  height: 1.15rem;
+  margin: 0;
+  accent-color: var(--brand-primary, #0D6E66);
+}
+.checkbox-row-lg span { font-size: inherit; }
+[data-treasury-member-fields] { margin-bottom: 0.85rem; }
+.treasury-currency-hint { margin: 0.35rem 0 0; font-size: 0.88rem; }
 .ack-list {
   display: grid;
   gap: 0.85rem;
@@ -6056,6 +6072,26 @@ tr.doc-row-editable:focus-visible {
 .treasury-form-body {
   padding: 0 1.15rem 1.15rem;
   border-top: 1px solid color-mix(in srgb, var(--border, #d0d7de) 80%, transparent);
+}
+.doc-file-preview {
+  margin-top: 0.35rem;
+  width: min(100%, 12rem);
+  aspect-ratio: 3 / 4;
+  border: 1px solid color-mix(in srgb, var(--border, #d0d7de) 85%, transparent);
+  border-radius: 0.35rem;
+  overflow: hidden;
+  background: #f8f9fa;
+}
+.doc-file-preview iframe {
+  width: 100%;
+  height: 100%;
+  border: 0;
+  display: block;
+}
+.doc-file-archive-link {
+  font-size: 0.82rem;
+  font-weight: 600;
+  margin-top: 0.15rem;
 }
 .treasury-type-row [data-treasury-sign-wrap] select {
   font-variant-numeric: tabular-nums;

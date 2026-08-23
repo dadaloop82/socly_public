@@ -36,7 +36,8 @@ final class TreasuryService
         private readonly AuditService $audit,
         private readonly Validator $validator,
         private readonly ComponentService $components,
-        private readonly DocumentService $documents
+        private readonly DocumentService $documents,
+        private readonly CurrencyService $currency
     ) {
     }
 
@@ -409,7 +410,8 @@ final class TreasuryService
         }
         /** @var array<string,mixed> $data */
         $data = $parsed['data'];
-        $attachment = $this->syncInvoiceDocument($data, $file, $ip, $userId);
+        $detach = !empty($input['detach_invoice_pdf']);
+        $attachment = $this->syncInvoiceDocument($data, $file, $ip, $userId, null, $detach);
         if (empty($attachment['ok'])) {
             return ['ok' => false, 'errors' => ['invoice_pdf' => (string) ($attachment['error'] ?? __('documents.upload_fail'))]];
         }
@@ -434,12 +436,18 @@ final class TreasuryService
         }
         /** @var array<string,mixed> $data */
         $data = $parsed['data'];
-        $attachment = $this->syncInvoiceDocument($data, $file, $ip, $userId, $existing);
+        $detach = !empty($input['detach_invoice_pdf']);
+        $attachment = $this->syncInvoiceDocument($data, $file, $ip, $userId, $existing, $detach);
         if (empty($attachment['ok'])) {
             return ['ok' => false, 'errors' => ['invoice_pdf' => (string) ($attachment['error'] ?? __('documents.upload_fail'))]];
         }
-        $data['attachment_path'] = $attachment['path'] ?? ($existing['attachment_path'] ?? null);
-        $data['document_id'] = $attachment['document_id'] ?? ($existing['document_id'] ?? null);
+        if ($detach) {
+            $data['attachment_path'] = null;
+            $data['document_id'] = null;
+        } else {
+            $data['attachment_path'] = $attachment['path'] ?? ($existing['attachment_path'] ?? null);
+            $data['document_id'] = $attachment['document_id'] ?? ($existing['document_id'] ?? null);
+        }
         $this->db->update('treasury_movements', $data, 'id = :id', ['id' => $id]);
         $this->audit->log('treasury.updated', 'treasury', (string) $id, [
             'direction' => $existing['direction'] ?? null,
@@ -525,9 +533,26 @@ final class TreasuryService
         if (!in_array($direction, ['income', 'expense'], true)) {
             return ['ok' => false, 'errors' => ['direction' => __('validation.in')]];
         }
-        $amount = (float) str_replace(',', '.', (string) ($input['amount'] ?? '0'));
-        if ($amount <= 0) {
+        $amountRaw = (float) str_replace(',', '.', (string) ($input['amount'] ?? '0'));
+        if ($amountRaw <= 0) {
             return ['ok' => false, 'errors' => ['amount' => __('validation.required')]];
+        }
+        $baseCurrency = $this->currency->code();
+        $inputCurrency = strtoupper(trim((string) ($input['amount_currency'] ?? $baseCurrency)));
+        if (!in_array($inputCurrency, $this->currency->supportedCodes(), true)) {
+            $inputCurrency = $baseCurrency;
+        }
+        $amount = $amountRaw;
+        $amountEntered = null;
+        $amountCurrency = null;
+        if ($inputCurrency !== $baseCurrency) {
+            $converted = $this->currency->convertToBase($amountRaw, $inputCurrency);
+            if ($converted === null) {
+                return ['ok' => false, 'errors' => ['amount_currency' => __('treasury.currency_rate_unavailable')]];
+            }
+            $amount = $converted;
+            $amountEntered = $amountRaw;
+            $amountCurrency = $inputCurrency;
         }
         $date = trim((string) ($input['movement_date'] ?? date('Y-m-d')));
         if (!$this->validator->validate(['movement_date' => $date], ['movement_date' => 'date'])) {
@@ -538,10 +563,29 @@ final class TreasuryService
             return ['ok' => false, 'errors' => ['category' => (string) ($categoryResult['error'] ?? __('validation.required'))]];
         }
         $method = self::normalizePaymentMethod(trim((string) ($input['payment_method'] ?? 'cash')));
-        $memberId = trim((string) ($input['member_id'] ?? ''));
+        $memberInvolved = !empty($input['member_involved']);
+        $memberId = $memberInvolved ? trim((string) ($input['member_id'] ?? '')) : '';
         $memberId = $memberId !== '' ? (int) $memberId : null;
         $isInvoice = $direction === 'expense' && !empty($input['invoice_payment']);
         $invoiceNumber = $isInvoice ? mb_substr(trim((string) ($input['invoice_number'] ?? '')), 0, 120) : null;
+        $invoiceDate = null;
+        $invoiceDueDate = null;
+        if ($isInvoice) {
+            $invoiceDateRaw = trim((string) ($input['invoice_date'] ?? ''));
+            if ($invoiceDateRaw !== '') {
+                if (!$this->validator->validate(['invoice_date' => $invoiceDateRaw], ['invoice_date' => 'date'])) {
+                    return ['ok' => false, 'errors' => ['invoice_date' => __('validation.date')]];
+                }
+                $invoiceDate = $invoiceDateRaw;
+            }
+            $invoiceDueRaw = trim((string) ($input['invoice_due_date'] ?? ''));
+            if ($invoiceDueRaw !== '') {
+                if (!$this->validator->validate(['invoice_due_date' => $invoiceDueRaw], ['invoice_due_date' => 'date'])) {
+                    return ['ok' => false, 'errors' => ['invoice_due_date' => __('validation.date')]];
+                }
+                $invoiceDueDate = $invoiceDueRaw;
+            }
+        }
         $beneficiary = $direction === 'expense'
             ? mb_substr(trim((string) ($input['beneficiary'] ?? '')), 0, 190)
             : '';
@@ -553,11 +597,15 @@ final class TreasuryService
                 'direction' => $direction,
                 'category' => (string) $categoryResult['key'],
                 'amount' => $amount,
+                'amount_entered' => $amountEntered,
+                'amount_currency' => $amountCurrency,
                 'description' => trim((string) ($input['description'] ?? '')),
                 'payment_method' => $method,
                 'member_id' => $memberId,
                 'invoice_payment' => $isInvoice ? 1 : 0,
                 'invoice_number' => $invoiceNumber !== '' ? $invoiceNumber : null,
+                'invoice_date' => $invoiceDate,
+                'invoice_due_date' => $invoiceDueDate,
                 'beneficiary' => $beneficiary !== '' ? $beneficiary : null,
             ],
         ];
@@ -576,8 +624,12 @@ final class TreasuryService
         ?array $file,
         string $ip,
         ?int $userId,
-        ?array $existing = null
+        ?array $existing = null,
+        bool $detach = false
     ): array {
+        if ($detach) {
+            return ['ok' => true, 'path' => null, 'document_id' => null];
+        }
         $hasUpload = is_array($file) && (int) ($file['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_NO_FILE;
         $documentId = isset($existing['document_id']) ? (int) $existing['document_id'] : 0;
         if (!$hasUpload && ($documentId < 1 || !$this->components->isEnabled('documents'))) {
@@ -616,8 +668,10 @@ final class TreasuryService
             }
             $docInput = [
                 'title' => implode(' - ', $titleParts),
-                'category' => 'other',
-                'document_date' => (string) ($data['movement_date'] ?? ''),
+                'category' => 'invoice',
+                'document_date' => trim((string) ($data['invoice_date'] ?? '')) !== ''
+                    ? (string) $data['invoice_date']
+                    : (string) ($data['movement_date'] ?? ''),
                 'language' => '',
                 'status' => 'approved',
                 'summary' => $description,

@@ -304,7 +304,8 @@ $app->bind(TreasuryService::class, fn (App $a) => new TreasuryService(
     $a->get(AuditService::class),
     $a->get(Validator::class),
     $a->get(ComponentService::class),
-    $a->get(DocumentService::class)
+    $a->get(DocumentService::class),
+    $a->get(CurrencyService::class)
 ));
 $app->bind(DeadlineService::class, fn (App $a) => new DeadlineService(
     $a->get(Database::class),

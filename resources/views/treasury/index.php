@@ -17,6 +17,8 @@ $values = $old !== [] ? $old : [
     'direction' => 'income',
     'movement_kind' => 'operating',
     'amount' => '',
+    'amount_currency' => '',
+    'member_involved' => '',
     'movement_date' => date('Y-m-d'),
     'category' => (string) ($default_category ?? 'membership_fee'),
     'payment_method' => 'cash',
@@ -25,6 +27,8 @@ $values = $old !== [] ? $old : [
     'new_category' => '',
     'invoice_payment' => '',
     'invoice_number' => '',
+    'invoice_date' => '',
+    'invoice_due_date' => '',
     'beneficiary' => '',
 ];
 $canManage = can('treasury.manage');
@@ -94,6 +98,10 @@ $formOpen = $old !== [];
     </summary>
     <form class="treasury-form-body" method="post" action="<?= e(url('/treasury')) ?>" enctype="multipart/form-data" data-treasury-form data-leave-guard
           data-confirm-template="<?= e(__('treasury.confirm_summary')) ?>"
+          data-base-currency="<?= e($currency->code()) ?>"
+          data-msg-doc-loaded="<?= e(__('treasury.document_loaded')) ?>"
+          data-msg-doc-idle="<?= e(__('documents.upload_idle')) ?>"
+          data-msg-doc-change="<?= e(__('treasury.document_change')) ?>"
           data-max-upload-bytes="<?= (int) upload_limit_bytes() ?>"
           data-msg-upload-too-large="<?= e(__('documents.upload_too_large', ['max' => upload_max_mb()])) ?>">
         <?= csrf_field() ?>
@@ -177,7 +185,10 @@ $formOpen = $old !== [];
                                         <?php if ($memberLabel !== ''): ?><div><?= e($memberLabel) ?></div><?php endif; ?>
                                         <?php if (!empty($row['beneficiary'])): ?><div><?= e(__('treasury.beneficiary')) ?>: <?= e((string) $row['beneficiary']) ?></div><?php endif; ?>
                                         <?php if (!empty($row['invoice_number'])): ?><div><?= e(__('treasury.invoice_number')) ?>: <?= e((string) $row['invoice_number']) ?></div><?php endif; ?>
-                                        <?php if (!empty($row['attachment_path'])): ?><div><a href="<?= e(url('/treasury/' . $rowId . '/attachment')) ?>" target="_blank" rel="noopener"><?= e(__('treasury.invoice_pdf')) ?></a></div><?php endif; ?>
+                                        <?php if (!empty($row['invoice_date'])): ?><div><?= e(__('treasury.invoice_date')) ?>: <?= e(format_date($row['invoice_date']) ?: (string) $row['invoice_date']) ?></div><?php endif; ?>
+                                        <?php if (!empty($row['invoice_due_date'])): ?><div><?= e(__('treasury.invoice_due_date')) ?>: <?= e(format_date($row['invoice_due_date']) ?: (string) $row['invoice_due_date']) ?></div><?php endif; ?>
+                                        <?php if (!empty($row['amount_entered']) && !empty($row['amount_currency'])): ?><div><?= e(__('treasury.amount_original')) ?>: <?= e(number_format((float) $row['amount_entered'], 2, ',', '.')) ?> <?= e((string) $row['amount_currency']) ?></div><?php endif; ?>
+                                        <?php if (!empty($row['attachment_path'])): ?><div><a href="<?= e(url('/treasury/' . $rowId . '/attachment')) ?>" target="_blank" rel="noopener"><?= e(__('treasury.upload_document')) ?></a></div><?php endif; ?>
                                         <?php if (empty($row['member_id']) && empty($row['beneficiary']) && empty($row['invoice_number']) && empty($row['attachment_path'])): ?><?= e(__('treasury.none')) ?><?php endif; ?>
                                     </td>
                                     <td>

@@ -5,23 +5,30 @@
 /** @var array{auto_from_payments?:bool} $config */
 /** @var list<string> $beneficiaries */
 /** @var \Socly\Services\CurrencyService $currency */
+$movementId = (int) ($movement['id'] ?? 0);
 $old = old_input();
 $values = $old !== [] ? $old : [
     'direction' => (string) ($movement['direction'] ?? 'income'),
     'movement_kind' => 'operating',
     'amount' => (string) ($movement['amount'] ?? ''),
+    'amount_entered' => (string) ($movement['amount_entered'] ?? ''),
+    'amount_currency' => (string) ($movement['amount_currency'] ?? ''),
     'movement_date' => (string) ($movement['movement_date'] ?? date('Y-m-d')),
     'category' => (string) ($movement['category'] ?? 'membership_fee'),
     'payment_method' => (string) ($movement['payment_method'] ?? 'cash'),
     'member_id' => (string) ($movement['member_id'] ?? ''),
+    'member_involved' => !empty($movement['member_id']) ? '1' : '',
     'description' => (string) ($movement['description'] ?? ''),
     'new_category' => '',
     'invoice_payment' => (string) ($movement['invoice_payment'] ?? ''),
     'invoice_number' => (string) ($movement['invoice_number'] ?? ''),
+    'invoice_date' => (string) ($movement['invoice_date'] ?? ''),
+    'invoice_due_date' => (string) ($movement['invoice_due_date'] ?? ''),
     'beneficiary' => (string) ($movement['beneficiary'] ?? ''),
     'attachment_path' => (string) ($movement['attachment_path'] ?? ''),
+    'attachment_preview_url' => url('/treasury/' . $movementId . '/attachment'),
+    'document_edit_url' => !empty($movement['document_id']) ? url('/documents/' . (int) $movement['document_id']) : '',
 ];
-$movementId = (int) ($movement['id'] ?? 0);
 ?>
 <div class="page-header">
     <div class="titles">
@@ -32,6 +39,10 @@ $movementId = (int) ($movement['id'] ?? 0);
 
 <form class="panel" method="post" action="<?= e(url('/treasury/' . $movementId)) ?>" enctype="multipart/form-data"
       data-treasury-form data-leave-guard data-confirm-template="<?= e(__('treasury.confirm_summary')) ?>"
+      data-base-currency="<?= e($currency->code()) ?>"
+      data-msg-doc-loaded="<?= e(__('treasury.document_loaded')) ?>"
+      data-msg-doc-idle="<?= e(__('documents.upload_idle')) ?>"
+      data-msg-doc-change="<?= e(__('treasury.document_change')) ?>"
       data-max-upload-bytes="<?= (int) upload_limit_bytes() ?>"
       data-msg-upload-too-large="<?= e(__('documents.upload_too_large', ['max' => upload_max_mb()])) ?>">
     <?= csrf_field() ?>

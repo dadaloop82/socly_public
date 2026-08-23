@@ -16,6 +16,7 @@ final class DocumentService
         'statute',
         'regulation',
         'contract',
+        'invoice',
         'other',
     ];
 

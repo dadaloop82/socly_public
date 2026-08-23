@@ -45,6 +45,33 @@ final class CurrencyService
         return $rate !== null ? round($amount * $rate, 2) : null;
     }
 
+    public function convertToBase(float $amount, ?string $from = null): ?float
+    {
+        $base = $this->code();
+        $from = strtoupper(trim($from ?? $base));
+        if ($from === $base) {
+            return round($amount, 2);
+        }
+        $inEur = $this->convertToEur($amount, $from);
+        if ($inEur === null) {
+            return null;
+        }
+        if ($base === 'EUR') {
+            return $inEur;
+        }
+        $baseRate = $this->rateToEur($base);
+        if ($baseRate === null || $baseRate <= 0) {
+            return null;
+        }
+        return round($inEur / $baseRate, 2);
+    }
+
+    /** @return list<string> */
+    public function supportedCodes(): array
+    {
+        return ['EUR', 'CHF', 'USD', 'GBP'];
+    }
+
     public function rateToEur(?string $from = null): ?float
     {
         $from = strtoupper(trim($from ?? $this->code()));

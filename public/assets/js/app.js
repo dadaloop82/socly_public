@@ -5484,6 +5484,117 @@ function initDeadlineCategory(root = document) {
   });
 }
 
+function formatFileSize(bytes) {
+  if (!Number.isFinite(bytes) || bytes <= 0) {
+    return '';
+  }
+  if (bytes < 1024) {
+    return `${bytes} B`;
+  }
+  if (bytes < 1024 * 1024) {
+    return `${Math.round(bytes / 1024)} KB`;
+  }
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+function initTreasuryFileField(form) {
+  const field = form.querySelector('[data-treasury-doc-field]');
+  const input = form.querySelector('[data-treasury-doc-input]');
+  if (!field || !input) {
+    return;
+  }
+
+  const nameEl = form.querySelector('[data-treasury-doc-name]');
+  const statusEl = form.querySelector('[data-treasury-doc-status]');
+  const preview = form.querySelector('[data-treasury-doc-preview]');
+  const pickLabel = form.querySelector('[data-treasury-doc-pick-label]');
+  const detachBtn = form.querySelector('[data-treasury-doc-detach]');
+  const detachInput = form.querySelector('[data-treasury-doc-detach-input]');
+  const msgLoaded = form.dataset.msgDocLoaded || 'Documento caricato (:size)';
+  const msgIdle = form.dataset.msgDocIdle || '';
+  const msgChange = form.dataset.msgDocChange || '';
+  const chooseLabel = pickLabel?.textContent?.trim() || '';
+
+  let objectUrl = '';
+
+  const clearObjectUrl = () => {
+    if (objectUrl) {
+      URL.revokeObjectURL(objectUrl);
+      objectUrl = '';
+    }
+  };
+
+  const setPreview = (url) => {
+    if (!preview) {
+      return;
+    }
+    if (!url) {
+      preview.hidden = true;
+      preview.innerHTML = '';
+      return;
+    }
+    preview.hidden = false;
+    preview.innerHTML = `<iframe src="${url}#toolbar=0" title="PDF" loading="lazy"></iframe>`;
+  };
+
+  const setUploaded = (name, size, previewUrl) => {
+    field.classList.add('is-uploaded');
+    field.classList.remove('is-error');
+    if (nameEl) {
+      nameEl.textContent = name;
+      nameEl.hidden = name === '';
+    }
+    if (statusEl) {
+      const sizeLabel = formatFileSize(size);
+      statusEl.textContent = sizeLabel !== ''
+        ? msgLoaded.replace(':size', sizeLabel)
+        : msgLoaded.replace(/\s*\(:size\)/, '').replace(':size', '');
+    }
+    if (pickLabel && msgChange) {
+      pickLabel.textContent = msgChange;
+    }
+    if (detachInput) {
+      detachInput.value = '';
+    }
+    setPreview(previewUrl);
+  };
+
+  const setIdle = () => {
+    field.classList.remove('is-uploaded', 'is-error');
+    if (nameEl) {
+      nameEl.textContent = '';
+      nameEl.hidden = true;
+    }
+    if (statusEl && msgIdle) {
+      statusEl.textContent = msgIdle;
+    }
+    if (pickLabel) {
+      pickLabel.textContent = chooseLabel;
+    }
+    clearObjectUrl();
+    setPreview('');
+    input.value = '';
+  };
+
+  input.addEventListener('change', () => {
+    const file = input.files?.[0];
+    if (!file) {
+      return;
+    }
+    clearObjectUrl();
+    objectUrl = URL.createObjectURL(file);
+    setUploaded(file.name, file.size, objectUrl);
+  });
+
+  detachBtn?.addEventListener('click', () => {
+    if (detachInput) {
+      detachInput.value = '1';
+    }
+    setIdle();
+    field.classList.remove('is-uploaded');
+  });
+}
+
 function formatTreasuryConfirmMessage(form, template) {
   const directionHidden = form.querySelector('[data-treasury-direction]');
   const signSelect = form.querySelector('[data-treasury-sign]');
@@ -5507,8 +5618,17 @@ function formatTreasuryConfirmMessage(form, template) {
   let amountLabel = amountRaw;
   const amountNum = Number(amountRaw.replace(',', '.'));
   if (Number.isFinite(amountNum)) {
-    amountLabel = amountNum.toLocaleString('it-IT', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    amountLabel = amountNum.toLocaleString(document.documentElement.lang || 'it-IT', {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    });
   }
+
+  const currencySelect = form.querySelector('[name="amount_currency"]');
+  const currencyCode = String(currencySelect?.value || form.dataset.baseCurrency || 'EUR').toUpperCase();
+  const currencySymbols = { EUR: '€', USD: '$', GBP: '£', CHF: 'CHF' };
+  const currencySym = currencySymbols[currencyCode] || currencyCode;
+  const amountDisplay = `${currencySym} ${amountLabel}`;
 
   let dateLabel = dateRaw;
   if (/^\d{4}-\d{2}-\d{2}$/.test(dateRaw)) {
@@ -5518,20 +5638,13 @@ function formatTreasuryConfirmMessage(form, template) {
 
   const tpl = String(template || '').trim();
   if (!tpl) {
-    return [
-      'Confermi il movimento?',
-      '',
-      `Tipo: ${directionLabel}`,
-      `Importo: ${amountLabel}`,
-      `Data: ${dateLabel}`,
-      `Categoria: ${categoryLabel}`,
-    ].join('\n');
+    return `Confermi l'inserimento di un movimento di tipo ${directionLabel} di ${amountDisplay} per ${categoryLabel} con valuta il ${dateLabel}?`;
   }
 
   return tpl
     .replace(':type', directionLabel)
     .replace(':kind', kindLabel)
-    .replace(':amount', amountLabel)
+    .replace(':amount', amountDisplay)
     .replace(':date', dateLabel)
     .replace(':category', categoryLabel);
 }
@@ -5833,6 +5946,12 @@ function initTreasuryCategory(root = document) {
     const signSelect = form.querySelector('[data-treasury-sign]');
     const signWrap = form.querySelector('[data-treasury-sign-wrap]');
     const invoiceToggle = form.querySelector('[data-treasury-invoice-toggle]');
+    const memberToggle = form.querySelector('[data-treasury-member-toggle]');
+    const memberFields = form.querySelector('[data-treasury-member-fields]');
+    const memberSelect = form.querySelector('[data-treasury-member-select]');
+    const amountCurrency = form.querySelector('[data-treasury-amount-currency]');
+    const currencyHint = form.querySelector('[data-treasury-currency-hint]');
+    const baseCurrency = String(form.dataset.baseCurrency || 'EUR').toUpperCase();
     if (!categorySelect) {
       return;
     }
@@ -5871,6 +5990,40 @@ function initTreasuryCategory(root = document) {
       syncDirection();
     });
     syncKindSign();
+
+    const syncMember = () => {
+      const involved = !!memberToggle?.checked;
+      if (memberFields) {
+        memberFields.hidden = !involved;
+      }
+      if (memberSelect) {
+        memberSelect.disabled = !involved;
+        if (!involved) {
+          memberSelect.value = '';
+        }
+      }
+    };
+    memberToggle?.addEventListener('change', syncMember);
+    syncMember();
+
+    const syncCurrencyHint = () => {
+      if (!currencyHint || !amountCurrency) {
+        return;
+      }
+      const selected = String(amountCurrency.value || baseCurrency).toUpperCase();
+      if (selected !== baseCurrency) {
+        currencyHint.hidden = false;
+        const tpl = currencyHint.dataset.template || '';
+        currencyHint.textContent = tpl.replace(':currency', selected).replace(':base', baseCurrency);
+      } else {
+        currencyHint.hidden = true;
+        currencyHint.textContent = '';
+      }
+    };
+    amountCurrency?.addEventListener('change', syncCurrencyHint);
+    syncCurrencyHint();
+
+    initTreasuryFileField(form);
 
     const sync = () => {
       const isNew = categorySelect.value === '__new__';
