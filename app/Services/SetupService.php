@@ -74,8 +74,11 @@ final class SetupService
         }
 
         if ($type === 'logo') {
-            // Logo file may already exist from scrape; step stays open until Avanti.
-            return $this->rawStored('branding.logo_configured', '') !== null;
+            if ($this->rawStored('branding.logo_configured', '') !== null) {
+                return true;
+            }
+            // Logo already imported during website scrape — skip the dedicated upload step.
+            return $this->branding->logoRelativePath() !== '';
         }
 
         if ($type === 'member_types') {

@@ -54,7 +54,7 @@ $errorStep = flash('setup_error_step');
                     <?php if (!empty($backHref)): ?>
                         <a class="btn btn-ghost setup-back" href="<?= e((string) $backHref) ?>"><?= e(__('common.back')) ?></a>
                     <?php endif; ?>
-                    <button class="btn setup-cta" type="submit"><?= e(__('setup.next')) ?></button>
+                    <button class="btn setup-cta" type="submit"><?= e(__('setup.thanks_agree')) ?></button>
                 </div>
             </form>
         </section>
@@ -272,6 +272,7 @@ $errorStep = flash('setup_error_step');
                                             placeholder="<?= e(__('setup.field_runts_placeholder')) ?>"
                                             data-setup-runts-input
                                         >
+                                        <p class="setup-runts-hint muted" data-setup-runts-hint><?= e(__('setup.runts_hint')) ?></p>
                                         <button type="button" class="btn setup-scrape-btn" data-setup-runts-btn hidden disabled aria-hidden="true">
                                             <span data-setup-runts-label><?= e(__('setup.runts_button_fallback')) ?></span>
                                         </button>
@@ -303,6 +304,9 @@ $errorStep = flash('setup_error_step');
                                             </option>
                                         <?php endforeach; ?>
                                     </select>
+                                    <?php if (!$isCurrency): ?>
+                                        <p class="setup-legal-meaning muted" data-setup-legal-meaning hidden></p>
+                                    <?php endif; ?>
                                 <?php else: ?>
                                     <input
                                         type="text"
@@ -588,7 +592,21 @@ $errorStep = flash('setup_error_step');
                         } catch (\Throwable) {
                             $mailReadyForSelect = false;
                         }
+                        $isLocaleStep = ($step['key'] ?? '') === 'app.locale';
                     ?>
+                    <?php if ($isLocaleStep): ?>
+                    <fieldset class="setup-locale-grid" data-setup-line>
+                        <legend class="setup-field-label"><?= e(__($step['title_key'])) ?></legend>
+                        <?php foreach ($step['options'] as $opt): ?>
+                            <?php $optVal = (string) ($opt['value'] ?? ''); ?>
+                            <label class="setup-locale-card">
+                                <input type="radio" name="value" value="<?= e($optVal) ?>" <?= (string) $value === $optVal ? 'checked' : '' ?> required>
+                                <img src="<?= e(locale_flag_url($optVal)) ?>" width="28" height="21" alt="" loading="lazy" decoding="async">
+                                <span><?= e(__($opt['label_key'])) ?></span>
+                            </label>
+                        <?php endforeach; ?>
+                    </fieldset>
+                    <?php else: ?>
                     <label class="setup-field" data-setup-line>
                         <span><?= e(__($step['title_key'])) ?></span>
                         <select name="value" required>
@@ -597,10 +615,11 @@ $errorStep = flash('setup_error_step');
                                     $optVal = (string) ($opt['value'] ?? '');
                                     $otpBlocked = $optVal === 'otp_email' && !$mailReadyForSelect;
                                 ?>
-                                <option value="<?= e($optVal) ?>" <?= (string) $value === $optVal ? 'selected' : '' ?> <?= $otpBlocked ? 'disabled' : '' ?>><?= ($step['key'] ?? '') === 'app.locale' ? e(match ($optVal) { 'it' => '🇮🇹 ', 'de' => '🇩🇪 ', default => '🇬🇧 ' }) : '' ?><?= e(__($opt['label_key'])) ?><?= $otpBlocked ? ' — ' . e(__('mail.required_short')) : '' ?></option>
+                                <option value="<?= e($optVal) ?>" <?= (string) $value === $optVal ? 'selected' : '' ?> <?= $otpBlocked ? 'disabled' : '' ?>><?= e(__($opt['label_key'])) ?><?= $otpBlocked ? ' — ' . e(__('mail.required_short')) : '' ?></option>
                             <?php endforeach; ?>
                         </select>
                     </label>
+                    <?php endif; ?>
                     <?php if (!$mailReadyForSelect && ($step['key'] ?? '') === 'membership.enrollment_validation'): ?>
                         <p class="setup-hint muted" data-setup-line><?= e(__('mail.required_for_otp')) ?></p>
                     <?php endif; ?>

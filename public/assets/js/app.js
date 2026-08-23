@@ -2338,6 +2338,7 @@ function initSetupNamePairPreview(scope = document) {
     const nameInput = root.querySelector('[data-setup-assoc-name]');
     const legalSelect = root.querySelector('[data-setup-legal-name]');
     const preview = root.querySelector('[data-setup-full-name-preview]');
+    const legalMeaning = root.querySelector('[data-setup-legal-meaning]');
     const template = root.dataset.previewTemplate || '';
     if (!nameInput || !legalSelect || !preview || !template) return;
 
@@ -2345,6 +2346,21 @@ function initSetupNamePairPreview(scope = document) {
       const name = String(raw || '').trim();
       if (!name) return '';
       return name.charAt(0).toLocaleUpperCase('it-IT') + name.slice(1);
+    };
+
+    const syncLegalMeaning = () => {
+      if (!legalMeaning) return;
+      const opt = legalSelect.selectedOptions[0];
+      const raw = opt ? String(opt.textContent || '') : '';
+      const parts = raw.split('—');
+      const meaning = parts.length > 1 ? parts.slice(1).join('—').trim() : '';
+      if (!legalSelect.value || meaning === '') {
+        legalMeaning.hidden = true;
+        legalMeaning.textContent = '';
+        return;
+      }
+      legalMeaning.textContent = meaning;
+      legalMeaning.hidden = false;
     };
 
     const sync = () => {
@@ -2370,8 +2386,12 @@ function initSetupNamePairPreview(scope = document) {
 
     nameInput.addEventListener('input', sync);
     nameInput.addEventListener('change', sync);
-    legalSelect.addEventListener('change', sync);
+    legalSelect.addEventListener('change', () => {
+      sync();
+      syncLegalMeaning();
+    });
     sync();
+    syncLegalMeaning();
   });
 }
 
@@ -2449,7 +2469,9 @@ function nameContainsLegal(name, legal) {
 }
 
 function normalizeWebsiteInput(value) {
-  let raw = String(value || '').trim().replace(/\s+/g, '').replace(/[.,;]+$/, '');
+  let raw = String(value || '').trim();
+  if (/\s/.test(raw)) return '';
+  raw = raw.replace(/\s+/g, '').replace(/[.,;]+$/, '');
   if (!raw) return '';
   raw = raw.replace(/^(?:URL|Sito|Website)\s*[:=]\s*/i, '');
   if (!/^https?:\/\//i.test(raw)) {
@@ -2459,12 +2481,30 @@ function normalizeWebsiteInput(value) {
   try {
     const u = new URL(raw);
     if (!u.hostname || !u.hostname.includes('.')) return '';
+    const host = u.hostname.replace(/^www\./i, '').toLowerCase();
+    if (host.length > 253) return '';
     let out = `${u.protocol}//${u.hostname.toLowerCase()}`;
     if (u.pathname && u.pathname !== '/') out += u.pathname;
     if (u.search) out += u.search;
     return out;
   } catch (_) {
     return '';
+  }
+}
+
+function isWebsiteScrapeAllowed(value) {
+  const raw = String(value || '').trim();
+  if (raw === '' || /\s/.test(raw)) return false;
+  const normalized = normalizeWebsiteInput(raw);
+  if (!normalized) return false;
+  try {
+    const host = new URL(normalized).hostname.replace(/^www\./i, '');
+    if (host.length > 80) return false;
+    const label = host.split('.')[0] || '';
+    if (label.length > 63) return false;
+    return true;
+  } catch {
+    return false;
   }
 }
 
@@ -2909,6 +2949,8 @@ function initSetupRuntsLookup(root) {
   const pair = root.querySelector('[data-setup-name-pair]') || input.closest('[data-setup-name-pair]');
   const nameInput = pair?.querySelector('[data-setup-assoc-name]');
   const legalSelect = pair?.querySelector('[data-setup-legal-name]');
+  const currencySelect = pair?.querySelector('select[name="currency"]');
+  const hintEl = box.querySelector('[data-setup-runts-hint]');
   const form = root.querySelector('[data-setup-form]');
   const backLink = form?.querySelector('.setup-back');
   const nextBtn = form?.querySelector('.setup-cta');
@@ -2922,11 +2964,13 @@ function initSetupRuntsLookup(root) {
     btn.hidden = true;
     btn.disabled = true;
     btn.setAttribute('aria-hidden', 'true');
+    if (hintEl) hintEl.hidden = false;
   };
   const showBtn = () => {
     btn.hidden = false;
     btn.removeAttribute('aria-hidden');
     btn.disabled = lookingUp || digits() === '';
+    if (hintEl) hintEl.hidden = true;
   };
 
   const syncLabel = () => {
@@ -3024,6 +3068,7 @@ function initSetupRuntsLookup(root) {
       nameInput.disabled = lookingUp;
     }
     if (legalSelect) legalSelect.disabled = lookingUp;
+    if (currencySelect) currencySelect.disabled = lookingUp;
     btn.disabled = true;
     if (lookingUp) {
       btn.setAttribute('aria-busy', 'true');
@@ -3166,12 +3211,16 @@ function initSetupRuntsLookup(root) {
 
       if (donePayload?.ok) {
         applyFields(donePayload.fields || {});
-        setProgress(100);
+        box.classList.add('is-found');
+        if (progress) progress.hidden = true;
+        if (elapsedEl) elapsedEl.hidden = true;
+        const spinner = live?.querySelector('.setup-scrape-spinner');
+        if (spinner instanceof HTMLElement) spinner.hidden = true;
         const warning = String(donePayload.warning || '').trim();
         if (warning) {
           showStatus(warning, donePayload.cancelled ? 'warn' : '');
         } else {
-          showStatus(foundLabel(donePayload.fields || {}), '', foundHtml(donePayload.fields || {}));
+          showStatus('', '', foundHtml(donePayload.fields || {}));
         }
       } else {
         showStatus(streamError || donePayload?.error || box.dataset.msgFail || '', 'error');
@@ -3185,7 +3234,9 @@ function initSetupRuntsLookup(root) {
     } finally {
       clearInterval(tick);
       clearTimeout(timer);
-      setElapsed(Math.max(1, Math.floor((Date.now() - startedAt) / 1000)));
+      if (!box.classList.contains('is-found')) {
+        setElapsed(Math.max(1, Math.floor((Date.now() - startedAt) / 1000)));
+      }
       if (progress && status?.classList.contains('is-error')) {
         progress.hidden = true;
       }
@@ -3233,7 +3284,7 @@ function initSetupWebsiteScrape(root) {
     btn.removeAttribute('aria-hidden');
   };
 
-  const hasValidWebsite = () => !!normalizeWebsiteInput(input.value);
+  const hasValidWebsite = () => isWebsiteScrapeAllowed(input.value);
 
   const setScrapeNavLocked = (locked) => {
     root.classList.toggle('is-scrape-busy', locked);
@@ -3408,6 +3459,9 @@ function initSetupWebsiteScrape(root) {
   const applyReplacedLogo = (data) => {
     const url = data.logo_url ? `${data.logo_url}?v=${Date.now()}` : '';
     if (url) showLogoPreview(url);
+    if (data.primary || data.accent) {
+      applyBrandColors(data.primary, data.accent);
+    }
   };
 
   const showLogoReplaceError = (message) => {
@@ -3577,11 +3631,24 @@ function initSetupWebsiteScrape(root) {
     const group = box.querySelector('[data-scrape-group="seat"]');
     const list = box.querySelector('[data-scrape-group-list="seat"]');
     if (!group || !list) return;
+    const addr = String(seatParts.address || '').trim();
+    const city = String(seatParts.city || '').trim();
+    const cap = String(seatParts.postal_code || '').trim();
+    if (addr && /^\d{5}$/.test(addr)) {
+      seatParts.address = '';
+    }
+    if (cap && !/^\d{5}$/.test(cap)) {
+      seatParts.postal_code = '';
+    }
+    const validAddr = String(seatParts.address || '').trim();
+    if (validAddr.length > 0 && validAddr.length < 4) {
+      seatParts.address = '';
+    }
     const line = [
       [seatParts.address, seatParts.house_number].filter(Boolean).join(' '),
       [seatParts.postal_code, seatParts.city].filter(Boolean).join(' '),
     ].filter(Boolean).join(', ');
-    if (!line) {
+    if (!line || (!validAddr && !city)) {
       group.hidden = true;
       list.innerHTML = '';
       return;
@@ -3690,17 +3757,13 @@ function initSetupWebsiteScrape(root) {
       return false;
     }
     clearScrapeRetry();
-    const summary = (box.dataset.msgOk || '')
-      .replaceAll(':count', String(Math.max(1, count)))
-      .replaceAll(':sec', String(sec))
-      .replaceAll(':ms', String(data.elapsed_ms || ''));
-    setPhase(summary);
+    if (live) live.hidden = true;
     if (resultsTitle) {
       resultsTitle.textContent = box.dataset.msgFoundTitle || '';
     }
     if (resultsStatus) {
-      resultsStatus.hidden = false;
-      resultsStatus.textContent = summary;
+      resultsStatus.hidden = true;
+      resultsStatus.textContent = '';
     }
     if (results) results.hidden = false;
     return true;

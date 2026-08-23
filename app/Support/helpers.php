@@ -258,6 +258,14 @@ if (!function_exists('is_user_upload_relative_path')) {
     }
 }
 
+if (!function_exists('locale_flag_url')) {
+    function locale_flag_url(string $locale): string
+    {
+        $code = strtolower(substr(preg_replace('/[^a-z]/i', '', $locale) ?: 'it', 0, 2));
+        return 'https://flagcdn.com/w20/' . rawurlencode($code) . '.png';
+    }
+}
+
 if (!function_exists('validate_adult_birth_date')) {
     /** @return string|null Validation message key or null if valid/empty */
     function validate_adult_birth_date(?string $date): ?string
