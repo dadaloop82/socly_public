@@ -1,5 +1,7 @@
 <?php
 /** @var string $content */
+/** @var bool $showNewsWidget */
+/** @var string $newsApiUrl */
 $branding = app()->branding();
 $assocName = trim((string) ($branding['name'] ?? ''));
 $hasAssoc = $assocName !== '' && strcasecmp($assocName, 'SOCLY') !== 0;
@@ -67,8 +69,21 @@ $year = date('Y');
                 <p class="auth-motto" data-i18n-html="auth.motto"><?= with_auth_asterisk(e(__('auth.motto'))) ?></p>
                 <p class="auth-desc" data-i18n-html="auth.product_description"><?= with_auth_asterisk(with_socly_word(__('auth.product_description'))) ?></p>
             </div>
+            <?php if (!empty($showNewsWidget)): ?>
+            <div
+                class="auth-news-slot"
+                data-auth-news
+                data-news-api="<?= e((string) ($newsApiUrl ?? socly_news_api_url())) ?>"
+                hidden
+            ></div>
+            <?php endif; ?>
             <div class="auth-brand-meta">
                 <p class="auth-license-note" data-i18n-html="auth.license_note"><?= with_auth_asterisk(e(__('auth.license_note'))) ?></p>
+                <p class="auth-updates-line">
+                    <button type="button" class="auth-check-updates" data-auth-check-updates data-updates-endpoint="<?= e(url('/api/updates/check')) ?>">
+                        <span data-i18n="auth.check_updates"><?= e(__('auth.check_updates')) ?></span>
+                    </button>
+                </p>
             </div>
         </aside>
         <section class="auth-panel">
@@ -83,6 +98,26 @@ $year = date('Y');
             </div>
         </section>
     </div>
+    <dialog class="setup-exit-dialog auth-updates-dialog" data-auth-updates-dialog
+        data-i18n-checking="<?= e(__('auth.updates_checking')) ?>"
+        data-i18n-none-title="<?= e(__('auth.updates_none_title')) ?>"
+        data-i18n-none-text="<?= e(__('auth.updates_none_text')) ?>"
+        data-i18n-error-title="<?= e(__('auth.updates_error_title')) ?>"
+        data-i18n-error-text="<?= e(__('auth.updates_error_text')) ?>"
+        data-i18n-available-title="<?= e(__('updates.available_title')) ?>"
+        data-i18n-available-text="<?= e(__('updates.available_text')) ?>"
+        data-i18n-manual-hint="<?= e(__('updates.manual_hint')) ?>"
+        data-i18n-notes="<?= e(__('updates.notes')) ?>"
+        data-i18n-download="<?= e(__('updates.download')) ?>"
+        data-i18n-guide="<?= e(__('updates.guide')) ?>"
+    >
+        <h2 class="setup-exit-title" data-auth-updates-title></h2>
+        <p class="setup-exit-text" data-auth-updates-text></p>
+        <div class="setup-exit-actions auth-updates-actions" data-auth-updates-actions hidden></div>
+        <div class="setup-exit-actions">
+            <button type="button" class="btn" data-auth-updates-close data-i18n="common.cancel"><?= e(__('common.cancel')) ?></button>
+        </div>
+    </dialog>
     <footer class="auth-footer">
         <div class="auth-footer-brand">
             <?= socly_word_html('socly-word-footer') ?>

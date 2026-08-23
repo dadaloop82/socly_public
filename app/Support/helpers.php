@@ -180,6 +180,111 @@ if (!function_exists('storage_path')) {
     }
 }
 
+if (!function_exists('user_upload_period')) {
+    /**
+     * Year/month folder for user uploads (reference date or today).
+     *
+     * @return array{year:string,month:string}
+     */
+    function user_upload_period(?string $referenceDate = null): array
+    {
+        $ts = time();
+        if ($referenceDate !== null && trim($referenceDate) !== '') {
+            $parsed = strtotime(trim($referenceDate));
+            if ($parsed !== false) {
+                $ts = $parsed;
+            }
+        }
+        return [
+            'year' => date('Y', $ts),
+            'month' => date('m', $ts),
+        ];
+    }
+}
+
+if (!function_exists('user_upload_paths')) {
+    /**
+     * Build storage paths under uploads/users/YYYY/MM/{category}/.
+     *
+     * @return array{dir:string,relative_dir:string,relative:string,absolute:string}
+     */
+    function user_upload_paths(string $category, ?string $referenceDate = null, string $filename = ''): array
+    {
+        $category = trim($category, '/');
+        $period = user_upload_period($referenceDate);
+        $relativeDir = 'users/' . $period['year'] . '/' . $period['month'] . '/' . $category;
+        $dir = storage_path('uploads/' . $relativeDir);
+        ensure_directory($dir);
+        $filename = ltrim($filename, '/');
+        $relative = $filename !== '' ? $relativeDir . '/' . $filename : $relativeDir;
+        $absolute = $filename !== '' ? $dir . '/' . $filename : $dir;
+        return [
+            'dir' => $dir,
+            'relative_dir' => $relativeDir,
+            'relative' => $relative,
+            'absolute' => $absolute,
+        ];
+    }
+}
+
+if (!function_exists('user_upload_relative_path')) {
+    /** Relative path stored in DB (under storage/uploads/, without uploads/ prefix). */
+    function user_upload_relative_path(string $category, ?string $referenceDate, string $filename): string
+    {
+        return user_upload_paths($category, $referenceDate, $filename)['relative'];
+    }
+}
+
+if (!function_exists('is_user_upload_relative_path')) {
+    function is_user_upload_relative_path(string $relative): bool
+    {
+        $relative = ltrim($relative, '/');
+        if (str_starts_with($relative, 'uploads/')) {
+            $relative = substr($relative, strlen('uploads/'));
+        }
+        if (str_contains($relative, '..') || str_contains($relative, '\\')) {
+            return false;
+        }
+        if (str_starts_with($relative, 'users/')) {
+            return (bool) preg_match('#^users/\d{4}/\d{2}/[a-zA-Z0-9._/-]+$#', $relative);
+        }
+        if (str_starts_with($relative, 'members/') || str_starts_with($relative, 'enrollment/') || str_starts_with($relative, 'branding/')) {
+            return (bool) preg_match('#^(members|enrollment|branding)/[a-zA-Z0-9._/-]+$#', $relative);
+        }
+        if (str_starts_with($relative, 'documents/')) {
+            return (bool) preg_match('#^documents/[a-zA-Z0-9._-]+$#', $relative);
+        }
+        return false;
+    }
+}
+
+if (!function_exists('socly_news_api_url')) {
+    function socly_news_api_url(): string
+    {
+        $url = trim((string) ($_ENV['SOCLY_NEWS_API_URL'] ?? 'https://www.socly.it/api/news.php'));
+        return $url !== '' ? $url : 'https://www.socly.it/api/news.php';
+    }
+}
+
+if (!function_exists('resolve_upload_absolute_path')) {
+    /** Resolve a stored relative upload path to an absolute filesystem path. */
+    function resolve_upload_absolute_path(string $relative): ?string
+    {
+        $relative = ltrim($relative, '/');
+        if ($relative === '' || str_contains($relative, '..')) {
+            return null;
+        }
+        if (str_starts_with($relative, 'uploads/')) {
+            $full = storage_path($relative);
+        } elseif (str_starts_with($relative, 'documents/')) {
+            $full = storage_path($relative);
+        } else {
+            $full = storage_path('uploads/' . $relative);
+        }
+        return is_file($full) ? $full : null;
+    }
+}
+
 if (!function_exists('is_temporary_instance')) {
     function is_temporary_instance(): bool
     {

@@ -39,4 +39,33 @@ final class UpdateController extends BaseController
         $this->flash('errors', [$result['message']]);
         redirect('/dashboard');
     }
+
+    public function check(Request $request): void
+    {
+        $force = (string) $request->input('force', '') === '1';
+        try {
+            $info = $this->updates->check($force);
+            $this->json([
+                'ok' => true,
+                'available' => !empty($info['available']),
+                'current' => (string) ($info['current'] ?? app_version()),
+                'remote' => (string) ($info['remote'] ?? ''),
+                'install_available' => !empty($info['install_available']),
+                'notes_url' => (string) ($info['notes_url'] ?? ''),
+                'download_url' => (string) ($info['download_url'] ?? ''),
+                'install_guide_url' => (string) ($info['install_guide_url'] ?? ''),
+                'error' => (string) ($info['error'] ?? ''),
+            ]);
+        } catch (\Throwable $e) {
+            $this->json(['ok' => false, 'error' => $e->getMessage()], 500);
+        }
+    }
+
+    /** @param array<string, mixed> $payload */
+    private function json(array $payload, int $status = 200): void
+    {
+        http_response_code($status);
+        header('Content-Type: application/json; charset=utf-8');
+        echo json_encode($payload, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+    }
 }

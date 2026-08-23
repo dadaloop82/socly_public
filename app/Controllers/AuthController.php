@@ -32,9 +32,22 @@ final class AuthController extends BaseController
         if ($request->input('expired') !== null && empty($_SESSION['_flash']['errors'])) {
             $this->flash('errors', ['session' => __('auth.session_expired')]);
         }
+        $needsSetup = $this->setup->allowsAnonymousSetup();
         $this->render('auth/login', [
             'title' => __('auth.welcome_title'),
-            'needsSetup' => $this->setup->allowsAnonymousSetup(),
+            'needsSetup' => $needsSetup,
+            'setupRequiredTitle' => $needsSetup
+                ? ($this->setup->isIncrementalSetup()
+                    ? __('auth.setup_required_title_incremental')
+                    : __('auth.setup_required_title_first'))
+                : '',
+            'setupRequiredI18nKey' => $needsSetup
+                ? ($this->setup->isIncrementalSetup()
+                    ? 'auth.setup_required_title_incremental'
+                    : 'auth.setup_required_title_first')
+                : '',
+            'showNewsWidget' => !$needsSetup && ((string) app(SettingsService::class)->get('platform.news_opt_in', '1')) !== '0',
+            'newsApiUrl' => socly_news_api_url(),
             'demoLoginNotice' => $this->demoLoginNotice(),
         ], 'layouts/guest');
     }

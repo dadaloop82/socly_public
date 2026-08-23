@@ -28,8 +28,7 @@ final class BrandingService
         if ($relative === '') {
             return null;
         }
-        $absolute = storage_path('uploads/' . ltrim($relative, '/'));
-        return is_file($absolute) ? $absolute : null;
+        return resolve_upload_absolute_path($relative);
     }
 
     public function logoUrl(): ?string
@@ -350,16 +349,12 @@ final class BrandingService
             }
         }
 
-        $dir = storage_path('uploads/branding');
-        if (!ensure_directory($dir)) {
-            return ['ok' => false, 'error' => __('validation.photo')];
-        }
-
-        $relative = 'branding/logo.' . $ext;
-        $absolute = storage_path('uploads/' . $relative);
+        $paths = user_upload_paths('branding', null, 'logo.' . $ext);
+        $relative = $paths['relative'];
+        $absolute = $paths['absolute'];
         if ($replace && $this->logoRelativePath() !== '' && $this->logoRelativePath() !== $relative) {
-            $old = storage_path('uploads/' . $this->logoRelativePath());
-            if (is_file($old)) {
+            $old = resolve_upload_absolute_path($this->logoRelativePath());
+            if ($old !== null) {
                 @unlink($old);
             }
         }

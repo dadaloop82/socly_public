@@ -1598,13 +1598,11 @@ td .muted { font-size: 0.88rem; margin-top: 0.15rem; }
   margin: 0 0 1.75rem;
   object-fit: contain;
   object-position: left center;
-  animation: rise 0.6s ease both;
   filter: drop-shadow(0 12px 28px rgba(0,0,0,0.28));
 }
 .auth-logo {
   width: 72px; height: 72px; border-radius: 18px; margin-bottom: 1.75rem;
   box-shadow: 0 16px 40px rgba(0,0,0,0.28); background: #fff; object-fit: contain; padding: 8px;
-  animation: rise 0.6s ease both;
 }
 .auth-product {
   font-family: var(--font-display);
@@ -1614,7 +1612,6 @@ td .muted { font-size: 0.88rem; margin-top: 0.15rem; }
   margin: 0 0 1rem;
   display: grid;
   gap: 0.4rem;
-  animation: rise 0.65s ease both;
 }
 .auth-product .socly {
   color: var(--brand-socly);
@@ -1651,12 +1648,92 @@ td .muted { font-size: 0.88rem; margin-top: 0.15rem; }
   font-family: var(--font-display);
   font-size: clamp(1.15rem, 2vw, 1.45rem);
   font-weight: 560; margin: 0 0 0.85rem; color: #E7F7F3;
-  animation: rise 0.7s ease both;
 }
 .auth-desc {
   margin: 0; color: color-mix(in srgb, var(--brand-paper) 78%, transparent);
   line-height: 1.55; font-size: 1.02rem; max-width: 32rem;
-  animation: rise 0.75s ease both;
+}
+.auth-news-slot {
+  position: relative;
+  z-index: 1;
+  flex: 1 1 auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 0;
+  margin: clamp(1rem, 3vh, 2rem) 0;
+  width: 100%;
+  max-width: 34rem;
+}
+.auth-news-card {
+  width: 100%;
+  border-radius: 16px;
+  overflow: hidden;
+  background: color-mix(in srgb, #000 24%, transparent);
+  border: 1px solid color-mix(in srgb, var(--brand-paper) 16%, transparent);
+  box-shadow: 0 18px 40px color-mix(in srgb, #000 22%, transparent);
+}
+.auth-news-hero {
+  min-height: 118px;
+  background-size: cover;
+  background-position: center;
+  background-color: color-mix(in srgb, var(--brand-primary-deep) 55%, #000);
+}
+.auth-news-body {
+  padding: 0.85rem 1rem 1rem;
+}
+.auth-news-date {
+  font-size: 0.72rem;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  opacity: 0.72;
+  margin-bottom: 0.25rem;
+}
+.auth-news-title {
+  margin: 0 0 0.35rem;
+  font-family: var(--font-display);
+  font-size: 1.02rem;
+  line-height: 1.25;
+  color: var(--brand-paper);
+}
+.auth-news-excerpt {
+  margin: 0;
+  font-size: 0.86rem;
+  line-height: 1.45;
+  color: color-mix(in srgb, var(--brand-paper) 82%, transparent);
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.auth-news-link {
+  display: inline-block;
+  margin-top: 0.55rem;
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: var(--brand-accent-on-dark);
+  text-decoration: none;
+}
+.auth-news-link:hover { text-decoration: underline; }
+.auth-updates-line { margin: 0; }
+.auth-check-updates {
+  background: none;
+  border: none;
+  padding: 0;
+  color: color-mix(in srgb, var(--brand-paper) 78%, transparent);
+  font: inherit;
+  font-size: 0.78rem;
+  text-decoration: underline;
+  text-underline-offset: 0.15em;
+  cursor: pointer;
+}
+.auth-check-updates:hover { color: var(--brand-paper); }
+.auth-check-updates:disabled { opacity: 0.55; cursor: wait; }
+.auth-updates-dialog .auth-updates-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-bottom: 0.75rem;
 }
 .auth-asterisk {
   opacity: 0.42;
@@ -1687,7 +1764,6 @@ td .muted { font-size: 0.88rem; margin-top: 0.15rem; }
   border-radius: 24px;
   box-shadow: var(--shadow);
   padding: clamp(1.5rem, 3vw, 2.25rem);
-  animation: rise 0.5s ease both;
 }
 .auth-card h1 { margin-bottom: 0.45rem; }
 .auth-card .lede { color: var(--muted); margin: 0 0 1.4rem; line-height: 1.5; }

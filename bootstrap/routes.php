@@ -75,6 +75,7 @@ $router->post('/setup/logo', [SetupController::class, 'uploadLogo'], null, ['mw.
 $router->post('/setup', [SetupController::class, 'save'], null, ['mw.locale', 'mw.install', 'mw.setup_open', 'mw.csrf']);
 
 $router->post('/updates/install', [UpdateController::class, 'install'], 'settings.manage', ['mw.locale', 'mw.install', 'mw.auth', 'mw.csrf']);
+$router->get('/api/updates/check', [UpdateController::class, 'check'], null, ['mw.locale', 'mw.install']);
 
 $router->get('/dashboard', [DashboardController::class, 'index'], 'dashboard.view', ['mw.locale', 'mw.install', 'mw.auth']);
 

@@ -425,8 +425,8 @@ final class DocumentService
         $uploadedMime = trim((string) ($input['uploaded_mime'] ?? ''));
 
         if ($uploadedPath !== '' && $this->isSafeStoredPath($uploadedPath)) {
-            $full = storage_path($uploadedPath);
-            if (!is_file($full)) {
+            $full = resolve_upload_absolute_path($uploadedPath);
+            if ($full === null) {
                 return ['ok' => false, 'path' => null, 'mime' => null, 'error' => __('documents.upload_missing')];
             }
             return [
@@ -437,7 +437,8 @@ final class DocumentService
         }
 
         if ($file && ($file['error'] ?? UPLOAD_ERR_NO_FILE) === UPLOAD_ERR_OK) {
-            $stored = $this->storeFile($file);
+            $refDate = trim((string) ($input['document_date'] ?? ''));
+            $stored = $this->storeFile($file, $refDate !== '' ? $refDate : null);
             if (!$stored['ok']) {
                 return [
                     'ok' => false,
@@ -456,7 +457,7 @@ final class DocumentService
         if ($existing !== null) {
             $keepPath = trim((string) ($existing['file_path'] ?? ''));
             $keepMime = trim((string) ($existing['file_mime'] ?? ''));
-            if ($keepPath !== '' && $this->isSafeStoredPath($keepPath) && is_file(storage_path($keepPath))) {
+            if ($keepPath !== '' && $this->isSafeStoredPath($keepPath) && resolve_upload_absolute_path($keepPath) !== null) {
                 return [
                     'ok' => true,
                     'path' => $keepPath,
@@ -470,7 +471,7 @@ final class DocumentService
     }
 
     /** @param array{name?:string,type?:string,tmp_name?:string,error?:int,size?:int} $file */
-    private function storeFile(array $file): array
+    private function storeFile(array $file, ?string $referenceDate = null): array
     {
         $err = (int) ($file['error'] ?? UPLOAD_ERR_NO_FILE);
         $maxBytes = $this->uploadMaxBytes();
@@ -510,17 +511,13 @@ final class DocumentService
             'image/webp' => 'webp',
             default => 'bin',
         };
-        $dir = storage_path('documents');
-        if (!ensure_directory($dir)) {
-            return ['ok' => false, 'error' => __('documents.upload_storage')];
-        }
         $name = bin2hex(random_bytes(8)) . '.' . $ext;
-        $dest = $dir . '/' . $name;
-        if (!move_uploaded_file($tmp, $dest)) {
+        $paths = user_upload_paths('documents', $referenceDate, $name);
+        if (!move_uploaded_file($tmp, $paths['absolute'])) {
             return ['ok' => false, 'error' => __('documents.upload_storage')];
         }
-        @chmod($dest, 0664);
-        return ['ok' => true, 'path' => 'documents/' . $name, 'mime' => $mime];
+        @chmod($paths['absolute'], 0664);
+        return ['ok' => true, 'path' => $paths['relative'], 'mime' => $mime];
     }
 
     /**
@@ -658,13 +655,7 @@ final class DocumentService
 
     private function isSafeStoredPath(string $relative): bool
     {
-        if (!str_starts_with($relative, 'documents/')) {
-            return false;
-        }
-        if (str_contains($relative, '..') || str_contains($relative, '\\')) {
-            return false;
-        }
-        return (bool) preg_match('#^documents/[a-zA-Z0-9._-]+$#', $relative);
+        return is_user_upload_relative_path($relative);
     }
 
     public function filePath(int $id): ?string
@@ -674,7 +665,6 @@ final class DocumentService
         if ($rel === '' || !$this->isSafeStoredPath($rel)) {
             return null;
         }
-        $full = storage_path($rel);
-        return is_file($full) ? $full : null;
+        return resolve_upload_absolute_path($rel);
     }
 }

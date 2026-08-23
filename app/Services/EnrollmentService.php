@@ -204,11 +204,10 @@ final class EnrollmentService
     public function absoluteArtifactPath(?string $relative): ?string
     {
         $relative = trim((string) $relative);
-        if ($relative === '' || str_contains($relative, '..')) {
+        if ($relative === '') {
             return null;
         }
-        $absolute = storage_path('uploads/' . ltrim($relative, '/'));
-        return is_file($absolute) ? $absolute : null;
+        return resolve_upload_absolute_path($relative);
     }
 
     /**
@@ -216,19 +215,14 @@ final class EnrollmentService
      */
     private function storeUpload(int $memberId, array $file, string $prefix): array
     {
-        $dir = storage_path('uploads/enrollment/' . $memberId);
-        if (!is_dir($dir)) {
-            mkdir($dir, 0775, true);
-        }
         $ext = strtolower(pathinfo((string) $file['name'], PATHINFO_EXTENSION) ?: 'bin');
         $ext = preg_replace('/[^a-z0-9]/', '', $ext) ?: 'bin';
         $name = $prefix . '_' . bin2hex(random_bytes(8)) . '.' . $ext;
-        $absolute = $dir . '/' . $name;
-        if (!move_uploaded_file((string) $file['tmp_name'], $absolute)) {
+        $paths = user_upload_paths('enrollment/' . $memberId, null, $name);
+        if (!move_uploaded_file((string) $file['tmp_name'], $paths['absolute'])) {
             return [];
         }
-        $relative = 'enrollment/' . $memberId . '/' . $name;
-        return ['path' => $relative, 'hash' => hash_file('sha256', $absolute) ?: null];
+        return ['path' => $paths['relative'], 'hash' => hash_file('sha256', $paths['absolute']) ?: null];
     }
 
     /** @return array{path?:string,hash?:string} */
@@ -241,17 +235,12 @@ final class EnrollmentService
         if ($bin === false || $bin === '') {
             return [];
         }
-        $dir = storage_path('uploads/enrollment/' . $memberId);
-        if (!is_dir($dir)) {
-            mkdir($dir, 0775, true);
-        }
         $ext = $m[1] === 'jpeg' ? 'jpg' : 'png';
         $name = $prefix . '_' . bin2hex(random_bytes(8)) . '.' . $ext;
-        $absolute = $dir . '/' . $name;
-        if (file_put_contents($absolute, $bin) === false) {
+        $paths = user_upload_paths('enrollment/' . $memberId, null, $name);
+        if (file_put_contents($paths['absolute'], $bin) === false) {
             return [];
         }
-        $relative = 'enrollment/' . $memberId . '/' . $name;
-        return ['path' => $relative, 'hash' => hash('sha256', $bin)];
+        return ['path' => $paths['relative'], 'hash' => hash('sha256', $bin)];
     }
 }

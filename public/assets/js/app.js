@@ -96,6 +96,15 @@ function initConfirmForms(scope = document) {
   });
 }
 
+function escapeHtml(value) {
+  return String(value)
+    .replaceAll('&', '&amp;')
+    .replaceAll('<', '&lt;')
+    .replaceAll('>', '&gt;')
+    .replaceAll('"', '&quot;')
+    .replaceAll("'", '&#39;');
+}
+
 document.addEventListener('DOMContentLoaded', () => {
   const payment = document.querySelector('[name="payment_status"]');
   const partial = document.querySelector('[data-partial-wrap]');
@@ -134,6 +143,8 @@ document.addEventListener('DOMContentLoaded', () => {
   initFieldsSortable(document);
   initComponentCards(document);
   initDemoLoginNotice();
+  initAuthNewsWidget();
+  initAuthUpdateCheck();
   initDocumentUpload(document);
   initDocumentRowLinks(document);
   document.querySelectorAll('[data-org-person-form]').forEach((form) => {
@@ -168,6 +179,7 @@ function initPageEnter() {
 
   const roots = [
     ...document.querySelectorAll('.main'),
+    ...document.querySelectorAll('.auth-shell'),
     ...document.querySelectorAll('.auth-layout, .auth-wrap, .install-wrap, .setup-layout, .setup-shell'),
   ];
   if (!roots.length) return;
@@ -237,11 +249,20 @@ function enterScope(scope, opts = {}) {
     '.setup-fields-step',
     '.setup-membership-card',
     '.auth-mark',
+    '.auth-assoc-logo',
     '.auth-logo',
     '.auth-product',
+    '.auth-motto',
+    '.auth-desc',
+    '.auth-news-slot',
+    '.auth-brand-meta',
     '.auth-lede',
+    '.auth-panel',
     '.auth-card',
+    '.auth-footer',
+    '.auth-lang',
     '.auth-form > *',
+    '.auth-card > *',
   ].join(',');
 
   const seen = new Set();
@@ -4577,6 +4598,134 @@ function initDemoLoginNotice() {
   window.setTimeout(() => {
     appConfirm(message, { alert: true, confirmLabel: okLabel });
   }, 120);
+}
+
+function formatNewsDate(iso) {
+  if (!iso) return '';
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return iso;
+  try {
+    return d.toLocaleDateString(document.documentElement.lang || 'it-IT', {
+      day: '2-digit',
+      month: 'short',
+      year: 'numeric',
+    });
+  } catch {
+    return iso;
+  }
+}
+
+function initAuthNewsWidget() {
+  const slot = document.querySelector('[data-auth-news]');
+  if (!(slot instanceof HTMLElement)) return;
+  const api = slot.dataset.newsApi || '';
+  if (!api) return;
+
+  fetch(api + (api.includes('?') ? '&' : '?') + 'limit=1', { credentials: 'omit' })
+    .then((res) => (res.ok ? res.json() : null))
+    .then((data) => {
+      const item = data?.items?.[0];
+      if (!item || !item.title) return;
+      const heroStyle = item.image ? `background-image:url('${String(item.image).replace(/'/g, "\\'")}')` : '';
+      const excerpt = item.excerpt || item.body || '';
+      const url = item.url || '#';
+      slot.innerHTML = `
+        <article class="auth-news-card will-enter">
+          ${heroStyle ? `<div class="auth-news-hero" style="${heroStyle}"></div>` : ''}
+          <div class="auth-news-body">
+            ${item.published_at ? `<div class="auth-news-date">${formatNewsDate(item.published_at)}</div>` : ''}
+            <h2 class="auth-news-title">${escapeHtml(String(item.title))}</h2>
+            ${excerpt ? `<p class="auth-news-excerpt">${escapeHtml(String(excerpt))}</p>` : ''}
+            <a class="auth-news-link" href="${escapeHtml(String(url))}" target="_blank" rel="noopener noreferrer">Leggi tutta →</a>
+          </div>
+        </article>`;
+      slot.hidden = false;
+      enterScope(slot, { reset: true });
+    })
+    .catch(() => {});
+}
+
+function initAuthUpdateCheck() {
+  const btn = document.querySelector('[data-auth-check-updates]');
+  const dialog = document.querySelector('[data-auth-updates-dialog]');
+  if (!(btn instanceof HTMLButtonElement) || !(dialog instanceof HTMLDialogElement)) return;
+
+  const titleEl = dialog.querySelector('[data-auth-updates-title]');
+  const textEl = dialog.querySelector('[data-auth-updates-text]');
+  const actionsEl = dialog.querySelector('[data-auth-updates-actions]');
+  const closeBtn = dialog.querySelector('[data-auth-updates-close]');
+
+  const tpl = (key, fallback = '') => dialog.dataset[key] || fallback;
+
+  const openDialog = () => {
+    if (typeof dialog.showModal === 'function') dialog.showModal();
+  };
+
+  const closeDialog = () => {
+    if (dialog.open) dialog.close();
+  };
+
+  closeBtn?.addEventListener('click', closeDialog);
+  dialog.addEventListener('cancel', (e) => {
+    e.preventDefault();
+    closeDialog();
+  });
+
+  btn.addEventListener('click', async () => {
+    const endpoint = btn.dataset.updatesEndpoint || '/api/updates/check';
+    if (titleEl) titleEl.textContent = tpl('i18nChecking', 'Verifica in corso…');
+    if (textEl) textEl.textContent = '';
+    if (actionsEl) {
+      actionsEl.innerHTML = '';
+      actionsEl.hidden = true;
+    }
+    openDialog();
+    btn.disabled = true;
+
+    try {
+      const res = await fetch(endpoint + '?force=1', { credentials: 'same-origin' });
+      const data = await res.json();
+      if (!data?.ok) throw new Error(data?.error || 'check failed');
+
+      if (data.available) {
+        if (titleEl) titleEl.textContent = tpl('i18nAvailableTitle', 'Aggiornamento disponibile');
+        const textTemplate = tpl('i18nAvailableText', 'Versione attuale v:current · nuova v:remote');
+        if (textEl) {
+          textEl.textContent = textTemplate
+            .replace(':current', data.current || '')
+            .replace(':remote', data.remote || '');
+        }
+        if (actionsEl) {
+          actionsEl.hidden = false;
+          const links = [];
+          if (data.notes_url) {
+            links.push(`<a class="btn btn-sm btn-ghost" href="${escapeHtml(data.notes_url)}" target="_blank" rel="noopener noreferrer">${escapeHtml(tpl('i18nNotes', 'Novità'))}</a>`);
+          }
+          if (data.download_url) {
+            links.push(`<a class="btn btn-sm btn-ghost" href="${escapeHtml(data.download_url)}" target="_blank" rel="noopener noreferrer">${escapeHtml(tpl('i18nDownload', 'Scarica'))}</a>`);
+          }
+          if (data.install_guide_url) {
+            links.push(`<a class="btn btn-sm btn-ghost" href="${escapeHtml(data.install_guide_url)}" target="_blank" rel="noopener noreferrer">${escapeHtml(tpl('i18nGuide', 'Come aggiornare'))}</a>`);
+          }
+          if (!data.install_available && links.length === 0) {
+            if (textEl) {
+              textEl.textContent += '\n\n' + tpl('i18nManualHint', '');
+            }
+          }
+          actionsEl.innerHTML = links.join('');
+        }
+      } else {
+        if (titleEl) titleEl.textContent = tpl('i18nNoneTitle', 'Nessun aggiornamento');
+        const noneText = tpl('i18nNoneText', 'Stai usando l’ultima versione (v:version).').replace(':version', data.current || '');
+        if (textEl) textEl.textContent = noneText;
+      }
+    } catch {
+      if (titleEl) titleEl.textContent = tpl('i18nErrorTitle', 'Verifica non riuscita');
+      if (textEl) textEl.textContent = tpl('i18nErrorText', 'Riprova tra poco.');
+    } finally {
+      btn.disabled = false;
+    }
+  });
 }
 
 function initTreasuryCategory(root = document) {

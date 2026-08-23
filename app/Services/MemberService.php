@@ -1129,13 +1129,9 @@ final class MemberService
             return ['ok' => false, 'error' => __('validation.photo')];
         }
 
-        $dir = storage_path('uploads/members/' . $memberId);
-        if (!ensure_directory($dir)) {
-            return ['ok' => false, 'error' => __('validation.photo')];
-        }
-
-        $relative = 'members/' . $memberId . '/photo.' . $ext;
-        $absolute = storage_path('uploads/' . $relative);
+        $paths = user_upload_paths('members/' . $memberId, null, 'photo.' . $ext);
+        $relative = $paths['relative'];
+        $absolute = $paths['absolute'];
         if (!move_uploaded_file($file['tmp_name'], $absolute)) {
             return ['ok' => false, 'error' => __('validation.photo')];
         }
@@ -1145,7 +1141,7 @@ final class MemberService
             $this->deleteMemberPhoto($memberId, $previous);
         }
 
-        return ['ok' => true, 'path' => $relative];
+        return ['ok' => true, 'path' => $paths['relative']];
     }
 
     private function deleteMemberPhoto(int $memberId, string $relative): void
@@ -1153,24 +1149,19 @@ final class MemberService
         if ($relative === '' || str_contains($relative, '..')) {
             return;
         }
-        $absolute = storage_path('uploads/' . ltrim($relative, '/'));
-        if (is_file($absolute)) {
+        $absolute = resolve_upload_absolute_path(ltrim($relative, '/'));
+        if ($absolute !== null) {
             @unlink($absolute);
-        }
-        $dir = storage_path('uploads/members/' . $memberId);
-        if (is_dir($dir)) {
-            @rmdir($dir);
+            $dir = dirname($absolute);
+            if (is_dir($dir)) {
+                @rmdir($dir);
+            }
         }
     }
 
     public function memberPhotoAbsolutePath(string $relative): ?string
     {
-        $relative = ltrim($relative, '/');
-        if ($relative === '' || str_contains($relative, '..') || !str_starts_with($relative, 'members/')) {
-            return null;
-        }
-        $absolute = storage_path('uploads/' . $relative);
-        return is_file($absolute) ? $absolute : null;
+        return resolve_upload_absolute_path(ltrim($relative, '/'));
     }
 
     public function nextMemberNumber(): string

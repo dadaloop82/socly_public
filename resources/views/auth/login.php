@@ -1,6 +1,11 @@
 <?php
+/** @var bool $needsSetup */
+/** @var string $setupRequiredTitle */
+/** @var string $setupRequiredI18nKey */
 $currentLocale = (string) app('translator')->getLocale();
 $needsSetup = !empty($needsSetup);
+$setupRequiredTitle = trim((string) ($setupRequiredTitle ?? ''));
+$setupRequiredI18nKey = trim((string) ($setupRequiredI18nKey ?? 'auth.setup_required_title_first'));
 ?>
 
 <div class="auth-lang" data-i18n-endpoint="<?= e(url('/i18n/messages')) ?>">
@@ -17,7 +22,7 @@ $needsSetup = !empty($needsSetup);
 </div>
 
 <?php if ($needsSetup): ?>
-    <h1 class="h1" data-i18n="auth.setup_required_title"><?= e(__('auth.setup_required_title')) ?></h1>
+    <h1 class="h1" data-i18n="<?= e($setupRequiredI18nKey) ?>"><?= e($setupRequiredTitle !== '' ? $setupRequiredTitle : __('auth.setup_required_title_first')) ?></h1>
     <p class="lede auth-setup-lede" data-i18n="auth.setup_required_text"><?= e(__('auth.setup_required_text')) ?></p>
     <a class="btn btn-block" href="<?= e(url('/setup')) ?>" data-i18n="auth.setup_configure_button" data-setup-lang-link><?= e(__('auth.setup_configure_button')) ?></a>
     <?php
