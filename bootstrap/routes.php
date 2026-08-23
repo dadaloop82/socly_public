@@ -90,6 +90,7 @@ $router->get('/members', [MemberController::class, 'index'], 'members.view', ['m
 $router->get('/members/export', [MemberController::class, 'export'], 'members.view', ['mw.locale', 'mw.install', 'mw.auth']);
 $router->get('/members/export/registry', [MemberController::class, 'exportRegistry'], 'members.view', ['mw.locale', 'mw.install', 'mw.auth']);
 $router->get('/members/create', [MemberController::class, 'create'], 'members.manage', ['mw.locale', 'mw.install', 'mw.auth']);
+$router->post('/members/bulk', [MemberController::class, 'bulk'], 'members.manage', ['mw.locale', 'mw.install', 'mw.auth', 'mw.csrf']);
 $router->post('/members', [MemberController::class, 'store'], 'members.manage', ['mw.locale', 'mw.install', 'mw.auth', 'mw.csrf']);
 $router->post('/members/enrollment/otp', [MemberController::class, 'sendEnrollmentOtp'], 'members.manage', ['mw.locale', 'mw.install', 'mw.auth', 'mw.csrf']);
 $router->get('/members/{id}', [MemberController::class, 'show'], 'members.view', ['mw.locale', 'mw.install', 'mw.auth']);
@@ -100,6 +101,7 @@ $router->get('/members/{id}/edit', [MemberController::class, 'edit'], 'members.m
 $router->post('/members/{id}', [MemberController::class, 'update'], 'members.manage', ['mw.locale', 'mw.install', 'mw.auth', 'mw.csrf']);
 $router->post('/members/{id}/delete', [MemberController::class, 'destroy'], 'members.delete', ['mw.locale', 'mw.install', 'mw.auth', 'mw.csrf']);
 $router->post('/members/{id}/payments', [MemberController::class, 'storePayment'], 'payments.manage', ['mw.locale', 'mw.install', 'mw.auth', 'mw.csrf']);
+$router->post('/members/{id}/remind-payment', [MemberController::class, 'remindPayment'], 'members.manage', ['mw.locale', 'mw.install', 'mw.auth', 'mw.csrf']);
 
 $router->get('/treasury', [TreasuryController::class, 'index'], 'treasury.view', ['mw.locale', 'mw.install', 'mw.auth']);
 $router->post('/treasury', [TreasuryController::class, 'store'], 'treasury.manage', ['mw.locale', 'mw.install', 'mw.auth', 'mw.csrf']);

@@ -9,6 +9,8 @@ use Socly\Core\View;
 use Socly\Services\ComponentService;
 use Socly\Services\EnrollmentFormService;
 use Socly\Services\EnrollmentService;
+use Socly\Services\MailService;
+use Socly\Services\MemberActionService;
 use Socly\Services\MemberRegistryService;
 use Socly\Services\MemberService;
 use Socly\Services\PaymentService;
@@ -24,7 +26,9 @@ final class MemberController extends BaseController
         private readonly EnrollmentService $enrollment,
         private readonly ComponentService $components,
         private readonly EnrollmentFormService $enrollmentForms,
-        private readonly MemberRegistryService $registry
+        private readonly MemberRegistryService $registry,
+        private readonly MemberActionService $memberActions,
+        private readonly MailService $mail
     ) {
         parent::__construct($view);
     }
@@ -70,6 +74,8 @@ final class MemberController extends BaseController
             'types' => $this->members->types(),
             'hasAnyMembers' => $this->members->totalCount() > 0,
             'gdprEnabled' => $this->members->isGdprEnabled(),
+            'summary' => $this->memberActions->listSummaryMetrics(),
+            'mailReady' => $this->mail->isReady(),
         ]);
     }
 
@@ -286,12 +292,49 @@ final class MemberController extends BaseController
     {
         $this->guardMembers();
         $result = $this->payments->record((int) $id, $request->all(), $request->ip());
+        $redirect = trim((string) $request->input('redirect', ''));
         if (!$result['ok']) {
             $this->flash('errors', $result['errors']);
         } else {
             $this->flash('success', __('payments.recorded'));
         }
+        if ($redirect !== '' && str_starts_with($redirect, '/members')) {
+            redirect($redirect);
+        }
         redirect('/members/' . $id);
+    }
+
+    public function remindPayment(Request $request, string $id): void
+    {
+        $this->guardMembers();
+        $redirect = trim((string) $request->input('redirect', '/members'));
+        $result = $this->memberActions->sendPaymentReminder((int) $id, $request->ip());
+        if (!$result['ok']) {
+            $this->flash('errors', ['reminder' => (string) ($result['error'] ?? __('mail.send_failed'))]);
+        } else {
+            $this->flash('success', __('members.remind_sent'));
+        }
+        redirect($redirect !== '' ? $redirect : '/members');
+    }
+
+    public function bulk(Request $request): void
+    {
+        $this->guardMembers();
+        $action = (string) $request->input('action', '');
+        $ids = $request->input('member_ids', []);
+        if (!is_array($ids)) {
+            $ids = [];
+        }
+        $redirect = trim((string) $request->input('redirect', '/members'));
+        $result = $this->memberActions->bulk($action, $ids, $request->all(), $request->ip());
+        if (!$result['ok']) {
+            $this->flash('errors', $result['errors'] ?? ['bulk' => __('validation.required')]);
+        } else {
+            $processed = (int) ($result['processed'] ?? 0);
+            $skipped = (int) ($result['skipped'] ?? 0);
+            $this->flash('success', __('members.bulk_done', ['processed' => (string) $processed, 'skipped' => (string) $skipped]));
+        }
+        redirect($redirect !== '' ? $redirect : '/members');
     }
 
     public function export(Request $request): void

@@ -60,6 +60,7 @@ use Socly\Services\EnrollmentService;
 use Socly\Services\GeoService;
 use Socly\Services\InstallerService;
 use Socly\Services\MailService;
+use Socly\Services\MemberActionService;
 use Socly\Services\MemberService;
 use Socly\Services\SmtpDiscoveryService;
 use Socly\Services\PaymentService;
@@ -352,6 +353,16 @@ $app->bind(DashboardController::class, fn (App $a) => new DashboardController(
     $a->get(AssociationPeopleService::class),
     $a->get(CurrencyService::class)
 ));
+$app->bind(MemberActionService::class, fn (App $a) => new MemberActionService(
+    $a->get(Database::class),
+    $a->get(MemberService::class),
+    $a->get(PaymentService::class),
+    $a->get(WorkflowService::class),
+    $a->get(MailService::class),
+    $a->get(SettingsService::class),
+    $a->get(AuditService::class),
+    $a->get(EmailTemplateService::class)
+));
 $app->bind(MemberRegistryService::class, fn (App $a) => new MemberRegistryService(
     $a->get(SettingsService::class),
     $a->get(MemberService::class)
@@ -374,7 +385,9 @@ $app->bind(MemberController::class, fn (App $a) => new MemberController(
     $a->get(EnrollmentService::class),
     $a->get(ComponentService::class),
     $a->get(EnrollmentFormService::class),
-    $a->get(MemberRegistryService::class)
+    $a->get(MemberRegistryService::class),
+    $a->get(MemberActionService::class),
+    $a->get(MailService::class)
 ));
 $app->bind(SettingsController::class, fn (App $a) => new SettingsController(
     $a->get(View::class),

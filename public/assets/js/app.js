@@ -124,6 +124,7 @@ document.addEventListener('DOMContentLoaded', () => {
   initConfigAccordions();
   initMemberForm();
   initMemberWizard();
+  initMembersList();
   initLegalDocs();
   initSetupWizard();
   initSetupSmtp(document);
@@ -1726,6 +1727,113 @@ function initMemberWizard() {
   });
 
   showStep(1, { animateEnter: false });
+}
+
+function initMembersList() {
+  const root = document.querySelector('[data-members-list]');
+  if (!root) return;
+
+  const bulkBar = root.querySelector('[data-members-bulk-bar]');
+  const bulkCount = root.querySelector('[data-members-bulk-count]');
+  const bulkForm = document.querySelector('[data-members-bulk-form]');
+  const bulkActionInput = bulkForm?.querySelector('[data-members-bulk-action-input]');
+  const bulkIdHost = bulkForm?.querySelector('[data-members-bulk-id-host]');
+  const selectAll = root.querySelector('[data-members-select-all]');
+  const checkboxes = [...root.querySelectorAll('[data-member-select]')];
+  const collectDialog = document.querySelector('[data-member-collect-dialog]');
+  const collectForm = collectDialog?.querySelector('[data-member-collect-form]');
+  const collectName = collectDialog?.querySelector('[data-member-collect-name]');
+  const collectAmount = collectDialog?.querySelector('[data-member-collect-amount]');
+  const emailDialog = document.querySelector('[data-members-bulk-email-dialog]');
+  const emailSubject = emailDialog?.querySelector('[data-members-bulk-email-subject]');
+  const emailBody = emailDialog?.querySelector('[data-members-bulk-email-body]');
+
+  const selectedIds = () =>
+    checkboxes.filter((cb) => cb.checked).map((cb) => cb.value);
+
+  const syncBulkBar = () => {
+    const ids = selectedIds();
+    if (bulkBar) bulkBar.hidden = ids.length === 0;
+    if (bulkCount) bulkCount.textContent = String(ids.length);
+    if (selectAll) {
+      selectAll.indeterminate = ids.length > 0 && ids.length < checkboxes.length;
+      selectAll.checked = checkboxes.length > 0 && ids.length === checkboxes.length;
+    }
+  };
+
+  checkboxes.forEach((cb) => cb.addEventListener('change', syncBulkBar));
+  selectAll?.addEventListener('change', () => {
+    const on = selectAll.checked;
+    checkboxes.forEach((cb) => {
+      cb.checked = on;
+    });
+    syncBulkBar();
+  });
+
+  const submitBulk = (action, extra = {}) => {
+    if (!bulkForm || !bulkActionInput || !bulkIdHost) return;
+    const ids = selectedIds();
+    if (ids.length === 0) return;
+    bulkActionInput.value = action;
+    bulkIdHost.replaceChildren();
+    ids.forEach((id) => {
+      const input = document.createElement('input');
+      input.type = 'hidden';
+      input.name = 'member_ids[]';
+      input.value = id;
+      bulkIdHost.appendChild(input);
+    });
+    if (extra.subject !== undefined && bulkForm.querySelector('[data-members-bulk-subject]')) {
+      bulkForm.querySelector('[data-members-bulk-subject]').value = extra.subject;
+    }
+    if (extra.body !== undefined && bulkForm.querySelector('[data-members-bulk-body]')) {
+      bulkForm.querySelector('[data-members-bulk-body]').value = extra.body;
+    }
+    bulkForm.hidden = false;
+    bulkForm.requestSubmit();
+  };
+
+  root.querySelectorAll('[data-members-bulk-action]').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      const action = btn.getAttribute('data-members-bulk-action') || '';
+      if (action === 'group_email') {
+        emailDialog?.showModal?.();
+        return;
+      }
+      if (action === 'mass_renewal') {
+        const ok = window.confirm(btn.dataset.confirm || '');
+        if (!ok) return;
+      }
+      submitBulk(action);
+    });
+  });
+
+  emailDialog?.querySelector('[data-members-bulk-email-cancel]')?.addEventListener('click', () => emailDialog.close());
+  emailDialog?.querySelector('[data-members-bulk-email-send]')?.addEventListener('click', () => {
+    const subject = (emailSubject?.value || '').trim();
+    const body = (emailBody?.value || '').trim();
+    if (!subject || !body) return;
+    emailDialog.close();
+    submitBulk('group_email', { subject, body });
+  });
+
+  root.querySelectorAll('[data-member-collect]').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      const id = btn.getAttribute('data-member-id') || '';
+      const name = btn.getAttribute('data-member-name') || '';
+      const balance = btn.getAttribute('data-member-balance') || '0';
+      const base = root.getAttribute('data-members-base') || '/members';
+      if (!collectForm || !collectDialog) return;
+      collectForm.action = `${base}/${id}/payments`;
+      if (collectName) collectName.textContent = name;
+      if (collectAmount) collectAmount.value = balance;
+      collectDialog.showModal();
+    });
+  });
+
+  collectDialog?.querySelector('[data-member-collect-cancel]')?.addEventListener('click', () => collectDialog.close());
+
+  syncBulkBar();
 }
 
 function initMemberForm() {
