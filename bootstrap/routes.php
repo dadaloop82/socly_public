@@ -88,6 +88,7 @@ $router->get('/branding/logo', [BrandingController::class, 'logo'], null, ['mw.l
 
 $router->get('/members', [MemberController::class, 'index'], 'members.view', ['mw.locale', 'mw.install', 'mw.auth']);
 $router->get('/members/export', [MemberController::class, 'export'], 'members.view', ['mw.locale', 'mw.install', 'mw.auth']);
+$router->get('/members/export/registry', [MemberController::class, 'exportRegistry'], 'members.view', ['mw.locale', 'mw.install', 'mw.auth']);
 $router->get('/members/create', [MemberController::class, 'create'], 'members.manage', ['mw.locale', 'mw.install', 'mw.auth']);
 $router->post('/members', [MemberController::class, 'store'], 'members.manage', ['mw.locale', 'mw.install', 'mw.auth', 'mw.csrf']);
 $router->post('/members/enrollment/otp', [MemberController::class, 'sendEnrollmentOtp'], 'members.manage', ['mw.locale', 'mw.install', 'mw.auth', 'mw.csrf']);

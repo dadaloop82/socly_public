@@ -8,6 +8,7 @@
             <a class="btn" href="<?= e(url('/members/create')) ?>"><?= e(__('members.create')) ?></a>
         <?php endif; ?>
         <a class="btn btn-ghost" href="<?= e(url('/members/export?' . http_build_query(array_filter($filters)))) ?>"><?= e(__('members.export')) ?></a>
+        <a class="btn btn-ghost" href="<?= e(url('/members/export/registry?' . http_build_query(array_filter($filters)))) ?>" target="_blank" rel="noopener"><?= e(__('members.registry_export')) ?></a>
     </div>
 </div>
 
@@ -42,7 +43,7 @@
             <label><?= e(__('members.status')) ?></label>
             <select name="status">
                 <option value="">—</option>
-                <?php foreach (['active','suspended','expired','cancelled'] as $st): ?>
+                <?php foreach (\Socly\Services\MemberService::memberStatuses() as $st): ?>
                     <option value="<?= $st ?>" <?= $filters['status']===$st?'selected':'' ?>><?= e(__('members.status_'.$st)) ?></option>
                 <?php endforeach; ?>
             </select>
@@ -89,6 +90,9 @@
                     <th><?= e(__('members.member_number')) ?></th>
                     <th><?= e(__('members.type')) ?></th>
                     <th><?= e(__('members.status')) ?></th>
+                    <?php if (!empty($gdprEnabled)): ?>
+                        <th><?= e(__('members.gdpr_column')) ?></th>
+                    <?php endif; ?>
                     <th><?= e(__('members.payment')) ?></th>
                     <th><?= e(__('members.balance_due')) ?></th>
                     <th><?= e(__('members.actions')) ?></th>
@@ -131,7 +135,26 @@
                             </div>
                         </td>
                         <td data-label="<?= e(__('members.type')) ?>"><?= e(localized($item['type_name_json'])) ?></td>
-                        <td data-label="<?= e(__('members.status')) ?>"><span class="badge"><?= e(__('members.status_'.$item['status'])) ?></span></td>
+                        <td data-label="<?= e(__('members.status')) ?>">
+                            <span class="badge<?= ($item['status'] ?? '') === 'pending' ? ' badge-warn' : '' ?>"><?= e(__('members.status_'.$item['status'])) ?></span>
+                        </td>
+                        <?php
+                        $gdprBadges = is_array($item['gdpr_badges'] ?? null) ? $item['gdpr_badges'] : [];
+                        if (!empty($gdprEnabled)): ?>
+                        <td data-label="<?= e(__('members.gdpr_column')) ?>">
+                            <?php if ($gdprBadges !== []): ?>
+                                <div class="member-gdpr-badges">
+                                    <?php foreach ($gdprBadges as $badge): ?>
+                                        <span class="badge <?= !empty($badge['ok']) ? 'badge-ok' : 'badge-due' ?>" title="<?= e((string) ($badge['label'] ?? '')) ?>">
+                                            <?= e((string) ($badge['label'] ?? '')) ?>
+                                        </span>
+                                    <?php endforeach; ?>
+                                </div>
+                            <?php else: ?>
+                                <span class="muted">—</span>
+                            <?php endif; ?>
+                        </td>
+                        <?php endif; ?>
                         <td data-label="<?= e(__('members.payment')) ?>"><span class="badge <?= $item['payment_status']==='paid'?'badge-ok':($item['payment_status']==='due'?'badge-due':'badge-warn') ?>"><?= e(__('members.payment_'.$item['payment_status'])) ?></span></td>
                         <td data-label="<?= e(__('members.balance_due')) ?>"><?= e(number_format((float)$item['balance_due'], 2, ',', '.')) ?> €</td>
                         <td data-label="<?= e(__('members.actions')) ?>">

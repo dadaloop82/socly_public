@@ -639,8 +639,8 @@ $paymentExtraHtml = $buildProfileFieldsHtml($paymentExtraFields);
                     <div class="field-block">
                         <label class="field-label"><?= e(__('members.status')) ?></label>
                         <select name="status">
-                            <?php foreach (['active','suspended','expired','cancelled'] as $st): ?>
-                                <option value="<?= $st ?>" <?= old('status', $member['status'] ?? 'active')===$st?'selected':'' ?>><?= e(__('members.status_'.$st)) ?></option>
+                            <?php foreach (\Socly\Services\MemberService::memberStatuses() as $st): ?>
+                                <option value="<?= $st ?>" <?= old('status', $member['status'] ?? 'pending')===$st?'selected':'' ?>><?= e(__('members.status_'.$st)) ?></option>
                             <?php endforeach; ?>
                         </select>
                     </div>

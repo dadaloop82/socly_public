@@ -21,6 +21,80 @@ final class MemberService
         return [self::STEP_TESSERA, self::STEP_ACKNOWLEDGEMENTS, self::STEP_PAYMENT];
     }
 
+    /** @return list<string> */
+    public static function memberStatuses(): array
+    {
+        return ['pending', 'active', 'suspended', 'expired', 'cancelled'];
+    }
+
+    /**
+     * GDPR / privacy consent indicators for list and profile views.
+     *
+     * @param array<string,mixed> $member
+     * @return list<array{key:string,ok:bool,label:string}>
+     */
+    public function gdprBadges(array $member): array
+    {
+        if (!$this->isGdprEnabled()) {
+            return [];
+        }
+        $fields = is_array($member['fields'] ?? null) ? $member['fields'] : [];
+        $badges = [];
+        $isChecked = static function (mixed $raw): bool {
+            return $raw === true || $raw === 1 || $raw === '1' || $raw === 'on' || $raw === 'yes';
+        };
+
+        $privacyOk = $isChecked($fields['privacy_ack'] ?? null);
+        $badges[] = [
+            'key' => 'privacy',
+            'ok' => $privacyOk,
+            'label' => $privacyOk ? __('members.gdpr_privacy_ok') : __('members.gdpr_privacy_missing'),
+        ];
+
+        $imageKey = null;
+        foreach (['image_consent', 'photo_consent', 'image_ack', 'photo_ack', 'images_consent'] as $candidate) {
+            if (array_key_exists($candidate, $fields)) {
+                $imageKey = $candidate;
+                break;
+            }
+        }
+        if ($imageKey === null) {
+            foreach ($this->fieldDefinitions(true) as $def) {
+                $key = (string) ($def['key'] ?? '');
+                if ($key === '' || $key === 'photo' || $key === 'privacy_ack') {
+                    continue;
+                }
+                if ((string) ($def['field_type'] ?? '') === 'checkbox' && preg_match('/image|photo|immagin/i', $key)) {
+                    $imageKey = $key;
+                    break;
+                }
+            }
+        }
+        if ($imageKey !== null) {
+            $imageOk = $isChecked($fields[$imageKey] ?? null);
+            $badges[] = [
+                'key' => 'images',
+                'ok' => $imageOk,
+                'label' => $imageOk ? __('members.gdpr_images_ok') : __('members.gdpr_images_missing'),
+            ];
+        }
+
+        return $badges;
+    }
+
+    private function syncAdmittedAt(int $memberId, string $beforeStatus, string $afterStatus, ?string $existingAdmitted): void
+    {
+        if ($afterStatus !== 'active') {
+            return;
+        }
+        if ($existingAdmitted !== null && trim((string) $existingAdmitted) !== '') {
+            return;
+        }
+        $this->db->update('members', [
+            'admitted_at' => date('Y-m-d'),
+        ], 'id = :id', ['id' => $memberId]);
+    }
+
     public function __construct(
         private readonly Database $db,
         private readonly AuditService $audit,
@@ -872,6 +946,10 @@ final class MemberService
         }
         unset($item);
         $this->attachComplianceIssues($items);
+        foreach ($items as &$item) {
+            $item['gdpr_badges'] = $this->gdprBadges($item);
+        }
+        unset($item);
         return ['items' => $items, 'total' => $total];
     }
 
@@ -892,7 +970,9 @@ final class MemberService
         $member['fields'] = $this->fieldValues($id);
         $list = [$member];
         $this->attachComplianceIssues($list);
-        return $list[0];
+        $member = $list[0];
+        $member['gdpr_badges'] = $this->gdprBadges($member);
+        return $member;
     }
 
     /**
@@ -1065,7 +1145,7 @@ final class MemberService
             'member_number' => 'required|string|max:50',
             'member_type_id' => 'required|integer',
             'membership_period_id' => 'required|integer',
-            'status' => 'required|in:active,suspended,expired,cancelled',
+            'status' => 'required|in:' . implode(',', self::memberStatuses()),
             'payment_status' => 'required|in:paid,partial,unpaid',
         ])) {
             return ['ok' => false, 'errors' => $this->validator->firstErrors()];
@@ -1093,6 +1173,7 @@ final class MemberService
                 'member_type_id' => (int) $data['member_type_id'],
                 'membership_period_id' => (int) $data['membership_period_id'],
                 'status' => $data['status'],
+                'admitted_at' => ($data['status'] ?? '') === 'active' ? date('Y-m-d') : null,
                 'notes' => $data['notes'] ?? null,
                 'balance_due' => $balance,
             ]);
@@ -1182,7 +1263,7 @@ final class MemberService
             'member_number' => 'required|string|max:50',
             'member_type_id' => 'required|integer',
             'membership_period_id' => 'required|integer',
-            'status' => 'required|in:active,suspended,expired,cancelled',
+            'status' => 'required|in:' . implode(',', self::memberStatuses()),
         ])) {
             return ['ok' => false, 'errors' => $this->validator->firstErrors()];
         }
@@ -1214,6 +1295,7 @@ final class MemberService
             'status' => $data['status'],
             'notes' => $data['notes'] ?? null,
         ], 'id = :id', ['id' => $id]);
+        $this->syncAdmittedAt($id, (string) ($before['status'] ?? ''), (string) $data['status'], $before['admitted_at'] ?? null);
         $this->saveFieldValues($id, $fieldData);
         $after = $this->find($id);
         $this->audit->log('member.updated', 'member', (string) $id, $before, $after, $ip);
@@ -1284,7 +1366,7 @@ final class MemberService
         return $errors;
     }
 
-    private function isGdprEnabled(): bool
+    public function isGdprEnabled(): bool
     {
         try {
             return (string) app(SettingsService::class)->get('gdpr.enabled', '0') === '1';

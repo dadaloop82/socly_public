@@ -72,8 +72,24 @@ $balanceDue = (float) ($member['balance_due'] ?? 0);
             </div>
             <div class="detail-item">
                 <div class="label"><?= e(__('members.status')) ?></div>
-                <div class="value"><span class="badge"><?= e(__('members.status_'.$member['status'])) ?></span></div>
+                <div class="value"><span class="badge<?= ($member['status'] ?? '') === 'pending' ? ' badge-warn' : '' ?>"><?= e(__('members.status_'.$member['status'])) ?></span></div>
             </div>
+            <?php if (!empty($member['gdpr_badges'])): ?>
+            <div class="detail-item detail-item-wide">
+                <div class="label"><?= e(__('members.gdpr_column')) ?></div>
+                <div class="value member-gdpr-badges">
+                    <?php foreach ($member['gdpr_badges'] as $badge): ?>
+                        <span class="badge <?= !empty($badge['ok']) ? 'badge-ok' : 'badge-due' ?>"><?= e((string) ($badge['label'] ?? '')) ?></span>
+                    <?php endforeach; ?>
+                </div>
+            </div>
+            <?php endif; ?>
+            <?php if (!empty($member['admitted_at'])): ?>
+            <div class="detail-item">
+                <div class="label"><?= e(__('members.admitted_at')) ?></div>
+                <div class="value"><?= e(format_date((string) $member['admitted_at'])) ?></div>
+            </div>
+            <?php endif; ?>
             <div class="detail-item">
                 <div class="label"><?= e(__('members.payment')) ?></div>
                 <div class="value member-payment-summary">

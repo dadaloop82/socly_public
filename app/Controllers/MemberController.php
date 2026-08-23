@@ -9,6 +9,7 @@ use Socly\Core\View;
 use Socly\Services\ComponentService;
 use Socly\Services\EnrollmentFormService;
 use Socly\Services\EnrollmentService;
+use Socly\Services\MemberRegistryService;
 use Socly\Services\MemberService;
 use Socly\Services\PaymentService;
 use Socly\Services\SettingsService;
@@ -22,7 +23,8 @@ final class MemberController extends BaseController
         private readonly SettingsService $settings,
         private readonly EnrollmentService $enrollment,
         private readonly ComponentService $components,
-        private readonly EnrollmentFormService $enrollmentForms
+        private readonly EnrollmentFormService $enrollmentForms,
+        private readonly MemberRegistryService $registry
     ) {
         parent::__construct($view);
     }
@@ -67,6 +69,7 @@ final class MemberController extends BaseController
             'page' => $page,
             'types' => $this->members->types(),
             'hasAnyMembers' => $this->members->totalCount() > 0,
+            'gdprEnabled' => $this->members->isGdprEnabled(),
         ]);
     }
 
@@ -328,5 +331,22 @@ final class MemberController extends BaseController
         }
         fclose($out);
         exit;
+    }
+
+    public function exportRegistry(Request $request): void
+    {
+        $this->guardMembers();
+        $filters = [
+            'q' => (string) $request->input('q', ''),
+            'status' => (string) $request->input('status', ''),
+            'member_type_id' => $request->input('member_type_id', ''),
+            'payment' => (string) $request->input('payment', ''),
+        ];
+        $context = $this->registry->build($filters);
+        if (!$context) {
+            $this->flash('errors', ['registry' => __('members.registry_empty')]);
+            redirect('/members');
+        }
+        echo $this->view->render('members/registry_print', $context, null);
     }
 }

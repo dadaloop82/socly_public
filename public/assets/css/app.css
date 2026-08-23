@@ -1520,6 +1520,13 @@ td .muted { font-size: 0.88rem; margin-top: 0.15rem; }
   padding-left: 1.2rem;
 }
 .member-anomaly-list li { margin: 0.2rem 0; }
+.member-gdpr-badges {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.35rem;
+}
+.member-gdpr-badges .badge { font-size: 0.72rem; }
+.detail-item-wide { grid-column: 1 / -1; }
 .member-scheda-top {
   display: grid;
   grid-template-columns: auto 1fr;
