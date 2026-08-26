@@ -757,9 +757,13 @@ final class SetupController extends BaseController
                 unset($result['found'][$lockedKey]);
             }
         }
+        // Website URL from scrape must not override RUNTS.
+        if (isset($locked['website'])) {
+            $canonical = '';
+        }
         $applied = [];
         try {
-            $applied = $this->setup->applyScrapedHints($found, $canonical, true);
+            $applied = $this->setup->applyScrapedHints($found, $canonical, $canonical !== '');
         } catch (\Throwable $e) {
             try {
                 app('logger')->anomaly('setup.scrape_apply_failed', [
@@ -770,6 +774,9 @@ final class SetupController extends BaseController
             }
         }
         $result['website'] = $canonical;
+        if (isset($locked['website']) && trim((string) $locked['website']) !== '') {
+            $result['website'] = trim((string) $locked['website']);
+        }
         $result['applied'] = $applied;
         $result['applied_count'] = count($applied);
         $result['labels'] = is_array($result['labels'] ?? null) ? $result['labels'] : [];

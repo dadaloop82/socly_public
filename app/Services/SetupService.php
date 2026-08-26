@@ -661,6 +661,11 @@ final class SetupService
                 }
                 $value = $normalized;
             }
+            $locked = $this->runtsLockedKeys();
+            if (isset($locked['website']) && trim((string) $locked['website']) !== '') {
+                // RUNTS remains the source of truth for the association website.
+                $value = trim((string) $locked['website']);
+            }
             $this->persistScalar($step, $value);
             return ['ok' => true];
         }
@@ -689,7 +694,8 @@ final class SetupService
     }
 
     /**
-     * Fill empty association settings from scrape results (never overwrite non-empty).
+     * Fill empty association settings from website scrape.
+     * RUNTS-locked keys always win: scrape may only fill gaps, never override them.
      *
      * @param array<string, string> $found
      * @return list<string> keys applied
@@ -714,7 +720,7 @@ final class SetupService
         $env = [];
         $website = trim($website);
         $locked = $this->runtsLockedKeys();
-        if ($website !== '') {
+        if ($website !== '' && !isset($locked['website'])) {
             $currentWeb = trim((string) $this->settings->get('association.website', ''));
             if ($updateWebsite || $currentWeb === '') {
                 $this->settings->set('association.website', $website);
@@ -742,8 +748,13 @@ final class SetupService
 
         $applied = array_merge($applied, $this->applyScrapedPeopleHints($found, $locked));
 
+        $seatLocked = isset($locked['address'])
+            || isset($locked['house_number'])
+            || isset($locked['postal_code'])
+            || isset($locked['city']);
         if (
-            isset($found['address'], $found['house_number'], $found['postal_code'], $found['city'])
+            !$seatLocked
+            && isset($found['address'], $found['house_number'], $found['postal_code'], $found['city'])
             && trim((string) $this->settings->get('association.address_full', '')) === ''
         ) {
             $this->settings->set('association.address_full', trim(sprintf(
@@ -1030,6 +1041,14 @@ final class SetupService
         );
         foreach ($peopleApplied as $key) {
             $applied[] = $key;
+            $lock[$key] = (string) ($lock[$key] ?? '1');
+        }
+        // Lock roles that RUNTS provided even if they were already filled (source of truth).
+        foreach ($this->runtsPeopleLockKeys(
+            is_array($detail['people'] ?? null) ? $detail['people'] : [],
+            $fields
+        ) as $key => $value) {
+            $lock[$key] = $value;
         }
 
         $this->settings->set('association.runts_lock', $lock);
@@ -1176,6 +1195,59 @@ final class SetupService
         'UD' => 'Udine', 'VA' => 'Varese', 'VB' => 'Verbano-Cusio-Ossola', 'VC' => 'Vercelli',
         'VE' => 'Venezia', 'VI' => 'Vicenza', 'VR' => 'Verona', 'VT' => 'Viterbo', 'VV' => 'Vibo Valentia',
     ];
+
+    /**
+     * @param list<array<string, mixed>> $people
+     * @param array<string, string> $fields
+     * @return array<string, string>
+     */
+    private function runtsPeopleLockKeys(array $people, array $fields): array
+    {
+        $lock = [];
+        $hasPresident = trim((string) ($fields['president_name'] ?? '')) !== '';
+        $hasVice = false;
+        $hasBoard = false;
+        foreach ($people as $row) {
+            if (!is_array($row)) {
+                continue;
+            }
+            $first = trim((string) ($row['first_name'] ?? ''));
+            $last = trim((string) ($row['last_name'] ?? ''));
+            if ($first === '' || $last === '') {
+                continue;
+            }
+            $role = mb_strtoupper(trim((string) ($row['role'] ?? '')), 'UTF-8');
+            $isLegal = (string) ($row['is_legal_rep'] ?? '') === '1'
+                || str_contains($role, 'LEGALE RAPPRESENTANTE');
+            if ($isLegal || (str_contains($role, 'PRESIDENTE') && !str_contains($role, 'VICE'))) {
+                $hasPresident = true;
+                $lock['president_name'] = trim($first . ' ' . $last);
+                continue;
+            }
+            if (str_contains($role, 'VICEPRESIDENTE') || str_contains($role, 'VICE PRESIDENTE')) {
+                $hasVice = true;
+                continue;
+            }
+            if (
+                str_contains($role, 'COMPONENTE')
+                || str_contains($role, 'CONSIGLIO')
+                || str_contains($role, 'AMMINISTRAZIONE')
+                || str_contains($role, 'ALTRO')
+            ) {
+                $hasBoard = true;
+            }
+        }
+        if ($hasPresident && !isset($lock['president_name'])) {
+            $lock['president_name'] = trim((string) ($fields['president_name'] ?? '1')) ?: '1';
+        }
+        if ($hasVice) {
+            $lock['vice_president_name'] = '1';
+        }
+        if ($hasBoard) {
+            $lock['board_names'] = '1';
+        }
+        return $lock;
+    }
 
     /**
      * Persist the full RUNTS detail snapshot (people, dates, stats, …).
@@ -1747,7 +1819,7 @@ final class SetupService
                 $board[] = $person;
             }
         }
-        if ($board !== [] && $this->people->countByRole(AssociationPeopleService::ROLE_BOARD) === 0) {
+        if ($board !== [] && !isset($locked['board_names']) && $this->people->countByRole(AssociationPeopleService::ROLE_BOARD) === 0) {
             try {
                 $this->people->replaceRole(AssociationPeopleService::ROLE_BOARD, $board);
                 $applied[] = 'board_names';
