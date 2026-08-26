@@ -1155,11 +1155,30 @@ a:hover { text-decoration: underline; color: var(--brand-primary-deep); }
   display: grid;
   grid-template-columns: auto 1fr;
   gap: 0.85rem;
-  align-items: center;
+  align-items: start;
   padding: 0.85rem 0.95rem;
   border-radius: 14px;
   background: color-mix(in srgb, white 72%, var(--brand-paper));
   border: 1px solid color-mix(in srgb, var(--brand-primary) 18%, var(--line));
+  max-height: min(46vh, 24rem);
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+  min-height: 0;
+}
+.setup-runts-block.is-found .setup-runts-live {
+  max-height: min(52vh, 28rem);
+}
+.setup-runts-live::-webkit-scrollbar {
+  width: 7px;
+}
+.setup-runts-live::-webkit-scrollbar-thumb {
+  background: color-mix(in srgb, var(--brand-primary) 30%, transparent);
+  border-radius: 999px;
+}
+.setup-runts-live::-webkit-scrollbar-track {
+  background: transparent;
 }
 .setup-runts-live[hidden] { display: none !important; }
 .setup-runts-live-copy { display: grid; gap: 0.4rem; min-width: 0; }
