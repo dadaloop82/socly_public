@@ -1992,6 +1992,10 @@ td .muted { font-size: 0.88rem; margin-top: 0.15rem; }
   transform: translateY(0);
   visibility: visible;
 }
+.auth-locale-grid {
+  margin: 0;
+  width: 100%;
+}
 .auth-lang select {
   width: 100%;
   margin-bottom: 0;

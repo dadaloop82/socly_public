@@ -898,14 +898,24 @@ function syncBrandReadableColors(target = document.documentElement) {
 
 function initAuthLoginI18nLive() {
   const authLang = document.querySelector('.auth-lang[data-i18n-endpoint]');
-  const select = document.querySelector('[data-lang-select]');
-  if (!authLang || !select || select.tagName !== 'SELECT') return;
+  const group = document.querySelector('[data-lang-group]');
+  const radios = group ? [...group.querySelectorAll('[data-lang-radio]')] : [];
+  const legacySelect = document.querySelector('[data-lang-select]');
+  if (!authLang) return;
+  if (radios.length === 0 && (!legacySelect || legacySelect.tagName !== 'SELECT')) return;
 
   const endpointBase = String(authLang.dataset.i18nEndpoint || '');
   if (!endpointBase) return;
 
   const loginLang = document.querySelector('[data-login-lang]');
   const setupLink = document.querySelector('[data-setup-lang-link]');
+
+  const currentLang = () => {
+    const checked = radios.find((r) => r.checked);
+    if (checked) return checked.value;
+    if (legacySelect) return legacySelect.value;
+    return 'it';
+  };
 
   // Rotazione “Scegli la lingua” (fade).
   const rotator = document.querySelector('.auth-lang-rotate');
@@ -918,7 +928,7 @@ function initAuthLoginI18nLive() {
     rotateItems.forEach((el, n) => el.classList.toggle('is-active', n === rotateIndex));
   };
   if (rotateItems.length > 0) {
-    const selectedIdx = rotateItems.findIndex((el) => el.dataset.rotateLang === select.value);
+    const selectedIdx = rotateItems.findIndex((el) => el.dataset.rotateLang === currentLang());
     showRotate(selectedIdx >= 0 ? selectedIdx : rotateIndex);
     setInterval(() => showRotate(rotateIndex + 1), 2600);
   }
@@ -937,7 +947,7 @@ function initAuthLoginI18nLive() {
 
   const applyMessages = (messages, lang) => {
     document.querySelectorAll('[data-i18n]').forEach((el) => {
-      if (el.closest('[data-lang-select]')) return;
+      if (el.closest('[data-lang-select], [data-lang-group]')) return;
       const key = el.dataset.i18n;
       const v = getByPath(messages, key);
       if (typeof v !== 'string') return;
@@ -972,22 +982,28 @@ function initAuthLoginI18nLive() {
 
     const chooseLabel = getByPath(messages, 'auth.choose_language');
     if (typeof chooseLabel === 'string') {
-      select.setAttribute('aria-label', chooseLabel);
+      if (group) group.setAttribute('aria-label', chooseLabel);
+      if (legacySelect) legacySelect.setAttribute('aria-label', chooseLabel);
     }
 
-    // Keep option labels as flag + translated language name.
     const labels = {
       it: getByPath(messages, 'members.lang_it') || 'Italiano',
       de: getByPath(messages, 'members.lang_de') || 'Deutsch',
       en: getByPath(messages, 'members.lang_en') || 'English',
     };
-    const flags = { it: '🇮🇹', de: '🇩🇪', en: '🇬🇧' };
-    [...select.options].forEach((opt) => {
-      const code = opt.value;
-      if (labels[code]) {
-        opt.textContent = `${flags[code] || ''} ${labels[code]}`.trim();
-      }
+    document.querySelectorAll('[data-lang-label]').forEach((el) => {
+      const code = el.dataset.langLabel;
+      if (labels[code]) el.textContent = labels[code];
     });
+    if (legacySelect) {
+      const flags = { it: '🇮🇹', de: '🇩🇪', en: '🇬🇧' };
+      [...legacySelect.options].forEach((opt) => {
+        const code = opt.value;
+        if (labels[code]) {
+          opt.textContent = `${flags[code] || ''} ${labels[code]}`.trim();
+        }
+      });
+    }
 
     document.documentElement.setAttribute('lang', lang);
   };
@@ -1004,7 +1020,7 @@ function initAuthLoginI18nLive() {
       }
     }
   };
-  syncLinks(select.value);
+  syncLinks(currentLang());
 
   const load = async (lang) => {
     syncLinks(lang);
@@ -1016,7 +1032,6 @@ function initAuthLoginI18nLive() {
       if (!res.ok) return;
       const data = await res.json();
       if (!data?.ok) return;
-      // Live text swap; the same request also persists locale in session via LocaleMiddleware.
       applyMessages(data.messages || {}, lang);
       if (rotateItems.length > 0) {
         const idx = rotateItems.findIndex((el) => el.dataset.rotateLang === lang);
@@ -1027,7 +1042,12 @@ function initAuthLoginI18nLive() {
     }
   };
 
-  select.addEventListener('change', () => load(select.value));
+  radios.forEach((radio) => {
+    radio.addEventListener('change', () => {
+      if (radio.checked) load(radio.value);
+    });
+  });
+  legacySelect?.addEventListener('change', () => load(legacySelect.value));
 }
 
 function initSetupWizard() {

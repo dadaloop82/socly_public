@@ -262,7 +262,11 @@ if (!function_exists('locale_flag_url')) {
     function locale_flag_url(string $locale): string
     {
         $code = strtolower(substr(preg_replace('/[^a-z]/i', '', $locale) ?: 'it', 0, 2));
-        return 'https://flagcdn.com/w20/' . rawurlencode($code) . '.png';
+        // flagcdn uses ISO country codes; English → Great Britain.
+        if ($code === 'en') {
+            $code = 'gb';
+        }
+        return 'https://flagcdn.com/w40/' . rawurlencode($code) . '.png';
     }
 }
 

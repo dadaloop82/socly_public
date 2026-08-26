@@ -14,11 +14,22 @@ $setupRequiredI18nKey = trim((string) ($setupRequiredI18nKey ?? 'auth.setup_requ
         <span class="auth-lang-rotate-item h2" data-rotate-lang="de">Sprache wählen</span>
         <span class="auth-lang-rotate-item h2" data-rotate-lang="en">Choose language</span>
     </div>
-    <select id="lang" name="lang" data-lang-select aria-label="<?= e(__('auth.choose_language')) ?>">
-        <option value="it" <?= $currentLocale === 'it' ? 'selected' : '' ?>>🇮🇹 Italiano</option>
-        <option value="de" <?= $currentLocale === 'de' ? 'selected' : '' ?>>🇩🇪 Deutsch</option>
-        <option value="en" <?= $currentLocale === 'en' ? 'selected' : '' ?>>🇬🇧 English</option>
-    </select>
+    <fieldset class="auth-locale-grid setup-locale-grid" role="radiogroup" aria-label="<?= e(__('auth.choose_language')) ?>" data-lang-group>
+        <legend class="visually-hidden"><?= e(__('auth.choose_language')) ?></legend>
+        <?php foreach (['it' => 'Italiano', 'de' => 'Deutsch', 'en' => 'English'] as $loc => $label): ?>
+            <label class="setup-locale-card auth-locale-card">
+                <input
+                    type="radio"
+                    name="lang"
+                    value="<?= e($loc) ?>"
+                    data-lang-radio
+                    <?= $currentLocale === $loc ? 'checked' : '' ?>
+                >
+                <img src="<?= e(locale_flag_url($loc)) ?>" width="28" height="21" alt="" loading="lazy" decoding="async">
+                <span data-lang-label="<?= e($loc) ?>"><?= e($label) ?></span>
+            </label>
+        <?php endforeach; ?>
+    </fieldset>
 </div>
 
 <?php if ($needsSetup): ?>
