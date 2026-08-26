@@ -3861,6 +3861,40 @@ function initSetupRuntsLookup(root) {
       `<p class="setup-runts-found">${escapeHtml(tpl).replaceAll(':name', `<strong>${escapeHtml(display)}</strong>`)}</p>`
     );
 
+    const fieldDefs = [
+      ['fiscal_code', box.dataset.msgFieldFiscalCode || 'Codice fiscale'],
+      ['pec', box.dataset.msgFieldPec || 'PEC'],
+      ['website', box.dataset.msgFieldWebsite || 'Sito web'],
+      ['address', box.dataset.msgFieldAddress || 'Sede'],
+      ['house_number', ''],
+      ['postal_code', box.dataset.msgFieldPostalCode || 'CAP'],
+      ['city', box.dataset.msgFieldCity || 'Città'],
+      ['province', box.dataset.msgFieldProvince || 'Provincia'],
+      ['president_name', box.dataset.msgFieldPresidentName || 'Presidente'],
+      ['section', box.dataset.msgFieldSection || 'Sezione RUNTS'],
+    ];
+    const fieldRows = [];
+    const address = String(fields?.address || '').trim();
+    const house = String(fields?.house_number || '').trim();
+    const seat = [address, house].filter(Boolean).join(' ').trim();
+    for (const [key, label] of fieldDefs) {
+      if (key === 'house_number') continue;
+      let value = String(fields?.[key] || '').trim();
+      if (key === 'address') value = seat;
+      if (!value || !label) continue;
+      fieldRows.push(`<li class="setup-runts-field-row">
+        <span class="setup-runts-field-label">${escapeHtml(label)}</span>
+        <span class="setup-runts-field-value">${escapeHtml(value)}</span>
+      </li>`);
+    }
+    if (fieldRows.length > 0) {
+      const heading = escapeHtml(box.dataset.msgFieldsHeading || 'Dati recuperati');
+      parts.push(`<div class="setup-runts-fields">
+        <p class="setup-runts-docs-heading">${heading}</p>
+        <ul class="setup-runts-fields-list">${fieldRows.join('')}</ul>
+      </div>`);
+    }
+
     const docs = Array.isArray(documents) ? documents : [];
     const viewBase = String(box.dataset.docViewBase || '').replace(/\/$/, '');
     const viewLabel = box.dataset.msgDocView || 'Vedi';

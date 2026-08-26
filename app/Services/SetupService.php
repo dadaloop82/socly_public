@@ -1075,8 +1075,26 @@ final class SetupService
 
             $code = trim((string) ($doc['code'] ?? ''));
             $marker = 'RUNTS' . ($runts !== '' ? ':' . $runts : '') . ($code !== '' ? ':' . $code : '') . ':' . mb_strtoupper($title, 'UTF-8');
-            if ($this->runtsDocumentAlreadyImported($marker)) {
+            $existing = $this->findRuntsDocumentByMarker($marker);
+            if ($existing !== null) {
                 @unlink($tmp);
+                $existingId = (int) ($existing['id'] ?? 0);
+                $existingTitle = trim((string) ($existing['title'] ?? $title)) ?: $title;
+                $existingFile = $this->filenameFromRuntsSummary((string) ($existing['summary'] ?? ''), (string) ($doc['filename'] ?? ($title . '.pdf')));
+                $abs = '';
+                $rel = trim((string) ($existing['file_path'] ?? ''));
+                if ($rel !== '') {
+                    $abs = resolve_upload_absolute_path($rel) ?? '';
+                }
+                $saved[] = [
+                    'title' => $existingTitle,
+                    'filename' => $existingFile,
+                    'category' => (string) ($existing['category'] ?? $this->mapRuntsDocumentCategory($title)),
+                    'id' => $existingId,
+                    'absolute' => $abs,
+                    'legal_kind' => $this->guessLegalTextKind($existingTitle, $existingFile),
+                    'already_imported' => true,
+                ];
                 continue;
             }
 
@@ -1123,6 +1141,7 @@ final class SetupService
                     'id' => (int) ($result['id'] ?? 0),
                     'absolute' => $paths['absolute'],
                     'legal_kind' => $this->guessLegalTextKind($title, $originalName),
+                    'already_imported' => false,
                 ];
             } else {
                 @unlink($paths['absolute']);
@@ -1311,6 +1330,49 @@ final class SetupService
     }
 
     /**
+     * If statute/privacy were already filled earlier (e.g. previous OCR), surface them in the UI.
+     *
+     * @param list<array<string,mixed>> $documents
+     * @param array{prefilled?:list<string>,methods?:array<string,string>,pending_ocr?:bool,status?:string,attempted?:list<string>} $legalPrefill
+     * @return array{prefilled:list<string>,methods:array<string,string>,pending_ocr:bool,status:string,attempted:list<string>}
+     */
+    public function enrichLegalPrefillWithExisting(array $documents, array $legalPrefill): array
+    {
+        $prefilled = array_values(array_unique(array_map('strval', $legalPrefill['prefilled'] ?? [])));
+        $methods = is_array($legalPrefill['methods'] ?? null) ? $legalPrefill['methods'] : [];
+        $attempted = array_values(array_unique(array_map('strval', $legalPrefill['attempted'] ?? [])));
+
+        foreach ($documents as $doc) {
+            $kind = (string) ($doc['legal_kind'] ?? '');
+            if (!in_array($kind, ['statute', 'privacy'], true) || in_array($kind, $prefilled, true)) {
+                continue;
+            }
+            $settingsKey = $kind === 'privacy' ? 'legal.privacy' : 'legal.statute';
+            if ($this->legalTextIsEmpty($settingsKey)) {
+                continue;
+            }
+            $prefilled[] = $kind;
+            $methods[$kind] = (string) ($methods[$kind] ?? 'existing');
+            if (!in_array($kind, $attempted, true)) {
+                $attempted[] = $kind;
+            }
+        }
+
+        $status = (string) ($legalPrefill['status'] ?? 'none');
+        if ($prefilled !== [] && !in_array($status, ['ok', 'prefilled', 'pending'], true)) {
+            $status = 'prefilled';
+        }
+
+        return [
+            'prefilled' => $prefilled,
+            'methods' => $methods,
+            'pending_ocr' => !empty($legalPrefill['pending_ocr']),
+            'status' => $status,
+            'attempted' => $attempted,
+        ];
+    }
+
+    /**
      * Queue background OCR when PDFs have no text layer.
      *
      * @param list<array<string, mixed>> $documents
@@ -1421,15 +1483,31 @@ final class SetupService
 
     private function runtsDocumentAlreadyImported(string $marker): bool
     {
+        return $this->findRuntsDocumentByMarker($marker) !== null;
+    }
+
+    /** @return array<string, mixed>|null */
+    private function findRuntsDocumentByMarker(string $marker): ?array
+    {
         try {
-            $row = $this->db->fetch(
-                'SELECT id FROM association_documents WHERE summary LIKE :m LIMIT 1',
+            return $this->db->fetch(
+                'SELECT id, title, category, summary, file_path FROM association_documents WHERE summary LIKE :m ORDER BY id DESC LIMIT 1',
                 ['m' => '%' . $marker . '%']
             );
-            return $row !== null;
         } catch (\Throwable) {
-            return false;
+            return null;
         }
+    }
+
+    private function filenameFromRuntsSummary(string $summary, string $fallback): string
+    {
+        if (preg_match('/File originale:\s*(.+)$/mu', $summary, $m)) {
+            $name = trim((string) ($m[1] ?? ''));
+            if ($name !== '') {
+                return $name;
+            }
+        }
+        return trim($fallback) !== '' ? trim($fallback) : 'documento.pdf';
     }
 
     private function mapRuntsDocumentCategory(string $title): string

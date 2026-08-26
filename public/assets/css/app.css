@@ -870,12 +870,37 @@ a:hover { text-decoration: underline; color: var(--brand-primary-deep); }
   font-weight: 800;
 }
 .setup-runts-docs,
-.setup-runts-legal {
+.setup-runts-legal,
+.setup-runts-fields {
   margin: 0;
   padding: 0.75rem 0.85rem;
   border-radius: 14px;
   border: 1px solid color-mix(in srgb, var(--brand-primary) 16%, var(--line));
   background: color-mix(in srgb, var(--brand-paper) 55%, #fff);
+}
+.setup-runts-fields-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 0.35rem;
+}
+.setup-runts-field-row {
+  display: grid;
+  grid-template-columns: minmax(6.5rem, 9rem) minmax(0, 1fr);
+  gap: 0.45rem 0.75rem;
+  align-items: baseline;
+}
+.setup-runts-field-label {
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: var(--muted);
+}
+.setup-runts-field-value {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--ink);
+  overflow-wrap: anywhere;
 }
 .setup-runts-docs-heading {
   margin: 0 0 0.55rem;

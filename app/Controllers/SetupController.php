@@ -976,6 +976,8 @@ final class SetupController extends BaseController
                         } else {
                             $legalPrefill['status'] = 'pending';
                         }
+                    } else {
+                        $legalPrefill = $this->setup->enrichLegalPrefillWithExisting($savedDocuments, $legalPrefill);
                     }
                 }
             } else {
