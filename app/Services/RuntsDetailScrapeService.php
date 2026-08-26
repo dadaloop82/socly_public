@@ -292,6 +292,12 @@ final class RuntsDetailScrapeService
             'website' => $website,
             'president_name' => $president,
             'section' => $section,
+            'forma_giuridica' => $this->spanText($html, 'dnn_ctr448_View_spnFormaGiuridica'),
+            'activities' => $this->cleanText($this->spanText($html, 'dnn_ctr448_View_spnAttivitaDettaglio')),
+            'founded_on' => $this->spanText($html, 'dnn_ctr448_View_spnAttoCostitutivo'),
+            'statute_updated_on' => $this->spanText($html, 'dnn_ctr448_View_spnUltimoAggiornamentoStatutario'),
+            'members_count' => $this->spanText($html, 'dnn_ctr448_View_spnSociPersonaFisica'),
+            'volunteers_count' => $this->spanText($html, 'dnn_ctr448_View_spnVolontari'),
         ], static fn ($v) => is_string($v) && trim($v) !== '');
 
         return $fields;

@@ -936,11 +936,13 @@ final class SetupService
 
     /**
      * Persist RUNTS lookup results. Name / legal form / RUNTS overwrite; other empty fields are filled.
+     * Also maps RUNTS people into president / vice / board when those roles are still empty.
      *
      * @param array<string, string> $fields
-     * @return list<string>
+     * @param array<string, mixed> $detail
+     * @return array{applied:list<string>,fields:array<string,string>}
      */
-    public function applyRuntsHints(array $fields): array
+    public function applyRuntsHints(array $fields, array $detail = []): array
     {
         $applied = [];
         $env = [];
@@ -953,6 +955,7 @@ final class SetupService
             $env['ASSOCIATION_NAME'] = $name;
             $applied[] = 'name';
             $lock['name'] = $name;
+            $fields['name'] = $name;
         }
 
         $legal = strtoupper(trim((string) ($fields['legal_name'] ?? '')));
@@ -961,6 +964,7 @@ final class SetupService
             $env['ASSOCIATION_LEGAL_NAME'] = $legal;
             $applied[] = 'legal_name';
             $lock['legal_name'] = $legal;
+            $fields['legal_name'] = $legal;
         }
 
         $runts = preg_replace('/\D+/', '', (string) ($fields['runts'] ?? '')) ?? '';
@@ -969,6 +973,7 @@ final class SetupService
             $env['ASSOCIATION_RUNTS'] = $runts;
             $applied[] = 'runts';
             $lock['runts'] = $runts;
+            $fields['runts'] = $runts;
         }
 
         $optional = [
@@ -991,7 +996,7 @@ final class SetupService
             } elseif ($key === 'city' || $key === 'address') {
                 $value = assoc_capitalize_name($value);
             } elseif ($key === 'province') {
-                $value = strtoupper(preg_replace('/[^A-Za-z]/', '', $value) ?? '');
+                $value = $this->expandProvinceName($value);
             } elseif ($key === 'postal_code') {
                 $value = preg_replace('/\D+/', '', $value) ?? '';
             } elseif ($key === 'pec') {
@@ -1003,6 +1008,7 @@ final class SetupService
             $env[$meta['env']] = $value;
             $applied[] = $key;
             $lock[$key] = $value;
+            $fields[$key] = $value;
         }
 
         if (
@@ -1018,21 +1024,158 @@ final class SetupService
             )));
         }
 
-        $personKey = 'president_name';
-        if (trim((string) ($fields[$personKey] ?? '')) !== '') {
-            $peopleApplied = $this->applyScrapedPeopleHints([$personKey => (string) $fields[$personKey]]);
-            foreach ($peopleApplied as $key) {
-                $applied[] = $key;
-                $lock[$key] = trim((string) $fields[$personKey]);
-            }
+        $peopleApplied = $this->applyRuntsPeopleFromDetail(
+            is_array($detail['people'] ?? null) ? $detail['people'] : [],
+            $fields
+        );
+        foreach ($peopleApplied as $key) {
+            $applied[] = $key;
         }
 
         $this->settings->set('association.runts_lock', $lock);
         if ($env !== []) {
             EnvWriter::setUserValues($env);
         }
+
+        return [
+            'applied' => array_values(array_unique($applied)),
+            'fields' => $fields,
+        ];
+    }
+
+    /**
+     * Map RUNTS people rows into president / vice / board when those roles are still empty.
+     *
+     * @param list<array<string, mixed>> $people
+     * @param array<string, string> $fields
+     * @return list<string>
+     */
+    private function applyRuntsPeopleFromDetail(array $people, array $fields): array
+    {
+        $applied = [];
+        $president = null;
+        $vices = [];
+        $board = [];
+
+        foreach ($people as $row) {
+            if (!is_array($row)) {
+                continue;
+            }
+            $first = trim((string) ($row['first_name'] ?? ''));
+            $last = trim((string) ($row['last_name'] ?? ''));
+            if ($first === '' || $last === '') {
+                continue;
+            }
+            $person = [
+                'first_name' => assoc_capitalize_name($first),
+                'last_name' => assoc_capitalize_name($last),
+            ];
+            $role = mb_strtoupper(trim((string) ($row['role'] ?? '')), 'UTF-8');
+            $isLegal = (string) ($row['is_legal_rep'] ?? '') === '1'
+                || str_contains($role, 'LEGALE RAPPRESENTANTE');
+
+            if ($isLegal || (str_contains($role, 'PRESIDENTE') && !str_contains($role, 'VICE'))) {
+                if ($president === null) {
+                    $president = $person;
+                }
+                continue;
+            }
+            if (str_contains($role, 'VICEPRESIDENTE') || str_contains($role, 'VICE PRESIDENTE')) {
+                $vices[] = $person;
+                continue;
+            }
+            if (
+                str_contains($role, 'COMPONENTE')
+                || str_contains($role, 'CONSIGLIO')
+                || str_contains($role, 'AMMINISTRAZIONE')
+                || str_contains($role, 'ALTRO')
+            ) {
+                $board[] = $person;
+            }
+        }
+
+        if ($president === null) {
+            $president = $this->splitScrapedPersonName((string) ($fields['president_name'] ?? ''));
+        }
+
+        if ($president !== null && $this->people->countByRole(AssociationPeopleService::ROLE_PRESIDENT) === 0) {
+            try {
+                $this->people->replaceRole(AssociationPeopleService::ROLE_PRESIDENT, [$president]);
+                $applied[] = 'president_name';
+            } catch (\Throwable) {
+            }
+        }
+
+        if ($vices !== [] && $this->people->countByRole(AssociationPeopleService::ROLE_VICE_PRESIDENT) === 0) {
+            try {
+                $this->people->replaceRole(AssociationPeopleService::ROLE_VICE_PRESIDENT, $vices);
+                $applied[] = 'vice_president_name';
+            } catch (\Throwable) {
+            }
+        }
+
+        $exclude = [];
+        foreach (array_filter([$president, ...$vices]) as $p) {
+            if (!is_array($p)) {
+                continue;
+            }
+            $exclude[mb_strtolower(trim($p['first_name'] . '|' . $p['last_name']), 'UTF-8')] = true;
+        }
+        $board = array_values(array_filter($board, static function (array $p) use ($exclude): bool {
+            $key = mb_strtolower(trim($p['first_name'] . '|' . $p['last_name']), 'UTF-8');
+            return !isset($exclude[$key]);
+        }));
+
+        if ($board !== [] && $this->people->countByRole(AssociationPeopleService::ROLE_BOARD) === 0) {
+            try {
+                $this->people->replaceRole(AssociationPeopleService::ROLE_BOARD, $board);
+                $this->settings->set('association.board_configured', '1');
+                $applied[] = 'board_names';
+            } catch (\Throwable) {
+            }
+        }
+
         return $applied;
     }
+
+    private function expandProvinceName(string $value): string
+    {
+        $raw = trim($value);
+        if ($raw === '') {
+            return '';
+        }
+        $code = strtoupper(preg_replace('/[^A-Za-z]/', '', $raw) ?? '');
+        if (strlen($code) === 2 && isset(self::IT_PROVINCES[$code])) {
+            return self::IT_PROVINCES[$code];
+        }
+        return assoc_capitalize_name($raw);
+    }
+
+    /** @var array<string, string> */
+    private const IT_PROVINCES = [
+        'AG' => 'Agrigento', 'AL' => 'Alessandria', 'AN' => 'Ancona', 'AO' => 'Aosta', 'AP' => 'Ascoli Piceno',
+        'AQ' => 'L\'Aquila', 'AR' => 'Arezzo', 'AT' => 'Asti', 'AV' => 'Avellino', 'BA' => 'Bari',
+        'BG' => 'Bergamo', 'BI' => 'Biella', 'BL' => 'Belluno', 'BN' => 'Benevento', 'BO' => 'Bologna',
+        'BR' => 'Brindisi', 'BS' => 'Brescia', 'BT' => 'Barletta-Andria-Trani', 'BZ' => 'Bolzano',
+        'CA' => 'Cagliari', 'CB' => 'Campobasso', 'CE' => 'Caserta', 'CH' => 'Chieti', 'CL' => 'Caltanissetta',
+        'CN' => 'Cuneo', 'CO' => 'Como', 'CR' => 'Cremona', 'CS' => 'Cosenza', 'CT' => 'Catania',
+        'CZ' => 'Catanzaro', 'EN' => 'Enna', 'FC' => 'Forlì-Cesena', 'FE' => 'Ferrara', 'FG' => 'Foggia',
+        'FI' => 'Firenze', 'FM' => 'Fermo', 'FR' => 'Frosinone', 'GE' => 'Genova', 'GO' => 'Gorizia',
+        'GR' => 'Grosseto', 'IM' => 'Imperia', 'IS' => 'Isernia', 'KR' => 'Crotone', 'LC' => 'Lecco',
+        'LE' => 'Lecce', 'LI' => 'Livorno', 'LO' => 'Lodi', 'LT' => 'Latina', 'LU' => 'Lucca',
+        'MB' => 'Monza e Brianza', 'MC' => 'Macerata', 'ME' => 'Messina', 'MI' => 'Milano', 'MN' => 'Mantova',
+        'MO' => 'Modena', 'MS' => 'Massa-Carrara', 'MT' => 'Matera', 'NA' => 'Napoli', 'NO' => 'Novara',
+        'NU' => 'Nuoro', 'OR' => 'Oristano', 'PA' => 'Palermo', 'PC' => 'Piacenza', 'PD' => 'Padova',
+        'PE' => 'Pescara', 'PG' => 'Perugia', 'PI' => 'Pisa', 'PN' => 'Pordenone', 'PO' => 'Prato',
+        'PR' => 'Parma', 'PT' => 'Pistoia', 'PU' => 'Pesaro e Urbino', 'PV' => 'Pavia', 'PZ' => 'Potenza',
+        'RA' => 'Ravenna', 'RC' => 'Reggio Calabria', 'RE' => 'Reggio Emilia', 'RG' => 'Ragusa',
+        'RI' => 'Rieti', 'RM' => 'Roma', 'RN' => 'Rimini', 'RO' => 'Rovigo', 'SA' => 'Salerno',
+        'SI' => 'Siena', 'SO' => 'Sondrio', 'SP' => 'La Spezia', 'SR' => 'Siracusa', 'SS' => 'Sassari',
+        'SU' => 'Sud Sardegna', 'SV' => 'Savona', 'TA' => 'Taranto', 'TE' => 'Teramo', 'TN' => 'Trento',
+        'TO' => 'Torino', 'TP' => 'Trapani', 'TR' => 'Terni', 'TS' => 'Trieste', 'TV' => 'Treviso',
+        'UD' => 'Udine', 'VA' => 'Varese', 'VB' => 'Verbano-Cusio-Ossola', 'VC' => 'Vercelli',
+        'VE' => 'Venezia', 'VI' => 'Vicenza', 'VR' => 'Verona', 'VT' => 'Viterbo', 'VV' => 'Vibo Valentia',
+    ];
 
     /**
      * Persist the full RUNTS detail snapshot (people, dates, stats, …).

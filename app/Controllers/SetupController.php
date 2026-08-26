@@ -937,6 +937,7 @@ final class SetupController extends BaseController
 
         $savedDocuments = [];
         $legalPrefill = ['prefilled' => [], 'pending_ocr' => false, 'methods' => []];
+        $detailMeta = [];
         try {
             $emit(['type' => 'progress', 'phase' => 'detail', 'percent' => 70, 'number' => $number]);
             $detail = $this->runtsDetail->fetch($number, $emit);
@@ -950,7 +951,8 @@ final class SetupController extends BaseController
                     $fields[$key] = $value;
                 }
                 if (is_array($detail['detail'] ?? null) && $detail['detail'] !== []) {
-                    $this->setup->storeRuntsDetail($detail['detail']);
+                    $detailMeta = $detail['detail'];
+                    $this->setup->storeRuntsDetail($detailMeta);
                 }
                 if (!empty($detail['warning'])) {
                     $warnings[] = trim((string) $detail['warning']);
@@ -990,7 +992,11 @@ final class SetupController extends BaseController
         $applied = [];
         try {
             $emit(['type' => 'progress', 'phase' => 'apply', 'percent' => 98]);
-            $applied = $this->setup->applyRuntsHints($fields);
+            $hintResult = $this->setup->applyRuntsHints($fields, $detailMeta);
+            $applied = is_array($hintResult['applied'] ?? null) ? $hintResult['applied'] : [];
+            if (is_array($hintResult['fields'] ?? null)) {
+                $fields = $hintResult['fields'];
+            }
         } catch (\Throwable $e) {
             $emit([
                 'type' => 'error',
@@ -1009,6 +1015,24 @@ final class SetupController extends BaseController
             ];
         }, $savedDocuments);
 
+        $publicPeople = [];
+        foreach (is_array($detailMeta['people'] ?? null) ? $detailMeta['people'] : [] as $person) {
+            if (!is_array($person)) {
+                continue;
+            }
+            $first = trim((string) ($person['first_name'] ?? ''));
+            $last = trim((string) ($person['last_name'] ?? ''));
+            if ($first === '' && $last === '') {
+                continue;
+            }
+            $publicPeople[] = [
+                'first_name' => $first,
+                'last_name' => $last,
+                'role' => (string) ($person['role'] ?? ''),
+                'is_legal_rep' => (string) ($person['is_legal_rep'] ?? '') === '1',
+            ];
+        }
+
         $warning = trim(implode(' ', array_filter($warnings)));
         $emit([
             'type' => 'done',
@@ -1016,6 +1040,7 @@ final class SetupController extends BaseController
             'cancelled' => false,
             'warning' => $warning,
             'fields' => $fields,
+            'people' => $publicPeople,
             'applied' => $applied,
             'documents' => $publicDocs,
             'legal_prefill' => [

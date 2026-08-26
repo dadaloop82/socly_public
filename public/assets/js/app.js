@@ -3853,7 +3853,7 @@ function initSetupRuntsLookup(root) {
     return '';
   };
 
-  const foundHtml = (fields, documents, legalPrefill) => {
+  const foundHtml = (fields, documents, legalPrefill, people) => {
     const display = foundLabel(fields);
     const tpl = box.dataset.msgOk || 'Ho trovato :name';
     const parts = [];
@@ -3866,19 +3866,23 @@ function initSetupRuntsLookup(root) {
       ['pec', box.dataset.msgFieldPec || 'PEC'],
       ['website', box.dataset.msgFieldWebsite || 'Sito web'],
       ['address', box.dataset.msgFieldAddress || 'Sede'],
-      ['house_number', ''],
       ['postal_code', box.dataset.msgFieldPostalCode || 'CAP'],
       ['city', box.dataset.msgFieldCity || 'Città'],
       ['province', box.dataset.msgFieldProvince || 'Provincia'],
-      ['president_name', box.dataset.msgFieldPresidentName || 'Presidente'],
+      ['president_name', box.dataset.msgFieldPresidentName || 'Rappresentante legale'],
       ['section', box.dataset.msgFieldSection || 'Sezione RUNTS'],
+      ['forma_giuridica', box.dataset.msgFieldFormaGiuridica || 'Forma giuridica'],
+      ['founded_on', box.dataset.msgFieldFoundedOn || 'Atto costitutivo'],
+      ['statute_updated_on', box.dataset.msgFieldStatuteUpdatedOn || 'Ultimo aggiornamento statutario'],
+      ['members_count', box.dataset.msgFieldMembersCount || 'Soci'],
+      ['volunteers_count', box.dataset.msgFieldVolunteersCount || 'Volontari'],
+      ['activities', box.dataset.msgFieldActivities || 'Attività'],
     ];
     const fieldRows = [];
     const address = String(fields?.address || '').trim();
     const house = String(fields?.house_number || '').trim();
     const seat = [address, house].filter(Boolean).join(' ').trim();
     for (const [key, label] of fieldDefs) {
-      if (key === 'house_number') continue;
       let value = String(fields?.[key] || '').trim();
       if (key === 'address') value = seat;
       if (!value || !label) continue;
@@ -3892,6 +3896,26 @@ function initSetupRuntsLookup(root) {
       parts.push(`<div class="setup-runts-fields">
         <p class="setup-runts-docs-heading">${heading}</p>
         <ul class="setup-runts-fields-list">${fieldRows.join('')}</ul>
+      </div>`);
+    }
+
+    const peopleRows = Array.isArray(people) ? people : [];
+    if (peopleRows.length > 0) {
+      const heading = escapeHtml(box.dataset.msgPeopleHeading || 'Persone');
+      const items = peopleRows.map((person) => {
+        const name = escapeHtml([person?.first_name, person?.last_name].filter(Boolean).join(' ').trim());
+        const role = escapeHtml(String(person?.role || '').trim());
+        const badge = person?.is_legal_rep
+          ? `<span class="setup-runts-chip">${escapeHtml(box.dataset.msgFieldPresidentName || 'Rappresentante legale')}</span>`
+          : (role ? `<span class="setup-runts-chip is-muted">${role}</span>` : '');
+        return `<li class="setup-runts-person-row">
+          <span class="setup-runts-person-name">${name}</span>
+          ${badge}
+        </li>`;
+      }).join('');
+      parts.push(`<div class="setup-runts-people">
+        <p class="setup-runts-docs-heading">${heading}</p>
+        <ul class="setup-runts-people-list">${items}</ul>
       </div>`);
     }
 
@@ -4249,7 +4273,8 @@ function initSetupRuntsLookup(root) {
         let html = foundHtml(
           donePayload.fields || {},
           donePayload.documents || [],
-          legalPrefill
+          legalPrefill,
+          donePayload.people || []
         );
         if (warning) {
           html = `<p class="setup-runts-warn">${escapeHtml(warning)}</p>${html}`;
