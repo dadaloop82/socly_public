@@ -68,6 +68,8 @@ $router->post('/setup/discard', [SetupController::class, 'discard'], null, ['mw.
 $router->post('/setup/exit', [SetupController::class, 'exitSetup'], null, ['mw.locale', 'mw.install', 'mw.setup_open', 'mw.csrf']);
 $router->post('/setup/scrape', [SetupController::class, 'scrape'], null, ['mw.locale', 'mw.install', 'mw.setup_open', 'mw.csrf']);
 $router->post('/setup/runts-lookup', [SetupController::class, 'lookupRunts'], null, ['mw.locale', 'mw.install', 'mw.setup_open', 'mw.csrf']);
+$router->get('/setup/runts-legal-prefill-status', [SetupController::class, 'runtsLegalPrefillStatus'], null, ['mw.locale', 'mw.install', 'mw.setup_open']);
+$router->get('/setup/runts-document/{id}', [SetupController::class, 'viewRuntsDocument'], null, ['mw.locale', 'mw.install', 'mw.setup_open']);
 $router->post('/setup/mail/discover', [SetupController::class, 'discoverMail'], null, ['mw.locale', 'mw.install', 'mw.setup_open', 'mw.csrf']);
 $router->post('/setup/mail/test', [SetupController::class, 'testMail'], null, ['mw.locale', 'mw.install', 'mw.setup_open', 'mw.csrf']);
 $router->post('/setup/fields/autosave', [SetupController::class, 'autosaveFields'], null, ['mw.locale', 'mw.install', 'mw.setup_open', 'mw.csrf']);

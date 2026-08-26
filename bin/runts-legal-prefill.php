@@ -41,8 +41,20 @@ try {
         'finished_at' => date('c'),
         'result' => $result,
     ], JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT));
-    echo "OK prefilled=" . implode(',', $result['prefilled'] ?? []) . "\n";
+    echo "OK prefilled=" . implode(',', $result['prefilled'] ?? []) . " status=" . ($result['status'] ?? '') . "\n";
 } catch (Throwable $e) {
+    try {
+        /** @var \Socly\Services\SetupService $setup */
+        $setup = $app->get(\Socly\Services\SetupService::class);
+        $setup->storeLegalOcrState('failed', [], [], false);
+    } catch (Throwable $ignored) {
+    }
+    $log = storage_path('cache/runts_ocr_last.json');
+    @file_put_contents($log, (string) json_encode([
+        'finished_at' => date('c'),
+        'error' => $e->getMessage(),
+        'result' => ['prefilled' => [], 'status' => 'failed', 'pending_ocr' => false],
+    ], JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT));
     fwrite(STDERR, $e->getMessage() . "\n");
     exit(2);
 } finally {

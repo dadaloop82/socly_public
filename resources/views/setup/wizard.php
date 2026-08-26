@@ -276,10 +276,17 @@ $errorStep = flash('setup_error_step');
                                      data-msg-phase-apply="<?= e(__('setup.runts_phase_apply')) ?>"
                                      data-msg-docs-saved="<?= e(__('setup.runts_docs_saved')) ?>"
                                      data-msg-docs-none="<?= e(__('setup.runts_docs_none')) ?>"
+                                     data-msg-doc-view="<?= e(__('setup.runts_doc_view')) ?>"
+                                     data-msg-doc-close="<?= e(__('common.close')) ?>"
+                                     data-doc-view-base="<?= e(url('/setup/runts-document')) ?>"
                                      data-msg-legal-prefilled="<?= e(__('setup.runts_legal_prefilled')) ?>"
                                      data-msg-legal-statute="<?= e(__('setup.runts_legal_statute')) ?>"
                                      data-msg-legal-privacy="<?= e(__('setup.runts_legal_privacy')) ?>"
                                      data-msg-legal-ocr-pending="<?= e(__('setup.runts_legal_ocr_pending')) ?>"
+                                     data-msg-legal-ocr-ok="<?= e(__('setup.runts_legal_ocr_ok')) ?>"
+                                     data-msg-legal-ocr-fail="<?= e(__('setup.runts_legal_ocr_fail')) ?>"
+                                     data-msg-legal-ocr-unavailable="<?= e(__('setup.runts_legal_ocr_unavailable')) ?>"
+                                     data-legal-status-url="<?= e(url('/setup/runts-legal-prefill-status')) ?>"
                                      data-msg-limit-wait="<?= e(__('setup.runts_limit_wait')) ?>"
                                      data-msg-limit-exhausted="<?= e(__('setup.runts_limit_exhausted')) ?>"
                                 >
@@ -287,7 +294,7 @@ $errorStep = flash('setup_error_step');
                                         <span><?= e(__($field['label_key'])) ?></span>
                                     </label>
                                     <div class="setup-runts-row">
-                                        <p class="setup-runts-hint muted" data-setup-runts-hint><?= e(__('setup.runts_hint')) ?></p>
+                                        <p class="setup-runts-hint" data-setup-runts-hint><?= e(__('setup.runts_hint')) ?></p>
                                         <input
                                             id="setup-runts-number"
                                             type="text"
@@ -1199,6 +1206,18 @@ $errorStep = flash('setup_error_step');
     <form method="post" action="<?= e(url('/setup/discard')) ?>" class="setup-logout-form" data-setup-discard hidden>
         <?= csrf_field() ?>
     </form>
+
+    <dialog class="setup-runts-doc-dialog" data-setup-runts-doc-dialog>
+        <div class="setup-runts-doc-shell">
+            <div class="setup-runts-doc-head">
+                <h2 class="setup-runts-doc-title" data-setup-runts-doc-title><?= e(__('setup.runts_doc_view')) ?></h2>
+                <button type="button" class="btn btn-ghost btn-sm" data-setup-runts-doc-close><?= e(__('common.close')) ?></button>
+            </div>
+            <div class="setup-runts-doc-frame-wrap">
+                <iframe class="setup-runts-doc-frame" data-setup-runts-doc-frame title="<?= e(__('setup.runts_doc_view')) ?>"></iframe>
+            </div>
+        </div>
+    </dialog>
 
     <dialog class="setup-exit-dialog" data-setup-exit-dialog>
         <div class="setup-exit-shell">

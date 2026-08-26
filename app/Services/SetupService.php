@@ -1136,7 +1136,13 @@ final class SetupService
      * Prefill legal.statute / legal.privacy from RUNTS PDF text (native or OCR).
      *
      * @param list<array{title?:string,filename?:string,absolute?:string,legal_kind?:string|null,id?:int}> $documents
-     * @return array{prefilled:list<string>,methods:array<string,string>,pending_ocr:bool}
+     * @return array{
+     *   prefilled:list<string>,
+     *   methods:array<string,string>,
+     *   pending_ocr:bool,
+     *   status:string,
+     *   attempted:list<string>
+     * }
      */
     public function prefillLegalTextsFromDocuments(array $documents, bool $allowOcr = false): array
     {
@@ -1144,6 +1150,7 @@ final class SetupService
         $extractor = app(PdfTextExtractor::class);
         $prefilled = [];
         $methods = [];
+        $attempted = [];
         $needsOcr = false;
 
         foreach ($documents as $doc) {
@@ -1178,6 +1185,7 @@ final class SetupService
                 continue;
             }
 
+            $attempted[] = $kind;
             $extracted = $extractor->extract($path, [
                 'ocr' => $allowOcr,
                 'max_pages' => 20,
@@ -1188,6 +1196,8 @@ final class SetupService
             if (empty($extracted['ok']) || !$this->legalTextLooksValid((string) ($extracted['text'] ?? ''), $kind)) {
                 if (!$allowOcr && ($extracted['error'] ?? '') === 'no_text_layer' && $extractor->ocrAvailable()) {
                     $needsOcr = true;
+                } elseif (!$allowOcr && ($extracted['error'] ?? '') === 'no_text_layer' && !$extractor->ocrAvailable()) {
+                    $needsOcr = false;
                 }
                 continue;
             }
@@ -1200,16 +1210,103 @@ final class SetupService
             $methods[$kind] = (string) ($extracted['method'] ?? '');
         }
 
-        if ($needsOcr && $prefilled === []) {
-            $this->settings->set('legal.runts_ocr_pending', '1');
+        $prefilled = array_values(array_unique($prefilled));
+        $attempted = array_values(array_unique($attempted));
+        $pending = $needsOcr && $prefilled === [];
+
+        if ($allowOcr) {
+            // Background OCR finished: always settle pending, success or not.
+            $status = $prefilled !== [] ? 'ok' : ($attempted !== [] ? 'failed' : 'none');
+            $this->storeLegalOcrState($status, $prefilled, $methods, false);
+        } elseif ($pending) {
+            $this->storeLegalOcrState('pending', [], [], true);
         } elseif ($prefilled !== []) {
-            $this->settings->set('legal.runts_ocr_pending', '0');
+            $usedOcr = in_array('ocr', array_values($methods), true);
+            $this->storeLegalOcrState($usedOcr ? 'ok' : 'prefilled', $prefilled, $methods, false);
+        } elseif ($attempted !== []) {
+            // Scanned PDFs but OCR tools missing, or text not usable.
+            $status = $extractor->ocrAvailable() ? 'failed' : 'unavailable';
+            $this->storeLegalOcrState($status, [], [], false);
+        } else {
+            $this->storeLegalOcrState('none', [], [], false);
+        }
+
+        $status = (string) $this->settings->get('legal.runts_ocr_status', $pending ? 'pending' : 'none');
+
+        return [
+            'prefilled' => $prefilled,
+            'methods' => $methods,
+            'pending_ocr' => $pending,
+            'status' => $status,
+            'attempted' => $attempted,
+        ];
+    }
+
+    /**
+     * @param list<string> $prefilled
+     * @param array<string,string> $methods
+     */
+    public function storeLegalOcrState(string $status, array $prefilled = [], array $methods = [], bool $pending = false): void
+    {
+        $this->settings->set('legal.runts_ocr_pending', $pending ? '1' : '0');
+        $this->settings->set('legal.runts_ocr_status', $status);
+        $this->settings->set('legal.runts_ocr_result', [
+            'prefilled' => array_values($prefilled),
+            'methods' => $methods,
+            'updated_at' => date('c'),
+        ]);
+    }
+
+    /**
+     * Current OCR/prefill outcome for the setup UI (polling after background job).
+     *
+     * @return array{
+     *   ok:bool,
+     *   pending:bool,
+     *   status:string,
+     *   prefilled:list<string>,
+     *   methods:array<string,string>
+     * }
+     */
+    public function legalPrefillStatus(): array
+    {
+        $pending = (string) $this->settings->get('legal.runts_ocr_pending', '0') === '1';
+        $status = (string) $this->settings->get('legal.runts_ocr_status', $pending ? 'pending' : 'none');
+        $raw = $this->settings->get('legal.runts_ocr_result', []);
+        $result = is_array($raw) ? $raw : [];
+        $prefilled = [];
+        if (is_array($result['prefilled'] ?? null)) {
+            foreach ($result['prefilled'] as $item) {
+                $item = (string) $item;
+                if (in_array($item, ['statute', 'privacy'], true)) {
+                    $prefilled[] = $item;
+                }
+            }
+        }
+        $methods = is_array($result['methods'] ?? null) ? $result['methods'] : [];
+
+        // Fallback: if pending flag stuck but lock is gone and last job log exists.
+        if ($pending && !is_file(storage_path('cache/runts_ocr.lock'))) {
+            $log = storage_path('cache/runts_ocr_last.json');
+            if (is_file($log)) {
+                $decoded = json_decode((string) file_get_contents($log), true);
+                if (is_array($decoded['result'] ?? null)) {
+                    $jobResult = $decoded['result'];
+                    $prefilled = array_values(array_unique(array_map('strval', $jobResult['prefilled'] ?? [])));
+                    $methods = is_array($jobResult['methods'] ?? null) ? $jobResult['methods'] : [];
+                    $status = $prefilled !== [] ? 'ok' : 'failed';
+                    $this->storeLegalOcrState($status, $prefilled, $methods, false);
+                    $pending = false;
+                }
+            }
         }
 
         return [
-            'prefilled' => array_values(array_unique($prefilled)),
+            'ok' => true,
+            'pending' => $pending,
+            'status' => $status,
+            'prefilled' => $prefilled,
             'methods' => $methods,
-            'pending_ocr' => $needsOcr && $prefilled === [],
         ];
     }
 

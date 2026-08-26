@@ -813,8 +813,15 @@ a:hover { text-decoration: underline; color: var(--brand-primary-deep); }
 }
 .setup-runts-hint {
   margin: 0;
-  font-size: 0.78rem;
-  line-height: 1.25;
+  padding: 0.55rem 0.7rem;
+  font-size: 0.84rem;
+  line-height: 1.3;
+  font-weight: 700;
+  color: var(--brand-primary-deep);
+  background: color-mix(in srgb, var(--brand-primary) 12%, #fff);
+  border: 2px solid color-mix(in srgb, var(--brand-primary) 55%, var(--line));
+  border-radius: 10px;
+  box-shadow: inset 3px 0 0 var(--brand-primary);
 }
 .setup-runts-actions {
   display: flex;
@@ -840,33 +847,190 @@ a:hover { text-decoration: underline; color: var(--brand-primary-deep); }
   display: none !important;
 }
 .setup-runts-block.is-found .setup-runts-status {
-  font-size: 1.08rem;
-  line-height: 1.35;
+  font-size: 0.95rem;
+  line-height: 1.4;
   color: var(--ink);
-  font-weight: 700;
+  font-weight: 400;
 }
 .setup-runts-block.is-found .setup-runts-status strong {
-  font-size: 1.12rem;
+  font-weight: 700;
 }
-.setup-runts-docs {
-  margin: 0.55rem 0 0;
-  font-size: 0.92rem;
-  font-weight: 500;
-  line-height: 1.4;
+.setup-runts-result {
+  display: grid;
+  gap: 0.85rem;
 }
-.setup-runts-docs p {
-  margin: 0 0 0.25rem;
-}
-.setup-runts-docs ul {
+.setup-runts-found {
   margin: 0;
-  padding-left: 1.1rem;
+  font-size: 1.08rem;
+  line-height: 1.35;
+  font-weight: 700;
+  color: var(--ink);
 }
-.setup-runts-docs li {
-  margin: 0.1rem 0;
+.setup-runts-found strong {
+  font-weight: 800;
+}
+.setup-runts-docs,
+.setup-runts-legal {
+  margin: 0;
+  padding: 0.75rem 0.85rem;
+  border-radius: 14px;
+  border: 1px solid color-mix(in srgb, var(--brand-primary) 16%, var(--line));
+  background: color-mix(in srgb, var(--brand-paper) 55%, #fff);
+}
+.setup-runts-docs-heading {
+  margin: 0 0 0.55rem;
+  font-size: 0.78rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.setup-runts-docs-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 0.45rem;
+}
+.setup-runts-doc-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.55rem 0.65rem;
+  border-radius: 10px;
+  background: color-mix(in srgb, #fff 78%, var(--brand-paper));
+  border: 1px solid color-mix(in srgb, var(--line) 80%, transparent);
+}
+.setup-runts-doc-meta {
+  min-width: 0;
+  display: grid;
+  gap: 0.1rem;
+}
+.setup-runts-doc-name {
+  font-size: 0.92rem;
+  font-weight: 700;
+  color: var(--ink);
+  line-height: 1.25;
+}
+.setup-runts-doc-file {
+  font-size: 0.76rem;
+  line-height: 1.3;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.setup-runts-doc-open {
+  flex: 0 0 auto;
+  margin: 0;
+  padding: 0.35rem 0.7rem;
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--brand-primary) 28%, var(--line));
+  background: color-mix(in srgb, var(--brand-primary) 8%, #fff);
+  color: var(--brand-primary-deep);
+  font: inherit;
+  font-size: 0.78rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+.setup-runts-doc-open:hover {
+  background: color-mix(in srgb, var(--brand-primary) 14%, #fff);
+}
+@media (max-width: 560px) {
+  .setup-runts-doc-row {
+    flex-wrap: wrap;
+    align-items: flex-start;
+  }
+  .setup-runts-doc-open {
+    margin-left: auto;
+  }
+}
+.setup-runts-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+.setup-runts-chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.28rem 0.65rem;
+  border-radius: 999px;
+  font-size: 0.8rem;
+  font-weight: 700;
+  background: color-mix(in srgb, var(--brand-primary) 12%, #fff);
+  color: var(--brand-primary-deep);
+  border: 1px solid color-mix(in srgb, var(--brand-primary) 22%, var(--line));
+}
+.setup-runts-note {
+  margin: 0;
+  padding: 0.65rem 0.8rem;
+  border-radius: 12px;
+  font-size: 0.86rem;
+  line-height: 1.4;
+  font-weight: 600;
+  color: color-mix(in srgb, var(--ink) 82%, #8a6a12);
+  background: color-mix(in srgb, #f6e7b2 55%, #fff);
+  border: 1px solid color-mix(in srgb, #d4b45a 35%, var(--line));
+}
+.setup-runts-note.is-fail {
+  color: color-mix(in srgb, var(--ink) 75%, #8b2e2e);
+  background: color-mix(in srgb, #f3d0d0 45%, #fff);
+  border-color: color-mix(in srgb, #c97070 40%, var(--line));
 }
 .setup-runts-warn {
   margin: 0 0 0.45rem;
   font-weight: 600;
+}
+.setup-runts-doc-dialog {
+  border: 0;
+  border-radius: 18px;
+  padding: 0;
+  max-width: min(960px, 96vw);
+  width: 100%;
+  background: transparent;
+}
+.setup-runts-doc-dialog::backdrop {
+  background: color-mix(in srgb, #0b1c24 62%, transparent);
+  backdrop-filter: blur(5px);
+}
+.setup-runts-doc-shell {
+  background: var(--card, #fff);
+  border-radius: 18px;
+  box-shadow: 0 24px 60px color-mix(in srgb, #000 28%, transparent);
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  max-height: min(90vh, 920px);
+  overflow: hidden;
+}
+.setup-runts-doc-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.85rem 1rem;
+  border-bottom: 1px solid var(--line, #d7dee7);
+}
+.setup-runts-doc-title {
+  margin: 0;
+  font-size: 1.05rem;
+  line-height: 1.3;
+  color: var(--ink, #1a1a1a);
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.setup-runts-doc-frame-wrap {
+  min-height: 0;
+  overflow: auto;
+  background: #edf1f4;
+}
+.setup-runts-doc-frame {
+  display: block;
+  width: 100%;
+  height: min(78vh, 820px);
+  border: 0;
+  background: #fff;
 }
 .setup-locale-grid {
   border: 0;
@@ -3406,6 +3570,8 @@ html:has(.setup-body) {
   line-height: 1.35;
   margin: 0 0 0.85rem;
   display: block;
+  max-width: 100%;
+  overflow: hidden;
 }
 .setup-thanks-lead,
 .setup-thanks-trail {
@@ -3420,6 +3586,8 @@ html:has(.setup-body) {
   vertical-align: baseline;
   white-space: nowrap;
   gap: 0.28em;
+  max-width: 100%;
+  min-width: 0;
 }
 .assoc-lockup-thanks .assoc-name,
 .assoc-lockup-setup-title .assoc-name {
@@ -3427,6 +3595,7 @@ html:has(.setup-body) {
   color: var(--brand-accent-ink);
   font-weight: 700;
   white-space: nowrap;
+  min-width: 0;
 }
 .assoc-lockup-thanks .assoc-legal,
 .assoc-lockup-setup-title .assoc-legal {

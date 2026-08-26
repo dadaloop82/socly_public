@@ -1085,6 +1085,7 @@ function initSetupWizard() {
   initSetupNamePairPreview(root);
   initPlatformConsents(root);
   initSetupCtaGate(root);
+  initSetupFitAssocNames(root);
 
   setupForm?.querySelectorAll('[data-setup-defer-step]').forEach((btn) => {
     btn.addEventListener('click', () => {
@@ -3800,37 +3801,196 @@ function initSetupRuntsLookup(root) {
     return `${name} ${legal}`;
   };
 
+  const formatDocTitle = (raw) => {
+    const title = String(raw || '').trim();
+    if (title === '') return 'Documento';
+    const letters = title.replace(/[^A-Za-zÀ-ÖØ-öø-ÿ]/g, '');
+    if (letters.length >= 4 && letters === letters.toUpperCase()) {
+      return title
+        .toLowerCase()
+        .replace(/(^|[\s/_(.-])([\p{L}])/gu, (_, sep, ch) => sep + ch.toUpperCase());
+    }
+    return title;
+  };
+
+  const legalPrefillBlock = (legalPrefill) => {
+    const prefilled = Array.isArray(legalPrefill?.prefilled) ? legalPrefill.prefilled : [];
+    const status = String(legalPrefill?.status || '').trim();
+    const pending = !!legalPrefill?.pending_ocr || status === 'pending';
+    const labels = {
+      statute: box.dataset.msgLegalStatute || 'Statuto',
+      privacy: box.dataset.msgLegalPrivacy || 'Informativa privacy',
+    };
+
+    if (prefilled.length > 0) {
+      const usedOcr = status === 'ok'
+        || Object.values(legalPrefill?.methods || {}).some((m) => String(m) === 'ocr');
+      const heading = escapeHtml(
+        usedOcr
+          ? (box.dataset.msgLegalOcrOk || box.dataset.msgLegalPrefilled || '')
+          : (box.dataset.msgLegalPrefilled || '')
+      );
+      const chips = prefilled.map((key) => {
+        const label = escapeHtml(labels[key] || String(key));
+        return `<span class="setup-runts-chip">${label}</span>`;
+      }).join('');
+      return `<div class="setup-runts-legal" data-setup-runts-legal>
+        <p class="setup-runts-docs-heading">${heading}</p>
+        <div class="setup-runts-chips">${chips}</div>
+      </div>`;
+    }
+
+    if (pending) {
+      return `<p class="setup-runts-note" data-setup-runts-legal>${escapeHtml(box.dataset.msgLegalOcrPending || '')}</p>`;
+    }
+    if (status === 'unavailable') {
+      return `<p class="setup-runts-note is-fail" data-setup-runts-legal>${escapeHtml(box.dataset.msgLegalOcrUnavailable || '')}</p>`;
+    }
+    if (status === 'failed') {
+      return `<p class="setup-runts-note is-fail" data-setup-runts-legal>${escapeHtml(box.dataset.msgLegalOcrFail || '')}</p>`;
+    }
+    return '';
+  };
+
   const foundHtml = (fields, documents, legalPrefill) => {
     const display = foundLabel(fields);
-    const tpl = box.dataset.msgOk || 'Trovato :name.';
-    let html = escapeHtml(tpl).replaceAll(':name', `<strong>${escapeHtml(display)}</strong>`);
+    const tpl = box.dataset.msgOk || 'Ho trovato :name';
+    const parts = [];
+    parts.push(
+      `<p class="setup-runts-found">${escapeHtml(tpl).replaceAll(':name', `<strong>${escapeHtml(display)}</strong>`)}</p>`
+    );
+
     const docs = Array.isArray(documents) ? documents : [];
+    const viewBase = String(box.dataset.docViewBase || '').replace(/\/$/, '');
+    const viewLabel = box.dataset.msgDocView || 'Vedi';
     if (docs.length > 0) {
-      const heading = escapeHtml(box.dataset.msgDocsSaved || 'Documenti scaricati e salvati in Documenti:');
+      const heading = escapeHtml(box.dataset.msgDocsSaved || 'Salvati in Documenti');
       const items = docs.map((doc) => {
-        const title = escapeHtml(String(doc?.title || '').trim() || 'Documento');
+        const title = escapeHtml(formatDocTitle(doc?.title));
         const file = escapeHtml(String(doc?.filename || '').trim());
-        return `<li><strong>${title}</strong>${file ? ` <span class="muted">(${file})</span>` : ''}</li>`;
+        const id = Number(doc?.id) || 0;
+        const openBtn = id > 0 && viewBase
+          ? `<button type="button" class="setup-runts-doc-open" data-runts-doc-id="${id}" data-runts-doc-title="${title}">${escapeHtml(viewLabel)}</button>`
+          : '';
+        return `<li class="setup-runts-doc-row">
+          <div class="setup-runts-doc-meta">
+            <span class="setup-runts-doc-name">${title}</span>
+            ${file ? `<span class="setup-runts-doc-file muted">${file}</span>` : ''}
+          </div>
+          ${openBtn}
+        </li>`;
       }).join('');
-      html += `<div class="setup-runts-docs"><p>${heading}</p><ul>${items}</ul></div>`;
+      parts.push(`<div class="setup-runts-docs">
+        <p class="setup-runts-docs-heading">${heading}</p>
+        <ul class="setup-runts-docs-list">${items}</ul>
+      </div>`);
     }
-    const prefilled = Array.isArray(legalPrefill?.prefilled) ? legalPrefill.prefilled : [];
-    if (prefilled.length > 0) {
-      const labels = {
-        statute: box.dataset.msgLegalStatute || 'Statuto',
-        privacy: box.dataset.msgLegalPrivacy || 'Informativa privacy',
-      };
-      const heading = escapeHtml(box.dataset.msgLegalPrefilled || 'Testo precompilato:');
-      const items = prefilled.map((key) => {
-        const label = escapeHtml(labels[key] || String(key));
-        return `<li><strong>${label}</strong></li>`;
-      }).join('');
-      html += `<div class="setup-runts-docs"><p>${heading}</p><ul>${items}</ul></div>`;
-    } else if (legalPrefill?.pending_ocr) {
-      html += `<p class="setup-runts-warn">${escapeHtml(box.dataset.msgLegalOcrPending || '')}</p>`;
-    }
-    return html;
+
+    const legalHtml = legalPrefillBlock(legalPrefill);
+    if (legalHtml) parts.push(legalHtml);
+
+    return `<div class="setup-runts-result">${parts.join('')}</div>`;
   };
+
+  let ocrPollTimer = 0;
+  const stopOcrPoll = () => {
+    if (ocrPollTimer) {
+      clearInterval(ocrPollTimer);
+      ocrPollTimer = 0;
+    }
+  };
+
+  const replaceLegalPrefillUi = (legalPrefill) => {
+    const result = status?.querySelector('.setup-runts-result');
+    if (!(result instanceof HTMLElement)) return;
+    const next = legalPrefillBlock(legalPrefill);
+    const current = result.querySelector('[data-setup-runts-legal]');
+    if (!next) {
+      current?.remove();
+      return;
+    }
+    const wrap = document.createElement('div');
+    wrap.innerHTML = next;
+    const node = wrap.firstElementChild;
+    if (!(node instanceof HTMLElement)) return;
+    if (current) current.replaceWith(node);
+    else result.appendChild(node);
+  };
+
+  const startOcrPoll = () => {
+    stopOcrPoll();
+    const url = String(box.dataset.legalStatusUrl || '').trim();
+    if (!url) return;
+    let tries = 0;
+    const maxTries = 90; // ~7.5 min at 5s
+    ocrPollTimer = window.setInterval(async () => {
+      tries += 1;
+      if (tries > maxTries) {
+        stopOcrPoll();
+        replaceLegalPrefillUi({ status: 'failed', pending_ocr: false, prefilled: [] });
+        return;
+      }
+      try {
+        const res = await fetch(url, { headers: { Accept: 'application/json' }, credentials: 'same-origin' });
+        if (!res.ok) return;
+        const data = await res.json();
+        if (!data || data.ok === false) return;
+        if (data.pending) return;
+        stopOcrPoll();
+        replaceLegalPrefillUi({
+          status: data.status || (Array.isArray(data.prefilled) && data.prefilled.length ? 'ok' : 'failed'),
+          pending_ocr: false,
+          prefilled: data.prefilled || [],
+          methods: data.methods || {},
+        });
+      } catch {
+        /* keep polling */
+      }
+    }, 5000);
+  };
+
+  const docDialog = root.querySelector('[data-setup-runts-doc-dialog]');
+  const docFrame = docDialog?.querySelector('[data-setup-runts-doc-frame]');
+  const docTitleEl = docDialog?.querySelector('[data-setup-runts-doc-title]');
+  const docCloseBtn = docDialog?.querySelector('[data-setup-runts-doc-close]');
+
+  const closeDocDialog = () => {
+    if (docFrame instanceof HTMLIFrameElement) {
+      docFrame.src = 'about:blank';
+    }
+    if (docDialog instanceof HTMLDialogElement && docDialog.open) {
+      docDialog.close();
+    }
+  };
+
+  const openDocDialog = (id, title) => {
+    if (!(docDialog instanceof HTMLDialogElement) || !(docFrame instanceof HTMLIFrameElement)) return;
+    const viewBase = String(box.dataset.docViewBase || '').replace(/\/$/, '');
+    if (!viewBase || !id) return;
+    if (docTitleEl) docTitleEl.textContent = title || (box.dataset.msgDocView || 'Documento');
+    docFrame.src = `${viewBase}/${id}`;
+    if (typeof docDialog.showModal === 'function') docDialog.showModal();
+    else docDialog.setAttribute('open', 'open');
+  };
+
+  status?.addEventListener('click', (event) => {
+    const target = event.target;
+    if (!(target instanceof Element)) return;
+    const btn = target.closest('[data-runts-doc-id]');
+    if (!(btn instanceof HTMLElement)) return;
+    event.preventDefault();
+    const id = Number(btn.dataset.runtsDocId) || 0;
+    const title = btn.dataset.runtsDocTitle || '';
+    openDocDialog(id, title);
+  });
+  docCloseBtn?.addEventListener('click', () => closeDocDialog());
+  docDialog?.addEventListener('cancel', (event) => {
+    event.preventDefault();
+    closeDocDialog();
+  });
+  docDialog?.addEventListener('click', (event) => {
+    if (event.target === docDialog) closeDocDialog();
+  });
 
   const setElapsed = (sec) => {
     if (!elapsedEl) return;
@@ -3959,6 +4119,7 @@ function initSetupRuntsLookup(root) {
       return;
     }
     if (box.dataset.runtsExhausted === '1' || box.dataset.runtsCooldowning === '1') return;
+    stopOcrPoll();
     setLookupBusy(true);
     showBtn();
     setProgress(4);
@@ -4049,16 +4210,20 @@ function initSetupRuntsLookup(root) {
         const spinner = live?.querySelector('.setup-scrape-spinner');
         if (spinner instanceof HTMLElement) spinner.hidden = true;
         const warning = String(donePayload.warning || '').trim();
+        const legalPrefill = donePayload.legal_prefill || {};
         let html = foundHtml(
           donePayload.fields || {},
           donePayload.documents || [],
-          donePayload.legal_prefill || {}
+          legalPrefill
         );
         if (warning) {
           html = `<p class="setup-runts-warn">${escapeHtml(warning)}</p>${html}`;
           showStatus('', 'warn', html);
         } else {
           showStatus('', '', html);
+        }
+        if (legalPrefill.pending_ocr || legalPrefill.status === 'pending') {
+          startOcrPoll();
         }
       } else {
         const code = streamErrorCode || String(donePayload?.code || '');
@@ -4128,6 +4293,62 @@ function initSetupCtaGate(root) {
   form.addEventListener('change', refresh);
   form.addEventListener('setup:cta-refresh', refresh);
   refresh();
+}
+
+function initSetupFitAssocNames(root) {
+  const fitOne = (lockup) => {
+    if (!(lockup instanceof HTMLElement)) return;
+    const nameEl = lockup.querySelector('.assoc-name');
+    if (!(nameEl instanceof HTMLElement)) return;
+    const titleEl = lockup.closest('.setup-thanks-title, [data-setup-fit-title], h1, h2') || lockup.parentElement;
+    if (!(titleEl instanceof HTMLElement)) return;
+
+    nameEl.style.fontSize = '';
+    nameEl.style.maxWidth = '';
+    nameEl.style.overflow = '';
+    nameEl.style.textOverflow = '';
+    nameEl.style.display = '';
+    nameEl.removeAttribute('title');
+
+    const full = (nameEl.textContent || '').trim();
+    if (full === '') return;
+
+    let size = parseFloat(getComputedStyle(nameEl).fontSize) || parseFloat(getComputedStyle(titleEl).fontSize) || 24;
+    const min = 13;
+    let guard = 40;
+    while (titleEl.scrollWidth > titleEl.clientWidth + 1 && size > min && guard > 0) {
+      size -= 0.5;
+      nameEl.style.fontSize = `${size}px`;
+      guard -= 1;
+    }
+
+    if (titleEl.scrollWidth > titleEl.clientWidth + 1) {
+      nameEl.style.display = 'inline-block';
+      nameEl.style.overflow = 'hidden';
+      nameEl.style.textOverflow = 'ellipsis';
+      nameEl.style.verticalAlign = 'bottom';
+      nameEl.setAttribute('title', full);
+      let lo = 5;
+      let hi = Math.max(6, Math.floor((titleEl.clientWidth || 280) / 12));
+      guard = 24;
+      while (lo < hi && guard > 0) {
+        const mid = Math.ceil((lo + hi) / 2);
+        nameEl.style.maxWidth = `${mid}ch`;
+        if (titleEl.scrollWidth > titleEl.clientWidth + 1) hi = mid - 1;
+        else lo = mid;
+        guard -= 1;
+      }
+      nameEl.style.maxWidth = `${Math.max(5, lo)}ch`;
+    }
+  };
+
+  const run = () => {
+    root.querySelectorAll('.assoc-lockup-thanks, .assoc-lockup-setup-title').forEach(fitOne);
+  };
+  run();
+  window.addEventListener('resize', () => {
+    window.requestAnimationFrame(run);
+  });
 }
 
 function initSetupWebsiteScrape(root) {

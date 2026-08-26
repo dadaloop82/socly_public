@@ -968,7 +968,14 @@ final class SetupController extends BaseController
                     $emit(['type' => 'progress', 'phase' => 'docs_ocr', 'percent' => 97, 'number' => $number]);
                     $legalPrefill = $this->setup->prefillLegalTextsFromDocuments($savedDocuments, false);
                     if (!empty($legalPrefill['pending_ocr'])) {
-                        $this->setup->queueLegalPrefillFromDocuments($savedDocuments);
+                        $queued = $this->setup->queueLegalPrefillFromDocuments($savedDocuments);
+                        if (!$queued) {
+                            $legalPrefill['pending_ocr'] = false;
+                            $legalPrefill['status'] = 'unavailable';
+                            $this->setup->storeLegalOcrState('unavailable', [], [], false);
+                        } else {
+                            $legalPrefill['status'] = 'pending';
+                        }
                     }
                 }
             } else {
@@ -1013,6 +1020,8 @@ final class SetupController extends BaseController
                 'prefilled' => $legalPrefill['prefilled'] ?? [],
                 'pending_ocr' => !empty($legalPrefill['pending_ocr']),
                 'methods' => $legalPrefill['methods'] ?? [],
+                'status' => (string) ($legalPrefill['status'] ?? 'none'),
+                'attempted' => $legalPrefill['attempted'] ?? [],
             ],
             'elapsed_ms' => $result['elapsed_ms'] ?? null,
             'attempts_left' => $attemptsLeft,
@@ -1023,6 +1032,72 @@ final class SetupController extends BaseController
                 ) ?: (string) ($fields['name'] ?? ''),
             ]),
         ]);
+    }
+
+    /**
+     * Poll OCR/prefill outcome after RUNTS lookup (background job).
+     */
+    public function runtsLegalPrefillStatus(Request $request): void
+    {
+        header('Content-Type: application/json; charset=utf-8');
+        if ($this->setup->isComplete() && !$this->setup->isAdmin()) {
+            http_response_code(403);
+            echo json_encode(['ok' => false, 'error' => 'forbidden'], JSON_UNESCAPED_UNICODE);
+            return;
+        }
+        echo json_encode($this->setup->legalPrefillStatus(), JSON_UNESCAPED_UNICODE);
+    }
+
+    /**
+     * Inline preview of a RUNTS-imported document during setup (no auth required).
+     */
+    public function viewRuntsDocument(Request $request, string $id): void
+    {
+        if ($this->setup->isComplete() && !$this->setup->isAdmin()) {
+            http_response_code(403);
+            echo 'Forbidden';
+            return;
+        }
+
+        $docId = (int) $id;
+        if ($docId < 1) {
+            http_response_code(404);
+            echo 'Not found';
+            return;
+        }
+
+        /** @var \Socly\Services\DocumentService $documents */
+        $documents = app(\Socly\Services\DocumentService::class);
+        $doc = $documents->find($docId);
+        if ($doc === null) {
+            http_response_code(404);
+            echo 'Not found';
+            return;
+        }
+
+        $summary = (string) ($doc['summary'] ?? '');
+        if (!str_contains($summary, 'RUNTS') && !str_contains($summary, 'portale RUNTS')) {
+            http_response_code(403);
+            echo 'Forbidden';
+            return;
+        }
+
+        $path = $documents->filePath($docId);
+        if ($path === null || !is_file($path)) {
+            http_response_code(404);
+            echo 'Not found';
+            return;
+        }
+
+        $mime = trim((string) ($doc['file_mime'] ?? '')) ?: (mime_content_type($path) ?: 'application/pdf');
+        $name = trim((string) ($doc['title'] ?? 'documento')) . '.pdf';
+        $safeName = preg_replace('/[^\w.\-]+/u', '_', $name) ?: 'documento.pdf';
+
+        header('Content-Type: ' . $mime);
+        header('Content-Disposition: inline; filename="' . $safeName . '"');
+        header('Cache-Control: private, max-age=120');
+        header('X-Content-Type-Options: nosniff');
+        readfile($path);
     }
 
     /** @return array<string, mixed> */
