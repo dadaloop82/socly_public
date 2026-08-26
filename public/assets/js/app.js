@@ -1129,6 +1129,7 @@ function initSetupWizard() {
       cardAnim.finished.then(() => {
         panel.style.opacity = '1';
         panel.style.transform = 'translateY(0)';
+        root.dispatchEvent(new CustomEvent('setup:fit-assoc-names'));
       }).catch(() => {});
 
       lines.forEach((el, i) => {
@@ -4300,8 +4301,9 @@ function initSetupFitAssocNames(root) {
     if (!(lockup instanceof HTMLElement)) return;
     const nameEl = lockup.querySelector('.assoc-name');
     if (!(nameEl instanceof HTMLElement)) return;
-    const titleEl = lockup.closest('.setup-thanks-title, [data-setup-fit-title], h1, h2') || lockup.parentElement;
+    const titleEl = lockup.closest('.setup-thanks-title, [data-setup-fit-title], h1.setup-title, h1, h2') || lockup.parentElement;
     if (!(titleEl instanceof HTMLElement)) return;
+    const card = lockup.closest('.setup-card');
 
     nameEl.style.fontSize = '';
     nameEl.style.maxWidth = '';
@@ -4313,16 +4315,27 @@ function initSetupFitAssocNames(root) {
     const full = (nameEl.textContent || '').trim();
     if (full === '') return;
 
+    const overflows = () => {
+      if (titleEl.scrollWidth > titleEl.clientWidth + 1) return true;
+      if (card instanceof HTMLElement) {
+        const styles = getComputedStyle(card);
+        const pad = (parseFloat(styles.paddingLeft) || 0) + (parseFloat(styles.paddingRight) || 0);
+        const usable = Math.max(0, card.clientWidth - pad);
+        if (usable > 0 && titleEl.scrollWidth > usable + 1) return true;
+      }
+      return false;
+    };
+
     let size = parseFloat(getComputedStyle(nameEl).fontSize) || parseFloat(getComputedStyle(titleEl).fontSize) || 24;
     const min = 13;
     let guard = 40;
-    while (titleEl.scrollWidth > titleEl.clientWidth + 1 && size > min && guard > 0) {
+    while (overflows() && size > min && guard > 0) {
       size -= 0.5;
       nameEl.style.fontSize = `${size}px`;
       guard -= 1;
     }
 
-    if (titleEl.scrollWidth > titleEl.clientWidth + 1) {
+    if (overflows()) {
       nameEl.style.display = 'inline-block';
       nameEl.style.overflow = 'hidden';
       nameEl.style.textOverflow = 'ellipsis';
@@ -4334,7 +4347,7 @@ function initSetupFitAssocNames(root) {
       while (lo < hi && guard > 0) {
         const mid = Math.ceil((lo + hi) / 2);
         nameEl.style.maxWidth = `${mid}ch`;
-        if (titleEl.scrollWidth > titleEl.clientWidth + 1) hi = mid - 1;
+        if (overflows()) hi = mid - 1;
         else lo = mid;
         guard -= 1;
       }
@@ -4346,9 +4359,16 @@ function initSetupFitAssocNames(root) {
     root.querySelectorAll('.assoc-lockup-thanks, .assoc-lockup-setup-title').forEach(fitOne);
   };
   run();
+  window.requestAnimationFrame(run);
+  window.setTimeout(run, 320);
+  window.setTimeout(run, 900);
+  if (document.fonts?.ready) {
+    document.fonts.ready.then(run).catch(() => {});
+  }
   window.addEventListener('resize', () => {
     window.requestAnimationFrame(run);
   });
+  root.addEventListener('setup:fit-assoc-names', run);
 }
 
 function initSetupWebsiteScrape(root) {
@@ -4642,6 +4662,13 @@ function initSetupWebsiteScrape(root) {
     return normalized;
   };
 
+  const truncateMiddle = (value, max) => {
+    const text = String(value || '').trim();
+    if (text === '' || text.length <= max) return text;
+    if (max <= 1) return '…';
+    return `${text.slice(0, Math.max(1, max - 1)).trimEnd()}…`;
+  };
+
   const syncLabel = () => {
     const scraping = box.classList.contains('is-scraping');
     const attempted = box.dataset.scrapeAttempted === '1';
@@ -4659,10 +4686,12 @@ function initSetupWebsiteScrape(root) {
       hideScrapeButton();
     } else {
       showScrapeButton();
-      const site = (normalizeWebsiteInput(input.value) || input.value.trim() || '…');
+      const siteFull = (normalizeWebsiteInput(input.value) || input.value.trim() || '…');
+      const nameShown = truncateMiddle(displayName, 42);
+      const siteShown = truncateMiddle(siteFull, 48);
       const html = labelTpl
-        .replaceAll(':name', `<span class="scrape-name">${escapeHtml(displayName)}</span>`)
-        .replaceAll(':site', `<span class="scrape-site">${escapeHtml(site)}</span>`);
+        .replaceAll(':name', `<span class="scrape-name" title="${escapeHtml(displayName)}">${escapeHtml(nameShown)}</span>`)
+        .replaceAll(':site', `<span class="scrape-site" title="${escapeHtml(siteFull)}">${escapeHtml(siteShown)}</span>`);
       labelEl.innerHTML = html || escapeHtml(box.dataset.msgNeedUrl || '');
       btn.disabled = scraping || !valid;
     }

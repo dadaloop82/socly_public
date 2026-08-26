@@ -3640,6 +3640,9 @@ html:has(.setup-body) {
 .setup-title {
   font-size: clamp(1.7rem, 4vw, 2.2rem);
   margin: 0.35rem 0 0.55rem;
+  max-width: 100%;
+  overflow: hidden;
+  line-height: 1.35;
 }
 .setup-copy {
   color: var(--muted);
@@ -3916,6 +3919,12 @@ html:has(.setup-body) {
   display: none !important;
 }
 .setup-scrape-btn .scrape-name {
+  display: inline-block;
+  max-width: min(100%, 16rem);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  vertical-align: bottom;
   color: color-mix(in srgb, var(--brand-accent) 40%, white);
   font-weight: 800;
 }
@@ -3925,10 +3934,9 @@ html:has(.setup-body) {
   color: color-mix(in srgb, var(--brand-primary) 28%, white);
   font-weight: 800;
   white-space: nowrap;
-  overflow-x: auto;
+  overflow: hidden;
+  text-overflow: ellipsis;
   max-width: 100%;
-  word-break: normal;
-  overflow-wrap: normal;
 }
 .setup-scrape-status { margin: 0; font-size: 0.92rem; }
 .setup-scrape-live {

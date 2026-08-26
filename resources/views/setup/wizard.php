@@ -111,7 +111,7 @@ $errorStep = flash('setup_error_step');
                 && strcasecmp($websiteTitleName, 'SOCLY') !== 0;
             ?>
             <?php if ($showWebsiteLockup): ?>
-                <h1 class="h1 h1-brand setup-title" data-setup-line>
+                <h1 class="h1 h1-brand setup-title" data-setup-line data-setup-fit-title>
                     <?= e(__('setup.step_website_of')) ?>
                     <?= assoc_lockup_html([
                         'name' => $websiteTitleName,
@@ -120,7 +120,7 @@ $errorStep = flash('setup_error_step');
                     ]) ?>
                 </h1>
             <?php elseif ($showComponentsLockup): ?>
-                <h1 class="h1 h1-brand setup-title" data-setup-line>
+                <h1 class="h1 h1-brand setup-title" data-setup-line data-setup-fit-title>
                     <?= e(__('setup.step_components_of')) ?>
                     <?= assoc_lockup_html([
                         'name' => $websiteTitleName,
@@ -129,7 +129,7 @@ $errorStep = flash('setup_error_step');
                     ]) ?>
                 </h1>
             <?php elseif ($showColorsLockup): ?>
-                <h1 class="h1 h1-brand setup-title" data-setup-line>
+                <h1 class="h1 h1-brand setup-title" data-setup-line data-setup-fit-title>
                     <?= e(__('setup.step_colors_of')) ?>
                     <?= assoc_lockup_html([
                         'name' => $websiteTitleName,
