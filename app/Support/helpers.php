@@ -428,19 +428,45 @@ if (!function_exists('validate_adult_birth_date')) {
     }
 }
 
+if (!function_exists('socly_site_url')) {
+    /** Base URL of socly.it for all app ↔ website API calls. */
+    function socly_site_url(): string
+    {
+        $url = trim((string) ($_ENV['SOCLY_SITE_URL'] ?? 'https://www.socly.it'));
+        if ($url === '') {
+            $url = 'https://www.socly.it';
+        }
+        return rtrim($url, '/');
+    }
+}
+
+if (!function_exists('socly_site_api_url')) {
+    function socly_site_api_url(string $path): string
+    {
+        $path = '/' . ltrim($path, '/');
+        return socly_site_url() . $path;
+    }
+}
+
 if (!function_exists('socly_news_api_url')) {
     function socly_news_api_url(): string
     {
-        $url = trim((string) ($_ENV['SOCLY_NEWS_API_URL'] ?? 'https://www.socly.it/api/news.php'));
-        return $url !== '' ? $url : 'https://www.socly.it/api/news.php';
+        $override = trim((string) ($_ENV['SOCLY_NEWS_API_URL'] ?? ''));
+        if ($override !== '') {
+            return $override;
+        }
+        return socly_site_api_url('/api/news.php');
     }
 }
 
 if (!function_exists('socly_platform_api_url')) {
     function socly_platform_api_url(): string
     {
-        $url = trim((string) ($_ENV['SOCLY_PLATFORM_API_URL'] ?? 'https://www.socly.it/api/platform.php'));
-        return $url !== '' ? $url : 'https://www.socly.it/api/platform.php';
+        $override = trim((string) ($_ENV['SOCLY_PLATFORM_API_URL'] ?? ''));
+        if ($override !== '') {
+            return $override;
+        }
+        return socly_site_api_url('/api/platform.php');
     }
 }
 

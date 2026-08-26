@@ -1758,14 +1758,20 @@ td .muted { font-size: 0.88rem; margin-top: 0.15rem; }
 .auth-news-slot {
   position: relative;
   z-index: 1;
-  flex: 1 1 auto;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  min-height: 0;
-  margin: clamp(1rem, 3vh, 2rem) 0;
+  display: block;
+  margin: 0.85rem 0 1rem;
   width: 100%;
   max-width: 34rem;
+}
+.auth-news-unavailable {
+  margin: 0;
+  font-size: 0.9rem;
+  line-height: 1.4;
+  color: color-mix(in srgb, var(--brand-paper) 72%, transparent);
+  text-align: center;
+}
+.auth-news-card--empty {
+  background: color-mix(in srgb, #000 18%, transparent);
 }
 .auth-news-card {
   width: 100%;

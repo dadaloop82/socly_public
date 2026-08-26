@@ -5872,13 +5872,35 @@ function initAuthNewsWidget() {
   const slot = document.querySelector('[data-auth-news]');
   if (!(slot instanceof HTMLElement)) return;
   const api = slot.dataset.newsApi || '';
-  if (!api) return;
+  const unavailable = slot.dataset.newsUnavailable || 'News non disponibili';
+  const readMore = slot.dataset.newsReadMore || 'Leggi tutta →';
+
+  const showUnavailable = () => {
+    slot.innerHTML = `
+      <article class="auth-news-card auth-news-card--empty will-enter">
+        <div class="auth-news-body">
+          <p class="auth-news-unavailable">${escapeHtml(unavailable)}</p>
+        </div>
+      </article>`;
+    slot.hidden = false;
+    enterScope(slot, { reset: true });
+  };
+
+  if (!api) {
+    showUnavailable();
+    return;
+  }
 
   fetch(api + (api.includes('?') ? '&' : '?') + 'limit=1', { credentials: 'omit' })
-    .then((res) => (res.ok ? res.json() : null))
-    .then((data) => {
+    .then(async (res) => {
+      if (!res.ok) {
+        throw new Error('news_http_' + res.status);
+      }
+      const data = await res.json();
       const item = data?.items?.[0];
-      if (!item || !item.title) return;
+      if (!item || !item.title) {
+        throw new Error('news_empty');
+      }
       const heroStyle = item.image ? `background-image:url('${String(item.image).replace(/'/g, "\\'")}')` : '';
       const excerpt = item.excerpt || item.body || '';
       const url = item.url || '#';
@@ -5889,13 +5911,15 @@ function initAuthNewsWidget() {
             ${item.published_at ? `<div class="auth-news-date">${formatNewsDate(item.published_at)}</div>` : ''}
             <h2 class="auth-news-title">${escapeHtml(String(item.title))}</h2>
             ${excerpt ? `<p class="auth-news-excerpt">${escapeHtml(String(excerpt))}</p>` : ''}
-            <a class="auth-news-link" href="${escapeHtml(String(url))}" target="_blank" rel="noopener noreferrer">Leggi tutta →</a>
+            <a class="auth-news-link" href="${escapeHtml(String(url))}" target="_blank" rel="noopener noreferrer">${escapeHtml(readMore)}</a>
           </div>
         </article>`;
       slot.hidden = false;
       enterScope(slot, { reset: true });
     })
-    .catch(() => {});
+    .catch(() => {
+      showUnavailable();
+    });
 }
 
 function initBirthDateFields(root = document) {

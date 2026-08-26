@@ -64,6 +64,8 @@ return [
         'motto' => 'The management platform for Italy\'s Third Sector, installed on your private server.',
         'product_description' => 'Your whole association in order and under control: goodbye scattered papers, hello clarity. Fully compliant with the law.',
         'license_note' => '100% Free Base Licence (Self-Hosting): includes all essential features to run your association. Extra modules, technical support, consulting and maintenance are available as optional services on request.',
+        'news_unavailable' => 'News unavailable',
+        'news_read_more' => 'Read more →',
         'check_updates' => 'Check for updates',
         'updates_checking' => 'Checking…',
         'updates_none_title' => 'No updates',

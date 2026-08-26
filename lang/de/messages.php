@@ -64,6 +64,8 @@ return [
         'motto' => 'Die Verwaltungssoftware für den italienischen Dritte-Sektor — auf Ihrem privaten Server installiert.',
         'product_description' => 'Ihr gesamter Verein in Ordnung und unter Kontrolle: Schluss mit verstreuten Unterlagen, willkommen Klarheit. Gesetzeskonform.',
         'license_note' => '100 % kostenlose Basis-Lizenz (Self-Hosting): umfasst alle wesentlichen Funktionen für die Vereinsverwaltung. Zusätzliche Module, technischer Support, Beratung und Wartung sind auf Anfrage als optionale Leistungen verfügbar.',
+        'news_unavailable' => 'News nicht verfügbar',
+        'news_read_more' => 'Weiterlesen →',
         'check_updates' => 'Updates prüfen',
         'updates_checking' => 'Prüfung läuft…',
         'updates_none_title' => 'Keine Updates',

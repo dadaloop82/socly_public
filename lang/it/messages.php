@@ -66,6 +66,8 @@ return [
         'motto' => 'Il gestionale per il Terzo Settore italiano, installato sul vostro server privato.',
         'product_description' => 'Tutta la tua associazione in regola e sotto controllo: addio fogli sparsi, benvenuta chiarezza. A norma di Legge.',
         'license_note' => 'Licenza Base 100% Gratuita (Self-Hosting): include tutte le funzionalità essenziali per la gestione dell’associazione. Moduli aggiuntivi, supporto tecnico, consulenza e manutenzione sono disponibili come servizi opzionali su richiesta.',
+        'news_unavailable' => 'News non disponibili',
+        'news_read_more' => 'Leggi tutta →',
         'check_updates' => 'Verifica aggiornamenti',
         'updates_checking' => 'Verifica in corso…',
         'updates_none_title' => 'Nessun aggiornamento',
