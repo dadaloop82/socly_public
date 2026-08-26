@@ -3716,7 +3716,7 @@ function initSetupRuntsLookup(root) {
     btn.setAttribute('aria-hidden', 'true');
   };
   const showBtn = () => {
-    if (box.dataset.runtsExhausted === '1') {
+    if (box.dataset.runtsExhausted === '1' || box.classList.contains('is-found')) {
       hideBtn();
       return;
     }
@@ -4160,11 +4160,17 @@ function initSetupRuntsLookup(root) {
       showBtn();
       return;
     }
-    if (digits() === '') hideBtn();
+    if (box.classList.contains('is-found') || digits() === '') hideBtn();
     else showBtn();
   };
 
-  input.addEventListener('input', sync);
+  input.addEventListener('input', () => {
+    if (box.classList.contains('is-found')) {
+      box.classList.remove('is-found');
+      stopOcrPoll();
+    }
+    sync();
+  });
   input.addEventListener('change', sync);
   nameInput?.addEventListener('input', syncLabel);
   sync();
@@ -4264,6 +4270,7 @@ function initSetupRuntsLookup(root) {
       if (donePayload?.ok) {
         applyFields(donePayload.fields || {});
         box.classList.add('is-found');
+        hideBtn();
         if (progress) progress.hidden = true;
         if (elapsedEl) elapsedEl.hidden = true;
         const spinner = live?.querySelector('.setup-scrape-spinner');

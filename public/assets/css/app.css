@@ -3534,6 +3534,7 @@ html:has(.setup-body) {
   align-content: center;
   padding: 1.25rem 1.25rem 0.85rem;
   min-height: 0;
+  max-height: 100%;
   overflow: hidden;
 }
 .setup-footer {
