@@ -40,8 +40,8 @@
                 <select name="association_legal_name" required maxlength="6" data-setup-legal-name>
                     <option value="" disabled <?= $currentLegal === '' ? 'selected' : '' ?>><?= e(__('setup.legal_form_placeholder')) ?></option>
                     <?php foreach ($legalForms as $code => $labelKey): ?>
-                        <option value="<?= e($code) ?>" <?= $currentLegal === $code ? 'selected' : '' ?>>
-                            <?= e($code) ?> — <?= e(__($labelKey)) ?>
+                        <option value="<?= e($code) ?>" <?= $currentLegal === $code ? 'selected' : '' ?> data-meaning="<?= e(__($labelKey)) ?>">
+                            <?= e($code) ?>
                         </option>
                     <?php endforeach; ?>
                 </select>

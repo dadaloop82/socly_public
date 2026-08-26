@@ -3059,9 +3059,9 @@ function initSetupNamePairPreview(scope = document) {
     const syncLegalMeaning = () => {
       if (!legalMeaning) return;
       const opt = legalSelect.selectedOptions[0];
-      const raw = opt ? String(opt.textContent || '') : '';
-      const parts = raw.split('—');
-      const meaning = parts.length > 1 ? parts.slice(1).join('—').trim() : '';
+      const meaning = opt
+        ? String(opt.getAttribute('data-meaning') || '').trim()
+        : '';
       if (!legalSelect.value || meaning === '') {
         legalMeaning.hidden = true;
         legalMeaning.textContent = '';

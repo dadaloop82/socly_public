@@ -345,8 +345,12 @@ $errorStep = flash('setup_error_step');
                                             <option value="" disabled <?= (($value[$fieldKey] ?? '') === '') ? 'selected' : '' ?>><?= e(__('setup.legal_form_placeholder')) ?></option>
                                         <?php endif; ?>
                                         <?php foreach ($field['options'] as $opt): ?>
-                                            <option value="<?= e($opt['value']) ?>" <?= (string) ($value[$fieldKey] ?? '') === $opt['value'] ? 'selected' : '' ?>>
-                                                <?= e($opt['value']) ?><?= $isCurrency ? '' : ' — ' . e(__($opt['label_key'])) ?>
+                                            <option
+                                                value="<?= e($opt['value']) ?>"
+                                                <?= (string) ($value[$fieldKey] ?? '') === $opt['value'] ? 'selected' : '' ?>
+                                                <?php if (!$isCurrency): ?>data-meaning="<?= e(__($opt['label_key'])) ?>"<?php endif; ?>
+                                            >
+                                                <?= e($opt['value']) ?>
                                             </option>
                                         <?php endforeach; ?>
                                     </select>

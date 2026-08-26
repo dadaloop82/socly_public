@@ -838,8 +838,12 @@ a:hover { text-decoration: underline; color: var(--brand-primary-deep); }
 }
 .setup-legal-meaning {
   margin: 0.15rem 0 0;
-  font-size: 0.86rem;
-  line-height: 1.45;
+  font-size: 0.82rem;
+  line-height: 1.35;
+  text-align: right;
+  font-variant: small-caps;
+  letter-spacing: 0.04em;
+  color: var(--muted);
 }
 .setup-runts-block.is-found .setup-runts-progress,
 .setup-runts-block.is-found .setup-runts-elapsed,
