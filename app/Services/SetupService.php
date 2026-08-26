@@ -975,6 +975,11 @@ final class SetupService
             'fiscal_code' => ['settings' => 'association.fiscal_code', 'env' => 'ASSOCIATION_FISCAL_CODE'],
             'city' => ['settings' => 'association.city', 'env' => 'ASSOCIATION_CITY'],
             'province' => ['settings' => 'association.province', 'env' => 'ASSOCIATION_PROVINCE'],
+            'pec' => ['settings' => 'association.pec', 'env' => 'ASSOCIATION_PEC'],
+            'website' => ['settings' => 'association.website', 'env' => 'ASSOCIATION_WEBSITE'],
+            'address' => ['settings' => 'association.address', 'env' => 'ASSOCIATION_ADDRESS'],
+            'house_number' => ['settings' => 'association.house_number', 'env' => 'ASSOCIATION_HOUSE_NUMBER'],
+            'postal_code' => ['settings' => 'association.postal_code', 'env' => 'ASSOCIATION_POSTAL_CODE'],
         ];
         foreach ($optional as $key => $meta) {
             $value = trim((string) ($fields[$key] ?? ''));
@@ -983,15 +988,34 @@ final class SetupService
             }
             if ($key === 'fiscal_code') {
                 $value = strtoupper(preg_replace('/\s+/', '', $value) ?? '');
-            } elseif ($key === 'city') {
+            } elseif ($key === 'city' || $key === 'address') {
                 $value = assoc_capitalize_name($value);
             } elseif ($key === 'province') {
                 $value = strtoupper(preg_replace('/[^A-Za-z]/', '', $value) ?? '');
+            } elseif ($key === 'postal_code') {
+                $value = preg_replace('/\D+/', '', $value) ?? '';
+            } elseif ($key === 'pec') {
+                $value = strtolower($value);
+            } elseif ($key === 'website' && !preg_match('#^https?://#i', $value)) {
+                $value = 'https://' . ltrim($value, '/');
             }
             $this->settings->set($meta['settings'], $value);
             $env[$meta['env']] = $value;
             $applied[] = $key;
             $lock[$key] = $value;
+        }
+
+        if (
+            isset($fields['address'], $fields['house_number'], $fields['postal_code'], $fields['city'])
+            && trim((string) ($fields['address'] ?? '')) !== ''
+        ) {
+            $this->settings->set('association.address_full', trim(sprintf(
+                '%s %s, %s %s',
+                $fields['address'],
+                $fields['house_number'],
+                $fields['postal_code'],
+                $fields['city']
+            )));
         }
 
         $personKey = 'president_name';
@@ -1008,6 +1032,331 @@ final class SetupService
             EnvWriter::setUserValues($env);
         }
         return $applied;
+    }
+
+    /**
+     * Persist the full RUNTS detail snapshot (people, dates, stats, …).
+     *
+     * @param array<string, mixed> $detail
+     */
+    public function storeRuntsDetail(array $detail): void
+    {
+        if ($detail === []) {
+            return;
+        }
+        $this->settings->set('association.runts_detail', $detail);
+    }
+
+    /**
+     * Import RUNTS PDFs into association documents.
+     *
+     * @param list<array{title:string,code?:string,date?:string,filename?:string,mime?:string,tmp_path:string}> $documents
+     * @return list<array{title:string,filename:string,category:string,id:int}>
+     */
+    public function importRuntsDocuments(array $documents, string $ip, ?int $userId = null, string $repertory = ''): array
+    {
+        /** @var DocumentService $docs */
+        $docs = app(DocumentService::class);
+        $saved = [];
+        $runts = preg_replace('/\D+/', '', $repertory) ?? '';
+        if ($runts === '') {
+            $runts = preg_replace('/\D+/', '', (string) $this->settings->get('association.runts', '')) ?? '';
+        }
+
+        foreach ($documents as $doc) {
+            $tmp = (string) ($doc['tmp_path'] ?? '');
+            $title = trim((string) ($doc['title'] ?? ''));
+            if ($tmp === '' || !is_file($tmp) || $title === '') {
+                if ($tmp !== '' && is_file($tmp)) {
+                    @unlink($tmp);
+                }
+                continue;
+            }
+
+            $code = trim((string) ($doc['code'] ?? ''));
+            $marker = 'RUNTS' . ($runts !== '' ? ':' . $runts : '') . ($code !== '' ? ':' . $code : '') . ':' . mb_strtoupper($title, 'UTF-8');
+            if ($this->runtsDocumentAlreadyImported($marker)) {
+                @unlink($tmp);
+                continue;
+            }
+
+            $mime = trim((string) ($doc['mime'] ?? 'application/pdf')) ?: 'application/pdf';
+            if (!str_contains(strtolower($mime), 'pdf')) {
+                $mime = 'application/pdf';
+            }
+            $originalName = trim((string) ($doc['filename'] ?? ($title . '.pdf')));
+            $safeExt = 'pdf';
+            $storedName = bin2hex(random_bytes(8)) . '.' . $safeExt;
+            $docDate = $this->normalizeItDate((string) ($doc['date'] ?? ''));
+            $paths = user_upload_paths('documents', $docDate ?: null, $storedName);
+            if (!@copy($tmp, $paths['absolute'])) {
+                @unlink($tmp);
+                continue;
+            }
+            @chmod($paths['absolute'], 0664);
+            @unlink($tmp);
+
+            $category = $this->mapRuntsDocumentCategory($title);
+            $summary = trim(sprintf(
+                "Importato automaticamente dal portale RUNTS.\nMarcatore: %s\nFile originale: %s",
+                $marker,
+                $originalName
+            ));
+
+            $result = $docs->create([
+                'title' => mb_substr($title, 0, 190),
+                'category' => $category,
+                'document_date' => $docDate,
+                'document_number' => mb_substr($code, 0, 80),
+                'language' => 'it',
+                'status' => 'signed',
+                'summary' => $summary,
+                'uploaded_path' => $paths['relative'],
+                'uploaded_mime' => $mime,
+            ], null, $ip, $userId);
+
+            if (!empty($result['ok'])) {
+                $saved[] = [
+                    'title' => $title,
+                    'filename' => $originalName,
+                    'category' => $category,
+                    'id' => (int) ($result['id'] ?? 0),
+                    'absolute' => $paths['absolute'],
+                    'legal_kind' => $this->guessLegalTextKind($title, $originalName),
+                ];
+            } else {
+                @unlink($paths['absolute']);
+            }
+        }
+
+        return $saved;
+    }
+
+    /**
+     * Prefill legal.statute / legal.privacy from RUNTS PDF text (native or OCR).
+     *
+     * @param list<array{title?:string,filename?:string,absolute?:string,legal_kind?:string|null,id?:int}> $documents
+     * @return array{prefilled:list<string>,methods:array<string,string>,pending_ocr:bool}
+     */
+    public function prefillLegalTextsFromDocuments(array $documents, bool $allowOcr = false): array
+    {
+        /** @var PdfTextExtractor $extractor */
+        $extractor = app(PdfTextExtractor::class);
+        $prefilled = [];
+        $methods = [];
+        $needsOcr = false;
+
+        foreach ($documents as $doc) {
+            $kind = (string) ($doc['legal_kind'] ?? '');
+            if ($kind === '') {
+                $kind = (string) ($this->guessLegalTextKind(
+                    (string) ($doc['title'] ?? ''),
+                    (string) ($doc['filename'] ?? '')
+                ) ?? '');
+            }
+            if (!in_array($kind, ['statute', 'privacy'], true)) {
+                continue;
+            }
+            $settingsKey = $kind === 'privacy' ? 'legal.privacy' : 'legal.statute';
+            if (!$this->legalTextIsEmpty($settingsKey)) {
+                continue;
+            }
+
+            $path = (string) ($doc['absolute'] ?? '');
+            if ($path === '' || !is_file($path)) {
+                $id = (int) ($doc['id'] ?? 0);
+                if ($id > 0) {
+                    /** @var DocumentService $docs */
+                    $docs = app(DocumentService::class);
+                    $row = $docs->find($id);
+                    $rel = trim((string) ($row['file_path'] ?? ''));
+                    $resolved = $rel !== '' ? resolve_upload_absolute_path($rel) : null;
+                    $path = $resolved ?? '';
+                }
+            }
+            if ($path === '' || !is_file($path)) {
+                continue;
+            }
+
+            $extracted = $extractor->extract($path, [
+                'ocr' => $allowOcr,
+                'max_pages' => 20,
+                'max_seconds' => 360,
+                'dpi' => 150,
+                'lang' => 'ita',
+            ]);
+            if (empty($extracted['ok']) || !$this->legalTextLooksValid((string) ($extracted['text'] ?? ''), $kind)) {
+                if (!$allowOcr && ($extracted['error'] ?? '') === 'no_text_layer' && $extractor->ocrAvailable()) {
+                    $needsOcr = true;
+                }
+                continue;
+            }
+
+            $text = trim((string) $extracted['text']);
+            $note = "[Bozza da PDF RUNTS — verificare e correggere prima della pubblicazione]\n\n";
+            $payload = ['it' => $note . $text, 'de' => $note . $text, 'en' => $note . $text];
+            $this->settings->set($settingsKey, $payload);
+            $prefilled[] = $kind;
+            $methods[$kind] = (string) ($extracted['method'] ?? '');
+        }
+
+        if ($needsOcr && $prefilled === []) {
+            $this->settings->set('legal.runts_ocr_pending', '1');
+        } elseif ($prefilled !== []) {
+            $this->settings->set('legal.runts_ocr_pending', '0');
+        }
+
+        return [
+            'prefilled' => array_values(array_unique($prefilled)),
+            'methods' => $methods,
+            'pending_ocr' => $needsOcr && $prefilled === [],
+        ];
+    }
+
+    /**
+     * Queue background OCR when PDFs have no text layer.
+     *
+     * @param list<array<string, mixed>> $documents
+     */
+    public function queueLegalPrefillFromDocuments(array $documents): bool
+    {
+        $targets = [];
+        foreach ($documents as $doc) {
+            $kind = (string) ($doc['legal_kind'] ?? '');
+            if ($kind === '') {
+                $kind = (string) ($this->guessLegalTextKind(
+                    (string) ($doc['title'] ?? ''),
+                    (string) ($doc['filename'] ?? '')
+                ) ?? '');
+            }
+            if (!in_array($kind, ['statute', 'privacy'], true)) {
+                continue;
+            }
+            $settingsKey = $kind === 'privacy' ? 'legal.privacy' : 'legal.statute';
+            if (!$this->legalTextIsEmpty($settingsKey)) {
+                continue;
+            }
+            if (empty($doc['absolute']) || !is_file((string) $doc['absolute'])) {
+                continue;
+            }
+            $targets[] = [
+                'title' => (string) ($doc['title'] ?? ''),
+                'filename' => (string) ($doc['filename'] ?? ''),
+                'absolute' => (string) $doc['absolute'],
+                'legal_kind' => $kind,
+                'id' => (int) ($doc['id'] ?? 0),
+            ];
+        }
+        if ($targets === []) {
+            return false;
+        }
+
+        /** @var PdfTextExtractor $extractor */
+        $extractor = app(PdfTextExtractor::class);
+        if (!$extractor->ocrAvailable()) {
+            return false;
+        }
+
+        $jobDir = storage_path('cache');
+        ensure_directory($jobDir);
+        $jobFile = $jobDir . '/runts_ocr_job_' . bin2hex(random_bytes(6)) . '.json';
+        file_put_contents($jobFile, (string) json_encode([
+            'created_at' => date('c'),
+            'documents' => $targets,
+        ], JSON_UNESCAPED_UNICODE));
+
+        $php = PHP_BINARY !== '' ? PHP_BINARY : 'php';
+        $script = base_path('bin/runts-legal-prefill.php');
+        if (!is_file($script)) {
+            @unlink($jobFile);
+            return false;
+        }
+
+        $cmd = sprintf(
+            'nohup %s %s %s > %s 2>&1 &',
+            escapeshellarg($php),
+            escapeshellarg($script),
+            escapeshellarg($jobFile),
+            escapeshellarg($jobDir . '/runts_ocr_job.log')
+        );
+        exec($cmd);
+        $this->settings->set('legal.runts_ocr_pending', '1');
+        return true;
+    }
+
+    private function legalTextIsEmpty(string $settingsKey): bool
+    {
+        $raw = $this->settings->get($settingsKey, '');
+        $text = localized(is_string($raw) ? $raw : (is_array($raw) ? $raw : ''));
+        return trim($text) === '';
+    }
+
+    private function legalTextLooksValid(string $text, string $kind): bool
+    {
+        $compact = preg_replace('/\s+/u', '', $text) ?? '';
+        if (mb_strlen($compact) < 180) {
+            return false;
+        }
+        $upper = mb_strtoupper($text, 'UTF-8');
+        if ($kind === 'statute') {
+            return (bool) preg_match('/STATUTO|ART\.?\s*1|ASSOCIAZION/u', $upper);
+        }
+        if ($kind === 'privacy') {
+            return (bool) preg_match('/PRIVACY|INFORMATIVA|GDPR|PROTEZIONE\s+DEI\s+DATI|TRATTAMENTO/u', $upper);
+        }
+        return true;
+    }
+
+    private function guessLegalTextKind(string $title, string $filename = ''): ?string
+    {
+        $hay = mb_strtoupper(trim($title . ' ' . $filename), 'UTF-8');
+        if ($hay === '') {
+            return null;
+        }
+        if (preg_match('/PRIVACY|INFORMATIVA|GDPR|PROTEZIONE\s+DATI|COOKIE/u', $hay)) {
+            return 'privacy';
+        }
+        if (preg_match('/STATUTO|REGOLAMENTO(?!\s+ELETTORALE)/u', $hay)) {
+            return 'statute';
+        }
+        return null;
+    }
+
+    private function runtsDocumentAlreadyImported(string $marker): bool
+    {
+        try {
+            $row = $this->db->fetch(
+                'SELECT id FROM association_documents WHERE summary LIKE :m LIMIT 1',
+                ['m' => '%' . $marker . '%']
+            );
+            return $row !== null;
+        } catch (\Throwable) {
+            return false;
+        }
+    }
+
+    private function mapRuntsDocumentCategory(string $title): string
+    {
+        $upper = mb_strtoupper($title, 'UTF-8');
+        if (str_contains($upper, 'STATUTO')) {
+            return 'statute';
+        }
+        return 'other';
+    }
+
+    private function normalizeItDate(string $value): string
+    {
+        $value = trim($value);
+        if ($value === '') {
+            return '';
+        }
+        if (preg_match('/^(\d{2})\/(\d{2})\/(\d{4})$/', $value, $m)) {
+            return $m[3] . '-' . $m[2] . '-' . $m[1];
+        }
+        if (preg_match('/^\d{4}-\d{2}-\d{2}$/', $value)) {
+            return $value;
+        }
+        return '';
     }
 
     /**

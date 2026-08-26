@@ -50,8 +50,7 @@ final class RuntsLookupService
             $ensured = $this->ensureLists($emit);
         } catch (\Throwable $e) {
             $ensured = ['ok' => false, 'error' => __('setup.runts_fail')];
-            $hasCache = $this->isValidList($this->listPath('iscritti'), 100000)
-                && $this->isValidList($this->listPath('cancellati'), 10000);
+            $hasCache = $this->isValidList($this->listPath('iscritti'), 100000);
             if ($hasCache) {
                 $ensured = ['ok' => true, 'cache_used' => true];
             }
@@ -62,38 +61,14 @@ final class RuntsLookupService
         $cacheUsed = !empty($ensured['cache_used']);
 
         $activePath = $this->listPath('iscritti');
-        $cancelledPath = $this->listPath('cancellati');
 
         $emit(['type' => 'progress', 'phase' => 'search_active', 'percent' => 58, 'number' => $number]);
         $active = is_file($activePath)
-            ? $this->findInXlsx($activePath, $number, $emit, 'search_active', 58, 88)
+            ? $this->findInXlsx($activePath, $number, $emit, 'search_active', 58, 96)
             : null;
         if ($active !== null) {
-            $emit(['type' => 'progress', 'phase' => 'apply', 'percent' => 96]);
-            $result = $this->hydrate($active, false);
-            if ($cacheUsed) {
-                $warning = __('setup.runts_cache_fallback');
-                $result['warning'] = trim($warning . ' ' . trim((string) ($result['warning'] ?? '')));
-            }
-            $result['elapsed_ms'] = (int) round((microtime(true) - $started) * 1000);
-            return $result;
-        }
-
-        $emit(['type' => 'progress', 'phase' => 'search_cancelled', 'percent' => 90, 'number' => $number]);
-        $cancelled = is_file($cancelledPath)
-            ? $this->findInXlsx($cancelledPath, $number, $emit, 'search_cancelled', 90, 97)
-            : null;
-        if ($cancelled !== null) {
             $emit(['type' => 'progress', 'phase' => 'apply', 'percent' => 98]);
-            $result = $this->hydrate($cancelled, true);
-            $cancelMsg = __('setup.runts_cancelled', [
-                'name' => (string) ($result['fields']['name'] ?? $cancelled['denominazione'] ?? ''),
-                'date' => (string) ($cancelled['data_cancellazione'] ?? ''),
-                'reason' => (string) ($cancelled['tipo_cancellazione'] ?? ''),
-            ]);
-            $result['warning'] = trim((string) ($result['warning'] ?? '')) !== ''
-                ? $cancelMsg . ' ' . $result['warning']
-                : $cancelMsg;
+            $result = $this->hydrate($active, false);
             if ($cacheUsed) {
                 $warning = __('setup.runts_cache_fallback');
                 $result['warning'] = trim($warning . ' ' . trim((string) ($result['warning'] ?? '')));
@@ -189,8 +164,7 @@ final class RuntsLookupService
         }
 
         $iscritti = $this->listPath('iscritti');
-        $cancellati = $this->listPath('cancellati');
-        $hasCache = $this->isValidList($iscritti, 100000) && $this->isValidList($cancellati, 10000);
+        $hasCache = $this->isValidList($iscritti, 100000);
         try {
             $downloaded = $this->downloadLists($emit);
         } catch (\Throwable $e) {
@@ -222,15 +196,14 @@ final class RuntsLookupService
             }
 
             $iscrittiBtn = $this->findDownloadButton($page['body'], 'Enti iscritti (formato Excel)');
-            $cancellatiBtn = $this->findDownloadButton($page['body'], 'Enti cancellati (formato Excel)');
-            if ($iscrittiBtn === '' || $cancellatiBtn === '') {
+            if ($iscrittiBtn === '') {
                 return ['ok' => false, 'error' => __('setup.runts_fail')];
             }
 
             $emit(['type' => 'progress', 'phase' => 'download_active', 'percent' => 10]);
             $lastPct = 10;
             $iscritti = $this->postDownload($page['body'], $iscrittiBtn, $cookie, static function (float $ratio) use ($emit, &$lastPct): void {
-                $pct = 10 + (int) round($ratio * 32);
+                $pct = 10 + (int) round($ratio * 46);
                 if ($pct <= $lastPct) {
                     return;
                 }
@@ -241,29 +214,9 @@ final class RuntsLookupService
                 return ['ok' => false, 'error' => __('setup.runts_fail')];
             }
 
-            $emit(['type' => 'progress', 'phase' => 'download_cancelled', 'percent' => 44]);
-            $page2 = $this->http('GET', self::LIST_URL, null, $cookie, 12, null);
-            if ($page2['status'] !== 200 || trim($page2['body']) === '') {
-                return ['ok' => false, 'error' => __('setup.runts_fail')];
-            }
-            $cancellatiBtn = $this->findDownloadButton($page2['body'], 'Enti cancellati (formato Excel)') ?: $cancellatiBtn;
-            $lastPct = 44;
-            $cancellati = $this->postDownload($page2['body'], $cancellatiBtn, $cookie, static function (float $ratio) use ($emit, &$lastPct): void {
-                $pct = 44 + (int) round($ratio * 12);
-                if ($pct <= $lastPct) {
-                    return;
-                }
-                $lastPct = $pct;
-                $emit(['type' => 'progress', 'phase' => 'download_cancelled', 'percent' => $pct]);
-            });
-            if (empty($cancellati['ok']) || !$this->storeList('cancellati', (string) ($cancellati['body'] ?? ''))) {
-                return ['ok' => false, 'error' => __('setup.runts_fail')];
-            }
-
             $this->replaceFile($this->cacheDir() . '/meta.json', json_encode([
                 'fetched_at' => time(),
                 'iscritti_name' => $iscritti['filename'] ?? '',
-                'cancellati_name' => $cancellati['filename'] ?? '',
             ], JSON_UNESCAPED_UNICODE) ?: '{}');
 
             $emit(['type' => 'progress', 'phase' => 'lists_ready', 'percent' => 58]);

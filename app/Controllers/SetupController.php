@@ -9,19 +9,27 @@ use Socly\Core\View;
 use Socly\Services\AssociationWebsiteScrapeService;
 use Socly\Services\AuthService;
 use Socly\Services\MailService;
+use Socly\Services\RateLimiter;
+use Socly\Services\RuntsDetailScrapeService;
 use Socly\Services\RuntsLookupService;
 use Socly\Services\SetupService;
 use Socly\Setup\SetupCatalogue;
 
 final class SetupController extends BaseController
 {
+    private const RUNTS_MAX_ATTEMPTS = 5;
+    private const RUNTS_COOLDOWN_SECONDS = 60;
+    private const RUNTS_ATTEMPTS_WINDOW = 86400;
+
     public function __construct(
         View $view,
         private readonly SetupService $setup,
         private readonly AuthService $auth,
         private readonly AssociationWebsiteScrapeService $scrape,
         private readonly MailService $mail,
-        private readonly RuntsLookupService $runts
+        private readonly RuntsLookupService $runts,
+        private readonly RuntsDetailScrapeService $runtsDetail,
+        private readonly RateLimiter $limiter
     ) {
         parent::__construct($view);
     }
@@ -871,6 +879,35 @@ final class SetupController extends BaseController
             flush();
         };
 
+        $ip = $request->ip();
+        $totalKey = 'setup_runts_total:' . $ip;
+        $cooldownKey = 'setup_runts_cd:' . $ip;
+
+        if ($this->limiter->tooManyAttempts($totalKey, self::RUNTS_MAX_ATTEMPTS, self::RUNTS_ATTEMPTS_WINDOW)) {
+            $emit([
+                'type' => 'error',
+                'error' => __('setup.runts_limit_exhausted'),
+                'code' => 'rate_limit_exhausted',
+                'attempts_left' => 0,
+            ]);
+            return;
+        }
+
+        if ($this->limiter->tooManyAttempts($cooldownKey, 1, self::RUNTS_COOLDOWN_SECONDS)) {
+            $wait = $this->limiter->availableIn($cooldownKey);
+            $emit([
+                'type' => 'error',
+                'error' => __('setup.runts_limit_wait', ['seconds' => (string) max(1, $wait)]),
+                'code' => 'rate_limit_wait',
+                'retry_after' => max(1, $wait),
+            ]);
+            return;
+        }
+
+        $this->limiter->hit($cooldownKey, self::RUNTS_COOLDOWN_SECONDS);
+        $attempts = $this->limiter->hit($totalKey, self::RUNTS_ATTEMPTS_WINDOW);
+        $attemptsLeft = max(0, self::RUNTS_MAX_ATTEMPTS - $attempts);
+
         $number = (string) $request->input('runts', '');
         try {
             $result = $this->runts->lookup($number, $emit);
@@ -878,6 +915,7 @@ final class SetupController extends BaseController
             $emit([
                 'type' => 'error',
                 'error' => __('setup.runts_fail'),
+                'attempts_left' => $attemptsLeft,
             ]);
             return;
         }
@@ -886,11 +924,60 @@ final class SetupController extends BaseController
                 'type' => 'error',
                 'error' => (string) ($result['error'] ?? __('setup.runts_fail')),
                 'elapsed_ms' => $result['elapsed_ms'] ?? null,
+                'attempts_left' => $attemptsLeft,
             ]);
             return;
         }
 
         $fields = is_array($result['fields'] ?? null) ? $result['fields'] : [];
+        $warnings = [];
+        if (!empty($result['warning'])) {
+            $warnings[] = trim((string) $result['warning']);
+        }
+
+        $savedDocuments = [];
+        $legalPrefill = ['prefilled' => [], 'pending_ocr' => false, 'methods' => []];
+        try {
+            $emit(['type' => 'progress', 'phase' => 'detail', 'percent' => 70, 'number' => $number]);
+            $detail = $this->runtsDetail->fetch($number, $emit);
+            if (!empty($detail['ok'])) {
+                $detailFields = is_array($detail['fields'] ?? null) ? $detail['fields'] : [];
+                foreach ($detailFields as $key => $value) {
+                    $value = trim((string) $value);
+                    if ($value === '') {
+                        continue;
+                    }
+                    $fields[$key] = $value;
+                }
+                if (is_array($detail['detail'] ?? null) && $detail['detail'] !== []) {
+                    $this->setup->storeRuntsDetail($detail['detail']);
+                }
+                if (!empty($detail['warning'])) {
+                    $warnings[] = trim((string) $detail['warning']);
+                }
+                $docs = is_array($detail['documents'] ?? null) ? $detail['documents'] : [];
+                if ($docs !== []) {
+                    $emit(['type' => 'progress', 'phase' => 'docs_save', 'percent' => 96, 'number' => $number]);
+                    $userId = isset(auth_user()['id']) ? (int) auth_user()['id'] : null;
+                    $savedDocuments = $this->setup->importRuntsDocuments(
+                        $docs,
+                        $request->ip(),
+                        $userId,
+                        (string) ($fields['runts'] ?? $number)
+                    );
+                    $emit(['type' => 'progress', 'phase' => 'docs_ocr', 'percent' => 97, 'number' => $number]);
+                    $legalPrefill = $this->setup->prefillLegalTextsFromDocuments($savedDocuments, false);
+                    if (!empty($legalPrefill['pending_ocr'])) {
+                        $this->setup->queueLegalPrefillFromDocuments($savedDocuments);
+                    }
+                }
+            } else {
+                $warnings[] = (string) ($detail['error'] ?? __('setup.runts_detail_fail'));
+            }
+        } catch (\Throwable $e) {
+            $warnings[] = __('setup.runts_detail_fail');
+        }
+
         $applied = [];
         try {
             $emit(['type' => 'progress', 'phase' => 'apply', 'percent' => 98]);
@@ -899,26 +986,42 @@ final class SetupController extends BaseController
             $emit([
                 'type' => 'error',
                 'error' => __('setup.runts_fail'),
+                'attempts_left' => $attemptsLeft,
             ]);
             return;
         }
 
+        $publicDocs = array_map(static function (array $doc): array {
+            return [
+                'title' => (string) ($doc['title'] ?? ''),
+                'filename' => (string) ($doc['filename'] ?? ''),
+                'category' => (string) ($doc['category'] ?? ''),
+                'id' => (int) ($doc['id'] ?? 0),
+            ];
+        }, $savedDocuments);
+
+        $warning = trim(implode(' ', array_filter($warnings)));
         $emit([
             'type' => 'done',
             'ok' => true,
-            'cancelled' => !empty($result['cancelled']),
-            'warning' => (string) ($result['warning'] ?? ''),
+            'cancelled' => false,
+            'warning' => $warning,
             'fields' => $fields,
             'applied' => $applied,
+            'documents' => $publicDocs,
+            'legal_prefill' => [
+                'prefilled' => $legalPrefill['prefilled'] ?? [],
+                'pending_ocr' => !empty($legalPrefill['pending_ocr']),
+                'methods' => $legalPrefill['methods'] ?? [],
+            ],
             'elapsed_ms' => $result['elapsed_ms'] ?? null,
-            'message' => !empty($result['cancelled'])
-                ? (string) ($result['warning'] ?? '')
-                : __('setup.runts_ok', [
-                    'name' => assoc_display_name(
-                        (string) ($fields['name'] ?? ''),
-                        (string) ($fields['legal_name'] ?? '')
-                    ) ?: (string) ($fields['name'] ?? ''),
-                ]),
+            'attempts_left' => $attemptsLeft,
+            'message' => __('setup.runts_ok', [
+                'name' => assoc_display_name(
+                    (string) ($fields['name'] ?? ''),
+                    (string) ($fields['legal_name'] ?? '')
+                ) ?: (string) ($fields['name'] ?? ''),
+            ]),
         ]);
     }
 

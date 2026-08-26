@@ -67,6 +67,8 @@ use Socly\Services\PaymentService;
 use Socly\Services\PlatformService;
 use Socly\Services\PluginAdminService;
 use Socly\Services\RateLimiter;
+use Socly\Services\PdfTextExtractor;
+use Socly\Services\RuntsDetailScrapeService;
 use Socly\Services\RuntsLookupService;
 use Socly\Services\SettingsService;
 use Socly\Services\SetupService;
@@ -269,6 +271,8 @@ $app->bind(AssociationPeopleService::class, fn (App $a) => new AssociationPeople
 ));
 $app->bind(AssociationWebsiteScrapeService::class, fn () => new AssociationWebsiteScrapeService());
 $app->bind(RuntsLookupService::class, fn () => new RuntsLookupService());
+$app->bind(RuntsDetailScrapeService::class, fn () => new RuntsDetailScrapeService());
+$app->bind(PdfTextExtractor::class, fn () => new PdfTextExtractor());
 $app->bind(MailService::class, fn (App $a) => new MailService($a->get(SettingsService::class)));
 $app->bind(EmailTemplateService::class, fn (App $a) => new EmailTemplateService(
     $a->get(Database::class),
@@ -441,7 +445,9 @@ $app->bind(SetupController::class, fn (App $a) => new SetupController(
     $a->get(AuthService::class),
     $a->get(AssociationWebsiteScrapeService::class),
     $a->get(MailService::class),
-    $a->get(RuntsLookupService::class)
+    $a->get(RuntsLookupService::class),
+    $a->get(RuntsDetailScrapeService::class),
+    $a->get(RateLimiter::class)
 ));
 $app->bind(UpdateController::class, fn (App $a) => new UpdateController(
     $a->get(View::class),

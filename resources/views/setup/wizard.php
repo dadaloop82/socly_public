@@ -3,7 +3,7 @@
 $errors = flash('errors');
 $errorStep = flash('setup_error_step');
 ?>
-<div class="setup-stage" data-setup-wizard data-mode="<?= e($mode) ?>" data-has-progress="<?= !empty($hasProgress) ? '1' : '0' ?>" data-setup-incremental="<?= !empty($isIncremental) ? '1' : '0' ?>">
+<div class="setup-stage" data-setup-wizard data-mode="<?= e($mode) ?>" data-has-progress="<?= !empty($hasProgress) ? '1' : '0' ?>" data-setup-incremental="<?= !empty($isIncremental) ? '1' : '0' ?>" data-i18n-endpoint="<?= e(url('/i18n/messages')) ?>">
     <div class="setup-ambient" aria-hidden="true"></div>
 
     <?php if ($mode === 'greeting'): ?>
@@ -94,9 +94,9 @@ $errorStep = flash('setup_error_step');
                 <div class="setup-progress" aria-hidden="true">
                     <span style="--setup-progress: <?= e((string) round($progress)) ?>%"></span>
                 </div>
-                <button type="button" class="btn btn-ghost btn-sm setup-exit" data-setup-exit><?= e(__('setup.exit')) ?></button>
+                <button type="button" class="btn btn-ghost btn-sm setup-exit" data-setup-exit data-i18n="setup.exit"><?= e(__('setup.exit')) ?></button>
             </div>
-            <p class="setup-meta" data-setup-line><?= e(__('setup.step_of', ['current' => (string) ($stepIndex + 1), 'total' => (string) $totalSteps])) ?></p>
+            <p class="setup-meta" data-setup-line data-i18n="setup.step_of" data-i18n-current="<?= e((string) ($stepIndex + 1)) ?>" data-i18n-total="<?= e((string) $totalSteps) ?>"><?= e(__('setup.step_of', ['current' => (string) ($stepIndex + 1), 'total' => (string) $totalSteps])) ?></p>
             <?php
             $stepKey = (string) ($step['key'] ?? '');
             $websiteTitleName = trim((string) ($assocName ?? ''));
@@ -138,13 +138,13 @@ $errorStep = flash('setup_error_step');
                     ]) ?>
                 </h1>
             <?php else: ?>
-                <h1 class="h1 h1-brand setup-title" data-setup-line><?= e(__($step['title_key'])) ?></h1>
+                <h1 class="h1 h1-brand setup-title" data-setup-line data-i18n="<?= e((string) ($step['title_key'] ?? '')) ?>"><?= e(__($step['title_key'])) ?></h1>
             <?php endif; ?>
             <?php
             $stepDesc = trim((string) __($step['description_key']));
             if ($stepDesc !== '' && $stepDesc !== ($step['description_key'] ?? '')):
             ?>
-                <p class="setup-copy" data-setup-line><?= e($stepDesc) ?></p>
+                <p class="setup-copy" data-setup-line data-i18n="<?= e((string) ($step['description_key'] ?? '')) ?>"><?= e($stepDesc) ?></p>
             <?php endif; ?>
 
             <?php if ($errors): ?>
@@ -269,12 +269,25 @@ $errorStep = flash('setup_error_step');
                                      data-msg-phase-download-cancelled="<?= e(__('setup.runts_phase_download_cancelled')) ?>"
                                      data-msg-phase-search-active="<?= e(__('setup.runts_phase_search_active')) ?>"
                                      data-msg-phase-search-cancelled="<?= e(__('setup.runts_phase_search_cancelled')) ?>"
+                                     data-msg-phase-detail="<?= e(__('setup.runts_phase_detail')) ?>"
+                                     data-msg-phase-docs="<?= e(__('setup.runts_phase_docs')) ?>"
+                                     data-msg-phase-docs-save="<?= e(__('setup.runts_phase_docs_save')) ?>"
+                                     data-msg-phase-docs-ocr="<?= e(__('setup.runts_phase_docs_ocr')) ?>"
                                      data-msg-phase-apply="<?= e(__('setup.runts_phase_apply')) ?>"
+                                     data-msg-docs-saved="<?= e(__('setup.runts_docs_saved')) ?>"
+                                     data-msg-docs-none="<?= e(__('setup.runts_docs_none')) ?>"
+                                     data-msg-legal-prefilled="<?= e(__('setup.runts_legal_prefilled')) ?>"
+                                     data-msg-legal-statute="<?= e(__('setup.runts_legal_statute')) ?>"
+                                     data-msg-legal-privacy="<?= e(__('setup.runts_legal_privacy')) ?>"
+                                     data-msg-legal-ocr-pending="<?= e(__('setup.runts_legal_ocr_pending')) ?>"
+                                     data-msg-limit-wait="<?= e(__('setup.runts_limit_wait')) ?>"
+                                     data-msg-limit-exhausted="<?= e(__('setup.runts_limit_exhausted')) ?>"
                                 >
                                     <label class="setup-field setup-field-runts" for="setup-runts-number">
                                         <span><?= e(__($field['label_key'])) ?></span>
                                     </label>
                                     <div class="setup-runts-row">
+                                        <p class="setup-runts-hint muted" data-setup-runts-hint><?= e(__('setup.runts_hint')) ?></p>
                                         <input
                                             id="setup-runts-number"
                                             type="text"
@@ -287,7 +300,8 @@ $errorStep = flash('setup_error_step');
                                             placeholder="<?= e(__('setup.field_runts_placeholder')) ?>"
                                             data-setup-runts-input
                                         >
-                                        <p class="setup-runts-hint muted" data-setup-runts-hint><?= e(__('setup.runts_hint')) ?></p>
+                                    </div>
+                                    <div class="setup-runts-actions">
                                         <button type="button" class="btn setup-scrape-btn" data-setup-runts-btn hidden disabled aria-hidden="true">
                                             <span data-setup-runts-label><?= e(__('setup.runts_button_fallback')) ?></span>
                                         </button>
@@ -319,9 +333,6 @@ $errorStep = flash('setup_error_step');
                                             </option>
                                         <?php endforeach; ?>
                                     </select>
-                                    <?php if (!$isCurrency): ?>
-                                        <p class="setup-legal-meaning muted" data-setup-legal-meaning hidden></p>
-                                    <?php endif; ?>
                                 <?php else: ?>
                                     <input
                                         type="text"
@@ -331,6 +342,9 @@ $errorStep = flash('setup_error_step');
                                         autocomplete="organization"
                                         data-setup-assoc-name
                                     >
+                                    <?php if ($fieldKey === 'name'): ?>
+                                        <p class="setup-legal-meaning muted" data-setup-legal-meaning hidden></p>
+                                    <?php endif; ?>
                                 <?php endif; ?>
                             </label>
                         <?php endforeach; ?>
@@ -667,14 +681,14 @@ $errorStep = flash('setup_error_step');
                         $isLocaleStep = ($step['key'] ?? '') === 'app.locale';
                     ?>
                     <?php if ($isLocaleStep): ?>
-                    <fieldset class="setup-locale-grid" data-setup-line>
-                        <legend class="setup-field-label"><?= e(__($step['title_key'])) ?></legend>
+                    <fieldset class="setup-locale-grid" data-setup-line data-setup-locale-picker>
+                        <legend class="setup-field-label" data-i18n="<?= e((string) ($step['title_key'] ?? '')) ?>"><?= e(__($step['title_key'])) ?></legend>
                         <?php foreach ($step['options'] as $opt): ?>
                             <?php $optVal = (string) ($opt['value'] ?? ''); ?>
                             <label class="setup-locale-card">
-                                <input type="radio" name="value" value="<?= e($optVal) ?>" <?= (string) $value === $optVal ? 'checked' : '' ?> required>
+                                <input type="radio" name="value" value="<?= e($optVal) ?>" data-setup-locale-radio <?= (string) $value === $optVal ? 'checked' : '' ?> required>
                                 <img src="<?= e(locale_flag_url($optVal)) ?>" width="28" height="21" alt="" loading="lazy" decoding="async">
-                                <span><?= e(__($opt['label_key'])) ?></span>
+                                <span data-i18n="<?= e((string) ($opt['label_key'] ?? '')) ?>"><?= e(__($opt['label_key'])) ?></span>
                             </label>
                         <?php endforeach; ?>
                     </fieldset>
@@ -1156,22 +1170,22 @@ $errorStep = flash('setup_error_step');
                 ?>
                 <?php if ($setupWhyText !== ''): ?>
                     <div class="setup-why-note" data-setup-line>
-                        <p class="setup-why-title"><?= e(__('setup.why_title')) ?></p>
-                        <p class="setup-why-text muted"><?= e($setupWhyText) ?></p>
+                        <p class="setup-why-title" data-i18n="setup.why_title"><?= e(__('setup.why_title')) ?></p>
+                        <p class="setup-why-text muted" data-i18n="<?= e($setupWhyKey ?? '') ?>"><?= e($setupWhyText) ?></p>
                     </div>
                 <?php endif; ?>
 
                 <?php if (in_array($stepType, ['president', 'people_list', 'textarea', 'smtp_config'], true)): ?>
                     <p class="setup-defer-wrap" data-setup-line>
-                        <button type="button" class="setup-defer-link" data-setup-defer-step><?= e(__('setup.defer_step')) ?></button>
+                        <button type="button" class="setup-defer-link" data-setup-defer-step data-i18n="setup.defer_step"><?= e(__('setup.defer_step')) ?></button>
                     </p>
                 <?php endif; ?>
 
                 <div class="setup-actions" data-setup-line>
                     <?php if (!empty($backHref)): ?>
-                        <a class="btn btn-ghost setup-back" href="<?= e((string) $backHref) ?>"><?= e(__('common.back')) ?></a>
+                        <a class="btn btn-ghost setup-back" href="<?= e((string) $backHref) ?>" data-i18n="common.back"><?= e(__('common.back')) ?></a>
                     <?php endif; ?>
-                    <button class="btn setup-cta" type="submit">
+                    <button class="btn setup-cta" type="submit" data-i18n="<?= !empty($isLast) ? 'setup.finish' : 'setup.next' ?>">
                         <?= e(!empty($isLast) ? __('setup.finish') : __('setup.next')) ?>
                     </button>
                 </div>

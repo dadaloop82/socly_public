@@ -8,7 +8,6 @@ use Socly\Core\Http\Request;
 use Socly\Core\Validator;
 use Socly\Core\View;
 use Socly\Services\AuthService;
-use Socly\Services\PlatformService;
 use Socly\Services\SetupService;
 use Socly\Services\SettingsService;
 
@@ -47,7 +46,7 @@ final class AuthController extends BaseController
                     ? 'auth.setup_required_title_incremental'
                     : 'auth.setup_required_title_first')
                 : '',
-            'showNewsWidget' => !$needsSetup && app(PlatformService::class)->isNewsEnabled(),
+            'showNewsWidget' => true,
             'newsApiUrl' => socly_news_api_url(),
             'demoLoginNotice' => $this->demoLoginNotice(),
         ], 'layouts/guest');

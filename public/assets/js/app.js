@@ -1073,6 +1073,7 @@ function initSetupWizard() {
     initBirthDateFields(setupForm);
     initGeoSubmitValidation(setupForm);
   }
+  initSetupLocaleLive(root);
   initSetupPeopleList(root);
   initSetupMemberTypes(root);
   initSetupMembershipPeriods(root);
@@ -1083,6 +1084,7 @@ function initSetupWizard() {
   initLogoFilePickers(root);
   initSetupNamePairPreview(root);
   initPlatformConsents(root);
+  initSetupCtaGate(root);
 
   setupForm?.querySelectorAll('[data-setup-defer-step]').forEach((btn) => {
     btn.addEventListener('click', () => {
@@ -3691,7 +3693,6 @@ function initSetupRuntsLookup(root) {
   const nameInput = pair?.querySelector('[data-setup-assoc-name]');
   const legalSelect = pair?.querySelector('[data-setup-legal-name]');
   const currencySelect = pair?.querySelector('select[name="currency"]');
-  const hintEl = box.querySelector('[data-setup-runts-hint]');
   const form = root.querySelector('[data-setup-form]');
   const backLink = form?.querySelector('.setup-back');
   const nextBtn = form?.querySelector('.setup-cta');
@@ -3699,19 +3700,67 @@ function initSetupRuntsLookup(root) {
 
   const digits = () => String(input.value || '').replace(/\D+/g, '');
   let lookingUp = false;
-  const TIMEOUT_MS = 120000;
+  let cooldownTimer = 0;
+  const TIMEOUT_MS = 240000;
+  const COOLDOWN_SECONDS = Math.max(1, Number(box.dataset.runtsCooldown || 60) || 60);
+
+  const refreshCta = () => {
+    form?.dispatchEvent(new CustomEvent('setup:cta-refresh'));
+  };
 
   const hideBtn = () => {
     btn.hidden = true;
     btn.disabled = true;
     btn.setAttribute('aria-hidden', 'true');
-    if (hintEl) hintEl.hidden = false;
   };
   const showBtn = () => {
+    if (box.dataset.runtsExhausted === '1') {
+      hideBtn();
+      return;
+    }
     btn.hidden = false;
     btn.removeAttribute('aria-hidden');
-    btn.disabled = lookingUp || digits() === '';
-    if (hintEl) hintEl.hidden = true;
+    btn.disabled = lookingUp || digits() === '' || box.dataset.runtsCooldowning === '1';
+  };
+
+  const markExhausted = () => {
+    box.dataset.runtsExhausted = '1';
+    box.dataset.runtsCooldowning = '0';
+    if (cooldownTimer) {
+      window.clearTimeout(cooldownTimer);
+      cooldownTimer = 0;
+    }
+    hideBtn();
+  };
+
+  const armCooldown = (seconds) => {
+    const wait = Math.max(1, Number(seconds) || COOLDOWN_SECONDS);
+    if (cooldownTimer) {
+      window.clearTimeout(cooldownTimer);
+      cooldownTimer = 0;
+    }
+    box.dataset.runtsCooldowning = '1';
+    btn.disabled = true;
+    cooldownTimer = window.setTimeout(() => {
+      cooldownTimer = 0;
+      box.dataset.runtsCooldowning = '0';
+      if (!lookingUp) sync();
+    }, wait * 1000);
+  };
+
+  const startCooldownCountdown = (seconds) => {
+    const wait = Math.max(1, Number(seconds) || COOLDOWN_SECONDS);
+    armCooldown(wait);
+    let left = wait;
+    const tick = () => {
+      if (box.dataset.runtsCooldowning !== '1') return;
+      const tpl = box.dataset.msgLimitWait || 'Ci puoi riprovare tra :seconds secondi.';
+      showStatus(tpl.replaceAll(':seconds', String(left)), 'warn');
+      if (left <= 0) return;
+      left -= 1;
+      window.setTimeout(tick, 1000);
+    };
+    tick();
   };
 
   const syncLabel = () => {
@@ -3751,10 +3800,36 @@ function initSetupRuntsLookup(root) {
     return `${name} ${legal}`;
   };
 
-  const foundHtml = (fields) => {
+  const foundHtml = (fields, documents, legalPrefill) => {
     const display = foundLabel(fields);
     const tpl = box.dataset.msgOk || 'Trovato :name.';
-    return escapeHtml(tpl).replaceAll(':name', `<strong>${escapeHtml(display)}</strong>`);
+    let html = escapeHtml(tpl).replaceAll(':name', `<strong>${escapeHtml(display)}</strong>`);
+    const docs = Array.isArray(documents) ? documents : [];
+    if (docs.length > 0) {
+      const heading = escapeHtml(box.dataset.msgDocsSaved || 'Documenti scaricati e salvati in Documenti:');
+      const items = docs.map((doc) => {
+        const title = escapeHtml(String(doc?.title || '').trim() || 'Documento');
+        const file = escapeHtml(String(doc?.filename || '').trim());
+        return `<li><strong>${title}</strong>${file ? ` <span class="muted">(${file})</span>` : ''}</li>`;
+      }).join('');
+      html += `<div class="setup-runts-docs"><p>${heading}</p><ul>${items}</ul></div>`;
+    }
+    const prefilled = Array.isArray(legalPrefill?.prefilled) ? legalPrefill.prefilled : [];
+    if (prefilled.length > 0) {
+      const labels = {
+        statute: box.dataset.msgLegalStatute || 'Statuto',
+        privacy: box.dataset.msgLegalPrivacy || 'Informativa privacy',
+      };
+      const heading = escapeHtml(box.dataset.msgLegalPrefilled || 'Testo precompilato:');
+      const items = prefilled.map((key) => {
+        const label = escapeHtml(labels[key] || String(key));
+        return `<li><strong>${label}</strong></li>`;
+      }).join('');
+      html += `<div class="setup-runts-docs"><p>${heading}</p><ul>${items}</ul></div>`;
+    } else if (legalPrefill?.pending_ocr) {
+      html += `<p class="setup-runts-warn">${escapeHtml(box.dataset.msgLegalOcrPending || '')}</p>`;
+    }
+    return html;
   };
 
   const setElapsed = (sec) => {
@@ -3785,6 +3860,10 @@ function initSetupRuntsLookup(root) {
       lists_ready: box.dataset.msgPhaseSearchActive,
       search_active: box.dataset.msgPhaseSearchActive,
       search_cancelled: box.dataset.msgPhaseSearchCancelled,
+      detail: box.dataset.msgPhaseDetail,
+      docs: box.dataset.msgPhaseDocs,
+      docs_save: box.dataset.msgPhaseDocsSave,
+      docs_ocr: box.dataset.msgPhaseDocsOcr,
       apply: box.dataset.msgPhaseApply,
     };
     const tpl = map[phase] || box.dataset.msgLoading || '…';
@@ -3801,7 +3880,7 @@ function initSetupRuntsLookup(root) {
       if (lookingUp) backLink.setAttribute('tabindex', '-1');
       else backLink.removeAttribute('tabindex');
     }
-    if (nextBtn) nextBtn.disabled = lookingUp;
+    if (lookingUp && nextBtn) nextBtn.disabled = true;
     if (exitBtn) exitBtn.disabled = lookingUp;
     input.readOnly = lookingUp;
     if (nameInput) {
@@ -3810,13 +3889,14 @@ function initSetupRuntsLookup(root) {
     }
     if (legalSelect) legalSelect.disabled = lookingUp;
     if (currencySelect) currencySelect.disabled = lookingUp;
-    btn.disabled = true;
     if (lookingUp) {
+      btn.disabled = true;
       btn.setAttribute('aria-busy', 'true');
       if (live) live.hidden = false;
     } else {
       btn.removeAttribute('aria-busy');
-      btn.disabled = digits() === '';
+      sync();
+      refreshCta();
     }
   };
 
@@ -3878,6 +3958,7 @@ function initSetupRuntsLookup(root) {
       showStatus(box.dataset.msgNeed || '', 'error');
       return;
     }
+    if (box.dataset.runtsExhausted === '1' || box.dataset.runtsCooldowning === '1') return;
     setLookupBusy(true);
     showBtn();
     setProgress(4);
@@ -3893,6 +3974,10 @@ function initSetupRuntsLookup(root) {
     const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
     let donePayload = null;
     let streamError = null;
+    let streamErrorCode = '';
+    let streamRetryAfter = 0;
+    let limitHandled = false;
+    let attemptConsumed = false;
 
     try {
       const body = new URLSearchParams();
@@ -3935,19 +4020,25 @@ function initSetupRuntsLookup(root) {
               continue;
             }
             if (event.type === 'progress') {
+              attemptConsumed = true;
               if (event.percent != null) setProgress(event.percent);
               showStatus(phaseText(String(event.phase || ''), event.number || number), '');
             } else if (event.type === 'start') {
+              attemptConsumed = true;
               showStatus(phaseText('connect', number), '');
             } else if (event.type === 'error') {
               streamError = String(event.error || box.dataset.msgFail || '');
+              streamErrorCode = String(event.code || '');
+              streamRetryAfter = Number(event.retry_after) || 0;
             } else if (event.type === 'done') {
+              attemptConsumed = true;
               donePayload = event;
             }
           }
         }
       } else {
         donePayload = await res.json();
+        attemptConsumed = true;
       }
 
       if (donePayload?.ok) {
@@ -3958,13 +4049,33 @@ function initSetupRuntsLookup(root) {
         const spinner = live?.querySelector('.setup-scrape-spinner');
         if (spinner instanceof HTMLElement) spinner.hidden = true;
         const warning = String(donePayload.warning || '').trim();
+        let html = foundHtml(
+          donePayload.fields || {},
+          donePayload.documents || [],
+          donePayload.legal_prefill || {}
+        );
         if (warning) {
-          showStatus(warning, donePayload.cancelled ? 'warn' : '');
+          html = `<p class="setup-runts-warn">${escapeHtml(warning)}</p>${html}`;
+          showStatus('', 'warn', html);
         } else {
-          showStatus('', '', foundHtml(donePayload.fields || {}));
+          showStatus('', '', html);
         }
       } else {
-        showStatus(streamError || donePayload?.error || box.dataset.msgFail || '', 'error');
+        const code = streamErrorCode || String(donePayload?.code || '');
+        if (code === 'rate_limit_exhausted') {
+          limitHandled = true;
+          markExhausted();
+          showStatus(
+            streamError || donePayload?.error || box.dataset.msgLimitExhausted || '',
+            'error'
+          );
+        } else if (code === 'rate_limit_wait') {
+          limitHandled = true;
+          const wait = streamRetryAfter || Number(donePayload?.retry_after) || COOLDOWN_SECONDS;
+          startCooldownCountdown(wait);
+        } else {
+          showStatus(streamError || donePayload?.error || box.dataset.msgFail || '', 'error');
+        }
       }
     } catch (err) {
       const timedOut = err && (err.name === 'AbortError' || controller.signal.aborted);
@@ -3978,12 +4089,45 @@ function initSetupRuntsLookup(root) {
       if (!box.classList.contains('is-found')) {
         setElapsed(Math.max(1, Math.floor((Date.now() - startedAt) / 1000)));
       }
-      if (progress && status?.classList.contains('is-error')) {
+      if (progress && (status?.classList.contains('is-error') || status?.classList.contains('is-warn'))) {
         progress.hidden = true;
+      }
+      if (!limitHandled && attemptConsumed && box.dataset.runtsExhausted !== '1') {
+        armCooldown(COOLDOWN_SECONDS);
       }
       setLookupBusy(false);
     }
   });
+}
+
+function initSetupCtaGate(root) {
+  const form = root.querySelector('[data-setup-form]');
+  const cta = form?.querySelector('button.setup-cta[type="submit"]');
+  if (!form || !cta) return;
+
+  const refresh = () => {
+    if (
+      root.classList.contains('is-runts-busy')
+      || form.classList.contains('is-runts-busy')
+      || root.classList.contains('is-scrape-busy')
+      || form.classList.contains('is-scrape-busy')
+    ) {
+      cta.disabled = true;
+      return;
+    }
+    let ok = true;
+    try {
+      ok = typeof form.checkValidity === 'function' ? form.checkValidity() : true;
+    } catch {
+      ok = true;
+    }
+    cta.disabled = !ok;
+  };
+
+  form.addEventListener('input', refresh);
+  form.addEventListener('change', refresh);
+  form.addEventListener('setup:cta-refresh', refresh);
+  refresh();
 }
 
 function initSetupWebsiteScrape(root) {
@@ -4036,11 +4180,14 @@ function initSetupWebsiteScrape(root) {
       if (locked) backLink.setAttribute('tabindex', '-1');
       else backLink.removeAttribute('tabindex');
     }
-    if (nextBtn) nextBtn.disabled = locked;
+    if (locked && nextBtn) nextBtn.disabled = true;
     if (exitBtn) exitBtn.disabled = locked;
     input.readOnly = locked;
     if (!btn.hidden) {
       btn.disabled = locked || !hasValidWebsite();
+    }
+    if (!locked) {
+      form?.dispatchEvent(new CustomEvent('setup:cta-refresh'));
     }
   };
 
@@ -4677,6 +4824,57 @@ function initSetupWebsiteScrape(root) {
     runScrape();
   });
 };
+
+function initSetupLocaleLive(root) {
+  const picker = root.querySelector('[data-setup-locale-picker]');
+  if (!picker) return;
+  const radios = [...picker.querySelectorAll('[data-setup-locale-radio]')];
+  if (radios.length === 0) return;
+  const endpointBase = String(root.dataset.i18nEndpoint || '');
+  if (!endpointBase) return;
+
+  const getByPath = (obj, path) => path.split('.').reduce(
+    (acc, key) => (acc && acc[key] !== undefined) ? acc[key] : undefined,
+    obj
+  );
+
+  const applyMessages = (messages, lang) => {
+    document.querySelectorAll('[data-i18n]').forEach((el) => {
+      const key = el.dataset.i18n;
+      if (!key) return;
+      let v = getByPath(messages, key);
+      if (typeof v !== 'string') return;
+      if (key === 'setup.step_of') {
+        v = v
+          .replace(':current', el.dataset.i18nCurrent || '')
+          .replace(':total', el.dataset.i18nTotal || '');
+      }
+      el.textContent = v;
+    });
+    document.documentElement.setAttribute('lang', lang);
+  };
+
+  const load = async (lang) => {
+    try {
+      const res = await fetch(`${endpointBase}?lang=${encodeURIComponent(lang)}`, {
+        headers: { Accept: 'application/json' },
+        credentials: 'same-origin',
+      });
+      if (!res.ok) return;
+      const data = await res.json();
+      if (!data?.ok) return;
+      applyMessages(data.messages || {}, lang);
+    } catch {
+      // ignore
+    }
+  };
+
+  radios.forEach((radio) => {
+    radio.addEventListener('change', () => {
+      if (radio.checked) load(radio.value);
+    });
+  });
+}
 
 function initSetupPeopleList(root) {
   root.querySelectorAll('[data-people-list]').forEach((list) => initPeopleList(list));
@@ -5896,6 +6094,7 @@ function initAuthNewsWidget() {
   const readMore = slot.dataset.newsReadMore || 'Leggi tutta →';
 
   const showUnavailable = () => {
+    slot.classList.add('is-empty');
     slot.innerHTML = `
       <article class="auth-news-card auth-news-card--empty will-enter">
         <div class="auth-news-body">
@@ -5921,6 +6120,7 @@ function initAuthNewsWidget() {
       if (!item || !item.title) {
         throw new Error('news_empty');
       }
+      slot.classList.remove('is-empty');
       const heroStyle = item.image ? `background-image:url('${String(item.image).replace(/'/g, "\\'")}')` : '';
       const excerpt = item.excerpt || item.body || '';
       const url = item.url || '#';

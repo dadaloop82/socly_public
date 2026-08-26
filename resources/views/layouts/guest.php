@@ -67,17 +67,17 @@ $year = date('Y');
                     <?php endif; ?>
                 </h1>
                 <p class="auth-motto" data-i18n-html="auth.motto"><?= with_auth_asterisk(e(__('auth.motto'))) ?></p>
-                <?php if (!empty($showNewsWidget)): ?>
-                <div
-                    class="auth-news-slot"
-                    data-auth-news
-                    data-news-api="<?= e((string) ($newsApiUrl ?? socly_news_api_url())) ?>"
-                    data-news-unavailable="<?= e(__('auth.news_unavailable')) ?>"
-                    data-news-read-more="<?= e(__('auth.news_read_more')) ?>"
-                ></div>
-                <?php endif; ?>
                 <p class="auth-desc" data-i18n-html="auth.product_description"><?= with_auth_asterisk(with_socly_word(__('auth.product_description'))) ?></p>
             </div>
+            <?php if (!empty($showNewsWidget)): ?>
+            <div
+                class="auth-news-slot"
+                data-auth-news
+                data-news-api="<?= e((string) ($newsApiUrl ?? socly_news_api_url())) ?>"
+                data-news-unavailable="<?= e(__('auth.news_unavailable')) ?>"
+                data-news-read-more="<?= e(__('auth.news_read_more')) ?>"
+            ></div>
+            <?php endif; ?>
             <div class="auth-brand-meta">
                 <p class="auth-license-note" data-i18n-html="auth.license_note"><?= with_auth_asterisk(e(__('auth.license_note'))) ?></p>
                 <p class="auth-updates-line">
