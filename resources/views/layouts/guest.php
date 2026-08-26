@@ -111,12 +111,19 @@ $year = date('Y');
         data-i18n-notes="<?= e(__('updates.notes')) ?>"
         data-i18n-download="<?= e(__('updates.download')) ?>"
         data-i18n-guide="<?= e(__('updates.guide')) ?>"
+        data-i18n-current-label="<?= e(__('updates.current_label')) ?>"
+        data-i18n-remote-label="<?= e(__('updates.remote_label')) ?>"
+        data-i18n-commit-label="<?= e(__('updates.commit_label')) ?>"
+        data-i18n-released-label="<?= e(__('updates.released_label')) ?>"
     >
-        <h2 class="setup-exit-title" data-auth-updates-title></h2>
-        <p class="setup-exit-text" data-auth-updates-text></p>
-        <div class="setup-exit-actions auth-updates-actions" data-auth-updates-actions hidden></div>
-        <div class="setup-exit-actions">
-            <button type="button" class="btn" data-auth-updates-close data-i18n="common.cancel"><?= e(__('common.cancel')) ?></button>
+        <div class="setup-exit-shell auth-updates-shell">
+            <h2 class="setup-exit-title" data-auth-updates-title></h2>
+            <p class="setup-exit-text" data-auth-updates-text></p>
+            <dl class="auth-updates-meta" data-auth-updates-meta hidden></dl>
+            <div class="setup-exit-actions auth-updates-actions" data-auth-updates-actions hidden></div>
+            <div class="setup-exit-actions">
+                <button type="button" class="btn" data-auth-updates-close data-i18n="common.cancel"><?= e(__('common.cancel')) ?></button>
+            </div>
         </div>
     </dialog>
     <footer class="auth-footer">

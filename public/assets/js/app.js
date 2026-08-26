@@ -6073,10 +6073,61 @@ function initAuthUpdateCheck() {
 
   const titleEl = dialog.querySelector('[data-auth-updates-title]');
   const textEl = dialog.querySelector('[data-auth-updates-text]');
+  const metaEl = dialog.querySelector('[data-auth-updates-meta]');
   const actionsEl = dialog.querySelector('[data-auth-updates-actions]');
   const closeBtn = dialog.querySelector('[data-auth-updates-close]');
 
   const tpl = (key, fallback = '') => dialog.dataset[key] || fallback;
+
+  const formatReleaseDate = (iso) => {
+    if (!iso) return '';
+    const d = new Date(iso);
+    if (Number.isNaN(d.getTime())) return String(iso);
+    try {
+      return d.toLocaleString(document.documentElement.lang || 'it-IT', {
+        day: '2-digit',
+        month: 'short',
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+      });
+    } catch {
+      return String(iso);
+    }
+  };
+
+  const renderMeta = (data) => {
+    if (!(metaEl instanceof HTMLElement)) return;
+    const rows = [];
+    const current = data?.current || '';
+    const remote = data?.remote || '';
+    if (current) {
+      rows.push(`<div><dt>${escapeHtml(tpl('i18nCurrentLabel', 'Versione attuale'))}</dt><dd>v${escapeHtml(current)}</dd></div>`);
+    }
+    if (remote) {
+      rows.push(`<div><dt>${escapeHtml(tpl('i18nRemoteLabel', 'Versione pubblicata'))}</dt><dd>v${escapeHtml(remote)}</dd></div>`);
+    }
+    if (data?.released_at) {
+      rows.push(`<div><dt>${escapeHtml(tpl('i18nReleasedLabel', 'Pubblicata il'))}</dt><dd>${escapeHtml(formatReleaseDate(data.released_at))}</dd></div>`);
+    }
+    const commit = data?.last_commit;
+    if (commit && (commit.sha || commit.message)) {
+      const label = tpl('i18nCommitLabel', 'Ultimo commit');
+      const sha = commit.sha ? `<code>${escapeHtml(commit.sha)}</code>` : '';
+      const msg = commit.message ? escapeHtml(commit.message) : '';
+      const body = commit.url
+        ? `<a href="${escapeHtml(commit.url)}" target="_blank" rel="noopener noreferrer">${sha}${sha && msg ? ' — ' : ''}${msg}</a>`
+        : `${sha}${sha && msg ? ' — ' : ''}${msg}`;
+      rows.push(`<div><dt>${escapeHtml(label)}</dt><dd>${body}</dd></div>`);
+    }
+    if (rows.length === 0) {
+      metaEl.innerHTML = '';
+      metaEl.hidden = true;
+      return;
+    }
+    metaEl.innerHTML = rows.join('');
+    metaEl.hidden = false;
+  };
 
   const openDialog = () => {
     if (typeof dialog.showModal === 'function') dialog.showModal();
@@ -6096,6 +6147,10 @@ function initAuthUpdateCheck() {
     const endpoint = btn.dataset.updatesEndpoint || '/api/updates/check';
     if (titleEl) titleEl.textContent = tpl('i18nChecking', 'Verifica in corso…');
     if (textEl) textEl.textContent = '';
+    if (metaEl) {
+      metaEl.innerHTML = '';
+      metaEl.hidden = true;
+    }
     if (actionsEl) {
       actionsEl.innerHTML = '';
       actionsEl.hidden = true;
@@ -6107,6 +6162,8 @@ function initAuthUpdateCheck() {
       const res = await fetch(endpoint + '?force=1', { credentials: 'same-origin' });
       const data = await res.json();
       if (!data?.ok) throw new Error(data?.error || 'check failed');
+
+      renderMeta(data);
 
       if (data.available) {
         if (titleEl) titleEl.textContent = tpl('i18nAvailableTitle', 'Aggiornamento disponibile');
@@ -6143,6 +6200,10 @@ function initAuthUpdateCheck() {
     } catch {
       if (titleEl) titleEl.textContent = tpl('i18nErrorTitle', 'Verifica non riuscita');
       if (textEl) textEl.textContent = tpl('i18nErrorText', 'Riprova tra poco.');
+      if (metaEl) {
+        metaEl.innerHTML = '';
+        metaEl.hidden = true;
+      }
     } finally {
       btn.disabled = false;
     }

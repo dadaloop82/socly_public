@@ -1083,6 +1083,10 @@ return [
     'updates' => [
         'available_title' => 'Aggiornamento disponibile',
         'available_text' => 'Versione attuale v:current · nuova v:remote',
+        'current_label' => 'Versione attuale',
+        'remote_label' => 'Versione pubblicata',
+        'released_label' => 'Pubblicata il',
+        'commit_label' => 'Ultimo commit (repo pubblico)',
         'manual_hint' => 'Scarica la nuova versione dal repository pubblico e segui la guida di aggiornamento.',
         'notes' => 'Novità',
         'download' => 'Scarica',

@@ -113,6 +113,12 @@ final class UpdateService
                 $result['notes_url'] = (string) ($manifest['notes_url'] ?? '');
                 $result['download_url'] = (string) ($manifest['download_url'] ?? '');
                 $result['install_guide_url'] = (string) ($manifest['install_guide_url'] ?? '');
+                $result['released_at'] = (string) ($manifest['released_at'] ?? '');
+                $result['repository_url'] = (string) ($manifest['repository_url'] ?? '');
+                $commit = $this->fetchPublicLatestCommit((string) ($manifest['repository_url'] ?? ''));
+                if ($commit !== null) {
+                    $result['last_commit'] = $commit;
+                }
                 $this->writeCache($cacheFile, $result);
                 return $result;
             } catch (\Throwable $e) {
@@ -236,6 +242,76 @@ final class UpdateService
         }
 
         return $data;
+    }
+
+    /**
+     * Latest commit on the public GitHub repository (dadaloop82/socly_public).
+     *
+     * @return array{sha:string,message:string,date:string,url:string}|null
+     */
+    private function fetchPublicLatestCommit(string $repositoryUrl): ?array
+    {
+        $repo = $this->publicGithubRepoSlug($repositoryUrl);
+        if ($repo === null) {
+            return null;
+        }
+        $url = 'https://api.github.com/repos/' . $repo . '/commits?per_page=1';
+        $context = stream_context_create([
+            'http' => [
+                'method' => 'GET',
+                'timeout' => 6,
+                'ignore_errors' => true,
+                'header' => implode("\r\n", [
+                    'User-Agent: SOCLY-UpdateCheck/1.0',
+                    'Accept: application/vnd.github+json',
+                ]) . "\r\n",
+            ],
+            'ssl' => [
+                'verify_peer' => true,
+                'verify_peer_name' => true,
+            ],
+        ]);
+        $raw = @file_get_contents($url, false, $context);
+        if ($raw === false || trim($raw) === '') {
+            return null;
+        }
+        $data = json_decode($raw, true);
+        if (!is_array($data) || $data === []) {
+            return null;
+        }
+        $row = $data[0] ?? null;
+        if (!is_array($row)) {
+            return null;
+        }
+        $sha = trim((string) ($row['sha'] ?? ''));
+        $message = trim((string) ($row['commit']['message'] ?? ''));
+        if ($message !== '') {
+            $message = preg_split('/\r\n|\r|\n/', $message)[0] ?? $message;
+            $message = mb_substr($message, 0, 160);
+        }
+        $date = trim((string) ($row['commit']['committer']['date'] ?? $row['commit']['author']['date'] ?? ''));
+        $htmlUrl = trim((string) ($row['html_url'] ?? ''));
+        if ($sha === '') {
+            return null;
+        }
+        return [
+            'sha' => substr($sha, 0, 7),
+            'message' => $message,
+            'date' => $date,
+            'url' => $htmlUrl !== '' ? $htmlUrl : ('https://github.com/' . $repo . '/commit/' . $sha),
+        ];
+    }
+
+    private function publicGithubRepoSlug(string $repositoryUrl): ?string
+    {
+        $repositoryUrl = trim($repositoryUrl);
+        if ($repositoryUrl === '') {
+            $repositoryUrl = 'https://github.com/dadaloop82/socly_public';
+        }
+        if (!preg_match('#github\.com/([A-Za-z0-9_.-]+)/([A-Za-z0-9_.-]+)#', $repositoryUrl, $m)) {
+            return null;
+        }
+        return $m[1] . '/' . rtrim($m[2], '/.git');
     }
 
     private function isAllowedManifestUrl(string $url): bool

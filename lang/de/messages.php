@@ -1079,6 +1079,10 @@ return [
     'updates' => [
         'available_title' => 'Update verfügbar',
         'available_text' => 'Aktuell v:current · neu v:remote',
+        'current_label' => 'Aktuelle Version',
+        'remote_label' => 'Veröffentlichte Version',
+        'released_label' => 'Veröffentlicht am',
+        'commit_label' => 'Letzter Commit (öffentliches Repo)',
         'manual_hint' => 'Laden Sie die neue Version aus dem öffentlichen Repository herunter und folgen Sie der Anleitung.',
         'notes' => 'Neuigkeiten',
         'download' => 'Herunterladen',
