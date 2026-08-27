@@ -103,6 +103,9 @@ $errorStep = flash('setup_error_step');
             $showWebsiteLockup = $stepKey === 'association.website'
                 && $websiteTitleName !== ''
                 && strcasecmp($websiteTitleName, 'SOCLY') !== 0;
+            $showLogoLockup = $stepKey === 'branding.logo'
+                && $websiteTitleName !== ''
+                && strcasecmp($websiteTitleName, 'SOCLY') !== 0;
             $showComponentsLockup = $stepKey === 'components.select'
                 && $websiteTitleName !== ''
                 && strcasecmp($websiteTitleName, 'SOCLY') !== 0;
@@ -113,6 +116,15 @@ $errorStep = flash('setup_error_step');
             <?php if ($showWebsiteLockup): ?>
                 <h1 class="h1 h1-brand setup-title" data-setup-line data-setup-fit-title>
                     <?= e(__('setup.step_website_of')) ?>
+                    <?= assoc_lockup_html([
+                        'name' => $websiteTitleName,
+                        'legal_name' => (string) ($assocLegal ?? ''),
+                        'class' => 'assoc-lockup-setup-title',
+                    ]) ?>
+                </h1>
+            <?php elseif ($showLogoLockup): ?>
+                <h1 class="h1 h1-brand setup-title" data-setup-line data-setup-fit-title>
+                    <?= e(__('setup.step_logo_of')) ?>
                     <?= assoc_lockup_html([
                         'name' => $websiteTitleName,
                         'legal_name' => (string) ($assocLegal ?? ''),
@@ -379,7 +391,16 @@ $errorStep = flash('setup_error_step');
                         <p class="setup-hint setup-full-name-preview muted" data-setup-full-name-preview hidden></p>
                     </div>
                 <?php elseif ($stepType === 'field_group'): ?>
-                    <div class="setup-field-group" data-setup-line>
+                    <div
+                        class="setup-field-group"
+                        data-setup-line
+                        <?php if (($step['key'] ?? '') === 'association.tax_ids'): ?>
+                            data-setup-tax-ids
+                            data-msg-fiscal-invalid="<?= e(__('setup.tax_fiscal_invalid')) ?>"
+                            data-msg-vat-invalid="<?= e(__('setup.tax_vat_invalid')) ?>"
+                            data-msg-vat-matches="<?= e(__('setup.tax_vat_matches_fiscal')) ?>"
+                        <?php endif; ?>
+                    >
                         <?php foreach ($step['fields'] as $field): ?>
                             <?php $fieldType = (string) ($field['type'] ?? 'text'); ?>
                             <?php if ($fieldType === 'tel'): ?>
@@ -400,7 +421,25 @@ $errorStep = flash('setup_error_step');
                                     value="<?= e((string) ($value[$field['key']] ?? '')) ?>"
                                     <?= !empty($field['required']) ? 'required' : '' ?>
                                     autocomplete="<?= e((string) ($field['autocomplete'] ?? 'off')) ?>"
+                                    <?php if (($field['key'] ?? '') === 'fiscal_code'): ?>
+                                        maxlength="16"
+                                        inputmode="text"
+                                        spellcheck="false"
+                                        data-setup-fiscal-code
+                                        placeholder="<?= e(__('setup.field_fiscal_code_placeholder')) ?>"
+                                    <?php elseif (($field['key'] ?? '') === 'vat_number'): ?>
+                                        maxlength="13"
+                                        inputmode="numeric"
+                                        spellcheck="false"
+                                        data-setup-vat-number
+                                        placeholder="<?= e(__('setup.field_vat_placeholder')) ?>"
+                                    <?php endif; ?>
                                 >
+                                <?php if (($field['key'] ?? '') === 'fiscal_code'): ?>
+                                    <p class="setup-hint muted" data-setup-fiscal-hint hidden></p>
+                                <?php elseif (($field['key'] ?? '') === 'vat_number'): ?>
+                                    <p class="setup-hint muted" data-setup-vat-hint hidden></p>
+                                <?php endif; ?>
                             </label>
                             <?php endif; ?>
                         <?php endforeach; ?>

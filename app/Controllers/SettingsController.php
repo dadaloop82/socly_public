@@ -219,7 +219,16 @@ final class SettingsController extends BaseController
         $legal = strtoupper(trim((string) $data['association_legal_name']));
         $name = assoc_capitalize_name((string) $data['association_name']);
         $fiscal = strtoupper(preg_replace('/\s+/', '', (string) $data['association_fiscal_code']) ?? '');
-        $vat = preg_replace('/\s+/', '', (string) ($data['association_vat'] ?? '')) ?? '';
+        $vat = strtoupper(preg_replace('/\s+/', '', (string) ($data['association_vat'] ?? '')) ?? '');
+        if (str_starts_with($vat, 'IT')) {
+            $vat = substr($vat, 2);
+        }
+        if ($fiscal !== '' && !$this->validator->isValidEntityFiscalCode($fiscal)) {
+            $this->settingsFail($request, ['association_fiscal_code' => __('validation.fiscal_code')], 'general');
+        }
+        if ($vat !== '' && !$this->validator->isValidVatNumber($vat) && !($vat === $fiscal && $this->validator->isValidEntityFiscalCode($fiscal))) {
+            $this->settingsFail($request, ['association_vat' => __('setup.validation_vat')], 'general');
+        }
         $before = [
             'association.name' => $this->settings->get('association.name'),
             'association.legal_name' => $this->settings->get('association.legal_name'),

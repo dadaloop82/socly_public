@@ -1086,6 +1086,7 @@ function initSetupWizard() {
   initPlatformConsents(root);
   initSetupCtaGate(root);
   initSetupFitAssocNames(root);
+  initSetupTaxIds(root);
 
   setupForm?.querySelectorAll('[data-setup-defer-step]').forEach((btn) => {
     btn.addEventListener('click', () => {
@@ -4359,6 +4360,117 @@ function initSetupCtaGate(root) {
   form.addEventListener('input', refresh);
   form.addEventListener('change', refresh);
   form.addEventListener('setup:cta-refresh', refresh);
+  refresh();
+}
+
+function initSetupTaxIds(root) {
+  const box = root.querySelector('[data-setup-tax-ids]');
+  if (!box) return;
+  const fiscalInput = box.querySelector('[data-setup-fiscal-code]');
+  const vatInput = box.querySelector('[data-setup-vat-number]');
+  const fiscalHint = box.querySelector('[data-setup-fiscal-hint]');
+  const vatHint = box.querySelector('[data-setup-vat-hint]');
+  const form = root.querySelector('[data-setup-form]');
+  if (!(fiscalInput instanceof HTMLInputElement)) return;
+
+  const oddMap = {
+    0: 1, 1: 0, 2: 5, 3: 7, 4: 9, 5: 13, 6: 15, 7: 17, 8: 19, 9: 21,
+    A: 1, B: 0, C: 5, D: 7, E: 9, F: 13, G: 15, H: 17, I: 19, J: 21,
+    K: 2, L: 4, M: 18, N: 20, O: 11, P: 3, Q: 6, R: 8, S: 12, T: 14,
+    U: 16, V: 10, W: 22, X: 25, Y: 24, Z: 23,
+  };
+
+  const normalize = (raw) => String(raw || '').replace(/\s+/g, '').toUpperCase();
+  const stripIt = (raw) => {
+    let v = normalize(raw);
+    if (v.startsWith('IT')) v = v.slice(2);
+    return v;
+  };
+
+  const isValidVat = (raw) => {
+    const vat = stripIt(raw);
+    if (!/^\d{11}$/.test(vat)) return false;
+    let sum = 0;
+    for (let i = 0; i < 10; i += 1) {
+      const n = Number(vat[i]);
+      if (i % 2 === 0) sum += n;
+      else {
+        const doubled = n * 2;
+        sum += doubled > 9 ? doubled - 9 : doubled;
+      }
+    }
+    const check = (10 - (sum % 10)) % 10;
+    return check === Number(vat[10]);
+  };
+
+  const isValidPersonCf = (raw) => {
+    const code = normalize(raw);
+    if (!/^[A-Z]{6}[0-9LMNPQRSTUV]{2}[ABCDEHLMPRST][0-9LMNPQRSTUV]{2}[A-Z][0-9LMNPQRSTUV]{3}[A-Z]$/.test(code)) {
+      return false;
+    }
+    let sum = 0;
+    for (let i = 0; i < 15; i += 1) {
+      const ch = code[i];
+      if (i % 2 === 0) sum += oddMap[ch] ?? 0;
+      else if (ch >= '0' && ch <= '9') sum += Number(ch);
+      else sum += ch.charCodeAt(0) - 65;
+    }
+    const check = String.fromCharCode((sum % 26) + 65);
+    return check === code[15];
+  };
+
+  const isValidEntityCf = (raw) => isValidVat(raw) || isValidPersonCf(raw);
+
+  const setHint = (el, message, isError) => {
+    if (!(el instanceof HTMLElement)) return;
+    const msg = String(message || '').trim();
+    el.hidden = msg === '';
+    el.textContent = msg;
+    el.classList.toggle('is-error', !!isError && msg !== '');
+  };
+
+  const refresh = () => {
+    const fiscal = normalize(fiscalInput.value);
+    fiscalInput.value = fiscal;
+    let fiscalOk = fiscal === '' || isValidEntityCf(fiscal);
+    if (fiscal !== '' && !fiscalOk) {
+      fiscalInput.setCustomValidity(box.dataset.msgFiscalInvalid || 'Invalid');
+      setHint(fiscalHint, box.dataset.msgFiscalInvalid || '', true);
+    } else {
+      fiscalInput.setCustomValidity('');
+      setHint(fiscalHint, '', false);
+    }
+
+    if (vatInput instanceof HTMLInputElement) {
+      let vat = stripIt(vatInput.value);
+      vatInput.value = vat;
+      let vatOk = true;
+      let hint = '';
+      let err = false;
+      if (vat !== '') {
+        if (isValidVat(vat)) {
+          if (fiscal !== '' && vat === fiscal) {
+            hint = box.dataset.msgVatMatches || '';
+          }
+        } else if (fiscal !== '' && vat === fiscal && isValidEntityCf(fiscal)) {
+          hint = box.dataset.msgVatMatches || '';
+        } else {
+          vatOk = false;
+          err = true;
+          hint = box.dataset.msgVatInvalid || '';
+        }
+      }
+      vatInput.setCustomValidity(vatOk ? '' : (box.dataset.msgVatInvalid || 'Invalid'));
+      setHint(vatHint, hint, err);
+    }
+
+    form?.dispatchEvent(new CustomEvent('setup:cta-refresh'));
+  };
+
+  fiscalInput.addEventListener('input', refresh);
+  fiscalInput.addEventListener('blur', refresh);
+  vatInput?.addEventListener('input', refresh);
+  vatInput?.addEventListener('blur', refresh);
   refresh();
 }
 

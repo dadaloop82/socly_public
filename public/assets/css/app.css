@@ -836,6 +836,9 @@ a:hover { text-decoration: underline; color: var(--brand-primary-deep); }
   width: auto;
   max-width: 100%;
 }
+.setup-hint.is-error {
+  color: var(--danger, #9b1c1c);
+}
 .setup-legal-meaning {
   margin: 0.15rem 0 0;
   font-size: 0.82rem;
@@ -3712,6 +3715,18 @@ html:has(.setup-body) {
   max-width: 100%;
   overflow: hidden;
   line-height: 1.35;
+}
+.setup-title[data-setup-fit-title] {
+  display: flex;
+  flex-wrap: nowrap;
+  align-items: baseline;
+  gap: 0.28em;
+  width: 100%;
+}
+.setup-title[data-setup-fit-title] .assoc-lockup-setup-title {
+  flex: 1 1 auto;
+  min-width: 0;
+  max-width: 100%;
 }
 .setup-copy {
   color: var(--muted);

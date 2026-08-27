@@ -165,7 +165,7 @@ final class Validator
     public function isValidFiscalCode(string $code): bool
     {
         $code = strtoupper(trim($code));
-        if (!preg_match('/^[A-Z]{6}[0-9]{2}[A-EHLMPRST][0-9]{2}[A-Z][0-9]{3}[A-Z]$/', $code)) {
+        if (!preg_match('/^[A-Z]{6}[0-9LMNPQRSTUV]{2}[ABCDEHLMPRST][0-9LMNPQRSTUV]{2}[A-Z][0-9LMNPQRSTUV]{3}[A-Z]$/', $code)) {
             return false;
         }
         $oddMap = [
@@ -188,5 +188,41 @@ final class Validator
         }
         $check = chr(($sum % 26) + ord('A'));
         return $check === $code[15];
+    }
+
+    /** Italian Partita IVA (11 digits) with check digit. Accepts optional IT prefix. */
+    public function isValidVatNumber(string $vat): bool
+    {
+        $vat = strtoupper(preg_replace('/\s+/', '', $vat) ?? '');
+        if (str_starts_with($vat, 'IT')) {
+            $vat = substr($vat, 2);
+        }
+        if (preg_match('/^\d{11}$/', $vat) !== 1) {
+            return false;
+        }
+        $sum = 0;
+        for ($i = 0; $i < 10; $i++) {
+            $n = (int) $vat[$i];
+            if ($i % 2 === 0) {
+                $sum += $n;
+            } else {
+                $doubled = $n * 2;
+                $sum += $doubled > 9 ? $doubled - 9 : $doubled;
+            }
+        }
+        $check = (10 - ($sum % 10)) % 10;
+        return $check === (int) $vat[10];
+    }
+
+    /**
+     * Entity fiscal code: 11-digit VAT-style CF, or 16-char codice fiscale with check digit.
+     */
+    public function isValidEntityFiscalCode(string $code): bool
+    {
+        $code = strtoupper(preg_replace('/\s+/', '', $code) ?? '');
+        if ($this->isValidVatNumber($code)) {
+            return true;
+        }
+        return $this->isValidFiscalCode($code);
     }
 }

@@ -1958,8 +1958,13 @@ final class SetupService
                 }
             }
             if ($key === 'vat_number') {
-                $value = preg_replace('/\s+/', '', $value) ?? '';
-                if (!$this->isValidVat($value)) {
+                $value = strtoupper(preg_replace('/\s+/', '', $value) ?? '');
+                if (str_starts_with($value, 'IT')) {
+                    $value = substr($value, 2);
+                }
+                $fiscal = strtoupper(preg_replace('/\s+/', '', (string) ($input['fiscal_code'] ?? '')) ?? '');
+                // P.IVA opzionale: può coincidere col CF ente (11 cifre).
+                if (!$this->isValidVat($value) && !($fiscal !== '' && $value === $fiscal && $this->isValidEntityFiscalCode($fiscal))) {
                     $errors[$key] = __('setup.validation_vat');
                     continue;
                 }
@@ -2192,22 +2197,18 @@ final class SetupService
 
     private function isValidEntityFiscalCode(string $value): bool
     {
-        // Ente: 11 cifre (come P.IVA) oppure 16 alfanumerici
-        if (preg_match('/^\d{11}$/', $value) === 1) {
-            return true;
-        }
-        return preg_match('/^[A-Z0-9]{16}$/', $value) === 1;
+        return (new \Socly\Core\Validator())->isValidEntityFiscalCode($value);
     }
 
     private function isValidPersonFiscalCode(string $value): bool
     {
-        return preg_match('/^[A-Z]{6}[0-9LMNPQRSTUV]{2}[ABCDEHLMPRST][0-9LMNPQRSTUV]{2}[A-Z][0-9LMNPQRSTUV]{3}[A-Z]$/', $value) === 1
+        return (new \Socly\Core\Validator())->isValidFiscalCode($value)
             || preg_match('/^[A-Z0-9]{16}$/', $value) === 1;
     }
 
     private function isValidVat(string $value): bool
     {
-        return preg_match('/^\d{11}$/', $value) === 1;
+        return (new \Socly\Core\Validator())->isValidVatNumber($value);
     }
 
     private function isValidDate(string $value): bool
