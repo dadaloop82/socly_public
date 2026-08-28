@@ -1088,12 +1088,17 @@ function initSetupWizard() {
   initSetupGeoGate(root);
   initSetupFitAssocNames(root);
   initSetupTaxIds(root);
+  initSetupContacts(root);
+  if (setupForm) initPhoneInputs(setupForm);
 
   setupForm?.querySelectorAll('[data-setup-defer-step]').forEach((btn) => {
     btn.addEventListener('click', () => {
       const flag = setupForm?.querySelector('[data-setup-defer-flag]');
       if (flag) flag.value = '1';
-      setupForm?.requestSubmit();
+      if (!setupForm) return;
+      setupForm.dataset.geoResolved = '1';
+      setupForm.noValidate = true;
+      HTMLFormElement.prototype.submit.call(setupForm);
     });
   });
 
@@ -4490,6 +4495,63 @@ function initSetupTaxIds(root) {
   refresh();
 }
 
+function initSetupContacts(root) {
+  const box = root.querySelector('[data-setup-contacts]');
+  if (!box) return;
+  const pecInput = box.querySelector('[data-setup-pec]');
+  const emailInput = box.querySelector('[data-setup-email]');
+  const form = root.querySelector('[data-setup-form]');
+  if (!(pecInput instanceof HTMLInputElement)) return;
+
+  const consumerDomains = new Set([
+    'gmail.com', 'googlemail.com', 'yahoo.com', 'yahoo.it', 'hotmail.com', 'hotmail.it',
+    'outlook.com', 'outlook.it', 'live.com', 'live.it', 'icloud.com', 'me.com',
+    'libero.it', 'virgilio.it', 'alice.it', 'tin.it', 'fastwebnet.it', 'email.it',
+    'proton.me', 'protonmail.com', 'msn.com', 'aol.com', 'mail.com', 'ymail.com',
+  ]);
+
+  const isValidEmail = (raw) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(raw || '').trim());
+
+  const isValidPec = (raw) => {
+    const value = String(raw || '').trim().toLowerCase();
+    if (!isValidEmail(value)) return false;
+    const domain = value.split('@')[1] || '';
+    if (!domain || consumerDomains.has(domain)) return false;
+    return domain.includes('pec')
+      || domain.includes('legalmail')
+      || domain.includes('postacert')
+      || domain.includes('cert.')
+      || domain.endsWith('.gov.it')
+      || domain.endsWith('.edu.it');
+  };
+
+  const refresh = () => {
+    const pec = pecInput.value.trim().toLowerCase();
+    pecInput.value = pec;
+    if (pec === '') {
+      pecInput.setCustomValidity('');
+    } else if (!isValidPec(pec)) {
+      pecInput.setCustomValidity(box.dataset.msgPecInvalid || 'Invalid');
+    } else {
+      pecInput.setCustomValidity('');
+    }
+
+    if (emailInput instanceof HTMLInputElement) {
+      const email = emailInput.value.trim().toLowerCase();
+      emailInput.value = email;
+      emailInput.setCustomValidity(email !== '' && !isValidEmail(email) ? (box.dataset.msgEmailInvalid || 'Invalid') : '');
+    }
+
+    form?.dispatchEvent(new Event('setup:cta-refresh', { bubbles: true }));
+  };
+
+  pecInput.addEventListener('input', refresh);
+  pecInput.addEventListener('change', refresh);
+  emailInput?.addEventListener('input', refresh);
+  emailInput?.addEventListener('change', refresh);
+  refresh();
+}
+
 function initSetupFitAssocNames(root) {
   const fitOne = (lockup) => {
     if (!(lockup instanceof HTMLElement)) return;
@@ -6810,17 +6872,21 @@ function initBirthDateFields(root = document) {
       const v = input.value;
       if (!v) {
         input.setCustomValidity('');
+        input.closest('form')?.dispatchEvent(new Event('setup:cta-refresh', { bubbles: true }));
         return true;
       }
       if (v > todayStr) {
         input.setCustomValidity(msgFuture);
+        input.closest('form')?.dispatchEvent(new Event('setup:cta-refresh', { bubbles: true }));
         return false;
       }
       if (v > maxStr) {
         input.setCustomValidity(msgMinor);
+        input.closest('form')?.dispatchEvent(new Event('setup:cta-refresh', { bubbles: true }));
         return false;
       }
       input.setCustomValidity('');
+      input.closest('form')?.dispatchEvent(new Event('setup:cta-refresh', { bubbles: true }));
       return true;
     };
     input.addEventListener('change', validate);
@@ -6947,6 +7013,9 @@ function initGeoSubmitValidation(root = document) {
     if (!form.querySelector('[data-address-input], [data-city-input]')) return;
     form.dataset.geoSubmitBound = '1';
     form.addEventListener('submit', async (event) => {
+      if (form.querySelector('[data-setup-defer-flag]')?.value === '1') {
+        return;
+      }
       if (form.dataset.geoResolved === '1') {
         delete form.dataset.geoResolved;
         return;

@@ -208,7 +208,7 @@ final class SettingsController extends BaseController
             'association_address' => 'required|string|max:255',
             'association_house_number' => 'required|string|max:20',
             'association_pec' => 'required|email|max:190',
-            'association_email' => 'required|email|max:190',
+            'association_email' => 'nullable|email|max:190',
             'association_runts' => 'nullable|string|max:6',
             'primary' => 'required|color',
             'accent' => 'required|color',
@@ -228,6 +228,10 @@ final class SettingsController extends BaseController
         }
         if ($vat !== '' && !$this->validator->isValidVatNumber($vat) && !($vat === $fiscal && $this->validator->isValidEntityFiscalCode($fiscal))) {
             $this->settingsFail($request, ['association_vat' => __('setup.validation_vat')], 'general');
+        }
+        $pec = strtolower(trim((string) ($data['association_pec'] ?? '')));
+        if (!$this->validator->isValidPecAddress($pec)) {
+            $this->settingsFail($request, ['association_pec' => __('setup.contacts_pec_invalid')], 'general');
         }
         $before = [
             'association.name' => $this->settings->get('association.name'),

@@ -244,7 +244,7 @@ final class SetupCatalogue
                         'env_key' => 'ASSOCIATION_EMAIL',
                         'settings_key' => 'association.email',
                         'type' => 'email',
-                        'required' => true,
+                        'required' => false,
                         'label_key' => 'setup.field_email',
                         'autocomplete' => 'email',
                     ],

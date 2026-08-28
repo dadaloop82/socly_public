@@ -1920,6 +1920,13 @@ final class SetupService
                 $errors[$key] = __('validation.email');
                 continue;
             }
+            if ($key === 'pec') {
+                $value = strtolower($value);
+                if (!(new \Socly\Core\Validator())->isValidPecAddress($value)) {
+                    $errors[$key] = __('setup.contacts_pec_invalid');
+                    continue;
+                }
+            }
             if ($key === 'fiscal_code') {
                 $value = strtoupper(preg_replace('/\s+/', '', $value) ?? '');
                 if (!$this->isValidEntityFiscalCode($value)) {
@@ -2072,6 +2079,7 @@ final class SetupService
             return ['ok' => false, 'errors' => $errors];
         }
         $this->people->replaceRole(AssociationPeopleService::ROLE_PRESIDENT, [$person]);
+        $this->markStepReviewed(['key' => 'association.president', 'type' => 'president']);
         return ['ok' => true];
     }
 

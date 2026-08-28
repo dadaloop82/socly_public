@@ -401,6 +401,11 @@ $errorStep = flash('setup_error_step');
                             data-msg-fiscal-invalid="<?= e(__('setup.tax_fiscal_invalid')) ?>"
                             data-msg-vat-invalid="<?= e(__('setup.tax_vat_invalid')) ?>"
                             data-msg-vat-matches="<?= e(__('setup.tax_vat_matches_fiscal')) ?>"
+                        <?php elseif (($step['key'] ?? '') === 'association.contacts'): ?>
+                            data-setup-contacts
+                            data-msg-pec-invalid="<?= e(__('setup.contacts_pec_invalid')) ?>"
+                            data-msg-email-invalid="<?= e(__('setup.contacts_email_invalid')) ?>"
+                            data-msg-phone-invalid="<?= e(__('setup.contacts_phone_invalid')) ?>"
                         <?php endif; ?>
                     >
                         <?php foreach ($step['fields'] as $field): ?>
@@ -435,6 +440,16 @@ $errorStep = flash('setup_error_step');
                                         spellcheck="false"
                                         data-setup-vat-number
                                         placeholder="<?= e(__('setup.field_vat_placeholder')) ?>"
+                                    <?php elseif (($field['key'] ?? '') === 'pec'): ?>
+                                        inputmode="email"
+                                        spellcheck="false"
+                                        data-setup-pec
+                                        placeholder="<?= e(__('setup.field_pec_placeholder')) ?>"
+                                    <?php elseif (($field['key'] ?? '') === 'email'): ?>
+                                        inputmode="email"
+                                        spellcheck="false"
+                                        data-setup-email
+                                        placeholder="<?= e(__('setup.field_email_placeholder')) ?>"
                                     <?php endif; ?>
                                 >
                                 <?php if (($field['key'] ?? '') === 'fiscal_code'): ?>
@@ -540,7 +555,7 @@ $errorStep = flash('setup_error_step');
                                 'address' => true,
                                 'house_number' => true,
                             ],
-                            'with_scope' => false,
+                            'with_scope' => true,
                         ]) ?>
                         <div class="setup-equal-row">
                             <label class="setup-field">

@@ -225,4 +225,32 @@ final class Validator
         }
         return $this->isValidFiscalCode($code);
     }
+
+    /** Italian PEC: valid email, not a common consumer mailbox domain. */
+    public function isValidPecAddress(string $address): bool
+    {
+        $address = strtolower(trim($address));
+        if (!filter_var($address, FILTER_VALIDATE_EMAIL)) {
+            return false;
+        }
+        $domain = substr(strrchr($address, '@') ?: '', 1);
+        if ($domain === '') {
+            return false;
+        }
+        $consumerDomains = [
+            'gmail.com', 'googlemail.com', 'yahoo.com', 'yahoo.it', 'hotmail.com', 'hotmail.it',
+            'outlook.com', 'outlook.it', 'live.com', 'live.it', 'icloud.com', 'me.com',
+            'libero.it', 'virgilio.it', 'alice.it', 'tin.it', 'fastwebnet.it', 'email.it',
+            'proton.me', 'protonmail.com', 'msn.com', 'aol.com', 'mail.com', 'ymail.com',
+        ];
+        if (in_array($domain, $consumerDomains, true)) {
+            return false;
+        }
+        return str_contains($domain, 'pec')
+            || str_contains($domain, 'legalmail')
+            || str_contains($domain, 'postacert')
+            || str_contains($domain, 'cert.')
+            || str_ends_with($domain, '.gov.it')
+            || str_ends_with($domain, '.edu.it');
+    }
 }
