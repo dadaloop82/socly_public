@@ -96,7 +96,7 @@
             </div>
             <div>
                 <label><?= e(__('setup.field_email')) ?></label>
-                <input type="email" name="association_email" value="<?= e((string)($settings['association.email'] ?? '')) ?>" required>
+                <input type="email" name="association_email" value="<?= e((string)($settings['association.email'] ?? '')) ?>">
             </div>
         </div>
         <div class="grid-2">
