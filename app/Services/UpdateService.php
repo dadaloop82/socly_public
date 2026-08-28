@@ -80,6 +80,8 @@ final class UpdateService
      *   checked_at:int,
      *   source?:string,
      *   install_available?:bool,
+     *   develop_version?:string,
+     *   public_version?:string,
      *   notes_url?:string,
      *   download_url?:string,
      *   install_guide_url?:string,
@@ -92,69 +94,110 @@ final class UpdateService
         if (!$force && is_file($cacheFile)) {
             $cached = json_decode((string) file_get_contents($cacheFile), true);
             if (is_array($cached) && (($cached['checked_at'] ?? 0) + self::CACHE_TTL) > time()) {
-                return $cached;
+                $staleManifestOnly = $this->installEnabled()
+                    && ($cached['source'] ?? '') === 'manifest'
+                    && trim((string) ($cached['develop_version'] ?? '')) === '';
+                if (!$staleManifestOnly) {
+                    return $this->finalizeResult($cached);
+                }
             }
         }
 
         $current = $this->currentVersion();
         if (!$this->notifyEnabled() && !$this->installEnabled()) {
-            $result = $this->baseResult($current, $current, false);
-            $this->writeCache($cacheFile, $result);
-            return $result;
+            return $this->writeCache($cacheFile, $this->finalizeResult(
+                $this->baseResult($current, $current, false)
+            ));
         }
 
+        $manifest = null;
+        $manifestError = null;
         if ($this->notifyEnabled()) {
             try {
                 $manifest = $this->fetchManifest();
-                $remote = (string) ($manifest['version'] ?? '0.0.0');
-                $result = $this->baseResult($current, $remote, $this->isNewer($remote, $current));
-                $result['source'] = 'manifest';
-                $result['install_available'] = $this->installEnabled();
-                $result['notes_url'] = (string) ($manifest['notes_url'] ?? '');
-                $result['download_url'] = (string) ($manifest['download_url'] ?? '');
-                $result['install_guide_url'] = (string) ($manifest['install_guide_url'] ?? '');
-                $result['released_at'] = (string) ($manifest['released_at'] ?? '');
-                $result['repository_url'] = (string) ($manifest['repository_url'] ?? '');
-                $commit = $this->fetchPublicLatestCommit((string) ($manifest['repository_url'] ?? ''));
-                if ($commit !== null) {
-                    $result['last_commit'] = $commit;
-                }
-                $this->writeCache($cacheFile, $result);
-                return $result;
             } catch (\Throwable $e) {
-                if (!$this->installEnabled()) {
-                    $result = $this->baseResult($current, $current, false);
-                    $result['source'] = 'manifest';
-                    $result['install_available'] = false;
-                    $result['error'] = $e->getMessage();
-                    $this->writeCache($cacheFile, $result);
-                    return $result;
-                }
+                $manifestError = $e->getMessage();
             }
         }
 
+        $gitRemote = null;
+        $gitError = null;
         if ($this->installEnabled()) {
             try {
                 $this->git(['fetch', 'origin']);
-                $remoteVersion = $this->gitShowVersion('origin/' . $this->channel());
-                $result = $this->baseResult($current, $remoteVersion, $this->isNewer($remoteVersion, $current));
-                $result['source'] = 'git';
-                $result['install_available'] = true;
-                $this->writeCache($cacheFile, $result);
-                return $result;
+                $gitRemote = $this->gitShowVersion('origin/' . $this->channel());
             } catch (\Throwable $e) {
-                $result = $this->baseResult($current, $current, false);
-                $result['source'] = 'git';
-                $result['install_available'] = true;
-                $result['error'] = $e->getMessage();
-                $this->writeCache($cacheFile, $result);
-                return $result;
+                $gitError = $e->getMessage();
             }
         }
 
-        $result = $this->baseResult($current, $current, false);
-        $this->writeCache($cacheFile, $result);
-        return $result;
+        $publicVersion = is_array($manifest)
+            ? trim((string) ($manifest['version'] ?? ''))
+            : '';
+        if ($publicVersion === '') {
+            $publicVersion = null;
+        }
+
+        if ($gitRemote !== null) {
+            $remote = $gitRemote;
+            $source = 'git';
+            $available = $this->isNewer($gitRemote, $current);
+            if ($publicVersion !== null && $this->isNewer($publicVersion, $gitRemote)) {
+                $publicVersion = $gitRemote;
+            }
+        } elseif ($this->installEnabled()) {
+            $remote = $current;
+            $source = 'git';
+            $available = false;
+        } elseif ($publicVersion !== null) {
+            $remote = $publicVersion;
+            $source = 'manifest';
+            $available = $this->isNewer($publicVersion, $current);
+        } else {
+            $remote = $current;
+            $source = $this->installEnabled() ? 'git' : 'manifest';
+            $available = false;
+        }
+
+        $result = $this->baseResult($current, $remote, $available);
+        $result['source'] = $source;
+        $result['install_available'] = $this->installEnabled();
+        if ($publicVersion !== null) {
+            $result['public_version'] = $publicVersion;
+        }
+        if ($gitRemote !== null) {
+            $result['develop_version'] = $gitRemote;
+        }
+
+        if (is_array($manifest)) {
+            $result['notes_url'] = (string) ($manifest['notes_url'] ?? '');
+            $result['download_url'] = (string) ($manifest['download_url'] ?? '');
+            $result['install_guide_url'] = (string) ($manifest['install_guide_url'] ?? '');
+            $result['released_at'] = (string) ($manifest['released_at'] ?? '');
+            $result['repository_url'] = (string) ($manifest['repository_url'] ?? '');
+        }
+
+        if ($source === 'git') {
+            $commit = $this->fetchGithubLatestCommit($this->githubRepoSlugFromGitRemote($this->repo()));
+            if ($commit !== null) {
+                $result['last_commit'] = $commit;
+            }
+        } elseif (is_array($manifest)) {
+            $commit = $this->fetchPublicLatestCommit((string) ($manifest['repository_url'] ?? ''));
+            if ($commit !== null) {
+                $result['last_commit'] = $commit;
+            }
+        }
+
+        if ($gitError !== null && $manifestError !== null) {
+            $result['error'] = $gitError;
+        } elseif ($gitError !== null && $this->installEnabled()) {
+            $result['error'] = $gitError;
+        } elseif ($manifestError !== null && !$this->installEnabled()) {
+            $result['error'] = $manifestError;
+        }
+
+        return $this->writeCache($cacheFile, $this->finalizeResult($result));
     }
 
     /** @return array{ok:bool,message:string,version?:string} */
@@ -403,7 +446,7 @@ final class UpdateService
     /** @param list<string> $args */
     private function git(array $args): string
     {
-        $cmd = array_merge(['git', '-C', base_path()], $args);
+        $cmd = array_merge(['git', '-c', 'safe.directory=' . base_path(), '-C', base_path()], $args);
         $descriptors = [
             0 => ['pipe', 'r'],
             1 => ['pipe', 'w'],
@@ -430,13 +473,76 @@ final class UpdateService
         return $stdout;
     }
 
-    /** @param array<string, mixed> $result */
-    private function writeCache(string $path, array $result): void
+    /**
+     * Latest commit on a GitHub repository.
+     *
+     * @return array{sha:string,message:string,date:string,url:string}|null
+     */
+    private function fetchGithubLatestCommit(?string $repoSlug): ?array
+    {
+        if ($repoSlug === null || $repoSlug === '') {
+            return null;
+        }
+        return $this->fetchPublicLatestCommit('https://github.com/' . $repoSlug);
+    }
+
+    private function githubRepoSlugFromGitRemote(string $remote): ?string
+    {
+        $remote = trim($remote);
+        if ($remote === '') {
+            return null;
+        }
+        if (preg_match('#github\.com[^:]*:([^/]+)/([^/]+?)(?:\.git)?$#', $remote, $m) === 1) {
+            return $m[1] . '/' . rtrim($m[2], '.git');
+        }
+        if (preg_match('#github\.com/([^/]+)/([^/]+?)(?:\.git)?#', $remote, $m) === 1) {
+            return $m[1] . '/' . rtrim($m[2], '.git');
+        }
+        return null;
+    }
+
+    /** @param array<string, mixed> $result @return array<string, mixed> */
+    private function finalizeResult(array $result): array
+    {
+        $current = $this->currentVersion();
+        $result['current'] = $current;
+
+        $develop = trim((string) ($result['develop_version'] ?? ''));
+        $source = (string) ($result['source'] ?? '');
+        $installAvailable = !empty($result['install_available']);
+
+        if ($develop !== '') {
+            $result['remote'] = $develop;
+            $result['available'] = $this->isNewer($develop, $current);
+        } elseif ($source === 'manifest') {
+            $remote = trim((string) ($result['remote'] ?? $current));
+            $result['remote'] = $remote !== '' ? $remote : $current;
+            $result['available'] = $this->isNewer($result['remote'], $current);
+        } elseif ($installAvailable) {
+            $result['remote'] = $current;
+            $result['available'] = false;
+        } else {
+            $remote = trim((string) ($result['remote'] ?? $current));
+            $result['remote'] = $remote !== '' ? $remote : $current;
+            $result['available'] = $this->isNewer($result['remote'], $current);
+        }
+
+        $public = trim((string) ($result['public_version'] ?? ''));
+        if ($develop !== '' && $public !== '' && $this->isNewer($public, $develop)) {
+            $result['public_version'] = $develop;
+        }
+
+        return $result;
+    }
+
+    /** @param array<string, mixed> $result @return array<string, mixed> */
+    private function writeCache(string $path, array $result): array
     {
         $dir = dirname($path);
         if (!is_dir($dir)) {
             mkdir($dir, 0775, true);
         }
         file_put_contents($path, json_encode($result, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES), LOCK_EX);
+        return $result;
     }
 }

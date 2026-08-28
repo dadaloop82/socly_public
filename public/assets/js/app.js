@@ -7020,19 +7020,27 @@ function initAuthUpdateCheck() {
     if (!(metaEl instanceof HTMLElement)) return;
     const rows = [];
     const current = data?.current || '';
+    const develop = data?.develop_version || '';
+    const published = data?.public_version || '';
     const remote = data?.remote || '';
     if (current) {
       rows.push(`<div><dt>${escapeHtml(tpl('i18nCurrentLabel', 'Versione attuale'))}</dt><dd>v${escapeHtml(current)}</dd></div>`);
     }
-    if (remote) {
-      rows.push(`<div><dt>${escapeHtml(tpl('i18nRemoteLabel', 'Versione pubblicata'))}</dt><dd>v${escapeHtml(remote)}</dd></div>`);
+    if (develop) {
+      rows.push(`<div><dt>${escapeHtml(tpl('i18nDevelopLabel', 'Versione develop'))}</dt><dd>v${escapeHtml(develop)}</dd></div>`);
+    } else if (remote && !published) {
+      rows.push(`<div><dt>${escapeHtml(tpl('i18nRemoteLabel', 'Versione disponibile'))}</dt><dd>v${escapeHtml(remote)}</dd></div>`);
+    }
+    if (published) {
+      rows.push(`<div><dt>${escapeHtml(tpl('i18nPublicLabel', 'Versione pubblicata'))}</dt><dd>v${escapeHtml(published)}</dd></div>`);
     }
     if (data?.released_at) {
       rows.push(`<div><dt>${escapeHtml(tpl('i18nReleasedLabel', 'Pubblicata il'))}</dt><dd>${escapeHtml(formatReleaseDate(data.released_at))}</dd></div>`);
     }
     const commit = data?.last_commit;
     if (commit && (commit.sha || commit.message)) {
-      const label = tpl('i18nCommitLabel', 'Ultimo commit');
+      const commitKey = data?.source === 'git' ? 'i18nCommitDevelopLabel' : 'i18nCommitLabel';
+      const label = tpl(commitKey, tpl('i18nCommitLabel', 'Ultimo commit'));
       const sha = commit.sha ? `<code>${escapeHtml(commit.sha)}</code>` : '';
       const msg = commit.message ? escapeHtml(commit.message) : '';
       const body = commit.url

@@ -112,8 +112,11 @@ $year = date('Y');
         data-i18n-download="<?= e(__('updates.download')) ?>"
         data-i18n-guide="<?= e(__('updates.guide')) ?>"
         data-i18n-current-label="<?= e(__('updates.current_label')) ?>"
+        data-i18n-develop-label="<?= e(__('updates.develop_label')) ?>"
+        data-i18n-public-label="<?= e(__('updates.public_label')) ?>"
         data-i18n-remote-label="<?= e(__('updates.remote_label')) ?>"
         data-i18n-commit-label="<?= e(__('updates.commit_label')) ?>"
+        data-i18n-commit-develop-label="<?= e(__('updates.commit_develop_label')) ?>"
         data-i18n-released-label="<?= e(__('updates.released_label')) ?>"
     >
         <div class="setup-exit-shell auth-updates-shell">
