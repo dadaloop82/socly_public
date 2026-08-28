@@ -16,6 +16,7 @@ final class RuntsDetailScrapeService
 
     /**
      * @param callable(array<string, mixed>):void|null $emit
+     * @param array{max_documents?:int} $options
      * @return array{
      *   ok:bool,
      *   error?:string,
@@ -25,7 +26,7 @@ final class RuntsDetailScrapeService
      *   warning?:string
      * }
      */
-    public function fetch(string $repertory, ?callable $emit = null): array
+    public function fetch(string $repertory, ?callable $emit = null, array $options = []): array
     {
         $number = preg_replace('/\D+/', '', trim($repertory)) ?? '';
         if ($number === '') {
@@ -33,6 +34,7 @@ final class RuntsDetailScrapeService
         }
 
         $emit = $emit ?? static function (): void {};
+        $maxDocuments = max(0, (int) ($options['max_documents'] ?? 0));
         @set_time_limit(self::TIMEOUT_SECONDS + 180);
 
         $cookie = sys_get_temp_dir() . '/socly-runts-detail-' . getmypid() . '-' . bin2hex(random_bytes(3)) . '.txt';
@@ -65,6 +67,9 @@ final class RuntsDetailScrapeService
             $failed = 0;
             $total = max(1, count($docRows));
             foreach ($docRows as $i => $row) {
+                if ($maxDocuments > 0 && count($documents) >= $maxDocuments) {
+                    break;
+                }
                 // Re-open detail after each download (ASP.NET leaves the Ente page).
                 if ($i > 0) {
                     $opened = $this->openDetail($number, $cookie);
