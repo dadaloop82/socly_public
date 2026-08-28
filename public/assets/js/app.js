@@ -1085,6 +1085,7 @@ function initSetupWizard() {
   initSetupNamePairPreview(root);
   initPlatformConsents(root);
   initSetupCtaGate(root);
+  initSetupGeoGate(root);
   initSetupFitAssocNames(root);
   initSetupTaxIds(root);
 
@@ -4348,6 +4349,7 @@ function initSetupCtaGate(root) {
       cta.disabled = true;
       return;
     }
+    refreshGeoFormValidity(form);
     let ok = true;
     try {
       ok = typeof form.checkValidity === 'function' ? form.checkValidity() : true;
@@ -4361,6 +4363,20 @@ function initSetupCtaGate(root) {
   form.addEventListener('change', refresh);
   form.addEventListener('setup:cta-refresh', refresh);
   refresh();
+}
+
+function initSetupGeoGate(root) {
+  const form = root.querySelector('[data-setup-form]');
+  if (!form || !form.querySelector('[data-city-input], [data-address-input]')) return;
+  const urls = resolveGeoUrls(form);
+  if (!urls) return;
+
+  const silentResolve = async () => {
+    await resolvePendingGeoFields(form, { silent: true });
+    refreshGeoFormValidity(form);
+    form.dispatchEvent(new Event('setup:cta-refresh', { bubbles: true }));
+  };
+  silentResolve().catch(() => {});
 }
 
 function initSetupTaxIds(root) {
@@ -5493,8 +5509,10 @@ function resolveGeoUrls(root) {
     if (!el || !el.dataset) return null;
     const citiesUrl = el.dataset.citiesUrl || '';
     const addressesUrl = el.dataset.addressesUrl || '';
+    const capUrl = el.dataset.capUrl || '';
+    const provincesUrl = el.dataset.provincesUrl || '';
     if (citiesUrl && addressesUrl) {
-      return { citiesUrl, addressesUrl };
+      return { citiesUrl, addressesUrl, capUrl, provincesUrl };
     }
     return null;
   };
@@ -5538,46 +5556,148 @@ function geoCityNotFoundMessage(template, city) {
   return tpl.replaceAll(':city', label);
 }
 
+function geoFieldNotFoundMessage(template, value) {
+  const label = String(value || '').trim();
+  const tpl = String(template || 'Valore non trovato.');
+  return tpl.replaceAll(':value', label).replaceAll(':city', label);
+}
+
 function clearGeoCityError(input) {
   if (!input) return;
   input.classList.remove('input-invalid');
   input.setCustomValidity('');
 }
 
-async function showGeoCityNotFound(input, template) {
+function clearGeoFieldError(input) {
+  clearGeoCityError(input);
+}
+
+async function showGeoFieldNotFound(input, template, options = {}) {
   if (!input) return;
-  const message = geoCityNotFoundMessage(template, input.value.trim());
+  const message = geoFieldNotFoundMessage(template, input.value.trim());
   input.dataset.geoPicked = '0';
   input.classList.add('input-invalid');
   input.setCustomValidity(message);
   const okLabel = document.body?.dataset?.msgGeoCityNotFoundOk || 'Ok, la correggo';
   await appConfirm(message, { alert: true, confirmLabel: okLabel });
-  input.value = '';
-  clearGeoCityError(input);
+  if (!options.keepValue) {
+    input.value = '';
+  }
+  clearGeoFieldError(input);
   if (input.matches('[data-birth-place-input]')) {
     input.closest('form')?.dispatchEvent(new Event('cf:refresh'));
   }
   input.focus();
+  input.closest('form')?.dispatchEvent(new Event('setup:cta-refresh', { bubbles: true }));
+}
+
+async function showGeoCityNotFound(input, template) {
+  await showGeoFieldNotFound(input, template);
+}
+
+function applyGeoComuneToScope(scope, item) {
+  if (!scope || !item) return;
+  const cityInput = scope.querySelector('[data-city-input]');
+  const postalInput = scope.querySelector('[data-postal-code]');
+  const provinceInput = scope.querySelector('[data-province-input]');
+  if (cityInput instanceof HTMLInputElement && item.city) {
+    cityInput.value = item.city;
+    cityInput.dataset.geoPicked = '1';
+    clearGeoFieldError(cityInput);
+  }
+  if (postalInput instanceof HTMLInputElement && item.cap) {
+    postalInput.value = item.cap;
+  }
+  if (provinceInput instanceof HTMLInputElement) {
+    const provinceName = String(item.provincia_name || item.name || '').trim();
+    if (provinceName) {
+      provinceInput.value = provinceName;
+      provinceInput.dataset.geoPicked = '1';
+      clearGeoFieldError(provinceInput);
+    }
+  }
+}
+
+function refreshGeoScopeValidity(scope) {
+  if (!scope) return;
+  const cityInput = scope.querySelector('[data-city-input]');
+  const addressInput = scope.querySelector('[data-address-input]');
+  const provinceInput = scope.querySelector('[data-province-input]');
+  const msgCity = document.body?.dataset?.msgGeoCityRequired || '';
+  const msgAddress = document.body?.dataset?.msgGeoAddressRequired || '';
+
+  if (cityInput instanceof HTMLInputElement) {
+    const value = cityInput.value.trim();
+    if (cityInput.required && value && cityInput.dataset.geoPicked !== '1') {
+      cityInput.setCustomValidity(msgCity);
+    } else if (cityInput.validationMessage === msgCity) {
+      cityInput.setCustomValidity('');
+    }
+  }
+  if (addressInput instanceof HTMLInputElement) {
+    const value = addressInput.value.trim();
+    if (addressInput.required && value && addressInput.dataset.geoPicked !== '1') {
+      addressInput.setCustomValidity(msgAddress);
+    } else if (addressInput.validationMessage === msgAddress) {
+      addressInput.setCustomValidity('');
+    }
+  }
+  if (provinceInput instanceof HTMLInputElement) {
+    const value = provinceInput.value.trim();
+    if (provinceInput.required && value && provinceInput.dataset.geoPicked !== '1') {
+      provinceInput.setCustomValidity(document.body?.dataset?.msgGeoProvinceNotFound || msgCity);
+    } else if (provinceInput.validationMessage) {
+      provinceInput.setCustomValidity('');
+    }
+  }
+}
+
+function refreshGeoFormValidity(form) {
+  if (!(form instanceof HTMLFormElement)) return;
+  const scopes = new Set();
+  form.querySelectorAll('[data-geo-scope], .geo-address, .setup-address').forEach((el) => scopes.add(el));
+  if (scopes.size === 0) {
+    form.querySelectorAll('[data-city-input], [data-address-input]').forEach((input) => {
+      const scope = geoScopeFor(input);
+      if (scope) scopes.add(scope);
+    });
+  }
+  scopes.forEach((scope) => refreshGeoScopeValidity(scope));
 }
 
 async function handleGeoResolveResult(data, input, applyItem, confirmTemplate, options = {}) {
-  if (!data || !input || typeof applyItem !== 'function') return;
+  if (!data || !input || typeof applyItem !== 'function') return false;
+  const notFoundTemplate = options.notFoundTemplate
+    || document.body?.dataset?.msgGeoCityNotFound
+    || 'Valore non trovato.';
   if (data.action === 'none') {
-    clearGeoCityError(input);
-    return;
+    input.dataset.geoPicked = '1';
+    clearGeoFieldError(input);
+    return true;
   }
   if (data.action === 'not_found') {
-    await showGeoCityNotFound(input, options.notFoundTemplate);
-    return;
+    if (options.silent) {
+      input.dataset.geoPicked = '0';
+      return false;
+    }
+    await showGeoFieldNotFound(input, notFoundTemplate, options);
+    return false;
   }
   if (data.action === 'apply' && data.item) {
     applyItem(data.item);
     input.dataset.geoPicked = '1';
-    clearGeoCityError(input);
-    return;
+    clearGeoFieldError(input);
+    input.closest('form')?.dispatchEvent(new Event('setup:cta-refresh', { bubbles: true }));
+    return true;
   }
-  if (data.action !== 'confirm' || !data.item) return;
-  const suggestion = data.label || data.item.label || data.item.city || data.item.address || '';
+  if (data.action !== 'confirm' || !data.item) return false;
+  if (options.silent) {
+    applyItem(data.item);
+    input.dataset.geoPicked = '1';
+    clearGeoFieldError(input);
+    return true;
+  }
+  const suggestion = data.label || data.item.label || data.item.city || data.item.address || data.item.name || '';
   const labels = geoConfirmLabelsFromBody();
   const confirmed = await appConfirm(
     geoConfirmMessage(confirmTemplate, suggestion),
@@ -5586,21 +5706,27 @@ async function handleGeoResolveResult(data, input, applyItem, confirmTemplate, o
   if (confirmed) {
     applyItem(data.item);
     input.dataset.geoPicked = '1';
-    clearGeoCityError(input);
-  } else {
-    await showGeoCityNotFound(input, options.notFoundTemplate);
+    clearGeoFieldError(input);
+    input.closest('form')?.dispatchEvent(new Event('setup:cta-refresh', { bubbles: true }));
+    return true;
   }
+  await showGeoFieldNotFound(input, notFoundTemplate, options);
+  return false;
 }
 
 function initPlaceSuggest(root = document) {
   const urls = resolveGeoUrls(root);
   if (!urls) return;
-  const { citiesUrl, addressesUrl } = urls;
+  const { citiesUrl, addressesUrl, capUrl, provincesUrl } = urls;
   const scopeRoot = root && root.querySelectorAll ? root : document;
   const confirmCityTpl = document.body?.dataset?.msgGeoConfirmCity || 'Intendevi :suggestion?';
   const confirmAddressTpl = document.body?.dataset?.msgGeoConfirmAddress || 'Intendevi :suggestion?';
   const confirmBirthTpl = document.body?.dataset?.msgGeoConfirmBirth || confirmCityTpl;
+  const confirmProvinceTpl = document.body?.dataset?.msgGeoConfirmProvince || confirmCityTpl;
   const cityNotFoundTpl = document.body?.dataset?.msgGeoCityNotFound || 'La città ":city" non è stata trovata.';
+  const addressNotFoundTpl = document.body?.dataset?.msgGeoAddressNotFound || 'Via non valida.';
+  const provinceNotFoundTpl = document.body?.dataset?.msgGeoProvinceNotFound || 'Provincia non trovata.';
+  const capNotFoundTpl = document.body?.dataset?.msgGeoCapNotFound || 'CAP non valido.';
 
   scopeRoot.querySelectorAll('[data-birth-place-input]').forEach((birthInput) => {
     if (birthInput.dataset.suggestBound === '1') return;
@@ -5656,14 +5782,93 @@ function initPlaceSuggest(root = document) {
     const form = (cityInput || addressInput)?.closest('form') || scope;
 
     const applyProvince = (item) => {
-      if (!provinceInput || !item?.provincia) return;
-      const raw = String(item.provincia).trim();
-      if (!raw) return;
-      const code = raw.length <= 3 ? raw.toUpperCase() : raw.slice(0, 2).toUpperCase();
-      if (!provinceInput.value) {
-        provinceInput.value = code;
+      if (!(provinceInput instanceof HTMLInputElement) || !item) return;
+      const provinceName = String(item.provincia_name || item.name || '').trim();
+      if (!provinceName) return;
+      if (!provinceInput.value || provinceInput.dataset.geoPicked !== '1') {
+        provinceInput.value = provinceName;
+        provinceInput.dataset.geoPicked = '1';
+        clearGeoFieldError(provinceInput);
       }
     };
+
+    const markCityPicked = () => {
+      if (cityInput instanceof HTMLInputElement && cityInput.value.trim()) {
+        cityInput.dataset.geoPicked = '1';
+        clearGeoFieldError(cityInput);
+      }
+    };
+
+    const markAddressPicked = () => {
+      if (addressInput instanceof HTMLInputElement && addressInput.value.trim()) {
+        addressInput.dataset.geoPicked = '1';
+        clearGeoFieldError(addressInput);
+      }
+    };
+
+    if (postalInput instanceof HTMLInputElement && postalInput.dataset.capBound !== '1' && capUrl) {
+      postalInput.dataset.capBound = '1';
+      const resolveCap = async () => {
+        const cap = postalInput.value.replace(/\D+/g, '');
+        if (cap.length !== 5) return;
+        const data = await resolveGeoQuery(capUrl, {
+          q: cap,
+          city: cityInput instanceof HTMLInputElement ? cityInput.value.trim() : '',
+        });
+        await handleGeoResolveResult(data, postalInput, (item) => {
+          applyGeoComuneToScope(scope, item);
+          if (addressInput instanceof HTMLInputElement) {
+            addressInput.dispatchEvent(new Event('input', { bubbles: true }));
+          }
+        }, confirmCityTpl, { notFoundTemplate: capNotFoundTpl, keepValue: true });
+        refreshGeoScopeValidity(scope);
+        form?.dispatchEvent(new Event('setup:cta-refresh', { bubbles: true }));
+      };
+      postalInput.addEventListener('blur', () => { resolveCap().catch(() => {}); });
+      postalInput.addEventListener('change', () => { resolveCap().catch(() => {}); });
+    }
+
+    if (provinceInput instanceof HTMLInputElement && provincesUrl) {
+      if (/^[A-Za-z]{2}$/.test(provinceInput.value.trim()) && provinceInput.dataset.geoPicked !== '1') {
+        resolveGeoQuery(provincesUrl, { q: provinceInput.value.trim() }).then((data) => {
+          if (data?.action === 'apply' && data.item?.name) {
+            provinceInput.value = data.item.name;
+            provinceInput.dataset.geoPicked = '1';
+            clearGeoFieldError(provinceInput);
+          }
+        }).catch(() => {});
+      }
+      if (provinceInput.dataset.suggestBound !== '1') {
+        provinceInput.dataset.suggestBound = '1';
+        const provinceList = provinceInput.closest('.suggest-wrap, .suggest-field, label, .field-block')?.querySelector('[data-province-suggest]')
+          || scope.querySelector('[data-province-suggest]');
+        bindSuggest({
+          input: provinceInput,
+          list: provinceList,
+          fetchItems: async (q) => {
+            const res = await fetch(`${provincesUrl}?q=${encodeURIComponent(q)}`);
+            const data = await res.json();
+            return (data.items || []).map((item) => ({
+              label: item.label,
+              apply: () => {
+                provinceInput.value = item.name || item.label;
+                provinceInput.dataset.geoPicked = '1';
+                clearGeoFieldError(provinceInput);
+              },
+            }));
+          },
+          resolve: {
+            minChars: 2,
+            run: async (raw) => {
+              const data = await resolveGeoQuery(provincesUrl, { q: raw });
+              await handleGeoResolveResult(data, provinceInput, (item) => {
+                provinceInput.value = item.name || item.label || raw;
+              }, confirmProvinceTpl, { notFoundTemplate: provinceNotFoundTpl });
+            },
+          },
+        });
+      }
+    }
 
     if (cityInput && cityInput.dataset.suggestBound !== '1') {
       cityInput.dataset.suggestBound = '1';
@@ -5679,6 +5884,8 @@ function initPlaceSuggest(root = document) {
             label: item.label,
             apply: () => {
               cityInput.value = item.city;
+              cityInput.dataset.geoPicked = '1';
+              clearGeoFieldError(cityInput);
               if (postalInput && item.cap && !postalInput.value) {
                 postalInput.value = item.cap;
               }
@@ -5688,9 +5895,12 @@ function initPlaceSuggest(root = document) {
           }));
         },
         onPick: () => {
+          markCityPicked();
           if (addressInput) {
             addressInput.dispatchEvent(new Event('input', { bubbles: true }));
           }
+          refreshGeoScopeValidity(scope);
+          form?.dispatchEvent(new Event('setup:cta-refresh', { bubbles: true }));
         },
         resolve: {
           minChars: 2,
@@ -5706,6 +5916,7 @@ function initPlaceSuggest(root = document) {
                 addressInput.dispatchEvent(new Event('input', { bubbles: true }));
               }
             }, confirmCityTpl, { notFoundTemplate: cityNotFoundTpl });
+            refreshGeoScopeValidity(scope);
           },
         },
       });
@@ -5713,6 +5924,7 @@ function initPlaceSuggest(root = document) {
         if (addressInput?.dataset.suggestBound === '1') {
           addressInput.dispatchEvent(new Event('input', { bubbles: true }));
         }
+        refreshGeoScopeValidity(scope);
       });
     }
 
@@ -5748,6 +5960,8 @@ function initPlaceSuggest(root = document) {
               label: item.label,
               apply: () => {
                 addressInput.value = item.address || item.label;
+                addressInput.dataset.geoPicked = '1';
+                clearGeoFieldError(addressInput);
                 if (houseNumberInput && item.house_number) {
                   houseNumberInput.value = item.house_number;
                 }
@@ -5758,6 +5972,11 @@ function initPlaceSuggest(root = document) {
               },
             }];
           });
+        },
+        onPick: () => {
+          markAddressPicked();
+          refreshGeoScopeValidity(scope);
+          form?.dispatchEvent(new Event('setup:cta-refresh', { bubbles: true }));
         },
         resolve: {
           minChars: 3,
@@ -5778,11 +5997,14 @@ function initPlaceSuggest(root = document) {
               if (postalInput && item.postal_code) {
                 postalInput.value = item.postal_code;
               }
-            }, confirmAddressTpl);
+            }, confirmAddressTpl, { notFoundTemplate: addressNotFoundTpl });
+            refreshGeoScopeValidity(scope);
           },
         },
       });
     }
+
+    refreshGeoScopeValidity(scope);
   });
 }
 
@@ -5842,7 +6064,8 @@ function bindSuggest({ input, list, fetchItems, minChars = 2, onPick, resolve = 
   input.addEventListener('input', () => {
     pickedFromList = false;
     input.dataset.geoPicked = '0';
-    clearGeoCityError(input);
+    clearGeoFieldError(input);
+    input.closest('form')?.dispatchEvent(new Event('setup:cta-refresh', { bubbles: true }));
     run();
   });
   input.addEventListener('keydown', (e) => {
@@ -6638,26 +6861,53 @@ function initBirthDateFields(root = document) {
   });
 }
 
-async function resolvePendingGeoFields(form) {
+async function resolvePendingGeoFields(form, options = {}) {
   const urls = resolveGeoUrls(form);
-  if (!urls) return;
-  const { citiesUrl, addressesUrl } = urls;
+  if (!urls) return true;
+  const { citiesUrl, addressesUrl, provincesUrl } = urls;
   const confirmCityTpl = document.body?.dataset?.msgGeoConfirmCity || '';
   const confirmAddressTpl = document.body?.dataset?.msgGeoConfirmAddress || '';
+  const confirmProvinceTpl = document.body?.dataset?.msgGeoConfirmProvince || confirmCityTpl;
   const cityNotFoundTpl = document.body?.dataset?.msgGeoCityNotFound || '';
+  const addressNotFoundTpl = document.body?.dataset?.msgGeoAddressNotFound || '';
+  const provinceNotFoundTpl = document.body?.dataset?.msgGeoProvinceNotFound || '';
+  const silent = !!options.silent;
+  let ok = true;
 
   for (const cityInput of form.querySelectorAll('[data-city-input]')) {
     if (!(cityInput instanceof HTMLInputElement) || cityInput.dataset.geoPicked === '1') continue;
     const raw = cityInput.value.trim();
     if (raw.length < 2) continue;
     const data = await resolveGeoQuery(citiesUrl, { q: raw });
-    await handleGeoResolveResult(data, cityInput, (item) => {
+    const scope = geoScopeFor(cityInput);
+    const postalInput = scope.querySelector('[data-postal-code]');
+    const provinceInput = scope.querySelector('[data-province-input]');
+    const addressInput = scope.querySelector('[data-address-input]');
+    const resolved = await handleGeoResolveResult(data, cityInput, (item) => {
       cityInput.value = item.city || item.label || raw;
-      const postalInput = cityInput.closest('form')?.querySelector('[data-postal-code]');
       if (postalInput instanceof HTMLInputElement && item.cap) {
         postalInput.value = item.cap;
       }
-    }, confirmCityTpl, { notFoundTemplate: cityNotFoundTpl });
+      if (provinceInput instanceof HTMLInputElement && item.provincia_name) {
+        provinceInput.value = item.provincia_name;
+        provinceInput.dataset.geoPicked = '1';
+      }
+      if (addressInput instanceof HTMLInputElement) {
+        addressInput.dispatchEvent(new Event('input', { bubbles: true }));
+      }
+    }, confirmCityTpl, { notFoundTemplate: cityNotFoundTpl, silent });
+    if (!resolved) ok = false;
+  }
+
+  for (const provinceInput of form.querySelectorAll('[data-province-input]')) {
+    if (!(provinceInput instanceof HTMLInputElement) || provinceInput.dataset.geoPicked === '1') continue;
+    const raw = provinceInput.value.trim();
+    if (raw.length < 2 || !provincesUrl) continue;
+    const data = await resolveGeoQuery(provincesUrl, { q: raw });
+    const resolved = await handleGeoResolveResult(data, provinceInput, (item) => {
+      provinceInput.value = item.name || item.label || raw;
+    }, confirmProvinceTpl, { notFoundTemplate: provinceNotFoundTpl, silent });
+    if (!resolved) ok = false;
   }
 
   for (const addressInput of form.querySelectorAll('[data-address-input]')) {
@@ -6674,7 +6924,7 @@ async function resolvePendingGeoFields(form) {
       city,
       house_number: houseNumberInput instanceof HTMLInputElement ? houseNumberInput.value.trim() : '',
     });
-    await handleGeoResolveResult(data, addressInput, (item) => {
+    const resolved = await handleGeoResolveResult(data, addressInput, (item) => {
       addressInput.value = item.address || item.label || raw;
       if (houseNumberInput instanceof HTMLInputElement && item.house_number) {
         houseNumberInput.value = item.house_number;
@@ -6682,8 +6932,12 @@ async function resolvePendingGeoFields(form) {
       if (postalInput instanceof HTMLInputElement && item.postal_code) {
         postalInput.value = item.postal_code;
       }
-    }, confirmAddressTpl);
+    }, confirmAddressTpl, { notFoundTemplate: addressNotFoundTpl, silent });
+    if (!resolved) ok = false;
   }
+
+  refreshGeoFormValidity(form);
+  return ok;
 }
 
 function initGeoSubmitValidation(root = document) {
@@ -6700,7 +6954,14 @@ function initGeoSubmitValidation(root = document) {
       event.preventDefault();
       event.stopPropagation();
       try {
-        await resolvePendingGeoFields(form);
+        const ok = await resolvePendingGeoFields(form);
+        refreshGeoFormValidity(form);
+        if (!ok || (typeof form.checkValidity === 'function' && !form.checkValidity())) {
+          form.reportValidity?.();
+          delete form.dataset.geoResolved;
+          form.dispatchEvent(new Event('setup:cta-refresh', { bubbles: true }));
+          return;
+        }
         form.dataset.geoResolved = '1';
         if (typeof form.requestSubmit === 'function') {
           form.requestSubmit();

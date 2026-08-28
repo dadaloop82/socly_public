@@ -54,6 +54,33 @@ final class ApiController extends BaseController
         ]);
     }
 
+    public function cap(Request $request): void
+    {
+        $cap = (string) $request->input('q', '');
+        if ((string) $request->input('resolve', '') === '1') {
+            $this->json($this->geo->resolveCapQuery(
+                $cap,
+                (string) $request->input('city', '')
+            ));
+            return;
+        }
+        $this->json([
+            'items' => $this->geo->findComuniByCap($cap),
+        ]);
+    }
+
+    public function provinces(Request $request): void
+    {
+        $query = (string) $request->input('q', '');
+        if ((string) $request->input('resolve', '') === '1') {
+            $this->json($this->geo->resolveProvinceQuery($query));
+            return;
+        }
+        $this->json([
+            'items' => $this->geo->searchProvinces($query),
+        ]);
+    }
+
     public function fiscalCode(Request $request): void
     {
         try {

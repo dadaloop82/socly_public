@@ -120,19 +120,21 @@ $anyEnabled = !empty($enabled['city']) || !empty($enabled['postal_code']) || !em
             </label>
             <?php endif; ?>
             <?php if (!empty($enabled['province'])): ?>
-            <label class="setup-field setup-field-province geo-field">
+            <label class="setup-field suggest-field setup-field-province geo-field">
                 <span><?= e(__('setup.field_province')) ?><?= e($star((bool) $required['province'])) ?></span>
-                <input
-                    type="text"
-                    name="<?= e($names['province']) ?>"
-                    value="<?= e((string) $values['province']) ?>"
-                    data-province-input
-                    autocomplete="address-level1"
-                    maxlength="4"
-                    placeholder="<?= e(__('setup.field_province_placeholder')) ?>"
-                    <?= !empty($ids['province']) ? 'id="' . e($ids['province']) . '"' : '' ?>
-                    <?= $req((bool) $required['province']) ?>
-                >
+                <div class="suggest-wrap">
+                    <input
+                        type="text"
+                        name="<?= e($names['province']) ?>"
+                        value="<?= e((string) $values['province']) ?>"
+                        data-province-input
+                        autocomplete="address-level1"
+                        placeholder="<?= e(__('setup.field_province_placeholder')) ?>"
+                        <?= !empty($ids['province']) ? 'id="' . e($ids['province']) . '"' : '' ?>
+                        <?= $req((bool) $required['province']) ?>
+                    >
+                    <div class="suggest-list" data-province-suggest hidden></div>
+                </div>
             </label>
             <?php endif; ?>
         </div>
@@ -173,19 +175,21 @@ $anyEnabled = !empty($enabled['city']) || !empty($enabled['postal_code']) || !em
             </label>
             <?php endif; ?>
             <?php if (!empty($enabled['province'])): ?>
-            <label class="setup-field setup-field-province geo-field">
+            <label class="setup-field suggest-field setup-field-province geo-field">
                 <span><?= e(__('setup.field_province')) ?><?= e($star((bool) $required['province'])) ?></span>
-                <input
-                    type="text"
-                    name="<?= e($names['province']) ?>"
-                    value="<?= e((string) $values['province']) ?>"
-                    data-province-input
-                    autocomplete="address-level1"
-                    maxlength="4"
-                    placeholder="<?= e(__('setup.field_province_placeholder')) ?>"
-                    <?= !empty($ids['province']) ? 'id="' . e($ids['province']) . '"' : '' ?>
-                    <?= $req((bool) $required['province']) ?>
-                >
+                <div class="suggest-wrap">
+                    <input
+                        type="text"
+                        name="<?= e($names['province']) ?>"
+                        value="<?= e((string) $values['province']) ?>"
+                        data-province-input
+                        autocomplete="address-level1"
+                        placeholder="<?= e(__('setup.field_province_placeholder')) ?>"
+                        <?= !empty($ids['province']) ? 'id="' . e($ids['province']) . '"' : '' ?>
+                        <?= $req((bool) $required['province']) ?>
+                    >
+                    <div class="suggest-list" data-province-suggest hidden></div>
+                </div>
             </label>
             <?php endif; ?>
         </div>

@@ -280,11 +280,15 @@ final class SetupService
                 if (($field['settings_key'] ?? '') === 'app.currency') {
                     $default = 'EUR';
                 }
-                $out[$field['key']] = (string) $this->readValue(
+                $value = (string) $this->readValue(
                     (string) $field['settings_key'],
                     (string) ($field['env_key'] ?? ''),
                     $default
                 );
+                if (($field['key'] ?? '') === 'province') {
+                    $value = $this->expandProvinceName($value);
+                }
+                $out[$field['key']] = $value;
             }
             if ($type === 'colors') {
                 $palettes = $this->branding->paletteSuggestions();
@@ -1159,42 +1163,8 @@ final class SetupService
 
     private function expandProvinceName(string $value): string
     {
-        $raw = trim($value);
-        if ($raw === '') {
-            return '';
-        }
-        $code = strtoupper(preg_replace('/[^A-Za-z]/', '', $raw) ?? '');
-        if (strlen($code) === 2 && isset(self::IT_PROVINCES[$code])) {
-            return self::IT_PROVINCES[$code];
-        }
-        return assoc_capitalize_name($raw);
+        return \Socly\Support\ItalianProvinces::expandName($value);
     }
-
-    /** @var array<string, string> */
-    private const IT_PROVINCES = [
-        'AG' => 'Agrigento', 'AL' => 'Alessandria', 'AN' => 'Ancona', 'AO' => 'Aosta', 'AP' => 'Ascoli Piceno',
-        'AQ' => 'L\'Aquila', 'AR' => 'Arezzo', 'AT' => 'Asti', 'AV' => 'Avellino', 'BA' => 'Bari',
-        'BG' => 'Bergamo', 'BI' => 'Biella', 'BL' => 'Belluno', 'BN' => 'Benevento', 'BO' => 'Bologna',
-        'BR' => 'Brindisi', 'BS' => 'Brescia', 'BT' => 'Barletta-Andria-Trani', 'BZ' => 'Bolzano',
-        'CA' => 'Cagliari', 'CB' => 'Campobasso', 'CE' => 'Caserta', 'CH' => 'Chieti', 'CL' => 'Caltanissetta',
-        'CN' => 'Cuneo', 'CO' => 'Como', 'CR' => 'Cremona', 'CS' => 'Cosenza', 'CT' => 'Catania',
-        'CZ' => 'Catanzaro', 'EN' => 'Enna', 'FC' => 'Forlì-Cesena', 'FE' => 'Ferrara', 'FG' => 'Foggia',
-        'FI' => 'Firenze', 'FM' => 'Fermo', 'FR' => 'Frosinone', 'GE' => 'Genova', 'GO' => 'Gorizia',
-        'GR' => 'Grosseto', 'IM' => 'Imperia', 'IS' => 'Isernia', 'KR' => 'Crotone', 'LC' => 'Lecco',
-        'LE' => 'Lecce', 'LI' => 'Livorno', 'LO' => 'Lodi', 'LT' => 'Latina', 'LU' => 'Lucca',
-        'MB' => 'Monza e Brianza', 'MC' => 'Macerata', 'ME' => 'Messina', 'MI' => 'Milano', 'MN' => 'Mantova',
-        'MO' => 'Modena', 'MS' => 'Massa-Carrara', 'MT' => 'Matera', 'NA' => 'Napoli', 'NO' => 'Novara',
-        'NU' => 'Nuoro', 'OR' => 'Oristano', 'PA' => 'Palermo', 'PC' => 'Piacenza', 'PD' => 'Padova',
-        'PE' => 'Pescara', 'PG' => 'Perugia', 'PI' => 'Pisa', 'PN' => 'Pordenone', 'PO' => 'Prato',
-        'PR' => 'Parma', 'PT' => 'Pistoia', 'PU' => 'Pesaro e Urbino', 'PV' => 'Pavia', 'PZ' => 'Potenza',
-        'RA' => 'Ravenna', 'RC' => 'Reggio Calabria', 'RE' => 'Reggio Emilia', 'RG' => 'Ragusa',
-        'RI' => 'Rieti', 'RM' => 'Roma', 'RN' => 'Rimini', 'RO' => 'Rovigo', 'SA' => 'Salerno',
-        'SI' => 'Siena', 'SO' => 'Sondrio', 'SP' => 'La Spezia', 'SR' => 'Siracusa', 'SS' => 'Sassari',
-        'SU' => 'Sud Sardegna', 'SV' => 'Savona', 'TA' => 'Taranto', 'TE' => 'Teramo', 'TN' => 'Trento',
-        'TO' => 'Torino', 'TP' => 'Trapani', 'TR' => 'Terni', 'TS' => 'Trieste', 'TV' => 'Treviso',
-        'UD' => 'Udine', 'VA' => 'Varese', 'VB' => 'Verbano-Cusio-Ossola', 'VC' => 'Vercelli',
-        'VE' => 'Venezia', 'VI' => 'Vicenza', 'VR' => 'Verona', 'VT' => 'Viterbo', 'VV' => 'Vibo Valentia',
-    ];
 
     /**
      * @param list<array<string, mixed>> $people
@@ -2010,7 +1980,7 @@ final class SetupService
                 continue;
             }
             if ($key === 'province') {
-                $value = strtoupper(preg_replace('/[^A-Za-z]/', '', $value) ?? '');
+                $value = $this->expandProvinceName($value);
             }
             $this->settings->set((string) $field['settings_key'], $value);
             if (!empty($field['env_key'])) {

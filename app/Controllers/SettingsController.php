@@ -204,7 +204,7 @@ final class SettingsController extends BaseController
             'association_fiscal_code' => 'required|string|max:16',
             'association_city' => 'required|string|max:120',
             'association_postal_code' => 'required|string|max:12',
-            'association_province' => 'required|string|max:4',
+            'association_province' => 'required|string|max:64',
             'association_address' => 'required|string|max:255',
             'association_house_number' => 'required|string|max:20',
             'association_pec' => 'required|email|max:190',
@@ -240,7 +240,7 @@ final class SettingsController extends BaseController
         $this->settings->set('association.vat_number', $vat);
         $this->settings->set('association.city', $data['association_city']);
         $this->settings->set('association.postal_code', $data['association_postal_code']);
-        $province = strtoupper(preg_replace('/[^A-Za-z]/', '', (string) ($data['association_province'] ?? '')) ?? '');
+        $province = \Socly\Support\ItalianProvinces::expandName((string) ($data['association_province'] ?? ''));
         $this->settings->set('association.province', $province);
         $this->settings->set('association.address', $data['association_address']);
         $this->settings->set('association.house_number', $data['association_house_number']);

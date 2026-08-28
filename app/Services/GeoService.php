@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Socly\Services;
 
 use Socly\Support\FiscalCode;
+use Socly\Support\ItalianProvinces;
 
 final class GeoService
 {
@@ -43,6 +44,79 @@ final class GeoService
             }
         }
         return array_slice(array_merge($starts, $contains), 0, $limit);
+    }
+
+    /** @return list<array{label:string,city:string,belfiore:string,provincia:string,cap:string}> */
+    public function findComuniByCap(string $cap, int $limit = 8): array
+    {
+        $cap = preg_replace('/\D+/', '', trim($cap)) ?? '';
+        if (strlen($cap) !== 5) {
+            return [];
+        }
+        $out = [];
+        foreach ($this->comuni() as $row) {
+            if ((string) ($row['cap'] ?? '') !== $cap) {
+                continue;
+            }
+            $out[] = $this->formatComuneItem($row);
+            if (count($out) >= $limit) {
+                break;
+            }
+        }
+        return $out;
+    }
+
+    /**
+     * Resolve a typed CAP on blur (local registry).
+     *
+     * @return array{action:'none'|'apply'|'confirm'|'not_found',item?:array<string,mixed>,label?:string}
+     */
+    public function resolveCapQuery(string $cap, string $cityHint = ''): array
+    {
+        $cap = preg_replace('/\D+/', '', trim($cap)) ?? '';
+        if (strlen($cap) !== 5) {
+            return ['action' => 'none'];
+        }
+
+        $results = $this->findComuniByCap($cap, 8);
+        if ($results === []) {
+            return ['action' => 'not_found'];
+        }
+
+        $cityHintNorm = $this->normalizePlace($cityHint);
+        if ($cityHintNorm !== '') {
+            foreach ($results as $row) {
+                if ($this->normalizePlace((string) ($row['city'] ?? '')) === $cityHintNorm) {
+                    return ['action' => 'none'];
+                }
+            }
+        }
+
+        if (count($results) === 1) {
+            $item = $results[0];
+            return ['action' => 'apply', 'item' => $item, 'label' => (string) ($item['label'] ?? $item['city'] ?? '')];
+        }
+
+        $top = $results[0];
+        return [
+            'action' => 'confirm',
+            'item' => $top,
+            'label' => (string) ($top['label'] ?? $top['city'] ?? ''),
+        ];
+    }
+
+    /** @return list<array{label:string,name:string,sigla:string}> */
+    public function searchProvinces(string $query, int $limit = 8): array
+    {
+        return ItalianProvinces::search($query, $limit);
+    }
+
+    /**
+     * @return array{action:'none'|'apply'|'confirm'|'not_found',item?:array<string,mixed>,label?:string}
+     */
+    public function resolveProvinceQuery(string $query): array
+    {
+        return ItalianProvinces::resolveQuery($query);
     }
 
     public function findComune(string $name): ?array
@@ -334,7 +408,7 @@ final class GeoService
         $typedNorm = $this->normalizePlace($query);
         $results = $this->searchAddresses($query, $city, 5);
         if ($results === []) {
-            return ['action' => 'none'];
+            return ['action' => 'not_found'];
         }
 
         return $this->resolvePlaceChoice(
@@ -456,11 +530,13 @@ final class GeoService
     /** @param array{nome:string,belfiore:string,provincia:string,cap:string} $row */
     private function formatComuneItem(array $row): array
     {
+        $sigla = (string) ($row['provincia'] ?? '');
         return [
-            'label' => $row['nome'] . ' (' . $row['provincia'] . ')',
+            'label' => $row['nome'] . ' (' . $sigla . ')',
             'city' => $row['nome'],
             'belfiore' => $row['belfiore'],
-            'provincia' => $row['provincia'],
+            'provincia' => $sigla,
+            'provincia_name' => ItalianProvinces::expandName($sigla),
             'cap' => $row['cap'],
         ];
     }
@@ -499,6 +575,7 @@ final class GeoService
             'city' => $city,
             'belfiore' => '',
             'provincia' => $state,
+            'provincia_name' => ItalianProvinces::expandName($state),
             'cap' => trim((string) ($addr['postcode'] ?? '')),
         ];
     }

@@ -175,6 +175,8 @@ $errorStep = flash('setup_error_step');
                 data-leave-guard
                 data-cities-url="<?= e(url('/api/geo/cities')) ?>"
                 data-addresses-url="<?= e(url('/api/geo/addresses')) ?>"
+                data-cap-url="<?= e(url('/api/geo/cap')) ?>"
+                data-provinces-url="<?= e(url('/api/geo/provinces')) ?>"
                 data-cf-url="<?= e(url('/api/fiscal-code')) ?>"
                 data-csrf="<?= e(csrf_token()) ?>"
             >

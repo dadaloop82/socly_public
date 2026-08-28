@@ -83,6 +83,8 @@ $router->get('/dashboard', [DashboardController::class, 'index'], 'dashboard.vie
 
 $router->get('/api/geo/cities', [ApiController::class, 'cities'], null, ['mw.locale', 'mw.install', 'mw.setup_or_auth']);
 $router->get('/api/geo/addresses', [ApiController::class, 'addresses'], null, ['mw.locale', 'mw.install', 'mw.setup_or_auth']);
+$router->get('/api/geo/cap', [ApiController::class, 'cap'], null, ['mw.locale', 'mw.install', 'mw.setup_or_auth']);
+$router->get('/api/geo/provinces', [ApiController::class, 'provinces'], null, ['mw.locale', 'mw.install', 'mw.setup_or_auth']);
 $router->post('/api/fiscal-code', [ApiController::class, 'fiscalCode'], null, ['mw.locale', 'mw.install', 'mw.setup_or_auth', 'mw.csrf']);
 $router->post('/api/translate', [ApiController::class, 'translate'], 'settings.manage', ['mw.locale', 'mw.install', 'mw.auth', 'mw.csrf']);
 $router->get('/i18n/messages', [I18nController::class, 'messages'], null, ['mw.locale', 'mw.install']);
