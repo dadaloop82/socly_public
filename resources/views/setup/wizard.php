@@ -114,8 +114,8 @@ $errorStep = flash('setup_error_step');
                 && strcasecmp($websiteTitleName, 'SOCLY') !== 0;
             ?>
             <?php if ($showWebsiteLockup): ?>
-                <h1 class="h1 h1-brand setup-title" data-setup-line data-setup-fit-title>
-                    <?= e(__('setup.step_website_of')) ?>
+                <h1 class="h1 h1-brand setup-title setup-title-lockup" data-setup-line data-setup-fit-title>
+                    <span class="setup-title-prefix"><?= e(__('setup.step_website_of')) ?></span>
                     <?= assoc_lockup_html([
                         'name' => $websiteTitleName,
                         'legal_name' => (string) ($assocLegal ?? ''),
@@ -123,8 +123,8 @@ $errorStep = flash('setup_error_step');
                     ]) ?>
                 </h1>
             <?php elseif ($showLogoLockup): ?>
-                <h1 class="h1 h1-brand setup-title" data-setup-line data-setup-fit-title>
-                    <?= e(__('setup.step_logo_of')) ?>
+                <h1 class="h1 h1-brand setup-title setup-title-lockup" data-setup-line data-setup-fit-title>
+                    <span class="setup-title-prefix"><?= e(__('setup.step_logo_of')) ?></span>
                     <?= assoc_lockup_html([
                         'name' => $websiteTitleName,
                         'legal_name' => (string) ($assocLegal ?? ''),
@@ -132,8 +132,8 @@ $errorStep = flash('setup_error_step');
                     ]) ?>
                 </h1>
             <?php elseif ($showComponentsLockup): ?>
-                <h1 class="h1 h1-brand setup-title" data-setup-line data-setup-fit-title>
-                    <?= e(__('setup.step_components_of')) ?>
+                <h1 class="h1 h1-brand setup-title setup-title-lockup" data-setup-line data-setup-fit-title>
+                    <span class="setup-title-prefix"><?= e(__('setup.step_components_of')) ?></span>
                     <?= assoc_lockup_html([
                         'name' => $websiteTitleName,
                         'legal_name' => (string) ($assocLegal ?? ''),
@@ -141,8 +141,8 @@ $errorStep = flash('setup_error_step');
                     ]) ?>
                 </h1>
             <?php elseif ($showColorsLockup): ?>
-                <h1 class="h1 h1-brand setup-title" data-setup-line data-setup-fit-title>
-                    <?= e(__('setup.step_colors_of')) ?>
+                <h1 class="h1 h1-brand setup-title setup-title-lockup" data-setup-line data-setup-fit-title>
+                    <span class="setup-title-prefix"><?= e(__('setup.step_colors_of')) ?></span>
                     <?= assoc_lockup_html([
                         'name' => $websiteTitleName,
                         'legal_name' => (string) ($assocLegal ?? ''),

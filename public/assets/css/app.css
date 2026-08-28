@@ -641,12 +641,19 @@ a:hover { text-decoration: underline; color: var(--brand-primary-deep); }
   white-space: nowrap;
   line-height: 1.15;
   max-width: 100%;
+  min-width: 0;
+  overflow: hidden;
 }
 .assoc-lockup .assoc-name {
-  display: inline !important;
+  display: inline-block !important;
   color: inherit;
   font-weight: inherit;
   white-space: nowrap;
+  max-width: 100%;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  vertical-align: bottom;
 }
 .assoc-lockup .assoc-legal {
   display: inline !important;
@@ -674,14 +681,21 @@ a:hover { text-decoration: underline; color: var(--brand-primary-deep); }
 .assoc-lockup-topbar {
   margin-top: 0.1rem;
   white-space: nowrap;
+  min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
 }
 .assoc-lockup-topbar .assoc-name {
   color: var(--brand-accent-ink);
   font-weight: 700;
   font-size: 0.92rem;
+  max-width: 100%;
 }
 .assoc-lockup-title {
   white-space: nowrap;
+  min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
 }
 .assoc-lockup-title .assoc-name {
   color: var(--brand-accent-ink);
@@ -689,6 +703,7 @@ a:hover { text-decoration: underline; color: var(--brand-primary-deep); }
   font-size: inherit;
   letter-spacing: -0.03em;
   font-weight: 700;
+  max-width: 100%;
 }
 .assoc-lockup-auth .assoc-name {
   color: var(--brand-accent-on-dark);
@@ -705,10 +720,13 @@ a:hover { text-decoration: underline; color: var(--brand-primary-deep); }
   align-items: baseline;
   vertical-align: baseline;
   white-space: nowrap;
+  min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
 }
 .assoc-lockup-footer .assoc-name {
-  display: inline !important;
   font-weight: 600;
+  max-width: 100%;
 }
 .assoc-lockup-footer .assoc-legal {
   display: inline !important;
@@ -3641,13 +3659,18 @@ html:has(.setup-body) {
   color: var(--brand-primary-deep);
   line-height: 1.35;
   margin: 0 0 0.85rem;
-  display: block;
+  display: flex;
+  flex-wrap: nowrap;
+  align-items: baseline;
+  gap: 0.28em;
   max-width: 100%;
   overflow: hidden;
 }
 .setup-thanks-lead,
 .setup-thanks-trail {
   color: var(--brand-primary-deep);
+  flex: 0 0 auto;
+  white-space: nowrap;
 }
 .assoc-lockup-thanks,
 .assoc-lockup-setup-title {
@@ -3660,14 +3683,19 @@ html:has(.setup-body) {
   gap: 0.28em;
   max-width: 100%;
   min-width: 0;
+  flex: 1 1 auto;
+  overflow: hidden;
 }
 .assoc-lockup-thanks .assoc-name,
 .assoc-lockup-setup-title .assoc-name {
-  display: inline !important;
+  display: block !important;
   color: var(--brand-accent-ink);
   font-weight: 700;
   white-space: nowrap;
   min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 .assoc-lockup-thanks .assoc-legal,
 .assoc-lockup-setup-title .assoc-legal {
@@ -3716,14 +3744,22 @@ html:has(.setup-body) {
   overflow: hidden;
   line-height: 1.35;
 }
-.setup-title[data-setup-fit-title] {
+.setup-title[data-setup-fit-title],
+.setup-title-lockup {
   display: flex;
   flex-wrap: nowrap;
   align-items: baseline;
   gap: 0.28em;
   width: 100%;
+  overflow: hidden;
+  white-space: nowrap;
 }
-.setup-title[data-setup-fit-title] .assoc-lockup-setup-title {
+.setup-title-prefix {
+  flex: 0 0 auto;
+  white-space: nowrap;
+}
+.setup-title[data-setup-fit-title] .assoc-lockup-setup-title,
+.setup-title-lockup .assoc-lockup-setup-title {
   flex: 1 1 auto;
   min-width: 0;
   max-width: 100%;

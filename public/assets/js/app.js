@@ -4553,78 +4553,20 @@ function initSetupContacts(root) {
 }
 
 function initSetupFitAssocNames(root) {
-  const fitOne = (lockup) => {
-    if (!(lockup instanceof HTMLElement)) return;
-    const nameEl = lockup.querySelector('.assoc-name');
-    if (!(nameEl instanceof HTMLElement)) return;
-    const titleEl = lockup.closest('.setup-thanks-title, [data-setup-fit-title], h1.setup-title, h1, h2') || lockup.parentElement;
-    if (!(titleEl instanceof HTMLElement)) return;
-    const card = lockup.closest('.setup-card');
-
-    nameEl.style.fontSize = '';
-    nameEl.style.maxWidth = '';
-    nameEl.style.overflow = '';
-    nameEl.style.textOverflow = '';
-    nameEl.style.display = '';
-    nameEl.removeAttribute('title');
-
-    const full = (nameEl.textContent || '').trim();
-    if (full === '') return;
-
-    const overflows = () => {
-      if (titleEl.scrollWidth > titleEl.clientWidth + 1) return true;
-      if (card instanceof HTMLElement) {
-        const styles = getComputedStyle(card);
-        const pad = (parseFloat(styles.paddingLeft) || 0) + (parseFloat(styles.paddingRight) || 0);
-        const usable = Math.max(0, card.clientWidth - pad);
-        if (usable > 0 && titleEl.scrollWidth > usable + 1) return true;
+  const refreshTitles = () => {
+    root.querySelectorAll('.assoc-lockup-thanks .assoc-name, .assoc-lockup-setup-title .assoc-name, .assoc-lockup .assoc-name').forEach((nameEl) => {
+      if (!(nameEl instanceof HTMLElement)) return;
+      nameEl.style.fontSize = '';
+      nameEl.style.maxWidth = '';
+      const full = (nameEl.textContent || '').trim();
+      if (full !== '') {
+        nameEl.setAttribute('title', full);
       }
-      return false;
-    };
-
-    let size = parseFloat(getComputedStyle(nameEl).fontSize) || parseFloat(getComputedStyle(titleEl).fontSize) || 24;
-    const min = 13;
-    let guard = 40;
-    while (overflows() && size > min && guard > 0) {
-      size -= 0.5;
-      nameEl.style.fontSize = `${size}px`;
-      guard -= 1;
-    }
-
-    if (overflows()) {
-      nameEl.style.display = 'inline-block';
-      nameEl.style.overflow = 'hidden';
-      nameEl.style.textOverflow = 'ellipsis';
-      nameEl.style.verticalAlign = 'bottom';
-      nameEl.setAttribute('title', full);
-      let lo = 5;
-      let hi = Math.max(6, Math.floor((titleEl.clientWidth || 280) / 12));
-      guard = 24;
-      while (lo < hi && guard > 0) {
-        const mid = Math.ceil((lo + hi) / 2);
-        nameEl.style.maxWidth = `${mid}ch`;
-        if (overflows()) hi = mid - 1;
-        else lo = mid;
-        guard -= 1;
-      }
-      nameEl.style.maxWidth = `${Math.max(5, lo)}ch`;
-    }
+    });
   };
-
-  const run = () => {
-    root.querySelectorAll('.assoc-lockup-thanks, .assoc-lockup-setup-title').forEach(fitOne);
-  };
-  run();
-  window.requestAnimationFrame(run);
-  window.setTimeout(run, 320);
-  window.setTimeout(run, 900);
-  if (document.fonts?.ready) {
-    document.fonts.ready.then(run).catch(() => {});
-  }
-  window.addEventListener('resize', () => {
-    window.requestAnimationFrame(run);
-  });
-  root.addEventListener('setup:fit-assoc-names', run);
+  refreshTitles();
+  window.addEventListener('resize', () => window.requestAnimationFrame(refreshTitles));
+  root.addEventListener('setup:fit-assoc-names', refreshTitles);
 }
 
 function initSetupWebsiteScrape(root) {
