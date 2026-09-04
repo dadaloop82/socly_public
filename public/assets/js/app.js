@@ -5287,34 +5287,57 @@ function initSetupLocaleLive(root) {
   );
 
   const applyMessages = (messages, lang) => {
-    document.querySelectorAll('[data-i18n]').forEach((el) => {
+    root.querySelectorAll('[data-i18n]').forEach((el) => {
       const key = el.dataset.i18n;
       if (!key) return;
       let v = getByPath(messages, key);
       if (typeof v !== 'string') return;
       if (key === 'setup.step_of') {
         v = v
-          .replace(':current', el.dataset.i18nCurrent || '')
-          .replace(':total', el.dataset.i18nTotal || '');
+          .replaceAll(':current', el.dataset.i18nCurrent || '')
+          .replaceAll(':total', el.dataset.i18nTotal || '');
       }
       el.textContent = v;
     });
+    root.querySelectorAll('[data-i18n-placeholder]').forEach((el) => {
+      const key = el.dataset.i18nPlaceholder;
+      const v = key ? getByPath(messages, key) : null;
+      if (typeof v === 'string') el.setAttribute('placeholder', v);
+    });
+    root.querySelectorAll('[data-i18n-aria-label]').forEach((el) => {
+      const key = el.dataset.i18nAriaLabel;
+      const v = key ? getByPath(messages, key) : null;
+      if (typeof v === 'string') el.setAttribute('aria-label', v);
+    });
     document.documentElement.setAttribute('lang', lang);
+    picker.querySelectorAll('.setup-locale-card').forEach((card) => {
+      const radio = card.querySelector('[data-setup-locale-radio]');
+      card.classList.toggle('is-selected', !!(radio && radio.checked));
+    });
   };
 
+  let loadSeq = 0;
   const load = async (lang) => {
+    const seq = ++loadSeq;
     try {
       const res = await fetch(`${endpointBase}?lang=${encodeURIComponent(lang)}`, {
         headers: { Accept: 'application/json' },
         credentials: 'same-origin',
+        cache: 'no-store',
       });
-      if (!res.ok) return;
+      if (!res.ok || seq !== loadSeq) return;
       const data = await res.json();
-      if (!data?.ok) return;
+      if (!data?.ok || seq !== loadSeq) return;
       applyMessages(data.messages || {}, lang);
     } catch {
-      // ignore
+      // ignore network/json errors
     }
+  };
+
+  const activate = (radio) => {
+    if (!radio) return;
+    if (!radio.checked) radio.checked = true;
+    load(radio.value);
   };
 
   radios.forEach((radio) => {
@@ -5322,6 +5345,41 @@ function initSetupLocaleLive(root) {
       if (radio.checked) load(radio.value);
     });
   });
+  picker.querySelectorAll('.setup-locale-card').forEach((card) => {
+    card.addEventListener('click', (event) => {
+      const radio = card.querySelector('[data-setup-locale-radio]');
+      if (!radio) return;
+      // Force reload even if radio was already checked (e.g. user re-taps).
+      if (event.target === radio && radio.checked) {
+        load(radio.value);
+        return;
+      }
+      activate(radio);
+    });
+  });
+
+  picker.querySelectorAll('img').forEach((img) => {
+    img.addEventListener('error', () => {
+      if (img.dataset.flagFallback === '1') return;
+      img.dataset.flagFallback = '1';
+      const card = img.closest('.setup-locale-card');
+      const code = card?.querySelector('[data-setup-locale-radio]')?.value || '';
+      const emoji = { it: '🇮🇹', de: '🇩🇪', en: '🇬🇧' }[code] || '🏳️';
+      const span = document.createElement('span');
+      span.className = 'setup-locale-flag-emoji';
+      span.textContent = emoji;
+      span.setAttribute('aria-hidden', 'true');
+      img.replaceWith(span);
+    });
+  });
+
+  const checked = radios.find((r) => r.checked);
+  if (checked) {
+    picker.querySelectorAll('.setup-locale-card').forEach((card) => {
+      const radio = card.querySelector('[data-setup-locale-radio]');
+      card.classList.toggle('is-selected', !!(radio && radio.checked));
+    });
+  }
 }
 
 function initSetupPeopleList(root) {
@@ -5479,13 +5537,74 @@ function initPeopleList(list) {
   const addBtn = list.querySelector('[data-people-add]');
   if (!rows || !template || !addBtn) return;
 
+  const form = list.closest('form');
+  const msgMismatch = list.dataset.msgCfMismatch || 'Il codice fiscale potrebbe non essere coerente con nome e cognome. Continuare?';
+  const msgUnderage = list.dataset.msgCfUnderage || 'Dal codice fiscale risulta un’età inferiore a 18 anni. Continuare?';
+  const msgContinue = list.dataset.msgCfContinue || 'Continua comunque';
+  const msgFix = list.dataset.msgCfFix || 'Correggi';
+
   const reindex = () => {
     [...rows.querySelectorAll('[data-people-row]')].forEach((row, i) => {
-      row.querySelectorAll('input[name]').forEach((input) => {
+      row.querySelectorAll('input[name], select[name], textarea[name]').forEach((input) => {
         input.name = input.name.replace(/\[(?:\d+|__i__)\]/, `[${i}]`);
       });
     });
   };
+
+  const normalizeName = (value) => String(value || '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toUpperCase()
+    .replace(/[^A-Z]/g, '');
+
+  const consonants = (value) => value.replace(/[AEIOU]/g, '');
+  const vowels = (value) => value.replace(/[^AEIOU]/g, '');
+
+  const surnameCode = (surname) => (consonants(surname) + vowels(surname) + 'XXX').slice(0, 3);
+  const nameCode = (name) => {
+    const cons = consonants(name);
+    if (cons.length >= 4) return cons[0] + cons[2] + cons[3];
+    return (cons + vowels(name) + 'XXX').slice(0, 3);
+  };
+
+  const cfMatchesName = (cf, firstName, lastName) => {
+    const code = String(cf || '').toUpperCase().replace(/\s+/g, '');
+    if (code.length !== 16) return true;
+    const first = normalizeName(firstName);
+    const last = normalizeName(lastName);
+    if (!first || !last) return true;
+    return code.slice(0, 3) === surnameCode(last) && code.slice(3, 6) === nameCode(first);
+  };
+
+  const cfIsAdult = (cf) => {
+    const code = String(cf || '').toUpperCase().replace(/\s+/g, '');
+    if (code.length !== 16) return true;
+    const months = { A: 1, B: 2, C: 3, D: 4, E: 5, H: 6, L: 7, M: 8, P: 9, R: 10, S: 11, T: 12 };
+    const yy = Number(code.slice(6, 8));
+    const month = months[code[8]];
+    let day = Number(code.slice(9, 11));
+    if (!month || !Number.isFinite(yy) || !Number.isFinite(day)) return true;
+    if (day >= 41) day -= 40;
+    if (day < 1 || day > 31) return true;
+    const nowYear = new Date().getFullYear();
+    const candidates = [1900 + yy, 2000 + yy]
+      .filter((y) => y >= nowYear - 120 && y <= nowYear)
+      .map((y) => new Date(y, month - 1, day))
+      .filter((d) => d.getFullYear() === (d.getFullYear()) && d.getMonth() === month - 1 && d.getDate() === day);
+    if (candidates.length === 0) return true;
+    const birth = candidates[candidates.length - 1];
+    const adult = new Date(birth);
+    adult.setFullYear(adult.getFullYear() + 18);
+    return adult <= new Date();
+  };
+
+  const personLabel = (row) => {
+    const first = row.querySelector('input[name*="[first_name]"]')?.value?.trim() || '';
+    const last = row.querySelector('input[name*="[last_name]"]')?.value?.trim() || '';
+    return `${first} ${last}`.trim() || 'questa persona';
+  };
+
+  const fillTpl = (tpl, name) => String(tpl || '').replaceAll(':name', name);
 
   addBtn.addEventListener('click', () => {
     const html = template.innerHTML.replaceAll('__i__', String(rows.children.length));
@@ -5501,11 +5620,48 @@ function initPeopleList(list) {
     if (!row) return;
     if (rows.children.length <= 1) {
       row.querySelectorAll('input').forEach((input) => { input.value = ''; });
+      row.querySelectorAll('select').forEach((select) => { select.value = ''; });
       return;
     }
     row.remove();
     reindex();
   });
+
+  if (form && form.dataset.peopleCfGate !== '1') {
+    form.dataset.peopleCfGate = '1';
+    form.addEventListener('submit', async (event) => {
+      if (form.dataset.peopleCfConfirmed === '1') return;
+      if (form.querySelector('[data-setup-defer-flag]')?.value === '1') return;
+      if (!form.querySelector('[data-people-list]')) return;
+
+      const warnings = [];
+      form.querySelectorAll('[data-people-row]').forEach((row) => {
+        const first = row.querySelector('input[name*="[first_name]"]')?.value?.trim() || '';
+        const last = row.querySelector('input[name*="[last_name]"]')?.value?.trim() || '';
+        const cf = row.querySelector('input[name*="[fiscal_code]"]')?.value?.trim() || '';
+        if (!first && !last && !cf) return;
+        const label = personLabel(row);
+        if (cf && first && last && !cfMatchesName(cf, first, last)) {
+          warnings.push(fillTpl(msgMismatch, label));
+        }
+        if (cf && !cfIsAdult(cf)) {
+          warnings.push(fillTpl(msgUnderage, label));
+        }
+      });
+      if (warnings.length === 0) return;
+
+      event.preventDefault();
+      event.stopPropagation();
+      const ok = await appConfirm(warnings.join('\n\n'), {
+        confirmLabel: msgContinue,
+        cancelLabel: msgFix,
+      });
+      if (!ok) return;
+      form.dataset.peopleCfConfirmed = '1';
+      if (typeof form.requestSubmit === 'function') form.requestSubmit();
+      else HTMLFormElement.prototype.submit.call(form);
+    }, true);
+  }
 }
 
 function resolveGeoUrls(root) {

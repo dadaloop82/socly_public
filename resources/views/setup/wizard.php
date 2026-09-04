@@ -581,7 +581,11 @@ $errorStep = flash('setup_error_step');
                         'altro' => 'setup.organ_altro',
                     ];
                     ?>
-                    <div class="setup-people" data-setup-line data-people-list>
+                    <div class="setup-people" data-setup-line data-people-list
+                         data-msg-cf-mismatch="<?= e(__('setup.cf_name_mismatch')) ?>"
+                         data-msg-cf-underage="<?= e(__('setup.cf_underage')) ?>"
+                         data-msg-cf-continue="<?= e(__('setup.cf_continue_anyway')) ?>"
+                         data-msg-cf-fix="<?= e(__('setup.cf_fix')) ?>">
                         <div class="setup-people-rows" data-people-rows>
                             <?php foreach ((array) $value as $i => $person): ?>
                                 <div class="setup-people-row" data-people-row>
@@ -614,7 +618,7 @@ $errorStep = flash('setup_error_step');
                                 </div>
                             <?php endforeach; ?>
                         </div>
-                        <button type="button" class="btn btn-ghost" data-people-add><?= e(__('setup.add_person')) ?></button>
+                        <button type="button" class="btn btn-ghost" data-people-add data-i18n="setup.add_person"><?= e(__('setup.add_person')) ?></button>
                         <template data-people-template>
                             <div class="setup-people-row" data-people-row>
                                 <?php if ($showOrganType): ?>

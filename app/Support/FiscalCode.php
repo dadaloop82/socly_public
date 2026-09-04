@@ -105,4 +105,83 @@ final class FiscalCode
         }
         return self::CHECK[$sum % 26];
     }
+
+    public static function normalizeCode(string $fiscalCode): string
+    {
+        return strtoupper(preg_replace('/\s+/', '', $fiscalCode) ?? '');
+    }
+
+    /**
+     * True when CF surname/name blocks match the given names (best-effort).
+     */
+    public static function matchesPersonName(string $fiscalCode, string $firstName, string $lastName): bool
+    {
+        $cf = self::normalizeCode($fiscalCode);
+        if (strlen($cf) !== 16) {
+            return false;
+        }
+        $first = self::normalize($firstName);
+        $last = self::normalize($lastName);
+        if ($first === '' || $last === '') {
+            return false;
+        }
+
+        return substr($cf, 0, 3) === self::surnameCode($last)
+            && substr($cf, 3, 3) === self::nameCode($first);
+    }
+
+    /**
+     * Birth date inferred from CF, or null if undecodable.
+     * Uses century heuristic: years within [now-120, now] prefer 1900/2000.
+     */
+    public static function birthDateFromCode(string $fiscalCode): ?\DateTimeImmutable
+    {
+        $cf = self::normalizeCode($fiscalCode);
+        if (strlen($cf) !== 16) {
+            return null;
+        }
+        $yy = (int) substr($cf, 6, 2);
+        $monthChar = $cf[8];
+        $dayRaw = (int) substr($cf, 9, 2);
+        $month = array_search($monthChar, self::MONTHS, true);
+        if ($month === false) {
+            return null;
+        }
+        $month = (int) $month + 1;
+        if ($dayRaw >= 41) {
+            $dayRaw -= 40;
+        }
+        if ($dayRaw < 1 || $dayRaw > 31) {
+            return null;
+        }
+
+        $nowYear = (int) date('Y');
+        $candidates = [1900 + $yy, 2000 + $yy];
+        $best = null;
+        foreach ($candidates as $year) {
+            if ($year < $nowYear - 120 || $year > $nowYear) {
+                continue;
+            }
+            $dt = \DateTimeImmutable::createFromFormat('!Y-n-j', $year . '-' . $month . '-' . $dayRaw);
+            if ($dt instanceof \DateTimeImmutable && $dt->format('Y-n-j') === $year . '-' . $month . '-' . $dayRaw) {
+                $best = $dt;
+            }
+        }
+
+        return $best;
+    }
+
+    public static function isAtLeastAge(string $fiscalCode, int $age = 18, ?\DateTimeInterface $asOf = null): ?bool
+    {
+        $birth = self::birthDateFromCode($fiscalCode);
+        if ($birth === null) {
+            return null;
+        }
+        $asOfDt = $asOf instanceof \DateTimeInterface
+            ? \DateTimeImmutable::createFromInterface($asOf)
+            : new \DateTimeImmutable('today');
+        $limit = $birth->modify('+' . max(0, $age) . ' years');
+
+        return $limit <= $asOfDt;
+    }
 }

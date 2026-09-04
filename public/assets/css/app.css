@@ -4872,6 +4872,18 @@ button.setup-scrape-logo-frame:focus-visible .setup-scrape-logo-overlay {
   border-radius: 14px;
   background: color-mix(in srgb, var(--brand-paper) 55%, white);
 }
+.setup-people-row:has(.setup-field-organ-type) {
+  grid-template-columns: 1fr 1fr 1fr auto;
+}
+.setup-people-row .setup-field-organ-type {
+  grid-column: 1 / -1;
+}
+.setup-locale-flag-emoji {
+  font-size: 1.35rem;
+  line-height: 1;
+  width: 28px;
+  text-align: center;
+}
 .assoc-people { display: grid; gap: 0.85rem; }
 .assoc-people-rows { display: grid; gap: 0.85rem; }
 .assoc-person-card {
