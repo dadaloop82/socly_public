@@ -370,7 +370,9 @@ function initPasswordToggles(scope = document) {
 
 function initPasswordGenerators(scope = document) {
   scope.querySelectorAll('[data-password-complexity]').forEach((meter) => {
-    const input = meter.closest('form')?.querySelector('[name="password"]');
+    const wrap = meter.closest('.setup-admin-account, .setup-password-strength, form, [data-setup-form]') || meter.parentElement;
+    const input = wrap?.querySelector('input[name="password"], input[type="password"][name="password"]')
+      || meter.closest('form')?.querySelector('[name="password"]');
     if (!input || meter.dataset.passwordComplexityBound === '1') return;
     meter.dataset.passwordComplexityBound = '1';
     const sync = () => {
@@ -387,6 +389,8 @@ function initPasswordGenerators(scope = document) {
       });
     };
     input.addEventListener('input', sync);
+    input.addEventListener('keyup', sync);
+    input.addEventListener('change', sync);
     sync();
   });
 
@@ -1092,6 +1096,8 @@ function initSetupWizard() {
   initLegalDocEditors(root);
   initSetupLegalPdf(root);
   initSetupFieldsAddNow(root);
+  initPasswordGenerators(root);
+  initPasswordToggles(root);
   if (setupForm) initPhoneInputs(setupForm);
 
   setupForm?.querySelectorAll('[data-setup-defer-step]').forEach((btn) => {
@@ -4556,16 +4562,29 @@ function initSetupContacts(root) {
 }
 
 function initSetupFitAssocNames(root) {
+  const fitOne = (nameEl) => {
+    if (!(nameEl instanceof HTMLElement)) return;
+    nameEl.style.fontSize = '';
+    nameEl.style.maxWidth = '';
+    const full = (nameEl.textContent || '').trim();
+    if (full !== '') {
+      nameEl.setAttribute('title', full);
+    }
+    const parent = nameEl.parentElement;
+    if (!parent) return;
+    // Shrink until it fits the parent width (min ~0.75rem).
+    let size = parseFloat(getComputedStyle(nameEl).fontSize || '24') || 24;
+    const min = 12;
+    let guard = 40;
+    while (guard-- > 0 && nameEl.scrollWidth > parent.clientWidth && size > min) {
+      size -= 1;
+      nameEl.style.fontSize = `${size}px`;
+    }
+  };
   const refreshTitles = () => {
-    root.querySelectorAll('.assoc-lockup-thanks .assoc-name, .assoc-lockup-setup-title .assoc-name, .assoc-lockup .assoc-name').forEach((nameEl) => {
-      if (!(nameEl instanceof HTMLElement)) return;
-      nameEl.style.fontSize = '';
-      nameEl.style.maxWidth = '';
-      const full = (nameEl.textContent || '').trim();
-      if (full !== '') {
-        nameEl.setAttribute('title', full);
-      }
-    });
+    root.querySelectorAll(
+      '.assoc-lockup-thanks .assoc-name, .assoc-lockup-setup-title .assoc-name, .assoc-lockup .assoc-name, [data-setup-assoc-fit]'
+    ).forEach(fitOne);
   };
   refreshTitles();
   window.addEventListener('resize', () => window.requestAnimationFrame(refreshTitles));

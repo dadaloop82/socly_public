@@ -798,7 +798,7 @@ $errorStep = flash('setup_error_step');
                             <?php $optVal = (string) ($opt['value'] ?? ''); ?>
                             <template data-enrollment-detail-for="<?= e($optVal) ?>"><?= e(__('setup.enrollment_detail_' . $optVal)) ?></template>
                         <?php endforeach; ?>
-                        <p class="setup-enrollment-detail muted" data-enrollment-detail aria-live="polite"></p>
+                        <p class="setup-enrollment-detail muted" data-enrollment-detail aria-live="polite" style="white-space:pre-line"></p>
                     </div>
                     <?php if (!$mailReadyForSelect): ?>
                         <p class="setup-hint muted" data-setup-line><?= e(__('setup.mail_required_for_otp')) ?></p>
@@ -1276,13 +1276,17 @@ $errorStep = flash('setup_error_step');
                                 <span></span><span></span><span></span><span></span>
                             </div>
                         </div>
-                        <label class="setup-field setup-admin-locale">
+                        <label class="setup-field setup-admin-locale" data-setup-admin-locale>
                             <span><?= e(__('setup.field_admin_locale')) ?></span>
-                            <select name="locale">
-                                <?php foreach (['it', 'de', 'en'] as $loc): ?>
-                                    <option value="<?= $loc ?>" <?= (string) ($value['locale'] ?? 'it') === $loc ? 'selected' : '' ?>><?= e(match ($loc) { 'it' => '🇮🇹 Italiano', 'de' => '🇩🇪 Deutsch', default => '🇬🇧 English' }) ?></option>
+                            <div class="setup-locale-grid setup-locale-grid-compact" role="radiogroup" aria-label="<?= e(__('setup.field_admin_locale')) ?>">
+                                <?php foreach (['it' => 'Italiano', 'de' => 'Deutsch', 'en' => 'English'] as $loc => $locLabel): ?>
+                                    <label class="setup-locale-card">
+                                        <input type="radio" name="locale" value="<?= e($loc) ?>" <?= (string) ($value['locale'] ?? 'it') === $loc ? 'checked' : '' ?> required>
+                                        <img src="<?= e(locale_flag_url($loc)) ?>" width="28" height="21" alt="" loading="lazy" decoding="async">
+                                        <span><?= e($locLabel) ?></span>
+                                    </label>
                                 <?php endforeach; ?>
-                            </select>
+                            </div>
                         </label>
                     </div>
                 <?php else: ?>

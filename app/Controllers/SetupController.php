@@ -675,7 +675,7 @@ final class SetupController extends BaseController
             return;
         }
 
-        @set_time_limit(90);
+        @set_time_limit(130);
         $result = $this->mail->discover($request->all());
         if (empty($result['ok'])) {
             http_response_code(422);

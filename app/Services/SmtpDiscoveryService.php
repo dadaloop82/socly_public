@@ -20,8 +20,8 @@ final class SmtpDiscoveryService
     private const MAX_AUTH_ATTEMPTS = 18;
     private const MAX_TCP_PROBES = 28;
     private const TCP_TIMEOUT = 2;
-    private const AUTH_TIMEOUT = 6;
-    private const WALL_CLOCK_SECONDS = 32;
+    private const AUTH_TIMEOUT = 8;
+    private const WALL_CLOCK_SECONDS = 120;
 
     /** @var list<array{port:int,encryption:string,weight:int}> */
     private const STANDARD_PORTS = [

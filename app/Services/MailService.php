@@ -87,7 +87,7 @@ final class MailService
                 'password' => $password,
                 'from_address' => $fromAddress,
             ];
-            $probe = $this->testConnection($cfg, 8);
+            $probe = $this->testConnection($cfg, 12);
             if (!empty($probe['ok'])) {
                 return [
                     'ok' => true,
@@ -121,7 +121,7 @@ final class MailService
             ];
         }
 
-        @set_time_limit(45);
+        @set_time_limit(130);
         $found = app(SmtpDiscoveryService::class)->discover($fromAddress, $password, $username);
         if (empty($found['ok']) || empty($found['config'])) {
             $suggestion = is_array($found['suggestion'] ?? null) ? $found['suggestion'] : null;
@@ -266,8 +266,26 @@ final class MailService
             }
             return ['ok' => true];
         } catch (\Throwable $e) {
-            return ['ok' => false, 'error' => $e->getMessage()];
+            $raw = $e->getMessage();
+            $friendly = $this->friendlySmtpAuthError($raw);
+            return ['ok' => false, 'error' => $friendly, 'raw_error' => $raw];
         }
+    }
+
+    private function friendlySmtpAuthError(string $raw): string
+    {
+        $lower = strtolower($raw);
+        if (preg_match(
+            '/\b(535|534)\b|authentication failed|bad auth|#auth|invalid (user|login|credentials)|username and password not accepted|login failed|auth(?:entication)? (?:fail|error|denied|rejected)/i',
+            $raw
+        ) === 1) {
+            return (string) __('mail.auth_failed');
+        }
+        if (str_contains($lower, 'timeout') || str_contains($lower, 'timed out')) {
+            return (string) __('mail.connection_timeout');
+        }
+
+        return $raw !== '' ? $raw : (string) __('mail.discovery_failed', ['tried' => '1']);
     }
 
     /**
