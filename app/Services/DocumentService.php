@@ -13,12 +13,38 @@ final class DocumentService
     public const BUILTIN_CATEGORIES = [
         'minutes',
         'board_minutes',
+        'members_register',
         'statute',
-        'regulation',
-        'contract',
+        'constitutive_act',
+        'runts_cert',
+        'balance',
+        'five_per_thousand',
+        'receipt',
+        'f24',
         'invoice',
+        'contract',
+        'insurance',
+        'lease',
+        'dvr',
+        'safeguarding',
+        'regulation',
         'other',
     ];
+
+    /** @var array<string, list<string>> */
+    public const CATEGORY_GROUPS = [
+        'organs' => ['minutes', 'board_minutes', 'members_register'],
+        'legal' => ['statute', 'constitutive_act', 'runts_cert', 'regulation'],
+        'finance' => ['balance', 'five_per_thousand', 'receipt', 'f24', 'invoice'],
+        'contracts' => ['contract', 'insurance', 'lease', 'dvr', 'safeguarding'],
+        'other' => ['other'],
+    ];
+
+    /** @var list<string> */
+    public const VISIBILITIES = ['reserved', 'internal', 'public'];
+
+    /** @var list<string> */
+    public const STATUSES = ['draft', 'pending_approval', 'approved', 'signed', 'archived', 'cancelled'];
 
     /** @var list<string> */
     public const LANGUAGES = [
@@ -218,26 +244,53 @@ final class DocumentService
     }
 
     /**
-     * @return list<array{key:string,label:string,builtin:bool}>
+     * @return list<array{key:string,label:string,builtin:bool,group?:string}>
      */
     public function categoryOptions(): array
     {
         $options = [];
-        foreach (self::BUILTIN_CATEGORIES as $key) {
-            $options[] = [
-                'key' => $key,
-                'label' => __('documents.category_' . $key),
-                'builtin' => true,
-            ];
+        foreach (self::CATEGORY_GROUPS as $groupKey => $keys) {
+            foreach ($keys as $key) {
+                $options[] = [
+                    'key' => $key,
+                    'label' => __('documents.category_' . $key),
+                    'builtin' => true,
+                    'group' => $groupKey,
+                ];
+            }
         }
         foreach ($this->customCategories() as $row) {
             $options[] = [
                 'key' => (string) $row['slug'],
                 'label' => (string) $row['label'],
                 'builtin' => false,
+                'group' => 'custom',
             ];
         }
         return $options;
+    }
+
+    /**
+     * @return list<array{key:string,label:string,options:list<array{key:string,label:string}>}>
+     */
+    public function categoryGroupedOptions(): array
+    {
+        $groups = [];
+        foreach ($this->categoryOptions() as $opt) {
+            $g = (string) ($opt['group'] ?? 'other');
+            if (!isset($groups[$g])) {
+                $groups[$g] = [
+                    'key' => $g,
+                    'label' => __('documents.category_group_' . $g),
+                    'options' => [],
+                ];
+            }
+            $groups[$g]['options'][] = [
+                'key' => (string) $opt['key'],
+                'label' => (string) $opt['label'],
+            ];
+        }
+        return array_values($groups);
     }
 
     /** @return array<string,string> */
@@ -298,7 +351,11 @@ final class DocumentService
         /** @var array<string,mixed> $data */
         $data = $parsed['data'];
         $data['created_by'] = $userId;
+        if (trim((string) ($data['document_number'] ?? '')) === '') {
+            $data['document_number'] = $this->suggestProtocolNumber((string) $data['category'], $data['document_date'] ?? null);
+        }
         $id = $this->db->insert('association_documents', $data);
+        $this->syncExpiryDeadline((int) $id, $data, $ip);
         $this->audit->log('document.created', 'document', (string) $id, null, [
             'title' => $data['title'],
             'document_number' => $data['document_number'],
@@ -337,6 +394,7 @@ final class DocumentService
         /** @var array<string,mixed> $data */
         $data = $parsed['data'];
         $this->db->update('association_documents', $data, 'id = :id', ['id' => $id]);
+        $this->syncExpiryDeadline($id, $data, $ip);
         $oldPath = trim((string) ($existing['file_path'] ?? ''));
         $newPath = trim((string) ($data['file_path'] ?? ''));
         if ($oldPath !== '' && $newPath !== $oldPath && $this->isSafeStoredPath($oldPath)) {
@@ -390,29 +448,111 @@ final class DocumentService
         }
 
         $status = (string) ($input['status'] ?? 'draft');
-        if (!in_array($status, ['draft', 'approved', 'signed'], true)) {
+        if (!in_array($status, self::STATUSES, true)) {
             $status = 'draft';
         }
+
+        $visibility = (string) ($input['visibility'] ?? 'internal');
+        if (!in_array($visibility, self::VISIBILITIES, true)) {
+            $visibility = 'internal';
+        }
+
+        $expiresAt = trim((string) ($input['expires_at'] ?? ''));
+        if ($expiresAt !== '' && !$this->validator->validate(['expires_at' => $expiresAt], ['expires_at' => 'date'])) {
+            return ['ok' => false, 'errors' => ['expires_at' => __('validation.date')]];
+        }
+
+        $memberId = trim((string) ($input['member_id'] ?? ''));
+        $siblingId = trim((string) ($input['sibling_document_id'] ?? ''));
 
         $attachment = $this->resolveAttachment($input, $file, $existing);
         if (empty($attachment['ok'])) {
             return ['ok' => false, 'errors' => ['file' => (string) ($attachment['error'] ?? __('documents.upload_fail'))]];
         }
 
+        $documentNumber = mb_substr(trim((string) ($input['document_number'] ?? '')), 0, 80);
+
         return [
             'ok' => true,
             'data' => [
                 'title' => $title,
-                'document_number' => mb_substr(trim((string) ($input['document_number'] ?? '')), 0, 80),
+                'document_number' => $documentNumber,
                 'category' => $category,
                 'language' => $language,
                 'document_date' => $docDate !== '' ? $docDate : null,
+                'expires_at' => $expiresAt !== '' ? $expiresAt : null,
                 'file_path' => $attachment['path'],
                 'file_mime' => $attachment['mime'],
                 'summary' => trim((string) ($input['summary'] ?? '')),
                 'status' => $status,
+                'visibility' => $visibility,
+                'member_id' => $memberId !== '' ? (int) $memberId : null,
+                'sibling_document_id' => $siblingId !== '' ? (int) $siblingId : null,
             ],
         ];
+    }
+
+    public function suggestProtocolNumber(string $category, ?string $documentDate = null): string
+    {
+        $year = date('Y');
+        if ($documentDate !== null && preg_match('/^(\d{4})/', $documentDate, $m)) {
+            $year = $m[1];
+        }
+        $prefixMap = [
+            'minutes' => 'VERB',
+            'board_minutes' => 'DELIB',
+            'statute' => 'STAT',
+            'invoice' => 'FATT',
+            'contract' => 'CONT',
+            'insurance' => 'POL',
+        ];
+        $prefix = $prefixMap[$category] ?? strtoupper(substr(preg_replace('/[^a-z0-9]/i', '', $category) ?: 'DOC', 0, 4));
+        $like = $prefix . '-' . $year . '-%';
+        $row = $this->db->fetch(
+            'SELECT document_number FROM association_documents
+             WHERE document_number LIKE :like
+             ORDER BY id DESC LIMIT 1',
+            ['like' => $like]
+        );
+        $seq = 1;
+        if ($row && preg_match('/-(\d+)$/', (string) ($row['document_number'] ?? ''), $m)) {
+            $seq = (int) $m[1] + 1;
+        }
+        return sprintf('%s-%s-%03d', $prefix, $year, $seq);
+    }
+
+    /**
+     * @param array<string,mixed> $data
+     */
+    private function syncExpiryDeadline(int $documentId, array $data, string $ip): void
+    {
+        $expires = trim((string) ($data['expires_at'] ?? ''));
+        $source = 'system:document:' . $documentId;
+        $existing = $this->db->fetch(
+            'SELECT id FROM deadline_items WHERE source = :source LIMIT 1',
+            ['source' => $source]
+        );
+        if ($expires === '') {
+            if ($existing) {
+                $this->db->query('DELETE FROM deadline_items WHERE id = :id', ['id' => (int) $existing['id']]);
+            }
+            return;
+        }
+        $payload = [
+            'title' => (string) ($data['title'] ?? __('documents.title')),
+            'category' => 'general',
+            'due_date' => $expires,
+            'member_id' => $data['member_id'] ?? null,
+            'notes' => __('documents.deadline_from_doc'),
+            'status' => 'open',
+            'source' => $source,
+        ];
+        if ($existing) {
+            $this->db->update('deadline_items', $payload, 'id = :id', ['id' => (int) $existing['id']]);
+        } else {
+            $this->db->insert('deadline_items', $payload);
+            $this->audit->log('deadline.created', 'deadline', $source, null, $payload, $ip);
+        }
     }
 
     /**

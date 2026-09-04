@@ -120,7 +120,7 @@ document.addEventListener('DOMContentLoaded', () => {
   initMembersFilterMobile();
   initMobileNav();
   initTopbarScroll();
-.initOrgHideVacant();
+  initOrgHideVacant();
   initSidebarDeadlines();
   initConfigAccordions();
   initMemberForm();

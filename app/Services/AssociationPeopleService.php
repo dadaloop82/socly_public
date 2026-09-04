@@ -606,6 +606,7 @@ final class AssociationPeopleService
             'house_number' => $this->nullIfEmpty($person['house_number'] ?? null),
             'appointed_at' => $this->nullIfEmpty($person['appointed_at'] ?? null),
             'mandate_ends_at' => $this->nullIfEmpty($person['mandate_ends_at'] ?? null),
+            'appointment_minutes' => $this->nullIfEmpty($person['appointment_minutes'] ?? null),
             'notes' => $this->nullIfEmpty($person['notes'] ?? null),
             'is_active' => 1,
         ];

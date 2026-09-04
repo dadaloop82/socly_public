@@ -59,6 +59,12 @@ $renderPersonCard = static function (
                 <?= e($ends !== '' ? $ends : '—') ?>
             </p>
         <?php endif; ?>
+        <?php
+        $minutesRef = trim((string) ($person['appointment_minutes'] ?? ''));
+        if ($minutesRef !== ''):
+        ?>
+            <p class="org-node-minutes muted"><?= e($minutesRef) ?></p>
+        <?php endif; ?>
         <?php if ($editable): ?>
             <span class="org-node-action"><?= e(__('org.tap_to_edit')) ?></span>
         <?php endif; ?>

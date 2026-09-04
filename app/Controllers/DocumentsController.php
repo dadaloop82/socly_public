@@ -7,12 +7,14 @@ namespace Socly\Controllers;
 use Socly\Core\Http\Request;
 use Socly\Core\View;
 use Socly\Services\DocumentService;
+use Socly\Services\MemberService;
 
 final class DocumentsController extends BaseController
 {
     public function __construct(
         View $view,
-        private readonly DocumentService $documents
+        private readonly DocumentService $documents,
+        private readonly MemberService $members
     ) {
         parent::__construct($view);
     }
@@ -28,9 +30,12 @@ final class DocumentsController extends BaseController
             'title' => __('documents.title'),
             'documents' => $this->documents->all(200, $query),
             'categories' => $this->documents->categoryOptions(),
+            'category_groups' => $this->documents->categoryGroupedOptions(),
             'default_category' => $this->documents->defaultCategory(),
             'languages' => DocumentService::LANGUAGES,
             'upload_max_mb' => $this->documents->uploadMaxMb(),
+            'members' => $this->members->listForSelect(),
+            'sibling_options' => $this->documents->all(100),
             'search_query' => $query,
         ]);
     }
@@ -54,13 +59,20 @@ final class DocumentsController extends BaseController
             ];
         }
         $filePath = trim((string) ($doc['file_path'] ?? ''));
+        $siblings = array_values(array_filter(
+            $this->documents->all(100),
+            static fn (array $row): bool => (int) ($row['id'] ?? 0) !== (int) $id
+        ));
         $this->render('documents/edit', [
             'title' => __('documents.edit'),
             'document' => $doc,
             'categories' => $categories,
+            'category_groups' => $this->documents->categoryGroupedOptions(),
             'languages' => DocumentService::LANGUAGES,
             'upload_max_mb' => $this->documents->uploadMaxMb(),
             'existing_file_name' => $filePath !== '' ? basename($filePath) : '',
+            'members' => $this->members->listForSelect(),
+            'sibling_options' => $siblings,
         ]);
     }
 

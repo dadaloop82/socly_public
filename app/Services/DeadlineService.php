@@ -445,8 +445,11 @@ final class DeadlineService
             'category' => (string) ($existing['category'] ?? 'general'),
             'due_date' => $nextDue,
             'member_id' => $existing['member_id'] !== null ? (int) $existing['member_id'] : null,
+            'assignee_role' => $existing['assignee_role'] ?? null,
             'notes' => (string) ($existing['notes'] ?? ''),
+            'notify_days' => $existing['notify_days'] ?? null,
             'status' => 'open',
+            'recurrence' => (string) ($existing['recurrence'] ?? 'none'),
             'source' => 'manual',
         ]);
         $this->audit->log('deadline.renewed', 'deadline', (string) $id, [
@@ -485,6 +488,15 @@ final class DeadlineService
         if (!in_array($status, self::STATUSES, true)) {
             $status = 'open';
         }
+        $recurrence = trim((string) ($input['recurrence'] ?? ($existing['recurrence'] ?? 'none')));
+        if (!in_array($recurrence, ['none', 'monthly', 'yearly'], true)) {
+            $recurrence = 'none';
+        }
+        $assigneeRole = trim((string) ($input['assignee_role'] ?? ($existing['assignee_role'] ?? '')));
+        $notifyDays = trim((string) ($input['notify_days'] ?? ($existing['notify_days'] ?? '')));
+        if ($notifyDays !== '' && !preg_match('/^[\d,\s]+$/', $notifyDays)) {
+            $notifyDays = '';
+        }
 
         return [
             'ok' => true,
@@ -493,8 +505,11 @@ final class DeadlineService
                 'category' => (string) $categoryResult['key'],
                 'due_date' => $due,
                 'member_id' => $memberId !== '' ? (int) $memberId : null,
+                'assignee_role' => $assigneeRole !== '' ? mb_substr($assigneeRole, 0, 40) : null,
                 'notes' => trim((string) ($input['notes'] ?? '')),
+                'notify_days' => $notifyDays !== '' ? mb_substr($notifyDays, 0, 40) : null,
                 'status' => $status,
+                'recurrence' => $recurrence,
             ],
         ];
     }

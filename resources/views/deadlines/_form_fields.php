@@ -86,7 +86,26 @@ $categoryGroups = $category_groups ?? null;
         <input type="hidden" name="status" value="open">
     <?php endif; ?>
     <div>
-        <label><?= e(__('deadlines.notes')) ?></label>
-        <input type="text" name="notes" value="<?= e((string) ($values['notes'] ?? '')) ?>">
+        <label><?= e(__('deadlines.recurrence')) ?></label>
+        <select name="recurrence">
+            <?php foreach (['none', 'monthly', 'yearly'] as $rec): ?>
+                <option value="<?= e($rec) ?>" <?= (string) ($values['recurrence'] ?? 'none') === $rec ? 'selected' : '' ?>><?= e(__('deadlines.recurrence_' . $rec)) ?></option>
+            <?php endforeach; ?>
+        </select>
     </div>
+</div>
+<div class="grid-2">
+    <div>
+        <label><?= e(__('deadlines.assignee_role')) ?></label>
+        <input type="text" name="assignee_role" value="<?= e((string) ($values['assignee_role'] ?? '')) ?>" maxlength="40" placeholder="<?= e(__('deadlines.assignee_role_placeholder')) ?>">
+    </div>
+    <div>
+        <label><?= e(__('deadlines.notify_days')) ?></label>
+        <input type="text" name="notify_days" value="<?= e((string) ($values['notify_days'] ?? '30,7')) ?>" maxlength="40" placeholder="30,7">
+        <p class="muted" style="margin:0.35rem 0 0;font-size:0.85rem"><?= e(__('deadlines.notify_days_hint')) ?></p>
+    </div>
+</div>
+<div>
+    <label><?= e(__('deadlines.notes')) ?></label>
+    <input type="text" name="notes" value="<?= e((string) ($values['notes'] ?? '')) ?>">
 </div>

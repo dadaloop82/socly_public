@@ -192,6 +192,10 @@ $action = $isEdit
             <input type="date" name="mandate_ends_at" value="<?= e((string) ($values['mandate_ends_at'] ?? '')) ?>" <?= $requiresMandate ? 'required' : '' ?>>
         </div>
     </div>
+    <div style="margin-top:1rem">
+        <label><?= e(__('org.appointment_minutes')) ?></label>
+        <input type="text" name="appointment_minutes" value="<?= e((string) ($values['appointment_minutes'] ?? '')) ?>" maxlength="190" placeholder="<?= e(__('org.appointment_minutes_placeholder')) ?>">
+    </div>
     <div class="form-actions form-actions-end">
         <a class="btn btn-ghost" href="<?= e(url('/org')) ?>"><?= e(__('common.back')) ?></a>
         <button class="btn" type="submit"><?= e($isEdit ? __('org.update_person') : __('org.create_person')) ?></button>

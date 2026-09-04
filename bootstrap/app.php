@@ -431,7 +431,8 @@ $app->bind(DeadlinesController::class, fn (App $a) => new DeadlinesController(
 ));
 $app->bind(DocumentsController::class, fn (App $a) => new DocumentsController(
     $a->get(View::class),
-    $a->get(DocumentService::class)
+    $a->get(DocumentService::class),
+    $a->get(MemberService::class)
 ));
 $app->bind(OrgController::class, fn (App $a) => new OrgController(
     $a->get(View::class),

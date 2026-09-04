@@ -43,9 +43,19 @@ $fileReady = $hasExistingFile || trim((string) ($values['uploaded_path'] ?? ''))
     <div data-doc-category-wrap>
         <label><?= e(__('documents.category')) ?></label>
         <select name="category" data-doc-category>
-            <?php foreach ($categories as $cat): ?>
-                <option value="<?= e($cat['key']) ?>" <?= $selectedCategory === $cat['key'] ? 'selected' : '' ?>><?= e($cat['label']) ?></option>
-            <?php endforeach; ?>
+            <?php if (!empty($category_groups) && is_array($category_groups)): ?>
+                <?php foreach ($category_groups as $group): ?>
+                    <optgroup label="<?= e((string) ($group['label'] ?? '')) ?>">
+                        <?php foreach (($group['options'] ?? []) as $cat): ?>
+                            <option value="<?= e($cat['key']) ?>" <?= $selectedCategory === $cat['key'] ? 'selected' : '' ?>><?= e($cat['label']) ?></option>
+                        <?php endforeach; ?>
+                    </optgroup>
+                <?php endforeach; ?>
+            <?php else: ?>
+                <?php foreach ($categories as $cat): ?>
+                    <option value="<?= e($cat['key']) ?>" <?= $selectedCategory === $cat['key'] ? 'selected' : '' ?>><?= e($cat['label']) ?></option>
+                <?php endforeach; ?>
+            <?php endif; ?>
             <option value="__new__" <?= $showNewCategory ? 'selected' : '' ?>><?= e(__('documents.category_new')) ?></option>
         </select>
         <div class="doc-new-category" data-doc-new-category <?= $showNewCategory ? '' : 'hidden' ?>>
@@ -64,11 +74,53 @@ $fileReady = $hasExistingFile || trim((string) ($values['uploaded_path'] ?? ''))
     <div>
         <label><?= e(__('documents.status')) ?></label>
         <select name="status">
-            <?php foreach (['draft','approved','signed'] as $st): ?>
+            <?php foreach (\Socly\Services\DocumentService::STATUSES as $st): ?>
                 <option value="<?= e($st) ?>" <?= ($values['status'] ?? 'draft') === $st ? 'selected' : '' ?>><?= e(__('documents.status_' . $st)) ?></option>
             <?php endforeach; ?>
         </select>
     </div>
+    <div>
+        <label><?= e(__('documents.visibility')) ?></label>
+        <select name="visibility">
+            <?php foreach (\Socly\Services\DocumentService::VISIBILITIES as $vis): ?>
+                <option value="<?= e($vis) ?>" <?= ($values['visibility'] ?? 'internal') === $vis ? 'selected' : '' ?>><?= e(__('documents.visibility_' . $vis)) ?></option>
+            <?php endforeach; ?>
+        </select>
+    </div>
+</div>
+<div class="grid-3">
+    <div>
+        <label><?= e(__('documents.expires_at')) ?></label>
+        <input type="date" name="expires_at" value="<?= e((string) ($values['expires_at'] ?? '')) ?>">
+        <p class="muted" style="margin:0.35rem 0 0;font-size:0.85rem"><?= e(__('documents.expires_at_hint')) ?></p>
+    </div>
+    <div>
+        <label><?= e(__('documents.member_link')) ?></label>
+        <select name="member_id">
+            <option value="">—</option>
+            <?php foreach (($members ?? []) as $member): ?>
+                <option value="<?= (int) $member['id'] ?>" <?= (string) ($values['member_id'] ?? '') === (string) $member['id'] ? 'selected' : '' ?>>
+                    <?= e(trim(($member['last_name'] ?? '') . ' ' . ($member['first_name'] ?? ''))) ?>
+                </option>
+            <?php endforeach; ?>
+        </select>
+    </div>
+    <div>
+        <label><?= e(__('documents.sibling')) ?></label>
+        <select name="sibling_document_id">
+            <option value="">—</option>
+            <?php foreach (($sibling_options ?? []) as $sib): ?>
+                <option value="<?= (int) $sib['id'] ?>" <?= (string) ($values['sibling_document_id'] ?? '') === (string) $sib['id'] ? 'selected' : '' ?>>
+                    <?= e((string) ($sib['title'] ?? '')) ?>
+                    <?php if (!empty($sib['language'])): ?>
+                        (<?= e((string) $sib['language']) ?>)
+                    <?php endif; ?>
+                </option>
+            <?php endforeach; ?>
+        </select>
+    </div>
+</div>
+<div class="grid-3">
     <div class="doc-file-field<?= $fileReady ? ' is-uploaded' : '' ?>" data-doc-file-field>
         <label><?= e(__('documents.file')) ?></label>
         <div class="doc-file-row">
