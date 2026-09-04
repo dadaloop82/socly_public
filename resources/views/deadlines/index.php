@@ -59,6 +59,11 @@ $filterUrl = static function (string $filter = '') use ($search_query): string {
     </p>
 <?php endif; ?>
 
+<div class="panel filter-bar" style="margin-bottom:1rem;display:flex;gap:0.5rem;flex-wrap:wrap;align-items:center">
+    <a class="btn btn-sm<?= $activeFilter === '' || $activeFilter === 'open' ? '' : ' btn-ghost' ?>" href="<?= e($filterUrl('')) ?>"><?= e(__('deadlines.tab_open')) ?></a>
+    <a class="btn btn-sm<?= $activeFilter === 'done' ? '' : ' btn-ghost' ?>" href="<?= e($filterUrl('done')) ?>"><?= e(__('deadlines.tab_done')) ?></a>
+</div>
+
 <form class="panel filter-bar members-filter" method="get" action="<?= e(url('/deadlines')) ?>" role="search" style="margin-bottom:1rem">
     <?php if ($activeFilter !== ''): ?>
         <input type="hidden" name="filter" value="<?= e($activeFilter) ?>">
@@ -135,8 +140,11 @@ $filterUrl = static function (string $filter = '') use ($search_query): string {
                             <?php foreach ($deadline_items as $item): ?>
                                 <?php
                                 $due = (string) ($item['due_date'] ?? '');
+                                $itemStatus = (string) ($item['status'] ?? 'open');
                                 $state = 'valid';
-                                if ($due !== '' && $due < $today) {
+                                if ($itemStatus === 'done') {
+                                    $state = 'done';
+                                } elseif ($due !== '' && $due < $today) {
                                     $state = 'overdue';
                                 } elseif ($due !== '' && $due <= $soon) {
                                     $state = 'soon';
@@ -144,7 +152,7 @@ $filterUrl = static function (string $filter = '') use ($search_query): string {
                                 $memberLabel = trim((string) (($item['last_name'] ?? '') . ' ' . ($item['first_name'] ?? '')));
                                 $itemId = (int) ($item['id'] ?? 0);
                                 $isSystem = str_starts_with((string) ($item['source'] ?? ''), 'system:');
-                                $editable = $canManage && !$isSystem;
+                                $editable = $canManage && !$isSystem && $itemStatus === 'open';
                                 $editUrl = $editable ? url('/deadlines/' . $itemId . '/edit') : '';
                                 $categoryLabel = '';
                                 foreach ($categories as $category) {
@@ -164,7 +172,11 @@ $filterUrl = static function (string $filter = '') use ($search_query): string {
                                     <?php endif; ?>
                                 >
                                     <td>
-                                        <span class="deadline-badge deadline-badge-<?= e($state) ?>"><?= e(__('deadlines.badge_' . $state)) ?></span>
+                                        <?php if ($itemStatus === 'done'): ?>
+                                            <span class="deadline-badge deadline-badge-done"><?= e(__('deadlines.status_done')) ?></span>
+                                        <?php else: ?>
+                                            <span class="deadline-badge deadline-badge-<?= e($state) ?>"><?= e(__('deadlines.badge_' . $state)) ?></span>
+                                        <?php endif; ?>
                                         <strong><?= e((string) ($item['title'] ?? '')) ?></strong>
                                         <?php if ($isSystem): ?>
                                             <span class="doc-status doc-status-approved"><?= e(__('deadlines.system_badge')) ?></span>
@@ -181,6 +193,10 @@ $filterUrl = static function (string $filter = '') use ($search_query): string {
                                             <form method="post" action="<?= e(url('/deadlines/' . $itemId . '/done')) ?>" class="inline-form">
                                                 <?= csrf_field() ?>
                                                 <button type="submit" class="btn btn-ghost btn-sm"><?= e(__('deadlines.mark_done')) ?></button>
+                                            </form>
+                                            <form method="post" action="<?= e(url('/deadlines/' . $itemId . '/renew')) ?>" class="inline-form">
+                                                <?= csrf_field() ?>
+                                                <button type="submit" class="btn btn-ghost btn-sm"><?= e(__('deadlines.renew')) ?></button>
                                             </form>
                                             <?php if (!empty($item['member_id']) && component_enabled('members') && can('members.manage')): ?>
                                                 <a class="btn btn-ghost btn-sm" href="<?= e(url('/members/' . (int) $item['member_id'])) ?>"><?= e(__('deadlines.open_member')) ?></a>

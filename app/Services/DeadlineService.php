@@ -47,7 +47,10 @@ final class DeadlineService
 
         $where = [];
         $params = [];
-        if ($openOnly) {
+        $bucket = trim($bucket);
+        if ($bucket === 'done') {
+            $where[] = "d.status = 'done'";
+        } elseif ($openOnly) {
             $where[] = "d.status = 'open'";
         }
         $query = trim($query);
@@ -56,7 +59,6 @@ final class DeadlineService
         }
         $today = date('Y-m-d');
         $soon = date('Y-m-d', strtotime('+30 days'));
-        $bucket = trim($bucket);
         if ($bucket === 'overdue') {
             $where[] = 'd.due_date < :bucket_today';
             $params['bucket_today'] = $today;
@@ -339,6 +341,45 @@ final class DeadlineService
         }
         $this->db->update('deadline_items', ['status' => 'done'], 'id = :id', ['id' => $id]);
         $this->audit->log('deadline.done', 'deadline', (string) $id, null, null, $ip);
+    }
+
+    /**
+     * Mark current deadline done and create a copy one year later.
+     *
+     * @return array{ok:bool,id?:int,error?:string}
+     */
+    public function renewPlusYear(int $id, string $ip): array
+    {
+        $existing = $this->find($id);
+        if ($existing === null) {
+            return ['ok' => false, 'error' => 'missing'];
+        }
+        if ($this->isSystem($existing)) {
+            return ['ok' => false, 'error' => 'system'];
+        }
+        $due = trim((string) ($existing['due_date'] ?? ''));
+        if ($due === '' || !preg_match('/^\d{4}-\d{2}-\d{2}$/', $due)) {
+            return ['ok' => false, 'error' => 'date'];
+        }
+        $nextDue = date('Y-m-d', strtotime($due . ' +1 year'));
+        $this->db->update('deadline_items', ['status' => 'done'], 'id = :id', ['id' => $id]);
+        $newId = $this->db->insert('deadline_items', [
+            'title' => (string) ($existing['title'] ?? ''),
+            'category' => (string) ($existing['category'] ?? 'general'),
+            'due_date' => $nextDue,
+            'member_id' => $existing['member_id'] !== null ? (int) $existing['member_id'] : null,
+            'notes' => (string) ($existing['notes'] ?? ''),
+            'status' => 'open',
+            'source' => 'manual',
+        ]);
+        $this->audit->log('deadline.renewed', 'deadline', (string) $id, [
+            'due_date' => $due,
+            'status' => $existing['status'] ?? null,
+        ], [
+            'new_id' => $newId,
+            'due_date' => $nextDue,
+        ], $ip);
+        return ['ok' => true, 'id' => (int) $newId];
     }
 
     /**

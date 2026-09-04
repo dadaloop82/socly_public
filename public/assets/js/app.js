@@ -6504,12 +6504,33 @@ function initSidebarDeadlines() {
   if (more && items.length > 1) {
     more.hidden = false;
     more.textContent = moreTemplate.replace(':count', String(items.length - 1));
+    more.addEventListener('click', (event) => {
+      event.preventDefault();
+      const expanded = box.classList.toggle('is-expanded');
+      if (expanded) {
+        items.forEach((item) => {
+          item.hidden = false;
+          item.classList.add('is-active');
+        });
+        more.textContent = more.getAttribute('data-collapse-label') || '−';
+      } else {
+        show(current);
+        more.textContent = moreTemplate.replace(':count', String(items.length - 1));
+      }
+    });
   }
   if (items.length > 1 && !window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
     window.setInterval(() => {
+      if (box.classList.contains('is-expanded')) {
+        return;
+      }
       const active = items[current];
       active.classList.add('is-fading');
       window.setTimeout(() => {
+        if (box.classList.contains('is-expanded')) {
+          active.classList.remove('is-fading');
+          return;
+        }
         current = (current + 1) % items.length;
         show(current);
         active.classList.remove('is-fading');

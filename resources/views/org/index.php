@@ -32,16 +32,25 @@ $renderPersonCard = static function (
 ) use ($personName): void {
     $name = $personName($person);
     $appointed = format_date($person['appointed_at'] ?? null);
-    $ends = format_date($person['mandate_ends_at'] ?? null);
+    $endsRaw = trim((string) ($person['mandate_ends_at'] ?? ''));
+    $ends = format_date($endsRaw !== '' ? $endsRaw : null);
     $hasMandate = $appointed !== '' || $ends !== '';
+    $mandateExpired = $endsRaw !== '' && preg_match('/^\d{4}-\d{2}-\d{2}/', $endsRaw) === 1
+        && substr($endsRaw, 0, 10) < date('Y-m-d');
     $id = (int) ($person['id'] ?? 0);
     $tag = $editable ? 'a' : 'article';
     $href = $editable ? ' href="' . e(url('/org/people/' . $id . '/edit')) . '"' : '';
     $class = 'org-node' . ($variant !== '' ? ' org-node--' . $variant : '') . ($editable ? ' org-node--clickable' : '');
+    if ($mandateExpired) {
+        $class .= ' org-node--mandate-expired';
+    }
     ?>
     <<?= $tag ?> class="<?= e($class) ?>"<?= $href ?><?= $editable ? ' title="' . e(__('org.edit_person')) . '"' : '' ?>>
         <p class="org-node-role"><?= e($roleLabelText) ?></p>
         <h3 class="org-node-name"><?= e($name !== '' ? $name : __('org.vacant')) ?></h3>
+        <?php if ($mandateExpired): ?>
+            <span class="org-mandate-badge"><?= e(__('org.mandate_expired')) ?></span>
+        <?php endif; ?>
         <?php if ($hasMandate): ?>
             <p class="org-node-mandate">
                 <?= e(__('org.mandate')) ?>:

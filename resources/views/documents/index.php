@@ -18,6 +18,7 @@ $values = $old !== [] ? $old : [
     'new_category' => '',
 ];
 $canManage = can('documents.manage');
+$formOpen = $old !== [];
 ?>
 <div class="page-header">
     <div class="titles">
@@ -26,39 +27,59 @@ $canManage = can('documents.manage');
     </div>
 </div>
 
-<?php if ($canManage): ?>
-<form
-    class="panel"
-    method="post"
-    action="<?= e(url('/documents')) ?>"
-    enctype="multipart/form-data"
-    data-document-form
-    data-leave-guard
-    data-upload-url="<?= e(url('/documents/upload')) ?>"
-    data-msg-idle="<?= e(__('documents.upload_idle')) ?>"
-    data-msg-uploading="<?= e(__('documents.upload_busy')) ?>"
-    data-msg-ok="<?= e(__('documents.upload_ok')) ?>"
-    data-msg-fail="<?= e(__('documents.upload_fail')) ?>"
-    data-msg-change="<?= e(__('documents.change_file')) ?>"
->
-    <?= csrf_field() ?>
-    <input type="hidden" name="uploaded_path" value="<?= e((string) ($values['uploaded_path'] ?? '')) ?>" data-doc-uploaded-path>
-    <input type="hidden" name="uploaded_mime" value="<?= e((string) ($values['uploaded_mime'] ?? '')) ?>" data-doc-uploaded-mime>
-    <div class="panel-header">
-        <div>
-            <h2 class="section-title"><?= e(__('documents.add')) ?></h2>
-            <p class="section-lede"><?= e(__('documents.add_lede')) ?></p>
-        </div>
-        <button class="btn" type="submit"><?= e(__('documents.submit')) ?></button>
-    </div>
-    <?php
-    $has_existing_file = false;
-    require __DIR__ . '/_form_fields.php';
-    ?>
-    <div class="form-actions form-actions-end">
-        <button class="btn" type="submit"><?= e(__('documents.submit')) ?></button>
-    </div>
+<form class="panel filter-bar members-filter" method="get" action="<?= e(url('/documents')) ?>" role="search" style="margin-bottom:1rem">
+    <label class="visually-hidden" for="doc-archive-q-top"><?= e(__('documents.search')) ?></label>
+    <input
+        id="doc-archive-q-top"
+        class="members-filter-q"
+        type="search"
+        name="q"
+        value="<?= e((string) ($search_query ?? '')) ?>"
+        placeholder="<?= e(__('documents.search_placeholder')) ?>"
+        maxlength="120"
+        autocomplete="off"
+    >
+    <button class="btn btn-sm" type="submit"><?= e(__('documents.search')) ?></button>
+    <?php if (trim((string) ($search_query ?? '')) !== ''): ?>
+        <a class="btn btn-ghost btn-sm" href="<?= e(url('/documents')) ?>"><?= e(__('documents.search_clear')) ?></a>
+    <?php endif; ?>
 </form>
+
+<?php if ($canManage): ?>
+<details class="panel treasury-form-panel" data-document-form-panel <?= $formOpen ? 'open' : '' ?>>
+    <summary class="treasury-form-summary">
+        <span class="treasury-form-summary-text">
+            <span class="section-title"><?= e(__('documents.add')) ?></span>
+            <span class="section-lede"><?= e(__('documents.add_lede')) ?></span>
+        </span>
+        <span class="treasury-form-chevron" aria-hidden="true"></span>
+    </summary>
+    <form
+        class="treasury-form-body"
+        method="post"
+        action="<?= e(url('/documents')) ?>"
+        enctype="multipart/form-data"
+        data-document-form
+        data-leave-guard
+        data-upload-url="<?= e(url('/documents/upload')) ?>"
+        data-msg-idle="<?= e(__('documents.upload_idle')) ?>"
+        data-msg-uploading="<?= e(__('documents.upload_busy')) ?>"
+        data-msg-ok="<?= e(__('documents.upload_ok')) ?>"
+        data-msg-fail="<?= e(__('documents.upload_fail')) ?>"
+        data-msg-change="<?= e(__('documents.change_file')) ?>"
+    >
+        <?= csrf_field() ?>
+        <input type="hidden" name="uploaded_path" value="<?= e((string) ($values['uploaded_path'] ?? '')) ?>" data-doc-uploaded-path>
+        <input type="hidden" name="uploaded_mime" value="<?= e((string) ($values['uploaded_mime'] ?? '')) ?>" data-doc-uploaded-mime>
+        <?php
+        $has_existing_file = false;
+        require __DIR__ . '/_form_fields.php';
+        ?>
+        <div class="form-actions form-actions-end">
+            <button class="btn" type="submit"><?= e(__('documents.submit')) ?></button>
+        </div>
+    </form>
+</details>
 <?php endif; ?>
 
 <div class="panel">
@@ -67,22 +88,6 @@ $canManage = can('documents.manage');
             <h2 class="section-title"><?= e(__('documents.archive')) ?></h2>
             <p class="section-lede"><?= e(__('documents.archive_lede')) ?></p>
         </div>
-        <form class="doc-archive-search" method="get" action="<?= e(url('/documents')) ?>" role="search">
-            <label class="visually-hidden" for="doc-archive-q"><?= e(__('documents.search')) ?></label>
-            <input
-                id="doc-archive-q"
-                type="search"
-                name="q"
-                value="<?= e((string) ($search_query ?? '')) ?>"
-                placeholder="<?= e(__('documents.search_placeholder')) ?>"
-                maxlength="120"
-                autocomplete="off"
-            >
-            <button class="btn btn-sm" type="submit"><?= e(__('documents.search')) ?></button>
-            <?php if (trim((string) ($search_query ?? '')) !== ''): ?>
-                <a class="btn btn-ghost btn-sm" href="<?= e(url('/documents')) ?>"><?= e(__('documents.search_clear')) ?></a>
-            <?php endif; ?>
-        </form>
     </div>
     <?php if ($documents === []): ?>
         <div class="empty-state">

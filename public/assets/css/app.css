@@ -432,6 +432,14 @@ a:hover { text-decoration: underline; color: var(--brand-primary-deep); }
   overflow: hidden;
   min-height: 0;
 }
+.sidebar-deadlines.is-expanded {
+  overflow: visible;
+}
+.sidebar-deadlines.is-expanded .sidebar-deadlines-list {
+  min-height: 0;
+  max-height: 14rem;
+  overflow-y: auto;
+}
 .sidebar-deadlines-head {
   display: flex;
   align-items: baseline;
@@ -5610,6 +5618,7 @@ button.setup-scrape-logo-frame:focus-visible .setup-scrape-logo-overlay {
 .deadline-badge-overdue { background: #fde8e8; color: #b42318; }
 .deadline-badge-soon { background: #fff4db; color: #9a6700; }
 .deadline-badge-valid { background: #e8f7ee; color: #0f7a48; }
+.deadline-badge-done { background: #eef2f6; color: #475467; }
 .deadline-row .deadline-badge {
   display: inline-block;
   margin-right: 0.45rem;
@@ -5879,6 +5888,22 @@ a.org-node:hover {
   width: min(100%, 18rem);
   border-color: color-mix(in srgb, var(--brand-primary, #0D6E66) 40%, var(--line));
   background: color-mix(in srgb, var(--brand-primary, #0D6E66) 7%, #fff);
+}
+.org-node--mandate-expired {
+  border-color: #c62828;
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, #c62828 40%, transparent);
+}
+.org-mandate-badge {
+  display: inline-block;
+  margin: 0.25rem 0 0.1rem;
+  padding: 0.12rem 0.45rem;
+  border-radius: 999px;
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  color: #fff;
+  background: #c62828;
 }
 .org-node--vacant,
 .org-node--add {

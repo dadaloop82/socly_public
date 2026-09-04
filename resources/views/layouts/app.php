@@ -215,6 +215,7 @@ try {
                     class="sidebar-deadlines-more"
                     href="<?= e(url('/deadlines')) ?>"
                     data-sidebar-deadlines-more
+                    data-collapse-label="<?= e(__('nav.all_deadlines')) ?>"
                     hidden
                 ></a>
             </section>

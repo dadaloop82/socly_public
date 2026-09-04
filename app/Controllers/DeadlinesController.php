@@ -27,14 +27,15 @@ final class DeadlinesController extends BaseController
             $query = mb_substr($query, 0, 120);
         }
         $bucket = trim((string) $request->input('filter', ''));
-        if (!in_array($bucket, ['overdue', 'soon', 'open', ''], true)) {
+        if (!in_array($bucket, ['overdue', 'soon', 'open', 'done', ''], true)) {
             $bucket = '';
         }
         $today = date('Y-m-d');
         $soon = date('Y-m-d', strtotime('+30 days'));
+        $openOnly = $bucket !== 'done';
         $this->render('deadlines/index', [
             'title' => __('deadlines.title'),
-            'deadline_items' => $this->deadlines->upcoming(200, $query, true, $bucket),
+            'deadline_items' => $this->deadlines->upcoming(200, $query, $openOnly, $bucket),
             'counts' => $this->deadlines->counts(),
             'today' => $today,
             'soon' => $soon,
@@ -107,6 +108,18 @@ final class DeadlinesController extends BaseController
         require_component('deadlines');
         $this->deadlines->markDone((int) $id, $request->ip());
         $this->flash('success', __('deadlines.done'));
+        redirect('/deadlines');
+    }
+
+    public function renew(Request $request, string $id): void
+    {
+        require_component('deadlines');
+        $result = $this->deadlines->renewPlusYear((int) $id, $request->ip());
+        if (empty($result['ok'])) {
+            $this->flash('error', __('deadlines.system_readonly'));
+            redirect('/deadlines');
+        }
+        $this->flash('success', __('deadlines.renewed'));
         redirect('/deadlines');
     }
 }
