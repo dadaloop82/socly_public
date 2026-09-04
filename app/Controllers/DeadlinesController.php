@@ -26,11 +26,15 @@ final class DeadlinesController extends BaseController
         if (mb_strlen($query) > 120) {
             $query = mb_substr($query, 0, 120);
         }
+        $bucket = trim((string) $request->input('filter', ''));
+        if (!in_array($bucket, ['overdue', 'soon', 'open', ''], true)) {
+            $bucket = '';
+        }
         $today = date('Y-m-d');
         $soon = date('Y-m-d', strtotime('+30 days'));
         $this->render('deadlines/index', [
             'title' => __('deadlines.title'),
-            'deadline_items' => $this->deadlines->upcoming(200, $query),
+            'deadline_items' => $this->deadlines->upcoming(200, $query, true, $bucket),
             'counts' => $this->deadlines->counts(),
             'today' => $today,
             'soon' => $soon,
@@ -38,6 +42,7 @@ final class DeadlinesController extends BaseController
             'categories' => $this->deadlines->categoryOptions(),
             'default_category' => $this->deadlines->defaultCategory(),
             'search_query' => $query,
+            'active_filter' => $bucket,
         ]);
     }
 

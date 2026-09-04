@@ -6703,3 +6703,16 @@ tr.doc-row-editable:focus-visible {
   font-variant-numeric: tabular-nums;
   font-weight: 700;
 }
+
+
+.stats a.stat {
+  text-decoration: none;
+  color: inherit;
+  cursor: pointer;
+  transition: box-shadow .15s ease, border-color .15s ease;
+}
+.stats a.stat:hover,
+.stats a.stat.is-active {
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--brand-primary) 45%, transparent);
+  border-color: color-mix(in srgb, var(--brand-primary) 55%, var(--line));
+}

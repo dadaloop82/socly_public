@@ -30,7 +30,7 @@ final class DeadlineService
     }
 
     /** @return list<array<string,mixed>> */
-    public function upcoming(int $limit = 200, string $query = '', bool $openOnly = true): array
+    public function upcoming(int $limit = 200, string $query = '', bool $openOnly = true, string $bucket = '', ?string $untilDate = null): array
     {
         $this->syncSystemDeadlines();
         $limitSql = ' LIMIT ' . max(1, min(500, $limit));
@@ -53,6 +53,23 @@ final class DeadlineService
         $query = trim($query);
         if ($query !== '') {
             $where[] = $this->buildSearchWhere($query, $params);
+        }
+        $today = date('Y-m-d');
+        $soon = date('Y-m-d', strtotime('+30 days'));
+        $bucket = trim($bucket);
+        if ($bucket === 'overdue') {
+            $where[] = 'd.due_date < :bucket_today';
+            $params['bucket_today'] = $today;
+        } elseif ($bucket === 'soon') {
+            $where[] = 'd.due_date >= :bucket_today AND d.due_date <= :bucket_soon';
+            $params['bucket_today'] = $today;
+            $params['bucket_soon'] = $soon;
+        } elseif ($bucket === 'open') {
+            // "Aperte" = tutte le scadenze aperte (nessun filtro data).
+        }
+        if ($untilDate !== null && preg_match('/^\d{4}-\d{2}-\d{2}$/', $untilDate)) {
+            $where[] = 'd.due_date <= :until_date';
+            $params['until_date'] = $untilDate;
         }
         $sql = $base;
         if ($where !== []) {

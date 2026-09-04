@@ -41,19 +41,25 @@ $showStatus = !empty($show_status);
     </div>
 </div>
 <div class="grid-<?= $showStatus ? '3' : '2' ?>">
-    <div>
-        <label><?= e(__('deadlines.member')) ?></label>
-        <select name="member_id">
-            <option value="">—</option>
-            <?php foreach ($members as $member): ?>
-                <option value="<?= (int) $member['id'] ?>" <?= (string) ($values['member_id'] ?? '') === (string) $member['id'] ? 'selected' : '' ?>>
-                    <?= e(trim(($member['last_name'] ?? '') . ' ' . ($member['first_name'] ?? ''))) ?>
-                    <?php if (!empty($member['member_number'])): ?>
-                        (<?= e((string) $member['member_number']) ?>)
-                    <?php endif; ?>
-                </option>
-            <?php endforeach; ?>
-        </select>
+    <div data-deadline-member-wrap>
+        <label class="checkbox-row" style="margin-bottom:0.5rem">
+            <input type="checkbox" value="1" data-deadline-member-toggle <?= trim((string) ($values['member_id'] ?? '')) !== '' ? 'checked' : '' ?>>
+            <span><?= e(__('deadlines.member_involved')) ?></span>
+        </label>
+        <div data-deadline-member-fields <?= trim((string) ($values['member_id'] ?? '')) !== '' ? '' : 'hidden' ?>>
+            <label><?= e(__('deadlines.member')) ?></label>
+            <select name="member_id" data-deadline-member-select>
+                <option value="">—</option>
+                <?php foreach ($members as $member): ?>
+                    <option value="<?= (int) $member['id'] ?>" <?= (string) ($values['member_id'] ?? '') === (string) $member['id'] ? 'selected' : '' ?>>
+                        <?= e(trim(($member['last_name'] ?? '') . ' ' . ($member['first_name'] ?? ''))) ?>
+                        <?php if (!empty($member['member_number'])): ?>
+                            (<?= e((string) $member['member_number']) ?>)
+                        <?php endif; ?>
+                    </option>
+                <?php endforeach; ?>
+            </select>
+        </div>
     </div>
     <?php if ($showStatus): ?>
         <div>

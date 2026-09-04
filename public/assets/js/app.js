@@ -6620,6 +6620,21 @@ function initDeadlineCategory(root = document) {
     };
     categorySelect.addEventListener('change', sync);
     sync();
+
+    const memberToggle = form.querySelector('[data-deadline-member-toggle]');
+    const memberFields = form.querySelector('[data-deadline-member-fields]');
+    const memberSelect = form.querySelector('[data-deadline-member-select]');
+    const syncMember = () => {
+      const involved = !!memberToggle?.checked;
+      if (memberFields) memberFields.hidden = !involved;
+      if (memberSelect) {
+        memberSelect.disabled = !involved;
+        if (!involved) memberSelect.value = '';
+      }
+    };
+    memberToggle?.addEventListener('change', syncMember);
+    syncMember();
+
     form.addEventListener('submit', async (event) => {
       const template = form.getAttribute('data-confirm-template') || '';
       if (!template) {
@@ -6630,14 +6645,19 @@ function initDeadlineCategory(root = document) {
       }
       event.preventDefault();
       const title = form.querySelector('[name="title"]')?.value?.trim() || '—';
-      const due = form.querySelector('[name="due_date"]')?.value || '—';
+      const dueRaw = form.querySelector('[name="due_date"]')?.value || '';
+      let due = dueRaw || '—';
+      if (/^\d{4}-\d{2}-\d{2}$/.test(dueRaw)) {
+        const [y, m, d] = dueRaw.split('-');
+        due = `${d}/${m}/${y}`;
+      }
       const category = categorySelect.value === '__new__'
         ? (newCategoryInput?.value?.trim() || '—')
         : (categorySelect.options[categorySelect.selectedIndex]?.text || '—');
       const summary = template
-        .replace(':title', title)
-        .replace(':date', due)
-        .replace(':category', category);
+        .replaceAll(':title', title)
+        .replaceAll(':date', due)
+        .replaceAll(':category', category);
       if (!(await appConfirm(summary))) {
         return;
       }

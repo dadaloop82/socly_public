@@ -159,7 +159,13 @@ try {
                 && component_enabled('deadlines')
                 && can('deadlines.view')
             ) {
-                $sidebarDeadlines = app(\Socly\Services\DeadlineService::class)->upcoming(12);
+                $sidebarDeadlines = app(\Socly\Services\DeadlineService::class)->upcoming(
+                    12,
+                    '',
+                    true,
+                    '',
+                    date('Y-m-d', strtotime('+7 days'))
+                );
             }
         } catch (\Throwable) {
             $sidebarDeadlines = [];

@@ -6,6 +6,7 @@
 /** @var string $today */
 /** @var string $soon */
 /** @var string $default_category */
+/** @var string $active_filter */
 $old = old_input();
 $values = $old !== [] ? $old : [
     'title' => '',
@@ -17,6 +18,19 @@ $values = $old !== [] ? $old : [
     'new_category' => '',
 ];
 $canManage = can('deadlines.manage');
+$formOpen = $old !== [];
+$activeFilter = (string) ($active_filter ?? '');
+$filterUrl = static function (string $filter = '') use ($search_query): string {
+    $params = [];
+    if (trim((string) ($search_query ?? '')) !== '') {
+        $params['q'] = (string) $search_query;
+    }
+    if ($filter !== '') {
+        $params['filter'] = $filter;
+    }
+    $qs = http_build_query($params);
+    return url('/deadlines' . ($qs !== '' ? '?' . $qs : ''));
+};
 ?>
 <div class="page-header">
     <div class="titles">
@@ -25,39 +39,67 @@ $canManage = can('deadlines.manage');
     </div>
 </div>
 
-<div class="stats">
-    <div class="stat">
+<div class="stats stats-context-deadlines">
+    <a class="stat<?= $activeFilter === 'overdue' ? ' is-active' : '' ?>" href="<?= e($filterUrl('overdue')) ?>">
         <div class="label"><?= e(__('deadlines.overdue')) ?></div>
         <div class="value stat-negative"><?= (int) ($counts['overdue'] ?? 0) ?></div>
-    </div>
-    <div class="stat">
+    </a>
+    <a class="stat<?= $activeFilter === 'soon' ? ' is-active' : '' ?>" href="<?= e($filterUrl('soon')) ?>">
         <div class="label"><?= e(__('deadlines.due_soon')) ?></div>
         <div class="value"><?= (int) ($counts['due_soon'] ?? 0) ?></div>
-    </div>
-    <div class="stat">
+    </a>
+    <a class="stat<?= $activeFilter === 'open' ? ' is-active' : '' ?>" href="<?= e($filterUrl('open')) ?>">
         <div class="label"><?= e(__('deadlines.open')) ?></div>
         <div class="value"><?= (int) ($counts['open'] ?? 0) ?></div>
-    </div>
+    </a>
 </div>
+<?php if ($activeFilter !== ''): ?>
+    <p class="muted" style="margin:-0.35rem 0 1rem">
+        <a href="<?= e($filterUrl('')) ?>"><?= e(__('deadlines.filter_clear')) ?></a>
+    </p>
+<?php endif; ?>
+
+<form class="panel filter-bar members-filter" method="get" action="<?= e(url('/deadlines')) ?>" role="search" style="margin-bottom:1rem">
+    <?php if ($activeFilter !== ''): ?>
+        <input type="hidden" name="filter" value="<?= e($activeFilter) ?>">
+    <?php endif; ?>
+    <label class="visually-hidden" for="deadline-q-top"><?= e(__('deadlines.search')) ?></label>
+    <input
+        id="deadline-q-top"
+        class="members-filter-q"
+        type="search"
+        name="q"
+        value="<?= e((string) ($search_query ?? '')) ?>"
+        placeholder="<?= e(__('deadlines.search_placeholder')) ?>"
+        maxlength="120"
+        autocomplete="off"
+    >
+    <button class="btn btn-sm" type="submit"><?= e(__('deadlines.search')) ?></button>
+    <?php if (trim((string) ($search_query ?? '')) !== ''): ?>
+        <a class="btn btn-ghost btn-sm" href="<?= e($filterUrl($activeFilter)) ?>"><?= e(__('deadlines.search_clear')) ?></a>
+    <?php endif; ?>
+</form>
 
 <?php if ($canManage): ?>
-<form class="panel" method="post" action="<?= e(url('/deadlines')) ?>" data-deadline-form data-leave-guard data-confirm-template="<?= e(__('deadlines.confirm_save')) ?>">
-    <?= csrf_field() ?>
-    <div class="panel-header">
-        <div>
-            <h2 class="section-title"><?= e(__('deadlines.add')) ?></h2>
-            <p class="section-lede"><?= e(__('deadlines.add_lede')) ?></p>
+<details class="panel treasury-form-panel" data-deadline-form-panel <?= $formOpen ? 'open' : '' ?>>
+    <summary class="treasury-form-summary">
+        <span class="treasury-form-summary-text">
+            <span class="section-title"><?= e(__('deadlines.add')) ?></span>
+            <span class="section-lede"><?= e(__('deadlines.add_lede')) ?></span>
+        </span>
+        <span class="treasury-form-chevron" aria-hidden="true"></span>
+    </summary>
+    <form class="treasury-form-body" method="post" action="<?= e(url('/deadlines')) ?>" data-deadline-form data-leave-guard data-confirm-template="<?= e(__('deadlines.confirm_save')) ?>">
+        <?= csrf_field() ?>
+        <?php
+        $show_status = false;
+        require __DIR__ . '/_form_fields.php';
+        ?>
+        <div class="form-actions form-actions-end">
+            <button class="btn" type="submit"><?= e(__('deadlines.submit')) ?></button>
         </div>
-        <button class="btn" type="submit"><?= e(__('deadlines.submit')) ?></button>
-    </div>
-    <?php
-    $show_status = false;
-    require __DIR__ . '/_form_fields.php';
-    ?>
-    <div class="form-actions form-actions-end">
-        <button class="btn" type="submit"><?= e(__('deadlines.submit')) ?></button>
-    </div>
-</form>
+    </form>
+</details>
 <?php endif; ?>
 
 <div class="panel">
@@ -66,28 +108,12 @@ $canManage = can('deadlines.manage');
             <h2 class="section-title"><?= e(__('deadlines.timeline')) ?></h2>
             <p class="section-lede"><?= e(__('deadlines.timeline_lede')) ?></p>
         </div>
-        <form class="doc-archive-search" method="get" action="<?= e(url('/deadlines')) ?>" role="search">
-            <label class="visually-hidden" for="deadline-q"><?= e(__('deadlines.search')) ?></label>
-            <input
-                id="deadline-q"
-                type="search"
-                name="q"
-                value="<?= e((string) ($search_query ?? '')) ?>"
-                placeholder="<?= e(__('deadlines.search_placeholder')) ?>"
-                maxlength="120"
-                autocomplete="off"
-            >
-            <button class="btn btn-sm" type="submit"><?= e(__('deadlines.search')) ?></button>
-            <?php if (trim((string) ($search_query ?? '')) !== ''): ?>
-                <a class="btn btn-ghost btn-sm" href="<?= e(url('/deadlines')) ?>"><?= e(__('deadlines.search_clear')) ?></a>
-            <?php endif; ?>
-        </form>
     </div>
     <?php if ($deadline_items === []): ?>
         <div class="empty-state">
-            <?php if (trim((string) ($search_query ?? '')) !== ''): ?>
+            <?php if (trim((string) ($search_query ?? '')) !== '' || $activeFilter !== ''): ?>
                 <strong><?= e(__('deadlines.search_empty_title')) ?></strong>
-                <?= e(__('deadlines.search_empty_text', ['q' => (string) $search_query])) ?>
+                <?= e(__('deadlines.search_empty_text', ['q' => (string) ($search_query !== '' ? $search_query : $activeFilter)])) ?>
             <?php else: ?>
                 <strong><?= e(__('deadlines.empty_title')) ?></strong>
                 <?= e(__('deadlines.empty_text')) ?>
