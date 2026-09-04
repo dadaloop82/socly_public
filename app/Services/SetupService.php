@@ -343,6 +343,8 @@ final class SetupService
                 'price' => $types === [] ? '0' : '',
                 'is_active' => true,
                 'single_type' => count($types) === 1,
+                'currency' => app(\Socly\Services\CurrencyService::class)->code(),
+                'currency_display' => app(\Socly\Services\CurrencyService::class)->display(),
             ];
         }
 
@@ -352,6 +354,30 @@ final class SetupService
             $hasCurrentYear = $this->hasPeriodForYear($year);
             $suggestNewYear = $periods !== [] && !$hasCurrentYear;
             $prefill = $periods === [] || $suggestNewYear;
+            $current = null;
+            foreach ($periods as $period) {
+                if (!empty($period['is_current'])) {
+                    $current = $period;
+                    break;
+                }
+            }
+            if ($current === null && $periods !== []) {
+                $current = $periods[0];
+            }
+            $nextStart = '';
+            $nextEnd = '';
+            if ($current !== null) {
+                $ends = trim((string) ($current['ends_on'] ?? ''));
+                if ($ends !== '' && preg_match('/^\d{4}-\d{2}-\d{2}$/', $ends)) {
+                    $endDt = \DateTimeImmutable::createFromFormat('Y-m-d', $ends);
+                    if ($endDt) {
+                        $nextStartDt = $endDt->modify('+1 day');
+                        $nextEndDt = $nextStartDt->modify('+1 year -1 day');
+                        $nextStart = $nextStartDt->format('Y-m-d');
+                        $nextEnd = $nextEndDt->format('Y-m-d');
+                    }
+                }
+            }
             return [
                 'periods' => $periods,
                 'needs_current_year' => $suggestNewYear,
@@ -359,6 +385,8 @@ final class SetupService
                 'starts_on' => $prefill ? sprintf('%d-01-01', $year) : '',
                 'ends_on' => $prefill ? sprintf('%d-12-31', $year) : '',
                 'is_current' => $prefill,
+                'next_period_starts_on' => $nextStart,
+                'next_period_ends_on' => $nextEnd,
             ];
         }
 
@@ -2377,7 +2405,8 @@ final class SetupService
      */
     public function autosaveMemberFields(array $input): array
     {
-        $result = $this->members->persistFieldsConfig($input, false);
+        $createNew = !empty($input['create_new']);
+        $result = $this->members->persistFieldsConfig($input, $createNew);
         if (!empty($result['ok'])) {
             $this->settings->set('membership.fields_configured', '1');
         }

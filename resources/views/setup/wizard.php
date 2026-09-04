@@ -860,8 +860,21 @@ $errorStep = flash('setup_error_step');
                     <?php
                     $types = is_array($value['types'] ?? null) ? $value['types'] : [];
                     $singleType = !empty($value['single_type']) || count($types) === 1;
+                    $currencyCode = (string) ($value['currency'] ?? 'EUR');
+                    $currencyDisplay = (string) ($value['currency_display'] ?? '€');
+                    $langFlags = [
+                        'it' => ['flag' => locale_flag_url('it'), 'label' => 'Italiano'],
+                        'de' => ['flag' => locale_flag_url('de'), 'label' => 'Deutsch'],
+                        'en' => ['flag' => locale_flag_url('en'), 'label' => 'English'],
+                    ];
                     ?>
-                    <div class="setup-membership" data-setup-line data-setup-member-types data-translate-url="<?= e(url('/api/translate')) ?>">
+                    <div class="setup-membership" data-setup-line data-setup-member-types
+                         data-translate-url="<?= e(url('/api/translate')) ?>"
+                         data-currency="<?= e($currencyCode) ?>"
+                         data-currency-display="<?= e($currencyDisplay) ?>"
+                         data-msg-free-title="<?= e(__('setup.type_free_confirm')) ?>"
+                         data-msg-free-confirm="<?= e(__('setup.type_free_confirm_ok')) ?>"
+                         data-msg-free-cancel="<?= e(__('common.cancel')) ?>">
                         <?php if ($types !== []): ?>
                             <p class="setup-hint muted"><?= e(__('setup.types_edit_hint')) ?></p>
                             <div class="setup-membership-list">
@@ -869,23 +882,23 @@ $errorStep = flash('setup_error_step');
                                     <?php $tid = (int) ($typeRow['id'] ?? 0); ?>
                                     <div class="setup-membership-card">
                                         <div class="setup-equal-row setup-langs-row">
+                                            <?php foreach ($langFlags as $langCode => $langMeta): ?>
                                             <label class="setup-field">
-                                                <span>🇮🇹 Italiano *</span>
-                                                <input type="text" name="types[<?= $tid ?>][name_it]" value="<?= e((string) ($typeRow['name_it'] ?? '')) ?>" required data-type-name-it>
+                                                <span class="setup-lang-flag-label">
+                                                    <img src="<?= e($langMeta['flag']) ?>" width="18" height="14" alt="" loading="lazy" decoding="async">
+                                                    <?= e($langMeta['label']) ?><?= $langCode === 'it' ? ' *' : '' ?>
+                                                </span>
+                                                <input type="text" name="types[<?= $tid ?>][name_<?= e($langCode) ?>]" value="<?= e((string) ($typeRow['name_' . $langCode] ?? '')) ?>" <?= $langCode === 'it' ? 'required data-type-name-it' : 'data-type-name-' . e($langCode) ?>>
                                             </label>
-                                            <label class="setup-field">
-                                                <span>🇩🇪 Deutsch</span>
-                                                <input type="text" name="types[<?= $tid ?>][name_de]" value="<?= e((string) ($typeRow['name_de'] ?? '')) ?>" data-type-name-de>
-                                            </label>
-                                            <label class="setup-field">
-                                                <span>🇬🇧 English</span>
-                                                <input type="text" name="types[<?= $tid ?>][name_en]" value="<?= e((string) ($typeRow['name_en'] ?? '')) ?>" data-type-name-en>
-                                            </label>
+                                            <?php endforeach; ?>
                                         </div>
                                         <div class="setup-equal-row">
                                             <label class="setup-field">
-                                                <span><?= e(__('install.type_price')) ?> *</span>
-                                                <input type="number" step="0.01" min="0" name="types[<?= $tid ?>][price]" value="<?= e((string) ($typeRow['price'] ?? '0')) ?>" required>
+                                                <span><?= e(__('install.type_price')) ?> (<?= e($currencyDisplay) ?>) *</span>
+                                                <div class="setup-price-with-currency">
+                                                    <input type="number" step="0.01" min="0" name="types[<?= $tid ?>][price]" value="<?= e((string) ($typeRow['price'] ?? '0')) ?>" required data-type-price data-type-name-ref="types[<?= $tid ?>][name_it]">
+                                                    <span class="setup-price-currency" aria-hidden="true"><?= e($currencyDisplay) ?></span>
+                                                </div>
                                             </label>
                                             <label class="checkbox-row setup-check setup-check-inline">
                                                 <input type="checkbox" name="types[<?= $tid ?>][is_active]" value="1" <?= !empty($typeRow['is_active']) ? 'checked' : '' ?><?= $singleType ? ' checked disabled' : '' ?>>
@@ -904,23 +917,23 @@ $errorStep = flash('setup_error_step');
                         <?php endif; ?>
                         <div class="setup-membership-card setup-membership-card-new">
                             <div class="setup-equal-row setup-langs-row">
+                                <?php foreach ($langFlags as $langCode => $langMeta): ?>
                                 <label class="setup-field">
-                                    <span>🇮🇹 Italiano<?= $types === [] ? ' *' : '' ?></span>
-                                    <input type="text" name="name_it" value="<?= e((string) ($value['name_it'] ?? '')) ?>" <?= $types === [] ? 'required' : '' ?> data-type-name-it placeholder="<?= e(__('setup.type_name_placeholder')) ?>">
+                                    <span class="setup-lang-flag-label">
+                                        <img src="<?= e($langMeta['flag']) ?>" width="18" height="14" alt="" loading="lazy" decoding="async">
+                                        <?= e($langMeta['label']) ?><?= $langCode === 'it' && $types === [] ? ' *' : '' ?>
+                                    </span>
+                                    <input type="text" name="name_<?= e($langCode) ?>" value="<?= e((string) ($value['name_' . $langCode] ?? '')) ?>" <?= $langCode === 'it' && $types === [] ? 'required' : '' ?> <?= $langCode === 'it' ? 'data-type-name-it' : 'data-type-name-' . e($langCode) ?> placeholder="<?= e(__('setup.type_name_placeholder')) ?>">
                                 </label>
-                                <label class="setup-field">
-                                    <span>🇩🇪 Deutsch</span>
-                                    <input type="text" name="name_de" value="<?= e((string) ($value['name_de'] ?? '')) ?>" data-type-name-de>
-                                </label>
-                                <label class="setup-field">
-                                    <span>🇬🇧 English</span>
-                                    <input type="text" name="name_en" value="<?= e((string) ($value['name_en'] ?? '')) ?>" data-type-name-en>
-                                </label>
+                                <?php endforeach; ?>
                             </div>
                             <div class="setup-equal-row">
                                 <label class="setup-field">
-                                    <span><?= e(__('install.type_price')) ?><?= $types === [] ? ' *' : '' ?></span>
-                                    <input type="number" step="0.01" min="0" name="price" value="<?= e((string) ($value['price'] ?? '')) ?>" <?= $types === [] ? 'required' : '' ?> placeholder="0.00">
+                                    <span><?= e(__('install.type_price')) ?> (<?= e($currencyDisplay) ?>)<?= $types === [] ? ' *' : '' ?></span>
+                                    <div class="setup-price-with-currency">
+                                        <input type="number" step="0.01" min="0" name="price" value="<?= e((string) ($value['price'] ?? '')) ?>" <?= $types === [] ? 'required' : '' ?> placeholder="0.00" data-type-price data-type-name-ref="name_it">
+                                        <span class="setup-price-currency" aria-hidden="true"><?= e($currencyDisplay) ?></span>
+                                    </div>
                                 </label>
                                 <?php if ($types !== []): ?>
                                 <label class="checkbox-row setup-check setup-check-inline">
@@ -931,6 +944,7 @@ $errorStep = flash('setup_error_step');
                                     <input type="hidden" name="is_active" value="1">
                                 <?php endif; ?>
                             </div>
+                            <button type="button" class="btn btn-ghost btn-sm" data-type-translate-now><?= e(__('settings.legal_translate')) ?></button>
                         </div>
                     </div>
                 <?php elseif ($stepType === 'membership_periods'): ?>
@@ -943,8 +957,8 @@ $errorStep = flash('setup_error_step');
                             <div class="setup-membership-list">
                                 <?php foreach ($periods as $period): ?>
                                     <?php $pid = (int) ($period['id'] ?? 0); ?>
-                                    <div class="setup-membership-card">
-                                        <p class="setup-period-label muted"><?= e((string) ($period['label'] ?? '')) ?></p>
+                                    <div class="setup-membership-card<?= !empty($period['is_current']) ? ' is-current-period' : '' ?>">
+                                        <p class="setup-period-label muted"><?= e((string) ($period['label'] ?? '')) ?><?= !empty($period['is_current']) ? ' · ' . e(__('settings.is_current')) : '' ?></p>
                                         <div class="setup-equal-row">
                                             <label class="setup-field">
                                                 <span><?= e(__('install.starts_on')) ?> *</span>
@@ -959,6 +973,14 @@ $errorStep = flash('setup_error_step');
                                             <input type="checkbox" name="periods[<?= $pid ?>][is_current]" value="1" <?= !empty($period['is_current']) ? 'checked' : '' ?>>
                                             <span><?= e(__('settings.is_current')) ?></span>
                                         </label>
+                                        <?php if (!empty($period['is_current']) && !empty($value['next_period_starts_on']) && !empty($value['next_period_ends_on'])): ?>
+                                            <p class="setup-period-next muted" data-setup-next-period>
+                                                <?= e(__('setup.periods_next_period', [
+                                                    'from' => date('d/m/Y', strtotime((string) $value['next_period_starts_on'])),
+                                                    'to' => date('d/m/Y', strtotime((string) $value['next_period_ends_on'])),
+                                                ])) ?>
+                                            </p>
+                                        <?php endif; ?>
                                     </div>
                                 <?php endforeach; ?>
                             </div>
@@ -1004,11 +1026,11 @@ $errorStep = flash('setup_error_step');
                             <div class="setup-equal-row">
                                 <label class="setup-field setup-field-grow">
                                     <span><?= e(__('setup.fields_new_label')) ?></span>
-                                    <input type="text" name="new_label" value="<?= e((string) ($value['new_label'] ?? '')) ?>" placeholder="<?= e(__('setup.fields_new_label_ph')) ?>">
+                                    <input type="text" name="new_label" value="<?= e((string) ($value['new_label'] ?? '')) ?>" placeholder="<?= e(__('setup.fields_new_label_ph')) ?>" data-new-field-label>
                                 </label>
                                 <label class="setup-field">
                                     <span><?= e(__('setup.fields_col_type')) ?> *</span>
-                                    <select name="new_type">
+                                    <select name="new_type" data-new-field-type>
                                         <?php foreach ($typeOptions as $opt): ?>
                                             <option value="<?= e($opt) ?>" <?= (string) ($value['new_type'] ?? 'text') === $opt ? 'selected' : '' ?>><?= e(\Socly\Support\MemberFieldTypes::label($opt)) ?></option>
                                         <?php endforeach; ?>
@@ -1025,6 +1047,13 @@ $errorStep = flash('setup_error_step');
                                     <span><?= e(__('setup.fields_col_required')) ?></span>
                                 </label>
                             </div>
+                            <button
+                                type="button"
+                                class="btn btn-ghost"
+                                data-fields-add-now
+                                data-msg-need-label="<?= e(__('setup.fields_need_label')) ?>"
+                                data-msg-adding="<?= e(__('setup.fields_adding')) ?>"
+                            ><?= e(__('setup.fields_add_now')) ?></button>
                         </div>
                     </div>
                 <?php elseif ($stepType === 'smtp_config'): ?>

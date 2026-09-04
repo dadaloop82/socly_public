@@ -4878,11 +4878,30 @@ button.setup-scrape-logo-frame:focus-visible .setup-scrape-logo-overlay {
 .setup-people-row .setup-field-organ-type {
   grid-column: 1 / -1;
 }
-.setup-locale-flag-emoji {
-  font-size: 1.35rem;
-  line-height: 1;
-  width: 28px;
+.setup-lang-flag-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+.setup-lang-flag-label img {
+  border-radius: 2px;
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--line) 70%, transparent);
+}
+.setup-price-with-currency {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 0.45rem;
+  align-items: center;
+}
+.setup-price-currency {
+  min-width: 2rem;
   text-align: center;
+  font-weight: 700;
+  color: var(--brand-primary-deep);
+}
+.setup-period-next {
+  margin: 0.35rem 0 0;
+  font-size: 0.92rem;
 }
 .assoc-people { display: grid; gap: 0.85rem; }
 .assoc-people-rows { display: grid; gap: 0.85rem; }

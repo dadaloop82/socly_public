@@ -1009,6 +1009,17 @@ return [
         'types_edit_hint' => 'Puoi modificare le tipologie già presenti (es. Ordinario) e aggiungerne di nuove.',
         'types_empty_hint' => 'Nessuna tipologia ancora. Aggiungine almeno una per continuare.',
         'type_name_placeholder' => 'Es. Ordinario',
+        'type_free_confirm' => 'Confermi che il tesseramento «:name» è gratuito (quota 0)?',
+
+        'type_free_confirm_ok' => 'Sì, è gratuito',
+
+        'periods_next_period' => 'Prossimo periodo: :from → :to',
+
+        'fields_add_now' => 'Aggiungi subito alla lista',
+
+        'fields_need_label' => 'Inserisci un’etichetta per il nuovo campo.',
+
+        'fields_adding' => 'Aggiunta in corso…',
         'periods_existing_hint' => 'Questi periodi sono già presenti. Puoi aggiungerne un altro oppure proseguire.',
         'periods_empty_hint' => 'Nessun periodo ancora. Aggiungine almeno uno per continuare.',
         'periods_yearly_hint' => 'Indica solo data inizio e fine; l’etichetta del periodo viene calcolata automaticamente.',

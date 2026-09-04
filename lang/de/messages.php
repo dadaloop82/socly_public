@@ -1005,6 +1005,17 @@ return [
         'types_edit_hint' => 'Sie können vorhandene Typen (z. B. Ordentlich) bearbeiten und neue hinzufügen.',
         'types_empty_hint' => 'Noch keine Typen. Fügen Sie mindestens einen hinzu, um fortzufahren.',
         'type_name_placeholder' => 'z. B. Ordentlich',
+        'type_free_confirm' => 'Bestätigen Sie, dass die Mitgliedschaft „:name“ kostenlos ist (Beitrag 0)?',
+
+        'type_free_confirm_ok' => 'Ja, kostenlos',
+
+        'periods_next_period' => 'Nächster Zeitraum: :from → :to',
+
+        'fields_add_now' => 'Jetzt zur Liste hinzufügen',
+
+        'fields_need_label' => 'Bitte eine Bezeichnung für das neue Feld eingeben.',
+
+        'fields_adding' => 'Wird hinzugefügt…',
         'periods_existing_hint' => 'Diese Zeiträume sind bereits vorhanden. Fügen Sie einen weiteren hinzu oder fahren Sie fort.',
         'periods_empty_hint' => 'Noch keine Zeiträume. Fügen Sie mindestens einen hinzu, um fortzufahren.',
         'periods_yearly_hint' => 'Nur Start- und Enddatum eingeben; die Bezeichnung wird automatisch erzeugt.',

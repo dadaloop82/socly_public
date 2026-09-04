@@ -1091,6 +1091,7 @@ function initSetupWizard() {
   initSetupContacts(root);
   initLegalDocEditors(root);
   initSetupLegalPdf(root);
+  initSetupFieldsAddNow(root);
   if (setupForm) initPhoneInputs(setupForm);
 
   setupForm?.querySelectorAll('[data-setup-defer-step]').forEach((btn) => {
@@ -5467,6 +5468,9 @@ function initSetupMemberTypes(root = document) {
 
     const translateUrl = block.dataset.translateUrl || '';
     const csrf = document.querySelector('meta[name="csrf-token"]')?.content || '';
+    const freeTpl = block.dataset.msgFreeTitle || 'Confermi che il tesseramento «:name» è gratuito?';
+    const freeOk = block.dataset.msgFreeConfirm || 'Conferma';
+    const freeCancel = block.dataset.msgFreeCancel || 'Annulla';
 
     const fetchTranslation = async (text, target) => {
       if (!translateUrl || !text) return null;
@@ -5488,47 +5492,105 @@ function initSetupMemberTypes(root = document) {
       }
     };
 
+    const translateCard = async (card, force = false) => {
+      const itInput = card.querySelector('[data-type-name-it]');
+      const deInput = card.querySelector('[data-type-name-de]');
+      const enInput = card.querySelector('[data-type-name-en]');
+      if (!itInput || !deInput || !enInput) return;
+      const value = itInput.value.trim();
+      if (!value) return;
+      const touched = !force && (
+        (deInput.dataset.userTouched === '1' && deInput.value.trim() !== '')
+        || (enInput.dataset.userTouched === '1' && enInput.value.trim() !== '')
+      );
+      if (touched) return;
+
+      const tr = suggestMemberTypeTranslations(value);
+      const dictHit = tr && (tr.de !== value || tr.en !== value);
+      if (dictHit && !force) {
+        if (deInput.value.trim() === '') deInput.value = tr.de;
+        if (enInput.value.trim() === '') enInput.value = tr.en;
+        deInput.dispatchEvent(new Event('input', { bubbles: true }));
+        enInput.dispatchEvent(new Event('input', { bubbles: true }));
+        return;
+      }
+
+      for (const [target, el] of [['de', deInput], ['en', enInput]]) {
+        if (!force && el.value.trim() !== '') continue;
+        const translated = await fetchTranslation(value, target);
+        if (translated) {
+          el.value = translated;
+          el.dispatchEvent(new Event('input', { bubbles: true }));
+        } else if (tr) {
+          el.value = target === 'de' ? tr.de : tr.en;
+          el.dispatchEvent(new Event('input', { bubbles: true }));
+        }
+      }
+    };
+
     block.querySelectorAll('[data-type-name-it]').forEach((itInput) => {
       if (itInput.dataset.typeI18nBound === '1') return;
       itInput.dataset.typeI18nBound = '1';
-      const row = itInput.closest('.setup-membership-card, .setup-langs-row, [data-setup-member-types]');
-      const deInput = row?.querySelector('[data-type-name-de]');
-      const enInput = row?.querySelector('[data-type-name-en]');
+      const card = itInput.closest('.setup-membership-card') || block;
+      const deInput = card.querySelector('[data-type-name-de]');
+      const enInput = card.querySelector('[data-type-name-en]');
       if (!deInput || !enInput) return;
 
-      itInput.addEventListener('blur', async () => {
-        const value = itInput.value.trim();
-        if (!value) return;
-        const touched = (deInput.dataset.userTouched === '1' && deInput.value.trim() !== '')
-          || (enInput.dataset.userTouched === '1' && enInput.value.trim() !== '');
-        if (touched) return;
-
-        const tr = suggestMemberTypeTranslations(value);
-        const dictHit = tr && (tr.de !== value || tr.en !== value);
-        if (dictHit) {
-          if (deInput.value.trim() === '') deInput.value = tr.de;
-          if (enInput.value.trim() === '') enInput.value = tr.en;
-          deInput.dispatchEvent(new Event('input', { bubbles: true }));
-          enInput.dispatchEvent(new Event('input', { bubbles: true }));
-          return;
-        }
-
-        for (const [target, el] of [['de', deInput], ['en', enInput]]) {
-          if (el.value.trim() !== '') continue;
-          const translated = await fetchTranslation(value, target);
-          if (translated) {
-            el.value = translated;
-            el.dispatchEvent(new Event('input', { bubbles: true }));
-          } else if (tr) {
-            el.value = target === 'de' ? tr.de : tr.en;
-            el.dispatchEvent(new Event('input', { bubbles: true }));
-          }
-        }
-      });
-
+      itInput.addEventListener('blur', () => { translateCard(card, false); });
       deInput.addEventListener('input', () => { deInput.dataset.userTouched = '1'; });
       enInput.addEventListener('input', () => { enInput.dataset.userTouched = '1'; });
     });
+
+    block.querySelectorAll('[data-type-translate-now]').forEach((btn) => {
+      btn.addEventListener('click', async () => {
+        const card = btn.closest('.setup-membership-card') || block;
+        btn.disabled = true;
+        try {
+          await translateCard(card, true);
+        } finally {
+          btn.disabled = false;
+        }
+      });
+    });
+
+    const form = block.closest('form');
+    if (form && form.dataset.memberTypesFreeGate !== '1') {
+      form.dataset.memberTypesFreeGate = '1';
+      form.addEventListener('submit', async (event) => {
+        if (form.dataset.memberTypesFreeConfirmed === '1') return;
+        if (form.querySelector('[data-setup-defer-flag]')?.value === '1') return;
+        if (!form.querySelector('[data-setup-member-types]')) return;
+
+        const freeNames = [];
+        form.querySelectorAll('[data-type-price]').forEach((priceInput) => {
+          const raw = String(priceInput.value || '').trim().replace(',', '.');
+          if (raw === '') return;
+          const amount = Number(raw);
+          if (!Number.isFinite(amount) || amount > 0) return;
+          const refName = priceInput.dataset.typeNameRef || '';
+          const nameInput = refName
+            ? form.querySelector(`[name="${CSS.escape(refName)}"]`)
+            : priceInput.closest('.setup-membership-card')?.querySelector('[data-type-name-it]');
+          const name = (nameInput?.value || '').trim() || '—';
+          freeNames.push(name);
+        });
+        if (freeNames.length === 0) return;
+
+        event.preventDefault();
+        event.stopPropagation();
+        const msg = freeNames
+          .map((name) => String(freeTpl).replaceAll(':name', name))
+          .join('\n\n');
+        const ok = await appConfirm(msg, {
+          confirmLabel: freeOk,
+          cancelLabel: freeCancel,
+        });
+        if (!ok) return;
+        form.dataset.memberTypesFreeConfirmed = '1';
+        if (typeof form.requestSubmit === 'function') form.requestSubmit();
+        else HTMLFormElement.prototype.submit.call(form);
+      }, true);
+    }
   });
 }
 
@@ -8344,7 +8406,7 @@ function queueFieldsAutosave(editor, { immediate = false } = {}) {
     setFieldsAutosaveStatus(editor, 'busy', editor.dataset.autosaveBusy || '');
 
     const fd = new FormData(form);
-    ['new_label', 'new_key', 'new_type', 'new_step', 'new_enabled', 'new_required'].forEach((name) => {
+    ['new_label', 'new_key', 'new_type', 'new_step', 'new_enabled', 'new_required', 'create_new'].forEach((name) => {
       fd.delete(name);
     });
     if (!fd.get('_token') && editor.dataset.csrf) {
@@ -8386,6 +8448,56 @@ function queueFieldsAutosave(editor, { immediate = false } = {}) {
     return;
   }
   editor._fieldsAutosaveTimer = setTimeout(run, 550);
+}
+
+function initSetupFieldsAddNow(root = document) {
+  root.querySelectorAll('[data-fields-add-now]').forEach((btn) => {
+    if (btn.dataset.addNowBound === '1') return;
+    btn.dataset.addNowBound = '1';
+    btn.addEventListener('click', async () => {
+      const form = btn.closest('form');
+      const editor = form?.querySelector('[data-fields-editor]');
+      const labelInput = form?.querySelector('[data-new-field-label], input[name="new_label"]');
+      if (!form || !editor) return;
+      const label = String(labelInput?.value || '').trim();
+      if (!label) {
+        await appConfirm(btn.dataset.msgNeedLabel || 'Inserisci un’etichetta.', { alert: true });
+        labelInput?.focus();
+        return;
+      }
+      const url = (editor.dataset.autosaveUrl || '').trim();
+      if (!url) return;
+      const original = btn.textContent;
+      btn.disabled = true;
+      btn.textContent = btn.dataset.msgAdding || '…';
+      syncFieldOrderInputs(editor);
+      const fd = new FormData(form);
+      fd.set('create_new', '1');
+      if (!fd.get('_token') && editor.dataset.csrf) {
+        fd.set('_token', editor.dataset.csrf);
+      }
+      try {
+        const res = await fetch(url, {
+          method: 'POST',
+          body: fd,
+          credentials: 'same-origin',
+          headers: {
+            Accept: 'application/json',
+            'X-Requested-With': 'XMLHttpRequest',
+          },
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok || !data.ok) {
+          throw new Error(data.message || editor.dataset.autosaveFail || '');
+        }
+        window.location.reload();
+      } catch (err) {
+        setFieldsAutosaveStatus(editor, 'error', err?.message || editor.dataset.autosaveFail || '');
+        btn.disabled = false;
+        btn.textContent = original;
+      }
+    });
+  });
 }
 
 function initFieldsSortable(scope = document) {

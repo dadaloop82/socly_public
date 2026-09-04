@@ -1007,6 +1007,17 @@ return [
         'types_edit_hint' => 'You can edit existing types (e.g. Ordinary) and add new ones.',
         'types_empty_hint' => 'No types yet. Add at least one to continue.',
         'type_name_placeholder' => 'e.g. Ordinary',
+        'type_free_confirm' => 'Confirm that membership “:name” is free (fee 0)?',
+
+        'type_free_confirm_ok' => 'Yes, it is free',
+
+        'periods_next_period' => 'Next period: :from → :to',
+
+        'fields_add_now' => 'Add to the list now',
+
+        'fields_need_label' => 'Enter a label for the new field.',
+
+        'fields_adding' => 'Adding…',
         'periods_existing_hint' => 'These periods already exist. Add another or continue.',
         'periods_empty_hint' => 'No periods yet. Add at least one to continue.',
         'periods_yearly_hint' => 'Enter start and end dates only; the period label is generated automatically.',
