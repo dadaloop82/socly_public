@@ -820,17 +820,42 @@ $errorStep = flash('setup_error_step');
                 <?php elseif ($stepType === 'checkbox'): ?>
                     <label class="checkbox-row setup-check" data-setup-line>
                         <input type="checkbox" name="value" value="1" <?= !empty($value) ? 'checked' : '' ?>>
-                        <span><?= e(__('setup.gdpr_label')) ?></span>
+                        <span data-i18n="setup.gdpr_label"><?= e(__('setup.gdpr_label')) ?></span>
                     </label>
                 <?php elseif ($stepType === 'textarea'): ?>
-                    <?php $isPrivacyStep = ($step['key'] ?? '') === 'legal.privacy'; ?>
+                    <?php
+                    $isPrivacyStep = ($step['key'] ?? '') === 'legal.privacy';
+                    $legalPrefix = $isPrivacyStep ? 'privacy' : 'statute';
+                    $legalValues = is_array($value) ? $value : ['it' => (string) $value, 'de' => '', 'en' => ''];
+                    $legalPlaceholder = $isPrivacyStep
+                        ? __('setup.privacy_sample_note')
+                        : __('setup.step_statute_desc');
+                    ?>
                     <?php if ($isPrivacyStep): ?>
-                        <p class="setup-hint muted" data-setup-line><?= e(__('setup.privacy_sample_note')) ?></p>
+                        <p class="setup-hint muted" data-setup-line data-i18n="setup.privacy_sample_note"><?= e(__('setup.privacy_sample_note')) ?></p>
                     <?php endif; ?>
-                    <label class="setup-field" data-setup-line>
-                        <span><?= e(__($step['title_key'])) ?></span>
-                        <textarea name="value" rows="10" <?= !empty($step['required']) ? 'required' : '' ?>><?= e((string) $value) ?></textarea>
-                    </label>
+                    <div class="setup-legal-upload" data-setup-line data-setup-legal-pdf
+                         data-upload-url="<?= e(url('/setup/legal-pdf')) ?>"
+                         data-csrf="<?= e(csrf_token()) ?>"
+                         data-target-prefix="<?= e($legalPrefix) ?>"
+                         data-msg-reading="<?= e(__('setup.legal_pdf_reading')) ?>"
+                         data-msg-fail="<?= e(__('setup.legal_pdf_fail')) ?>"
+                         data-msg-ok="<?= e(__('setup.legal_pdf_ok')) ?>">
+                        <label class="btn btn-ghost file-btn">
+                            <input type="file" accept="application/pdf,.pdf" hidden data-setup-legal-pdf-input>
+                            <span data-i18n="setup.legal_pdf_upload"><?= e(__('setup.legal_pdf_upload')) ?></span>
+                        </label>
+                        <p class="setup-hint muted" data-setup-legal-pdf-status hidden></p>
+                    </div>
+                    <div data-setup-line>
+                        <?php
+                        $namePrefix = $legalPrefix;
+                        $values = $legalValues;
+                        $placeholder = (string) $legalPlaceholder;
+                        require base_path('resources/views/partials/legal_doc_editor.php');
+                        ?>
+                    </div>
+                    <p class="setup-hint muted" data-setup-line data-i18n="setup.legal_min_chars_hint"><?= e(__('setup.legal_min_chars_hint', ['min' => '50'])) ?></p>
                 <?php elseif ($stepType === 'member_types'): ?>
                     <?php
                     $types = is_array($value['types'] ?? null) ? $value['types'] : [];

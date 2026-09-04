@@ -1089,6 +1089,8 @@ function initSetupWizard() {
   initSetupFitAssocNames(root);
   initSetupTaxIds(root);
   initSetupContacts(root);
+  initLegalDocEditors(root);
+  initSetupLegalPdf(root);
   if (setupForm) initPhoneInputs(setupForm);
 
   setupForm?.querySelectorAll('[data-setup-defer-step]').forEach((btn) => {
@@ -5272,6 +5274,56 @@ function initSetupWebsiteScrape(root) {
     runScrape();
   });
 };
+
+function initSetupLegalPdf(root) {
+  root.querySelectorAll('[data-setup-legal-pdf]').forEach((block) => {
+    if (block.dataset.legalPdfBound === '1') return;
+    block.dataset.legalPdfBound = '1';
+    const input = block.querySelector('[data-setup-legal-pdf-input]');
+    const status = block.querySelector('[data-setup-legal-pdf-status]');
+    if (!input) return;
+    const uploadUrl = block.dataset.uploadUrl || '';
+    const csrf = block.dataset.csrf || document.querySelector('meta[name="csrf-token"]')?.content || '';
+    const prefix = block.dataset.targetPrefix || 'statute';
+    const msgReading = block.dataset.msgReading || '…';
+    const msgFail = block.dataset.msgFail || '';
+    const msgOk = block.dataset.msgOk || '';
+
+    input.addEventListener('change', async () => {
+      const file = input.files && input.files[0];
+      input.value = '';
+      if (!file || !uploadUrl) return;
+      if (status) {
+        status.hidden = false;
+        status.textContent = msgReading;
+      }
+      const body = new FormData();
+      body.append('pdf', file);
+      body.append('_token', csrf);
+      try {
+        const res = await fetch(uploadUrl, {
+          method: 'POST',
+          headers: { 'X-Requested-With': 'XMLHttpRequest', 'X-CSRF-Token': csrf },
+          credentials: 'same-origin',
+          body,
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok || !data.ok || !data.text) {
+          throw new Error(data.error || msgFail);
+        }
+        const target = root.querySelector(`[data-legal-textarea="it"][name="${prefix}_it"]`)
+          || root.querySelector('[data-legal-textarea="it"]');
+        if (target) {
+          target.value = String(data.text);
+          target.dispatchEvent(new Event('input', { bubbles: true }));
+        }
+        if (status) status.textContent = msgOk;
+      } catch (err) {
+        if (status) status.textContent = (err && err.message) ? err.message : msgFail;
+      }
+    });
+  });
+}
 
 function initSetupLocaleLive(root) {
   const picker = root.querySelector('[data-setup-locale-picker]');

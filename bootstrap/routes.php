@@ -74,6 +74,7 @@ $router->post('/setup/mail/discover', [SetupController::class, 'discoverMail'], 
 $router->post('/setup/mail/test', [SetupController::class, 'testMail'], null, ['mw.locale', 'mw.install', 'mw.setup_open', 'mw.csrf']);
 $router->post('/setup/fields/autosave', [SetupController::class, 'autosaveFields'], null, ['mw.locale', 'mw.install', 'mw.setup_open', 'mw.csrf']);
 $router->post('/setup/logo', [SetupController::class, 'uploadLogo'], null, ['mw.locale', 'mw.install', 'mw.setup_open', 'mw.csrf']);
+$router->post('/setup/legal-pdf', [SetupController::class, 'extractLegalPdf'], null, ['mw.locale', 'mw.install', 'mw.setup_open', 'mw.csrf']);
 $router->post('/setup', [SetupController::class, 'save'], null, ['mw.locale', 'mw.install', 'mw.setup_open', 'mw.csrf']);
 
 $router->post('/updates/install', [UpdateController::class, 'install'], 'settings.manage', ['mw.locale', 'mw.install', 'mw.auth', 'mw.csrf']);
@@ -86,7 +87,7 @@ $router->get('/api/geo/addresses', [ApiController::class, 'addresses'], null, ['
 $router->get('/api/geo/cap', [ApiController::class, 'cap'], null, ['mw.locale', 'mw.install', 'mw.setup_or_auth']);
 $router->get('/api/geo/provinces', [ApiController::class, 'provinces'], null, ['mw.locale', 'mw.install', 'mw.setup_or_auth']);
 $router->post('/api/fiscal-code', [ApiController::class, 'fiscalCode'], null, ['mw.locale', 'mw.install', 'mw.setup_or_auth', 'mw.csrf']);
-$router->post('/api/translate', [ApiController::class, 'translate'], 'settings.manage', ['mw.locale', 'mw.install', 'mw.auth', 'mw.csrf']);
+$router->post('/api/translate', [ApiController::class, 'translate'], null, ['mw.locale', 'mw.install', 'mw.setup_or_auth', 'mw.csrf']);
 $router->get('/i18n/messages', [I18nController::class, 'messages'], null, ['mw.locale', 'mw.install']);
 $router->get('/branding/logo', [BrandingController::class, 'logo'], null, ['mw.locale', 'mw.install']);
 

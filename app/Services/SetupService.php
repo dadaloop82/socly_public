@@ -181,15 +181,21 @@ final class SetupService
             if (!$this->isGdprEnabled()) {
                 return true;
             }
+            if ($this->isStepDeferred($step)) {
+                return true;
+            }
             $raw = $this->settings->get('legal.privacy', '');
             $text = localized(is_string($raw) ? $raw : (is_array($raw) ? $raw : ''));
-            return trim($text) !== '';
+            return mb_strlen(trim($text), 'UTF-8') >= 50;
         }
 
         if (($step['key'] ?? '') === 'legal.statute') {
+            if ($this->isStepDeferred($step)) {
+                return true;
+            }
             $raw = $this->settings->get((string) $step['settings_key'], '');
             $text = localized(is_string($raw) ? $raw : (is_array($raw) ? $raw : ''));
-            return trim($text) !== '';
+            return mb_strlen(trim($text), 'UTF-8') >= 50;
         }
 
         $val = $this->readValue((string) ($step['settings_key'] ?? ''), (string) ($step['env_key'] ?? ''));
@@ -485,12 +491,31 @@ final class SetupService
 
         if (in_array($step['key'] ?? '', ['legal.privacy', 'legal.statute'], true)) {
             $raw = $this->settings->get((string) $step['settings_key'], '');
-            $text = localized(is_string($raw) ? $raw : (is_array($raw) ? $raw : ''));
-            if (($step['key'] ?? '') === 'legal.privacy' && trim($text) === '' && $this->isGdprEnabled()) {
-                return privacy_sample_draft();
+            $decoded = is_string($raw) ? $raw : (is_array($raw) ? $raw : '');
+            if (is_string($decoded) && $decoded !== '' && ($decoded[0] ?? '') === '{') {
+                $json = json_decode($decoded, true);
+                if (is_array($json)) {
+                    $decoded = $json;
+                }
+            }
+            if (is_array($decoded)) {
+                $values = [
+                    'it' => trim((string) ($decoded['it'] ?? '')),
+                    'de' => trim((string) ($decoded['de'] ?? '')),
+                    'en' => trim((string) ($decoded['en'] ?? '')),
+                ];
+            } else {
+                $text = localized(is_string($decoded) ? $decoded : '');
+                $values = ['it' => $text, 'de' => '', 'en' => ''];
+            }
+            if (($step['key'] ?? '') === 'legal.privacy'
+                && trim($values['it']) === ''
+                && $this->isGdprEnabled()
+            ) {
+                $values['it'] = privacy_sample_draft();
             }
 
-            return $text;
+            return $values;
         }
         if ($type === 'checkbox') {
             $default = (($step['key'] ?? '') === 'gdpr.enabled') ? '1' : '0';
@@ -637,15 +662,27 @@ final class SetupService
         }
 
         if (in_array($step['key'] ?? '', ['legal.privacy', 'legal.statute'], true)) {
-            $text = trim((string) ($input['value'] ?? ''));
+            $prefix = ($step['key'] ?? '') === 'legal.privacy' ? 'privacy' : 'statute';
+            $it = trim((string) ($input[$prefix . '_it'] ?? $input['value'] ?? ''));
+            $de = trim((string) ($input[$prefix . '_de'] ?? ''));
+            $en = trim((string) ($input[$prefix . '_en'] ?? ''));
             $mustFill = !empty($step['required']);
             if (($step['key'] ?? '') === 'legal.privacy' && !$this->isGdprEnabled()) {
                 $mustFill = false;
             }
-            if ($mustFill && $text === '') {
-                return ['ok' => false, 'errors' => ['value' => __('validation.required')]];
+            if ($mustFill && mb_strlen($it, 'UTF-8') < 50) {
+                return ['ok' => false, 'errors' => ['value' => __('setup.legal_min_chars', ['min' => '50'])]];
             }
-            $payload = ['it' => $text, 'de' => $text, 'en' => $text];
+            // Clear deferred flag when user actually saves content.
+            $key = trim((string) ($step['key'] ?? ''));
+            if ($key !== '' && $it !== '') {
+                $this->settings->set('setup.deferred.' . $key, '0');
+            }
+            $payload = [
+                'it' => $it,
+                'de' => $de !== '' ? $de : $it,
+                'en' => $en !== '' ? $en : $it,
+            ];
             $this->settings->set((string) $step['settings_key'], $payload);
             return ['ok' => true];
         }

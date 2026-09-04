@@ -171,13 +171,25 @@ final class SetupController extends BaseController
                     $keys[] = $key;
                 }
             }
-            // Catalogue updates can add new required steps mid-run — append them.
+            // Catalogue updates can add new required steps mid-run — merge them.
             foreach ($missingKeys as $key) {
                 if (!in_array($key, $keys, true)) {
                     $keys[] = $key;
                 }
             }
             if ($keys !== []) {
+                // Keep catalogue order so privacy stays after GDPR (not appended at end).
+                $catalogueOrder = array_values(array_filter(array_map(
+                    static fn (array $step): string => (string) ($step['key'] ?? ''),
+                    $catalogue
+                )));
+                usort($keys, static function (string $a, string $b) use ($catalogueOrder): int {
+                    $ia = array_search($a, $catalogueOrder, true);
+                    $ib = array_search($b, $catalogueOrder, true);
+                    $ia = $ia === false ? PHP_INT_MAX : (int) $ia;
+                    $ib = $ib === false ? PHP_INT_MAX : (int) $ib;
+                    return $ia <=> $ib;
+                });
                 $keys = array_values(array_unique($keys));
                 $_SESSION['setup_progress_keys'] = $keys;
                 return $keys;
@@ -600,6 +612,58 @@ final class SetupController extends BaseController
             'accent' => $result['accent'] ?? '',
             'palettes' => $result['palettes'] ?? [],
         ], JSON_UNESCAPED_UNICODE);
+    }
+
+    public function extractLegalPdf(Request $request): void
+    {
+        if ($this->setup->isComplete() && !$this->setup->isAdmin()) {
+            http_response_code(403);
+            header('Content-Type: application/json; charset=utf-8');
+            echo json_encode(['ok' => false, 'error' => 'forbidden'], JSON_UNESCAPED_UNICODE);
+            return;
+        }
+
+        $file = $request->file('pdf');
+        if (!is_array($file) || (int) ($file['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_OK) {
+            http_response_code(422);
+            header('Content-Type: application/json; charset=utf-8');
+            echo json_encode(['ok' => false, 'error' => (string) __('setup.legal_pdf_fail')], JSON_UNESCAPED_UNICODE);
+            return;
+        }
+
+        $tmp = (string) ($file['tmp_name'] ?? '');
+        $name = (string) ($file['name'] ?? '');
+        $size = (int) ($file['size'] ?? 0);
+        if ($tmp === '' || !is_uploaded_file($tmp) || $size <= 0 || $size > 12 * 1024 * 1024) {
+            http_response_code(422);
+            header('Content-Type: application/json; charset=utf-8');
+            echo json_encode(['ok' => false, 'error' => (string) __('setup.legal_pdf_fail')], JSON_UNESCAPED_UNICODE);
+            return;
+        }
+        $ext = strtolower(pathinfo($name, PATHINFO_EXTENSION));
+        if ($ext !== 'pdf') {
+            http_response_code(422);
+            header('Content-Type: application/json; charset=utf-8');
+            echo json_encode(['ok' => false, 'error' => (string) __('setup.legal_pdf_fail')], JSON_UNESCAPED_UNICODE);
+            return;
+        }
+
+        @set_time_limit(120);
+        $extractor = new \Socly\Services\PdfTextExtractor();
+        $result = $extractor->extract($tmp, ['ocr' => true, 'max_pages' => 40, 'max_seconds' => 90]);
+        $text = trim((string) ($result['text'] ?? ''));
+        if ($text === '' || mb_strlen($text, 'UTF-8') < 40) {
+            http_response_code(422);
+            header('Content-Type: application/json; charset=utf-8');
+            echo json_encode([
+                'ok' => false,
+                'error' => (string) __('setup.legal_pdf_fail'),
+            ], JSON_UNESCAPED_UNICODE);
+            return;
+        }
+
+        header('Content-Type: application/json; charset=utf-8');
+        echo json_encode(['ok' => true, 'text' => $text, 'method' => $result['method'] ?? ''], JSON_UNESCAPED_UNICODE);
     }
 
     public function discoverMail(Request $request): void
