@@ -188,12 +188,26 @@ $votingMembersCount = (int) ($votingMembersCount ?? 0);
         </div>
         <?php if ($canEdit): ?>
             <div class="actions org-chart-actions">
+                <label class="checkbox-row org-hide-vacant-toggle">
+                    <input type="checkbox" data-org-hide-vacant>
+                    <span><?= e(__('org.hide_vacant')) ?></span>
+                </label>
+                <a class="btn btn-ghost" href="<?= e(url('/org/history')) ?>"><?= e(__('org.history_title')) ?></a>
+                <a class="btn btn-ghost" href="<?= e(url('/org/export.csv')) ?>"><?= e(__('org.export_csv')) ?></a>
                 <a class="btn" href="<?= e(url('/org/people/create')) ?>"><?= e(__('org.add_person')) ?></a>
+            </div>
+        <?php else: ?>
+            <div class="actions org-chart-actions">
+                <label class="checkbox-row org-hide-vacant-toggle">
+                    <input type="checkbox" data-org-hide-vacant>
+                    <span><?= e(__('org.hide_vacant')) ?></span>
+                </label>
+                <a class="btn btn-ghost" href="<?= e(url('/org/export.csv')) ?>"><?= e(__('org.export_csv')) ?></a>
             </div>
         <?php endif; ?>
     </div>
 
-    <div class="org-chart" aria-label="<?= e(__('org.chart_title')) ?>">
+    <div class="org-chart" data-org-chart aria-label="<?= e(__('org.chart_title')) ?>">
         <div class="org-tier org-tier--root">
             <div class="org-assoc-root<?= $hasLogo ? ' has-logo' : '' ?>">
                 <?php if ($hasLogo): ?>

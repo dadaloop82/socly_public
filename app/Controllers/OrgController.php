@@ -157,6 +157,58 @@ final class OrgController extends BaseController
         redirect('/org');
     }
 
+    public function history(Request $request): void
+    {
+        require_component('org_roles');
+        $rows = $this->people->history();
+        $this->render('org/history', [
+            'title' => __('org.history_title'),
+            'history' => $rows,
+            'canEdit' => $this->canEditOrg(),
+        ]);
+    }
+
+    public function exportCsv(Request $request): void
+    {
+        require_component('org_roles');
+        $rows = $this->people->exportActive();
+        $filename = 'cariche-' . date('Y-m-d') . '.csv';
+        header('Content-Type: text/csv; charset=utf-8');
+        header('Content-Disposition: attachment; filename="' . $filename . '"');
+        $out = fopen('php://output', 'w');
+        if ($out === false) {
+            http_response_code(500);
+            return;
+        }
+        fprintf($out, chr(0xEF) . chr(0xBB) . chr(0xBF));
+        fputcsv($out, [
+            'Ruolo',
+            'Nome',
+            'Cognome',
+            'Codice fiscale',
+            'Nomina',
+            'Fine mandato',
+            'Email',
+        ], ';');
+        foreach ($rows as $row) {
+            $custom = trim((string) ($row['custom_label'] ?? ''));
+            $role = $custom !== ''
+                ? $custom
+                : __((string) ($row['label_key'] ?? ('association.role_' . ($row['role_key'] ?? ''))));
+            fputcsv($out, [
+                $role,
+                (string) ($row['first_name'] ?? ''),
+                (string) ($row['last_name'] ?? ''),
+                (string) ($row['fiscal_code'] ?? ''),
+                (string) ($row['appointed_at'] ?? ''),
+                (string) ($row['mandate_ends_at'] ?? ''),
+                (string) ($row['email'] ?? ''),
+            ], ';');
+        }
+        fclose($out);
+        exit;
+    }
+
     public function memberProfile(Request $request, string $id): void
     {
         require_component('org_roles');

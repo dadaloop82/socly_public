@@ -120,6 +120,7 @@ document.addEventListener('DOMContentLoaded', () => {
   initMembersFilterMobile();
   initMobileNav();
   initTopbarScroll();
+.initOrgHideVacant();
   initSidebarDeadlines();
   initConfigAccordions();
   initMemberForm();
@@ -6476,6 +6477,19 @@ function initFiscalCodeAuto(form) {
       setStatus('');
     }
   });
+}
+
+function initOrgHideVacant() {
+  const toggle = document.querySelector('[data-org-hide-vacant]');
+  const chart = document.querySelector('[data-org-chart]');
+  if (!toggle || !chart) {
+    return;
+  }
+  const apply = () => {
+    chart.classList.toggle('hide-vacant', !!toggle.checked);
+  };
+  toggle.addEventListener('change', apply);
+  apply();
 }
 
 function initSidebarDeadlines() {

@@ -12,10 +12,32 @@ final class DeadlineService
     /** @var list<string> */
     public const BUILTIN_CATEGORIES = [
         'membership',
+        'membership_fee',
         'certificate',
-        'assembly',
+        'medical_cert',
+        'accident_insurance',
         'mandate',
+        'mandate_board',
+        'assembly',
+        'assembly_budget',
+        'runts_deposit',
+        'five_per_thousand',
+        'f24',
+        'cu',
+        'insurance_rc',
+        'rent',
+        'dvr',
+        'pa_convention',
         'general',
+    ];
+
+    /** @var array<string, list<string>> */
+    public const CATEGORY_GROUPS = [
+        'members' => ['membership', 'membership_fee', 'certificate', 'medical_cert', 'accident_insurance'],
+        'organs' => ['mandate', 'mandate_board', 'assembly', 'assembly_budget'],
+        'runts_tax' => ['runts_deposit', 'five_per_thousand', 'f24', 'cu'],
+        'contracts' => ['insurance_rc', 'rent', 'dvr', 'pa_convention'],
+        'other' => ['general'],
     ];
 
     /** @var list<string> */
@@ -211,26 +233,81 @@ final class DeadlineService
     }
 
     /**
-     * @return list<array{key:string,label:string,builtin:bool}>
+     * @return list<array{key:string,label:string,builtin:bool,group?:string}>
      */
     public function categoryOptions(): array
     {
+        $usage = $this->categoryUsageCounts();
         $options = [];
-        foreach (self::BUILTIN_CATEGORIES as $key) {
-            $options[] = [
-                'key' => $key,
-                'label' => __('deadlines.category_' . $key),
-                'builtin' => true,
-            ];
+        foreach (self::CATEGORY_GROUPS as $groupKey => $keys) {
+            $groupOpts = [];
+            foreach ($keys as $key) {
+                $groupOpts[] = [
+                    'key' => $key,
+                    'label' => __('deadlines.category_' . $key),
+                    'builtin' => true,
+                    'group' => $groupKey,
+                    'usage' => (int) ($usage[$key] ?? 0),
+                ];
+            }
+            usort($groupOpts, static function (array $a, array $b): int {
+                return ($b['usage'] <=> $a['usage']) ?: strcmp((string) $a['label'], (string) $b['label']);
+            });
+            foreach ($groupOpts as $opt) {
+                unset($opt['usage']);
+                $options[] = $opt;
+            }
         }
         foreach ($this->customCategories() as $row) {
             $options[] = [
                 'key' => (string) $row['slug'],
                 'label' => (string) $row['label'],
                 'builtin' => false,
+                'group' => 'custom',
             ];
         }
         return $options;
+    }
+
+    /**
+     * @return list<array{key:string,label:string,options:list<array{key:string,label:string,builtin:bool}>}>
+     */
+    public function categoryGroupedOptions(): array
+    {
+        $groups = [];
+        foreach ($this->categoryOptions() as $opt) {
+            $g = (string) ($opt['group'] ?? 'other');
+            if (!isset($groups[$g])) {
+                $groups[$g] = [
+                    'key' => $g,
+                    'label' => __('deadlines.category_group_' . $g),
+                    'options' => [],
+                ];
+            }
+            $groups[$g]['options'][] = [
+                'key' => (string) $opt['key'],
+                'label' => (string) $opt['label'],
+                'builtin' => !empty($opt['builtin']),
+            ];
+        }
+        return array_values($groups);
+    }
+
+    /** @return array<string,int> */
+    private function categoryUsageCounts(): array
+    {
+        try {
+            $rows = $this->db->fetchAll(
+                'SELECT category, COUNT(*) AS c FROM deadline_items GROUP BY category'
+            );
+        } catch (\Throwable) {
+            return [];
+        }
+        $out = [];
+        foreach ($rows as $row) {
+            $out[(string) ($row['category'] ?? '')] = (int) ($row['c'] ?? 0);
+        }
+        return $out;
     }
 
     /** @return array<string,string> */

@@ -32,6 +32,53 @@ final class SetupService
         return can(Permission::SETTINGS_MANAGE);
     }
 
+    /**
+     * Steps deferred with «Lo inserirò in seguito» that still lack real content.
+     *
+     * @return list<array{key:string,title:string,setup_url:string}>
+     */
+    public function deferredIncompleteSteps(): array
+    {
+        $out = [];
+        foreach (SetupCatalogue::all() as $step) {
+            if (!$this->isStepDeferred($step)) {
+                continue;
+            }
+            $key = (string) ($step['key'] ?? '');
+            if ($key === 'legal.statute') {
+                $raw = $this->settings->get('legal.statute', '');
+                $text = localized(is_string($raw) ? $raw : (is_array($raw) ? $raw : ''));
+                if (mb_strlen(trim($text), 'UTF-8') >= 50) {
+                    continue;
+                }
+            } elseif ($key === 'legal.privacy') {
+                if (!$this->isGdprEnabled()) {
+                    continue;
+                }
+                $raw = $this->settings->get('legal.privacy', '');
+                $text = localized(is_string($raw) ? $raw : (is_array($raw) ? $raw : ''));
+                if (mb_strlen(trim($text), 'UTF-8') >= 50) {
+                    continue;
+                }
+            } elseif ((string) ($step['type'] ?? '') === 'people_list') {
+                $role = (string) ($step['role'] ?? '');
+                if ($role !== '' && $this->people->countByRole($role) > 0) {
+                    continue;
+                }
+            } else {
+                continue;
+            }
+            $out[] = [
+                'key' => $key,
+                'title' => __((string) ($step['title_key'] ?? $key)),
+                'setup_url' => $key === 'legal.statute' || $key === 'legal.privacy'
+                    ? '/settings#legal'
+                    : '/org',
+            ];
+        }
+        return $out;
+    }
+
     public function isComplete(): bool
     {
         return $this->missingSteps() === [];

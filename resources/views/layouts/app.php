@@ -267,6 +267,29 @@ try {
                 </div>
             <?php endif; ?>
             <?php
+            $deferredIncomplete = [];
+            if (can('settings.manage')) {
+                try {
+                    $deferredIncomplete = app(\Socly\Services\SetupService::class)->deferredIncompleteSteps();
+                } catch (\Throwable) {
+                    $deferredIncomplete = [];
+                }
+            }
+            ?>
+            <?php if ($deferredIncomplete !== []): ?>
+                <div class="alert alert-warn setup-incomplete-banner">
+                    <strong><?= e(__('setup.incomplete_banner_title')) ?></strong>
+                    <p><?= e(__('setup.incomplete_banner_text')) ?></p>
+                    <ul class="setup-incomplete-list">
+                        <?php foreach ($deferredIncomplete as $item): ?>
+                            <li>
+                                <a href="<?= e(url((string) $item['setup_url'])) ?>"><?= e((string) $item['title']) ?></a>
+                            </li>
+                        <?php endforeach; ?>
+                    </ul>
+                </div>
+            <?php endif; ?>
+            <?php
             $updateInfo = null;
             if (can('settings.manage')) {
                 try {

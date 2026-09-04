@@ -2,12 +2,14 @@
 /**
  * @var array<string,mixed> $values
  * @var list<array{key:string,label:string,builtin?:bool}> $categories
+ * @var list<array{key:string,label:string,options:list<array{key:string,label:string}>}>|null $category_groups
  * @var list<array> $members
  * @var bool $show_status
  */
 $selectedCategory = (string) ($values['category'] ?? 'general');
 $showNewCategory = $selectedCategory === '__new__';
 $showStatus = !empty($show_status);
+$categoryGroups = $category_groups ?? null;
 ?>
 <div class="grid-3">
     <div>
@@ -21,9 +23,19 @@ $showStatus = !empty($show_status);
     <div data-deadline-category-wrap>
         <label><?= e(__('deadlines.category')) ?></label>
         <select name="category" data-deadline-category>
-            <?php foreach ($categories as $cat): ?>
-                <option value="<?= e($cat['key']) ?>" <?= $selectedCategory === $cat['key'] ? 'selected' : '' ?>><?= e($cat['label']) ?></option>
-            <?php endforeach; ?>
+            <?php if (is_array($categoryGroups) && $categoryGroups !== []): ?>
+                <?php foreach ($categoryGroups as $group): ?>
+                    <optgroup label="<?= e((string) ($group['label'] ?? '')) ?>">
+                        <?php foreach (($group['options'] ?? []) as $cat): ?>
+                            <option value="<?= e($cat['key']) ?>" <?= $selectedCategory === $cat['key'] ? 'selected' : '' ?>><?= e($cat['label']) ?></option>
+                        <?php endforeach; ?>
+                    </optgroup>
+                <?php endforeach; ?>
+            <?php else: ?>
+                <?php foreach ($categories as $cat): ?>
+                    <option value="<?= e($cat['key']) ?>" <?= $selectedCategory === $cat['key'] ? 'selected' : '' ?>><?= e($cat['label']) ?></option>
+                <?php endforeach; ?>
+            <?php endif; ?>
             <option value="__new__" <?= $showNewCategory ? 'selected' : '' ?>><?= e(__('deadlines.category_new')) ?></option>
         </select>
         <div class="doc-new-category" data-deadline-new-category <?= $showNewCategory ? '' : 'hidden' ?>>

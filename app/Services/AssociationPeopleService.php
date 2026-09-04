@@ -381,8 +381,45 @@ final class AssociationPeopleService
                 return ['ok' => false, 'errors' => ['role_key' => __('org.cannot_delete_president')]];
             }
         }
-        $this->db->query('DELETE FROM association_people WHERE id = :id', ['id' => $id]);
+        $this->db->update('association_people', [
+            'is_active' => 0,
+            'mandate_ends_at' => $person['mandate_ends_at'] ?? date('Y-m-d'),
+        ], 'id = :id', ['id' => $id]);
         return ['ok' => true];
+    }
+
+    /**
+     * Past offices (soft-removed or archived).
+     *
+     * @return list<array<string,mixed>>
+     */
+    public function history(int $limit = 200): array
+    {
+        $limit = max(1, min(500, $limit));
+        return $this->db->fetchAll(
+            "SELECT p.*, r.label_key, r.custom_label
+             FROM association_people p
+             LEFT JOIN association_roles r ON r.`key` = p.role_key
+             WHERE p.is_active = 0
+             ORDER BY COALESCE(p.mandate_ends_at, p.updated_at, p.appointed_at) DESC, p.id DESC
+             LIMIT {$limit}"
+        );
+    }
+
+    /**
+     * Active officers for export.
+     *
+     * @return list<array<string,mixed>>
+     */
+    public function exportActive(): array
+    {
+        return $this->db->fetchAll(
+            "SELECT p.*, r.label_key, r.custom_label
+             FROM association_people p
+             LEFT JOIN association_roles r ON r.`key` = p.role_key
+             WHERE p.is_active = 1
+             ORDER BY r.sort_order ASC, p.sort_order ASC, p.id ASC"
+        );
     }
 
     /**

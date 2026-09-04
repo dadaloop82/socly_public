@@ -183,6 +183,14 @@ final class SettingsController extends BaseController
         $this->settings->set('legal.privacy', $privacy);
         $this->settings->set('legal.statute', $statute);
         $this->settings->set('gdpr.enabled', !empty($data['gdpr_enabled']) ? '1' : '0');
+        $privacyText = localized($privacy);
+        $statuteText = localized($statute);
+        if (mb_strlen(trim($privacyText), 'UTF-8') >= 50) {
+            $this->settings->set('setup.deferred.legal.privacy', '0');
+        }
+        if (mb_strlen(trim($statuteText), 'UTF-8') >= 50) {
+            $this->settings->set('setup.deferred.legal.statute', '0');
+        }
         \Socly\Support\EnvWriter::setUserValues([
             'GDPR_ENABLED' => !empty($data['gdpr_enabled']) ? '1' : '0',
         ]);

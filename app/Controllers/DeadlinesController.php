@@ -41,6 +41,7 @@ final class DeadlinesController extends BaseController
             'soon' => $soon,
             'members' => $this->members->listForSelect(),
             'categories' => $this->deadlines->categoryOptions(),
+            'category_groups' => $this->deadlines->categoryGroupedOptions(),
             'default_category' => $this->deadlines->defaultCategory(),
             'search_query' => $query,
             'active_filter' => $bucket,
@@ -73,6 +74,7 @@ final class DeadlinesController extends BaseController
             'title' => __('deadlines.edit'),
             'deadline' => $item,
             'categories' => $categories,
+            'category_groups' => $this->deadlines->categoryGroupedOptions(),
             'members' => $this->members->listForSelect(),
         ]);
     }

@@ -1621,6 +1621,26 @@ td .muted { font-size: 0.88rem; margin-top: 0.15rem; }
   color: #7a5a00;
   border: 1px solid #f0d48a;
 }
+.setup-incomplete-list {
+  margin: 0.45rem 0 0;
+  padding-left: 1.1rem;
+}
+.setup-incomplete-list a {
+  font-weight: 700;
+}
+.org-hide-vacant-toggle {
+  margin-right: 0.5rem;
+}
+.org-chart.hide-vacant .org-node--vacant,
+.org-chart.hide-vacant .org-node--add {
+  display: none !important;
+}
+@media print {
+  .org-chart.hide-vacant .org-node--vacant,
+  .org-chart.hide-vacant .org-node--add {
+    display: none !important;
+  }
+}
 
 .member-list-identity {
   display: flex;
