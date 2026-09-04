@@ -209,6 +209,27 @@ final class OrgController extends BaseController
         exit;
     }
 
+    public function exportPdf(Request $request): void
+    {
+        require_component('org_roles');
+        $branding = app()->branding();
+        $legalCode = strtoupper(trim((string) ($branding['legal_name'] ?? '')));
+        $legalLabel = '';
+        if ($legalCode !== '') {
+            $forms = \Socly\Setup\AssociationLegalForms::all();
+            if (isset($forms[$legalCode])) {
+                $legalLabel = __($forms[$legalCode]);
+            }
+        }
+        $this->render('org/export_pdf', [
+            'title' => __('org.export_officers'),
+            'rows' => $this->people->exportActive(),
+            'assocName' => assoc_capitalize_name((string) ($branding['name'] ?? 'SOCLY')),
+            'assocLegalCode' => $legalCode,
+            'assocLegalLabel' => $legalLabel,
+        ], null);
+    }
+
     public function memberProfile(Request $request, string $id): void
     {
         require_component('org_roles');

@@ -200,6 +200,7 @@ $votingMembersCount = (int) ($votingMembersCount ?? 0);
                 </label>
                 <a class="btn btn-ghost" href="<?= e(url('/org/history')) ?>"><?= e(__('org.history_title')) ?></a>
                 <a class="btn btn-ghost" href="<?= e(url('/org/export.csv')) ?>"><?= e(__('org.export_csv')) ?></a>
+                <a class="btn btn-ghost" href="<?= e(url('/org/export.pdf')) ?>" target="_blank" rel="noopener"><?= e(__('org.export_pdf')) ?></a>
                 <a class="btn" href="<?= e(url('/org/people/create')) ?>"><?= e(__('org.add_person')) ?></a>
             </div>
         <?php else: ?>
@@ -209,6 +210,7 @@ $votingMembersCount = (int) ($votingMembersCount ?? 0);
                     <span><?= e(__('org.hide_vacant')) ?></span>
                 </label>
                 <a class="btn btn-ghost" href="<?= e(url('/org/export.csv')) ?>"><?= e(__('org.export_csv')) ?></a>
+                <a class="btn btn-ghost" href="<?= e(url('/org/export.pdf')) ?>" target="_blank" rel="noopener"><?= e(__('org.export_pdf')) ?></a>
             </div>
         <?php endif; ?>
     </div>

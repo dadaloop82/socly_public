@@ -73,6 +73,7 @@ final class DocumentsController extends BaseController
             'existing_file_name' => $filePath !== '' ? basename($filePath) : '',
             'members' => $this->members->listForSelect(),
             'sibling_options' => $siblings,
+            'document_id' => (int) $id,
         ]);
     }
 

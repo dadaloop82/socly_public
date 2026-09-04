@@ -193,6 +193,52 @@ final class DeadlineService
             ]);
         }
 
+        $certRows = $this->db->fetchAll(
+            "SELECT m.id AS member_id,
+                    v.value AS cert_date,
+                    dfn.`key` AS field_key,
+                    (SELECT v2.value FROM member_field_values v2
+                     INNER JOIN member_field_definitions dfn2 ON dfn2.id = v2.field_definition_id AND dfn2.`key` = 'first_name'
+                     WHERE v2.member_id = m.id LIMIT 1) AS first_name,
+                    (SELECT v2.value FROM member_field_values v2
+                     INNER JOIN member_field_definitions dfn2 ON dfn2.id = v2.field_definition_id AND dfn2.`key` = 'last_name'
+                     WHERE v2.member_id = m.id LIMIT 1) AS last_name
+             FROM members m
+             INNER JOIN member_field_values v ON v.member_id = m.id
+             INNER JOIN member_field_definitions dfn ON dfn.id = v.field_definition_id
+             WHERE dfn.field_type IN ('date', 'datetime')
+               AND (
+                    dfn.`key` LIKE '%medical%'
+                 OR dfn.`key` LIKE '%certificat%'
+                 OR dfn.`key` LIKE '%cert_medico%'
+                 OR dfn.`key` LIKE '%medico%'
+               )
+               AND v.value IS NOT NULL AND TRIM(v.value) <> ''"
+        );
+        foreach ($certRows as $row) {
+            $raw = substr(trim((string) ($row['cert_date'] ?? '')), 0, 10);
+            if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $raw)) {
+                continue;
+            }
+            // If the stored date looks like an issue date (no "scad"/"expir" in key), assume +1 year.
+            $key = strtolower((string) ($row['field_key'] ?? ''));
+            $due = $raw;
+            if (!str_contains($key, 'scad') && !str_contains($key, 'expir') && !str_contains($key, 'end')) {
+                $due = date('Y-m-d', strtotime($raw . ' +1 year'));
+            }
+            $memberId = (int) ($row['member_id'] ?? 0);
+            $source = 'system:member_cert:' . $memberId . ':' . $key;
+            $sources[] = $source;
+            $name = trim((string) (($row['first_name'] ?? '') . ' ' . ($row['last_name'] ?? '')));
+            $this->upsertSystemDeadline($source, [
+                'title' => __('deadlines.auto_medical_cert', ['name' => $name !== '' ? $name : ('#' . $memberId)]),
+                'category' => 'medical_cert',
+                'due_date' => $due,
+                'member_id' => $memberId > 0 ? $memberId : null,
+                'notes' => __('deadlines.auto_generated_note'),
+            ]);
+        }
+
         $params = [];
         $keep = [];
         foreach ($sources as $i => $source) {
@@ -200,7 +246,8 @@ final class DeadlineService
             $params[$key] = $source;
             $keep[] = ':' . $key;
         }
-        $sql = "DELETE FROM deadline_items WHERE source LIKE 'system:%'";
+        // Document-sourced deadlines use source system:document:* and must not be wiped here.
+        $sql = "DELETE FROM deadline_items WHERE source LIKE 'system:%' AND source NOT LIKE 'system:document:%'";
         if ($keep !== []) {
             $sql .= ' AND source NOT IN (' . implode(', ', $keep) . ')';
         }

@@ -133,6 +133,7 @@ $router->get('/documents/{id}/download', [DocumentsController::class, 'forceDown
 $router->get('/org', [OrgController::class, 'index'], 'org.view', ['mw.locale', 'mw.install', 'mw.auth']);
 $router->get('/org/history', [OrgController::class, 'history'], 'org.view', ['mw.locale', 'mw.install', 'mw.auth']);
 $router->get('/org/export.csv', [OrgController::class, 'exportCsv'], 'org.view', ['mw.locale', 'mw.install', 'mw.auth']);
+$router->get('/org/export.pdf', [OrgController::class, 'exportPdf'], 'org.view', ['mw.locale', 'mw.install', 'mw.auth']);
 $router->post('/org/organs', [OrgController::class, 'storeOrgan'], null, ['mw.locale', 'mw.install', 'mw.auth', 'mw.csrf']);
 $router->post('/org/organs/{key}/delete', [OrgController::class, 'destroyOrgan'], null, ['mw.locale', 'mw.install', 'mw.auth', 'mw.csrf']);
 $router->get('/org/people/create', [OrgController::class, 'create'], null, ['mw.locale', 'mw.install', 'mw.auth']);

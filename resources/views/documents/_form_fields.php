@@ -153,3 +153,8 @@ $fileReady = $hasExistingFile || trim((string) ($values['uploaded_path'] ?? ''))
     <label><?= e(__('documents.summary')) ?></label>
     <textarea name="summary" rows="3"><?= e((string) ($values['summary'] ?? '')) ?></textarea>
 </div>
+<?php if (!empty($document_id) && (int) $document_id > 0 && component_enabled('treasury') && can('treasury.manage')): ?>
+    <p class="muted" style="margin-top:0.75rem">
+        <a href="<?= e(url('/treasury?document_id=' . (int) $document_id)) ?>"><?= e(__('documents.link_treasury')) ?></a>
+    </p>
+<?php endif; ?>
