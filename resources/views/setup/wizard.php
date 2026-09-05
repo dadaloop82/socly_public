@@ -179,12 +179,16 @@ $errorStep = flash('setup_error_step');
                 data-provinces-url="<?= e(url('/api/geo/provinces')) ?>"
                 data-cf-url="<?= e(url('/api/fiscal-code')) ?>"
                 data-csrf="<?= e(csrf_token()) ?>"
+                data-msg-field-ok="<?= e(__('validation.field_ok')) ?>"
+                data-msg-field-required="<?= e(__('validation.required')) ?>"
             >
                 <?= csrf_field() ?>
                 <input type="hidden" name="step_index" value="<?= (int) $stepIndex ?>">
                 <input type="hidden" name="step_key" value="<?= e((string) ($step['key'] ?? '')) ?>">
                 <input type="hidden" name="setup_exit" value="0" data-setup-exit-flag>
                 <input type="hidden" name="setup_defer" value="0" data-setup-defer-flag>
+
+                <div class="setup-form-scroll">
 
                 <?php if ($stepType === 'colors'): ?>
                     <?php
@@ -323,9 +327,6 @@ $errorStep = flash('setup_error_step');
                                 >
                                     <label class="setup-field setup-field-runts" for="setup-runts-number">
                                         <span><?= e(__($field['label_key'])) ?></span>
-                                    </label>
-                                    <div class="setup-runts-row">
-                                        <p class="setup-runts-hint" data-setup-runts-hint><?= e(__('setup.runts_hint')) ?></p>
                                         <input
                                             id="setup-runts-number"
                                             type="text"
@@ -338,7 +339,8 @@ $errorStep = flash('setup_error_step');
                                             placeholder="<?= e(__('setup.field_runts_placeholder')) ?>"
                                             data-setup-runts-input
                                         >
-                                    </div>
+                                        <p class="setup-runts-hint" data-setup-runts-hint><?= e(__('setup.runts_hint')) ?></p>
+                                    </label>
                                     <div class="setup-runts-actions">
                                         <button type="button" class="btn setup-scrape-btn" data-setup-runts-btn hidden disabled aria-hidden="true">
                                             <span data-setup-runts-label><?= e(__('setup.runts_button_fallback')) ?></span>
@@ -1326,6 +1328,8 @@ $errorStep = flash('setup_error_step');
                         <button type="button" class="setup-defer-link" data-setup-defer-step data-i18n="setup.defer_step"><?= e(__('setup.defer_step')) ?></button>
                     </p>
                 <?php endif; ?>
+
+                </div><!-- .setup-form-scroll -->
 
                 <div class="setup-actions" data-setup-line>
                     <?php if (!empty($backHref)): ?>

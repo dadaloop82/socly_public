@@ -64,7 +64,19 @@ final class PdfTextExtractor
 
     public function ocrAvailable(): bool
     {
+        if (!$this->canExec()) {
+            return false;
+        }
         return $this->bin('pdftoppm') !== null && $this->bin('tesseract') !== null;
+    }
+
+    private function canExec(): bool
+    {
+        if (!function_exists('exec')) {
+            return false;
+        }
+        $disabled = array_map('trim', explode(',', (string) ini_get('disable_functions')));
+        return !in_array('exec', $disabled, true);
     }
 
     /** @return array{text:string,pages:int} */

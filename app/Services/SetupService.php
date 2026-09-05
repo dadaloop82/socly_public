@@ -1263,8 +1263,8 @@ final class SetupService
 
         if ($board !== [] && $this->people->countByRole(AssociationPeopleService::ROLE_BOARD) === 0) {
             try {
+                // Prefill names only — do NOT mark board_configured; user must still review the step (CF optional).
                 $this->people->replaceRole(AssociationPeopleService::ROLE_BOARD, $board);
-                $this->settings->set('association.board_configured', '1');
                 $applied[] = 'board_names';
             } catch (\Throwable) {
             }
@@ -1722,20 +1722,23 @@ final class SetupService
         ], JSON_UNESCAPED_UNICODE));
 
         $php = PHP_BINARY !== '' ? PHP_BINARY : 'php';
-        $script = base_path('bin/runts-legal-prefill.php');
+        // Demos: code lives in SOCLY_CODE_PATH; instance has no bin/.
+        $script = code_path('bin/runts-legal-prefill.php');
         if (!is_file($script)) {
             @unlink($jobFile);
             return false;
         }
 
         $cmd = sprintf(
-            'nohup %s %s %s > %s 2>&1 &',
+            'nohup env SOCLY_CODE_PATH=%s SOCLY_INSTANCE_PATH=%s %s %s %s > %s 2>&1 &',
+            escapeshellarg(code_path()),
+            escapeshellarg(base_path()),
             escapeshellarg($php),
             escapeshellarg($script),
             escapeshellarg($jobFile),
             escapeshellarg($jobDir . '/runts_ocr_job.log')
         );
-        exec($cmd);
+        @exec($cmd);
         $this->settings->set('legal.runts_ocr_pending', '1');
         return true;
     }
@@ -2223,11 +2226,12 @@ final class SetupService
             if ($first === '' && $last === '' && $cf === '') {
                 continue;
             }
-            if ($first === '' || $last === '' || $cf === '') {
+            if ($first === '' || $last === '') {
                 $errors['people.' . $i] = __('validation.required');
                 continue;
             }
-            if (!$this->isValidPersonFiscalCode($cf)) {
+            // Fiscal code is optional in setup; validate format only when provided.
+            if ($cf !== '' && !$this->isValidPersonFiscalCode($cf)) {
                 $errors['people.' . $i . '.fiscal_code'] = __('validation.fiscal_code');
                 continue;
             }

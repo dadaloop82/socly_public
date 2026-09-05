@@ -1181,6 +1181,7 @@ return [
     ],
     'validation' => [
         'required' => 'This field is required.',
+        'field_ok' => 'Looks good.',
         'email' => 'Invalid email.',
         'string' => 'Must be text.',
         'numeric' => 'Must be numeric.',

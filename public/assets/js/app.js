@@ -1090,6 +1090,7 @@ function initSetupWizard() {
   initSetupNamePairPreview(root);
   initPlatformConsents(root);
   initSetupCtaGate(root);
+  initSetupFieldFeedback(root);
   initSetupGeoGate(root);
   initSetupFitAssocNames(root);
   initSetupTaxIds(root);
@@ -4378,6 +4379,107 @@ function initSetupCtaGate(root) {
   form.addEventListener('change', refresh);
   form.addEventListener('setup:cta-refresh', refresh);
   refresh();
+}
+
+/** Live OK / error hints when the user leaves or confirms a setup field. */
+function initSetupFieldFeedback(root) {
+  const form = root.querySelector('[data-setup-form]');
+  if (!form) return;
+  const msgOk = form.dataset.msgFieldOk || 'OK';
+  const msgRequired = form.dataset.msgFieldRequired || 'Required';
+
+  const ensureHint = (field) => {
+    let hint = field.querySelector(':scope > .setup-field-feedback');
+    if (hint) return hint;
+    hint = document.createElement('p');
+    hint.className = 'setup-field-hint setup-field-feedback';
+    hint.hidden = true;
+    field.appendChild(hint);
+    return hint;
+  };
+
+  const paint = (el, state, message) => {
+    if (!(el instanceof HTMLElement)) return;
+    el.classList.toggle('is-valid', state === 'ok');
+    el.classList.toggle('is-invalid', state === 'err');
+    const field = el.closest('.setup-field, .setup-people-row, label.setup-check');
+    if (!field) return;
+    const hint = ensureHint(field instanceof HTMLLabelElement && field.classList.contains('setup-field')
+      ? field
+      : (el.closest('.setup-field') || field));
+    if (!(hint instanceof HTMLElement)) return;
+    const msg = String(message || '').trim();
+    hint.hidden = msg === '';
+    hint.textContent = msg;
+    hint.classList.toggle('is-error', state === 'err' && msg !== '');
+    hint.classList.toggle('is-ok', state === 'ok' && msg !== '');
+  };
+
+  const evaluate = (el) => {
+    if (!(el instanceof HTMLInputElement || el instanceof HTMLSelectElement || el instanceof HTMLTextAreaElement)) {
+      return;
+    }
+    if (el.disabled || el.type === 'hidden' || el.type === 'submit' || el.type === 'button') return;
+    if (el.name === '_token' || el.name === 'step_index' || el.name === 'step_key') return;
+    if (el.name === 'setup_exit' || el.name === 'setup_defer') return;
+    // Skip radios that are part of a group — validate the group via the checked one.
+    if (el.type === 'radio') {
+      const group = form.querySelectorAll(`input[type="radio"][name="${CSS.escape(el.name)}"]`);
+      const anyChecked = [...group].some((r) => r instanceof HTMLInputElement && r.checked);
+      const required = [...group].some((r) => r instanceof HTMLInputElement && r.required);
+      const card = el.closest('.setup-locale-card')?.parentElement || el.closest('.setup-field');
+      if (required && !anyChecked) {
+        group.forEach((r) => paint(r, 'err', msgRequired));
+        if (card) {
+          const hint = ensureHint(card);
+          hint.hidden = false;
+          hint.textContent = msgRequired;
+          hint.classList.add('is-error');
+          hint.classList.remove('is-ok');
+        }
+      } else if (anyChecked) {
+        group.forEach((r) => paint(r, 'ok', ''));
+        if (card) {
+          const hint = ensureHint(card);
+          hint.hidden = false;
+          hint.textContent = msgOk;
+          hint.classList.remove('is-error');
+          hint.classList.add('is-ok');
+        }
+      }
+      return;
+    }
+
+    const empty = String(el.value || '').trim() === '';
+    if (el.required && empty) {
+      paint(el, 'err', msgRequired);
+      return;
+    }
+    if (empty && !el.required) {
+      paint(el, '', '');
+      return;
+    }
+    let ok = true;
+    try {
+      ok = typeof el.checkValidity === 'function' ? el.checkValidity() : true;
+    } catch {
+      ok = true;
+    }
+    if (!ok) {
+      paint(el, 'err', el.validationMessage || msgRequired);
+      return;
+    }
+    paint(el, 'ok', msgOk);
+  };
+
+  form.addEventListener('focusout', (event) => {
+    const t = event.target;
+    if (t instanceof HTMLElement) evaluate(t);
+  });
+  form.addEventListener('change', (event) => {
+    const t = event.target;
+    if (t instanceof HTMLElement) evaluate(t);
+  });
 }
 
 function initSetupGeoGate(root) {

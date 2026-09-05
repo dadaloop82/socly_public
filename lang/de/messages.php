@@ -1179,6 +1179,7 @@ return [
     ],
     'validation' => [
         'required' => 'Pflichtfeld.',
+        'field_ok' => 'Korrekt.',
         'email' => 'Ungültige E-Mail.',
         'string' => 'Muss Text sein.',
         'numeric' => 'Muss numerisch sein.',

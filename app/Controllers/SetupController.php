@@ -213,6 +213,9 @@ final class SetupController extends BaseController
                     return $ia <=> $ib;
                 });
                 $keys = array_values(array_unique($keys));
+                if (SetupCatalogue::findByKey('app.locale') !== null && !in_array('app.locale', $keys, true)) {
+                    array_unshift($keys, 'app.locale');
+                }
                 $_SESSION['setup_progress_keys'] = $keys;
                 return $keys;
             }
@@ -224,6 +227,11 @@ final class SetupController extends BaseController
                 static fn (array $step): string => (string) ($step['key'] ?? ''),
                 $catalogue
             )));
+        }
+        // Locale is passo 1 (shown before greet) but may already be configured —
+        // keep it first so RUNTS/name is Passo 2, not another Passo 1.
+        if (SetupCatalogue::findByKey('app.locale') !== null && !in_array('app.locale', $keys, true)) {
+            array_unshift($keys, 'app.locale');
         }
         $_SESSION['setup_progress_keys'] = $keys;
         return $keys;
@@ -646,54 +654,68 @@ final class SetupController extends BaseController
 
     public function extractLegalPdf(Request $request): void
     {
-        if ($this->setup->isComplete() && !$this->setup->isAdmin()) {
-            http_response_code(403);
-            header('Content-Type: application/json; charset=utf-8');
-            echo json_encode(['ok' => false, 'error' => 'forbidden'], JSON_UNESCAPED_UNICODE);
-            return;
-        }
+        header('Content-Type: application/json; charset=utf-8');
+        try {
+            if ($this->setup->isComplete() && !$this->setup->isAdmin()) {
+                http_response_code(403);
+                echo json_encode(['ok' => false, 'error' => 'forbidden'], JSON_UNESCAPED_UNICODE);
+                return;
+            }
 
-        $file = $request->file('pdf');
-        if (!is_array($file) || (int) ($file['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_OK) {
-            http_response_code(422);
-            header('Content-Type: application/json; charset=utf-8');
-            echo json_encode(['ok' => false, 'error' => (string) __('setup.legal_pdf_fail')], JSON_UNESCAPED_UNICODE);
-            return;
-        }
+            $file = $request->file('pdf');
+            if (!is_array($file) || (int) ($file['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_OK) {
+                http_response_code(422);
+                echo json_encode(['ok' => false, 'error' => (string) __('setup.legal_pdf_fail')], JSON_UNESCAPED_UNICODE);
+                return;
+            }
 
-        $tmp = (string) ($file['tmp_name'] ?? '');
-        $name = (string) ($file['name'] ?? '');
-        $size = (int) ($file['size'] ?? 0);
-        if ($tmp === '' || !is_uploaded_file($tmp) || $size <= 0 || $size > 12 * 1024 * 1024) {
-            http_response_code(422);
-            header('Content-Type: application/json; charset=utf-8');
-            echo json_encode(['ok' => false, 'error' => (string) __('setup.legal_pdf_fail')], JSON_UNESCAPED_UNICODE);
-            return;
-        }
-        $ext = strtolower(pathinfo($name, PATHINFO_EXTENSION));
-        if ($ext !== 'pdf') {
-            http_response_code(422);
-            header('Content-Type: application/json; charset=utf-8');
-            echo json_encode(['ok' => false, 'error' => (string) __('setup.legal_pdf_fail')], JSON_UNESCAPED_UNICODE);
-            return;
-        }
+            $tmp = (string) ($file['tmp_name'] ?? '');
+            $name = (string) ($file['name'] ?? '');
+            $size = (int) ($file['size'] ?? 0);
+            if ($tmp === '' || !is_uploaded_file($tmp) || $size <= 0 || $size > 12 * 1024 * 1024) {
+                http_response_code(422);
+                echo json_encode(['ok' => false, 'error' => (string) __('setup.legal_pdf_fail')], JSON_UNESCAPED_UNICODE);
+                return;
+            }
+            $ext = strtolower(pathinfo($name, PATHINFO_EXTENSION));
+            if ($ext !== 'pdf') {
+                http_response_code(422);
+                echo json_encode(['ok' => false, 'error' => (string) __('setup.legal_pdf_fail')], JSON_UNESCAPED_UNICODE);
+                return;
+            }
 
-        @set_time_limit(120);
-        $extractor = new \Socly\Services\PdfTextExtractor();
-        $result = $extractor->extract($tmp, ['ocr' => true, 'max_pages' => 40, 'max_seconds' => 90]);
-        $text = trim((string) ($result['text'] ?? ''));
-        if ($text === '' || mb_strlen($text, 'UTF-8') < 40) {
-            http_response_code(422);
-            header('Content-Type: application/json; charset=utf-8');
+            @set_time_limit(120);
+            $extractor = new \Socly\Services\PdfTextExtractor();
+            $result = $extractor->extract($tmp, ['ocr' => true, 'max_pages' => 40, 'max_seconds' => 90]);
+            $text = trim((string) ($result['text'] ?? ''));
+            if ($text === '' || mb_strlen($text, 'UTF-8') < 40) {
+                http_response_code(422);
+                $errKey = (($result['error'] ?? '') === 'ocr_unavailable')
+                    ? 'setup.runts_legal_ocr_unavailable'
+                    : 'setup.legal_pdf_fail';
+                echo json_encode([
+                    'ok' => false,
+                    'error' => (string) __($errKey),
+                ], JSON_UNESCAPED_UNICODE);
+                return;
+            }
+
+            echo json_encode(['ok' => true, 'text' => $text, 'method' => $result['method'] ?? ''], JSON_UNESCAPED_UNICODE);
+        } catch (\Throwable $e) {
+            try {
+                app('logger')->error('setup.legal_pdf_failed', [
+                    'message' => $e->getMessage(),
+                    'file' => $e->getFile(),
+                    'line' => $e->getLine(),
+                ]);
+            } catch (\Throwable) {
+            }
+            http_response_code(500);
             echo json_encode([
                 'ok' => false,
                 'error' => (string) __('setup.legal_pdf_fail'),
             ], JSON_UNESCAPED_UNICODE);
-            return;
         }
-
-        header('Content-Type: application/json; charset=utf-8');
-        echo json_encode(['ok' => true, 'text' => $text, 'method' => $result['method'] ?? ''], JSON_UNESCAPED_UNICODE);
     }
 
     public function discoverMail(Request $request): void

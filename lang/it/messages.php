@@ -1183,6 +1183,7 @@ return [
     ],
     'validation' => [
         'required' => 'Campo obbligatorio.',
+        'field_ok' => 'Corretto.',
         'email' => 'Email non valida.',
         'string' => 'Deve essere testo.',
         'numeric' => 'Deve essere numerico.',
