@@ -2047,11 +2047,14 @@ final class SetupService
                 }
             }
             if ($key === 'vat_number') {
-                $value = strtoupper(preg_replace('/\s+/', '', $value) ?? '');
-                if (str_starts_with($value, 'IT')) {
-                    $value = substr($value, 2);
+                $value = strtoupper(preg_replace('/[\s.\-]/', '', $value) ?? '');
+                if (preg_match('/^([A-Z]{2})(.+)$/', $value, $m) === 1) {
+                    // Keep country prefix in storage for non-IT; strip IT for local numbers.
+                    if ($m[1] === 'IT') {
+                        $value = $m[2];
+                    }
                 }
-                $fiscal = strtoupper(preg_replace('/\s+/', '', (string) ($input['fiscal_code'] ?? '')) ?? '');
+                $fiscal = strtoupper(preg_replace('/[\s.\-]/', '', (string) ($input['fiscal_code'] ?? '')) ?? '');
                 // P.IVA opzionale: può coincidere col CF ente (11 cifre).
                 if (!$this->isValidVat($value) && !($fiscal !== '' && $value === $fiscal && $this->isValidEntityFiscalCode($fiscal))) {
                     $errors[$key] = __('setup.validation_vat');

@@ -190,10 +190,32 @@ final class Validator
         return $check === $code[15];
     }
 
-    /** Italian Partita IVA (11 digits) with check digit. Accepts optional IT prefix. */
+    /** Italian Partita IVA (11 digits). Accepts optional EU country prefix (IT, DE, …). */
     public function isValidVatNumber(string $vat): bool
     {
-        $vat = strtoupper(preg_replace('/\s+/', '', $vat) ?? '');
+        $vat = strtoupper(preg_replace('/[\s.\-]/', '', $vat) ?? '');
+        $country = '';
+        if (preg_match('/^([A-Z]{2})(.+)$/', $vat, $m) === 1) {
+            $country = $m[1];
+            $vat = $m[2];
+        }
+        // German USt-IdNr. (9 digits) when explicitly prefixed.
+        if ($country === 'DE') {
+            return preg_match('/^\d{9}$/', $vat) === 1;
+        }
+        // Other EU prefixes: accept 8–12 alphanumeric digits (loose, optional field).
+        if ($country !== '' && $country !== 'IT') {
+            return preg_match('/^[A-Z0-9]{8,12}$/', $vat) === 1;
+        }
+        // Italian: 11 digits (check digit not required for optional setup VAT —
+        // operators often paste progressive numbers that fail the ADE check digit).
+        return preg_match('/^\d{11}$/', $vat) === 1;
+    }
+
+    /** Strict ADE check digit for Italian VAT. */
+    public function isValidVatCheckDigit(string $vat): bool
+    {
+        $vat = strtoupper(preg_replace('/[\s.\-]/', '', $vat) ?? '');
         if (str_starts_with($vat, 'IT')) {
             $vat = substr($vat, 2);
         }
@@ -220,8 +242,8 @@ final class Validator
     public function isValidEntityFiscalCode(string $code): bool
     {
         $code = strtoupper(preg_replace('/\s+/', '', $code) ?? '');
-        if ($this->isValidVatNumber($code)) {
-            return true;
+        if (preg_match('/^\d{11}$/', $code) === 1) {
+            return $this->isValidVatCheckDigit($code);
         }
         return $this->isValidFiscalCode($code);
     }

@@ -13,37 +13,51 @@ final class GeoService
     private static ?array $comuni = null;
 
     /** @return list<array{label:string,city:string,belfiore:string,provincia:string,cap:string}> */
-    public function searchComuni(string $query, int $limit = 8): array
+    public function searchComuni(string $query, int $limit = 12): array
     {
         $query = trim($query);
         if (mb_strlen($query) < 2) {
             return [];
         }
         $q = mb_strtolower($query);
-        $starts = [];
-        $contains = [];
+        $scored = [];
         foreach ($this->comuni() as $row) {
-            $name = mb_strtolower($row['nome']);
-            if (!str_contains($name, $q)) {
+            $name = mb_strtolower((string) ($row['nome'] ?? ''));
+            if ($name === '' || !str_contains($name, $q)) {
                 continue;
             }
-            $item = [
-                'label' => $row['nome'] . ' (' . $row['provincia'] . ')',
-                'city' => $row['nome'],
-                'belfiore' => $row['belfiore'],
-                'provincia' => $row['provincia'],
-                'cap' => $row['cap'],
-            ];
-            if (str_starts_with($name, $q)) {
-                $starts[] = $item;
+            $score = 0;
+            if ($name === $q) {
+                $score = 300;
+            } elseif (str_starts_with($name, $q)) {
+                // Prefer shorter names so "Bol" surfaces Bolzano before Bologna-long lists flood the quota.
+                $score = 200 - min(80, mb_strlen($name));
             } else {
-                $contains[] = $item;
+                $score = 50 - min(40, mb_strlen($name));
             }
-            if (count($starts) >= $limit) {
-                break;
+            // Capitals / province seats (often shorter CAP lists) get a tiny boost when tied.
+            if (($row['provincia'] ?? '') !== '' && str_starts_with($name, $q)) {
+                $score += 5;
             }
+            $scored[] = [
+                'score' => $score,
+                'item' => [
+                    'label' => $row['nome'] . ' (' . $row['provincia'] . ')',
+                    'city' => $row['nome'],
+                    'belfiore' => $row['belfiore'],
+                    'provincia' => $row['provincia'],
+                    'cap' => $row['cap'],
+                ],
+            ];
         }
-        return array_slice(array_merge($starts, $contains), 0, $limit);
+        usort($scored, static function (array $a, array $b): int {
+            return ($b['score'] <=> $a['score']) ?: strcmp((string) $a['item']['city'], (string) $b['item']['city']);
+        });
+        $out = [];
+        foreach (array_slice($scored, 0, max(1, $limit)) as $row) {
+            $out[] = $row['item'];
+        }
+        return $out;
     }
 
     /** @return list<array{label:string,city:string,belfiore:string,provincia:string,cap:string}> */
@@ -644,8 +658,13 @@ final class GeoService
         if (self::$comuni !== null) {
             return self::$comuni;
         }
-        $path = base_path('database/data/comuni.slim.json');
+        $path = code_path('database/data/comuni.slim.json');
         if (!is_file($path)) {
+            // Fallback for odd installs that only ship data next to the instance.
+            $fallback = base_path('database/data/comuni.slim.json');
+            $path = is_file($fallback) ? $fallback : '';
+        }
+        if ($path === '' || !is_file($path)) {
             return self::$comuni = [];
         }
         $decoded = json_decode((string) file_get_contents($path), true);

@@ -56,6 +56,28 @@ final class SetupController extends BaseController
         $planKeys = $this->progressPlanKeys($missing, $catalogue);
 
         $greeted = !empty($_SESSION['setup_greeted']);
+        $localeStep = SetupCatalogue::findByKey('app.locale');
+        $localeChosen = !empty($_SESSION['setup_locale_chosen'])
+            || ($localeStep !== null && $this->setup->stepIsConfigured($localeStep));
+
+        // Passo 0: lingua prima del benvenuto, così il greeting è già nella lingua scelta.
+        if (!$localeChosen && $localeStep !== null) {
+            $this->render('setup/wizard', [
+                'title' => __('setup.title'),
+                'mode' => 'step',
+                'step' => $localeStep,
+                'value' => $this->withDraftInput($localeStep, $this->setup->currentValue($localeStep)),
+                'stepIndex' => 0,
+                'totalSteps' => max(1, count($planKeys)),
+                'missingCount' => count($missing),
+                'hasProgress' => $hasProgress,
+                'isIncremental' => $isIncremental,
+                'backHref' => null,
+                'localeFirst' => true,
+            ], 'layouts/setup');
+            return;
+        }
+
         if (!$greeted) {
             $this->render('setup/wizard', [
                 'title' => __('setup.title'),
@@ -415,11 +437,19 @@ final class SetupController extends BaseController
     private function afterStepSaved(Request $request, array $step, int $stepIndex): void
     {
         if ((string) $request->input('setup_exit', '0') === '1') {
-            unset($_SESSION['setup_greeted'], $_SESSION['setup_show_thanks']);
+            unset($_SESSION['setup_greeted'], $_SESSION['setup_show_thanks'], $_SESSION['setup_locale_chosen']);
             if (auth_user()) {
                 $this->auth->logout($request->ip());
             }
             redirect('/login');
+        }
+
+        if (($step['key'] ?? '') === 'app.locale') {
+            $_SESSION['setup_locale_chosen'] = true;
+            // Dopo la lingua: mostra il benvenuto (nella lingua appena scelta).
+            if (empty($_SESSION['setup_greeted'])) {
+                redirect('/setup');
+            }
         }
 
         if (($step['key'] ?? '') === 'association.name') {

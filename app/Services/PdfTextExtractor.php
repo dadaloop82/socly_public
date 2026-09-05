@@ -230,9 +230,24 @@ final class PdfTextExtractor
         if (array_key_exists($name, $cache)) {
             return $cache[$name];
         }
-        $path = trim((string) shell_exec('command -v ' . escapeshellarg($name) . ' 2>/dev/null'));
-        $cache[$name] = $path !== '' ? $path : null;
-        return $cache[$name];
+        $candidates = [
+            '/usr/bin/' . $name,
+            '/usr/local/bin/' . $name,
+            '/bin/' . $name,
+        ];
+        foreach ($candidates as $path) {
+            if (is_file($path) && is_executable($path)) {
+                return $cache[$name] = $path;
+            }
+        }
+        // FPM often has a minimal PATH; still try command -v when shell_exec works.
+        if (function_exists('shell_exec') && !in_array('shell_exec', array_map('trim', explode(',', (string) ini_get('disable_functions'))), true)) {
+            $path = trim((string) shell_exec('command -v ' . escapeshellarg($name) . ' 2>/dev/null'));
+            if ($path !== '' && is_executable($path)) {
+                return $cache[$name] = $path;
+            }
+        }
+        return $cache[$name] = null;
     }
 
     private function wipeDir(string $dir): void

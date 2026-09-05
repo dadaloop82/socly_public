@@ -4411,27 +4411,21 @@ function initSetupTaxIds(root) {
     U: 16, V: 10, W: 22, X: 25, Y: 24, Z: 23,
   };
 
-  const normalize = (raw) => String(raw || '').replace(/\s+/g, '').toUpperCase();
-  const stripIt = (raw) => {
+  const normalize = (raw) => String(raw || '').replace(/[\s.\-]/g, '').toUpperCase();
+  const stripCountry = (raw) => {
     let v = normalize(raw);
-    if (v.startsWith('IT')) v = v.slice(2);
+    if (/^[A-Z]{2}/.test(v)) v = v.slice(2);
     return v;
   };
 
   const isValidVat = (raw) => {
-    const vat = stripIt(raw);
-    if (!/^\d{11}$/.test(vat)) return false;
-    let sum = 0;
-    for (let i = 0; i < 10; i += 1) {
-      const n = Number(vat[i]);
-      if (i % 2 === 0) sum += n;
-      else {
-        const doubled = n * 2;
-        sum += doubled > 9 ? doubled - 9 : doubled;
-      }
-    }
-    const check = (10 - (sum % 10)) % 10;
-    return check === Number(vat[10]);
+    const full = normalize(raw);
+    const country = /^[A-Z]{2}/.test(full) ? full.slice(0, 2) : '';
+    const vat = stripCountry(raw);
+    if (country === 'DE') return /^\d{9}$/.test(vat);
+    if (country && country !== 'IT') return /^[A-Z0-9]{8,12}$/.test(vat);
+    // Italian optional P.IVA: 11 digits (check digit not enforced client-side).
+    return /^\d{11}$/.test(vat);
   };
 
   const isValidPersonCf = (raw) => {
@@ -4473,13 +4467,16 @@ function initSetupTaxIds(root) {
     }
 
     if (vatInput instanceof HTMLInputElement) {
-      let vat = stripIt(vatInput.value);
-      vatInput.value = vat;
+      const rawVat = normalize(vatInput.value);
+      const country = /^[A-Z]{2}/.test(rawVat) ? rawVat.slice(0, 2) : '';
+      let vat = stripCountry(rawVat);
+      // Keep non-IT country prefix in the field; strip only IT.
+      vatInput.value = country && country !== 'IT' ? (country + vat) : vat;
       let vatOk = true;
       let hint = '';
       let err = false;
-      if (vat !== '') {
-        if (isValidVat(vat)) {
+      if (vatInput.value !== '') {
+        if (isValidVat(vatInput.value)) {
           if (fiscal !== '' && vat === fiscal) {
             hint = box.dataset.msgVatMatches || '';
           }
@@ -4584,8 +4581,16 @@ function initSetupFitAssocNames(root) {
   };
   const refreshTitles = () => {
     root.querySelectorAll(
-      '.assoc-lockup-thanks .assoc-name, .assoc-lockup-setup-title .assoc-name, .assoc-lockup .assoc-name, [data-setup-assoc-fit]'
+      '.assoc-lockup-setup-title .assoc-name, .assoc-lockup .assoc-name, [data-setup-assoc-fit]'
     ).forEach(fitOne);
+    // Thanks step: never truncate — only keep the full name in the title tooltip.
+    root.querySelectorAll('.assoc-lockup-thanks .assoc-name').forEach((nameEl) => {
+      if (!(nameEl instanceof HTMLElement)) return;
+      nameEl.style.fontSize = '';
+      nameEl.style.maxWidth = '';
+      const full = (nameEl.textContent || '').trim();
+      if (full !== '') nameEl.setAttribute('title', full);
+    });
   };
   refreshTitles();
   window.addEventListener('resize', () => window.requestAnimationFrame(refreshTitles));
@@ -6114,7 +6119,7 @@ function initPlaceSuggest(root = document) {
           if (addressInput instanceof HTMLInputElement) {
             addressInput.dispatchEvent(new Event('input', { bubbles: true }));
           }
-        }, confirmCityTpl, { notFoundTemplate: capNotFoundTpl, keepValue: true });
+        }, confirmCityTpl, { notFoundTemplate: capNotFoundTpl, keepValue: false });
         refreshGeoScopeValidity(scope);
         form?.dispatchEvent(new Event('setup:cta-refresh', { bubbles: true }));
       };

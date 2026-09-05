@@ -22,7 +22,7 @@ final class I18nController extends BaseController
             $locale = (string) (app()->config('app.locale', 'it') ?: 'it');
         }
 
-        $path = base_path('lang/' . $locale . '/messages.php');
+        $path = code_path('lang/' . $locale . '/messages.php');
         $messages = is_file($path) ? (require $path) : [];
 
         http_response_code(200);
