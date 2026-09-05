@@ -102,6 +102,8 @@ return [
         'reset_success' => 'Password aggiornata. Ora puoi accedere.',
         'reset_invalid' => 'Link di recupero non valido.',
         'reset_expired' => 'Link di recupero scaduto. Richiedine uno nuovo.',
+        'demo_login_notice' => "Ambiente demo\n\nQuesta istanza di prova scade il :expires.\n\nNon inserire dati personali reali: usa solo informazioni fittizie.",
+        'demo_login_notice_ok' => 'Ho capito',
         'footer_tagline' => 'Realizzato con :heart da Stimpfl Daniel',
     ],
     'install' => [

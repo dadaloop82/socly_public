@@ -5415,6 +5415,8 @@ function initSetupLocaleLive(root) {
   const activate = (radio) => {
     if (!radio) return;
     if (!radio.checked) radio.checked = true;
+    // Programmatic checked does not fire input/change — refresh CTA gate.
+    radio.closest('form')?.dispatchEvent(new Event('setup:cta-refresh', { bubbles: true }));
     load(radio.value);
   };
 

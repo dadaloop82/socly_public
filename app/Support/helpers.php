@@ -436,9 +436,10 @@ if (!function_exists('socly_site_url')) {
     /** Base URL of socly.it for all app ↔ website API calls. */
     function socly_site_url(): string
     {
-        $url = trim((string) ($_ENV['SOCLY_SITE_URL'] ?? 'https://www.socly.it'));
+        // Use apex host: www.socly.it 301-redirects and breaks browser CORS for news/API.
+        $url = trim((string) ($_ENV['SOCLY_SITE_URL'] ?? 'https://socly.it'));
         if ($url === '') {
-            $url = 'https://www.socly.it';
+            $url = 'https://socly.it';
         }
         return rtrim($url, '/');
     }

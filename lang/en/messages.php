@@ -100,6 +100,8 @@ return [
         'reset_success' => 'Password updated. You can sign in now.',
         'reset_invalid' => 'Invalid recovery link.',
         'reset_expired' => 'Recovery link expired. Please request a new one.',
+        'demo_login_notice' => "Demo environment\n\nThis trial instance expires on :expires.\n\nDo not enter real personal data — use fictional information only.",
+        'demo_login_notice_ok' => 'Got it',
         'footer_tagline' => 'Made with :heart by Stimpfl Daniel',
     ],
     'install' => [

@@ -80,11 +80,13 @@ $year = date('Y');
             <?php endif; ?>
             <div class="auth-brand-meta">
                 <p class="auth-license-note" data-i18n-html="auth.license_note"><?= with_auth_asterisk(e(__('auth.license_note'))) ?></p>
+                <?php if (!is_temporary_instance()): ?>
                 <p class="auth-updates-line">
                     <button type="button" class="auth-check-updates" data-auth-check-updates data-updates-endpoint="<?= e(url('/api/updates/check')) ?>">
                         <span data-i18n="auth.check_updates"><?= e(__('auth.check_updates')) ?></span>
                     </button>
                 </p>
+                <?php endif; ?>
             </div>
         </aside>
         <section class="auth-panel">
