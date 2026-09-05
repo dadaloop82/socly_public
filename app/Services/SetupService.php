@@ -1692,13 +1692,25 @@ final class SetupService
             if (!$this->legalTextIsEmpty($settingsKey)) {
                 continue;
             }
-            if (empty($doc['absolute']) || !is_file((string) $doc['absolute'])) {
+            $path = (string) ($doc['absolute'] ?? '');
+            if ($path === '' || !is_file($path)) {
+                $id = (int) ($doc['id'] ?? 0);
+                if ($id > 0) {
+                    /** @var DocumentService $docs */
+                    $docs = app(DocumentService::class);
+                    $row = $docs->find($id);
+                    $rel = trim((string) ($row['file_path'] ?? ''));
+                    $resolved = $rel !== '' ? resolve_upload_absolute_path($rel) : null;
+                    $path = $resolved ?? '';
+                }
+            }
+            if ($path === '' || !is_file($path)) {
                 continue;
             }
             $targets[] = [
                 'title' => (string) ($doc['title'] ?? ''),
                 'filename' => (string) ($doc['filename'] ?? ''),
-                'absolute' => (string) $doc['absolute'],
+                'absolute' => $path,
                 'legal_kind' => $kind,
                 'id' => (int) ($doc['id'] ?? 0),
             ];
@@ -1721,7 +1733,10 @@ final class SetupService
             'documents' => $targets,
         ], JSON_UNESCAPED_UNICODE));
 
-        $php = PHP_BINARY !== '' ? PHP_BINARY : 'php';
+        $php = PHP_BINARY !== '' ? PHP_BINARY : '/usr/bin/php';
+        if (!is_file($php) || !is_executable($php)) {
+            $php = 'php';
+        }
         // Demos: code lives in SOCLY_CODE_PATH; instance has no bin/.
         $script = code_path('bin/runts-legal-prefill.php');
         if (!is_file($script)) {
@@ -2223,15 +2238,25 @@ final class SetupService
             $first = trim((string) ($row['first_name'] ?? ''));
             $last = trim((string) ($row['last_name'] ?? ''));
             $cf = strtoupper(preg_replace('/\s+/', '', (string) ($row['fiscal_code'] ?? '')) ?? '');
-            if ($first === '' && $last === '' && $cf === '') {
+            $organ = trim((string) ($row['organ_type'] ?? ''));
+            if ($first === '' && $last === '' && $cf === '' && $organ === '') {
+                continue;
+            }
+            // Organ selected without names → still a filled row (auditors step).
+            if ($organ !== '' && ($first === '' || $last === '')) {
+                $errors['people.' . $i] = __('validation.required');
                 continue;
             }
             if ($first === '' || $last === '') {
                 $errors['people.' . $i] = __('validation.required');
                 continue;
             }
-            // Fiscal code is optional in setup; validate format only when provided.
-            if ($cf !== '' && !$this->isValidPersonFiscalCode($cf)) {
+            // CF required whenever the person row is filled (board and auditors).
+            if ($cf === '') {
+                $errors['people.' . $i . '.fiscal_code'] = __('validation.required');
+                continue;
+            }
+            if (!$this->isValidPersonFiscalCode($cf)) {
                 $errors['people.' . $i . '.fiscal_code'] = __('validation.fiscal_code');
                 continue;
             }
@@ -2239,7 +2264,7 @@ final class SetupService
                 'first_name' => $first,
                 'last_name' => $last,
                 'fiscal_code' => $cf,
-                'notes' => trim((string) ($row['organ_type'] ?? '')),
+                'notes' => $organ,
             ];
         }
         if (!empty($step['required']) && count($people) < max(1, $min)) {

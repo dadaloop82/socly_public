@@ -3801,10 +3801,10 @@ html:has(.setup-body) {
 }
 .setup-title {
   font-size: clamp(1.7rem, 4vw, 2.2rem);
-  margin: 0.35rem 0 0.55rem;
+  margin: 0.35rem 0 0.9rem;
   max-width: 100%;
-  overflow: hidden;
-  line-height: 1.35;
+  overflow: visible;
+  line-height: 1.3;
 }
 .setup-title[data-setup-fit-title],
 .setup-title-lockup {
@@ -3830,7 +3830,7 @@ html:has(.setup-body) {
   color: var(--muted);
   font-size: 1.02rem;
   line-height: 1.5;
-  margin: 0 0 1rem;
+  margin: 0.15rem 0 1rem;
 }
 .setup-copy + .setup-copy-reassure {
   margin-top: -0.65rem;
@@ -5013,8 +5013,46 @@ button.setup-scrape-logo-frame:focus-visible .setup-scrape-logo-overlay {
   font-weight: 600;
 }
 .setup-field .setup-field-hint.is-ok {
-  color: color-mix(in srgb, #1a7a3c 85%, var(--ink));
-  font-weight: 600;
+  display: none;
+}
+.setup-input-validity {
+  position: relative;
+  display: block;
+  width: 100%;
+}
+.setup-input-validity > input,
+.setup-input-validity > select,
+.setup-input-validity > textarea {
+  width: 100%;
+  padding-right: 2.35rem;
+}
+.setup-input-validity-mark {
+  position: absolute;
+  right: 0.7rem;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 1rem;
+  font-weight: 800;
+  line-height: 1;
+  pointer-events: none;
+  color: transparent;
+}
+.setup-input-validity.is-valid .setup-input-validity-mark {
+  color: #1a7a3c;
+}
+.setup-input-validity.is-invalid .setup-input-validity-mark {
+  color: var(--danger, #9b1c1c);
+}
+.setup-input-validity > textarea ~ .setup-input-validity-mark {
+  top: 0.85rem;
+  transform: none;
+}
+.setup-locale-grid.is-valid::after {
+  content: '✓';
+  display: inline-block;
+  margin-top: 0.35rem;
+  color: #1a7a3c;
+  font-weight: 800;
 }
 .setup-field input.is-invalid,
 .setup-field select.is-invalid,

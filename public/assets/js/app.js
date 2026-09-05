@@ -4381,14 +4381,33 @@ function initSetupCtaGate(root) {
   refresh();
 }
 
-/** Live OK / error hints when the user leaves or confirms a setup field. */
+/** Live validity icons inside inputs (✓ / ✕) — no "Corretto" text under fields. */
 function initSetupFieldFeedback(root) {
   const form = root.querySelector('[data-setup-form]');
   if (!form) return;
-  const msgOk = form.dataset.msgFieldOk || 'OK';
   const msgRequired = form.dataset.msgFieldRequired || 'Required';
 
-  const ensureHint = (field) => {
+  const ensureWrap = (el) => {
+    if (!(el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement || el instanceof HTMLSelectElement)) {
+      return null;
+    }
+    if (el.type === 'radio' || el.type === 'checkbox' || el.type === 'hidden' || el.type === 'file') {
+      return null;
+    }
+    let wrap = el.closest('.setup-input-validity');
+    if (wrap) return wrap;
+    wrap = document.createElement('div');
+    wrap.className = 'setup-input-validity';
+    el.parentNode?.insertBefore(wrap, el);
+    wrap.appendChild(el);
+    const mark = document.createElement('span');
+    mark.className = 'setup-input-validity-mark';
+    mark.setAttribute('aria-hidden', 'true');
+    wrap.appendChild(mark);
+    return wrap;
+  };
+
+  const ensureErrHint = (field) => {
     let hint = field.querySelector(':scope > .setup-field-feedback');
     if (hint) return hint;
     hint = document.createElement('p');
@@ -4402,17 +4421,30 @@ function initSetupFieldFeedback(root) {
     if (!(el instanceof HTMLElement)) return;
     el.classList.toggle('is-valid', state === 'ok');
     el.classList.toggle('is-invalid', state === 'err');
-    const field = el.closest('.setup-field, .setup-people-row, label.setup-check');
+    const wrap = ensureWrap(el);
+    if (wrap) {
+      wrap.classList.toggle('is-valid', state === 'ok');
+      wrap.classList.toggle('is-invalid', state === 'err');
+      const mark = wrap.querySelector('.setup-input-validity-mark');
+      if (mark) {
+        mark.textContent = state === 'ok' ? '✓' : (state === 'err' ? '✕' : '');
+      }
+    }
+    const field = el.closest('.setup-field') || el.closest('.setup-locale-grid')?.parentElement;
     if (!field) return;
-    const hint = ensureHint(field instanceof HTMLLabelElement && field.classList.contains('setup-field')
-      ? field
-      : (el.closest('.setup-field') || field));
-    if (!(hint instanceof HTMLElement)) return;
-    const msg = String(message || '').trim();
-    hint.hidden = msg === '';
-    hint.textContent = msg;
-    hint.classList.toggle('is-error', state === 'err' && msg !== '');
-    hint.classList.toggle('is-ok', state === 'ok' && msg !== '');
+    const hint = ensureErrHint(field);
+    // Only show text for errors (why), never for "ok".
+    if (state === 'err') {
+      const msg = String(message || '').trim();
+      hint.hidden = msg === '';
+      hint.textContent = msg;
+      hint.classList.add('is-error');
+      hint.classList.remove('is-ok');
+    } else {
+      hint.hidden = true;
+      hint.textContent = '';
+      hint.classList.remove('is-error', 'is-ok');
+    }
   };
 
   const evaluate = (el) => {
@@ -4422,34 +4454,34 @@ function initSetupFieldFeedback(root) {
     if (el.disabled || el.type === 'hidden' || el.type === 'submit' || el.type === 'button') return;
     if (el.name === '_token' || el.name === 'step_index' || el.name === 'step_key') return;
     if (el.name === 'setup_exit' || el.name === 'setup_defer') return;
-    // Skip radios that are part of a group — validate the group via the checked one.
+
     if (el.type === 'radio') {
       const group = form.querySelectorAll(`input[type="radio"][name="${CSS.escape(el.name)}"]`);
       const anyChecked = [...group].some((r) => r instanceof HTMLInputElement && r.checked);
       const required = [...group].some((r) => r instanceof HTMLInputElement && r.required);
-      const card = el.closest('.setup-locale-card')?.parentElement || el.closest('.setup-field');
+      const grid = el.closest('.setup-locale-grid') || el.closest('.setup-field');
       if (required && !anyChecked) {
-        group.forEach((r) => paint(r, 'err', msgRequired));
-        if (card) {
-          const hint = ensureHint(card);
+        if (grid) {
+          grid.classList.add('is-invalid');
+          grid.classList.remove('is-valid');
+          const hint = ensureErrHint(grid.parentElement || grid);
           hint.hidden = false;
           hint.textContent = msgRequired;
           hint.classList.add('is-error');
-          hint.classList.remove('is-ok');
         }
       } else if (anyChecked) {
-        group.forEach((r) => paint(r, 'ok', ''));
-        if (card) {
-          const hint = ensureHint(card);
-          hint.hidden = false;
-          hint.textContent = msgOk;
-          hint.classList.remove('is-error');
-          hint.classList.add('is-ok');
+        if (grid) {
+          grid.classList.add('is-valid');
+          grid.classList.remove('is-invalid');
+          const hint = ensureErrHint(grid.parentElement || grid);
+          hint.hidden = true;
+          hint.textContent = '';
         }
       }
       return;
     }
 
+    ensureWrap(el);
     const empty = String(el.value || '').trim() === '';
     if (el.required && empty) {
       paint(el, 'err', msgRequired);
@@ -4469,7 +4501,7 @@ function initSetupFieldFeedback(root) {
       paint(el, 'err', el.validationMessage || msgRequired);
       return;
     }
-    paint(el, 'ok', msgOk);
+    paint(el, 'ok', '');
   };
 
   form.addEventListener('focusout', (event) => {
@@ -5785,6 +5817,27 @@ function initPeopleList(list) {
   const msgUnderage = list.dataset.msgCfUnderage || 'Dal codice fiscale risulta un’età inferiore a 18 anni. Continuare?';
   const msgContinue = list.dataset.msgCfContinue || 'Continua comunque';
   const msgFix = list.dataset.msgCfFix || 'Correggi';
+  const msgCfRequired = list.dataset.msgCfRequired
+    || form?.dataset.msgFieldRequired
+    || 'Campo obbligatorio.';
+
+  const syncPeopleCfRequired = () => {
+    rows.querySelectorAll('[data-people-row]').forEach((row) => {
+      const first = row.querySelector('input[name*="[first_name]"]')?.value?.trim() || '';
+      const last = row.querySelector('input[name*="[last_name]"]')?.value?.trim() || '';
+      const organ = row.querySelector('select[name*="[organ_type]"]')?.value?.trim() || '';
+      const cfInput = row.querySelector('input[data-people-cf], input[name*="[fiscal_code]"]');
+      if (!(cfInput instanceof HTMLInputElement)) return;
+      const filled = !!(first || last || organ);
+      cfInput.required = filled;
+      if (!filled) cfInput.setCustomValidity('');
+    });
+    form?.dispatchEvent(new Event('setup:cta-refresh', { bubbles: true }));
+  };
+
+  rows.addEventListener('input', syncPeopleCfRequired);
+  rows.addEventListener('change', syncPeopleCfRequired);
+  syncPeopleCfRequired();
 
   const reindex = () => {
     [...rows.querySelectorAll('[data-people-row]')].forEach((row, i) => {
@@ -5854,6 +5907,7 @@ function initPeopleList(list) {
     rows.insertAdjacentHTML('beforeend', html);
     reindex();
     initPlaceSuggest(list.closest('form') || list || document);
+    syncPeopleCfRequired();
   });
 
   rows.addEventListener('click', (event) => {
@@ -5864,10 +5918,12 @@ function initPeopleList(list) {
     if (rows.children.length <= 1) {
       row.querySelectorAll('input').forEach((input) => { input.value = ''; });
       row.querySelectorAll('select').forEach((select) => { select.value = ''; });
+      syncPeopleCfRequired();
       return;
     }
     row.remove();
     reindex();
+    syncPeopleCfRequired();
   });
 
   if (form && form.dataset.peopleCfGate !== '1') {
@@ -5878,11 +5934,26 @@ function initPeopleList(list) {
       if (!form.querySelector('[data-people-list]')) return;
 
       const warnings = [];
+      let missingCf = false;
       form.querySelectorAll('[data-people-row]').forEach((row) => {
         const first = row.querySelector('input[name*="[first_name]"]')?.value?.trim() || '';
         const last = row.querySelector('input[name*="[last_name]"]')?.value?.trim() || '';
         const cf = row.querySelector('input[name*="[fiscal_code]"]')?.value?.trim() || '';
-        if (!first && !last && !cf) return;
+        const organ = row.querySelector('select[name*="[organ_type]"]')?.value?.trim() || '';
+        if (!first && !last && !cf && !organ) return;
+        if ((first || last || organ) && !cf) {
+          missingCf = true;
+          const cfInput = row.querySelector('input[name*="[fiscal_code]"]');
+          if (cfInput instanceof HTMLInputElement) {
+            cfInput.setCustomValidity(msgCfRequired);
+            cfInput.reportValidity();
+          }
+        } else {
+          const cfInput = row.querySelector('input[name*="[fiscal_code]"]');
+          if (cfInput instanceof HTMLInputElement && cfInput.validationMessage === msgCfRequired) {
+            cfInput.setCustomValidity('');
+          }
+        }
         const label = personLabel(row);
         if (cf && first && last && !cfMatchesName(cf, first, last)) {
           warnings.push(fillTpl(msgMismatch, label));
@@ -5891,6 +5962,11 @@ function initPeopleList(list) {
           warnings.push(fillTpl(msgUnderage, label));
         }
       });
+      if (missingCf) {
+        event.preventDefault();
+        event.stopPropagation();
+        return;
+      }
       if (warnings.length === 0) return;
 
       event.preventDefault();
@@ -6254,9 +6330,23 @@ function initPlaceSuggest(root = document) {
             return (data.items || []).map((item) => ({
               label: item.label,
               apply: () => {
-                provinceInput.value = item.name || item.label;
+                const prev = provinceInput.value.trim();
+                const next = item.name || item.label;
+                provinceInput.value = next;
                 provinceInput.dataset.geoPicked = '1';
                 clearGeoFieldError(provinceInput);
+                // Province change invalidates CAP/city unless they already match.
+                if (prev && next && prev.toLowerCase() !== String(next).toLowerCase()) {
+                  if (postalInput instanceof HTMLInputElement) {
+                    postalInput.value = '';
+                    postalInput.dataset.geoPicked = '';
+                  }
+                  if (cityInput instanceof HTMLInputElement) {
+                    cityInput.value = '';
+                    cityInput.dataset.geoPicked = '';
+                  }
+                }
+                form?.dispatchEvent(new Event('setup:cta-refresh', { bubbles: true }));
               },
             }));
           },
@@ -6265,8 +6355,21 @@ function initPlaceSuggest(root = document) {
             run: async (raw) => {
               const data = await resolveGeoQuery(provincesUrl, { q: raw });
               await handleGeoResolveResult(data, provinceInput, (item) => {
-                provinceInput.value = item.name || item.label || raw;
+                const prev = provinceInput.value.trim();
+                const next = item.name || item.label || raw;
+                provinceInput.value = next;
+                if (prev && next && prev.toLowerCase() !== String(next).toLowerCase()) {
+                  if (postalInput instanceof HTMLInputElement) {
+                    postalInput.value = '';
+                    postalInput.dataset.geoPicked = '';
+                  }
+                  if (cityInput instanceof HTMLInputElement) {
+                    cityInput.value = '';
+                    cityInput.dataset.geoPicked = '';
+                  }
+                }
               }, confirmProvinceTpl, { notFoundTemplate: provinceNotFoundTpl });
+              form?.dispatchEvent(new Event('setup:cta-refresh', { bubbles: true }));
             },
           },
         });
@@ -6289,11 +6392,13 @@ function initPlaceSuggest(root = document) {
               cityInput.value = item.city;
               cityInput.dataset.geoPicked = '1';
               clearGeoFieldError(cityInput);
-              if (postalInput && item.cap && !postalInput.value) {
+              if (postalInput instanceof HTMLInputElement && item.cap) {
                 postalInput.value = item.cap;
+                postalInput.dataset.geoPicked = '1';
               }
               applyProvince(item);
               addressInput?.focus();
+              form?.dispatchEvent(new Event('setup:cta-refresh', { bubbles: true }));
             },
           }));
         },

@@ -613,8 +613,8 @@ $errorStep = flash('setup_error_step');
                                         <input type="text" name="people[<?= (int) $i ?>][last_name]" value="<?= e((string) ($person['last_name'] ?? '')) ?>" autocomplete="family-name">
                                     </label>
                                     <label class="setup-field">
-                                        <span><?= e(__('setup.field_person_fiscal_code')) ?></span>
-                                        <input type="text" name="people[<?= (int) $i ?>][fiscal_code]" value="<?= e((string) ($person['fiscal_code'] ?? '')) ?>" maxlength="16" autocomplete="off">
+                                        <span><?= e(__('setup.field_person_fiscal_code')) ?> *</span>
+                                        <input type="text" name="people[<?= (int) $i ?>][fiscal_code]" value="<?= e((string) ($person['fiscal_code'] ?? '')) ?>" maxlength="16" autocomplete="off" data-people-cf>
                                     </label>
                                     <button type="button" class="btn btn-ghost btn-sm" data-people-remove aria-label="<?= e(__('setup.remove_person')) ?>">×</button>
                                 </div>
@@ -643,8 +643,8 @@ $errorStep = flash('setup_error_step');
                                     <input type="text" name="people[__i__][last_name]" value="" autocomplete="family-name">
                                 </label>
                                 <label class="setup-field">
-                                    <span><?= e(__('setup.field_person_fiscal_code')) ?></span>
-                                    <input type="text" name="people[__i__][fiscal_code]" value="" maxlength="16" autocomplete="off">
+                                    <span><?= e(__('setup.field_person_fiscal_code')) ?> *</span>
+                                    <input type="text" name="people[__i__][fiscal_code]" value="" maxlength="16" autocomplete="off" data-people-cf>
                                 </label>
                                 <button type="button" class="btn btn-ghost btn-sm" data-people-remove aria-label="<?= e(__('setup.remove_person')) ?>">×</button>
                             </div>
@@ -850,12 +850,11 @@ $errorStep = flash('setup_error_step');
                         <p class="setup-hint muted" data-setup-legal-pdf-status hidden></p>
                     </div>
                     <div data-setup-line>
-                        <?php
-                        $namePrefix = $legalPrefix;
-                        $values = $legalValues;
-                        $placeholder = (string) $legalPlaceholder;
-                        require base_path('resources/views/partials/legal_doc_editor.php');
-                        ?>
+                        <?= view_partial('partials/legal_doc_editor', [
+                            'namePrefix' => $legalPrefix,
+                            'values' => $legalValues,
+                            'placeholder' => (string) $legalPlaceholder,
+                        ]) ?>
                     </div>
                     <p class="setup-hint muted" data-setup-line data-i18n="setup.legal_min_chars_hint"><?= e(__('setup.legal_min_chars_hint', ['min' => '50'])) ?></p>
                 <?php elseif ($stepType === 'member_types'): ?>
