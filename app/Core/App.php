@@ -116,14 +116,24 @@ final class App
         try {
             $router->dispatch($request);
         } catch (\Throwable $e) {
-            try {
-                $this->get('logger')->error('request.failed', [
-                    'path' => (string) ($request->path() ?? ''),
-                    'method' => (string) ($request->method() ?? ''),
-                    'error' => $e->getMessage(),
-                    'file' => $e->getFile() . ':' . $e->getLine(),
-                ]);
-            } catch (\Throwable) {
+            $ref = function_exists('socly_error_ref') ? socly_error_ref() : 'ERR';
+            if (function_exists('socly_log_uncaught_error')) {
+                socly_log_uncaught_error($e, $ref);
+            } else {
+                try {
+                    $this->get('logger')->error('request.failed', [
+                        'path' => (string) ($request->path() ?? ''),
+                        'method' => (string) ($request->method() ?? ''),
+                        'error' => $e->getMessage(),
+                        'file' => $e->getFile() . ':' . $e->getLine(),
+                    ]);
+                } catch (\Throwable) {
+                }
+            }
+            $verbose = function_exists('socly_should_show_error_details') && socly_should_show_error_details();
+            if (function_exists('socly_render_error_page')) {
+                socly_render_error_page($e, $verbose, ['ref' => $ref]);
+                return;
             }
             throw $e;
         }

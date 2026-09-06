@@ -467,4 +467,8 @@ $app->bind(PluginController::class, fn (App $a) => new PluginController(
     $a->get(PluginAdminService::class)
 ));
 
+if (function_exists('socly_register_fatal_error_page')) {
+    socly_register_fatal_error_page();
+}
+
 return $app;

@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 use Socly\Core\App;
 
+require_once __DIR__ . '/error_page.php';
+
 if (!function_exists('app')) {
     function app(?string $abstract = null): mixed
     {
