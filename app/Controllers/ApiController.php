@@ -49,7 +49,9 @@ final class ApiController extends BaseController
         $this->json([
             'items' => $this->geo->searchAddresses(
                 $query,
-                (string) $request->input('city', '')
+                (string) $request->input('city', ''),
+                6,
+                (string) $request->input('house_number', '')
             ),
         ]);
     }

@@ -6824,7 +6824,10 @@ function initPlaceSuggest(root = document) {
           if (!city) {
             return [{ label: cityFirstMsg, apply: () => pairedCity?.focus() }];
           }
-          const res = await fetch(`${addressesUrl}?q=${encodeURIComponent(q)}&city=${encodeURIComponent(city)}`);
+          const house = houseNumberInput instanceof HTMLInputElement ? houseNumberInput.value.trim() : '';
+          const qs = new URLSearchParams({ q, city });
+          if (house) qs.set('house_number', house);
+          const res = await fetch(`${addressesUrl}?${qs.toString()}`);
           const data = await res.json();
           const seen = new Set();
           return (data.items || []).flatMap((item) => {

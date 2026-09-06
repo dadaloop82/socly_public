@@ -164,73 +164,114 @@ final class GeoService
     }
 
     /** @return list<array{label:string,address:string,house_number:string,city:string,postal_code:string,lat:float,lon:float}> */
-    public function searchAddresses(string $query, string $city = '', int $limit = 6): array
+    public function searchAddresses(string $query, string $city = '', int $limit = 6, string $houseNumber = ''): array
     {
         $query = trim($query);
         $city = trim($city);
+        $houseNumber = trim($houseNumber);
         // Address suggestions are always scoped to the preselected city.
         if ($city === '' || mb_strlen($query) < 3) {
             return [];
         }
 
         $cityNeedle = $this->normalizePlace($city);
-        // Prefer structured Nominatim search so results stay in the chosen city.
-        $url = 'https://nominatim.openstreetmap.org/search?' . http_build_query([
-            'street' => $query,
-            'city' => $city,
-            'country' => 'Italy',
-            'format' => 'jsonv2',
-            'addressdetails' => 1,
-            'limit' => max($limit * 2, 8),
-            'countrycodes' => 'it',
-        ]);
-        $json = $this->httpGet($url);
-        if ($json === null || $json === '[]') {
-            // Fallback: free-form query still pinned to city + Italy.
-            $url = 'https://nominatim.openstreetmap.org/search?' . http_build_query([
-                'q' => $query . ', ' . $city . ', Italia',
-                'format' => 'jsonv2',
-                'addressdetails' => 1,
-                'limit' => max($limit * 2, 8),
-                'countrycodes' => 'it',
-            ]);
-            $json = $this->httpGet($url);
+        $bbox = $this->cityBoundingBox($city);
+        $data = [];
+        foreach ($this->streetQueryVariants($query) as $street) {
+            $streetWithNo = $houseNumber !== '' ? trim($street . ' ' . $houseNumber) : $street;
+            $paramSets = [
+                [
+                    'street' => $streetWithNo,
+                    'city' => $city,
+                    'country' => 'Italy',
+                    'format' => 'jsonv2',
+                    'addressdetails' => 1,
+                    'limit' => max($limit * 3, 10),
+                    'countrycodes' => 'it',
+                ],
+                [
+                    'q' => $streetWithNo . ', ' . $city . ', Italia',
+                    'format' => 'jsonv2',
+                    'addressdetails' => 1,
+                    'limit' => max($limit * 3, 10),
+                    'countrycodes' => 'it',
+                ],
+            ];
+            if ($bbox !== null) {
+                $paramSets[] = [
+                    'q' => $streetWithNo,
+                    'format' => 'jsonv2',
+                    'addressdetails' => 1,
+                    'limit' => max($limit * 3, 10),
+                    'countrycodes' => 'it',
+                    'viewbox' => $bbox['viewbox'],
+                    'bounded' => 1,
+                ];
+            }
+            foreach ($paramSets as $params) {
+                $json = $this->httpGet('https://nominatim.openstreetmap.org/search?' . http_build_query($params));
+                if ($json === null || $json === '[]') {
+                    continue;
+                }
+                $decoded = json_decode($json, true);
+                if (!is_array($decoded) || $decoded === []) {
+                    continue;
+                }
+                $data = array_merge($data, $decoded);
+            }
+            if ($data !== [] && $houseNumber !== '') {
+                break;
+            }
         }
-        if ($json === null) {
+        if ($data === []) {
             return [];
         }
-        $data = json_decode($json, true);
-        if (!is_array($data)) {
-            return [];
-        }
+
         $out = [];
         $seen = [];
         foreach ($data as $row) {
+            if (!is_array($row)) {
+                continue;
+            }
             $addr = is_array($row['address'] ?? null) ? $row['address'] : [];
-            $road = trim((string) ($addr['road'] ?? $addr['pedestrian'] ?? $addr['residential'] ?? $addr['path'] ?? ''));
-            $houseNumber = trim((string) ($addr['house_number'] ?? ''));
+            $road = trim((string) ($addr['road'] ?? $addr['pedestrian'] ?? $addr['residential'] ?? $addr['path'] ?? $row['name'] ?? ''));
+            $rowHouse = trim((string) ($addr['house_number'] ?? ''));
             $cityName = trim((string) ($addr['city'] ?? $addr['town'] ?? $addr['village'] ?? $addr['municipality'] ?? $addr['city_district'] ?? ''));
             $display = (string) ($row['display_name'] ?? '');
             if ($road === '') {
                 continue;
             }
-            if (!$this->addressMatchesCity($cityNeedle, $cityName, $display, $addr)) {
+            $lat = (float) ($row['lat'] ?? 0);
+            $lon = (float) ($row['lon'] ?? 0);
+            $cityOk = $this->addressMatchesCity($cityNeedle, $cityName, $display, $addr);
+            $inBox = $bbox !== null && $this->pointInBoundingBox($lat, $lon, $bbox);
+            $roadMatches = $this->roadMatchesQuery($query, $road);
+            // Accept city-tagged hits, or same road inside the comune bbox (OSM often
+            // tags border roads with the neighbouring town — e.g. Via Granara / Dozza).
+            if (!$cityOk && !($inBox && $roadMatches)) {
                 continue;
             }
             $postalCode = trim((string) ($addr['postcode'] ?? ''));
-            $streetLabel = trim($road . ($houseNumber !== '' ? ' ' . $houseNumber : ''));
+            // Border roads mistagged to a neighbour often carry that town's CAP — prefer the selected comune CAP.
+            if (!$cityOk && $inBox) {
+                $comune = $this->findComune($city);
+                $cityCap = trim((string) ($comune['cap'] ?? ''));
+                if ($cityCap !== '') {
+                    $postalCode = $cityCap;
+                }
+            }
+            $streetLabel = trim($road . ($rowHouse !== '' ? ' ' . $rowHouse : ''));
             $item = [
                 'label' => trim($streetLabel . ', ' . $city),
                 'address' => $road,
-                'house_number' => $houseNumber,
+                'house_number' => $rowHouse,
                 'city' => $city,
                 'postal_code' => $postalCode,
-                'lat' => (float) ($row['lat'] ?? 0),
-                'lon' => (float) ($row['lon'] ?? 0),
+                'lat' => $lat,
+                'lon' => $lon,
             ];
             $uniqueKey = $this->addressUniqueKey($item);
             if (isset($seen[$uniqueKey])) {
-                // Keep the richer duplicate (with house number / CAP) if we already stored a poorer one.
                 $existingIdx = $seen[$uniqueKey];
                 if ($this->addressRichness($item) > $this->addressRichness($out[$existingIdx])) {
                     $out[$existingIdx] = $item;
@@ -420,9 +461,20 @@ final class GeoService
         }
 
         $typedNorm = $this->normalizePlace($query);
-        $results = $this->searchAddresses($query, $city, 5);
+        $results = $this->searchAddresses($query, $city, 5, $houseNumber);
         if ($results === []) {
             return ['action' => 'not_found'];
+        }
+
+        $top = $results[0];
+        $road = trim((string) ($top['address'] ?? ''));
+        if ($road !== '' && $this->roadMatchesQuery($query, $road)) {
+            $canonicalNorm = $this->normalizePlace($road);
+            $label = trim((string) ($top['label'] ?? $road));
+            if ($canonicalNorm === $typedNorm && $road === $query) {
+                return ['action' => 'none'];
+            }
+            return ['action' => 'apply', 'item' => $top, 'label' => $label !== '' ? $label : $road];
         }
 
         return $this->resolvePlaceChoice(
@@ -741,6 +793,113 @@ final class GeoService
         }
         $decoded = json_decode((string) file_get_contents($path), true);
         return self::$comuni = is_array($decoded) ? $decoded : [];
+    }
+
+
+    /** @return list<string> */
+    private function streetQueryVariants(string $query): array
+    {
+        $query = trim(preg_replace('/\s+/u', ' ', $query) ?? $query);
+        if ($query === '') {
+            return [];
+        }
+        $variants = [$query];
+        $norm = $this->normalizePlace($query);
+        $prefixes = ['via', 'viale', 'corso', 'piazza', 'piazzale', 'largo', 'vicolo', 'strada', 'contrada', 'localita', 'località'];
+        $hasPrefix = false;
+        foreach ($prefixes as $prefix) {
+            if (str_starts_with($norm, $prefix . ' ') || $norm === $prefix) {
+                $hasPrefix = true;
+                break;
+            }
+        }
+        if (!$hasPrefix) {
+            $variants[] = 'Via ' . $query;
+        }
+        return array_values(array_unique($variants));
+    }
+
+    private function roadMatchesQuery(string $query, string $road): bool
+    {
+        $q = $this->normalizePlace($query);
+        $r = $this->normalizePlace($road);
+        if ($q === '' || $r === '') {
+            return false;
+        }
+        if ($q === $r || $this->placesSimilar($q, $r)) {
+            return true;
+        }
+        // "granara" vs "via granara"
+        if (str_contains($r, $q) || str_contains($q, $r)) {
+            return true;
+        }
+        $strip = static function (string $value): string {
+            return trim(preg_replace('/^(via|viale|corso|piazza|piazzale|largo|vicolo|strada|contrada|localita)\\s+/u', '', $value) ?? $value);
+        };
+        $qCore = $strip($q);
+        $rCore = $strip($r);
+        return $qCore !== '' && $rCore !== '' && ($qCore === $rCore || $this->placesSimilar($qCore, $rCore));
+    }
+
+    /**
+     * @return array{viewbox:string,south:float,north:float,west:float,east:float}|null
+     */
+    private function cityBoundingBox(string $city): ?array
+    {
+        static $cache = [];
+        $key = $this->normalizePlace($city);
+        if ($key === '') {
+            return null;
+        }
+        if (array_key_exists($key, $cache)) {
+            return $cache[$key];
+        }
+        $json = $this->httpGet('https://nominatim.openstreetmap.org/search?' . http_build_query([
+            'q' => $city . ', Italia',
+            'format' => 'jsonv2',
+            'addressdetails' => 1,
+            'limit' => 1,
+            'countrycodes' => 'it',
+        ]));
+        if ($json === null) {
+            return $cache[$key] = null;
+        }
+        $data = json_decode($json, true);
+        if (!is_array($data) || !isset($data[0]) || !is_array($data[0])) {
+            return $cache[$key] = null;
+        }
+        $box = $data[0]['boundingbox'] ?? null;
+        if (!is_array($box) || count($box) < 4) {
+            return $cache[$key] = null;
+        }
+        $south = (float) $box[0];
+        $north = (float) $box[1];
+        $west = (float) $box[2];
+        $east = (float) $box[3];
+        // Pad slightly so border streets just outside the polygon still match.
+        $padLat = max(0.01, ($north - $south) * 0.08);
+        $padLon = max(0.01, ($east - $west) * 0.08);
+        $south -= $padLat;
+        $north += $padLat;
+        $west -= $padLon;
+        $east += $padLon;
+        return $cache[$key] = [
+            'viewbox' => implode(',', [$west, $north, $east, $south]),
+            'south' => $south,
+            'north' => $north,
+            'west' => $west,
+            'east' => $east,
+        ];
+    }
+
+    /** @param array{south:float,north:float,west:float,east:float} $bbox */
+    private function pointInBoundingBox(float $lat, float $lon, array $bbox): bool
+    {
+        if ($lat == 0.0 && $lon == 0.0) {
+            return false;
+        }
+        return $lat >= $bbox['south'] && $lat <= $bbox['north']
+            && $lon >= $bbox['west'] && $lon <= $bbox['east'];
     }
 
     private function httpGet(string $url): ?string
