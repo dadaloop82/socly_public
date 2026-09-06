@@ -1,6 +1,8 @@
 <?php
 /**
- * Shared city / CAP / street / house-number block (suggest-enabled).
+ * Standard SOCLY address block — use everywhere (setup, members, settings, org).
+ * City / CAP / street / house-number with shared suggest + foreign toggle.
+ * Do not reimplement city/street inputs ad-hoc; pass names/values/enabled only.
  *
  * @var array<string,string> $names Input name attributes
  * @var array<string,string> $values Current values

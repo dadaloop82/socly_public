@@ -26,7 +26,8 @@
   --muted: color-mix(in srgb, var(--brand-primary) 22%, #667774);
   --surface: color-mix(in srgb, var(--brand-primary) 10%, #eef2f1);
   --card: #ffffff;
-  --line: color-mix(in srgb, var(--brand-primary) 16%, transparent);
+  /* Mix against a solid grey so light brand palettes still show field borders */
+  --line: color-mix(in srgb, var(--brand-primary-ink) 22%, #c5cdca);
   --danger: #A61B1B;
   --ok: #0F6B4C;
   --shadow: 0 24px 60px color-mix(in srgb, var(--brand-primary) 18%, transparent);
@@ -1527,6 +1528,22 @@ input[type="search"], select, textarea {
   color: var(--ink);
   max-width: 100%;
   transition: border-color 0.15s ease, box-shadow 0.15s ease, transform 0.15s ease;
+}
+/* Specialty / member fields share the same visible chrome as setup */
+.member-form input[type="text"],
+.member-form input[type="email"],
+.member-form input[type="password"],
+.member-form input[type="number"],
+.member-form input[type="date"],
+.member-form input[type="tel"],
+.member-form input[type="search"],
+.member-form select,
+.member-form textarea,
+.geo-address input,
+.geo-birth-place input,
+.phone-field input,
+.phone-field select {
+  border-color: var(--line);
 }
 input:focus, select:focus, textarea:focus {
   outline: 2px solid color-mix(in srgb, var(--brand-primary) 35%, white);
@@ -4114,8 +4131,14 @@ html:has(.setup-body) {
   max-width: 100%;
   box-sizing: border-box;
 }
-.geo-address-host {
+.geo-address-host,
+.member-form,
+.member-form .member-profile-grid,
+.member-form .wizard-panel.is-active {
   overflow: visible;
+}
+.suggest-list {
+  border-color: color-mix(in srgb, var(--brand-primary-ink) 28%, #c5cdca);
 }
 .geo-hint,
 .setup-hint {

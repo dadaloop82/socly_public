@@ -1037,6 +1037,8 @@ if (!function_exists('brand_derived_css_vars')) {
             '--brand-accent-ink' => $accentInk,
             '--brand-accent-muted' => $accentMuted,
             '--brand-accent-on-dark' => $accentOnDark,
+            // Keep form borders readable even when primary is a light tint.
+            '--line' => 'color-mix(in srgb, ' . $primaryInk . ' 22%, #c5cdca)',
         ];
     }
 }

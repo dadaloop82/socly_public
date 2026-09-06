@@ -109,6 +109,35 @@ foreach ($fields as $field) {
 $geoAddressKeys = ['city', 'postal_code', 'address', 'house_number'];
 $geoAddressKeySet = array_fill_keys($geoAddressKeys, true);
 
+/** Full residence block across all archive fields (never split across wizard steps). */
+$allGeoFieldsByKey = [];
+foreach ($fields as $field) {
+    $gk = (string) ($field['key'] ?? '');
+    $gType = \Socly\Support\MemberFieldTypes::resolve((string) ($field['field_type'] ?? 'text'), $gk);
+    if (isset($geoAddressKeySet[$gk]) || in_array($gType, [
+        \Socly\Support\MemberFieldTypes::CITY,
+        \Socly\Support\MemberFieldTypes::STREET,
+        \Socly\Support\MemberFieldTypes::HOUSE_NUMBER,
+        \Socly\Support\MemberFieldTypes::POSTAL_CODE,
+    ], true)) {
+        $allGeoFieldsByKey[$gk] = $field;
+    }
+}
+$geoHomeStepKey = null;
+foreach ($formSteps as $step) {
+    $sk = (string) ($step['key'] ?? '');
+    foreach ($fieldsByFormStep[$sk] ?? [] as $field) {
+        $gk = (string) ($field['key'] ?? '');
+        if (isset($allGeoFieldsByKey[$gk])) {
+            $geoHomeStepKey = $sk;
+            break 2;
+        }
+    }
+}
+if ($geoHomeStepKey === null && $allGeoFieldsByKey !== []) {
+    $geoHomeStepKey = $defaultFormStepKey;
+}
+
 $renderTextField = static function (array $field) use ($fieldValue, $icons): string {
     $val = $fieldValue($field);
     $key = (string) $field['key'];
@@ -247,12 +276,14 @@ $isRowBreakField = static function (array $field) use ($geoAddressKeySet): bool 
     ], true);
 };
 
-$buildProfileFieldsHtml = function (array $list) use (
+$buildProfileFieldsHtml = function (array $list, ?string $stepKey = null) use (
     $fieldValue,
     $renderTextField,
     $isRowBreakField,
     $geoAddressKeys,
     $geoAddressKeySet,
+    $allGeoFieldsByKey,
+    $geoHomeStepKey,
     $reqFor,
     $valFor,
     $isEdit,
@@ -265,6 +296,10 @@ $buildProfileFieldsHtml = function (array $list) use (
     foreach ($list as $field) {
         $listByKey[(string) ($field['key'] ?? '')] = $field;
     }
+    $geoBagByKey = $allGeoFieldsByKey !== [] ? $allGeoFieldsByKey : $listByKey;
+    $renderFullGeoHere = $stepKey === null
+        || $geoHomeStepKey === null
+        || $stepKey === $geoHomeStepKey;
     ob_start();
     $renderedKeys = [];
     $fieldCount = count($list);
@@ -363,15 +398,19 @@ $buildProfileFieldsHtml = function (array $list) use (
         ], true)):
             $flushPending();
             foreach ($geoAddressKeys as $gk) {
-                if (isset($listByKey[$gk])) {
-                    $renderedKeys[$gk] = true;
-                }
+                $renderedKeys[$gk] = true;
+            }
+            foreach (array_keys($geoBagByKey) as $gk) {
+                $renderedKeys[$gk] = true;
             }
             $index++;
+            if (!$renderFullGeoHere) {
+                continue;
+            }
             ?>
             <div class="member-field-row is-full geo-address-host" data-field="residence">
                 <?= view_partial('partials/geo_address', [
-                    'layout' => 'inline',
+                    'layout' => 'rows',
                     'names' => [
                         'city' => 'fields[city]',
                         'postal_code' => 'fields[postal_code]',
@@ -397,10 +436,10 @@ $buildProfileFieldsHtml = function (array $list) use (
                         'house_number' => 'field-house_number',
                     ],
                     'enabled' => [
-                        'city' => isset($listByKey['city']),
-                        'postal_code' => isset($listByKey['postal_code']),
-                        'address' => isset($listByKey['address']),
-                        'house_number' => isset($listByKey['house_number']),
+                        'city' => isset($geoBagByKey['city']),
+                        'postal_code' => isset($geoBagByKey['postal_code']),
+                        'address' => isset($geoBagByKey['address']),
+                        'house_number' => isset($geoBagByKey['house_number']),
                     ],
                 ]) ?>
             </div>
@@ -485,10 +524,10 @@ $buildProfileFieldsHtml = function (array $list) use (
 $profileHtmlByStep = [];
 foreach ($formSteps as $step) {
     $stepKey = (string) ($step['key'] ?? '');
-    $profileHtmlByStep[$stepKey] = $buildProfileFieldsHtml($fieldsByFormStep[$stepKey] ?? []);
+    $profileHtmlByStep[$stepKey] = $buildProfileFieldsHtml($fieldsByFormStep[$stepKey] ?? [], $stepKey);
 }
-$tesseraExtraHtml = $buildProfileFieldsHtml($tesseraExtraFields);
-$paymentExtraHtml = $buildProfileFieldsHtml($paymentExtraFields);
+$tesseraExtraHtml = $buildProfileFieldsHtml($tesseraExtraFields, \Socly\Services\MemberService::STEP_TESSERA);
+$paymentExtraHtml = $buildProfileFieldsHtml($paymentExtraFields, \Socly\Services\MemberService::STEP_PAYMENT);
 ?>
 
 <div class="page-header">
@@ -517,6 +556,8 @@ $paymentExtraHtml = $buildProfileFieldsHtml($paymentExtraFields);
     data-total-steps="<?= (int)$totalSteps ?>"
     data-cities-url="<?= e(url('/api/geo/cities')) ?>"
     data-addresses-url="<?= e(url('/api/geo/addresses')) ?>"
+    data-cap-url="<?= e(url('/api/geo/cap')) ?>"
+    data-provinces-url="<?= e(url('/api/geo/provinces')) ?>"
     data-cf-url="<?= e(url('/api/fiscal-code')) ?>"
     data-csrf="<?= e(csrf_token()) ?>"
     data-enrollment-method="<?= e($enrollmentMethod) ?>"

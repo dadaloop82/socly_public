@@ -40,3 +40,23 @@ Rules for current and future views:
 5. **Page headers** — `.page-header` with `.titles` + `.actions`; actions wrap / full-width on small screens.
 6. **Touch** — buttons keep usable height; form controls stay `font-size: 1rem` (avoids iOS zoom).
 7. **No fixed desktop widths** in new views; prefer `%`, `minmax`, `clamp`, and existing utility classes.
+
+## Standard specialty form fields
+
+Fields with specific behaviour must reuse the shared partials — never reinvent markup or JS.
+
+| Capability | Partial | Hooks / JS |
+|------------|---------|------------|
+| City / CAP / street / house no. | `resources/views/partials/geo_address.php` | `data-city-input`, `data-address-input`, … · `initPlaceSuggest` |
+| Birth place | `resources/views/partials/geo_birth_place.php` | `data-birth-place-input` |
+| Foreign address toggle | `resources/views/partials/geo_foreign_bar.php` | `data-geo-foreign-toggle` |
+| Phone (+ dial) | `resources/views/partials/phone_field.php` | `data-phone-field` · `initPhoneInputs` |
+| Password show/hide | `resources/views/partials/password_input.php` | `initPasswordToggles` |
+
+Rules:
+
+1. Call `view_partial('partials/geo_address', …)` for any residence/seat address (setup, members, settings, org).
+2. Prefer `layout => 'rows'` (same as setup). Use `inline` only when space is intentionally tight.
+3. Keep city + street in the **same** geo scope so street autocomplete always has a city sibling.
+4. Wire geo API URLs on `body` or the form (`data-cities-url`, `data-addresses-url`, `data-cap-url`, `data-provinces-url`).
+5. Borders use `--line` (derived from `--brand-primary-ink`) so light association palettes stay readable.

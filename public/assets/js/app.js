@@ -925,13 +925,15 @@ function applyReadableBrandVars(primary, accent, target = document.documentEleme
   const paper = '#FFFFFF';
   const deep = brandMixHex(p, '#000000', 0.72);
   const accentInk = brandReadableHex(a, paper, 4.5);
-  target.style.setProperty('--brand-primary-ink', brandReadableHex(p, paper, 4.5));
+  const primaryInk = brandReadableHex(p, paper, 4.5);
+  target.style.setProperty('--brand-primary-ink', primaryInk);
   target.style.setProperty('--brand-accent-ink', accentInk);
   target.style.setProperty(
     '--brand-accent-muted',
     brandReadableHex(brandMixHex(accentInk, paper, 0.28), paper, 3.0)
   );
   target.style.setProperty('--brand-accent-on-dark', brandReadableHex(a, deep, 4.5));
+  target.style.setProperty('--line', `color-mix(in srgb, ${primaryInk} 22%, #c5cdca)`);
 }
 
 function brandColorsTooClose(a, b) {
