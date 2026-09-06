@@ -274,6 +274,10 @@ $errorStep = flash('setup_error_step');
                                 <div class="setup-runts-block" data-setup-runts
                                      data-runts-url="<?= e(url('/setup/runts-lookup')) ?>"
                                      data-csrf="<?= e(csrf_token()) ?>"
+                                     data-runts-max="<?= (int) ($runtsAttemptsMax ?? 3) ?>"
+                                     data-runts-left="<?= (int) ($runtsAttemptsLeft ?? 3) ?>"
+                                     data-runts-cooldown="<?= (int) ($runtsCooldownSeconds ?? 8) ?>"
+                                     <?= !empty($runtsExhausted) ? 'data-runts-exhausted="1"' : '' ?>
                                      data-label-template="<?= e(__('setup.runts_button')) ?>"
                                      data-msg-need="<?= e(__('setup.runts_need_number')) ?>"
                                      data-msg-loading="<?= e(__('setup.runts_loading')) ?>"
@@ -282,6 +286,7 @@ $errorStep = flash('setup_error_step');
                                      data-msg-not-found="<?= e(__('setup.runts_not_found')) ?>"
                                      data-msg-timeout="<?= e(__('setup.runts_timeout')) ?>"
                                      data-msg-elapsed="<?= e(__('setup.runts_elapsed')) ?>"
+                                     data-msg-attempts-left="<?= e(__('setup.runts_attempts_left')) ?>"
                                      data-msg-phase-connect="<?= e(__('setup.runts_phase_connect')) ?>"
                                      data-msg-phase-download-active="<?= e(__('setup.runts_phase_download_active')) ?>"
                                      data-msg-phase-download-cancelled="<?= e(__('setup.runts_phase_download_cancelled')) ?>"

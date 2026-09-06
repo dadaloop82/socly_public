@@ -17,8 +17,8 @@ use Socly\Setup\SetupCatalogue;
 
 final class SetupController extends BaseController
 {
-    private const RUNTS_MAX_ATTEMPTS = 5;
-    private const RUNTS_COOLDOWN_SECONDS = 60;
+    private const RUNTS_MAX_ATTEMPTS = 3;
+    private const RUNTS_COOLDOWN_SECONDS = 8;
     private const RUNTS_ATTEMPTS_WINDOW = 86400;
 
     public function __construct(
@@ -153,6 +153,7 @@ final class SetupController extends BaseController
             unset($_SESSION['_flash']['errors'], $_SESSION['_flash']['setup_error_step']);
         }
 
+        $runtsQuota = $this->runtsLookupQuota($request);
         $this->render('setup/wizard', [
             'title' => __('setup.title'),
             'mode' => 'step',
@@ -166,7 +167,29 @@ final class SetupController extends BaseController
             'assocName' => assoc_capitalize_name((string) ($branding['name'] ?? '')),
             'assocLegal' => trim((string) ($branding['legal_name'] ?? '')),
             'backHref' => $this->backHrefForStep($step, $planKeys),
+            'runtsAttemptsMax' => $runtsQuota['max'],
+            'runtsAttemptsLeft' => $runtsQuota['left'],
+            'runtsAttemptsUsed' => $runtsQuota['used'],
+            'runtsExhausted' => $runtsQuota['exhausted'],
+            'runtsCooldownSeconds' => self::RUNTS_COOLDOWN_SECONDS,
         ], 'layouts/setup');
+    }
+
+    /**
+     * @return array{max:int,used:int,left:int,exhausted:bool}
+     */
+    private function runtsLookupQuota(Request $request): array
+    {
+        $totalKey = 'setup_runts_total:' . $request->ip();
+        $used = $this->limiter->attempts($totalKey);
+        $max = self::RUNTS_MAX_ATTEMPTS;
+        $left = max(0, $max - $used);
+        return [
+            'max' => $max,
+            'used' => $used,
+            'left' => $left,
+            'exhausted' => $left <= 0 && $used > 0,
+        ];
     }
 
     /**
@@ -1094,26 +1117,50 @@ final class SetupController extends BaseController
                     // Clear sticky OCR status from earlier lookups on this demo.
                     $this->setup->storeLegalOcrState('none', [], [], false);
                     $legalPrefill = $this->setup->prefillLegalTextsFromDocuments($savedDocuments, false);
+                    $extractor = new \Socly\Services\PdfTextExtractor();
+                    $ocrDebug = $extractor->ocrDiagnostics();
+                    $ocrDebug['queue'] = null;
+                    $ocrDebug['path'] = 'native_prefill';
                     if (!empty($legalPrefill['pending_ocr'])) {
-                        $extractor = new \Socly\Services\PdfTextExtractor();
-                        $ocrOk = $extractor->ocrAvailable();
-                        $queued = $ocrOk && $this->setup->queueLegalPrefillFromDocuments($savedDocuments);
+                        $ocrOk = !empty($ocrDebug['available']);
+                        $queued = false;
+                        $queueMeta = [];
+                        if ($ocrOk) {
+                            $queueMeta = $this->setup->queueLegalPrefillFromDocumentsMeta($savedDocuments);
+                            $queued = !empty($queueMeta['ok']);
+                            $ocrDebug['queue'] = $queueMeta;
+                        }
                         if ($queued) {
                             $legalPrefill['status'] = 'pending';
                             $legalPrefill['pending_ocr'] = true;
+                            $ocrDebug['path'] = 'background_queue';
                         } elseif ($ocrOk) {
                             // Background spawn failed: short inline OCR that fits Apache's 30s budget.
                             @set_time_limit(120);
                             $emit(['type' => 'progress', 'phase' => 'docs_ocr', 'percent' => 98, 'number' => $number]);
                             $legalPrefill = $this->setup->prefillLegalTextsFromDocumentsFastOcr($savedDocuments);
+                            $ocrDebug['path'] = 'inline_fast_ocr';
+                            $ocrDebug['inline_status'] = (string) ($legalPrefill['status'] ?? '');
+                            $ocrDebug['inline_prefilled'] = $legalPrefill['prefilled'] ?? [];
                         } else {
                             $legalPrefill['pending_ocr'] = false;
                             $legalPrefill['status'] = 'unavailable';
                             $this->setup->storeLegalOcrState('unavailable', [], [], false);
+                            $ocrDebug['path'] = 'unavailable';
                         }
                     } else {
                         $legalPrefill = $this->setup->enrichLegalPrefillWithExisting($savedDocuments, $legalPrefill);
+                        $ocrDebug['path'] = 'no_pending_ocr';
+                        $ocrDebug['prefill_status'] = (string) ($legalPrefill['status'] ?? '');
                     }
+                    $legalPrefill['ocr_debug'] = $ocrDebug;
+                    $emit([
+                        'type' => 'progress',
+                        'phase' => 'docs_ocr',
+                        'percent' => 99,
+                        'number' => $number,
+                        'ocr_debug' => $ocrDebug,
+                    ]);
                 }
             } else {
                 $warnings[] = (string) ($detail['error'] ?? __('setup.runts_detail_fail'));
@@ -1182,6 +1229,7 @@ final class SetupController extends BaseController
                 'methods' => $legalPrefill['methods'] ?? [],
                 'status' => (string) ($legalPrefill['status'] ?? 'none'),
                 'attempted' => $legalPrefill['attempted'] ?? [],
+                'ocr_debug' => is_array($legalPrefill['ocr_debug'] ?? null) ? $legalPrefill['ocr_debug'] : null,
             ],
             'elapsed_ms' => $result['elapsed_ms'] ?? null,
             'attempts_left' => $attemptsLeft,

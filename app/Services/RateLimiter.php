@@ -59,6 +59,20 @@ final class RateLimiter
         return max(0, $data['reset_at'] - time());
     }
 
+    /** Current attempt count for an unexpired window (0 if none / expired). */
+    public function attempts(string $key): int
+    {
+        $data = $this->read($key);
+        if ($data === null) {
+            return 0;
+        }
+        if ($data['reset_at'] < time()) {
+            $this->clear($key);
+            return 0;
+        }
+        return max(0, (int) $data['attempts']);
+    }
+
     private function path(string $key): string
     {
         return $this->storagePath . '/' . hash('sha256', $key) . '.json';

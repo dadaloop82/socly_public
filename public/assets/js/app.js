@@ -3724,7 +3724,39 @@ function initSetupRuntsLookup(root) {
   let lookingUp = false;
   let cooldownTimer = 0;
   const TIMEOUT_MS = 240000;
-  const COOLDOWN_SECONDS = Math.max(1, Number(box.dataset.runtsCooldown || 60) || 60);
+  const COOLDOWN_SECONDS = Math.max(1, Number(box.dataset.runtsCooldown || 8) || 8);
+  const MAX_ATTEMPTS = Math.max(1, Number(box.dataset.runtsMax || 3) || 3);
+  const storageKey = (() => {
+    try {
+      return `socly_runts_exhausted:${location.pathname}`;
+    } catch {
+      return 'socly_runts_exhausted';
+    }
+  })();
+
+  const readStoredExhausted = () => {
+    try {
+      return sessionStorage.getItem(storageKey) === '1';
+    } catch {
+      return false;
+    }
+  };
+  const writeStoredExhausted = () => {
+    try {
+      sessionStorage.setItem(storageKey, '1');
+    } catch {
+      /* ignore */
+    }
+  };
+
+  let attemptsLeft = Number(box.dataset.runtsLeft);
+  if (!Number.isFinite(attemptsLeft)) attemptsLeft = MAX_ATTEMPTS;
+  attemptsLeft = Math.max(0, Math.min(MAX_ATTEMPTS, attemptsLeft));
+  if (box.dataset.runtsExhausted === '1' || attemptsLeft <= 0 || readStoredExhausted()) {
+    box.dataset.runtsExhausted = '1';
+    attemptsLeft = 0;
+    writeStoredExhausted();
+  }
 
   const refreshCta = () => {
     form?.dispatchEvent(new CustomEvent('setup:cta-refresh'));
@@ -3748,11 +3780,35 @@ function initSetupRuntsLookup(root) {
   const markExhausted = () => {
     box.dataset.runtsExhausted = '1';
     box.dataset.runtsCooldowning = '0';
+    attemptsLeft = 0;
+    writeStoredExhausted();
     if (cooldownTimer) {
       window.clearTimeout(cooldownTimer);
       cooldownTimer = 0;
     }
     hideBtn();
+  };
+
+  const setAttemptsLeft = (left) => {
+    if (!Number.isFinite(left)) return;
+    attemptsLeft = Math.max(0, Math.min(MAX_ATTEMPTS, Math.floor(left)));
+    box.dataset.runtsLeft = String(attemptsLeft);
+    if (attemptsLeft <= 0) markExhausted();
+  };
+
+  const attemptsLeftMessage = () => {
+    const tpl = box.dataset.msgAttemptsLeft || 'Tentativi RUNTS rimasti: :left su :max.';
+    return tpl.replaceAll(':left', String(attemptsLeft)).replaceAll(':max', String(MAX_ATTEMPTS));
+  };
+
+  const logOcrDebug = (payload, where) => {
+    const debug = payload && typeof payload === 'object' ? payload.ocr_debug || payload : null;
+    if (!debug || typeof debug !== 'object') return;
+    try {
+      console.info(`[Socly OCR] ${where || 'debug'}`, debug);
+    } catch {
+      /* ignore */
+    }
   };
 
   const armCooldown = (seconds) => {
@@ -3868,9 +3924,11 @@ function initSetupRuntsLookup(root) {
       return `<p class="setup-runts-note" data-setup-runts-legal>${escapeHtml(box.dataset.msgLegalOcrPending || '')}</p>`;
     }
     if (status === 'unavailable') {
+      logOcrDebug(legalPrefill, 'unavailable');
       return `<p class="setup-runts-note is-fail" data-setup-runts-legal>${escapeHtml(box.dataset.msgLegalOcrUnavailable || '')}</p>`;
     }
     if (status === 'failed') {
+      logOcrDebug(legalPrefill, 'failed');
       return `<p class="setup-runts-note is-fail" data-setup-runts-legal>${escapeHtml(box.dataset.msgLegalOcrFail || '')}</p>`;
     }
     return '';
@@ -4272,6 +4330,8 @@ function initSetupRuntsLookup(root) {
               attemptConsumed = true;
               if (event.percent != null) setProgress(event.percent);
               showStatus(phaseText(String(event.phase || ''), event.number || number), '');
+              if (event.ocr_debug) logOcrDebug(event, `progress:${event.phase || ''}`);
+              if (event.attempts_left != null) setAttemptsLeft(Number(event.attempts_left));
             } else if (event.type === 'start') {
               attemptConsumed = true;
               showStatus(phaseText('connect', number), '');
@@ -4279,9 +4339,11 @@ function initSetupRuntsLookup(root) {
               streamError = String(event.error || box.dataset.msgFail || '');
               streamErrorCode = String(event.code || '');
               streamRetryAfter = Number(event.retry_after) || 0;
+              if (event.attempts_left != null) setAttemptsLeft(Number(event.attempts_left));
             } else if (event.type === 'done') {
               attemptConsumed = true;
               donePayload = event;
+              if (event.attempts_left != null) setAttemptsLeft(Number(event.attempts_left));
             }
           }
         }
@@ -4300,6 +4362,7 @@ function initSetupRuntsLookup(root) {
         if (spinner instanceof HTMLElement) spinner.hidden = true;
         const warning = String(donePayload.warning || '').trim();
         const legalPrefill = donePayload.legal_prefill || {};
+        logOcrDebug(legalPrefill, 'done');
         let html = foundHtml(
           donePayload.fields || {},
           donePayload.documents || [],
@@ -4317,7 +4380,9 @@ function initSetupRuntsLookup(root) {
         }
       } else {
         const code = streamErrorCode || String(donePayload?.code || '');
-        if (code === 'rate_limit_exhausted') {
+        const leftFromPayload = donePayload?.attempts_left;
+        if (leftFromPayload != null) setAttemptsLeft(Number(leftFromPayload));
+        if (code === 'rate_limit_exhausted' || attemptsLeft <= 0) {
           limitHandled = true;
           markExhausted();
           showStatus(
@@ -4329,7 +4394,15 @@ function initSetupRuntsLookup(root) {
           const wait = streamRetryAfter || Number(donePayload?.retry_after) || COOLDOWN_SECONDS;
           startCooldownCountdown(wait);
         } else {
-          showStatus(streamError || donePayload?.error || box.dataset.msgFail || '', 'error');
+          const base = streamError || donePayload?.error || box.dataset.msgFail || '';
+          const withLeft = attemptsLeft > 0
+            ? `${base} ${attemptsLeftMessage()}`.trim()
+            : base;
+          showStatus(withLeft, 'error');
+          if (attemptsLeft <= 0) {
+            limitHandled = true;
+            markExhausted();
+          }
         }
       }
     } catch (err) {
@@ -4347,7 +4420,10 @@ function initSetupRuntsLookup(root) {
       if (progress && (status?.classList.contains('is-error') || status?.classList.contains('is-warn'))) {
         progress.hidden = true;
       }
-      if (!limitHandled && attemptConsumed && box.dataset.runtsExhausted !== '1') {
+      if (box.dataset.runtsExhausted === '1') {
+        hideBtn();
+      } else if (!limitHandled && attemptConsumed && !box.classList.contains('is-found')) {
+        // Short pause between the 3 attempts — keep the error visible, then re-enable.
         armCooldown(COOLDOWN_SECONDS);
       }
       setLookupBusy(false);

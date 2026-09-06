@@ -1693,6 +1693,15 @@ final class SetupService
      */
     public function queueLegalPrefillFromDocuments(array $documents): bool
     {
+        return !empty($this->queueLegalPrefillFromDocumentsMeta($documents)['ok']);
+    }
+
+    /**
+     * @param list<array<string, mixed>> $documents
+     * @return array{ok:bool,reason:string,script?:string,php?:string,targets?:int,job?:string,started?:bool}
+     */
+    public function queueLegalPrefillFromDocumentsMeta(array $documents): array
+    {
         $targets = [];
         foreach ($documents as $doc) {
             $kind = (string) ($doc['legal_kind'] ?? '');
@@ -1733,13 +1742,13 @@ final class SetupService
             ];
         }
         if ($targets === []) {
-            return false;
+            return ['ok' => false, 'reason' => 'no_targets', 'targets' => 0];
         }
 
         /** @var PdfTextExtractor $extractor */
         $extractor = app(PdfTextExtractor::class);
         if (!$extractor->ocrAvailable()) {
-            return false;
+            return ['ok' => false, 'reason' => 'ocr_unavailable', 'targets' => count($targets)];
         }
 
         $jobDir = storage_path('cache');
@@ -1756,7 +1765,14 @@ final class SetupService
         $script = code_path('bin/runts-legal-prefill.php');
         if (!is_file($script)) {
             @unlink($jobFile);
-            return false;
+            return [
+                'ok' => false,
+                'reason' => 'missing_script',
+                'script' => $script,
+                'php' => $php,
+                'targets' => count($targets),
+                'code_path' => code_path(),
+            ];
         }
 
         $cmd = sprintf(
@@ -1782,10 +1798,27 @@ final class SetupService
         if (!$started) {
             // Last resort: do not delete the job — leave it for a manual/retry path;
             // still report failure so caller can run a short inline OCR.
-            return false;
+            return [
+                'ok' => false,
+                'reason' => 'worker_not_started',
+                'script' => $script,
+                'php' => $php,
+                'targets' => count($targets),
+                'job' => basename($jobFile),
+                'started' => false,
+                'cmd_preview' => sprintf('%s %s …', $php, basename($script)),
+            ];
         }
         $this->settings->set('legal.runts_ocr_pending', '1');
-        return true;
+        return [
+            'ok' => true,
+            'reason' => 'queued',
+            'script' => $script,
+            'php' => $php,
+            'targets' => count($targets),
+            'job' => basename($jobFile),
+            'started' => true,
+        ];
     }
 
     private function resolvePhpCliBinary(): string

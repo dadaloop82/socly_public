@@ -64,22 +64,90 @@ final class PdfTextExtractor
 
     public function ocrAvailable(): bool
     {
-        if (!$this->canExec()) {
-            return false;
+        $diag = $this->ocrDiagnostics();
+        return !empty($diag['available']);
+    }
+
+    /**
+     * Host-level OCR capability probe (safe to expose in setup debug payloads).
+     *
+     * @return array{
+     *   available:bool,
+     *   reason:string,
+     *   can_exec:bool,
+     *   disable_functions:string,
+     *   open_basedir:string,
+     *   php_sapi:string,
+     *   php_binary:string,
+     *   bins:array<string,?string>,
+     *   tesseract_probe:array{exit_code:int,output:string},
+     *   tessdata_ita:bool|null
+     * }
+     */
+    public function ocrDiagnostics(): array
+    {
+        static $cached = null;
+        if (is_array($cached)) {
+            return $cached;
         }
-        if ($this->bin('pdftoppm') === null || $this->bin('tesseract') === null) {
-            return false;
+
+        $bins = [
+            'pdftotext' => $this->bin('pdftotext'),
+            'pdftoppm' => $this->bin('pdftoppm'),
+            'tesseract' => $this->bin('tesseract'),
+            'pdfinfo' => $this->bin('pdfinfo'),
+        ];
+        $canExec = $this->canExec();
+        $disabled = (string) ini_get('disable_functions');
+        $probe = ['exit_code' => -1, 'output' => ''];
+        $tessdataIta = null;
+        $reason = 'ok';
+        $available = false;
+
+        if (!$canExec) {
+            $reason = 'exec_disabled';
+        } elseif ($bins['pdftoppm'] === null && $bins['tesseract'] === null) {
+            $reason = 'missing_pdftoppm_and_tesseract';
+        } elseif ($bins['pdftoppm'] === null) {
+            $reason = 'missing_pdftoppm';
+        } elseif ($bins['tesseract'] === null) {
+            $reason = 'missing_tesseract';
+        } else {
+            $out = [];
+            $code = 1;
+            @exec(escapeshellarg((string) $bins['tesseract']) . ' --version 2>&1', $out, $code);
+            $probe = [
+                'exit_code' => (int) $code,
+                'output' => trim(implode("\n", array_slice($out, 0, 4))),
+            ];
+            if ($code !== 0) {
+                $reason = 'tesseract_probe_failed';
+            } else {
+                $available = true;
+                $langOut = [];
+                $langCode = 1;
+                @exec(escapeshellarg((string) $bins['tesseract']) . ' --list-langs 2>&1', $langOut, $langCode);
+                $langs = strtolower(implode("\n", $langOut));
+                $tessdataIta = str_contains($langs, "\nita") || str_starts_with(trim($langs), 'ita') || preg_match('/^ita$/m', $langs) === 1;
+                if ($tessdataIta === false) {
+                    $reason = 'missing_tessdata_ita';
+                    // Tools exist; OCR can still run with fallback eng if configured — mark available.
+                }
+            }
         }
-        // Definitive probe: some hosts report is_executable oddly under open_basedir.
-        static $probed = null;
-        if ($probed !== null) {
-            return $probed;
-        }
-        $tesseract = $this->bin('tesseract');
-        $out = [];
-        $code = 1;
-        @exec(escapeshellarg((string) $tesseract) . ' --version 2>&1', $out, $code);
-        return $probed = ($code === 0);
+
+        return $cached = [
+            'available' => $available,
+            'reason' => $reason,
+            'can_exec' => $canExec,
+            'disable_functions' => $disabled,
+            'open_basedir' => (string) ini_get('open_basedir'),
+            'php_sapi' => PHP_SAPI,
+            'php_binary' => PHP_BINARY,
+            'bins' => $bins,
+            'tesseract_probe' => $probe,
+            'tessdata_ita' => $tessdataIta,
+        ];
     }
 
     private function canExec(): bool
