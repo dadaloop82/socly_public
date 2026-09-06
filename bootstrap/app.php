@@ -122,10 +122,6 @@ $app->setConfig([
         'channel' => $_ENV['UPDATE_CHANNEL'] ?? 'main',
         'enabled' => filter_var($_ENV['UPDATE_ENABLED'] ?? 'false', FILTER_VALIDATE_BOOL),
     ],
-    'github_issues' => [
-        // Issues are created by the socly.it platform relay — installs never hold a PAT.
-        'repo' => (string) ($_ENV['GITHUB_ISSUES_REPO'] ?? 'dadaloop82/socly'),
-    ],
 ]);
 
 $sessionPath = $basePath . '/storage/sessions';

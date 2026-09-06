@@ -12,14 +12,15 @@ declare(strict_types=1);
  *   php bin/seal-secret.php github_issues_token 'ghp_…'
  *   php bin/seal-secret.php github_issues_token   # reads token from stdin
  *
- * Requires SOCLY_SEAL_KEY in .env (base64:… 32 bytes). If missing, generates one
- * and appends it to .env — keep SOCLY_SEAL_KEY private; only ciphertext is committed.
+ * Seal key is stored in admin settings (github.seal_key) and
+ * _webSite/storage/github_seal.key — never in product .env / socly_public.
  */
 
 use Socly\Core\Encryptor;
 
 $root = dirname(__DIR__);
 require $root . '/vendor/autoload.php';
+require $root . '/_webSite/lib/db.php';
 
 $keyName = $argv[1] ?? '';
 $plain = $argv[2] ?? '';
@@ -35,26 +36,23 @@ if ($plain === '') {
     exit(1);
 }
 
-$envFile = $root . '/.env';
-$env = [];
-if (is_file($envFile)) {
-    foreach (file($envFile, FILE_IGNORE_NEW_LINES) ?: [] as $line) {
-        $line = trim($line);
-        if ($line === '' || str_starts_with($line, '#') || !str_contains($line, '=')) {
-            continue;
-        }
-        [$k, $v] = explode('=', $line, 2);
-        $env[trim($k)] = trim($v, " \t\"'");
-    }
+$sealFile = $root . '/_webSite/storage/github_seal.key';
+$sealKey = trim(socly_setting_get('github.seal_key', ''));
+if ($sealKey === '' && is_file($sealFile)) {
+    $sealKey = trim((string) file_get_contents($sealFile));
 }
-
-$sealKey = (string) ($env['SOCLY_SEAL_KEY'] ?? '');
 if ($sealKey === '') {
     $sealKey = Encryptor::generateKey();
-    $append = "\n# Seal key for bootstrap/sealed_secrets.php (never commit)\nSOCLY_SEAL_KEY={$sealKey}\n";
-    file_put_contents($envFile, $append, FILE_APPEND | LOCK_EX);
-    fwrite(STDERR, "Generated SOCLY_SEAL_KEY and appended to .env\n");
+    fwrite(STDERR, "Generated new seal key (stored in settings + storage file).\n");
 }
+
+socly_setting_set('github.seal_key', $sealKey);
+$storageDir = dirname($sealFile);
+if (!is_dir($storageDir)) {
+    mkdir($storageDir, 0775, true);
+}
+file_put_contents($sealFile, $sealKey . "\n");
+@chmod($sealFile, 0640);
 
 $enc = new Encryptor($sealKey);
 $cipher = $enc->encrypt($plain);
@@ -76,8 +74,8 @@ $content = <<<PHP
 declare(strict_types=1);
 
 /**
- * Sealed secrets (AES-256-GCM). Ciphertext only — decrypt with SOCLY_SEAL_KEY.
- * Private repo only; excluded from socly_public sync.
+ * Sealed secrets (AES-256-GCM). Ciphertext only — decrypt with github.seal_key / github_seal.key.
+ * Private repo only; excluded from socly_public sync. Product installs never use this.
  *
  * @return array<string, string>
  */
@@ -86,4 +84,13 @@ return {$export};
 PHP;
 
 file_put_contents($sealedPath, $content);
-fwrite(STDOUT, "Sealed {$keyName} → bootstrap/sealed_secrets.php\n");
+
+if ($keyName === 'github_issues_token') {
+    socly_setting_set('github.issues_token_enc', $cipher);
+    socly_setting_set('github.issues_token', '');
+    if (socly_setting_get('github.issues_repo', '') === '') {
+        socly_setting_set('github.issues_repo', 'dadaloop82/socly');
+    }
+}
+
+fwrite(STDOUT, "Sealed {$keyName} → bootstrap/sealed_secrets.php (+ admin settings)\n");
