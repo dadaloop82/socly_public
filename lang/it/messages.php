@@ -958,6 +958,8 @@ return [
         'cf_underage' => 'Dal codice fiscale di :name risulta un\'età inferiore a 18 anni. Vuoi continuare comunque?',
         'cf_continue_anyway' => 'Continua comunque',
         'cf_fix' => 'Correggi',
+        'cf_calc_title' => 'Calcola il codice fiscale',
+        'cf_calc_apply' => 'Calcola e usa',
         'step_runts_title' => 'Nr. Repertorio RUNTS',
         'step_runts_desc' => 'Numero di repertorio nel Registro Unico Nazionale del Terzo Settore.',
         'step_colors_title' => 'Colori del brand',

@@ -4965,19 +4965,47 @@ button.setup-scrape-logo-frame:focus-visible .setup-scrape-logo-overlay {
 .setup-people-rows { display: grid; gap: 0.75rem; }
 .setup-people-row {
   display: grid;
-  grid-template-columns: 1fr 1fr 1fr auto;
   gap: 0.65rem;
-  align-items: end;
   padding: 0.85rem;
   border: 1px solid var(--line);
   border-radius: 14px;
   background: color-mix(in srgb, var(--brand-paper) 55%, white);
 }
-.setup-people-row:has(.setup-field-organ-type) {
-  grid-template-columns: 1fr 1fr 1fr auto;
+.setup-people-main {
+  display: grid;
+  grid-template-columns: 1fr 1fr minmax(16rem, 1.35fr);
+  gap: 0.65rem;
+  align-items: end;
 }
 .setup-people-row .setup-field-organ-type {
   grid-column: 1 / -1;
+}
+.setup-people-cf-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  gap: 0.4rem;
+  align-items: center;
+}
+.setup-people-cf-row input {
+  min-width: 0;
+  width: 100%;
+}
+.setup-people-cf-row .btn {
+  white-space: nowrap;
+}
+.setup-people-remove {
+  min-width: 2.25rem;
+  padding-inline: 0.55rem;
+  font-size: 1.15rem;
+  line-height: 1;
+}
+.setup-cf-calc-shell {
+  display: grid;
+  gap: 0.75rem;
+  min-width: min(28rem, 92vw);
+}
+.setup-cf-calc-dialog::backdrop {
+  background: color-mix(in srgb, #0b1f1c 45%, transparent);
 }
 .setup-lang-flag-label {
   display: inline-flex;
@@ -5030,9 +5058,12 @@ button.setup-scrape-logo-frame:focus-visible .setup-scrape-logo-overlay {
   .setup-address-row:not(.geo-address-row-inline),
   .geo-address-row:not(.geo-address-row-inline),
   .setup-equal-row,
-  .setup-people-row,
+  .setup-people-main,
   .assoc-person-main {
     grid-template-columns: 1fr;
+  }
+  .setup-people-cf-row {
+    grid-template-columns: minmax(0, 1fr) auto auto;
   }
   .setup-field-cap,
   .setup-field-num { max-width: none; }

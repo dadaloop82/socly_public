@@ -954,6 +954,8 @@ return [
         'cf_underage' => 'Laut Steuernummer scheint :name unter 18 Jahre alt zu sein. Möchten Sie trotzdem fortfahren?',
         'cf_continue_anyway' => 'Trotzdem fortfahren',
         'cf_fix' => 'Korrigieren',
+        'cf_calc_title' => 'Steuernummer berechnen',
+        'cf_calc_apply' => 'Berechnen und übernehmen',
         'step_runts_title' => 'RUNTS-Repertoriums-Nr.',
         'step_runts_desc' => 'Repertoriumsnummer im nationalen Register des Dritten Sektors (RUNTS).',
         'step_colors_title' => 'Markenfarben',

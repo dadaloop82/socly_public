@@ -5884,6 +5884,28 @@ function initSetupMembershipPeriods(root = document) {
   });
 }
 
+function isValidItalianFiscalCode(code) {
+  const cf = String(code || '').toUpperCase().replace(/\s+/g, '');
+  if (!/^[A-Z]{6}[0-9LMNPQRSTUV]{2}[ABCDEHLMPRST][0-9LMNPQRSTUV]{2}[A-Z][0-9LMNPQRSTUV]{3}[A-Z]$/.test(cf)) {
+    return false;
+  }
+  const oddMap = {
+    0: 1, 1: 0, 2: 5, 3: 7, 4: 9, 5: 13, 6: 15, 7: 17, 8: 19, 9: 21,
+    A: 1, B: 0, C: 5, D: 7, E: 9, F: 13, G: 15, H: 17, I: 19, J: 21,
+    K: 2, L: 4, M: 18, N: 20, O: 11, P: 3, Q: 6, R: 8, S: 12, T: 14,
+    U: 16, V: 10, W: 22, X: 25, Y: 24, Z: 23,
+  };
+  const evenMap = {};
+  for (let i = 0; i <= 9; i += 1) evenMap[String(i)] = i;
+  for (let i = 0; i < 26; i += 1) evenMap[String.fromCharCode(65 + i)] = i;
+  let sum = 0;
+  for (let i = 0; i < 15; i += 1) {
+    const ch = cf[i];
+    sum += (i % 2 === 0) ? (oddMap[ch] || 0) : (evenMap[ch] || 0);
+  }
+  return String.fromCharCode((sum % 26) + 65) === cf[15];
+}
+
 function initPeopleList(list) {
   if (list.dataset.peopleListBound === '1') return;
   list.dataset.peopleListBound = '1';
@@ -5894,6 +5916,18 @@ function initPeopleList(list) {
   if (!rows || !template || !addBtn) return;
 
   const form = list.closest('form');
+  const root = list.closest('[data-setup-wizard]') || document;
+  const dialog = root.querySelector('[data-setup-people-cf-dialog]');
+  const dialogForm = dialog?.querySelector('[data-setup-people-cf-form]');
+  const dialogStatus = dialog?.querySelector('[data-setup-people-cf-status]');
+  const dialogFirst = dialog?.querySelector('[data-cf-dialog-first]');
+  const dialogLast = dialog?.querySelector('[data-cf-dialog-last]');
+  const dialogBirth = dialog?.querySelector('[data-cf-dialog-birth]');
+  const dialogGender = dialog?.querySelector('[data-cf-dialog-gender]');
+  const dialogBirthPlace = dialog?.querySelector('[data-birth-place-input]');
+  const dialogCancel = dialog?.querySelector('[data-setup-people-cf-cancel]');
+  let calcTargetRow = null;
+
   const msgMismatch = list.dataset.msgCfMismatch || 'Il codice fiscale potrebbe non essere coerente con nome e cognome. Continuare?';
   const msgUnderage = list.dataset.msgCfUnderage || 'Dal codice fiscale risulta un’età inferiore a 18 anni. Continuare?';
   const msgContinue = list.dataset.msgCfContinue || 'Continua comunque';
@@ -5901,6 +5935,34 @@ function initPeopleList(list) {
   const msgCfRequired = list.dataset.msgCfRequired
     || form?.dataset.msgFieldRequired
     || 'Campo obbligatorio.';
+  const msgCfInvalid = list.dataset.msgCfInvalid || 'Codice fiscale non valido.';
+  const msgCfIncomplete = list.dataset.msgCfIncomplete || 'Compila nome, cognome, sesso, data e luogo di nascita.';
+
+  const setCfValidity = (cfInput, filled) => {
+    if (!(cfInput instanceof HTMLInputElement)) return;
+    cfInput.required = filled;
+    const raw = cfInput.value.trim().toUpperCase();
+    if (!filled && raw === '') {
+      cfInput.setCustomValidity('');
+      cfInput.classList.remove('is-invalid', 'is-valid');
+      return;
+    }
+    if (raw === '') {
+      cfInput.setCustomValidity(msgCfRequired);
+      cfInput.classList.add('is-invalid');
+      cfInput.classList.remove('is-valid');
+      return;
+    }
+    if (!isValidItalianFiscalCode(raw)) {
+      cfInput.setCustomValidity(msgCfInvalid);
+      cfInput.classList.add('is-invalid');
+      cfInput.classList.remove('is-valid');
+      return;
+    }
+    cfInput.setCustomValidity('');
+    cfInput.classList.remove('is-invalid');
+    cfInput.classList.add('is-valid');
+  };
 
   const syncPeopleCfRequired = () => {
     rows.querySelectorAll('[data-people-row]').forEach((row) => {
@@ -5908,15 +5970,19 @@ function initPeopleList(list) {
       const last = row.querySelector('input[name*="[last_name]"]')?.value?.trim() || '';
       const organ = row.querySelector('select[name*="[organ_type]"]')?.value?.trim() || '';
       const cfInput = row.querySelector('input[data-people-cf], input[name*="[fiscal_code]"]');
-      if (!(cfInput instanceof HTMLInputElement)) return;
       const filled = !!(first || last || organ);
-      cfInput.required = filled;
-      if (!filled) cfInput.setCustomValidity('');
+      setCfValidity(cfInput, filled);
     });
     form?.dispatchEvent(new Event('setup:cta-refresh', { bubbles: true }));
   };
 
-  rows.addEventListener('input', syncPeopleCfRequired);
+  rows.addEventListener('input', (event) => {
+    const target = event.target;
+    if (target instanceof HTMLInputElement && target.matches('[data-people-cf]')) {
+      target.value = target.value.toUpperCase();
+    }
+    syncPeopleCfRequired();
+  });
   rows.addEventListener('change', syncPeopleCfRequired);
   syncPeopleCfRequired();
 
@@ -5946,7 +6012,7 @@ function initPeopleList(list) {
 
   const cfMatchesName = (cf, firstName, lastName) => {
     const code = String(cf || '').toUpperCase().replace(/\s+/g, '');
-    if (code.length !== 16) return true;
+    if (!isValidItalianFiscalCode(code)) return false;
     const first = normalizeName(firstName);
     const last = normalizeName(lastName);
     if (!first || !last) return true;
@@ -5955,7 +6021,7 @@ function initPeopleList(list) {
 
   const cfIsAdult = (cf) => {
     const code = String(cf || '').toUpperCase().replace(/\s+/g, '');
-    if (code.length !== 16) return true;
+    if (!isValidItalianFiscalCode(code)) return true;
     const months = { A: 1, B: 2, C: 3, D: 4, E: 5, H: 6, L: 7, M: 8, P: 9, R: 10, S: 11, T: 12 };
     const yy = Number(code.slice(6, 8));
     const month = months[code[8]];
@@ -5967,7 +6033,7 @@ function initPeopleList(list) {
     const candidates = [1900 + yy, 2000 + yy]
       .filter((y) => y >= nowYear - 120 && y <= nowYear)
       .map((y) => new Date(y, month - 1, day))
-      .filter((d) => d.getFullYear() === (d.getFullYear()) && d.getMonth() === month - 1 && d.getDate() === day);
+      .filter((d) => d.getMonth() === month - 1 && d.getDate() === day);
     if (candidates.length === 0) return true;
     const birth = candidates[candidates.length - 1];
     const adult = new Date(birth);
@@ -5983,6 +6049,39 @@ function initPeopleList(list) {
 
   const fillTpl = (tpl, name) => String(tpl || '').replaceAll(':name', name);
 
+  const setDialogStatus = (msg) => {
+    if (!(dialogStatus instanceof HTMLElement)) return;
+    const text = String(msg || '').trim();
+    dialogStatus.textContent = text;
+    dialogStatus.hidden = text === '';
+    dialogStatus.classList.toggle('is-error', text !== '');
+  };
+
+  const openCfDialog = (row) => {
+    if (!(dialog instanceof HTMLDialogElement) || !dialogForm) return;
+    calcTargetRow = row;
+    const first = row.querySelector('[data-people-first], input[name*="[first_name]"]')?.value?.trim() || '';
+    const last = row.querySelector('[data-people-last], input[name*="[last_name]"]')?.value?.trim() || '';
+    if (dialogFirst instanceof HTMLInputElement) dialogFirst.value = first;
+    if (dialogLast instanceof HTMLInputElement) dialogLast.value = last;
+    if (dialogBirth instanceof HTMLInputElement) dialogBirth.value = '';
+    if (dialogGender instanceof HTMLSelectElement) dialogGender.value = '';
+    if (dialogBirthPlace instanceof HTMLInputElement) {
+      dialogBirthPlace.value = '';
+      dialogBirthPlace.dataset.geoPicked = '0';
+    }
+    setDialogStatus('');
+    initPlaceSuggest(dialog);
+    if (typeof dialog.showModal === 'function') dialog.showModal();
+    else dialog.setAttribute('open', 'open');
+    (dialogFirst instanceof HTMLInputElement ? dialogFirst : dialogBirth)?.focus();
+  };
+
+  const closeCfDialog = () => {
+    if (dialog instanceof HTMLDialogElement && dialog.open) dialog.close();
+    calcTargetRow = null;
+  };
+
   addBtn.addEventListener('click', () => {
     const html = template.innerHTML.replaceAll('__i__', String(rows.children.length));
     rows.insertAdjacentHTML('beforeend', html);
@@ -5992,6 +6091,12 @@ function initPeopleList(list) {
   });
 
   rows.addEventListener('click', (event) => {
+    const calcBtn = event.target.closest('[data-people-cf-calc]');
+    if (calcBtn) {
+      const row = calcBtn.closest('[data-people-row]');
+      if (row) openCfDialog(row);
+      return;
+    }
     const btn = event.target.closest('[data-people-remove]');
     if (!btn) return;
     const row = btn.closest('[data-people-row]');
@@ -6007,6 +6112,72 @@ function initPeopleList(list) {
     syncPeopleCfRequired();
   });
 
+  dialogCancel?.addEventListener('click', (event) => {
+    event.preventDefault();
+    closeCfDialog();
+  });
+
+  dialogForm?.addEventListener('submit', async (event) => {
+    event.preventDefault();
+    if (!(calcTargetRow instanceof HTMLElement)) {
+      closeCfDialog();
+      return;
+    }
+    const first = (dialogFirst instanceof HTMLInputElement ? dialogFirst.value : '').trim();
+    const last = (dialogLast instanceof HTMLInputElement ? dialogLast.value : '').trim();
+    const birth = (dialogBirth instanceof HTMLInputElement ? dialogBirth.value : '').trim();
+    const gender = (dialogGender instanceof HTMLSelectElement ? dialogGender.value : '').trim();
+    const place = (dialogBirthPlace instanceof HTMLInputElement ? dialogBirthPlace.value : '').trim();
+    if (!first || !last || !birth || !gender || !place) {
+      setDialogStatus(msgCfIncomplete);
+      dialogForm.reportValidity?.();
+      return;
+    }
+    const applyBtn = dialogForm.querySelector('[data-setup-people-cf-apply]');
+    if (applyBtn instanceof HTMLButtonElement) applyBtn.disabled = true;
+    setDialogStatus('');
+    try {
+      const body = new URLSearchParams({
+        first_name: first,
+        last_name: last,
+        birth_date: birth,
+        gender,
+        birth_place: place,
+      });
+      body.set('_token', form?.dataset.csrf || '');
+      const res = await fetch(form?.dataset.cfUrl || '/api/fiscal-code', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+          'X-CSRF-Token': form?.dataset.csrf || '',
+          'X-Requested-With': 'XMLHttpRequest',
+        },
+        credentials: 'same-origin',
+        body,
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || !data.ok || !data.fiscal_code) {
+        setDialogStatus(data.error || msgCfIncomplete);
+        return;
+      }
+      const firstInput = calcTargetRow.querySelector('[data-people-first], input[name*="[first_name]"]');
+      const lastInput = calcTargetRow.querySelector('[data-people-last], input[name*="[last_name]"]');
+      const cfInput = calcTargetRow.querySelector('[data-people-cf], input[name*="[fiscal_code]"]');
+      if (firstInput instanceof HTMLInputElement && !firstInput.value.trim()) firstInput.value = first;
+      if (lastInput instanceof HTMLInputElement && !lastInput.value.trim()) lastInput.value = last;
+      if (cfInput instanceof HTMLInputElement) {
+        cfInput.value = String(data.fiscal_code).toUpperCase();
+        cfInput.dispatchEvent(new Event('input', { bubbles: true }));
+      }
+      syncPeopleCfRequired();
+      closeCfDialog();
+    } catch {
+      setDialogStatus(msgCfIncomplete);
+    } finally {
+      if (applyBtn instanceof HTMLButtonElement) applyBtn.disabled = false;
+    }
+  });
+
   if (form && form.dataset.peopleCfGate !== '1') {
     form.dataset.peopleCfGate = '1';
     form.addEventListener('submit', async (event) => {
@@ -6014,27 +6185,33 @@ function initPeopleList(list) {
       if (form.querySelector('[data-setup-defer-flag]')?.value === '1') return;
       if (!form.querySelector('[data-people-list]')) return;
 
+      syncPeopleCfRequired();
       const warnings = [];
-      let missingCf = false;
+      let blocked = false;
       form.querySelectorAll('[data-people-row]').forEach((row) => {
         const first = row.querySelector('input[name*="[first_name]"]')?.value?.trim() || '';
         const last = row.querySelector('input[name*="[last_name]"]')?.value?.trim() || '';
         const cf = row.querySelector('input[name*="[fiscal_code]"]')?.value?.trim() || '';
         const organ = row.querySelector('select[name*="[organ_type]"]')?.value?.trim() || '';
         if (!first && !last && !cf && !organ) return;
+        const cfInput = row.querySelector('input[name*="[fiscal_code]"]');
         if ((first || last || organ) && !cf) {
-          missingCf = true;
-          const cfInput = row.querySelector('input[name*="[fiscal_code]"]');
+          blocked = true;
           if (cfInput instanceof HTMLInputElement) {
             cfInput.setCustomValidity(msgCfRequired);
             cfInput.reportValidity();
           }
-        } else {
-          const cfInput = row.querySelector('input[name*="[fiscal_code]"]');
-          if (cfInput instanceof HTMLInputElement && cfInput.validationMessage === msgCfRequired) {
-            cfInput.setCustomValidity('');
-          }
+          return;
         }
+        if (cf && !isValidItalianFiscalCode(cf)) {
+          blocked = true;
+          if (cfInput instanceof HTMLInputElement) {
+            cfInput.setCustomValidity(msgCfInvalid);
+            cfInput.reportValidity();
+          }
+          return;
+        }
+        if (cfInput instanceof HTMLInputElement) cfInput.setCustomValidity('');
         const label = personLabel(row);
         if (cf && first && last && !cfMatchesName(cf, first, last)) {
           warnings.push(fillTpl(msgMismatch, label));
@@ -6043,7 +6220,7 @@ function initPeopleList(list) {
           warnings.push(fillTpl(msgUnderage, label));
         }
       });
-      if (missingCf) {
+      if (blocked) {
         event.preventDefault();
         event.stopPropagation();
         return;

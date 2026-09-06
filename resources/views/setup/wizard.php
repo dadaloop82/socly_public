@@ -600,7 +600,12 @@ $errorStep = flash('setup_error_step');
                          data-msg-cf-mismatch="<?= e(__('setup.cf_name_mismatch')) ?>"
                          data-msg-cf-underage="<?= e(__('setup.cf_underage')) ?>"
                          data-msg-cf-continue="<?= e(__('setup.cf_continue_anyway')) ?>"
-                         data-msg-cf-fix="<?= e(__('setup.cf_fix')) ?>">
+                         data-msg-cf-fix="<?= e(__('setup.cf_fix')) ?>"
+                         data-msg-cf-invalid="<?= e(__('validation.fiscal_code')) ?>"
+                         data-msg-cf-incomplete="<?= e(__('members.cf_incomplete')) ?>"
+                         data-msg-cf-calc="<?= e(__('members.cf_generate')) ?>"
+                         data-msg-cf-calc-title="<?= e(__('setup.cf_calc_title')) ?>"
+                         data-msg-cf-calc-apply="<?= e(__('setup.cf_calc_apply')) ?>">
                         <div class="setup-people-rows" data-people-rows>
                             <?php foreach ((array) $value as $i => $person): ?>
                                 <div class="setup-people-row" data-people-row>
@@ -617,19 +622,24 @@ $errorStep = flash('setup_error_step');
                                         </select>
                                     </label>
                                     <?php endif; ?>
-                                    <label class="setup-field">
-                                        <span><?= e(__('setup.field_first_name')) ?></span>
-                                        <input type="text" name="people[<?= (int) $i ?>][first_name]" value="<?= e((string) ($person['first_name'] ?? '')) ?>" autocomplete="given-name">
-                                    </label>
-                                    <label class="setup-field">
-                                        <span><?= e(__('setup.field_last_name')) ?></span>
-                                        <input type="text" name="people[<?= (int) $i ?>][last_name]" value="<?= e((string) ($person['last_name'] ?? '')) ?>" autocomplete="family-name">
-                                    </label>
-                                    <label class="setup-field">
-                                        <span><?= e(__('setup.field_person_fiscal_code')) ?> *</span>
-                                        <input type="text" name="people[<?= (int) $i ?>][fiscal_code]" value="<?= e((string) ($person['fiscal_code'] ?? '')) ?>" maxlength="16" autocomplete="off" data-people-cf>
-                                    </label>
-                                    <button type="button" class="btn btn-ghost btn-sm" data-people-remove aria-label="<?= e(__('setup.remove_person')) ?>">×</button>
+                                    <div class="setup-people-main">
+                                        <label class="setup-field">
+                                            <span><?= e(__('setup.field_first_name')) ?></span>
+                                            <input type="text" name="people[<?= (int) $i ?>][first_name]" value="<?= e((string) ($person['first_name'] ?? '')) ?>" autocomplete="given-name" data-people-first>
+                                        </label>
+                                        <label class="setup-field">
+                                            <span><?= e(__('setup.field_last_name')) ?></span>
+                                            <input type="text" name="people[<?= (int) $i ?>][last_name]" value="<?= e((string) ($person['last_name'] ?? '')) ?>" autocomplete="family-name" data-people-last>
+                                        </label>
+                                        <label class="setup-field setup-field-people-cf">
+                                            <span><?= e(__('setup.field_person_fiscal_code')) ?> *</span>
+                                            <div class="setup-people-cf-row">
+                                                <input type="text" name="people[<?= (int) $i ?>][fiscal_code]" value="<?= e((string) ($person['fiscal_code'] ?? '')) ?>" maxlength="16" minlength="16" pattern="[A-Za-z]{6}[0-9LmnpqrstuvLMNPQRSTUV]{2}[A-Ea-eHhLlMmPpRrSsTt][0-9LmnpqrstuvLMNPQRSTUV]{2}[A-Za-z][0-9LmnpqrstuvLMNPQRSTUV]{3}[A-Za-z]" autocomplete="off" data-people-cf placeholder="<?= e(__('members.cf_hint')) ?>" title="<?= e(__('validation.fiscal_code')) ?>">
+                                                <button type="button" class="btn btn-ghost btn-sm" data-people-cf-calc><?= e(__('members.cf_generate')) ?></button>
+                                                <button type="button" class="btn btn-ghost btn-sm setup-people-remove" data-people-remove aria-label="<?= e(__('setup.remove_person')) ?>">×</button>
+                                            </div>
+                                        </label>
+                                    </div>
                                 </div>
                             <?php endforeach; ?>
                         </div>
@@ -647,19 +657,24 @@ $errorStep = flash('setup_error_step');
                                     </select>
                                 </label>
                                 <?php endif; ?>
-                                <label class="setup-field">
-                                    <span><?= e(__('setup.field_first_name')) ?></span>
-                                    <input type="text" name="people[__i__][first_name]" value="" autocomplete="given-name">
-                                </label>
-                                <label class="setup-field">
-                                    <span><?= e(__('setup.field_last_name')) ?></span>
-                                    <input type="text" name="people[__i__][last_name]" value="" autocomplete="family-name">
-                                </label>
-                                <label class="setup-field">
-                                    <span><?= e(__('setup.field_person_fiscal_code')) ?> *</span>
-                                    <input type="text" name="people[__i__][fiscal_code]" value="" maxlength="16" autocomplete="off" data-people-cf>
-                                </label>
-                                <button type="button" class="btn btn-ghost btn-sm" data-people-remove aria-label="<?= e(__('setup.remove_person')) ?>">×</button>
+                                <div class="setup-people-main">
+                                    <label class="setup-field">
+                                        <span><?= e(__('setup.field_first_name')) ?></span>
+                                        <input type="text" name="people[__i__][first_name]" value="" autocomplete="given-name" data-people-first>
+                                    </label>
+                                    <label class="setup-field">
+                                        <span><?= e(__('setup.field_last_name')) ?></span>
+                                        <input type="text" name="people[__i__][last_name]" value="" autocomplete="family-name" data-people-last>
+                                    </label>
+                                    <label class="setup-field setup-field-people-cf">
+                                        <span><?= e(__('setup.field_person_fiscal_code')) ?> *</span>
+                                        <div class="setup-people-cf-row">
+                                            <input type="text" name="people[__i__][fiscal_code]" value="" maxlength="16" minlength="16" pattern="[A-Za-z]{6}[0-9LmnpqrstuvLMNPQRSTUV]{2}[A-Ea-eHhLlMmPpRrSsTt][0-9LmnpqrstuvLMNPQRSTUV]{2}[A-Za-z][0-9LmnpqrstuvLMNPQRSTUV]{3}[A-Za-z]" autocomplete="off" data-people-cf placeholder="<?= e(__('members.cf_hint')) ?>" title="<?= e(__('validation.fiscal_code')) ?>">
+                                            <button type="button" class="btn btn-ghost btn-sm" data-people-cf-calc><?= e(__('members.cf_generate')) ?></button>
+                                            <button type="button" class="btn btn-ghost btn-sm setup-people-remove" data-people-remove aria-label="<?= e(__('setup.remove_person')) ?>">×</button>
+                                        </div>
+                                    </label>
+                                </div>
                             </div>
                         </template>
                     </div>
@@ -1411,5 +1426,47 @@ $errorStep = flash('setup_error_step');
                 <button type="button" class="btn" data-setup-scrape-ask-yes><?= e(__('setup.scrape_ask_yes')) ?></button>
             </div>
         </div>
+    </dialog>
+
+    <dialog class="setup-exit-dialog setup-cf-calc-dialog" data-setup-people-cf-dialog>
+        <form method="dialog" class="setup-exit-shell setup-cf-calc-shell" data-setup-people-cf-form>
+            <p class="setup-exit-text" data-setup-people-cf-title><?= e(__('setup.cf_calc_title')) ?></p>
+            <div class="setup-equal-row">
+                <label class="setup-field">
+                    <span><?= e(__('setup.field_first_name')) ?> *</span>
+                    <input type="text" name="first_name" required autocomplete="given-name" data-cf-dialog-first>
+                </label>
+                <label class="setup-field">
+                    <span><?= e(__('setup.field_last_name')) ?> *</span>
+                    <input type="text" name="last_name" required autocomplete="family-name" data-cf-dialog-last>
+                </label>
+            </div>
+            <div class="setup-equal-row">
+                <label class="setup-field">
+                    <span><?= e(__('setup.field_birth_date')) ?> *</span>
+                    <input type="date" name="birth_date" required data-cf-dialog-birth>
+                </label>
+                <label class="setup-field">
+                    <span><?= e(__('setup.field_gender')) ?> *</span>
+                    <select name="gender" required data-cf-dialog-gender>
+                        <option value="">—</option>
+                        <option value="M"><?= e(__('members.gender_m')) ?></option>
+                        <option value="F"><?= e(__('members.gender_f')) ?></option>
+                    </select>
+                </label>
+            </div>
+            <?= view_partial('partials/geo_birth_place', [
+                'name' => 'birth_place',
+                'value' => '',
+                'required' => true,
+                'foreign_toggle' => true,
+                'flag_name' => 'cf_dialog_foreign',
+            ]) ?>
+            <p class="setup-hint muted" data-setup-people-cf-status hidden></p>
+            <div class="setup-exit-actions">
+                <button type="button" class="btn btn-ghost" data-setup-people-cf-cancel value="cancel"><?= e(__('common.cancel')) ?></button>
+                <button type="submit" class="btn" data-setup-people-cf-apply value="default"><?= e(__('setup.cf_calc_apply')) ?></button>
+            </div>
+        </form>
     </dialog>
 </div>

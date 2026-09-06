@@ -956,6 +956,8 @@ return [
         'cf_underage' => 'According to the tax code, :name appears to be under 18. Do you want to continue anyway?',
         'cf_continue_anyway' => 'Continue anyway',
         'cf_fix' => 'Fix',
+        'cf_calc_title' => 'Calculate tax code',
+        'cf_calc_apply' => 'Calculate and use',
         'step_runts_title' => 'RUNTS repertory no.',
         'step_runts_desc' => 'Repertory number in the Italian National Single Third Sector Register.',
         'step_colors_title' => 'Brand colours',
