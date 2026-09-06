@@ -1460,7 +1460,7 @@ final class SetupService
      *   attempted:list<string>
      * }
      */
-    public function prefillLegalTextsFromDocuments(array $documents, bool $allowOcr = false): array
+    public function prefillLegalTextsFromDocuments(array $documents, bool $allowOcr = false, array $ocrOptions = []): array
     {
         /** @var PdfTextExtractor $extractor */
         $extractor = app(PdfTextExtractor::class);
@@ -1468,6 +1468,9 @@ final class SetupService
         $methods = [];
         $attempted = [];
         $needsOcr = false;
+        $maxPages = max(1, (int) ($ocrOptions['max_pages'] ?? 20));
+        $maxSeconds = max(5, (int) ($ocrOptions['max_seconds'] ?? 360));
+        $dpi = max(72, min(200, (int) ($ocrOptions['dpi'] ?? 150)));
 
         foreach ($documents as $doc) {
             $kind = (string) ($doc['legal_kind'] ?? '');
@@ -1504,16 +1507,15 @@ final class SetupService
             $attempted[] = $kind;
             $extracted = $extractor->extract($path, [
                 'ocr' => $allowOcr,
-                'max_pages' => 20,
-                'max_seconds' => 360,
-                'dpi' => 150,
+                'max_pages' => $maxPages,
+                'max_seconds' => $maxSeconds,
+                'dpi' => $dpi,
                 'lang' => 'ita',
             ]);
             if (empty($extracted['ok']) || !$this->legalTextLooksValid((string) ($extracted['text'] ?? ''), $kind)) {
-                if (!$allowOcr && ($extracted['error'] ?? '') === 'no_text_layer' && $extractor->ocrAvailable()) {
+                // Any failed native extract with tools present → queue/background OCR.
+                if (!$allowOcr && $extractor->ocrAvailable()) {
                     $needsOcr = true;
-                } elseif (!$allowOcr && ($extracted['error'] ?? '') === 'no_text_layer' && !$extractor->ocrAvailable()) {
-                    $needsOcr = false;
                 }
                 continue;
             }
@@ -1556,6 +1558,21 @@ final class SetupService
             'status' => $status,
             'attempted' => $attempted,
         ];
+    }
+
+    /**
+     * Short OCR pass for Apache/mod_php (max_execution_time ≈ 30s).
+     *
+     * @param list<array<string,mixed>> $documents
+     * @return array{prefilled:list<string>,methods:array<string,string>,pending_ocr:bool,status:string,attempted:list<string>}
+     */
+    public function prefillLegalTextsFromDocumentsFastOcr(array $documents): array
+    {
+        return $this->prefillLegalTextsFromDocuments($documents, true, [
+            'max_pages' => 4,
+            'max_seconds' => 22,
+            'dpi' => 110,
+        ]);
     }
 
     /**
@@ -1733,10 +1750,8 @@ final class SetupService
             'documents' => $targets,
         ], JSON_UNESCAPED_UNICODE));
 
-        $php = PHP_BINARY !== '' ? PHP_BINARY : '/usr/bin/php';
-        if (!is_file($php) || !is_executable($php)) {
-            $php = 'php';
-        }
+        // Under php-fpm, PHP_BINARY is often the FPM binary and cannot run CLI scripts.
+        $php = $this->resolvePhpCliBinary();
         // Demos: code lives in SOCLY_CODE_PATH; instance has no bin/.
         $script = code_path('bin/runts-legal-prefill.php');
         if (!is_file($script)) {
@@ -1754,22 +1769,49 @@ final class SetupService
             escapeshellarg($jobDir . '/runts_ocr_job.log')
         );
         @exec($cmd);
-        // Confirm the worker actually started (lock or log appear quickly).
+        // Confirm worker started; Apache/mod_php cold start can exceed 500ms.
         $lock = $jobDir . '/runts_ocr.lock';
         $started = false;
-        for ($i = 0; $i < 10; $i++) {
-            usleep(50000);
+        for ($i = 0; $i < 40; $i++) {
+            usleep(50000); // up to ~2s
             if (is_file($lock) || !is_file($jobFile)) {
                 $started = true;
                 break;
             }
         }
         if (!$started) {
-            @unlink($jobFile);
+            // Last resort: do not delete the job — leave it for a manual/retry path;
+            // still report failure so caller can run a short inline OCR.
             return false;
         }
         $this->settings->set('legal.runts_ocr_pending', '1');
         return true;
+    }
+
+    private function resolvePhpCliBinary(): string
+    {
+        $candidates = [];
+        $binary = PHP_BINARY !== '' ? PHP_BINARY : '';
+        if ($binary !== '' && !str_contains($binary, 'php-fpm')) {
+            $candidates[] = $binary;
+        }
+        $major = PHP_MAJOR_VERSION . '.' . PHP_MINOR_VERSION;
+        $candidates = array_merge($candidates, [
+            '/usr/bin/php' . $major,
+            '/usr/local/bin/php' . $major,
+            '/usr/bin/php',
+            '/usr/local/bin/php',
+            'php',
+        ]);
+        foreach ($candidates as $candidate) {
+            if ($candidate === 'php') {
+                return 'php';
+            }
+            if (is_file($candidate) && is_executable($candidate)) {
+                return $candidate;
+            }
+        }
+        return 'php';
     }
 
     private function legalTextIsEmpty(string $settingsKey): bool

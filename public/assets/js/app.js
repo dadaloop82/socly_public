@@ -4179,11 +4179,11 @@ function initSetupRuntsLookup(root) {
 
   const sync = () => {
     syncLabel();
-    if (lookingUp) {
-      showBtn();
+    if (lookingUp || box.classList.contains('is-found')) {
+      hideBtn();
       return;
     }
-    if (box.classList.contains('is-found') || digits() === '') hideBtn();
+    if (digits() === '') hideBtn();
     else showBtn();
   };
 
@@ -4209,7 +4209,7 @@ function initSetupRuntsLookup(root) {
     if (box.dataset.runtsExhausted === '1' || box.dataset.runtsCooldowning === '1') return;
     stopOcrPoll();
     setLookupBusy(true);
-    showBtn();
+    hideBtn();
     setProgress(4);
     showStatus(phaseText('connect', number), '');
     setElapsed(0);

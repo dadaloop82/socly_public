@@ -67,7 +67,19 @@ final class PdfTextExtractor
         if (!$this->canExec()) {
             return false;
         }
-        return $this->bin('pdftoppm') !== null && $this->bin('tesseract') !== null;
+        if ($this->bin('pdftoppm') === null || $this->bin('tesseract') === null) {
+            return false;
+        }
+        // Definitive probe: some hosts report is_executable oddly under open_basedir.
+        static $probed = null;
+        if ($probed !== null) {
+            return $probed;
+        }
+        $tesseract = $this->bin('tesseract');
+        $out = [];
+        $code = 1;
+        @exec(escapeshellarg((string) $tesseract) . ' --version 2>&1', $out, $code);
+        return $probed = ($code === 0);
     }
 
     private function canExec(): bool
@@ -116,7 +128,7 @@ final class PdfTextExtractor
             $pages = 1;
         }
         $maxPages = max(1, (int) ($options['max_pages'] ?? 20));
-        $maxSeconds = max(30, (int) ($options['max_seconds'] ?? 300));
+        $maxSeconds = max(5, (int) ($options['max_seconds'] ?? 300));
         $dpi = max(72, min(200, (int) ($options['dpi'] ?? 150)));
         $lang = trim((string) ($options['lang'] ?? 'ita'));
         if ($lang === '') {
