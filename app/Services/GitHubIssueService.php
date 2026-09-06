@@ -63,6 +63,8 @@ final class GitHubIssueService
             'kind' => 'user-report',
             'title' => $title,
             'body' => $body,
+            'description' => $description,
+            'context' => $ctx,
         ]);
         if (!$created['ok']) {
             return $created;
@@ -128,6 +130,8 @@ final class GitHubIssueService
                 'kind' => 'auto-crash',
                 'title' => $title,
                 'body' => $body,
+                'description' => $e->getMessage(),
+                'context' => $ctx,
                 'dedup' => $sig,
             ]);
             if ($created['ok']) {
@@ -149,7 +153,7 @@ final class GitHubIssueService
     }
 
     /**
-     * @param array{kind:string,title:string,body:string,dedup?:string} $payload
+     * @param array{kind:string,title:string,body:string,description?:string,context?:array<string,mixed>,dedup?:string} $payload
      * @return array{ok:bool,issue_url?:string,error?:string,code?:string}
      */
     private function relay(array $payload): array
@@ -165,6 +169,8 @@ final class GitHubIssueService
             'kind' => $payload['kind'],
             'title' => $payload['title'],
             'body' => $payload['body'],
+            'description' => (string) ($payload['description'] ?? ''),
+            'context' => $payload['context'] ?? [],
         ];
         if (!empty($payload['dedup'])) {
             $body['dedup'] = $payload['dedup'];
