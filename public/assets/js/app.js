@@ -2935,7 +2935,9 @@ function initLegalDocEditors(scope = document) {
     const busyMsg = translateBtn.dataset.msgBusy || '…';
     const emptyMsg = translateBtn.dataset.msgEmpty || '';
     const failMsg = translateBtn.dataset.msgFail || '';
-    const csrf = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
+    const csrf = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content')
+      || document.querySelector('[data-setup-form]')?.dataset?.csrf
+      || '';
 
     translateBtn.addEventListener('click', async () => {
       const text = String(source.value || '').trim();
@@ -3773,10 +3775,13 @@ function initSetupRuntsLookup(root) {
     armCooldown(wait);
     let left = wait;
     const tick = () => {
-      if (box.dataset.runtsCooldowning !== '1') return;
+      if (box.dataset.runtsCooldowning !== '1' || left <= 0) {
+        showStatus('', '');
+        if (!lookingUp) sync();
+        return;
+      }
       const tpl = box.dataset.msgLimitWait || 'Ci puoi riprovare tra :seconds secondi.';
       showStatus(tpl.replaceAll(':seconds', String(left)), 'warn');
-      if (left <= 0) return;
       left -= 1;
       window.setTimeout(tick, 1000);
     };
@@ -6099,6 +6104,15 @@ function applyGeoComuneToScope(scope, item) {
 
 function refreshGeoScopeValidity(scope) {
   if (!scope) return;
+  if (scope.dataset.geoForeign === '1') {
+    scope.querySelectorAll('[data-city-input], [data-address-input], [data-province-input], [data-postal-code]').forEach((el) => {
+      if (el instanceof HTMLInputElement) {
+        el.setCustomValidity('');
+        el.dataset.geoPicked = '1';
+      }
+    });
+    return;
+  }
   const cityInput = scope.querySelector('[data-city-input]');
   const addressInput = scope.querySelector('[data-address-input]');
   const provinceInput = scope.querySelector('[data-province-input]');
@@ -6207,6 +6221,54 @@ function initPlaceSuggest(root = document) {
   const provinceNotFoundTpl = document.body?.dataset?.msgGeoProvinceNotFound || 'Provincia non trovata.';
   const capNotFoundTpl = document.body?.dataset?.msgGeoCapNotFound || 'CAP non valido.';
 
+  scopeRoot.querySelectorAll('[data-geo-scope]').forEach((scope) => {
+    const toggle = scope.querySelector('[data-geo-foreign-toggle]');
+    const flag = scope.querySelector('[data-geo-foreign-flag]');
+    const hint = scope.querySelector('[data-geo-foreign-hint]');
+    if (!(toggle instanceof HTMLButtonElement) || toggle.dataset.foreignBound === '1') return;
+    toggle.dataset.foreignBound = '1';
+    const applyForeign = (on) => {
+      scope.dataset.geoForeign = on ? '1' : '0';
+      toggle.setAttribute('aria-pressed', on ? 'true' : 'false');
+      toggle.textContent = on
+        ? (toggle.dataset.labelOn || toggle.textContent)
+        : (toggle.dataset.labelOff || toggle.textContent);
+      if (flag instanceof HTMLInputElement) flag.value = on ? '1' : '0';
+      if (hint instanceof HTMLElement) hint.hidden = !on;
+      scope.classList.toggle('is-geo-foreign', on);
+      // Soften Italian CAP/province: optional when foreign.
+      const postal = scope.querySelector('[data-postal-code]');
+      if (postal instanceof HTMLInputElement) {
+        if (postal.dataset.wasRequired === undefined) {
+          postal.dataset.wasRequired = postal.required ? '1' : '0';
+        }
+        postal.required = !on && postal.dataset.wasRequired === '1';
+      }
+      const province = scope.querySelector('[data-province-input]');
+      if (province instanceof HTMLInputElement) {
+        if (province.dataset.wasRequired === undefined) {
+          province.dataset.wasRequired = province.required ? '1' : '0';
+        }
+        province.required = !on && province.dataset.wasRequired === '1';
+      }
+      scope.querySelectorAll('[data-city-input], [data-address-input], [data-province-input], [data-postal-code]').forEach((el) => {
+        if (!(el instanceof HTMLInputElement)) return;
+        if (on) {
+          el.dataset.geoPicked = '1';
+          el.setCustomValidity('');
+        } else if (!el.value.trim()) {
+          el.dataset.geoPicked = '0';
+        }
+      });
+      refreshGeoScopeValidity(scope);
+      scope.closest('form')?.dispatchEvent(new Event('setup:cta-refresh', { bubbles: true }));
+    };
+    if (flag instanceof HTMLInputElement && flag.value === '1') applyForeign(true);
+    toggle.addEventListener('click', () => {
+      applyForeign(scope.dataset.geoForeign !== '1');
+    });
+  });
+
   scopeRoot.querySelectorAll('[data-birth-place-input]').forEach((birthInput) => {
     if (birthInput.dataset.suggestBound === '1') return;
     birthInput.dataset.suggestBound = '1';
@@ -6288,6 +6350,7 @@ function initPlaceSuggest(root = document) {
     if (postalInput instanceof HTMLInputElement && postalInput.dataset.capBound !== '1' && capUrl) {
       postalInput.dataset.capBound = '1';
       const resolveCap = async () => {
+        if (scope.dataset.geoForeign === '1') return;
         const cap = postalInput.value.replace(/\D+/g, '');
         if (cap.length !== 5) return;
         const data = await resolveGeoQuery(capUrl, {
@@ -7394,7 +7457,9 @@ function initBirthDateFields(root = document) {
   });
 
   const msgAppointedFuture = document.body?.dataset?.msgAppointedFuture || 'La data di nomina non può essere nel futuro.';
+  const msgAppointedTooOld = document.body?.dataset?.msgAppointedTooOld || 'La data di nomina deve rientrare negli ultimi 50 anni.';
   const msgMandatePast = document.body?.dataset?.msgMandatePast || 'La scadenza del mandato deve essere una data futura.';
+  const msgMandateTooFar = document.body?.dataset?.msgMandateTooFar || 'La scadenza del mandato deve rientrare nei prossimi 50 anni.';
   const msgMandateOrder = document.body?.dataset?.msgMandateOrder || 'La scadenza del mandato deve essere successiva alla data di nomina.';
 
   scope.querySelectorAll('[data-appointed-date]').forEach((appointedInput) => {
@@ -7407,13 +7472,23 @@ function initBirthDateFields(root = document) {
     const validateMandate = () => {
       const appointed = appointedInput.value;
       const mandate = mandateInput.value;
+      const minAppointed = new Date();
+      minAppointed.setFullYear(minAppointed.getFullYear() - 50);
+      const maxMandate = new Date();
+      maxMandate.setFullYear(maxMandate.getFullYear() + 50);
+      const minAppointedStr = minAppointed.toISOString().slice(0, 10);
+      const maxMandateStr = maxMandate.toISOString().slice(0, 10);
       appointedInput.setCustomValidity('');
       mandateInput.setCustomValidity('');
       if (appointed && appointed > todayStr) {
         appointedInput.setCustomValidity(msgAppointedFuture);
+      } else if (appointed && appointed < minAppointedStr) {
+        appointedInput.setCustomValidity(msgAppointedTooOld);
       }
       if (mandate && mandate <= todayStr) {
         mandateInput.setCustomValidity(msgMandatePast);
+      } else if (mandate && mandate > maxMandateStr) {
+        mandateInput.setCustomValidity(msgMandateTooFar);
       }
       if (appointed && mandate && appointed >= mandate) {
         mandateInput.setCustomValidity(msgMandateOrder);
@@ -7442,10 +7517,11 @@ async function resolvePendingGeoFields(form, options = {}) {
 
   for (const cityInput of form.querySelectorAll('[data-city-input]')) {
     if (!(cityInput instanceof HTMLInputElement) || cityInput.dataset.geoPicked === '1') continue;
+    const scope = geoScopeFor(cityInput);
+    if (scope?.dataset?.geoForeign === '1') continue;
     const raw = cityInput.value.trim();
     if (raw.length < 2) continue;
     const data = await resolveGeoQuery(citiesUrl, { q: raw });
-    const scope = geoScopeFor(cityInput);
     const postalInput = scope.querySelector('[data-postal-code]');
     const provinceInput = scope.querySelector('[data-province-input]');
     const addressInput = scope.querySelector('[data-address-input]');
@@ -7467,6 +7543,8 @@ async function resolvePendingGeoFields(form, options = {}) {
 
   for (const provinceInput of form.querySelectorAll('[data-province-input]')) {
     if (!(provinceInput instanceof HTMLInputElement) || provinceInput.dataset.geoPicked === '1') continue;
+    const scope = geoScopeFor(provinceInput);
+    if (scope?.dataset?.geoForeign === '1') continue;
     const raw = provinceInput.value.trim();
     if (raw.length < 2 || !provincesUrl) continue;
     const data = await resolveGeoQuery(provincesUrl, { q: raw });
@@ -7481,6 +7559,7 @@ async function resolvePendingGeoFields(form, options = {}) {
     const raw = addressInput.value.trim();
     if (raw.length < 3) continue;
     const scope = addressInput.closest('[data-geo-scope], [data-people-row], .setup-address, .setup-president, [data-member-form], form') || form;
+    if (scope?.dataset?.geoForeign === '1') continue;
     const city = scope.querySelector('[data-city-input]')?.value?.trim() || '';
     if (!city) continue;
     const houseNumberInput = scope.querySelector('[data-house-number]');

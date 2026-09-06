@@ -1540,7 +1540,7 @@ final class SetupService
             $usedOcr = in_array('ocr', array_values($methods), true);
             $this->storeLegalOcrState($usedOcr ? 'ok' : 'prefilled', $prefilled, $methods, false);
         } elseif ($attempted !== []) {
-            // Scanned PDFs but OCR tools missing, or text not usable.
+            // Scanned PDFs: only "unavailable" when OCR tools are truly missing.
             $status = $extractor->ocrAvailable() ? 'failed' : 'unavailable';
             $this->storeLegalOcrState($status, [], [], false);
         } else {
@@ -1754,6 +1754,20 @@ final class SetupService
             escapeshellarg($jobDir . '/runts_ocr_job.log')
         );
         @exec($cmd);
+        // Confirm the worker actually started (lock or log appear quickly).
+        $lock = $jobDir . '/runts_ocr.lock';
+        $started = false;
+        for ($i = 0; $i < 10; $i++) {
+            usleep(50000);
+            if (is_file($lock) || !is_file($jobFile)) {
+                $started = true;
+                break;
+            }
+        }
+        if (!$started) {
+            @unlink($jobFile);
+            return false;
+        }
         $this->settings->set('legal.runts_ocr_pending', '1');
         return true;
     }
@@ -2195,11 +2209,19 @@ final class SetupService
             }
         }
         $today = date('Y-m-d');
+        $minAppointed = (new \DateTimeImmutable('-50 years'))->format('Y-m-d');
+        $maxMandate = (new \DateTimeImmutable('+50 years'))->format('Y-m-d');
         if ($person['appointed_at'] !== '' && $person['appointed_at'] > $today) {
             $errors['appointed_at'] = __('validation.appointed_future');
         }
+        if ($person['appointed_at'] !== '' && $person['appointed_at'] < $minAppointed) {
+            $errors['appointed_at'] = __('validation.appointed_too_old');
+        }
         if ($person['mandate_ends_at'] !== '' && $person['mandate_ends_at'] <= $today) {
             $errors['mandate_ends_at'] = __('validation.mandate_past');
+        }
+        if ($person['mandate_ends_at'] !== '' && $person['mandate_ends_at'] > $maxMandate) {
+            $errors['mandate_ends_at'] = __('validation.mandate_too_far');
         }
         if (
             $person['appointed_at'] !== ''

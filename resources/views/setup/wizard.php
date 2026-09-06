@@ -562,11 +562,15 @@ $errorStep = flash('setup_error_step');
                         <div class="setup-equal-row">
                             <label class="setup-field">
                                 <span><?= e(__('setup.field_appointed_at')) ?> *</span>
-                                <input type="date" name="appointed_at" value="<?= e((string) ($value['appointed_at'] ?? '')) ?>" required data-appointed-date max="<?= e(date('Y-m-d')) ?>">
+                                <input type="date" name="appointed_at" value="<?= e((string) ($value['appointed_at'] ?? '')) ?>" required data-appointed-date
+                                       min="<?= e(date('Y-m-d', strtotime('-50 years'))) ?>"
+                                       max="<?= e(date('Y-m-d')) ?>">
                             </label>
                             <label class="setup-field">
                                 <span><?= e(__('setup.field_mandate_ends_at')) ?> *</span>
-                                <input type="date" name="mandate_ends_at" value="<?= e((string) ($value['mandate_ends_at'] ?? '')) ?>" required data-mandate-ends-date min="<?= e(date('Y-m-d', strtotime('+1 day'))) ?>">
+                                <input type="date" name="mandate_ends_at" value="<?= e((string) ($value['mandate_ends_at'] ?? '')) ?>" required data-mandate-ends-date
+                                       min="<?= e(date('Y-m-d', strtotime('+1 day'))) ?>"
+                                       max="<?= e(date('Y-m-d', strtotime('+50 years'))) ?>">
                             </label>
                         </div>
                     </div>

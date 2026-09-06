@@ -70,8 +70,10 @@ final class RuntsLookupService
             $emit(['type' => 'progress', 'phase' => 'apply', 'percent' => 98]);
             $result = $this->hydrate($active, false);
             if ($cacheUsed) {
-                $warning = __('setup.runts_cache_fallback');
-                $result['warning'] = trim($warning . ' ' . trim((string) ($result['warning'] ?? '')));
+                $warning = $this->cacheFallbackWarning();
+                if ($warning !== '') {
+                    $result['warning'] = trim($warning . ' ' . trim((string) ($result['warning'] ?? '')));
+                }
             }
             $result['elapsed_ms'] = (int) round((microtime(true) - $started) * 1000);
             return $result;
@@ -526,6 +528,25 @@ final class RuntsLookupService
         $ok = $zip->statName('xl/worksheets/sheet1.xml') !== false;
         $zip->close();
         return $ok;
+    }
+
+    private function cacheFallbackWarning(): string
+    {
+        $metaFile = $this->cacheDir() . '/meta.json';
+        $fetchedAt = 0;
+        if (is_file($metaFile)) {
+            $meta = json_decode((string) file_get_contents($metaFile), true);
+            $fetchedAt = (int) ($meta['fetched_at'] ?? 0);
+        }
+        // Fresh cache (< 3 days): silent fallback — live download often flaky from demos.
+        if ($fetchedAt > 0 && (time() - $fetchedAt) < 3 * 86400) {
+            return '';
+        }
+        if ($fetchedAt > 0) {
+            $days = max(1, (int) floor((time() - $fetchedAt) / 86400));
+            return __('setup.runts_cache_fallback_stale', ['days' => (string) $days]);
+        }
+        return __('setup.runts_cache_fallback');
     }
 
     private function cacheDir(): string

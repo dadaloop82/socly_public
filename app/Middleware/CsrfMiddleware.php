@@ -82,6 +82,13 @@ final class CsrfMiddleware
             return true;
         }
         // Helper APIs used by the open setup wizard.
-        return in_array($path, ['/api/fiscal-code', '/api/geo/cities', '/api/geo/addresses', '/api/geo/cap', '/api/geo/provinces'], true);
+        return in_array($path, [
+            '/api/fiscal-code',
+            '/api/geo/cities',
+            '/api/geo/addresses',
+            '/api/geo/cap',
+            '/api/geo/provinces',
+            '/api/translate',
+        ], true);
     }
 }

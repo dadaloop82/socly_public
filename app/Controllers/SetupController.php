@@ -1095,16 +1095,17 @@ final class SetupController extends BaseController
                     if (!empty($legalPrefill['pending_ocr'])) {
                         $queued = $this->setup->queueLegalPrefillFromDocuments($savedDocuments);
                         if (!$queued) {
-                            $legalPrefill['pending_ocr'] = false;
-                            // Queue failure ≠ missing OCR tools (e.g. path resolve).
-                            $ocrOk = (new \Socly\Services\PdfTextExtractor())->ocrAvailable();
-                            $legalPrefill['status'] = $ocrOk ? 'failed' : 'unavailable';
-                            $this->setup->storeLegalOcrState(
-                                (string) $legalPrefill['status'],
-                                [],
-                                [],
-                                false
-                            );
+                            $extractor = new \Socly\Services\PdfTextExtractor();
+                            if ($extractor->ocrAvailable()) {
+                                // Tools exist: never claim "unavailable" — run OCR inline.
+                                @set_time_limit(0);
+                                $emit(['type' => 'progress', 'phase' => 'docs_ocr', 'percent' => 98, 'number' => $number]);
+                                $legalPrefill = $this->setup->prefillLegalTextsFromDocuments($savedDocuments, true);
+                            } else {
+                                $legalPrefill['pending_ocr'] = false;
+                                $legalPrefill['status'] = 'unavailable';
+                                $this->setup->storeLegalOcrState('unavailable', [], [], false);
+                            }
                         } else {
                             $legalPrefill['status'] = 'pending';
                         }

@@ -14,6 +14,7 @@ $assetVer = (string) max(
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="csrf-token" content="<?= e(csrf_token()) ?>">
     <?= view_partial('partials/password_i18n_meta') ?>
     <title><?= e(($title ?? __('setup.title')) . ' · SOCLY') ?></title>
     <link rel="icon" href="<?= e(socly_icon_url()) ?>" type="image/png">

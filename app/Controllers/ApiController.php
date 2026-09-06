@@ -105,6 +105,7 @@ final class ApiController extends BaseController
 
     public function translate(Request $request): void
     {
+        @set_time_limit(180);
         $raw = json_decode((string) file_get_contents('php://input'), true);
         $data = is_array($raw) ? $raw : $request->all();
         $text = trim((string) ($data['text'] ?? ''));
