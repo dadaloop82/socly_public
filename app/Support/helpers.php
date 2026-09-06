@@ -625,9 +625,10 @@ if (!function_exists('app_version')) {
         if ($configured !== '') {
             return sanitize_app_version($configured);
         }
-        $path = base_path('VERSION');
-        if (is_file($path)) {
-            return sanitize_app_version((string) file_get_contents($path));
+        foreach ([code_path('VERSION'), base_path('VERSION')] as $path) {
+            if (is_file($path)) {
+                return sanitize_app_version((string) file_get_contents($path));
+            }
         }
         return '0.0.0';
     }

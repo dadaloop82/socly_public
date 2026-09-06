@@ -55,11 +55,24 @@ final class UpdateService
 
     public function currentVersion(): string
     {
-        $path = base_path('VERSION');
+        if (function_exists('app_version')) {
+            $v = trim(app_version());
+            if ($v !== '') {
+                return $v;
+            }
+        }
+        // Prefer shared code tree (demos: instance dir has no VERSION file).
+        $path = function_exists('code_path') ? code_path('VERSION') : base_path('VERSION');
+        if (!is_file($path)) {
+            $path = base_path('VERSION');
+        }
         if (!is_file($path)) {
             return '0.0.0';
         }
-        return trim((string) file_get_contents($path)) ?: '0.0.0';
+        $raw = trim((string) file_get_contents($path));
+        return function_exists('sanitize_app_version')
+            ? sanitize_app_version($raw)
+            : ($raw !== '' ? $raw : '0.0.0');
     }
 
     public function channel(): string
@@ -90,6 +103,15 @@ final class UpdateService
      */
     public function check(bool $force = false): array
     {
+        if (function_exists('is_temporary_instance') && is_temporary_instance()) {
+            $current = $this->currentVersion();
+            $result = $this->baseResult($current, $current, false);
+            $result['source'] = 'demo';
+            $result['install_available'] = false;
+
+            return $this->finalizeResult($result);
+        }
+
         $cacheFile = storage_path('cache/update_check.json');
         if (!$force && is_file($cacheFile)) {
             $cached = json_decode((string) file_get_contents($cacheFile), true);
@@ -203,6 +225,9 @@ final class UpdateService
     /** @return array{ok:bool,message:string,version?:string} */
     public function apply(string $ip): array
     {
+        if (function_exists('is_temporary_instance') && is_temporary_instance()) {
+            return ['ok' => false, 'message' => __('updates.disabled')];
+        }
         if (!$this->installEnabled()) {
             return ['ok' => false, 'message' => __('updates.disabled')];
         }

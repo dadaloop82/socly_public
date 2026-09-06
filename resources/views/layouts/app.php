@@ -293,7 +293,8 @@ try {
             <?php endif; ?>
             <?php
             $updateInfo = null;
-            if (can('settings.manage')) {
+            // Demo / temporary instances never show update prompts (shared code mirror).
+            if (!$temporaryInstance && can('settings.manage')) {
                 try {
                     $updateInfo = app(\Socly\Services\UpdateService::class)->check();
                 } catch (\Throwable) {
