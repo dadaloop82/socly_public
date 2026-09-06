@@ -49,19 +49,14 @@ $req = static fn (bool $need): string => $need ? ' required' : '';
 $rootClass = trim('geo-address setup-address geo-layout-' . $layout . ' ' . $extraClass);
 $anyEnabled = !empty($enabled['city']) || !empty($enabled['postal_code']) || !empty($enabled['province']) || !empty($enabled['address']) || !empty($enabled['house_number']);
 $showForeignToggle = !isset($foreign_toggle) || (bool) $foreign_toggle;
+$flagName = (string) ($flag_name ?? 'address_foreign');
 ?>
 <?php if ($anyEnabled): ?>
 <div class="<?= e($rootClass) ?>"<?= $withScope ? ' data-geo-scope' : '' ?>>
     <?php if ($showForeignToggle): ?>
-    <div class="geo-foreign-bar" data-geo-foreign-bar>
-        <button type="button" class="btn btn-ghost btn-sm" data-geo-foreign-toggle
-                data-label-on="<?= e(__('setup.address_foreign_back')) ?>"
-                data-label-off="<?= e(__('setup.address_foreign')) ?>"
-                aria-pressed="false"><?= e(__('setup.address_foreign')) ?></button>
-        <input type="hidden" name="address_foreign" value="0" data-geo-foreign-flag>
-        <p class="setup-hint muted geo-foreign-hint" data-geo-foreign-hint hidden><?= e(__('setup.address_foreign_hint')) ?></p>
-    </div>
-    <?php endif; ?>    <?php if ($layout === 'inline'): ?>
+    <?= view_partial('partials/geo_foreign_bar', ['flag_name' => $flagName]) ?>
+    <?php endif; ?>
+    <?php if ($layout === 'inline'): ?>
         <div class="geo-address-row geo-address-row-inline setup-address-row">
             <?php if (!empty($enabled['city'])): ?>
             <label class="setup-field suggest-field setup-field-grow geo-field">

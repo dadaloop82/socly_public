@@ -6181,7 +6181,7 @@ function applyGeoComuneToScope(scope, item) {
 function refreshGeoScopeValidity(scope) {
   if (!scope) return;
   if (scope.dataset.geoForeign === '1') {
-    scope.querySelectorAll('[data-city-input], [data-address-input], [data-province-input], [data-postal-code]').forEach((el) => {
+    scope.querySelectorAll('[data-city-input], [data-address-input], [data-province-input], [data-postal-code], [data-birth-place-input]').forEach((el) => {
       if (el instanceof HTMLInputElement) {
         el.setCustomValidity('');
         el.dataset.geoPicked = '1';
@@ -6327,7 +6327,7 @@ function initPlaceSuggest(root = document) {
         }
         province.required = !on && province.dataset.wasRequired === '1';
       }
-      scope.querySelectorAll('[data-city-input], [data-address-input], [data-province-input], [data-postal-code]').forEach((el) => {
+      scope.querySelectorAll('[data-city-input], [data-address-input], [data-province-input], [data-postal-code], [data-birth-place-input]').forEach((el) => {
         if (!(el instanceof HTMLInputElement)) return;
         if (on) {
           el.dataset.geoPicked = '1';
@@ -6348,13 +6348,15 @@ function initPlaceSuggest(root = document) {
   scopeRoot.querySelectorAll('[data-birth-place-input]').forEach((birthInput) => {
     if (birthInput.dataset.suggestBound === '1') return;
     birthInput.dataset.suggestBound = '1';
-    const birthList = birthInput.closest('.suggest-wrap, .suggest-field, label, .field-block')
+    const birthList = birthInput.closest('.suggest-wrap, .suggest-field, label, .field-block, .geo-birth-place')
       ?.querySelector('[data-birth-place-suggest]')
       || birthInput.closest('form')?.querySelector('[data-birth-place-suggest]');
+    const birthScope = () => birthInput.closest('[data-geo-scope]') || geoScopeFor(birthInput);
     bindSuggest({
       input: birthInput,
       list: birthList,
       fetchItems: async (q) => {
+        if (birthScope()?.dataset?.geoForeign === '1') return [];
         const res = await fetch(`${citiesUrl}?q=${encodeURIComponent(q)}`);
         const data = await res.json();
         return (data.items || []).map((item) => ({
@@ -6366,6 +6368,11 @@ function initPlaceSuggest(root = document) {
       resolve: {
         minChars: 2,
         run: async (raw) => {
+          if (birthScope()?.dataset?.geoForeign === '1') {
+            birthInput.dataset.geoPicked = '1';
+            clearGeoFieldError(birthInput);
+            return;
+          }
           const data = await resolveGeoQuery(citiesUrl, { q: raw, foreign: '1' });
           await handleGeoResolveResult(data, birthInput, (item) => {
             birthInput.value = item.city || item.label || raw;

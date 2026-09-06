@@ -194,7 +194,6 @@ final class SetupService
                 && trim((string) ($p['gender'] ?? '')) !== ''
                 && trim((string) ($p['birth_place'] ?? '')) !== ''
                 && trim((string) ($p['city'] ?? '')) !== ''
-                && trim((string) ($p['postal_code'] ?? '')) !== ''
                 && trim((string) ($p['address'] ?? '')) !== ''
                 && trim((string) ($p['house_number'] ?? '')) !== ''
                 && trim((string) ($p['appointed_at'] ?? '')) !== ''
@@ -216,6 +215,11 @@ final class SetupService
                 return $count >= max(1, $min);
             }
             return false;
+        }
+
+        if ($type === 'website') {
+            // Prefill from RUNTS must not skip: user confirms and can scrape logo/colors.
+            return $this->isStepReviewed($step);
         }
 
         if ($type === 'checkbox' && !empty($step['required'])) {
@@ -783,6 +787,7 @@ final class SetupService
                 $value = trim((string) $locked['website']);
             }
             $this->persistScalar($step, $value);
+            $this->markStepReviewed($step);
             return ['ok' => true];
         }
 
@@ -2200,11 +2205,12 @@ final class SetupService
         $env = [];
         $errors = [];
         $parts = [];
+        $foreign = trim((string) ($input['address_foreign'] ?? '')) === '1';
         foreach ($step['fields'] ?? [] as $field) {
             $key = (string) $field['key'];
             $value = trim((string) ($input[$key] ?? ''));
             $required = array_key_exists('required', $field) ? !empty($field['required']) : !empty($step['required']);
-            if ($required && $value === '') {
+            if ($required && $value === '' && !($foreign && $key === 'postal_code')) {
                 $errors[$key] = __('validation.required');
                 continue;
             }
@@ -2246,6 +2252,7 @@ final class SetupService
     private function savePresident(array $input): array
     {
         $errors = [];
+        $foreign = trim((string) ($input['address_foreign'] ?? '')) === '1';
         $keys = [
             'first_name', 'last_name',
             'birth_date', 'gender', 'birth_place',
@@ -2257,6 +2264,9 @@ final class SetupService
         foreach ($keys as $key) {
             $person[$key] = trim((string) ($input[$key] ?? ''));
             if ($person[$key] === '') {
+                if ($foreign && $key === 'postal_code') {
+                    continue;
+                }
                 $errors[$key] = __('validation.required');
             }
         }

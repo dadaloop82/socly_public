@@ -879,14 +879,25 @@ a:hover { text-decoration: underline; color: var(--brand-primary-deep); }
   flex: 1 1 12rem;
   font-size: 0.82rem;
 }
+[data-geo-scope].is-geo-foreign [data-postal-code],
+[data-geo-scope].is-geo-foreign [data-province-input],
 .geo-address.is-geo-foreign [data-postal-code],
 .geo-address.is-geo-foreign [data-province-input] {
   opacity: 0.85;
 }
+[data-geo-scope].is-geo-foreign [data-city-suggest],
+[data-geo-scope].is-geo-foreign [data-province-suggest],
+[data-geo-scope].is-geo-foreign [data-address-suggest],
+[data-geo-scope].is-geo-foreign [data-birth-place-suggest],
 .geo-address.is-geo-foreign [data-city-suggest],
 .geo-address.is-geo-foreign [data-province-suggest],
 .geo-address.is-geo-foreign [data-address-suggest] {
   display: none !important;
+}
+.geo-birth-place {
+  display: grid;
+  gap: 0.35rem;
+  min-width: 0;
 }
 .setup-legal-meaning {
   margin: 0.15rem 0 0;

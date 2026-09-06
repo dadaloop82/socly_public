@@ -501,6 +501,7 @@ $errorStep = flash('setup_error_step');
                     ]) ?>
                 <?php elseif ($stepType === 'president'): ?>
                     <div class="setup-president" data-setup-line data-geo-scope>
+                        <?= view_partial('partials/geo_foreign_bar') ?>
                         <div class="setup-equal-row">
                             <label class="setup-field">
                                 <span><?= e(__('setup.field_first_name')) ?> *</span>
@@ -529,6 +530,8 @@ $errorStep = flash('setup_error_step');
                             'name' => 'birth_place',
                             'value' => (string) ($value['birth_place'] ?? ''),
                             'required' => true,
+                            'foreign_toggle' => false,
+                            'with_scope' => false,
                         ]) ?>
                         <label class="setup-field">
                             <span><?= e(__('setup.field_person_fiscal_code')) ?> *</span>
@@ -562,7 +565,8 @@ $errorStep = flash('setup_error_step');
                                 'address' => true,
                                 'house_number' => true,
                             ],
-                            'with_scope' => true,
+                            'with_scope' => false,
+                            'foreign_toggle' => false,
                         ]) ?>
                         <div class="setup-equal-row">
                             <label class="setup-field">
