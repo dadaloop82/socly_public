@@ -113,7 +113,20 @@ final class App
             }
         }
 
-        $router->dispatch($request);
+        try {
+            $router->dispatch($request);
+        } catch (\Throwable $e) {
+            try {
+                $this->get('logger')->error('request.failed', [
+                    'path' => (string) ($request->path() ?? ''),
+                    'method' => (string) ($request->method() ?? ''),
+                    'error' => $e->getMessage(),
+                    'file' => $e->getFile() . ':' . $e->getLine(),
+                ]);
+            } catch (\Throwable) {
+            }
+            throw $e;
+        }
     }
 
     public function branding(): array

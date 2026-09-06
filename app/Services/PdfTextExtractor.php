@@ -309,11 +309,22 @@ final class PdfTextExtractor
 
     private function normalizeText(string $text): string
     {
+        // Drop invalid UTF-8 (OCR can emit binary noise) so later mb_* / JSON never blow up.
+        if (!mb_check_encoding($text, 'UTF-8')) {
+            $converted = @iconv('UTF-8', 'UTF-8//IGNORE', $text);
+            $text = is_string($converted) ? $converted : '';
+        }
         $text = str_replace(["\r\n", "\r"], "\n", $text);
         $text = preg_replace("/\n{3,}/u", "\n\n", $text) ?? $text;
         // Drop isolated form-feed noise from empty OCR pages.
         $text = str_replace("\f", "\n", $text);
-        return trim($text);
+        $text = trim($text);
+        // Cap size: demos/setup must keep settings + HTML render under memory limits.
+        $maxChars = 80_000;
+        if (mb_strlen($text, 'UTF-8') > $maxChars) {
+            $text = rtrim(mb_substr($text, 0, $maxChars, 'UTF-8')) . "\n\n[… testo troncato automaticamente — completa o sostituisci dal PDF originale]";
+        }
+        return $text;
     }
 
     private function bin(string $name): ?string

@@ -569,32 +569,46 @@ final class SetupService
         }
 
         if (in_array($step['key'] ?? '', ['legal.privacy', 'legal.statute'], true)) {
-            $raw = $this->settings->get((string) $step['settings_key'], '');
-            $decoded = is_string($raw) ? $raw : (is_array($raw) ? $raw : '');
-            if (is_string($decoded) && $decoded !== '' && ($decoded[0] ?? '') === '{') {
-                $json = json_decode($decoded, true);
-                if (is_array($json)) {
-                    $decoded = $json;
+            try {
+                $raw = $this->settings->get((string) $step['settings_key'], '');
+                $decoded = is_string($raw) ? $raw : (is_array($raw) ? $raw : '');
+                if (is_string($decoded) && $decoded !== '' && ($decoded[0] ?? '') === '{') {
+                    $json = json_decode($decoded, true);
+                    if (is_array($json)) {
+                        $decoded = $json;
+                    }
                 }
-            }
-            if (is_array($decoded)) {
-                $values = [
-                    'it' => trim((string) ($decoded['it'] ?? '')),
-                    'de' => trim((string) ($decoded['de'] ?? '')),
-                    'en' => trim((string) ($decoded['en'] ?? '')),
-                ];
-            } else {
-                $text = localized(is_string($decoded) ? $decoded : '');
-                $values = ['it' => $text, 'de' => '', 'en' => ''];
-            }
-            if (($step['key'] ?? '') === 'legal.privacy'
-                && trim($values['it']) === ''
-                && $this->isGdprEnabled()
-            ) {
-                $values['it'] = privacy_sample_draft();
-            }
+                if (is_array($decoded)) {
+                    $values = [
+                        'it' => $this->clipLegalEditorText(trim((string) ($decoded['it'] ?? ''))),
+                        'de' => $this->clipLegalEditorText(trim((string) ($decoded['de'] ?? ''))),
+                        'en' => $this->clipLegalEditorText(trim((string) ($decoded['en'] ?? ''))),
+                    ];
+                } else {
+                    $text = localized(is_string($decoded) ? $decoded : '');
+                    $values = ['it' => $this->clipLegalEditorText($text), 'de' => '', 'en' => ''];
+                }
+                if (($step['key'] ?? '') === 'legal.privacy'
+                    && trim($values['it']) === ''
+                    && $this->isGdprEnabled()
+                ) {
+                    $values['it'] = privacy_sample_draft();
+                }
 
-            return $values;
+                return $values;
+            } catch (\Throwable $e) {
+                try {
+                    app('logger')->error('setup.legal_value_failed', [
+                        'step' => (string) ($step['key'] ?? ''),
+                        'error' => $e->getMessage(),
+                    ]);
+                } catch (\Throwable) {
+                }
+                if (($step['key'] ?? '') === 'legal.privacy' && $this->isGdprEnabled()) {
+                    return ['it' => privacy_sample_draft(), 'de' => '', 'en' => ''];
+                }
+                return ['it' => '', 'de' => '', 'en' => ''];
+            }
         }
         if ($type === 'checkbox') {
             $default = (($step['key'] ?? '') === 'gdpr.enabled') ? '1' : '0';
@@ -1527,7 +1541,8 @@ final class SetupService
 
             $text = trim((string) $extracted['text']);
             $note = "[Bozza da PDF RUNTS — verificare e correggere prima della pubblicazione]\n\n";
-            $payload = ['it' => $note . $text, 'de' => $note . $text, 'en' => $note . $text];
+            // Store Italian only: triplicating OCR text in de/en blew past memory on the privacy step.
+            $payload = ['it' => $note . $text, 'de' => '', 'en' => ''];
             $this->settings->set($settingsKey, $payload);
             $prefilled[] = $kind;
             $methods[$kind] = (string) ($extracted['method'] ?? '');
@@ -1535,14 +1550,15 @@ final class SetupService
 
         $prefilled = array_values(array_unique($prefilled));
         $attempted = array_values(array_unique($attempted));
-        $pending = $needsOcr && $prefilled === [];
+        $missingAfterNative = array_values(array_diff($attempted, $prefilled));
+        $pending = $needsOcr && $missingAfterNative !== [];
 
         if ($allowOcr) {
             // Background OCR finished: always settle pending, success or not.
             $status = $prefilled !== [] ? 'ok' : ($attempted !== [] ? 'failed' : 'none');
             $this->storeLegalOcrState($status, $prefilled, $methods, false);
         } elseif ($pending) {
-            $this->storeLegalOcrState('pending', [], [], true);
+            $this->storeLegalOcrState('pending', $prefilled, $methods, true);
         } elseif ($prefilled !== []) {
             $usedOcr = in_array('ocr', array_values($methods), true);
             $this->storeLegalOcrState($usedOcr ? 'ok' : 'prefilled', $prefilled, $methods, false);
@@ -1857,6 +1873,17 @@ final class SetupService
         $raw = $this->settings->get($settingsKey, '');
         $text = localized(is_string($raw) ? $raw : (is_array($raw) ? $raw : ''));
         return trim($text) === '';
+    }
+
+    /** Keep setup textareas renderable even if a previous OCR dumped megabytes. */
+    private function clipLegalEditorText(string $text): string
+    {
+        $max = 80_000;
+        if ($text === '' || mb_strlen($text, 'UTF-8') <= $max) {
+            return $text;
+        }
+        return rtrim(mb_substr($text, 0, $max, 'UTF-8'))
+            . "\n\n[… testo troncato per visualizzazione — usa il PDF originale se serve il resto]";
     }
 
     private function legalTextLooksValid(string $text, string $kind): bool

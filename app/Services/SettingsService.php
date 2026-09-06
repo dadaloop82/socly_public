@@ -29,7 +29,9 @@ final class SettingsService
 
     public function set(string $key, mixed $value, bool $encrypted = false, ?string $pluginId = null): void
     {
-        $store = $encrypted ? $this->encryptor->encrypt((string) $value) : (is_scalar($value) || $value === null ? (string) $value : json_encode($value));
+        $store = $encrypted
+            ? $this->encryptor->encrypt((string) $value)
+            : $this->encodeValue($value);
         $existing = $this->db->fetch('SELECT `key` FROM settings WHERE `key` = :k', ['k' => $key]);
         if ($existing) {
             $this->db->update('settings', [
@@ -46,6 +48,41 @@ final class SettingsService
             ]);
         }
         $this->cache = null;
+    }
+
+    private function encodeValue(mixed $value): string
+    {
+        if (is_scalar($value) || $value === null) {
+            return (string) $value;
+        }
+        $flags = JSON_UNESCAPED_UNICODE | JSON_INVALID_UTF8_SUBSTITUTE;
+        $encoded = json_encode($value, $flags);
+        if (is_string($encoded)) {
+            return $encoded;
+        }
+        // Last resort: drop non-UTF8 recursively then retry.
+        $clean = $this->utf8Clean($value);
+        $encoded = json_encode($clean, $flags);
+        return is_string($encoded) ? $encoded : '{}';
+    }
+
+    private function utf8Clean(mixed $value): mixed
+    {
+        if (is_string($value)) {
+            if (mb_check_encoding($value, 'UTF-8')) {
+                return $value;
+            }
+            $converted = @iconv('UTF-8', 'UTF-8//IGNORE', $value);
+            return is_string($converted) ? $converted : '';
+        }
+        if (is_array($value)) {
+            $out = [];
+            foreach ($value as $k => $v) {
+                $out[$k] = $this->utf8Clean($v);
+            }
+            return $out;
+        }
+        return $value;
     }
 
     public function delete(string $key): void

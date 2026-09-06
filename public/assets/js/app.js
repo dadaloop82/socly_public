@@ -3901,6 +3901,7 @@ function initSetupRuntsLookup(root) {
       statute: box.dataset.msgLegalStatute || 'Statuto',
       privacy: box.dataset.msgLegalPrivacy || 'Informativa privacy',
     };
+    const parts = [];
 
     if (prefilled.length > 0) {
       const usedOcr = status === 'ok'
@@ -3914,24 +3915,23 @@ function initSetupRuntsLookup(root) {
         const label = escapeHtml(labels[key] || String(key));
         return `<span class="setup-runts-chip">${label}</span>`;
       }).join('');
-      return `<div class="setup-runts-legal" data-setup-runts-legal>
+      parts.push(`<div class="setup-runts-legal" data-setup-runts-legal>
         <p class="setup-runts-docs-heading">${heading}</p>
         <div class="setup-runts-chips">${chips}</div>
-      </div>`;
+      </div>`);
     }
 
     if (pending) {
-      return `<p class="setup-runts-note" data-setup-runts-legal>${escapeHtml(box.dataset.msgLegalOcrPending || '')}</p>`;
-    }
-    if (status === 'unavailable') {
+      parts.push(`<p class="setup-runts-note" data-setup-runts-legal-pending>${escapeHtml(box.dataset.msgLegalOcrPending || '')}</p>`);
+    } else if (prefilled.length === 0 && status === 'unavailable') {
       logOcrDebug(legalPrefill, 'unavailable');
-      return `<p class="setup-runts-note is-fail" data-setup-runts-legal>${escapeHtml(box.dataset.msgLegalOcrUnavailable || '')}</p>`;
-    }
-    if (status === 'failed') {
+      parts.push(`<p class="setup-runts-note is-fail" data-setup-runts-legal>${escapeHtml(box.dataset.msgLegalOcrUnavailable || '')}</p>`);
+    } else if (prefilled.length === 0 && status === 'failed') {
       logOcrDebug(legalPrefill, 'failed');
-      return `<p class="setup-runts-note is-fail" data-setup-runts-legal>${escapeHtml(box.dataset.msgLegalOcrFail || '')}</p>`;
+      parts.push(`<p class="setup-runts-note is-fail" data-setup-runts-legal>${escapeHtml(box.dataset.msgLegalOcrFail || '')}</p>`);
     }
-    return '';
+
+    return parts.join('');
   };
 
   const foundHtml = (fields, documents, legalPrefill, people) => {
@@ -4044,17 +4044,13 @@ function initSetupRuntsLookup(root) {
     const result = status?.querySelector('.setup-runts-result');
     if (!(result instanceof HTMLElement)) return;
     const next = legalPrefillBlock(legalPrefill);
-    const current = result.querySelector('[data-setup-runts-legal]');
-    if (!next) {
-      current?.remove();
-      return;
-    }
+    result.querySelectorAll('[data-setup-runts-legal], [data-setup-runts-legal-pending]').forEach((el) => el.remove());
+    if (!next) return;
     const wrap = document.createElement('div');
     wrap.innerHTML = next;
-    const node = wrap.firstElementChild;
-    if (!(node instanceof HTMLElement)) return;
-    if (current) current.replaceWith(node);
-    else result.appendChild(node);
+    [...wrap.children].forEach((node) => {
+      if (node instanceof HTMLElement) result.appendChild(node);
+    });
   };
 
   const startOcrPoll = () => {
