@@ -120,6 +120,35 @@ if (!function_exists('socly_log_uncaught_error')) {
     }
 }
 
+if (!function_exists('socly_auto_report_crash')) {
+    /**
+     * Best-effort GitHub issue for uncaught crashes. Never throws.
+     *
+     * @return array{ok:bool,issue_url?:string,skipped?:bool,error?:string}
+     */
+    function socly_auto_report_crash(Throwable $e, string $ref = ''): array
+    {
+        try {
+            if (!function_exists('app')) {
+                return ['ok' => false, 'skipped' => true, 'error' => 'no_app'];
+            }
+            /** @var \Socly\Services\GitHubIssueService $svc */
+            $svc = app(\Socly\Services\GitHubIssueService::class);
+            return $svc->reportCrash($e, $ref);
+        } catch (Throwable $inner) {
+            try {
+                if (function_exists('app')) {
+                    app('logger')->error('github_issue.auto_report_failed', [
+                        'error' => $inner->getMessage(),
+                    ]);
+                }
+            } catch (Throwable) {
+            }
+            return ['ok' => false, 'error' => 'exception'];
+        }
+    }
+}
+
 if (!function_exists('socly_render_error_page')) {
     /** @param array<string, mixed> $extra */
     function socly_render_error_page(Throwable $e, bool $verbose = false, array $extra = []): void
@@ -128,6 +157,10 @@ if (!function_exists('socly_render_error_page')) {
             http_response_code(500);
         }
         $ref = (string) ($extra['ref'] ?? socly_error_ref());
+        $report = $extra['report'] ?? null;
+        if (!is_array($report)) {
+            $report = socly_auto_report_crash($e, $ref);
+        }
         $wantsJson = (
             str_contains((string) ($_SERVER['HTTP_ACCEPT'] ?? ''), 'application/json')
             || strcasecmp((string) ($_SERVER['HTTP_X_REQUESTED_WITH'] ?? ''), 'XMLHttpRequest') === 0
@@ -153,6 +186,9 @@ if (!function_exists('socly_render_error_page')) {
             if ($verbose) {
                 $payload['detail'] = $detail;
             }
+            if (!empty($report['ok'])) {
+                $payload['reported'] = true;
+            }
             echo json_encode($payload, JSON_UNESCAPED_UNICODE);
             return;
         }
@@ -162,6 +198,23 @@ if (!function_exists('socly_render_error_page')) {
         }
 
         $esc = static fn (string $v): string => htmlspecialchars($v, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
+        $reportNote = '';
+        if (!empty($report['ok'])) {
+            $reportNote = 'Segnalazione automatica inviata al team SOCLY.';
+            try {
+                $reportNote = (string) __('report.auto_sent');
+            } catch (Throwable) {
+            }
+        } elseif (($report['error'] ?? '') === 'not_configured' || !empty($report['skipped'])) {
+            $reportNote = '';
+        } else {
+            try {
+                $reportNote = (string) __('report.auto_failed');
+            } catch (Throwable) {
+                $reportNote = 'Impossibile inviare la segnalazione automatica.';
+            }
+        }
+
         echo '<!DOCTYPE html><html lang="it"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">';
         echo '<title>Errore · SOCLY</title>';
         echo '<style>body{font-family:Manrope,system-ui,sans-serif;margin:0;background:#f4f7f6;color:#123;padding:2rem}'
@@ -172,6 +225,9 @@ if (!function_exists('socly_render_error_page')) {
         echo '<h1>Errore temporaneo</h1>';
         echo '<p>Riprova tra poco o contatta il supporto SOCLY.</p>';
         echo '<p class="muted">Codice riferimento: <code>' . $esc($ref) . '</code></p>';
+        if ($reportNote !== '') {
+            echo '<p class="muted">' . $esc($reportNote) . '</p>';
+        }
 
         if ($verbose) {
             echo '<h2 style="font-size:1.05rem;margin:1.2rem 0 .4rem">Dettagli tecnici</h2>';
@@ -213,11 +269,15 @@ if (!function_exists('socly_register_fatal_error_page')) {
             $e = new ErrorException($message, 0, $type, $file, $line);
             $ref = socly_error_ref();
             socly_log_uncaught_error($e, $ref, ['fatal' => true]);
+            $report = socly_auto_report_crash($e, $ref);
             if (!headers_sent() || (string) ob_get_contents() === '') {
                 if (ob_get_level() > 0) {
                     @ob_end_clean();
                 }
-                socly_render_error_page($e, socly_should_show_error_details(), ['ref' => $ref]);
+                socly_render_error_page($e, socly_should_show_error_details(), [
+                    'ref' => $ref,
+                    'report' => $report,
+                ]);
             }
         });
     }

@@ -142,6 +142,7 @@ document.addEventListener('DOMContentLoaded', () => {
   initSessionHeartbeat();
   initPlatformConsents(document);
   initResetUserData();
+  initReportProblem();
   initPasswordToggles(document);
   initPasswordGenerators(document);
   initPermissionTemplates(document);
@@ -627,6 +628,90 @@ function initEmailTemplateEditor(scope = document) {
   });
 
   applyFormatMode();
+}
+
+function initReportProblem() {
+  const buttons = [...document.querySelectorAll('[data-report-problem]')];
+  if (!buttons.length) return;
+
+  const csrf = () => document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
+
+  buttons.forEach((btn) => {
+    if (!(btn instanceof HTMLElement) || btn.dataset.reportBound === '1') return;
+    btn.dataset.reportBound = '1';
+    const dialog = btn.parentElement?.querySelector('[data-report-problem-dialog]')
+      || document.querySelector('[data-report-problem-dialog]');
+    if (!(dialog instanceof HTMLDialogElement)) return;
+    const form = dialog.querySelector('[data-report-problem-form]');
+    const textarea = dialog.querySelector('[data-report-problem-description]');
+    const status = dialog.querySelector('[data-report-problem-status]');
+    const cancel = dialog.querySelector('[data-report-problem-cancel]');
+    const submit = dialog.querySelector('[data-report-problem-submit]');
+    const url = btn.dataset.reportUrl || '/api/report-problem';
+    if (!(form instanceof HTMLFormElement) || !(textarea instanceof HTMLTextAreaElement)) return;
+
+    const setStatus = (msg, isError = false) => {
+      if (!(status instanceof HTMLElement)) return;
+      const text = String(msg || '').trim();
+      status.hidden = text === '';
+      status.textContent = text;
+      status.classList.toggle('is-error', !!isError);
+    };
+
+    const close = () => {
+      if (typeof dialog.close === 'function') dialog.close();
+    };
+
+    btn.addEventListener('click', () => {
+      setStatus('');
+      textarea.value = '';
+      if (submit instanceof HTMLButtonElement) submit.disabled = false;
+      if (typeof dialog.showModal === 'function') dialog.showModal();
+      textarea.focus();
+    });
+
+    cancel?.addEventListener('click', (e) => {
+      e.preventDefault();
+      close();
+    });
+
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const description = textarea.value.trim();
+      if (!description) {
+        setStatus(document.body?.dataset?.msgReportRequired || 'Required', true);
+        return;
+      }
+      if (submit instanceof HTMLButtonElement) submit.disabled = true;
+      setStatus(document.body?.dataset?.msgReportSending || '…');
+      try {
+        const res = await fetch(url, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Accept: 'application/json',
+            'X-CSRF-TOKEN': csrf(),
+            'X-Requested-With': 'XMLHttpRequest',
+          },
+          body: JSON.stringify({
+            description,
+            page_url: window.location.href,
+          }),
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok || !data?.ok) {
+          setStatus(data?.message || document.body?.dataset?.msgReportError || 'Error', true);
+          if (submit instanceof HTMLButtonElement) submit.disabled = false;
+          return;
+        }
+        setStatus(data?.message || 'OK');
+        setTimeout(close, 1200);
+      } catch (err) {
+        setStatus(document.body?.dataset?.msgReportError || 'Error', true);
+        if (submit instanceof HTMLButtonElement) submit.disabled = false;
+      }
+    });
+  });
 }
 
 function initResetUserData() {
@@ -4589,6 +4674,19 @@ function initSetupFieldFeedback(root) {
     const t = event.target;
     if (t instanceof HTMLElement) evaluate(t);
   });
+  // Keep ✓/✕ in sync when geo customValidity changes the CTA gate — never paint untouched empties.
+  form.addEventListener('setup:cta-refresh', () => {
+    const seen = new Set();
+    const sync = (el) => {
+      if (!(el instanceof HTMLElement) || seen.has(el)) return;
+      seen.add(el);
+      evaluate(el);
+    };
+    form.querySelectorAll('input.is-valid, input.is-invalid, select.is-valid, select.is-invalid, textarea.is-valid, textarea.is-invalid').forEach(sync);
+    form.querySelectorAll('[data-city-input], [data-address-input], [data-province-input], [data-birth-place-input]').forEach((el) => {
+      if (el instanceof HTMLInputElement && el.value.trim()) sync(el);
+    });
+  });
 }
 
 function initSetupGeoGate(root) {
@@ -6460,11 +6558,13 @@ async function handleGeoResolveResult(data, input, applyItem, confirmTemplate, o
   if (data.action === 'none') {
     input.dataset.geoPicked = '1';
     clearGeoFieldError(input);
+    input.closest('form')?.dispatchEvent(new Event('setup:cta-refresh', { bubbles: true }));
     return true;
   }
   if (data.action === 'not_found') {
     if (options.silent) {
       input.dataset.geoPicked = '0';
+      input.closest('form')?.dispatchEvent(new Event('setup:cta-refresh', { bubbles: true }));
       return false;
     }
     await showGeoFieldNotFound(input, notFoundTemplate, options);
@@ -6482,6 +6582,7 @@ async function handleGeoResolveResult(data, input, applyItem, confirmTemplate, o
     applyItem(data.item);
     input.dataset.geoPicked = '1';
     clearGeoFieldError(input);
+    input.closest('form')?.dispatchEvent(new Event('setup:cta-refresh', { bubbles: true }));
     return true;
   }
   const suggestion = data.label || data.item.label || data.item.city || data.item.address || data.item.name || '';
@@ -6797,6 +6898,7 @@ function initPlaceSuggest(root = document) {
               }
             }, confirmCityTpl, { notFoundTemplate: cityNotFoundTpl });
             refreshGeoScopeValidity(scope);
+            form?.dispatchEvent(new Event('setup:cta-refresh', { bubbles: true }));
           },
         },
       });
@@ -6882,6 +6984,7 @@ function initPlaceSuggest(root = document) {
               }
             }, confirmAddressTpl, { notFoundTemplate: addressNotFoundTpl });
             refreshGeoScopeValidity(scope);
+            form?.dispatchEvent(new Event('setup:cta-refresh', { bubbles: true }));
           },
         },
       });
@@ -7730,12 +7833,19 @@ function initAuthNewsWidget() {
     });
 }
 
+function localIsoDate(date) {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, '0');
+  const d = String(date.getDate()).padStart(2, '0');
+  return `${y}-${m}-${d}`;
+}
+
 function initBirthDateFields(root = document) {
   const scope = root && root.querySelectorAll ? root : document;
   const today = new Date();
   const maxAdult = new Date(today.getFullYear() - 18, today.getMonth(), today.getDate());
-  const maxStr = maxAdult.toISOString().slice(0, 10);
-  const todayStr = today.toISOString().slice(0, 10);
+  const maxStr = localIsoDate(maxAdult);
+  const todayStr = localIsoDate(today);
   const msgFuture = document.body?.dataset?.msgBirthFuture || 'La data di nascita non può essere nel futuro.';
   const msgMinor = document.body?.dataset?.msgBirthMinor || 'La persona deve avere almeno 18 anni.';
 
@@ -7788,8 +7898,8 @@ function initBirthDateFields(root = document) {
       minAppointed.setFullYear(minAppointed.getFullYear() - 50);
       const maxMandate = new Date();
       maxMandate.setFullYear(maxMandate.getFullYear() + 50);
-      const minAppointedStr = minAppointed.toISOString().slice(0, 10);
-      const maxMandateStr = maxMandate.toISOString().slice(0, 10);
+      const minAppointedStr = localIsoDate(minAppointed);
+      const maxMandateStr = localIsoDate(maxMandate);
       appointedInput.setCustomValidity('');
       mandateInput.setCustomValidity('');
       if (appointed && appointed > todayStr) {
@@ -7805,6 +7915,7 @@ function initBirthDateFields(root = document) {
       if (appointed && mandate && appointed >= mandate) {
         mandateInput.setCustomValidity(msgMandateOrder);
       }
+      form?.dispatchEvent(new Event('setup:cta-refresh', { bubbles: true }));
     };
 
     appointedInput.addEventListener('change', validateMandate);

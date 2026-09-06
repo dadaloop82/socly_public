@@ -804,6 +804,16 @@ final class GeoService
             return [];
         }
         $variants = [$query];
+        // OSM often stores only the main road: "Via Roma - Secondo Tronco" → "Via Roma"
+        $withoutBranch = trim((string) preg_replace('/\s*[-–—,]\s+.+$/u', '', $query));
+        if ($withoutBranch !== '' && mb_strtolower($withoutBranch) !== mb_strtolower($query)) {
+            $variants[] = $withoutBranch;
+        }
+        $withoutParen = trim((string) preg_replace('/\s*\([^)]*\)\s*/u', ' ', $query));
+        $withoutParen = trim((string) preg_replace('/\s+/u', ' ', $withoutParen));
+        if ($withoutParen !== '' && mb_strtolower($withoutParen) !== mb_strtolower($query)) {
+            $variants[] = $withoutParen;
+        }
         $norm = $this->normalizePlace($query);
         $prefixes = ['via', 'viale', 'corso', 'piazza', 'piazzale', 'largo', 'vicolo', 'strada', 'contrada', 'localita', 'località'];
         $hasPrefix = false;
@@ -815,6 +825,9 @@ final class GeoService
         }
         if (!$hasPrefix) {
             $variants[] = 'Via ' . $query;
+            if ($withoutBranch !== '' && mb_strtolower($withoutBranch) !== mb_strtolower($query)) {
+                $variants[] = 'Via ' . $withoutBranch;
+            }
         }
         return array_values(array_unique($variants));
     }

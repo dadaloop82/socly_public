@@ -73,6 +73,7 @@ use Socly\Services\RuntsLookupService;
 use Socly\Services\SettingsService;
 use Socly\Services\SetupService;
 use Socly\Services\TreasuryService;
+use Socly\Services\GitHubIssueService;
 use Socly\Services\UpdateService;
 use Socly\Services\UserService;
 use Socly\Services\WorkflowService;
@@ -120,6 +121,14 @@ $app->setConfig([
         'repo' => $_ENV['UPDATE_REPO'] ?? 'git@github.com-socly:dadaloop82/socly.git',
         'channel' => $_ENV['UPDATE_CHANNEL'] ?? 'main',
         'enabled' => filter_var($_ENV['UPDATE_ENABLED'] ?? 'false', FILTER_VALIDATE_BOOL),
+    ],
+    'github_issues' => [
+        // Prefer sealed ciphertext (bootstrap/sealed_secrets.php + SOCLY_SEAL_KEY).
+        // Plain GITHUB_ISSUES_TOKEN is accepted only as a local override and should not be committed.
+        'token' => (string) ($_ENV['GITHUB_ISSUES_TOKEN'] ?? ''),
+        'token_enc' => (string) ($_ENV['GITHUB_ISSUES_TOKEN_ENC'] ?? ''),
+        'repo' => (string) ($_ENV['GITHUB_ISSUES_REPO'] ?? 'dadaloop82/socly'),
+        'seal_key' => (string) ($_ENV['SOCLY_SEAL_KEY'] ?? ''),
     ],
 ]);
 
@@ -331,10 +340,12 @@ $app->bind(UpdateService::class, fn (App $a) => new UpdateService($a->get(Migrat
 $app->bind(BrandingService::class, fn (App $a) => new BrandingService($a->get(SettingsService::class)));
 $app->bind(BrandingController::class, fn (App $a) => new BrandingController($a->get(View::class), $a->get(BrandingService::class)));
 $app->bind(GeoService::class, fn () => new GeoService());
+$app->bind(GitHubIssueService::class, fn (App $a) => new GitHubIssueService($a->get(RateLimiter::class)));
 $app->bind(ApiController::class, fn (App $a) => new ApiController(
     $a->get(View::class),
     $a->get(GeoService::class),
-    $a->get(SetupService::class)
+    $a->get(SetupService::class),
+    $a->get(GitHubIssueService::class)
 ));
 $app->bind(I18nController::class, fn (App $a) => new I18nController($a->get(View::class)));
 $app->bind(InstallController::class, fn (App $a) => new InstallController($a->get(View::class), $a->get(Validator::class)));

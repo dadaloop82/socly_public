@@ -23,6 +23,7 @@ $year = date('Y');
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="csrf-token" content="<?= e(csrf_token()) ?>">
     <?= view_partial('partials/password_i18n_meta') ?>
     <title><?= e($computedTitle) ?></title>
     <link rel="icon" href="<?= e(socly_icon_url()) ?>" type="image/png">
@@ -142,7 +143,8 @@ $year = date('Y');
             <span class="auth-footer-meta">· © <?= e($year) ?></span>
             <span class="auth-footer-version">· v<?= e(app_version()) ?></span>
         </div>
-        <nav>
+        <nav class="auth-footer-actions">
+            <?= view_partial('partials/report_problem') ?>
             <span data-i18n-html="auth.footer_tagline"><?= credit_line() ?></span>
         </nav>
     </footer>

@@ -347,7 +347,10 @@ try {
                 <?php endif; ?>
                 <span class="footer-meta">· © <?= e(date('Y')) ?> · v<?= e(app_version()) ?></span>
             </div>
-            <div><?= credit_line() ?></div>
+            <div class="app-footer-actions">
+                <?= view_partial('partials/report_problem') ?>
+                <div><?= credit_line() ?></div>
+            </div>
         </footer>
     </div>
 </div>

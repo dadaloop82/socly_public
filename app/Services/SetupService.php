@@ -592,7 +592,7 @@ final class SetupService
                     && trim($values['it']) === ''
                     && $this->isGdprEnabled()
                 ) {
-                    $values['it'] = privacy_sample_draft();
+                    $values['it'] = \privacy_sample_draft();
                 }
 
                 return $values;
@@ -605,7 +605,7 @@ final class SetupService
                 } catch (\Throwable) {
                 }
                 if (($step['key'] ?? '') === 'legal.privacy' && $this->isGdprEnabled()) {
-                    return ['it' => privacy_sample_draft(), 'de' => '', 'en' => ''];
+                    return ['it' => \privacy_sample_draft(), 'de' => '', 'en' => ''];
                 }
                 return ['it' => '', 'de' => '', 'en' => ''];
             }

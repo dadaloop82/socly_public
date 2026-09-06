@@ -7,6 +7,7 @@ namespace Socly\Controllers;
 use Socly\Core\Http\Request;
 use Socly\Core\View;
 use Socly\Services\GeoService;
+use Socly\Services\GitHubIssueService;
 use Socly\Services\SetupService;
 use Socly\Support\Permission;
 
@@ -15,7 +16,8 @@ final class ApiController extends BaseController
     public function __construct(
         View $view,
         private readonly GeoService $geo,
-        private readonly SetupService $setup
+        private readonly SetupService $setup,
+        private readonly GitHubIssueService $githubIssues
     ) {
         parent::__construct($view);
     }
@@ -103,6 +105,42 @@ final class ApiController extends BaseController
             (string) $request->input('birth_place', '')
         );
         $this->json($result, $result['ok'] ? 200 : 422);
+    }
+
+    public function reportProblem(Request $request): void
+    {
+        $raw = json_decode((string) file_get_contents('php://input'), true);
+        $data = is_array($raw) ? $raw : $request->all();
+        $description = trim((string) ($data['description'] ?? ''));
+        $result = $this->githubIssues->reportProblem($description, [
+            'page_url' => (string) ($data['page_url'] ?? ''),
+            'client_note' => (string) ($data['client_note'] ?? ''),
+            'ref' => (string) ($data['ref'] ?? ''),
+        ]);
+
+        if (!empty($result['ok'])) {
+            $this->json([
+                'ok' => true,
+                'message' => __('report.thanks'),
+                'issue_url' => (string) ($result['issue_url'] ?? ''),
+            ]);
+            return;
+        }
+
+        $code = (string) ($result['code'] ?? $result['error'] ?? 'error');
+        $message = match ($code) {
+            'not_configured' => __('report.not_configured'),
+            'description_required' => __('report.description_required'),
+            'rate_limited' => __('report.rate_limited'),
+            default => __('report.error'),
+        };
+        $status = match ($code) {
+            'not_configured' => 503,
+            'description_required' => 422,
+            'rate_limited' => 429,
+            default => 502,
+        };
+        $this->json(['ok' => false, 'message' => $message, 'code' => $code], $status);
     }
 
     public function translate(Request $request): void

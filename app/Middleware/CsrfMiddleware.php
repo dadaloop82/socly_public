@@ -89,6 +89,7 @@ final class CsrfMiddleware
             '/api/geo/cap',
             '/api/geo/provinces',
             '/api/translate',
+            '/api/report-problem',
         ], true);
     }
 }

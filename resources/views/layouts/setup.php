@@ -94,7 +94,8 @@ $assetVer = (string) max(
             <span class="auth-footer-meta">· © <?= e($year) ?></span>
             <span class="auth-footer-version">· v<?= e(app_version()) ?></span>
         </div>
-        <nav>
+        <nav class="auth-footer-actions">
+            <?= view_partial('partials/report_problem') ?>
             <span><?= credit_line() ?></span>
         </nav>
     </footer>

@@ -576,6 +576,65 @@ a:hover { text-decoration: underline; color: var(--brand-primary-deep); }
   gap: 1rem;
   flex-wrap: wrap;
 }
+.app-footer-actions,
+.auth-footer-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem 1.1rem;
+  justify-content: flex-end;
+}
+.report-problem-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  border: 0;
+  background: transparent;
+  color: var(--muted);
+  font: inherit;
+  font-size: 0.85rem;
+  cursor: pointer;
+  padding: 0;
+  text-decoration: underline;
+  text-underline-offset: 0.18em;
+}
+.report-problem-btn:hover,
+.report-problem-btn:focus-visible {
+  color: var(--ink);
+}
+.report-problem-icon {
+  flex: 0 0 auto;
+  opacity: 0.85;
+}
+.report-problem-title {
+  margin: 0;
+  font-size: 1.15rem;
+  color: var(--ink);
+}
+.report-problem-field {
+  display: grid;
+  gap: 0.35rem;
+  font-size: 0.9rem;
+  color: var(--ink);
+}
+.report-problem-field textarea {
+  width: 100%;
+  min-height: 7rem;
+  resize: vertical;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 0.7rem 0.8rem;
+  font: inherit;
+  background: #fff;
+  color: var(--ink);
+}
+.report-problem-status {
+  margin: 0;
+  min-height: 1.2em;
+}
+.report-problem-status.is-error {
+  color: #a11;
+}
 .app-footer-brand,
 .auth-footer-brand {
   display: flex;

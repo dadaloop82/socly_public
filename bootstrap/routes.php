@@ -88,6 +88,7 @@ $router->get('/api/geo/cap', [ApiController::class, 'cap'], null, ['mw.locale', 
 $router->get('/api/geo/provinces', [ApiController::class, 'provinces'], null, ['mw.locale', 'mw.install', 'mw.setup_or_auth']);
 $router->post('/api/fiscal-code', [ApiController::class, 'fiscalCode'], null, ['mw.locale', 'mw.install', 'mw.setup_or_auth', 'mw.csrf']);
 $router->post('/api/translate', [ApiController::class, 'translate'], null, ['mw.locale', 'mw.install', 'mw.setup_or_auth', 'mw.csrf']);
+$router->post('/api/report-problem', [ApiController::class, 'reportProblem'], null, ['mw.locale', 'mw.install', 'mw.csrf']);
 $router->get('/i18n/messages', [I18nController::class, 'messages'], null, ['mw.locale', 'mw.install']);
 $router->get('/branding/logo', [BrandingController::class, 'logo'], null, ['mw.locale', 'mw.install']);
 
