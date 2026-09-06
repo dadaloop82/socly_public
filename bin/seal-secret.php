@@ -5,6 +5,8 @@ declare(strict_types=1);
 
 /**
  * Seal a secret (AES-256-GCM) for bootstrap/sealed_secrets.php.
+ * Used ONLY on the private marketing host (socly.it) that relays bug reports to GitHub.
+ * Public installs never need this — they POST to /api/platform.php.
  *
  * Usage:
  *   php bin/seal-secret.php github_issues_token 'ghp_…'

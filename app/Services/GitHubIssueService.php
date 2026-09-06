@@ -4,18 +4,14 @@ declare(strict_types=1);
 
 namespace Socly\Services;
 
-use Socly\Core\Encryptor;
-
 /**
- * Creates GitHub issues on the private development repo (server-side only).
+ * Bug reports / crash issues via the socly.it platform relay.
+ * Installations never hold a GitHub PAT — only the marketing host does.
  */
 final class GitHubIssueService
 {
-    private const DEFAULT_REPO = 'dadaloop82/socly';
     private const MANUAL_MAX_PER_HOUR = 5;
     private const CRASH_DEDUP_SECONDS = 900;
-
-    private ?string $resolvedToken = null;
 
     public function __construct(
         private readonly RateLimiter $limiter
@@ -24,12 +20,13 @@ final class GitHubIssueService
 
     public function isConfigured(): bool
     {
-        return $this->token() !== '' && $this->repo() !== '';
+        return function_exists('socly_platform_api_url') && socly_platform_api_url() !== '';
     }
 
     /**
      * Manual report from the footer dialog.
      *
+     * @param array<string, mixed> $clientContext
      * @return array{ok:bool,issue_url?:string,error?:string,code?:string}
      */
     public function reportProblem(string $description, array $clientContext = []): array
@@ -62,7 +59,11 @@ final class GitHubIssueService
             $this->contextMarkdown($ctx),
         ]);
 
-        $created = $this->createIssue($title, $body);
+        $created = $this->relay([
+            'kind' => 'user-report',
+            'title' => $title,
+            'body' => $body,
+        ]);
         if (!$created['ok']) {
             return $created;
         }
@@ -73,25 +74,25 @@ final class GitHubIssueService
     /**
      * Automatic crash report. Never throws.
      *
-     * @return array{ok:bool,issue_url?:string,skipped?:bool,error?:string}
+     * @return array{ok:bool,issue_url?:string,skipped?:bool,error?:string,code?:string}
      */
     public function reportCrash(\Throwable $e, string $ref = ''): array
     {
         try {
             if (!$this->isConfigured()) {
-                return ['ok' => false, 'skipped' => true, 'error' => 'not_configured'];
+                return ['ok' => false, 'skipped' => true, 'error' => 'not_configured', 'code' => 'not_configured'];
             }
 
             $sig = hash('sha256', $e::class . '|' . $e->getMessage() . '|' . $e->getFile() . '|' . $e->getLine());
             $dedupKey = 'report-crash:' . $sig;
             if ($this->limiter->tooManyAttempts($dedupKey, 1, self::CRASH_DEDUP_SECONDS)) {
-                return ['ok' => false, 'skipped' => true, 'error' => 'dedup'];
+                return ['ok' => false, 'skipped' => true, 'error' => 'dedup', 'code' => 'dedup'];
             }
 
             $ip = $this->clientIp();
             $ipKey = 'report-crash-ip:' . $ip;
             if ($this->limiter->tooManyAttempts($ipKey, self::MANUAL_MAX_PER_HOUR, 3600)) {
-                return ['ok' => false, 'skipped' => true, 'error' => 'rate_limited'];
+                return ['ok' => false, 'skipped' => true, 'error' => 'rate_limited', 'code' => 'rate_limited'];
             }
 
             if ($ref === '') {
@@ -103,7 +104,6 @@ final class GitHubIssueService
                 'error_type' => $e::class,
                 'error_message' => $e->getMessage(),
                 'error_file' => $e->getFile() . ':' . $e->getLine(),
-                'traceback' => $e->getTraceAsString(),
             ]);
 
             $shortMsg = mb_substr(preg_replace('/\s+/', ' ', $e->getMessage()) ?? $e->getMessage(), 0, 80);
@@ -124,7 +124,12 @@ final class GitHubIssueService
                 '```',
             ]);
 
-            $created = $this->createIssue($title, $body);
+            $created = $this->relay([
+                'kind' => 'auto-crash',
+                'title' => $title,
+                'body' => $body,
+                'dedup' => $sig,
+            ]);
             if ($created['ok']) {
                 $this->limiter->hit($dedupKey, self::CRASH_DEDUP_SECONDS);
                 $this->limiter->hit($ipKey, 3600);
@@ -139,246 +144,110 @@ final class GitHubIssueService
                 }
             } catch (\Throwable) {
             }
-            return ['ok' => false, 'error' => 'exception'];
+            return ['ok' => false, 'error' => 'exception', 'code' => 'exception'];
         }
     }
 
     /**
+     * @param array{kind:string,title:string,body:string,dedup?:string} $payload
      * @return array{ok:bool,issue_url?:string,error?:string,code?:string}
      */
-    public function createIssue(string $title, string $body): array
+    private function relay(array $payload): array
     {
-        $token = $this->token();
-        $repo = $this->repo();
-        if ($token === '' || $repo === '') {
+        $url = socly_platform_api_url();
+        if ($url === '') {
             return ['ok' => false, 'error' => 'not_configured', 'code' => 'not_configured'];
         }
 
-        $title = mb_substr(trim($title), 0, 200);
-        if ($title === '') {
-            $title = '[report] SOCLY';
+        $body = [
+            'action' => 'report_problem',
+            'token' => $this->instanceTokenSoft(),
+            'kind' => $payload['kind'],
+            'title' => $payload['title'],
+            'body' => $payload['body'],
+        ];
+        if (!empty($payload['dedup'])) {
+            $body['dedup'] = $payload['dedup'];
         }
-        $body = $this->truncate($body, 60000);
 
-        $url = 'https://api.github.com/repos/' . $repo . '/issues';
-        $payload = json_encode([
-            'title' => $title,
-            'body' => $body,
-        ], JSON_UNESCAPED_UNICODE);
-        if ($payload === false) {
+        $json = json_encode($body, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+        if (!is_string($json)) {
             return ['ok' => false, 'error' => 'encode_failed', 'code' => 'encode_failed'];
         }
 
-        $context = stream_context_create([
-            'http' => [
-                'method' => 'POST',
-                'timeout' => 12,
-                'ignore_errors' => true,
-                'header' => implode("\r\n", [
-                    'User-Agent: SOCLY-IssueReporter/1.0',
-                    'Accept: application/vnd.github+json',
-                    'Authorization: Bearer ' . $token,
-                    'X-GitHub-Api-Version: 2022-11-28',
-                    'Content-Type: application/json',
-                    'Content-Length: ' . strlen($payload),
-                ]) . "\r\n",
-                'content' => $payload,
-            ],
-            'ssl' => [
-                'verify_peer' => true,
-                'verify_peer_name' => true,
-            ],
-        ]);
-
-        $raw = @file_get_contents($url, false, $context);
+        $response = null;
         $status = 0;
-        if (isset($http_response_header) && is_array($http_response_header)) {
-            foreach ($http_response_header as $line) {
-                if (preg_match('/^HTTP\/\S+\s+(\d+)/', $line, $m)) {
-                    $status = (int) $m[1];
-                    break;
+        if (function_exists('curl_init')) {
+            $ch = curl_init($url);
+            if ($ch === false) {
+                return ['ok' => false, 'error' => 'relay_failed', 'code' => 'relay_failed'];
+            }
+            curl_setopt_array($ch, [
+                CURLOPT_POST => true,
+                CURLOPT_POSTFIELDS => $json,
+                CURLOPT_HTTPHEADER => ['Content-Type: application/json', 'Accept: application/json'],
+                CURLOPT_RETURNTRANSFER => true,
+                CURLOPT_CONNECTTIMEOUT => 5,
+                CURLOPT_TIMEOUT => 15,
+                CURLOPT_USERAGENT => 'SoclyIssueRelay/1.0',
+            ]);
+            $response = curl_exec($ch);
+            $status = (int) curl_getinfo($ch, CURLINFO_HTTP_CODE);
+            curl_close($ch);
+        } else {
+            $ctx = stream_context_create([
+                'http' => [
+                    'method' => 'POST',
+                    'header' => "Content-Type: application/json\r\nAccept: application/json\r\n",
+                    'content' => $json,
+                    'timeout' => 15,
+                    'ignore_errors' => true,
+                ],
+            ]);
+            $response = @file_get_contents($url, false, $ctx);
+            if (isset($http_response_header) && is_array($http_response_header)) {
+                foreach ($http_response_header as $line) {
+                    if (preg_match('/^HTTP\/\S+\s+(\d+)/', $line, $m)) {
+                        $status = (int) $m[1];
+                        break;
+                    }
                 }
             }
         }
 
-        $data = is_string($raw) ? json_decode($raw, true) : null;
-        if ($status >= 200 && $status < 300 && is_array($data)) {
-            $htmlUrl = trim((string) ($data['html_url'] ?? ''));
+        $decoded = is_string($response) ? json_decode($response, true) : null;
+        if ($status >= 200 && $status < 300 && is_array($decoded) && !empty($decoded['ok'])) {
             return [
                 'ok' => true,
-                'issue_url' => $htmlUrl !== '' ? $htmlUrl : ('https://github.com/' . $repo . '/issues'),
+                'issue_url' => (string) ($decoded['issue_url'] ?? ''),
             ];
         }
 
-        $ghMessage = is_array($data) ? (string) ($data['message'] ?? '') : '';
+        $code = is_array($decoded) ? (string) ($decoded['error'] ?? 'relay_failed') : 'relay_failed';
         try {
             if (function_exists('app')) {
-                app('logger')->error('github_issue.create_failed', [
+                app('logger')->error('github_issue.relay_failed', [
                     'status' => $status,
-                    'message' => $ghMessage,
-                    'repo' => $repo,
+                    'code' => $code,
                 ]);
             }
         } catch (\Throwable) {
         }
 
-        return ['ok' => false, 'error' => 'github_failed', 'code' => 'github_failed'];
+        return ['ok' => false, 'error' => $code, 'code' => $code];
     }
 
-    private function token(): string
+    private function instanceTokenSoft(): string
     {
-        if ($this->resolvedToken !== null) {
-            return $this->resolvedToken;
-        }
-
-        $candidates = [];
-
-        // 1) Sealed ciphertext from private bootstrap file.
-        foreach ($this->sealedSecretCiphertexts('github_issues_token') as $cipher) {
-            $candidates[] = $cipher;
-        }
-
-        // 2) Env/config ciphertext override (e.g. demo .env without sealed file).
         try {
-            $enc = trim((string) config('github_issues.token_enc', ''));
-        } catch (\Throwable) {
-            $enc = '';
-        }
-        if ($enc === '') {
-            $enc = trim((string) ($_ENV['GITHUB_ISSUES_TOKEN_ENC'] ?? getenv('GITHUB_ISSUES_TOKEN_ENC') ?: ''));
-        }
-        if ($enc !== '') {
-            $candidates[] = $enc;
-        }
-
-        foreach ($candidates as $cipher) {
-            $plain = $this->decryptSealed($cipher);
-            if ($plain !== '') {
-                return $this->resolvedToken = $plain;
+            if (function_exists('app')) {
+                /** @var PlatformService $platform */
+                $platform = app(PlatformService::class);
+                return $platform->instanceToken();
             }
-        }
-
-        // 3) Local plaintext override only (never commit). Useful for one-off debugging.
-        try {
-            $plain = trim((string) config('github_issues.token', ''));
-        } catch (\Throwable) {
-            $plain = '';
-        }
-        if ($plain === '') {
-            $plain = trim((string) ($_ENV['GITHUB_ISSUES_TOKEN'] ?? getenv('GITHUB_ISSUES_TOKEN') ?: ''));
-        }
-        // Ignore values that look like ciphertext placeholders.
-        if ($plain !== '' && !str_starts_with($plain, 'enc:')) {
-            return $this->resolvedToken = $plain;
-        }
-
-        return $this->resolvedToken = '';
-    }
-
-    /** @return list<string> */
-    private function sealedSecretCiphertexts(string $key): array
-    {
-        $out = [];
-        $paths = [];
-        try {
-            $paths[] = base_path('bootstrap/sealed_secrets.php');
         } catch (\Throwable) {
         }
-        if (defined('SOCLY_CODE_PATH')) {
-            $paths[] = rtrim((string) SOCLY_CODE_PATH, '/') . '/bootstrap/sealed_secrets.php';
-        }
-        if (defined('SOCLY_PRIVATE_PATH')) {
-            $paths[] = rtrim((string) SOCLY_PRIVATE_PATH, '/') . '/bootstrap/sealed_secrets.php';
-        }
-        // Demo code tree is public; private sealed file may live beside the marketing site checkout.
-        $paths[] = dirname(__DIR__, 2) . '/bootstrap/sealed_secrets.php';
-
-        foreach (array_unique($paths) as $path) {
-            if (!is_file($path)) {
-                continue;
-            }
-            try {
-                $data = require $path;
-            } catch (\Throwable) {
-                continue;
-            }
-            if (!is_array($data)) {
-                continue;
-            }
-            $cipher = trim((string) ($data[$key] ?? ''));
-            if ($cipher !== '') {
-                $out[] = $cipher;
-            }
-        }
-        return $out;
-    }
-
-    private function decryptSealed(string $ciphertext): string
-    {
-        $ciphertext = trim($ciphertext);
-        if ($ciphertext === '') {
-            return '';
-        }
-        foreach ($this->sealKeys() as $key) {
-            try {
-                $plain = (new Encryptor($key))->decrypt($ciphertext);
-                $plain = trim($plain);
-                if ($plain !== '') {
-                    return $plain;
-                }
-            } catch (\Throwable) {
-                // try next key
-            }
-        }
-        return '';
-    }
-
-    /** @return list<string> */
-    private function sealKeys(): array
-    {
-        $keys = [];
-        try {
-            $seal = trim((string) config('github_issues.seal_key', ''));
-        } catch (\Throwable) {
-            $seal = '';
-        }
-        if ($seal === '') {
-            $seal = trim((string) ($_ENV['SOCLY_SEAL_KEY'] ?? getenv('SOCLY_SEAL_KEY') ?: ''));
-        }
-        if ($seal !== '') {
-            $keys[] = $seal;
-        }
-        // Fallback: instance APP_KEY (for env-local re-encrypted blobs).
-        try {
-            $appKey = trim((string) config('app.key', ''));
-        } catch (\Throwable) {
-            $appKey = '';
-        }
-        if ($appKey === '') {
-            $appKey = trim((string) ($_ENV['APP_KEY'] ?? getenv('APP_KEY') ?: ''));
-        }
-        if ($appKey !== '') {
-            $keys[] = $appKey;
-        }
-        return array_values(array_unique($keys));
-    }
-
-    private function repo(): string
-    {
-        $fromConfig = '';
-        try {
-            $fromConfig = trim((string) config('github_issues.repo', ''));
-        } catch (\Throwable) {
-        }
-        $repo = $fromConfig !== ''
-            ? $fromConfig
-            : trim((string) ($_ENV['GITHUB_ISSUES_REPO'] ?? getenv('GITHUB_ISSUES_REPO') ?: self::DEFAULT_REPO));
-        $repo = preg_replace('#^https?://github\.com/#i', '', $repo) ?? $repo;
-        $repo = trim($repo, '/');
-        if (!preg_match('#^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$#', $repo)) {
-            return self::DEFAULT_REPO;
-        }
-        return $repo;
+        return 'anon-' . substr(hash('sha256', $this->clientIp() . '|' . date('Y-m-d')), 0, 24);
     }
 
     /** @param array<string, mixed> $clientContext */
@@ -412,7 +281,6 @@ final class GitHubIssueService
         }
 
         $path = (string) ($_SERVER['REQUEST_URI'] ?? '');
-        // Never include query strings that may carry tokens.
         $pathOnly = (string) (parse_url($path, PHP_URL_PATH) ?: $path);
 
         return [
@@ -474,7 +342,7 @@ final class GitHubIssueService
     {
         $parts[] = '';
         $parts[] = '---';
-        $parts[] = '_Inviata automaticamente da SOCLY Issue Reporter_';
+        $parts[] = '_Inviata da SOCLY via relay socly.it_';
         return implode("\n", $parts);
     }
 

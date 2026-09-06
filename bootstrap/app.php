@@ -123,12 +123,8 @@ $app->setConfig([
         'enabled' => filter_var($_ENV['UPDATE_ENABLED'] ?? 'false', FILTER_VALIDATE_BOOL),
     ],
     'github_issues' => [
-        // Prefer sealed ciphertext (bootstrap/sealed_secrets.php + SOCLY_SEAL_KEY).
-        // Plain GITHUB_ISSUES_TOKEN is accepted only as a local override and should not be committed.
-        'token' => (string) ($_ENV['GITHUB_ISSUES_TOKEN'] ?? ''),
-        'token_enc' => (string) ($_ENV['GITHUB_ISSUES_TOKEN_ENC'] ?? ''),
+        // Issues are created by the socly.it platform relay — installs never hold a PAT.
         'repo' => (string) ($_ENV['GITHUB_ISSUES_REPO'] ?? 'dadaloop82/socly'),
-        'seal_key' => (string) ($_ENV['SOCLY_SEAL_KEY'] ?? ''),
     ],
 ]);
 
