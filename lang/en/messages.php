@@ -455,6 +455,8 @@ return [
         'geo_city_not_found' => 'City «:city» was not found.',
         'geo_address_not_found' => 'Street «:value» is not valid for the selected city.',
         'geo_province_not_found' => 'Province «:value» was not found.',
+        'geo_province_city_mismatch' => 'Province «:province» does not match «:city» (expected: :expected).',
+        'geo_cap_city_mismatch' => 'Postal code «:cap» does not match city «:city».',
         'geo_cap_not_found' => 'Postal code «:value» is not valid.',
         'geo_city_required' => 'Select or confirm the city from the list.',
         'geo_address_required' => 'Select or confirm the street from the list.',

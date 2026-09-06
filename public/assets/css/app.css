@@ -4999,13 +4999,53 @@ button.setup-scrape-logo-frame:focus-visible .setup-scrape-logo-overlay {
   font-size: 1.15rem;
   line-height: 1;
 }
+.setup-exit-dialog.setup-cf-calc-dialog {
+  max-width: min(36rem, 96vw);
+  width: min(36rem, 96vw);
+  overflow: visible;
+}
 .setup-cf-calc-shell {
   display: grid;
-  gap: 0.75rem;
-  min-width: min(28rem, 92vw);
+  gap: 0.85rem;
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+  overflow: visible;
 }
 .setup-cf-calc-dialog::backdrop {
   background: color-mix(in srgb, #0b1f1c 45%, transparent);
+}
+.setup-cf-calc-fields {
+  display: grid;
+  gap: 0.75rem;
+  overflow: visible;
+  min-width: 0;
+}
+.setup-cf-calc-dialog .setup-equal-row {
+  grid-template-columns: 1fr;
+  min-width: 0;
+}
+@media (min-width: 560px) {
+  .setup-cf-calc-dialog .setup-equal-row {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+.setup-cf-calc-dialog .setup-field,
+.setup-cf-calc-dialog .suggest-field,
+.setup-cf-calc-dialog .geo-birth-place {
+  position: relative;
+  z-index: 2;
+  min-width: 0;
+}
+.setup-cf-calc-dialog .setup-field input,
+.setup-cf-calc-dialog .setup-field select,
+.setup-cf-calc-dialog .suggest-wrap {
+  max-width: 100%;
+  box-sizing: border-box;
+}
+.setup-cf-calc-dialog .setup-hint.is-error {
+  color: var(--danger);
+  font-weight: 600;
 }
 .setup-lang-flag-label {
   display: inline-flex;

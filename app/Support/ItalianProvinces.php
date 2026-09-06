@@ -45,6 +45,24 @@ final class ItalianProvinces
         return assoc_capitalize_name($raw);
     }
 
+    /** True when $value is the same province as $sigla (or its expanded name). */
+    public static function matchesSigla(string $value, string $sigla): bool
+    {
+        $sigla = strtoupper(preg_replace('/[^A-Za-z]/', '', trim($sigla)) ?? '');
+        if ($sigla === '' || !isset(self::SIGLA_TO_NAME[$sigla])) {
+            return false;
+        }
+        $value = trim($value);
+        if ($value === '') {
+            return false;
+        }
+        $asCode = strtoupper(preg_replace('/[^A-Za-z]/', '', $value) ?? '');
+        if (strlen($asCode) === 2 && $asCode === $sigla) {
+            return true;
+        }
+        return self::normalize($value) === self::normalize(self::SIGLA_TO_NAME[$sigla]);
+    }
+
     /** @return list<array{label:string,name:string,sigla:string}> */
     public static function search(string $query, int $limit = 8): array
     {

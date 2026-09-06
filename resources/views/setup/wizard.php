@@ -1428,45 +1428,51 @@ $errorStep = flash('setup_error_step');
         </div>
     </dialog>
 
-    <dialog class="setup-exit-dialog setup-cf-calc-dialog" data-setup-people-cf-dialog>
-        <form method="dialog" class="setup-exit-shell setup-cf-calc-shell" data-setup-people-cf-form>
+    <dialog class="setup-exit-dialog setup-cf-calc-dialog" data-setup-people-cf-dialog
+            data-cities-url="<?= e(url('/api/geo/cities')) ?>"
+            data-addresses-url="<?= e(url('/api/geo/addresses')) ?>"
+            data-cap-url="<?= e(url('/api/geo/cap')) ?>"
+            data-provinces-url="<?= e(url('/api/geo/provinces')) ?>">
+        <div class="setup-exit-shell setup-cf-calc-shell">
             <p class="setup-exit-text" data-setup-people-cf-title><?= e(__('setup.cf_calc_title')) ?></p>
-            <div class="setup-equal-row">
-                <label class="setup-field">
-                    <span><?= e(__('setup.field_first_name')) ?> *</span>
-                    <input type="text" name="first_name" required autocomplete="given-name" data-cf-dialog-first>
-                </label>
-                <label class="setup-field">
-                    <span><?= e(__('setup.field_last_name')) ?> *</span>
-                    <input type="text" name="last_name" required autocomplete="family-name" data-cf-dialog-last>
-                </label>
+            <div class="setup-cf-calc-fields" data-setup-people-cf-form>
+                <div class="setup-equal-row">
+                    <label class="setup-field">
+                        <span><?= e(__('setup.field_first_name')) ?> *</span>
+                        <input type="text" name="first_name" required autocomplete="given-name" data-cf-dialog-first>
+                    </label>
+                    <label class="setup-field">
+                        <span><?= e(__('setup.field_last_name')) ?> *</span>
+                        <input type="text" name="last_name" required autocomplete="family-name" data-cf-dialog-last>
+                    </label>
+                </div>
+                <div class="setup-equal-row">
+                    <label class="setup-field">
+                        <span><?= e(__('setup.field_birth_date')) ?> *</span>
+                        <input type="date" name="birth_date" required data-cf-dialog-birth>
+                    </label>
+                    <label class="setup-field">
+                        <span><?= e(__('setup.field_gender')) ?> *</span>
+                        <select name="gender" required data-cf-dialog-gender>
+                            <option value="">—</option>
+                            <option value="M"><?= e(__('members.gender_m')) ?></option>
+                            <option value="F"><?= e(__('members.gender_f')) ?></option>
+                        </select>
+                    </label>
+                </div>
+                <?= view_partial('partials/geo_birth_place', [
+                    'name' => 'birth_place',
+                    'value' => '',
+                    'required' => true,
+                    'foreign_toggle' => true,
+                    'flag_name' => 'cf_dialog_foreign',
+                ]) ?>
+                <p class="setup-hint muted" data-setup-people-cf-status hidden></p>
             </div>
-            <div class="setup-equal-row">
-                <label class="setup-field">
-                    <span><?= e(__('setup.field_birth_date')) ?> *</span>
-                    <input type="date" name="birth_date" required data-cf-dialog-birth>
-                </label>
-                <label class="setup-field">
-                    <span><?= e(__('setup.field_gender')) ?> *</span>
-                    <select name="gender" required data-cf-dialog-gender>
-                        <option value="">—</option>
-                        <option value="M"><?= e(__('members.gender_m')) ?></option>
-                        <option value="F"><?= e(__('members.gender_f')) ?></option>
-                    </select>
-                </label>
-            </div>
-            <?= view_partial('partials/geo_birth_place', [
-                'name' => 'birth_place',
-                'value' => '',
-                'required' => true,
-                'foreign_toggle' => true,
-                'flag_name' => 'cf_dialog_foreign',
-            ]) ?>
-            <p class="setup-hint muted" data-setup-people-cf-status hidden></p>
             <div class="setup-exit-actions">
-                <button type="button" class="btn btn-ghost" data-setup-people-cf-cancel value="cancel"><?= e(__('common.cancel')) ?></button>
-                <button type="submit" class="btn" data-setup-people-cf-apply value="default"><?= e(__('setup.cf_calc_apply')) ?></button>
+                <button type="button" class="btn btn-ghost" data-setup-people-cf-cancel><?= e(__('common.cancel')) ?></button>
+                <button type="button" class="btn" data-setup-people-cf-apply><?= e(__('setup.cf_calc_apply')) ?></button>
             </div>
-        </form>
+        </div>
     </dialog>
 </div>

@@ -2228,6 +2228,43 @@ final class SetupService
         if ($errors) {
             return ['ok' => false, 'errors' => $errors];
         }
+        if (!$foreign) {
+            $geo = app(GeoService::class);
+            $check = $geo->validateItalianAddressTriplet(
+                (string) ($parts['city'] ?? ''),
+                (string) ($parts['postal_code'] ?? ''),
+                (string) ($parts['province'] ?? '')
+            );
+            if (empty($check['ok'])) {
+                $field = (string) ($check['field'] ?? 'city');
+                $expected = (string) ($check['expected_province'] ?? '');
+                if (($check['error'] ?? '') === 'cap_mismatch') {
+                    $errors['postal_code'] = __('members.geo_cap_city_mismatch', [
+                        'city' => (string) ($parts['city'] ?? ''),
+                        'cap' => (string) ($parts['postal_code'] ?? ''),
+                    ]);
+                } else {
+                    $errors[$field] = __('members.geo_province_city_mismatch', [
+                        'city' => (string) ($parts['city'] ?? ''),
+                        'province' => (string) ($parts['province'] ?? ''),
+                        'expected' => $expected,
+                    ]);
+                }
+                return ['ok' => false, 'errors' => $errors];
+            }
+            if ($expected = trim((string) ($check['expected_province'] ?? ''))) {
+                $parts['province'] = $expected;
+                foreach ($step['fields'] ?? [] as $field) {
+                    if ((string) ($field['key'] ?? '') !== 'province') {
+                        continue;
+                    }
+                    $this->settings->set((string) $field['settings_key'], $expected);
+                    if (!empty($field['env_key'])) {
+                        $env[(string) $field['env_key']] = $expected;
+                    }
+                }
+            }
+        }
         // Composite line for legacy consumers of association.address display
         $composite = trim(sprintf(
             '%s %s, %s %s %s',
@@ -2280,6 +2317,19 @@ final class SetupService
             $person['fiscal_code'] = strtoupper(preg_replace('/\s+/', '', $person['fiscal_code']) ?? '');
             if (!$this->isValidPersonFiscalCode($person['fiscal_code'])) {
                 $errors['fiscal_code'] = __('validation.fiscal_code');
+            }
+        }
+        if (!$foreign && $errors === [] && $person['city'] !== '') {
+            $geoCheck = app(GeoService::class)->validateItalianAddressTriplet(
+                $person['city'],
+                $person['postal_code'],
+                ''
+            );
+            if (empty($geoCheck['ok']) && ($geoCheck['error'] ?? '') === 'cap_mismatch') {
+                $errors['postal_code'] = __('members.geo_cap_city_mismatch', [
+                    'city' => $person['city'],
+                    'cap' => $person['postal_code'],
+                ]);
             }
         }
         foreach (['birth_date', 'appointed_at', 'mandate_ends_at'] as $dateKey) {

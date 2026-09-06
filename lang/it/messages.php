@@ -457,6 +457,8 @@ return [
         'geo_city_not_found' => 'La città «:city» non è stata trovata.',
         'geo_address_not_found' => 'La via «:value» non risulta valida per la città selezionata.',
         'geo_province_not_found' => 'La provincia «:value» non è stata trovata.',
+        'geo_province_city_mismatch' => 'La provincia «:province» non corrisponde a «:city» (attesa: :expected).',
+        'geo_cap_city_mismatch' => 'Il CAP «:cap» non corrisponde alla città «:city».',
         'geo_cap_not_found' => 'Il CAP «:value» non risulta valido.',
         'geo_city_required' => 'Seleziona o conferma la città dall\'elenco.',
         'geo_address_required' => 'Seleziona o conferma la via dall\'elenco.',

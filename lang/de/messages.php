@@ -453,6 +453,8 @@ return [
         'geo_city_not_found' => 'Stadt «:city» wurde nicht gefunden.',
         'geo_address_not_found' => 'Straße «:value» ist für die gewählte Stadt nicht gültig.',
         'geo_province_not_found' => 'Provinz «:value» wurde nicht gefunden.',
+        'geo_province_city_mismatch' => 'Provinz «:province» passt nicht zu «:city» (erwartet: :expected).',
+        'geo_cap_city_mismatch' => 'PLZ «:cap» passt nicht zur Stadt «:city».',
         'geo_cap_not_found' => 'PLZ «:value» ist ungültig.',
         'geo_city_required' => 'Stadt aus der Liste wählen oder bestätigen.',
         'geo_address_required' => 'Straße aus der Liste wählen oder bestätigen.',

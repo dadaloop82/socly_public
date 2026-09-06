@@ -53,6 +53,8 @@ $configActive = str_contains($uri, '/settings') || str_contains($uri, '/users') 
     data-msg-geo-city-not-found="<?= e(__('members.geo_city_not_found')) ?>"
     data-msg-geo-address-not-found="<?= e(__('members.geo_address_not_found')) ?>"
     data-msg-geo-province-not-found="<?= e(__('members.geo_province_not_found')) ?>"
+    data-msg-geo-province-city-mismatch="<?= e(__('members.geo_province_city_mismatch')) ?>"
+    data-msg-geo-cap-city-mismatch="<?= e(__('members.geo_cap_city_mismatch')) ?>"
     data-msg-geo-cap-not-found="<?= e(__('members.geo_cap_not_found')) ?>"
     data-msg-geo-city-not-found-ok="<?= e(__('members.geo_city_not_found_ok')) ?>"
     data-msg-geo-confirm-yes="<?= e(__('members.geo_confirm_yes')) ?>"

@@ -652,6 +652,78 @@ final class GeoService
         return ['ok' => true, 'fiscal_code' => $code];
     }
 
+    /**
+     * Check city / CAP / province coherence against the Italian comuni registry.
+     *
+     * @return array{ok:bool,error?:string,field?:string,expected_province?:string,expected_cap?:string}
+     */
+    public function validateItalianAddressTriplet(string $city, string $postalCode = '', string $province = ''): array
+    {
+        $city = trim($city);
+        $postalCode = preg_replace('/\D+/', '', trim($postalCode)) ?? '';
+        $province = trim($province);
+        if ($city === '') {
+            return ['ok' => true];
+        }
+
+        $comune = $this->findComune($city);
+        if ($comune === null) {
+            // Unknown city: leave soft (foreign / typo handled by UI resolve).
+            return ['ok' => true];
+        }
+
+        $sigla = strtoupper(trim((string) ($comune['provincia'] ?? '')));
+        $expectedProvince = ItalianProvinces::expandName($sigla);
+        $expectedCap = preg_replace('/\D+/', '', (string) ($comune['cap'] ?? '')) ?? '';
+
+        if ($province !== '' && $sigla !== '' && !ItalianProvinces::matchesSigla($province, $sigla)) {
+            return [
+                'ok' => false,
+                'field' => 'province',
+                'error' => 'province_mismatch',
+                'expected_province' => $expectedProvince !== '' ? $expectedProvince : $sigla,
+                'expected_cap' => $expectedCap,
+            ];
+        }
+
+        if ($postalCode !== '' && strlen($postalCode) === 5) {
+            $matches = $this->findComuniByCap($postalCode, 20);
+            $cityNorm = $this->normalizePlace($city);
+            $capMatchesCity = false;
+            foreach ($matches as $row) {
+                if ($this->normalizePlace((string) ($row['city'] ?? '')) === $cityNorm) {
+                    $capMatchesCity = true;
+                    break;
+                }
+            }
+            if (!$capMatchesCity && $expectedCap !== '' && $postalCode !== $expectedCap) {
+                // Fallback: registry primary CAP for the comune.
+                return [
+                    'ok' => false,
+                    'field' => 'postal_code',
+                    'error' => 'cap_mismatch',
+                    'expected_province' => $expectedProvince !== '' ? $expectedProvince : $sigla,
+                    'expected_cap' => $expectedCap,
+                ];
+            }
+            if ($matches !== [] && !$capMatchesCity) {
+                return [
+                    'ok' => false,
+                    'field' => 'postal_code',
+                    'error' => 'cap_mismatch',
+                    'expected_province' => $expectedProvince !== '' ? $expectedProvince : $sigla,
+                    'expected_cap' => $expectedCap !== '' ? $expectedCap : $postalCode,
+                ];
+            }
+        }
+
+        return [
+            'ok' => true,
+            'expected_province' => $expectedProvince !== '' ? $expectedProvince : $sigla,
+            'expected_cap' => $expectedCap,
+        ];
+    }
+
     /** @return list<array{nome:string,belfiore:string,provincia:string,cap:string}> */
     private function comuni(): array
     {

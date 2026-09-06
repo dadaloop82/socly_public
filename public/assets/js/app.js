@@ -6114,11 +6114,11 @@ function initPeopleList(list) {
 
   dialogCancel?.addEventListener('click', (event) => {
     event.preventDefault();
+    event.stopPropagation();
     closeCfDialog();
   });
 
-  dialogForm?.addEventListener('submit', async (event) => {
-    event.preventDefault();
+  const applyCfFromDialog = async () => {
     if (!(calcTargetRow instanceof HTMLElement)) {
       closeCfDialog();
       return;
@@ -6128,12 +6128,21 @@ function initPeopleList(list) {
     const birth = (dialogBirth instanceof HTMLInputElement ? dialogBirth.value : '').trim();
     const gender = (dialogGender instanceof HTMLSelectElement ? dialogGender.value : '').trim();
     const place = (dialogBirthPlace instanceof HTMLInputElement ? dialogBirthPlace.value : '').trim();
+    const requiredInputs = [dialogFirst, dialogLast, dialogBirth, dialogGender, dialogBirthPlace];
+    for (const el of requiredInputs) {
+      if (el instanceof HTMLInputElement || el instanceof HTMLSelectElement) {
+        if (!el.checkValidity()) {
+          setDialogStatus(msgCfIncomplete);
+          el.reportValidity();
+          return;
+        }
+      }
+    }
     if (!first || !last || !birth || !gender || !place) {
       setDialogStatus(msgCfIncomplete);
-      dialogForm.reportValidity?.();
       return;
     }
-    const applyBtn = dialogForm.querySelector('[data-setup-people-cf-apply]');
+    const applyBtn = dialog?.querySelector('[data-setup-people-cf-apply]');
     if (applyBtn instanceof HTMLButtonElement) applyBtn.disabled = true;
     setDialogStatus('');
     try {
@@ -6175,6 +6184,20 @@ function initPeopleList(list) {
       setDialogStatus(msgCfIncomplete);
     } finally {
       if (applyBtn instanceof HTMLButtonElement) applyBtn.disabled = false;
+    }
+  };
+
+  dialog?.querySelector('[data-setup-people-cf-apply]')?.addEventListener('click', (event) => {
+    event.preventDefault();
+    event.stopPropagation();
+    applyCfFromDialog().catch(() => {});
+  });
+
+  dialog?.addEventListener('keydown', (event) => {
+    if (event.key === 'Enter' && event.target instanceof HTMLElement
+      && !event.target.matches('button, textarea')) {
+      event.preventDefault();
+      applyCfFromDialog().catch(() => {});
     }
   });
 
@@ -6344,15 +6367,20 @@ function applyGeoComuneToScope(scope, item) {
   }
   if (postalInput instanceof HTMLInputElement && item.cap) {
     postalInput.value = item.cap;
+    postalInput.dataset.geoPicked = '1';
   }
   if (provinceInput instanceof HTMLInputElement) {
     const provinceName = String(item.provincia_name || item.name || '').trim();
     if (provinceName) {
+      // Always sync province from the selected comune — never keep a stale manual value.
       provinceInput.value = provinceName;
       provinceInput.dataset.geoPicked = '1';
       clearGeoFieldError(provinceInput);
     }
   }
+  if (item.provincia) scope.dataset.geoProvinceSigla = String(item.provincia);
+  if (item.provincia_name) scope.dataset.geoProvinceName = String(item.provincia_name);
+  if (item.cap) scope.dataset.geoExpectedCap = String(item.cap);
 }
 
 function refreshGeoScopeValidity(scope) {
@@ -6390,7 +6418,24 @@ function refreshGeoScopeValidity(scope) {
   }
   if (provinceInput instanceof HTMLInputElement) {
     const value = provinceInput.value.trim();
-    if (provinceInput.required && value && provinceInput.dataset.geoPicked !== '1') {
+    const expectedProv = String(scope.dataset.geoProvinceName || '').trim();
+    const expectedSigla = String(scope.dataset.geoProvinceSigla || '').trim().toUpperCase();
+    const provinceMismatchTpl = document.body?.dataset?.msgGeoProvinceCityMismatch
+      || 'La provincia «:province» non corrisponde a «:city» (attesa: :expected).';
+    const cityLabel = cityInput instanceof HTMLInputElement ? cityInput.value.trim() : '';
+    if (value && expectedProv && cityLabel) {
+      const siglaOk = expectedSigla && value.replace(/[^a-z]/gi, '').toUpperCase() === expectedSigla;
+      if (value.toLowerCase() !== expectedProv.toLowerCase() && !siglaOk) {
+        provinceInput.setCustomValidity(
+          provinceMismatchTpl
+            .replaceAll(':province', value)
+            .replaceAll(':city', cityLabel)
+            .replaceAll(':expected', expectedProv)
+        );
+      } else {
+        provinceInput.setCustomValidity('');
+      }
+    } else if (provinceInput.required && value && provinceInput.dataset.geoPicked !== '1') {
       provinceInput.setCustomValidity(document.body?.dataset?.msgGeoProvinceNotFound || msgCity);
     } else if (provinceInput.validationMessage) {
       provinceInput.setCustomValidity('');
@@ -6586,11 +6631,13 @@ function initPlaceSuggest(root = document) {
       if (!(provinceInput instanceof HTMLInputElement) || !item) return;
       const provinceName = String(item.provincia_name || item.name || '').trim();
       if (!provinceName) return;
-      if (!provinceInput.value || provinceInput.dataset.geoPicked !== '1') {
-        provinceInput.value = provinceName;
-        provinceInput.dataset.geoPicked = '1';
-        clearGeoFieldError(provinceInput);
-      }
+      // City/CAP always win over a previously typed province.
+      provinceInput.value = provinceName;
+      provinceInput.dataset.geoPicked = '1';
+      clearGeoFieldError(provinceInput);
+      if (item.provincia) scope.dataset.geoProvinceSigla = String(item.provincia);
+      if (item.provincia_name) scope.dataset.geoProvinceName = String(item.provincia_name);
+      if (item.cap) scope.dataset.geoExpectedCap = String(item.cap);
     };
 
     const markCityPicked = () => {
@@ -6696,6 +6743,12 @@ function initPlaceSuggest(root = document) {
             },
           },
         });
+      }
+      if (provinceInput.dataset.coherenceBound !== '1') {
+        provinceInput.dataset.coherenceBound = '1';
+        provinceInput.addEventListener('input', () => refreshGeoScopeValidity(scope));
+        provinceInput.addEventListener('change', () => refreshGeoScopeValidity(scope));
+        provinceInput.addEventListener('blur', () => refreshGeoScopeValidity(scope));
       }
     }
 
@@ -7784,16 +7837,28 @@ async function resolvePendingGeoFields(form, options = {}) {
     const data = await resolveGeoQuery(citiesUrl, { q: raw });
     const postalInput = scope.querySelector('[data-postal-code]');
     const provinceInput = scope.querySelector('[data-province-input]');
-    const addressInput = scope.querySelector('[data-address-input]');
+    const existingProvince = provinceInput instanceof HTMLInputElement ? provinceInput.value.trim() : '';
     const resolved = await handleGeoResolveResult(data, cityInput, (item) => {
       cityInput.value = item.city || item.label || raw;
-      if (postalInput instanceof HTMLInputElement && item.cap) {
+      cityInput.dataset.geoPicked = '1';
+      clearGeoFieldError(cityInput);
+      if (postalInput instanceof HTMLInputElement && item.cap && !postalInput.value.trim()) {
         postalInput.value = item.cap;
+        postalInput.dataset.geoPicked = '1';
       }
-      if (provinceInput instanceof HTMLInputElement && item.provincia_name) {
-        provinceInput.value = item.provincia_name;
-        provinceInput.dataset.geoPicked = '1';
+      if (item.provincia) scope.dataset.geoProvinceSigla = String(item.provincia);
+      if (item.provincia_name) scope.dataset.geoProvinceName = String(item.provincia_name);
+      if (item.cap) scope.dataset.geoExpectedCap = String(item.cap);
+      // If province was empty, fill it; if already set, leave it for the coherence pass.
+      if (provinceInput instanceof HTMLInputElement && !existingProvince) {
+        const provinceName = String(item.provincia_name || '').trim();
+        if (provinceName) {
+          provinceInput.value = provinceName;
+          provinceInput.dataset.geoPicked = '1';
+          clearGeoFieldError(provinceInput);
+        }
       }
+      const addressInput = scope.querySelector('[data-address-input]');
       if (addressInput instanceof HTMLInputElement) {
         addressInput.dispatchEvent(new Event('input', { bubbles: true }));
       }
@@ -7839,6 +7904,92 @@ async function resolvePendingGeoFields(form, options = {}) {
       }
     }, confirmAddressTpl, { notFoundTemplate: addressNotFoundTpl, silent });
     if (!resolved) ok = false;
+  }
+
+  // Final coherence: city / CAP / province must belong together.
+  const provinceMismatchTpl = document.body?.dataset?.msgGeoProvinceCityMismatch
+    || 'La provincia «:province» non corrisponde a «:city» (attesa: :expected).';
+  const capMismatchTpl = document.body?.dataset?.msgGeoCapCityMismatch
+    || 'Il CAP «:cap» non corrisponde alla città «:city».';
+  const scopesDone = new Set();
+  for (const cityInput of form.querySelectorAll('[data-city-input]')) {
+    if (!(cityInput instanceof HTMLInputElement)) continue;
+    const scope = geoScopeFor(cityInput);
+    if (!scope || scopesDone.has(scope) || scope.dataset.geoForeign === '1') continue;
+    scopesDone.add(scope);
+    const city = cityInput.value.trim();
+    if (city.length < 2) continue;
+    const postalInput = scope.querySelector('[data-postal-code]');
+    const provinceInput = scope.querySelector('[data-province-input]');
+    const cap = postalInput instanceof HTMLInputElement ? postalInput.value.replace(/\D+/g, '') : '';
+    const province = provinceInput instanceof HTMLInputElement ? provinceInput.value.trim() : '';
+    const data = await resolveGeoQuery(citiesUrl, { q: city });
+    let expectedProv = '';
+    let expectedSigla = '';
+    let expectedCap = '';
+    let meta = data?.item || null;
+    if ((data?.action === 'apply' || data?.action === 'confirm') && meta) {
+      expectedProv = String(meta.provincia_name || '').trim();
+      expectedSigla = String(meta.provincia || '').trim().toUpperCase();
+      expectedCap = String(meta.cap || '').replace(/\D+/g, '');
+    } else if (data?.action === 'none' || !meta) {
+      // Exact match / missing item — re-fetch search list for metadata.
+      try {
+        const res = await fetch(`${citiesUrl}?q=${encodeURIComponent(city)}`);
+        const payload = await res.json();
+        const hit = (payload.items || []).find((row) => String(row.city || '').toLowerCase() === city.toLowerCase())
+          || (payload.items || [])[0];
+        if (hit) {
+          meta = hit;
+          expectedProv = String(hit.provincia_name || '').trim();
+          expectedSigla = String(hit.provincia || '').trim().toUpperCase();
+          expectedCap = String(hit.cap || '').replace(/\D+/g, '');
+        }
+      } catch {
+        /* ignore */
+      }
+    }
+    if (expectedSigla) scope.dataset.geoProvinceSigla = expectedSigla;
+    if (expectedProv) scope.dataset.geoProvinceName = expectedProv;
+    if (expectedCap) scope.dataset.geoExpectedCap = expectedCap;
+
+    if (provinceInput instanceof HTMLInputElement && province && expectedProv) {
+      const provNorm = province.toLowerCase();
+      const expNorm = expectedProv.toLowerCase();
+      const siglaOk = expectedSigla && province.replace(/[^a-z]/gi, '').toUpperCase() === expectedSigla;
+      if (provNorm !== expNorm && !siglaOk) {
+        const msg = provinceMismatchTpl
+          .replaceAll(':province', province)
+          .replaceAll(':city', city)
+          .replaceAll(':expected', expectedProv);
+        provinceInput.setCustomValidity(msg);
+        if (!silent) provinceInput.reportValidity();
+        ok = false;
+      } else {
+        provinceInput.setCustomValidity('');
+        provinceInput.value = expectedProv;
+        provinceInput.dataset.geoPicked = '1';
+      }
+    }
+    if (postalInput instanceof HTMLInputElement && cap.length === 5 && expectedCap && cap !== expectedCap) {
+      // Confirm CAP via CAP endpoint (cities can have multiple CAP).
+      let capOk = false;
+      if (urls.capUrl) {
+        const capData = await resolveGeoQuery(urls.capUrl, { q: cap, city });
+        if (capData?.action === 'apply' || capData?.action === 'confirm' || capData?.action === 'none') {
+          const capCity = String(capData.item?.city || '').toLowerCase();
+          if (!capCity || capCity === city.toLowerCase()) capOk = true;
+        }
+      }
+      if (!capOk) {
+        const msg = capMismatchTpl.replaceAll(':cap', cap).replaceAll(':city', city);
+        postalInput.setCustomValidity(msg);
+        if (!silent) postalInput.reportValidity();
+        ok = false;
+      } else if (postalInput.validationMessage) {
+        postalInput.setCustomValidity('');
+      }
+    }
   }
 
   refreshGeoFormValidity(form);

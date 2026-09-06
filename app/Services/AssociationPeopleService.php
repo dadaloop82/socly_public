@@ -307,6 +307,31 @@ final class AssociationPeopleService
                     return ['ok' => false, 'errors' => [$field => __('validation.required')]];
                 }
             }
+            $foreign = trim((string) ($input['address_foreign'] ?? '')) === '1';
+            if (!$foreign) {
+                $geoCheck = app(GeoService::class)->validateItalianAddressTriplet(
+                    (string) ($row['city'] ?? ''),
+                    (string) ($row['postal_code'] ?? ''),
+                    (string) ($row['province'] ?? '')
+                );
+                if (empty($geoCheck['ok'])) {
+                    if (($geoCheck['error'] ?? '') === 'cap_mismatch') {
+                        return ['ok' => false, 'errors' => [
+                            'postal_code' => __('members.geo_cap_city_mismatch', [
+                                'city' => (string) ($row['city'] ?? ''),
+                                'cap' => (string) ($row['postal_code'] ?? ''),
+                            ]),
+                        ]];
+                    }
+                    return ['ok' => false, 'errors' => [
+                        'province' => __('members.geo_province_city_mismatch', [
+                            'city' => (string) ($row['city'] ?? ''),
+                            'province' => (string) ($row['province'] ?? ''),
+                            'expected' => (string) ($geoCheck['expected_province'] ?? ''),
+                        ]),
+                    ]];
+                }
+            }
         }
         if ($requiresMandate) {
             foreach (['appointed_at', 'mandate_ends_at'] as $field) {

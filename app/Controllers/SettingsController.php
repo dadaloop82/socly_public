@@ -253,6 +253,37 @@ final class SettingsController extends BaseController
         $this->settings->set('association.city', $data['association_city']);
         $this->settings->set('association.postal_code', $data['association_postal_code']);
         $province = \Socly\Support\ItalianProvinces::expandName((string) ($data['association_province'] ?? ''));
+        $foreign = trim((string) ($data['address_foreign'] ?? '')) === '1';
+        if (!$foreign) {
+            $geoCheck = app(\Socly\Services\GeoService::class)->validateItalianAddressTriplet(
+                (string) $data['association_city'],
+                (string) $data['association_postal_code'],
+                $province
+            );
+            if (empty($geoCheck['ok'])) {
+                $field = (string) ($geoCheck['field'] ?? 'association_province');
+                $map = [
+                    'province' => 'association_province',
+                    'postal_code' => 'association_postal_code',
+                    'city' => 'association_city',
+                ];
+                $errKey = $map[$field] ?? 'association_province';
+                $msg = ($geoCheck['error'] ?? '') === 'cap_mismatch'
+                    ? __('members.geo_cap_city_mismatch', [
+                        'city' => (string) $data['association_city'],
+                        'cap' => (string) $data['association_postal_code'],
+                    ])
+                    : __('members.geo_province_city_mismatch', [
+                        'city' => (string) $data['association_city'],
+                        'province' => $province,
+                        'expected' => (string) ($geoCheck['expected_province'] ?? ''),
+                    ]);
+                $this->settingsFail($request, [$errKey => $msg], 'general');
+            }
+            if (!empty($geoCheck['expected_province'])) {
+                $province = (string) $geoCheck['expected_province'];
+            }
+        }
         $this->settings->set('association.province', $province);
         $this->settings->set('association.address', $data['association_address']);
         $this->settings->set('association.house_number', $data['association_house_number']);

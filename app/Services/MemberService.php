@@ -1233,6 +1233,7 @@ final class MemberService
                 $fieldErrors['photo'] = $photoError;
             }
         }
+        $fieldErrors = array_merge($fieldErrors, $this->geoAddressFieldErrors($fieldData, $data));
         if ($fieldErrors) {
             return ['ok' => false, 'errors' => $fieldErrors];
         }
@@ -1353,6 +1354,7 @@ final class MemberService
                 $fieldErrors['photo'] = $photoError;
             }
         }
+        $fieldErrors = array_merge($fieldErrors, $this->geoAddressFieldErrors($fieldData, $data));
         if ($fieldErrors) {
             return ['ok' => false, 'errors' => $fieldErrors];
         }
@@ -1466,6 +1468,46 @@ final class MemberService
             }
         }
         return $errors;
+    }
+
+    /**
+     * Reject incoherent Italian city / CAP / province on member forms.
+     *
+     * @param array<string,mixed> $fieldData
+     * @param array<string,mixed> $data
+     * @return array<string,string>
+     */
+    private function geoAddressFieldErrors(array $fieldData, array $data = []): array
+    {
+        $foreign = trim((string) ($data['address_foreign'] ?? $fieldData['address_foreign'] ?? '')) === '1';
+        if ($foreign) {
+            return [];
+        }
+        $city = trim((string) ($fieldData['city'] ?? ''));
+        if ($city === '') {
+            return [];
+        }
+        $postal = trim((string) ($fieldData['postal_code'] ?? ''));
+        $province = trim((string) ($fieldData['province'] ?? ''));
+        $check = app(GeoService::class)->validateItalianAddressTriplet($city, $postal, $province);
+        if (!empty($check['ok'])) {
+            return [];
+        }
+        if (($check['error'] ?? '') === 'cap_mismatch') {
+            return [
+                'postal_code' => __('members.geo_cap_city_mismatch', [
+                    'city' => $city,
+                    'cap' => $postal,
+                ]),
+            ];
+        }
+        return [
+            'province' => __('members.geo_province_city_mismatch', [
+                'city' => $city,
+                'province' => $province,
+                'expected' => (string) ($check['expected_province'] ?? ''),
+            ]),
+        ];
     }
 
     public function isGdprEnabled(): bool
