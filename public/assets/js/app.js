@@ -5674,7 +5674,19 @@ function initSetupLocaleLive(root) {
   );
 
   const applyMessages = (messages, lang) => {
-    root.querySelectorAll('[data-i18n]').forEach((el) => {
+    const scopes = [root, document];
+    const seen = new Set();
+    const visit = (selector, fn) => {
+      scopes.forEach((scope) => {
+        if (!scope || !scope.querySelectorAll) return;
+        scope.querySelectorAll(selector).forEach((el) => {
+          if (seen.has(el)) return;
+          seen.add(el);
+          fn(el);
+        });
+      });
+    };
+    visit('[data-i18n]', (el) => {
       const key = el.dataset.i18n;
       if (!key) return;
       let v = getByPath(messages, key);
@@ -5686,12 +5698,22 @@ function initSetupLocaleLive(root) {
       }
       el.textContent = v;
     });
-    root.querySelectorAll('[data-i18n-placeholder]').forEach((el) => {
+    visit('[data-i18n-html]', (el) => {
+      const key = el.dataset.i18nHtml;
+      if (!key) return;
+      let v = getByPath(messages, key);
+      if (typeof v !== 'string') return;
+      if (key === 'auth.footer_tagline') {
+        v = v.replaceAll(':heart', '<span class="heart" aria-hidden="true">❤</span>');
+      }
+      el.innerHTML = v;
+    });
+    visit('[data-i18n-placeholder]', (el) => {
       const key = el.dataset.i18nPlaceholder;
       const v = key ? getByPath(messages, key) : null;
       if (typeof v === 'string') el.setAttribute('placeholder', v);
     });
-    root.querySelectorAll('[data-i18n-aria-label]').forEach((el) => {
+    visit('[data-i18n-aria-label]', (el) => {
       const key = el.dataset.i18nAriaLabel;
       const v = key ? getByPath(messages, key) : null;
       if (typeof v === 'string') el.setAttribute('aria-label', v);

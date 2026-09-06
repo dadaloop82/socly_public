@@ -87,16 +87,16 @@ $assetVer = (string) max(
         <div class="auth-footer-brand">
             <?= socly_word_html('socly-word-footer') ?>
             <?php if ($hasAssoc): ?>
-                <span class="auth-footer-assoc">· <?= e(__('auth.for')) ?> <?= assoc_lockup_html(['class' => 'assoc-lockup-footer']) ?></span>
+                <span class="auth-footer-assoc">· <span data-i18n="auth.for"><?= e(__('auth.for')) ?></span> <?= assoc_lockup_html(['class' => 'assoc-lockup-footer']) ?></span>
             <?php else: ?>
-                <span class="auth-footer-assoc">· <?= e(__('auth.for_new_prefix')) ?><span class="footer-new"><?= e(__('auth.for_new_highlight')) ?></span><?= e(__('auth.for_new_suffix')) ?></span>
+                <span class="auth-footer-assoc">· <span data-i18n="auth.for_new_prefix"><?= e(__('auth.for_new_prefix')) ?></span><span class="footer-new" data-i18n="auth.for_new_highlight"><?= e(__('auth.for_new_highlight')) ?></span><span data-i18n="auth.for_new_suffix"><?= e(__('auth.for_new_suffix')) ?></span></span>
             <?php endif; ?>
             <span class="auth-footer-meta">· © <?= e($year) ?></span>
             <span class="auth-footer-version">· v<?= e(app_version()) ?></span>
         </div>
         <nav class="auth-footer-actions">
             <?= view_partial('partials/report_problem') ?>
-            <span><?= credit_line() ?></span>
+            <span data-i18n-html="auth.footer_tagline"><?= credit_line() ?></span>
         </nav>
     </footer>
 </div>

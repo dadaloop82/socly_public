@@ -5,6 +5,9 @@ declare(strict_types=1);
 use Socly\Core\App;
 
 require_once __DIR__ . '/error_page.php';
+if (is_file(__DIR__ . '/legal_samples.php')) {
+    require_once __DIR__ . '/legal_samples.php';
+}
 
 if (!function_exists('app')) {
     function app(?string $abstract = null): mixed
