@@ -68,6 +68,7 @@ $configActive = str_contains($uri, '/settings') || str_contains($uri, '/users') 
 $temporaryInstance = false;
 $temporaryExpiresLabel = '';
 $temporaryExpiresIso = '';
+$temporaryRemainingText = '';
 try {
     if (app()->isInstalled()) {
         $settings = app(\Socly\Services\SettingsService::class);
@@ -79,6 +80,26 @@ try {
                 if ($ts !== false) {
                     $temporaryExpiresLabel = date('d/m/Y H:i', $ts);
                     $temporaryExpiresIso = gmdate('c', $ts);
+                    $remain = $ts - time();
+                    if ($remain <= 0) {
+                        $temporaryRemainingText = (string) __('common.demo_banner_expired');
+                    } else {
+                        $days = intdiv($remain, 86400);
+                        $hours = intdiv($remain % 86400, 3600);
+                        if ($days === 0 && $hours === 0) {
+                            $hours = 1;
+                        }
+                        if ($days > 0) {
+                            $temporaryRemainingText = (string) __('common.demo_banner_remaining_days_hours', [
+                                'days' => (string) $days,
+                                'hours' => (string) $hours,
+                            ]);
+                        } else {
+                            $temporaryRemainingText = (string) __('common.demo_banner_remaining_hours', [
+                                'hours' => (string) $hours,
+                            ]);
+                        }
+                    }
                 }
             }
         }
@@ -88,7 +109,7 @@ try {
 ?>
 <?php if ($temporaryInstance): ?>
 <div
-  style="background:#fff3d6;color:#6b4a00;padding:0.55rem 1rem;text-align:center;font-size:0.9rem;font-weight:700;border-bottom:1px solid #f0d48a"
+  class="demo-banner"
   data-demo-banner
   <?php if ($temporaryExpiresIso !== ''): ?>
     data-demo-expires="<?= e($temporaryExpiresIso) ?>"
@@ -98,38 +119,8 @@ try {
     data-demo-tpl-expired="<?= e(__('common.demo_banner_expired')) ?>"
   <?php endif; ?>
 >
-  <?= e(__('common.demo_banner')) ?><?php if ($temporaryExpiresIso !== ''): ?> — <span data-demo-countdown><?= e(__('common.demo_banner_loading')) ?></span><?php elseif ($temporaryExpiresLabel !== ''): ?> — <?= e(__('common.demo_banner_expires_on', ['date' => $temporaryExpiresLabel])) ?><?php endif; ?>. <?= e(__('common.demo_banner_suffix')) ?>
+  <?= e(__('common.demo_banner')) ?><?php if ($temporaryRemainingText !== ''): ?> — <span data-demo-countdown><?= e($temporaryRemainingText) ?></span><?php elseif ($temporaryExpiresLabel !== ''): ?> — <?= e(__('common.demo_banner_expires_on', ['date' => $temporaryExpiresLabel])) ?><?php endif; ?>. <?= e(__('common.demo_banner_suffix')) ?>
 </div>
-<script>
-(() => {
-  const root = document.querySelector('[data-demo-banner][data-demo-expires]');
-  const target = root?.querySelector('[data-demo-countdown]');
-  if (!root || !target) return;
-  const ends = Date.parse(root.getAttribute('data-demo-expires') || '');
-  if (!Number.isFinite(ends)) return;
-  const tpl = (key, fallback) => root.getAttribute(key) || fallback;
-  const fill = (template, map) => String(template).replace(/:([a-z_]+)/g, (_, k) => String(map[k] ?? ''));
-  const tick = () => {
-    let ms = ends - Date.now();
-    if (ms <= 0) {
-      target.textContent = tpl('data-demo-tpl-expired', 'scaduta');
-      return;
-    }
-    const days = Math.floor(ms / 86400000);
-    let hours = Math.floor((ms % 86400000) / 3600000);
-    if (days === 0 && hours === 0) {
-      hours = 1;
-    }
-    if (days > 0) {
-      target.textContent = fill(tpl('data-demo-tpl-days-hours', 'sarà attiva per altri :days giorni e :hours ore'), { days, hours });
-    } else {
-      target.textContent = fill(tpl('data-demo-tpl-hours', 'sarà attiva per altre :hours ore'), { hours });
-    }
-  };
-  tick();
-  setInterval(tick, 60000);
-})();
-</script>
 <?php endif; ?>
 <?php if ($user): ?>
 <div class="app-shell" data-app-shell>

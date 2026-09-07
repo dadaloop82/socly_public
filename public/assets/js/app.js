@@ -117,6 +117,7 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   initPageEnter();
+  initDemoBannerCountdown();
   initMembersFilterMobile();
   initMobileNav();
   initTopbarScroll();
@@ -7867,6 +7868,55 @@ function initOrgPersonForm(form) {
       });
     }
   });
+}
+
+function initDemoBannerCountdown() {
+  const root = document.querySelector('[data-demo-banner][data-demo-expires]');
+  const target = root?.querySelector('[data-demo-countdown]');
+  if (!(root instanceof HTMLElement) || !(target instanceof HTMLElement)) {
+    return;
+  }
+  const raw = String(root.getAttribute('data-demo-expires') || '').trim();
+  // Support both ISO-8601 and "YYYY-MM-DD HH:MM:SS" style values.
+  let ends = Date.parse(raw);
+  if (!Number.isFinite(ends)) {
+    ends = Date.parse(raw.replace(' ', 'T'));
+  }
+  if (!Number.isFinite(ends)) {
+    return;
+  }
+  const tpl = (attr, fallback) => root.getAttribute(attr) || fallback;
+  const fill = (template, map) => String(template).replace(/:([a-z_]+)/g, (_, k) => String(map[k] ?? ''));
+  const tick = () => {
+    const ms = ends - Date.now();
+    if (ms <= 0) {
+      target.textContent = tpl('data-demo-tpl-expired', 'expired');
+      return false;
+    }
+    const days = Math.floor(ms / 86400000);
+    let hours = Math.floor((ms % 86400000) / 3600000);
+    if (days === 0 && hours === 0) {
+      hours = 1;
+    }
+    if (days > 0) {
+      target.textContent = fill(
+        tpl('data-demo-tpl-days-hours', 'active for :days days and :hours hours'),
+        { days, hours }
+      );
+    } else {
+      target.textContent = fill(
+        tpl('data-demo-tpl-hours', 'active for :hours hours'),
+        { hours }
+      );
+    }
+    return true;
+  };
+  if (!tick()) {
+    return;
+  }
+  window.setInterval(() => {
+    tick();
+  }, 60000);
 }
 
 function initDemoLoginNotice() {
