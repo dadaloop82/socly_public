@@ -116,6 +116,10 @@ final class ApiController extends BaseController
             'page_url' => (string) ($data['page_url'] ?? ''),
             'client_note' => (string) ($data['client_note'] ?? ''),
             'ref' => (string) ($data['ref'] ?? ''),
+            'recent_pages' => $data['recent_pages'] ?? [],
+            'recent_errors' => $data['recent_errors'] ?? [],
+            'viewport' => (string) ($data['viewport'] ?? ''),
+            'referrer' => (string) ($data['referrer'] ?? ''),
         ]);
 
         if (!empty($result['ok'])) {

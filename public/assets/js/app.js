@@ -165,7 +165,26 @@ document.addEventListener('DOMContentLoaded', () => {
   initTreasuryCategory(document);
   initLeaveGuards(document);
   initConfirmForms(document);
+  initOpenCreatePanels(document);
 });
+
+function initOpenCreatePanels(root = document) {
+  root.querySelectorAll('[data-open-create-panel]').forEach((btn) => {
+    if (!(btn instanceof HTMLElement) || btn.dataset.openCreateBound === '1') return;
+    btn.dataset.openCreateBound = '1';
+    btn.addEventListener('click', () => {
+      const sel = btn.getAttribute('data-open-create-panel') || '';
+      const panel = sel ? document.querySelector(sel) : null;
+      if (!(panel instanceof HTMLDetailsElement)) return;
+      panel.open = true;
+      panel.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      const first = panel.querySelector('input:not([type="hidden"]), select, textarea');
+      if (first instanceof HTMLElement) {
+        window.setTimeout(() => first.focus(), 250);
+      }
+    });
+  });
+}
 
 /** Compact members search placeholder on small screens. */
 function initMembersFilterMobile() {
@@ -630,6 +649,77 @@ function initEmailTemplateEditor(scope = document) {
   applyFormatMode();
 }
 
+/** Collect recent pages + JS errors for “Segnala un problema”. */
+const SoclyReportTrail = (() => {
+  const PAGES_KEY = 'socly_report_pages';
+  const ERRORS_KEY = 'socly_report_errors';
+  const maxPages = 12;
+  const maxErrors = 8;
+
+  const read = (key) => {
+    try {
+      const raw = sessionStorage.getItem(key);
+      const data = raw ? JSON.parse(raw) : [];
+      return Array.isArray(data) ? data : [];
+    } catch {
+      return [];
+    }
+  };
+  const write = (key, value) => {
+    try {
+      sessionStorage.setItem(key, JSON.stringify(value));
+    } catch {
+      // ignore quota / private mode
+    }
+  };
+
+  const pushPage = (url) => {
+    const href = String(url || window.location.href || '').trim();
+    if (!href) return;
+    const pages = read(PAGES_KEY).filter((p) => p !== href);
+    pages.push(href);
+    write(PAGES_KEY, pages.slice(-maxPages));
+  };
+
+  const pushError = (message, source = '') => {
+    const msg = String(message || '').trim();
+    if (!msg) return;
+    const entry = {
+      message: msg.slice(0, 400),
+      source: String(source || '').slice(0, 160),
+      at: new Date().toISOString(),
+    };
+    const errors = read(ERRORS_KEY);
+    errors.push(entry);
+    write(ERRORS_KEY, errors.slice(-maxErrors));
+  };
+
+  pushPage(window.location.href);
+  window.addEventListener('error', (event) => {
+    const msg = event?.message || event?.error?.message || 'Script error';
+    const src = event?.filename
+      ? `${event.filename}:${event.lineno || 0}:${event.colno || 0}`
+      : '';
+    pushError(msg, src);
+  });
+  window.addEventListener('unhandledrejection', (event) => {
+    const reason = event?.reason;
+    const msg = reason instanceof Error ? reason.message : String(reason || 'Unhandled rejection');
+    pushError(msg, 'unhandledrejection');
+  });
+
+  return {
+    snapshot() {
+      return {
+        recent_pages: read(PAGES_KEY),
+        recent_errors: read(ERRORS_KEY),
+        viewport: `${window.innerWidth || 0}x${window.innerHeight || 0}`,
+        referrer: document.referrer || '',
+      };
+    },
+  };
+})();
+
 function initReportProblem() {
   const buttons = [...document.querySelectorAll('[data-report-problem]')];
   if (!buttons.length) return;
@@ -696,6 +786,7 @@ function initReportProblem() {
           body: JSON.stringify({
             description,
             page_url: window.location.href,
+            ...(typeof SoclyReportTrail !== 'undefined' ? SoclyReportTrail.snapshot() : {}),
           }),
         });
         const data = await res.json().catch(() => ({}));
@@ -3122,7 +3213,14 @@ function initSettingsAutosave(scope = document) {
         });
         const data = await res.json().catch(() => ({}));
         if (!res.ok || !data.ok) {
-          setStatus('error', data.message || failMsg);
+          let detail = '';
+          if (data.errors && typeof data.errors === 'object') {
+            const first = Object.values(data.errors).find((v) => typeof v === 'string' && v.trim() !== '');
+            if (typeof first === 'string') {
+              detail = first.trim();
+            }
+          }
+          setStatus('error', detail || data.message || failMsg);
           return;
         }
         lastSavedAt = Date.now();
@@ -8321,6 +8419,20 @@ function initAuthUpdateCheck() {
 }
 
 function initTreasuryCategory(root = document) {
+  root.querySelectorAll('[data-treasury-filter-auto]').forEach((el) => {
+    if (!(el instanceof HTMLSelectElement) || el.dataset.boundAuto === '1') return;
+    el.dataset.boundAuto = '1';
+    el.addEventListener('change', () => {
+      const form = el.form;
+      if (!form) return;
+      if (typeof form.requestSubmit === 'function') {
+        form.requestSubmit();
+      } else {
+        form.submit();
+      }
+    });
+  });
+
   root.querySelectorAll('[data-treasury-form]').forEach((form) => {
     const categorySelect = form.querySelector('[data-treasury-category]');
     const newCategoryWrap = form.querySelector('[data-treasury-new-category]');

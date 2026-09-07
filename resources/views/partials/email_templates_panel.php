@@ -164,16 +164,28 @@ $isSystemSlug = $editing && in_array((string) ($editing['slug'] ?? ''), $systemS
                             <td><code><?= e((string) ($t['slug'] ?? '')) ?></code></td>
                             <td><?= ($t['body_format'] ?? 'text') === 'html' ? 'HTML' : e(__('email_templates.format_text')) ?></td>
                             <td><?= e(implode(' · ', $ready)) ?></td>
-                            <td>
-                                <a class="btn btn-ghost btn-sm" href="<?= e(url('/settings?edit_template=' . (int) ($t['id'] ?? 0) . '#email-templates')) ?>"><?= e(__('common.edit')) ?></a>
-                                <?php if (!$isSystem): ?>
-                                    <form method="post" action="<?= e(url('/settings/email-templates')) ?>" class="inline-form" data-confirm="<?= e(__('email_templates.confirm_delete')) ?>">
-                                        <?= csrf_field() ?>
-                                        <input type="hidden" name="action" value="delete">
-                                        <input type="hidden" name="id" value="<?= (int) ($t['id'] ?? 0) ?>">
-                                        <button class="btn btn-danger btn-sm" type="submit"><?= e(__('common.delete')) ?></button>
-                                    </form>
-                                <?php endif; ?>
+                            <td class="doc-row-actions">
+                                <?= row_actions([
+                                    [
+                                        'icon' => 'edit',
+                                        'label' => __('common.edit'),
+                                        'href' => url('/settings?edit_template=' . (int) ($t['id'] ?? 0) . '#email-templates'),
+                                    ],
+                                    [
+                                        'icon' => 'delete',
+                                        'label' => __('common.delete'),
+                                        'show' => !$isSystem,
+                                        'danger' => true,
+                                        'form_action' => url('/settings/email-templates'),
+                                        'form_attrs' => [
+                                            'data-confirm' => __('email_templates.confirm_delete'),
+                                        ],
+                                        'hidden' => [
+                                            'action' => 'delete',
+                                            'id' => (int) ($t['id'] ?? 0),
+                                        ],
+                                    ],
+                                ]) ?>
                             </td>
                         </tr>
                     <?php endforeach; ?>

@@ -94,20 +94,36 @@ $events = \Socly\Services\WorkflowService::events();
                                     <span class="badge badge-muted"><?= e(__('workflow.inactive')) ?></span>
                                 <?php endif; ?>
                             </td>
-                            <td>
-                                <a class="btn btn-ghost btn-sm" href="<?= e(url('/settings?edit_workflow=' . (int) ($r['id'] ?? 0) . '#workflow')) ?>"><?= e(__('common.edit')) ?></a>
-                                <form method="post" action="<?= e(url('/settings/workflow')) ?>" class="inline-form">
-                                    <?= csrf_field() ?>
-                                    <input type="hidden" name="action" value="toggle">
-                                    <input type="hidden" name="id" value="<?= (int) ($r['id'] ?? 0) ?>">
-                                    <button class="btn btn-ghost btn-sm" type="submit"><?= !empty($r['enabled']) ? e(__('workflow.deactivate')) : e(__('workflow.activate')) ?></button>
-                                </form>
-                                <form method="post" action="<?= e(url('/settings/workflow')) ?>" class="inline-form" data-confirm="<?= e(__('workflow.confirm_delete')) ?>">
-                                    <?= csrf_field() ?>
-                                    <input type="hidden" name="action" value="delete">
-                                    <input type="hidden" name="id" value="<?= (int) ($r['id'] ?? 0) ?>">
-                                    <button class="btn btn-danger btn-sm" type="submit"><?= e(__('common.delete')) ?></button>
-                                </form>
+                            <td class="doc-row-actions">
+                                <?= row_actions([
+                                    [
+                                        'icon' => 'edit',
+                                        'label' => __('common.edit'),
+                                        'href' => url('/settings?edit_workflow=' . (int) ($r['id'] ?? 0) . '#workflow'),
+                                    ],
+                                    [
+                                        'icon' => 'toggle',
+                                        'label' => !empty($r['enabled']) ? __('workflow.deactivate') : __('workflow.activate'),
+                                        'form_action' => url('/settings/workflow'),
+                                        'hidden' => [
+                                            'action' => 'toggle',
+                                            'id' => (int) ($r['id'] ?? 0),
+                                        ],
+                                    ],
+                                    [
+                                        'icon' => 'delete',
+                                        'label' => __('common.delete'),
+                                        'danger' => true,
+                                        'form_action' => url('/settings/workflow'),
+                                        'form_attrs' => [
+                                            'data-confirm' => __('workflow.confirm_delete'),
+                                        ],
+                                        'hidden' => [
+                                            'action' => 'delete',
+                                            'id' => (int) ($r['id'] ?? 0),
+                                        ],
+                                    ],
+                                ]) ?>
                             </td>
                         </tr>
                     <?php endforeach; ?>

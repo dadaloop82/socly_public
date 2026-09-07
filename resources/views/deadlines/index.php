@@ -37,6 +37,11 @@ $filterUrl = static function (string $filter = '') use ($search_query): string {
         <h1 class="page-title"><?= e(__('deadlines.title')) ?></h1>
         <p class="page-lede"><?= e(__('deadlines.lede')) ?></p>
     </div>
+    <?php if ($canManage): ?>
+        <div class="actions">
+            <button type="button" class="btn" data-open-create-panel="[data-deadline-form-panel]"><?= e(__('deadlines.add')) ?></button>
+        </div>
+    <?php endif; ?>
 </div>
 
 <div class="stats stats-context-deadlines">
@@ -188,19 +193,31 @@ $filterUrl = static function (string $filter = '') use ($search_query): string {
                                     <td><span class="doc-category-badge"><?= e($categoryLabel !== '' ? $categoryLabel : (string) ($item['category'] ?? '')) ?></span></td>
                                     <td><?= e(format_date($due) ?: '—') ?></td>
                                     <td><?= e($memberLabel !== '' ? $memberLabel : '—') ?></td>
-                                    <td class="doc-row-actions">
+                                    <td class="doc-row-actions" onclick="event.stopPropagation()">
                                         <?php if ($editable): ?>
-                                            <form method="post" action="<?= e(url('/deadlines/' . $itemId . '/done')) ?>" class="inline-form">
-                                                <?= csrf_field() ?>
-                                                <button type="submit" class="btn btn-ghost btn-sm"><?= e(__('deadlines.mark_done')) ?></button>
-                                            </form>
-                                            <form method="post" action="<?= e(url('/deadlines/' . $itemId . '/renew')) ?>" class="inline-form">
-                                                <?= csrf_field() ?>
-                                                <button type="submit" class="btn btn-ghost btn-sm"><?= e(__('deadlines.renew')) ?></button>
-                                            </form>
-                                            <?php if (!empty($item['member_id']) && component_enabled('members') && can('members.manage')): ?>
-                                                <a class="btn btn-ghost btn-sm" href="<?= e(url('/members/' . (int) $item['member_id'])) ?>"><?= e(__('deadlines.open_member')) ?></a>
-                                            <?php endif; ?>
+                                            <?= row_actions([
+                                                [
+                                                    'icon' => 'check',
+                                                    'label' => __('deadlines.mark_done'),
+                                                    'form_action' => url('/deadlines/' . $itemId . '/done'),
+                                                ],
+                                                [
+                                                    'icon' => 'renew',
+                                                    'label' => __('deadlines.renew'),
+                                                    'form_action' => url('/deadlines/' . $itemId . '/renew'),
+                                                ],
+                                                [
+                                                    'icon' => 'user',
+                                                    'label' => __('deadlines.open_member'),
+                                                    'show' => !empty($item['member_id']) && component_enabled('members') && can('members.manage'),
+                                                    'href' => !empty($item['member_id']) ? url('/members/' . (int) $item['member_id']) : '',
+                                                ],
+                                                [
+                                                    'icon' => 'edit',
+                                                    'label' => __('deadlines.edit'),
+                                                    'href' => $editUrl,
+                                                ],
+                                            ]) ?>
                                         <?php elseif (!$isSystem): ?>
                                             <span class="muted">—</span>
                                         <?php else: ?>

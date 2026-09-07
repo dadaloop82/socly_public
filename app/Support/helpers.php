@@ -559,6 +559,28 @@ if (!function_exists('can')) {
         if (!empty($user['is_system_admin'])) {
             return true;
         }
+        // Temporary demos: after setup, only superadmin may open/change settings, users, plugins.
+        if (in_array($permission, [
+            \Socly\Support\Permission::SETTINGS_MANAGE,
+            \Socly\Support\Permission::USERS_MANAGE,
+            \Socly\Support\Permission::PLUGINS_MANAGE,
+        ], true)) {
+            static $demoConfigLocked = null;
+            if ($demoConfigLocked === null) {
+                $demoConfigLocked = false;
+                try {
+                    $demoConfigLocked = function_exists('is_temporary_instance')
+                        && is_temporary_instance()
+                        && app()->isInstalled()
+                        && app(\Socly\Services\SetupService::class)->isComplete();
+                } catch (\Throwable) {
+                    $demoConfigLocked = false;
+                }
+            }
+            if ($demoConfigLocked) {
+                return false;
+            }
+        }
         $perms = $_SESSION['permissions'] ?? [];
         return in_array($permission, $perms, true);
     }
@@ -1084,6 +1106,145 @@ if (!function_exists('socly_icon_img')) {
     function socly_icon_img(string $class = 'socly-icon', string $alt = 'SOCLY'): string
     {
         return '<img class="' . e($class) . '" src="' . e(socly_icon_url()) . '" alt="' . e($alt) . '" decoding="async">';
+    }
+}
+
+if (!function_exists('row_action_icon_svg')) {
+    /** Inline SVG for list-row icon actions (16×16 stroke). */
+    function row_action_icon_svg(string $key): string
+    {
+        static $icons = [
+            'view' => '<path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/>',
+            'edit' => '<path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/>',
+            'collect' => '<rect x="3" y="6" width="18" height="12" rx="2"/><path d="M3 10h18"/><path d="M8 14h2"/><path d="M14 14h4"/>',
+            'mail' => '<rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3 7 9 6 9-7"/>',
+            'file' => '<path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/>',
+            'external' => '<path d="M15 3h6v6"/><path d="M10 14 21 3"/><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/>',
+            'check' => '<path d="M20 6 9 17l-5-5"/>',
+            'renew' => '<path d="M3 12a9 9 0 0 1 15-6.7"/><path d="M21 3v6h-6"/><path d="M21 12a9 9 0 0 1-15 6.7"/><path d="M3 21v-6h6"/>',
+            'user' => '<circle cx="12" cy="8" r="3.5"/><path d="M5 19c1.8-3.2 4-4.5 7-4.5s5.2 1.3 7 4.5"/>',
+            'delete' => '<path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M10 11v6M14 11v6"/>',
+            'toggle' => '<rect x="1" y="5" width="22" height="14" rx="7"/><circle cx="16" cy="12" r="3"/>',
+        ];
+        $path = $icons[$key] ?? $icons['view'];
+        return '<svg class="row-action-icon" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' . $path . '</svg>';
+    }
+}
+
+if (!function_exists('row_icon_action')) {
+    /**
+     * Single list-row icon action (link, button, form submit, or empty slot for alignment).
+     *
+     * @param array{
+     *   icon?:string,
+     *   label?:string,
+     *   href?:string,
+     *   type?:string,
+     *   show?:bool,
+     *   primary?:bool,
+     *   danger?:bool,
+     *   target?:string,
+     *   rel?:string,
+     *   form_action?:string,
+     *   form_method?:string,
+     *   hidden?:array<string,scalar|null>,
+     *   attrs?:array<string,scalar|null|bool>
+     * } $opts
+     */
+    function row_icon_action(array $opts): string
+    {
+        $show = !array_key_exists('show', $opts) || !empty($opts['show']);
+        if (!$show) {
+            return '<span class="row-action-slot" aria-hidden="true"></span>';
+        }
+
+        $icon = (string) ($opts['icon'] ?? 'view');
+        $label = (string) ($opts['label'] ?? '');
+        $href = isset($opts['href']) ? (string) $opts['href'] : '';
+        $formAction = isset($opts['form_action']) ? (string) $opts['form_action'] : '';
+        $classes = ['btn-icon', 'row-action'];
+        if (!empty($opts['primary'])) {
+            $classes[] = 'is-primary';
+        }
+        if (!empty($opts['danger'])) {
+            $classes[] = 'is-danger';
+        }
+        $classAttr = implode(' ', $classes);
+        $title = $label !== '' ? ' title="' . e($label) . '"' : '';
+        $aria = $label !== '' ? ' aria-label="' . e($label) . '"' : '';
+        $extra = '';
+        foreach (($opts['attrs'] ?? []) as $name => $value) {
+            $name = (string) $name;
+            if ($name === '' || $value === null || $value === false) {
+                continue;
+            }
+            if ($value === true) {
+                $extra .= ' ' . e($name);
+                continue;
+            }
+            $extra .= ' ' . e($name) . '="' . e((string) $value) . '"';
+        }
+        $svg = row_action_icon_svg($icon);
+
+        if ($formAction !== '') {
+            $method = strtolower((string) ($opts['form_method'] ?? 'post'));
+            $formExtra = '';
+            foreach (($opts['form_attrs'] ?? []) as $name => $value) {
+                $name = (string) $name;
+                if ($name === '' || $value === null || $value === false) {
+                    continue;
+                }
+                if ($value === true) {
+                    $formExtra .= ' ' . e($name);
+                    continue;
+                }
+                $formExtra .= ' ' . e($name) . '="' . e((string) $value) . '"';
+            }
+            $html = '<form method="' . e($method) . '" action="' . e($formAction) . '" class="row-action-form"' . $formExtra . '>';
+            if ($method === 'post' && function_exists('csrf_field')) {
+                $html .= csrf_field();
+            }
+            foreach (($opts['hidden'] ?? []) as $name => $value) {
+                if ($value === null) {
+                    continue;
+                }
+                $html .= '<input type="hidden" name="' . e((string) $name) . '" value="' . e((string) $value) . '">';
+            }
+            $html .= '<button type="submit" class="' . e($classAttr) . '"' . $title . $aria . $extra . '>' . $svg . '</button>';
+            $html .= '</form>';
+            return $html;
+        }
+
+        if ($href !== '') {
+            $target = isset($opts['target']) ? ' target="' . e((string) $opts['target']) . '"' : '';
+            $rel = isset($opts['rel']) ? ' rel="' . e((string) $opts['rel']) . '"' : ($target !== '' ? ' rel="noopener"' : '');
+            return '<a class="' . e($classAttr) . '" href="' . e($href) . '"' . $target . $rel . $title . $aria . $extra . '>' . $svg . '</a>';
+        }
+
+        $type = (string) ($opts['type'] ?? 'button');
+        return '<button type="' . e($type) . '" class="' . e($classAttr) . '"' . $title . $aria . $extra . '>' . $svg . '</button>';
+    }
+}
+
+if (!function_exists('row_actions')) {
+    /**
+     * Fixed-slot row action group so icons stay vertically aligned across list rows.
+     *
+     * @param list<array<string,mixed>> $items
+     * @param array{class?:string} $opts
+     */
+    function row_actions(array $items, array $opts = []): string
+    {
+        $class = trim('row-actions ' . (string) ($opts['class'] ?? ''));
+        $html = '<div class="' . e($class) . '" role="group">';
+        foreach ($items as $item) {
+            if (!is_array($item)) {
+                continue;
+            }
+            $html .= row_icon_action($item);
+        }
+        $html .= '</div>';
+        return $html;
     }
 }
 

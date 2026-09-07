@@ -203,29 +203,38 @@ $canPayments = can('payments.manage');
                         <td data-label="<?= e(__('members.payment')) ?>"><span class="badge <?= $item['payment_status']==='paid'?'badge-ok':($item['payment_status']==='due'?'badge-due':'badge-warn') ?>"><?= e(__('members.payment_'.$item['payment_status'])) ?></span></td>
                         <td data-label="<?= e(__('members.balance_due')) ?>"><?= e(number_format($balanceDue, 2, ',', '.')) ?> €</td>
                         <td data-label="<?= e(__('members.actions')) ?>">
-                            <div class="member-row-actions">
-                                <?php if ($canCollect): ?>
-                                    <button
-                                        type="button"
-                                        class="btn btn-ghost btn-sm"
-                                        data-member-collect
-                                        data-member-id="<?= (int) $item['id'] ?>"
-                                        data-member-name="<?= e($fullName !== '' ? $fullName : $item['member_number']) ?>"
-                                        data-member-balance="<?= e(number_format($balanceDue, 2, '.', '')) ?>"
-                                    ><?= e(__('members.collect_short')) ?></button>
-                                <?php endif; ?>
-                                <?php if ($canRemind): ?>
-                                    <form method="post" action="<?= e(url('/members/' . (int) $item['id'] . '/remind-payment')) ?>" class="member-inline-form">
-                                        <?= csrf_field() ?>
-                                        <input type="hidden" name="redirect" value="<?= e($redirectBack) ?>">
-                                        <button type="submit" class="btn btn-ghost btn-sm"><?= e(__('members.remind_short')) ?></button>
-                                    </form>
-                                <?php endif; ?>
-                                <a class="btn btn-ghost btn-sm" href="<?= e(url('/members/'.$item['id'])) ?>"><?= e(__('members.scheda')) ?></a>
-                                <?php if ($canManage): ?>
-                                    <a class="btn btn-ghost btn-sm" href="<?= e(url('/members/'.$item['id'].'/edit')) ?>"><?= e(__('members.edit_short')) ?></a>
-                                <?php endif; ?>
-                            </div>
+                            <?= row_actions([
+                                [
+                                    'icon' => 'collect',
+                                    'label' => __('members.collect_short'),
+                                    'show' => $canCollect,
+                                    'type' => 'button',
+                                    'attrs' => [
+                                        'data-member-collect' => true,
+                                        'data-member-id' => (int) $item['id'],
+                                        'data-member-name' => $fullName !== '' ? $fullName : (string) $item['member_number'],
+                                        'data-member-balance' => number_format($balanceDue, 2, '.', ''),
+                                    ],
+                                ],
+                                [
+                                    'icon' => 'mail',
+                                    'label' => __('members.remind_short'),
+                                    'show' => $canRemind,
+                                    'form_action' => url('/members/' . (int) $item['id'] . '/remind-payment'),
+                                    'hidden' => ['redirect' => $redirectBack],
+                                ],
+                                [
+                                    'icon' => 'view',
+                                    'label' => __('members.scheda'),
+                                    'href' => url('/members/' . (int) $item['id']),
+                                ],
+                                [
+                                    'icon' => 'edit',
+                                    'label' => __('members.edit_short'),
+                                    'show' => $canManage,
+                                    'href' => url('/members/' . (int) $item['id'] . '/edit'),
+                                ],
+                            ], ['class' => 'member-row-actions']) ?>
                         </td>
                     </tr>
                 <?php endforeach; ?>

@@ -83,6 +83,20 @@ final class Request
         return $this->server['REMOTE_ADDR'] ?? '0.0.0.0';
     }
 
+    public function header(string $name, mixed $default = null): mixed
+    {
+        $key = 'HTTP_' . strtoupper(str_replace('-', '_', $name));
+        if (array_key_exists($key, $this->server)) {
+            return $this->server[$key];
+        }
+        // Content-Type / Content-Length are not prefixed with HTTP_ in PHP.
+        $special = strtoupper(str_replace('-', '_', $name));
+        if (in_array($special, ['CONTENT_TYPE', 'CONTENT_LENGTH'], true) && array_key_exists($special, $this->server)) {
+            return $this->server[$special];
+        }
+        return $default;
+    }
+
     public function file(string $key): ?array
     {
         return $this->files[$key] ?? null;

@@ -30,12 +30,25 @@ final class TreasuryController extends BaseController
         if (mb_strlen($query) > 120) {
             $query = mb_substr($query, 0, 120);
         }
-        $ledger = $this->treasury->ledger(200, $query);
+        $groupByCategory = (string) $request->input('group', '1') !== '0';
+        $sort = (string) $request->input('sort', 'date_desc');
+        if (!in_array($sort, ['date_desc', 'date_asc', 'created_desc', 'invoice_desc'], true)) {
+            $sort = 'date_desc';
+        }
+        $ledger = $this->treasury->ledger(200, $query, $sort);
         $config = $this->components->config('treasury', ['auto_from_payments' => true]);
         $this->render('treasury/index', [
             'title' => __('treasury.title'),
             'ledger' => $ledger,
-            'movement_groups' => $this->treasury->groupedByCategory(200, $query),
+            'movement_groups' => $groupByCategory
+                ? $this->treasury->groupedByCategory(200, $query, $sort)
+                : [[
+                    'key' => 'all',
+                    'label' => __('treasury.group_by_category_off'),
+                    'items' => $ledger['movements'],
+                ]],
+            'group_by_category' => $groupByCategory,
+            'ledger_sort' => $sort,
             'config' => $config,
             'members' => $this->members->listForSelect(),
             'categories' => $this->treasury->categoryOptions(),

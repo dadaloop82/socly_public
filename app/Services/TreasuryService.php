@@ -122,7 +122,6 @@ final class TreasuryService
             ['label_key' => 'treasury.cat_group_financial', 'keys' => [
                 'internal_transfer', 'cash_deposit_withdrawal', 'member_loan', 'security_deposit',
             ]],
-            ['label_key' => 'treasury.cat_group_other', 'keys' => ['other']],
         ];
         $out = [];
         foreach ($groups as $group) {
@@ -154,7 +153,7 @@ final class TreasuryService
     }
 
     /** @return array{movements:list<array<string,mixed>>,balance:float,income:float,expense:float} */
-    public function ledger(int $limit = 200, string $query = ''): array
+    public function ledger(int $limit = 200, string $query = '', string $sort = 'date_desc'): array
     {
         $params = [];
         $sql = "SELECT m.*,
@@ -174,7 +173,13 @@ final class TreasuryService
         if ($query !== '') {
             $sql .= ' WHERE ' . $this->buildSearchWhere($query, $params);
         }
-        $sql .= ' ORDER BY m.movement_date DESC, m.id DESC LIMIT ' . max(1, min(500, $limit));
+        $order = match ($sort) {
+            'date_asc' => 'm.movement_date ASC, m.id ASC',
+            'created_desc' => 'm.created_at DESC, m.id DESC',
+            'invoice_desc' => 'm.invoice_date IS NULL, m.invoice_date DESC, m.movement_date DESC, m.id DESC',
+            default => 'm.movement_date DESC, m.id DESC',
+        };
+        $sql .= ' ORDER BY ' . $order . ' LIMIT ' . max(1, min(500, $limit));
         $movements = $this->db->fetchAll($sql, $params);
 
         $balanceRow = $this->db->fetch(
@@ -257,9 +262,9 @@ final class TreasuryService
     /**
      * @return list<array{key:string,label:string,items:list<array<string,mixed>>}>
      */
-    public function groupedByCategory(int $limit = 200, string $query = ''): array
+    public function groupedByCategory(int $limit = 200, string $query = '', string $sort = 'date_desc'): array
     {
-        $ledger = $this->ledger($limit, $query);
+        $ledger = $this->ledger($limit, $query, $sort);
         $items = $ledger['movements'];
         $labels = $this->categoryMap();
         $buckets = [];
@@ -568,6 +573,7 @@ final class TreasuryService
         $memberId = $memberId !== '' ? (int) $memberId : null;
         $isInvoice = $direction === 'expense' && !empty($input['invoice_payment']);
         $invoiceNumber = $isInvoice ? mb_substr(trim((string) ($input['invoice_number'] ?? '')), 0, 120) : null;
+        $invoiceTitle = $isInvoice ? mb_substr(trim((string) ($input['invoice_title'] ?? '')), 0, 190) : null;
         $invoiceDate = null;
         $invoiceDueDate = null;
         if ($isInvoice) {
@@ -586,7 +592,7 @@ final class TreasuryService
                 $invoiceDueDate = $invoiceDueRaw;
             }
         }
-        $beneficiary = $direction === 'expense'
+        $beneficiary = $isInvoice
             ? mb_substr(trim((string) ($input['beneficiary'] ?? '')), 0, 190)
             : '';
 
@@ -606,6 +612,7 @@ final class TreasuryService
                 'invoice_number' => $invoiceNumber !== '' ? $invoiceNumber : null,
                 'invoice_date' => $invoiceDate,
                 'invoice_due_date' => $invoiceDueDate,
+                'invoice_title' => $invoiceTitle !== '' && $invoiceTitle !== null ? $invoiceTitle : null,
                 'beneficiary' => $beneficiary !== '' ? $beneficiary : null,
             ],
         ];
@@ -659,11 +666,14 @@ final class TreasuryService
             $description = trim((string) ($data['description'] ?? ''));
             $beneficiary = trim((string) ($data['beneficiary'] ?? ''));
             $invoice = trim((string) ($data['invoice_number'] ?? ''));
+            $invoiceTitle = trim((string) ($data['invoice_title'] ?? ''));
             $titleParts = [__('treasury.invoice_document_title')];
             if ($invoice !== '') {
                 $titleParts[] = $invoice;
             }
-            if ($beneficiary !== '') {
+            if ($invoiceTitle !== '') {
+                $titleParts[] = $invoiceTitle;
+            } elseif ($beneficiary !== '') {
                 $titleParts[] = $beneficiary;
             }
             $docInput = [
@@ -674,7 +684,7 @@ final class TreasuryService
                     : (string) ($data['movement_date'] ?? ''),
                 'language' => '',
                 'status' => 'approved',
-                'summary' => $description,
+                'summary' => $description !== '' ? $description : $invoiceTitle,
                 'uploaded_path' => $path,
                 'uploaded_mime' => $mime,
             ];
@@ -702,10 +712,16 @@ final class TreasuryService
         $params['like_desc'] = $like;
         $params['like_category'] = $like;
         $params['like_method'] = $like;
+        $params['like_invoice_title'] = $like;
+        $params['like_beneficiary'] = $like;
+        $params['like_invoice_number'] = $like;
         $parts = [
             'm.description LIKE :like_desc',
             'm.category LIKE :like_category',
             'm.payment_method LIKE :like_method',
+            'm.invoice_title LIKE :like_invoice_title',
+            'm.beneficiary LIKE :like_beneficiary',
+            'm.invoice_number LIKE :like_invoice_number',
         ];
 
         $needle = mb_strtolower($query);

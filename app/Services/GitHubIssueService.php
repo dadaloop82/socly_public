@@ -51,13 +51,20 @@ final class GitHubIssueService
 
         $ctx = $this->collectContext($clientContext);
         $title = '[user-report] ' . $this->titleFromDescription($description);
-        $body = $this->buildBody([
+        $sections = [
             '## Descrizione utente',
             $description,
             '',
             '## Contesto',
             $this->contextMarkdown($ctx),
-        ]);
+        ];
+        $trail = $this->clientTrailMarkdown($clientContext);
+        if ($trail !== '') {
+            $sections[] = '';
+            $sections[] = '## Attività recente (client)';
+            $sections[] = $trail;
+        }
+        $body = $this->buildBody($sections);
 
         $created = $this->relay([
             'kind' => 'user-report',
@@ -307,7 +314,63 @@ final class GitHubIssueService
             'error_file' => (string) ($clientContext['error_file'] ?? ''),
             'page_url' => $this->safeClientUrl((string) ($clientContext['page_url'] ?? '')),
             'client_note' => mb_substr(trim((string) ($clientContext['client_note'] ?? '')), 0, 500),
+            'viewport' => mb_substr(trim((string) ($clientContext['viewport'] ?? '')), 0, 80),
+            'referrer' => $this->safeClientUrl((string) ($clientContext['referrer'] ?? '')),
         ];
+    }
+
+    /** @param array<string, mixed> $clientContext */
+    private function clientTrailMarkdown(array $clientContext): string
+    {
+        $lines = [];
+        $pages = $clientContext['recent_pages'] ?? [];
+        if (is_array($pages) && $pages !== []) {
+            $lines[] = '### Pagine recenti';
+            $n = 0;
+            foreach ($pages as $page) {
+                if ($n >= 12) {
+                    break;
+                }
+                $url = $this->safeClientUrl(is_string($page) ? $page : (string) ($page['url'] ?? ''));
+                if ($url === '') {
+                    continue;
+                }
+                $lines[] = '- `' . str_replace('`', "'", $url) . '`';
+                $n++;
+            }
+        }
+        $errors = $clientContext['recent_errors'] ?? [];
+        if (is_array($errors) && $errors !== []) {
+            if ($lines !== []) {
+                $lines[] = '';
+            }
+            $lines[] = '### Errori JS recenti (browser)';
+            $n = 0;
+            foreach ($errors as $err) {
+                if ($n >= 8) {
+                    break;
+                }
+                if (is_string($err)) {
+                    $msg = trim($err);
+                    $src = '';
+                } elseif (is_array($err)) {
+                    $msg = trim((string) ($err['message'] ?? ''));
+                    $src = trim((string) ($err['source'] ?? ''));
+                } else {
+                    continue;
+                }
+                if ($msg === '') {
+                    continue;
+                }
+                $line = mb_substr(str_replace(["\r", "\n", '`'], [' ', ' ', "'"], $msg), 0, 400);
+                if ($src !== '') {
+                    $line .= ' @ ' . mb_substr(str_replace('`', "'", $src), 0, 120);
+                }
+                $lines[] = '- `' . $line . '`';
+                $n++;
+            }
+        }
+        return implode("\n", $lines);
     }
 
     /** @param array<string, string> $ctx */
@@ -321,6 +384,8 @@ final class GitHubIssueService
             'method' => 'Method',
             'path' => 'Path',
             'page_url' => 'Page URL',
+            'referrer' => 'Referrer',
+            'viewport' => 'Viewport',
             'demo_id' => 'Demo ID',
             'url_prefix' => 'URL prefix',
             'temporary_instance' => 'Temporary instance',

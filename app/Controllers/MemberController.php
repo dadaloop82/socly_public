@@ -127,6 +127,8 @@ final class MemberController extends BaseController
         $this->clearOld();
         if ($this->enrollment->method() === 'print_scan' && !$this->enrollment->hasArtifact((int) $result['id'])) {
             $this->flash('success', __('members.enrollment_created_print'));
+        } elseif ($this->enrollment->method() === 'none') {
+            $this->flash('success', __('members.enrollment_created_optional'));
         } else {
             $this->flash('success', __('members.created'));
         }
@@ -281,6 +283,29 @@ final class MemberController extends BaseController
             return;
         }
         echo $this->view->render('members/enrollment_form_print', $context, null);
+    }
+
+    public function uploadEnrollmentScan(Request $request, string $id): void
+    {
+        $this->guardMembers();
+        if (!can('members.manage')) {
+            http_response_code(403);
+            $this->render('errors/403');
+            return;
+        }
+        $memberId = (int) $id;
+        if ($this->members->find($memberId) === null) {
+            http_response_code(404);
+            $this->render('errors/404');
+            return;
+        }
+        $result = $this->enrollment->storeLateScan($memberId, $request->file('enrollment_scan'), $request->ip());
+        if (!empty($result['ok'])) {
+            $this->flash('success', __('members.enrollment_upload_ok'));
+        } else {
+            $this->flash('errors', ['enrollment_scan' => (string) ($result['error'] ?? __('members.enrollment_upload_fail'))]);
+        }
+        redirect('/members/' . $memberId);
     }
 
     public function destroy(Request $request, string $id): void

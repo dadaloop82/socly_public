@@ -58,6 +58,16 @@ final class CsrfMiddleware
             }
 
             http_response_code(419);
+            $wantsJson = strtolower((string) ($request->header('X-Requested-With') ?? '')) === 'xmlhttprequest'
+                || str_contains(strtolower((string) ($request->header('Accept') ?? '')), 'application/json');
+            if ($wantsJson) {
+                header('Content-Type: application/json; charset=utf-8');
+                echo json_encode([
+                    'ok' => false,
+                    'message' => __('errors.419'),
+                ], JSON_UNESCAPED_UNICODE);
+                return false;
+            }
             $layout = auth_user() ? 'layouts/app' : 'layouts/guest';
             echo app(View::class)->render('errors/419', [
                 'title' => __('errors.419'),

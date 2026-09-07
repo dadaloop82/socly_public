@@ -103,7 +103,7 @@ $fileReady = $hasAttachment;
                 <?php foreach ($categoryGroups as $group): ?>
                     <optgroup label="<?= e((string) $group['label']) ?>">
                         <?php foreach ($group['keys'] as $key): ?>
-                            <?php if (!isset($categoryMap[$key])) { continue; } ?>
+                            <?php if ($key === 'other' || !isset($categoryMap[$key])) { continue; } ?>
                             <option value="<?= e($key) ?>" <?= $selectedCategory === $key ? 'selected' : '' ?>><?= e($categoryMap[$key]) ?></option>
                         <?php endforeach; ?>
                     </optgroup>
@@ -187,65 +187,72 @@ $fileReady = $hasAttachment;
     </select>
 </div>
 <div data-treasury-expense-fields>
-    <label class="checkbox-row checkbox-row-lg">
-        <input type="checkbox" name="invoice_payment" value="1" data-treasury-invoice-toggle <?= !empty($values['invoice_payment']) ? 'checked' : '' ?>>
-        <span><?= e(__('treasury.invoice_payment')) ?></span>
-    </label>
-    <div class="grid-3" data-treasury-invoice-fields>
-        <div>
-            <label><?= e(__('treasury.invoice_number')) ?></label>
-            <input type="text" name="invoice_number" value="<?= e((string) ($values['invoice_number'] ?? '')) ?>" maxlength="120">
-        </div>
-        <div>
-            <label><?= e(__('treasury.invoice_date')) ?></label>
-            <input type="date" name="invoice_date" value="<?= e((string) ($values['invoice_date'] ?? '')) ?>">
-        </div>
-        <div>
-            <label><?= e(__('treasury.invoice_due_date')) ?></label>
-            <input type="date" name="invoice_due_date" value="<?= e((string) ($values['invoice_due_date'] ?? '')) ?>">
-        </div>
-    </div>
-    <div data-treasury-invoice-fields>
-        <label><?= e(__('treasury.beneficiary')) ?></label>
-        <input type="text" name="beneficiary" value="<?= e((string) ($values['beneficiary'] ?? '')) ?>" maxlength="190" list="treasury-beneficiaries">
-        <datalist id="treasury-beneficiaries">
-            <?php foreach ($beneficiaries as $beneficiary): ?>
-                <option value="<?= e($beneficiary) ?>">
-            <?php endforeach; ?>
-        </datalist>
-    </div>
-    <div data-treasury-invoice-fields>
-        <div class="doc-file-field<?= $fileReady ? ' is-uploaded' : '' ?>" data-treasury-doc-field>
-            <label><?= e(__('treasury.upload_document')) ?></label>
-            <div class="doc-file-row">
-                <label class="btn btn-ghost file-btn">
-                    <span data-treasury-doc-pick-label><?= e($fileReady ? __('treasury.document_change') : __('treasury.document_choose')) ?></span>
-                    <input
-                        type="file"
-                        name="invoice_pdf"
-                        accept="application/pdf,.pdf"
-                        data-treasury-doc-input
-                    >
-                </label>
-                <div class="doc-file-meta">
-                    <strong class="doc-file-name" data-treasury-doc-name <?= $attachmentName === '' ? 'hidden' : '' ?>><?= e($attachmentName) ?></strong>
-                    <span class="doc-file-status muted" data-treasury-doc-status>
-                        <?= e($fileReady ? __('treasury.document_attached') : __('documents.upload_idle')) ?>
-                    </span>
-                    <div class="doc-file-preview" data-treasury-doc-preview <?= ($fileReady && $attachmentPreviewUrl !== '') ? '' : 'hidden' ?>>
-                        <?php if ($fileReady && $attachmentPreviewUrl !== ''): ?>
-                            <iframe src="<?= e($attachmentPreviewUrl) ?>#toolbar=0" title="<?= e(__('treasury.upload_document')) ?>" loading="lazy"></iframe>
+    <div class="treasury-invoice-block">
+        <label class="checkbox-row checkbox-row-lg">
+            <input type="checkbox" name="invoice_payment" value="1" data-treasury-invoice-toggle <?= !empty($values['invoice_payment']) ? 'checked' : '' ?>>
+            <span><?= e(__('treasury.invoice_payment')) ?></span>
+        </label>
+        <div class="treasury-invoice-fields" data-treasury-invoice-fields>
+            <p class="section-lede" style="margin:0 0 0.65rem"><?= e(__('treasury.invoice_block_lede')) ?></p>
+            <div>
+                <label><?= e(__('treasury.invoice_title')) ?></label>
+                <input type="text" name="invoice_title" value="<?= e((string) ($values['invoice_title'] ?? '')) ?>" maxlength="190" placeholder="<?= e(__('treasury.invoice_title_placeholder')) ?>">
+            </div>
+            <div class="grid-3">
+                <div>
+                    <label><?= e(__('treasury.invoice_number')) ?></label>
+                    <input type="text" name="invoice_number" value="<?= e((string) ($values['invoice_number'] ?? '')) ?>" maxlength="120">
+                </div>
+                <div>
+                    <label><?= e(__('treasury.invoice_date')) ?></label>
+                    <input type="date" name="invoice_date" value="<?= e((string) ($values['invoice_date'] ?? '')) ?>">
+                </div>
+                <div>
+                    <label><?= e(__('treasury.invoice_due_date')) ?></label>
+                    <input type="date" name="invoice_due_date" value="<?= e((string) ($values['invoice_due_date'] ?? '')) ?>">
+                </div>
+            </div>
+            <div>
+                <label><?= e(__('treasury.supplier')) ?></label>
+                <input type="text" name="beneficiary" value="<?= e((string) ($values['beneficiary'] ?? '')) ?>" maxlength="190" list="treasury-beneficiaries" placeholder="<?= e(__('treasury.supplier_placeholder')) ?>">
+                <datalist id="treasury-beneficiaries">
+                    <?php foreach ($beneficiaries as $beneficiary): ?>
+                        <option value="<?= e($beneficiary) ?>">
+                    <?php endforeach; ?>
+                </datalist>
+            </div>
+            <div class="doc-file-field<?= $fileReady ? ' is-uploaded' : '' ?>" data-treasury-doc-field>
+                <label><?= e(__('treasury.upload_document')) ?></label>
+                <div class="doc-file-row">
+                    <label class="btn btn-ghost file-btn">
+                        <span data-treasury-doc-pick-label><?= e($fileReady ? __('treasury.document_change') : __('treasury.document_choose')) ?></span>
+                        <input
+                            type="file"
+                            name="invoice_pdf"
+                            accept="application/pdf,.pdf"
+                            data-treasury-doc-input
+                        >
+                    </label>
+                    <div class="doc-file-meta">
+                        <strong class="doc-file-name" data-treasury-doc-name <?= $attachmentName === '' ? 'hidden' : '' ?>><?= e($attachmentName) ?></strong>
+                        <span class="doc-file-status muted" data-treasury-doc-status>
+                            <?= e($fileReady ? __('treasury.document_attached') : __('documents.upload_idle')) ?>
+                        </span>
+                        <div class="doc-file-preview" data-treasury-doc-preview <?= ($fileReady && $attachmentPreviewUrl !== '') ? '' : 'hidden' ?>>
+                            <?php if ($fileReady && $attachmentPreviewUrl !== ''): ?>
+                                <iframe src="<?= e($attachmentPreviewUrl) ?>#toolbar=0" title="<?= e(__('treasury.upload_document')) ?>" loading="lazy"></iframe>
+                            <?php endif; ?>
+                        </div>
+                        <span class="doc-file-hint muted"><?= e(__('documents.upload_hint', ['max' => upload_max_mb()])) ?></span>
+                        <?php if ($documentEditUrl !== ''): ?>
+                            <a class="doc-file-archive-link" href="<?= e($documentEditUrl) ?>" target="_blank" rel="noopener"><?= e(__('treasury.document_in_archive')) ?></a>
                         <?php endif; ?>
                     </div>
-                    <span class="doc-file-hint muted"><?= e(__('documents.upload_hint', ['max' => upload_max_mb()])) ?></span>
-                    <?php if ($documentEditUrl !== ''): ?>
-                        <a class="doc-file-archive-link" href="<?= e($documentEditUrl) ?>" target="_blank" rel="noopener"><?= e(__('treasury.document_in_archive')) ?></a>
+                    <?php if ($fileReady || !empty($values['attachment_path'])): ?>
+                        <button type="button" class="btn btn-ghost btn-sm" data-treasury-doc-detach><?= e(__('treasury.document_detach')) ?></button>
+                        <input type="hidden" name="detach_invoice_pdf" value="" data-treasury-doc-detach-input>
                     <?php endif; ?>
                 </div>
-                <?php if ($fileReady || !empty($values['attachment_path'])): ?>
-                    <button type="button" class="btn btn-ghost btn-sm" data-treasury-doc-detach><?= e(__('treasury.document_detach')) ?></button>
-                    <input type="hidden" name="detach_invoice_pdf" value="" data-treasury-doc-detach-input>
-                <?php endif; ?>
             </div>
         </div>
     </div>

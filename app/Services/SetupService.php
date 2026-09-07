@@ -84,6 +84,52 @@ final class SetupService
         return $this->missingSteps() === [];
     }
 
+    /**
+     * On temporary demos, strip settings/users/plugins from the association admin.
+     * Superadmin keeps full access via is_system_admin (can() bypass).
+     */
+    public function lockTemporaryDemoPrivileges(): void
+    {
+        if ((string) $this->settings->get('app.temporary_instance', '0') !== '1') {
+            return;
+        }
+        $adminId = (int) $this->settings->get('app.admin_user_id', 0);
+        if ($adminId < 1) {
+            $row = $this->db->fetch(
+                'SELECT id FROM users WHERE is_system_admin = 0 AND is_active = 1 ORDER BY id ASC LIMIT 1'
+            );
+            $adminId = (int) ($row['id'] ?? 0);
+        }
+        if ($adminId < 1) {
+            return;
+        }
+        $blocked = [
+            Permission::SETTINGS_MANAGE,
+            Permission::USERS_MANAGE,
+            Permission::PLUGINS_MANAGE,
+        ];
+        foreach ($blocked as $key) {
+            $perm = $this->db->fetch('SELECT id FROM permissions WHERE `key` = :k', ['k' => $key]);
+            if (!$perm) {
+                continue;
+            }
+            $this->db->query(
+                'DELETE FROM user_permissions WHERE user_id = :u AND permission_id = :p',
+                ['u' => $adminId, 'p' => (int) $perm['id']]
+            );
+        }
+        $user = auth_user();
+        if ($user && (int) ($user['id'] ?? 0) === $adminId && empty($user['is_system_admin'])) {
+            $perms = $_SESSION['permissions'] ?? [];
+            if (is_array($perms)) {
+                $_SESSION['permissions'] = array_values(array_filter(
+                    $perms,
+                    static fn ($p): bool => !in_array((string) $p, $blocked, true)
+                ));
+            }
+        }
+    }
+
     /** @return list<array<string, mixed>> */
     public function missingSteps(): array
     {

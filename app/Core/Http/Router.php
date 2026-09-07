@@ -66,6 +66,17 @@ final class Router
                 } catch (\Throwable) {
                 }
                 http_response_code(403);
+                $wantsJson = strtolower((string) ($request->header('X-Requested-With') ?? '')) === 'xmlhttprequest'
+                    || str_contains(strtolower((string) ($request->header('Accept') ?? '')), 'application/json');
+                if ($wantsJson) {
+                    header('Content-Type: application/json; charset=utf-8');
+                    echo json_encode([
+                        'ok' => false,
+                        'message' => __('errors.403'),
+                        'permission' => $route['permission'],
+                    ], JSON_UNESCAPED_UNICODE);
+                    return;
+                }
                 echo $this->app->get(View::class)->render('errors/403', [], 'layouts/app');
                 return;
             }

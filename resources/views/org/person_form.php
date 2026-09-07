@@ -131,6 +131,8 @@ $action = $isEdit
         <?= view_partial('partials/geo_birth_place', [
             'name' => 'birth_place',
             'value' => (string) ($values['birth_place'] ?? ''),
+            'flag_name' => 'birth_place_foreign',
+            'class' => 'org-geo-birth',
         ]) ?>
         <div>
             <label><?= e(__('setup.field_birth_date')) ?></label>

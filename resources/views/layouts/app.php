@@ -90,9 +90,15 @@ try {
 <div
   style="background:#fff3d6;color:#6b4a00;padding:0.55rem 1rem;text-align:center;font-size:0.9rem;font-weight:700;border-bottom:1px solid #f0d48a"
   data-demo-banner
-  <?php if ($temporaryExpiresIso !== ''): ?>data-demo-expires="<?= e($temporaryExpiresIso) ?>"<?php endif; ?>
+  <?php if ($temporaryExpiresIso !== ''): ?>
+    data-demo-expires="<?= e($temporaryExpiresIso) ?>"
+    data-demo-tpl-days-hours="<?= e(__('common.demo_banner_remaining_days_hours')) ?>"
+    data-demo-tpl-days="<?= e(__('common.demo_banner_remaining_days')) ?>"
+    data-demo-tpl-hours="<?= e(__('common.demo_banner_remaining_hours')) ?>"
+    data-demo-tpl-expired="<?= e(__('common.demo_banner_expired')) ?>"
+  <?php endif; ?>
 >
-  Ambiente di Demo<?php if ($temporaryExpiresIso !== ''): ?> — resta attiva <span data-demo-countdown><?= e($temporaryExpiresLabel) ?></span><?php elseif ($temporaryExpiresLabel !== ''): ?> — scade il <?= e($temporaryExpiresLabel) ?><?php endif; ?>. Configurazione e aggiornamenti non disponibili.
+  <?= e(__('common.demo_banner')) ?><?php if ($temporaryExpiresIso !== ''): ?> — <span data-demo-countdown><?= e(__('common.demo_banner_loading')) ?></span><?php elseif ($temporaryExpiresLabel !== ''): ?> — <?= e(__('common.demo_banner_expires_on', ['date' => $temporaryExpiresLabel])) ?><?php endif; ?>. <?= e(__('common.demo_banner_suffix')) ?>
 </div>
 <script>
 (() => {
@@ -101,21 +107,27 @@ try {
   if (!root || !target) return;
   const ends = Date.parse(root.getAttribute('data-demo-expires') || '');
   if (!Number.isFinite(ends)) return;
+  const tpl = (key, fallback) => root.getAttribute(key) || fallback;
+  const fill = (template, map) => String(template).replace(/:([a-z_]+)/g, (_, k) => String(map[k] ?? ''));
   const tick = () => {
     let ms = ends - Date.now();
     if (ms <= 0) {
-      target.textContent = '0g 0h 0m';
+      target.textContent = tpl('data-demo-tpl-expired', 'scaduta');
       return;
     }
     const days = Math.floor(ms / 86400000);
-    ms -= days * 86400000;
-    const hours = Math.floor(ms / 3600000);
-    ms -= hours * 3600000;
-    const mins = Math.floor(ms / 60000);
-    target.textContent = `${days}g ${hours}h ${mins}m`;
+    let hours = Math.floor((ms % 86400000) / 3600000);
+    if (days === 0 && hours === 0) {
+      hours = 1;
+    }
+    if (days > 0) {
+      target.textContent = fill(tpl('data-demo-tpl-days-hours', 'sarà attiva per altri :days giorni e :hours ore'), { days, hours });
+    } else {
+      target.textContent = fill(tpl('data-demo-tpl-hours', 'sarà attiva per altre :hours ore'), { hours });
+    }
   };
   tick();
-  setInterval(tick, 30000);
+  setInterval(tick, 60000);
 })();
 </script>
 <?php endif; ?>

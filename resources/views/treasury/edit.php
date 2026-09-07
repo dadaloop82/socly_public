@@ -24,6 +24,7 @@ $values = $old !== [] ? $old : [
     'invoice_number' => (string) ($movement['invoice_number'] ?? ''),
     'invoice_date' => (string) ($movement['invoice_date'] ?? ''),
     'invoice_due_date' => (string) ($movement['invoice_due_date'] ?? ''),
+    'invoice_title' => (string) ($movement['invoice_title'] ?? ''),
     'beneficiary' => (string) ($movement['beneficiary'] ?? ''),
     'attachment_path' => (string) ($movement['attachment_path'] ?? ''),
     'attachment_preview_url' => url('/treasury/' . $movementId . '/attachment'),

@@ -166,7 +166,7 @@ $renderTextField = static function (array $field) use ($fieldValue, $icons): str
         $placeholder = __('members.phone_hint');
     } elseif ($type === 'email') {
         $attrs .= ' data-email-input autocomplete="email"';
-        $placeholder = __('auth.email_placeholder');
+        $placeholder = __('members.email_placeholder');
     } elseif ($key === 'first_name') {
         $attrs .= ' data-first-name autocomplete="given-name"';
     } elseif ($key === 'last_name') {
@@ -479,24 +479,21 @@ $buildProfileFieldsHtml = function (array $list, ?string $stepKey = null) use (
         endif;
 
         if ($key === 'birth_place' || $type === \Socly\Support\MemberFieldTypes::BIRTH_PLACE):
+            $flushPending();
             $renderedKeys[$key] = true;
             $index++;
-            ob_start();
             ?>
-            <div class="field-block suggest-field" data-field="<?= e($key) ?>">
+            <div class="member-field-row is-full geo-birth-host" data-field="<?= e($key) ?>">
                 <?= view_partial('partials/geo_birth_place', [
                     'name' => 'fields[' . $key . ']',
                     'value' => $fieldValue($field),
                     'required' => !empty($field['is_required']),
                     'id' => 'field-' . $key,
                     'class' => 'member-geo-birth',
+                    'flag_name' => 'birth_place_foreign',
                 ]) ?>
             </div>
             <?php
-            $pending[] = (string) ob_get_clean();
-            if (count($pending) >= 4) {
-                $flushPending();
-            }
             continue;
         endif;
 

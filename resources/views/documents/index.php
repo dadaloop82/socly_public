@@ -29,6 +29,11 @@ $formOpen = $old !== [];
         <h1 class="page-title"><?= e(__('documents.title')) ?></h1>
         <p class="page-lede"><?= e(__('documents.lede')) ?></p>
     </div>
+    <?php if ($canManage): ?>
+        <div class="actions">
+            <button type="button" class="btn" data-open-create-panel="[data-document-form-panel]"><?= e(__('documents.add')) ?></button>
+        </div>
+    <?php endif; ?>
 </div>
 
 <form class="panel filter-bar members-filter" method="get" action="<?= e(url('/documents')) ?>" role="search" style="margin-bottom:1rem">
@@ -154,14 +159,24 @@ $formOpen = $old !== [];
                                     <td><?= e(format_date($doc['document_date'] ?? null) ?: '—') ?></td>
                                     <td><span class="doc-status doc-status-<?= e((string) ($doc['status'] ?? 'draft')) ?>"><?= e(__('documents.status_' . (string) ($doc['status'] ?? 'draft'))) ?></span></td>
                                     <td class="doc-row-actions" onclick="event.stopPropagation()">
-                                        <?php if (!empty($doc['file_path'])): ?>
-                                            <a class="btn btn-ghost btn-sm" href="<?= e(url('/documents/' . $docId . '/file')) ?>" target="_blank" rel="noopener"><?= e(__('documents.open_file')) ?></a>
-                                        <?php elseif (!$canManage): ?>
-                                            <span class="muted">—</span>
-                                        <?php endif; ?>
-                                        <?php if ($canManage): ?>
-                                            <a class="btn btn-ghost btn-sm" href="<?= e(url('/documents/' . $docId . '/edit')) ?>"><?= e(__('documents.edit')) ?></a>
-                                        <?php endif; ?>
+                                        <?= row_actions([
+                                            [
+                                                'icon' => !empty($doc['file_path']) ? 'file' : 'view',
+                                                'label' => !empty($doc['file_path']) ? __('documents.open_file') : __('documents.view'),
+                                                'href' => !empty($doc['file_path'])
+                                                    ? url('/documents/' . $docId . '/file')
+                                                    : $detailUrl,
+                                                'target' => !empty($doc['file_path']) ? '_blank' : null,
+                                                'rel' => !empty($doc['file_path']) ? 'noopener' : null,
+                                                'primary' => !empty($doc['file_path']),
+                                            ],
+                                            [
+                                                'icon' => 'edit',
+                                                'label' => __('documents.edit'),
+                                                'show' => $canManage,
+                                                'href' => url('/documents/' . $docId . '/edit'),
+                                            ],
+                                        ]) ?>
                                     </td>
                                 </tr>
                             <?php endforeach; ?>

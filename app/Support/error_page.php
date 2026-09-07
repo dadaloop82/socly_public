@@ -149,6 +149,71 @@ if (!function_exists('socly_auto_report_crash')) {
     }
 }
 
+if (!function_exists('socly_msg')) {
+    /**
+     * Translate UI copy; falls back to lang files when __() is unavailable.
+     *
+     * @param array<string, string|int|float> $replace
+     */
+    function socly_msg(string $key, array $replace = []): string
+    {
+        try {
+            if (function_exists('__')) {
+                $out = (string) __($key, $replace);
+                if ($out !== $key && $out !== '') {
+                    return $out;
+                }
+            }
+        } catch (Throwable) {
+        }
+
+        $locale = 'it';
+        try {
+            if (function_exists('app')) {
+                $locale = (string) app('translator')->getLocale();
+            }
+        } catch (Throwable) {
+            $locale = (string) ($_SESSION['locale'] ?? getenv('APP_LOCALE') ?: 'it');
+        }
+        if (!in_array($locale, ['it', 'en', 'de'], true)) {
+            $locale = 'it';
+        }
+
+        $path = null;
+        try {
+            if (function_exists('code_path')) {
+                $path = code_path('lang/' . $locale . '/messages.php');
+            }
+        } catch (Throwable) {
+        }
+        if ($path === null || !is_file($path)) {
+            $base = defined('SOCLY_CODE_PATH') ? (string) SOCLY_CODE_PATH : dirname(__DIR__, 2);
+            $path = $base . '/lang/' . $locale . '/messages.php';
+        }
+        if (!is_file($path)) {
+            return $key;
+        }
+
+        /** @var array<string, mixed> $messages */
+        $messages = require $path;
+        $node = $messages;
+        foreach (explode('.', $key) as $part) {
+            if (!is_array($node) || !array_key_exists($part, $node)) {
+                return $key;
+            }
+            $node = $node[$part];
+        }
+        if (!is_string($node) || $node === '') {
+            return $key;
+        }
+        $out = $node;
+        foreach ($replace as $k => $v) {
+            $out = str_replace(':' . $k, (string) $v, $out);
+        }
+        return $out;
+    }
+}
+
 if (!function_exists('socly_render_error_page')) {
     /** @param array<string, mixed> $extra */
     function socly_render_error_page(Throwable $e, bool $verbose = false, array $extra = []): void
@@ -178,11 +243,13 @@ if (!function_exists('socly_render_error_page')) {
             'php' => PHP_VERSION,
         ];
 
+        $short = socly_msg('errors.500_short');
+
         if ($wantsJson) {
             if (!headers_sent()) {
                 header('Content-Type: application/json; charset=utf-8');
             }
-            $payload = ['ok' => false, 'error' => 'Errore temporaneo. Riprova tra poco.', 'ref' => $ref];
+            $payload = ['ok' => false, 'error' => $short, 'ref' => $ref];
             if ($verbose) {
                 $payload['detail'] = $detail;
             }
@@ -200,37 +267,41 @@ if (!function_exists('socly_render_error_page')) {
         $esc = static fn (string $v): string => htmlspecialchars($v, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
         $reportNote = '';
         if (!empty($report['ok'])) {
-            $reportNote = 'Segnalazione automatica inviata al team SOCLY.';
-            try {
-                $reportNote = (string) __('report.auto_sent');
-            } catch (Throwable) {
-            }
+            $reportNote = socly_msg('report.auto_sent');
         } elseif (($report['error'] ?? '') === 'not_configured' || !empty($report['skipped'])) {
             $reportNote = '';
         } else {
-            try {
-                $reportNote = (string) __('report.auto_failed');
-            } catch (Throwable) {
-                $reportNote = 'Impossibile inviare la segnalazione automatica.';
-            }
+            $reportNote = socly_msg('report.auto_failed');
         }
 
-        echo '<!DOCTYPE html><html lang="it"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">';
-        echo '<title>Errore · SOCLY</title>';
+        $locale = 'it';
+        try {
+            if (function_exists('app')) {
+                $locale = (string) app('translator')->getLocale();
+            }
+        } catch (Throwable) {
+            $locale = (string) ($_SESSION['locale'] ?? getenv('APP_LOCALE') ?: 'it');
+        }
+        if (!in_array($locale, ['it', 'en', 'de'], true)) {
+            $locale = 'it';
+        }
+
+        echo '<!DOCTYPE html><html lang="' . $esc($locale) . '"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">';
+        echo '<title>' . $esc(socly_msg('errors.500_page_title')) . '</title>';
         echo '<style>body{font-family:Manrope,system-ui,sans-serif;margin:0;background:#f4f7f6;color:#123;padding:2rem}'
             . '.box{max-width:44rem;margin:0 auto;background:#fff;border-radius:16px;padding:1.4rem 1.5rem;box-shadow:0 10px 30px rgba(0,0,0,.08)}'
             . 'h1{margin:0 0 .6rem;font-size:1.45rem}p{line-height:1.45}.muted{color:#567}'
             . 'pre{white-space:pre-wrap;word-break:break-word;background:#0b1f1c;color:#d7fff3;padding:1rem;border-radius:12px;font-size:.85rem;overflow:auto}'
             . 'code{background:#eef3f1;padding:.1rem .35rem;border-radius:6px}</style></head><body><div class="box">';
-        echo '<h1>Errore temporaneo</h1>';
-        echo '<p>Riprova tra poco o contatta il supporto SOCLY.</p>';
-        echo '<p class="muted">Codice riferimento: <code>' . $esc($ref) . '</code></p>';
+        echo '<h1>' . $esc(socly_msg('errors.500_title')) . '</h1>';
+        echo '<p>' . $esc(socly_msg('errors.500_text')) . '</p>';
+        echo '<p class="muted">' . $esc(socly_msg('errors.500_ref', ['ref' => $ref])) . '</p>';
         if ($reportNote !== '') {
             echo '<p class="muted">' . $esc($reportNote) . '</p>';
         }
 
         if ($verbose) {
-            echo '<h2 style="font-size:1.05rem;margin:1.2rem 0 .4rem">Dettagli tecnici</h2>';
+            echo '<h2 style="font-size:1.05rem;margin:1.2rem 0 .4rem">' . $esc(socly_msg('errors.500_tech_title')) . '</h2>';
             echo '<pre>' . $esc(
                 $detail['type'] . "\n"
                 . $detail['message'] . "\n"
@@ -239,7 +310,7 @@ if (!function_exists('socly_render_error_page')) {
                 . 'memory: ' . $detail['memory'] . "\n"
                 . 'php: ' . $detail['php']
             ) . '</pre>';
-            echo '<p class="muted">Copia questi dettagli in chat così individuiamo il bug.</p>';
+            echo '<p class="muted">' . $esc(socly_msg('errors.500_copy_hint')) . '</p>';
         }
 
         echo '</div></body></html>';

@@ -29,6 +29,7 @@ $values = $old !== [] ? $old : [
     'invoice_number' => '',
     'invoice_date' => '',
     'invoice_due_date' => '',
+    'invoice_title' => '',
     'beneficiary' => '',
 ];
 $canManage = can('treasury.manage');
@@ -39,6 +40,11 @@ $formOpen = $old !== [];
         <h1 class="page-title"><?= e(__('treasury.title')) ?></h1>
         <p class="page-lede"><?= e(__('treasury.lede')) ?></p>
     </div>
+    <?php if ($canManage): ?>
+        <div class="actions">
+            <button type="button" class="btn" data-open-create-panel="[data-treasury-form-panel]"><?= e(__('treasury.add_movement')) ?></button>
+        </div>
+    <?php endif; ?>
 </div>
 
 <div class="stats stats-context-treasury">
@@ -61,7 +67,7 @@ $formOpen = $old !== [];
     <div class="panel-header treasury-filter-head">
         <div>
             <h2 class="section-title"><?= e(__('treasury.search')) ?></h2>
-            <p class="section-lede"><?= e(__('treasury.search_lede')) ?></p>
+            <p class="section-lede"><?= e(__('treasury.ledger_options')) ?></p>
         </div>
         <button class="btn btn-sm treasury-filter-submit-desktop" type="submit"><?= e(__('treasury.search')) ?></button>
     </div>
@@ -82,6 +88,25 @@ $formOpen = $old !== [];
             <?php if (trim((string) ($search_query ?? '')) !== ''): ?>
                 <a class="btn btn-ghost btn-sm" href="<?= e(url('/treasury')) ?>"><?= e(__('treasury.search_clear')) ?></a>
             <?php endif; ?>
+        </div>
+    </div>
+    <div class="grid-2" style="margin-top:0.85rem;gap:0.85rem">
+        <div>
+            <label for="treasury-group"><?= e(__('treasury.group_by_category')) ?></label>
+            <select id="treasury-group" name="group" data-treasury-filter-auto>
+                <option value="1" <?= !empty($group_by_category) ? 'selected' : '' ?>><?= e(__('treasury.group_by_category')) ?></option>
+                <option value="0" <?= empty($group_by_category) ? 'selected' : '' ?>><?= e(__('treasury.group_by_category_off')) ?></option>
+            </select>
+        </div>
+        <div>
+            <label for="treasury-sort"><?= e(__('treasury.sort_by')) ?></label>
+            <?php $sort = (string) ($ledger_sort ?? 'date_desc'); ?>
+            <select id="treasury-sort" name="sort" data-treasury-filter-auto>
+                <option value="date_desc" <?= $sort === 'date_desc' ? 'selected' : '' ?>><?= e(__('treasury.sort_date_desc')) ?></option>
+                <option value="date_asc" <?= $sort === 'date_asc' ? 'selected' : '' ?>><?= e(__('treasury.sort_date_asc')) ?></option>
+                <option value="created_desc" <?= $sort === 'created_desc' ? 'selected' : '' ?>><?= e(__('treasury.sort_created_desc')) ?></option>
+                <option value="invoice_desc" <?= $sort === 'invoice_desc' ? 'selected' : '' ?>><?= e(__('treasury.sort_invoice_desc')) ?></option>
+            </select>
         </div>
     </div>
 </form>
@@ -136,19 +161,20 @@ $formOpen = $old !== [];
                 <section class="doc-archive-group">
                     <header class="doc-archive-group-head">
                         <h3 class="doc-archive-group-title"><?= e((string) $group['label']) ?></h3>
-                        <span class="doc-archive-group-count muted"><?= e((string) count($group['items'])) ?></span>
                     </header>
                     <div class="table-wrap embedded">
                         <table class="treasury-ledger">
                             <thead>
                             <tr>
                                 <th><?= e(__('treasury.operation_date')) ?></th>
+                                <th><?= e(__('treasury.invoice_date')) ?></th>
                                 <th><?= e(__('treasury.description')) ?></th>
                                 <th><?= e(__('treasury.method')) ?></th>
                                 <th><?= e(__('treasury.details')) ?></th>
                                 <th><?= e(__('treasury.created')) ?></th>
                                 <th><?= e(__('treasury.income')) ?></th>
                                 <th><?= e(__('treasury.expense')) ?></th>
+                                <th><?= e(__('treasury.actions')) ?></th>
                             </tr>
                             </thead>
                             <tbody>
@@ -158,6 +184,10 @@ $formOpen = $old !== [];
                                 $amount = (float) ($row['amount'] ?? 0);
                                 $memberLabel = trim((string) (($row['last_name'] ?? '') . ' ' . ($row['first_name'] ?? '')));
                                 $desc = trim((string) ($row['description'] ?? ''));
+                                $invoiceTitle = trim((string) ($row['invoice_title'] ?? ''));
+                                if ($desc === '' && $invoiceTitle !== '') {
+                                    $desc = $invoiceTitle;
+                                }
                                 if ($desc === '' && $memberLabel !== '') {
                                     $desc = $memberLabel;
                                 }
@@ -179,17 +209,18 @@ $formOpen = $old !== [];
                                     <?php endif; ?>
                                 >
                                     <td><?= e(format_date($row['movement_date'] ?? null) ?: '—') ?></td>
+                                    <td><?= e(!empty($row['invoice_date']) ? (format_date($row['invoice_date']) ?: (string) $row['invoice_date']) : '—') ?></td>
                                     <td><?= e($desc !== '' ? $desc : '—') ?></td>
                                     <td><?= e($methodLabel) ?></td>
                                     <td>
                                         <?php if ($memberLabel !== ''): ?><div><?= e($memberLabel) ?></div><?php endif; ?>
-                                        <?php if (!empty($row['beneficiary'])): ?><div><?= e(__('treasury.beneficiary')) ?>: <?= e((string) $row['beneficiary']) ?></div><?php endif; ?>
+                                        <?php if (!empty($row['beneficiary'])): ?><div><?= e(__('treasury.supplier')) ?>: <?= e((string) $row['beneficiary']) ?></div><?php endif; ?>
+                                        <?php if ($invoiceTitle !== '' && $invoiceTitle !== $desc): ?><div><?= e(__('treasury.invoice_title')) ?>: <?= e($invoiceTitle) ?></div><?php endif; ?>
                                         <?php if (!empty($row['invoice_number'])): ?><div><?= e(__('treasury.invoice_number')) ?>: <?= e((string) $row['invoice_number']) ?></div><?php endif; ?>
-                                        <?php if (!empty($row['invoice_date'])): ?><div><?= e(__('treasury.invoice_date')) ?>: <?= e(format_date($row['invoice_date']) ?: (string) $row['invoice_date']) ?></div><?php endif; ?>
                                         <?php if (!empty($row['invoice_due_date'])): ?><div><?= e(__('treasury.invoice_due_date')) ?>: <?= e(format_date($row['invoice_due_date']) ?: (string) $row['invoice_due_date']) ?></div><?php endif; ?>
                                         <?php if (!empty($row['amount_entered']) && !empty($row['amount_currency'])): ?><div><?= e(__('treasury.amount_original')) ?>: <?= e(number_format((float) $row['amount_entered'], 2, ',', '.')) ?> <?= e((string) $row['amount_currency']) ?></div><?php endif; ?>
                                         <?php if (!empty($row['attachment_path'])): ?><div><a href="<?= e(url('/treasury/' . $rowId . '/attachment')) ?>" target="_blank" rel="noopener"><?= e(__('treasury.upload_document')) ?></a></div><?php endif; ?>
-                                        <?php if (empty($row['member_id']) && empty($row['beneficiary']) && empty($row['invoice_number']) && empty($row['attachment_path'])): ?><?= e(__('treasury.none')) ?><?php endif; ?>
+                                        <?php if (empty($row['member_id']) && empty($row['beneficiary']) && empty($row['invoice_number']) && empty($row['invoice_title']) && empty($row['attachment_path'])): ?><?= e(__('treasury.none')) ?><?php endif; ?>
                                     </td>
                                     <td>
                                         <div><?= e(format_datetime($row['created_at'] ?? null) ?: '—') ?></div>
@@ -197,6 +228,24 @@ $formOpen = $old !== [];
                                     </td>
                                     <td class="amount-income"><?= $isIncome ? e($currency->format($amount)) : '—' ?></td>
                                     <td class="amount-expense"><?= !$isIncome ? e($currency->format($amount)) : '—' ?></td>
+                                    <td class="doc-row-actions" onclick="event.stopPropagation()">
+                                        <?= row_actions([
+                                            [
+                                                'icon' => 'file',
+                                                'label' => __('treasury.upload_document'),
+                                                'show' => !empty($row['attachment_path']),
+                                                'href' => !empty($row['attachment_path']) ? url('/treasury/' . $rowId . '/attachment') : '',
+                                                'target' => '_blank',
+                                                'rel' => 'noopener',
+                                            ],
+                                            [
+                                                'icon' => 'edit',
+                                                'label' => __('treasury.edit'),
+                                                'show' => $canManage,
+                                                'href' => $editUrl,
+                                            ],
+                                        ]) ?>
+                                    </td>
                                 </tr>
                             <?php endforeach; ?>
                             </tbody>

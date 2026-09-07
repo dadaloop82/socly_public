@@ -24,10 +24,14 @@ $panelUsers = is_array($panelUsers ?? null) ? $panelUsers : [];
                         <td><?= e((string) ($u['email'] ?? '')) ?></td>
                         <td><?= e(strtoupper((string) ($u['locale'] ?? 'it'))) ?></td>
                         <td><?= !empty($u['is_active']) ? e(__('common.yes')) : e(__('common.no')) ?></td>
-                        <td>
-                            <a class="btn btn-ghost btn-sm" href="<?= e(url('/users/' . (int) ($u['id'] ?? 0) . '/edit?return=settings')) ?>">
-                                <?= e(__('users.edit')) ?>
-                            </a>
+                        <td class="doc-row-actions">
+                            <?= row_actions([
+                                [
+                                    'icon' => 'edit',
+                                    'label' => __('users.edit'),
+                                    'href' => url('/users/' . (int) ($u['id'] ?? 0) . '/edit?return=settings'),
+                                ],
+                            ]) ?>
                         </td>
                     </tr>
                 <?php endforeach; ?>

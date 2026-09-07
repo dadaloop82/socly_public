@@ -117,6 +117,46 @@ final class EnrollmentService
         $this->audit->log('member.enrollment_attested', 'member', (string) $memberId, null, $meta, $ip);
     }
 
+    /**
+     * Archive a signed scan after registration (any enrollment mode, including "none").
+     *
+     * @param array{name:string,type:string,tmp_name:string,error:int,size:int}|null $scanFile
+     * @return array{ok:bool,error?:string}
+     */
+    public function storeLateScan(int $memberId, ?array $scanFile, string $ip): array
+    {
+        $hasScan = $scanFile !== null && ($scanFile['error'] ?? UPLOAD_ERR_NO_FILE) === UPLOAD_ERR_OK;
+        if (!$hasScan) {
+            return ['ok' => false, 'error' => __('members.enrollment_scan_required')];
+        }
+        $size = (int) ($scanFile['size'] ?? 0);
+        if ($size <= 0 || $size > 8 * 1024 * 1024) {
+            return ['ok' => false, 'error' => __('validation.photo')];
+        }
+        $stored = $this->storeUpload($memberId, $scanFile, 'scan');
+        $path = $stored['path'] ?? null;
+        $hash = $stored['hash'] ?? null;
+        if ($path === null) {
+            return ['ok' => false, 'error' => __('members.enrollment_upload_fail')];
+        }
+        $meta = ['method' => 'print_scan', 'late_upload' => true, 'configured_method' => $this->method()];
+        try {
+            $this->db->insert('member_enrollment_artifacts', [
+                'member_id' => $memberId,
+                'method' => 'print_scan',
+                'storage_path' => $path,
+                'content_hash' => $hash,
+                'meta_json' => json_encode($meta, JSON_UNESCAPED_UNICODE),
+                'created_by' => auth_user()['id'] ?? null,
+            ]);
+        } catch (\Throwable) {
+            return ['ok' => false, 'error' => __('members.enrollment_upload_fail')];
+        }
+        $this->audit->log('member.enrollment_attested', 'member', (string) $memberId, null, $meta, $ip);
+
+        return ['ok' => true];
+    }
+
     /** @return array{ok:bool,error?:string,message?:string} */
     public function sendOtp(string $email, string $ip, string $memberName = ''): array
     {

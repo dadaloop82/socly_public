@@ -206,21 +206,29 @@ $balanceDue = (float) ($member['balance_due'] ?? 0);
         <?php elseif (($enrollmentArtifact['method'] ?? '') === 'otp_email'): ?>
             <p class="muted"><?= e(__('members.enrollment_otp_recorded')) ?></p>
         <?php endif; ?>
-    <?php elseif ($enrollmentMethod === 'print_scan'): ?>
-        <p class="muted"><?= e(__('members.enrollment_missing_on_file')) ?></p>
-        <div class="actions">
+    <?php else: ?>
+        <?php if ($enrollmentMethod === 'none'): ?>
+            <p class="muted"><?= e(__('members.enrollment_not_required')) ?></p>
+        <?php else: ?>
+            <p class="muted"><?= e(__('members.enrollment_missing_on_file')) ?></p>
+        <?php endif; ?>
+        <div class="actions" style="margin-top:0.85rem;flex-wrap:wrap;gap:0.65rem">
             <a class="btn btn-sm" href="<?= e(url('/members/'.$member['id'].'/enrollment-form')) ?>" target="_blank" rel="noopener"><?= e(__('members.enrollment_print_form')) ?></a>
             <?php if (can('members.manage')): ?>
-                <a class="btn btn-sm btn-ghost" href="<?= e(url('/members/'.$member['id'].'/edit')) ?>"><?= e(__('members.anomaly_fix')) ?></a>
+                <?php if (in_array($enrollmentMethod, ['tablet_sign', 'otp_email'], true)): ?>
+                    <a class="btn btn-sm btn-ghost" href="<?= e(url('/members/'.$member['id'].'/edit')) ?>"><?= e(__('members.anomaly_fix')) ?></a>
+                <?php endif; ?>
             <?php endif; ?>
         </div>
-    <?php elseif ($enrollmentMethod !== 'none'): ?>
-        <p class="muted"><?= e(__('members.enrollment_missing_on_file')) ?></p>
         <?php if (can('members.manage')): ?>
-            <a class="btn btn-sm" href="<?= e(url('/members/'.$member['id'].'/edit')) ?>"><?= e(__('members.anomaly_fix')) ?></a>
+            <form class="member-enrollment-upload" method="post" action="<?= e(url('/members/'.$member['id'].'/enrollment-scan')) ?>" enctype="multipart/form-data" style="margin-top:1rem;display:grid;gap:0.65rem;max-width:28rem">
+                <?= csrf_field() ?>
+                <label class="field-label"><?= e(__('members.enrollment_upload_scan')) ?></label>
+                <input type="file" name="enrollment_scan" accept="application/pdf,image/jpeg,image/png,.pdf,.jpg,.jpeg,.png" required>
+                <p class="muted" style="margin:0"><?= e(__('members.enrollment_upload_hint')) ?></p>
+                <button type="submit" class="btn btn-sm"><?= e(__('members.enrollment_upload_submit')) ?></button>
+            </form>
         <?php endif; ?>
-    <?php else: ?>
-        <p class="muted"><?= e(__('members.enrollment_not_required')) ?></p>
     <?php endif; ?>
 </div>
 

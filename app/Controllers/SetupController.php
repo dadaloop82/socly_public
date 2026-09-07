@@ -490,6 +490,7 @@ final class SetupController extends BaseController
 
         $remaining = $this->setup->missingSteps();
         if ($remaining === []) {
+            $this->setup->lockTemporaryDemoPrivileges();
             unset(
                 $_SESSION['setup_greeted'],
                 $_SESSION['setup_show_thanks'],
