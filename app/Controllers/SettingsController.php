@@ -74,6 +74,7 @@ final class SettingsController extends BaseController
             'title' => __('settings.title'),
             'settings' => [
                 'association.name' => $this->settings->get('association.name'),
+                'association.name_de' => $this->settings->get('association.name_de'),
                 'association.legal_name' => $this->settings->get('association.legal_name'),
                 'association.fiscal_code' => $this->settings->get('association.fiscal_code'),
                 'association.vat_number' => $this->settings->get('association.vat_number'),
@@ -208,6 +209,7 @@ final class SettingsController extends BaseController
         $data = $request->all();
         if (!$this->validator->validate($data, [
             'association_name' => 'required|string|max:120',
+            'association_name_de' => 'nullable|string|max:120',
             'association_legal_name' => 'required|string|max:6|in:' . implode(',', \Socly\Setup\AssociationLegalForms::codes()),
             'association_fiscal_code' => 'required|string|max:16',
             'association_city' => 'required|string|max:120',
@@ -226,6 +228,8 @@ final class SettingsController extends BaseController
         }
         $legal = strtoupper(trim((string) $data['association_legal_name']));
         $name = assoc_capitalize_name((string) $data['association_name']);
+        $nameDeRaw = trim((string) ($data['association_name_de'] ?? ''));
+        $nameDe = $nameDeRaw !== '' ? assoc_capitalize_name($nameDeRaw) : '';
         $fiscal = strtoupper(preg_replace('/\s+/', '', (string) $data['association_fiscal_code']) ?? '');
         $vat = strtoupper(preg_replace('/\s+/', '', (string) ($data['association_vat'] ?? '')) ?? '');
         if (str_starts_with($vat, 'IT')) {
@@ -243,10 +247,12 @@ final class SettingsController extends BaseController
         }
         $before = [
             'association.name' => $this->settings->get('association.name'),
+            'association.name_de' => $this->settings->get('association.name_de'),
             'association.legal_name' => $this->settings->get('association.legal_name'),
             'branding.primary' => $this->settings->get('branding.primary'),
         ];
         $this->settings->set('association.name', $name);
+        $this->settings->set('association.name_de', $nameDe);
         $this->settings->set('association.legal_name', $legal);
         $this->settings->set('association.fiscal_code', $fiscal);
         $this->settings->set('association.vat_number', $vat);
@@ -333,6 +339,7 @@ final class SettingsController extends BaseController
         }
         \Socly\Support\EnvWriter::setUserValues([
             'ASSOCIATION_NAME' => $name,
+            'ASSOCIATION_NAME_DE' => $nameDe,
             'ASSOCIATION_LEGAL_NAME' => $legal,
             'ASSOCIATION_FISCAL_CODE' => $fiscal,
             'ASSOCIATION_VAT' => $vat,

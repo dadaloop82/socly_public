@@ -1012,6 +1012,13 @@ function brandReadableHex(fg, bg = '#FFFFFF', minRatio = 4.5) {
   return best;
 }
 
+function brandOnColor(bg) {
+  const surface = brandNormalizeHex(bg, '#0D6E66');
+  const white = '#FFFFFF';
+  const dark = '#121212';
+  return brandContrastRatio(white, surface) >= brandContrastRatio(dark, surface) ? white : dark;
+}
+
 function applyReadableBrandVars(primary, accent, target = document.documentElement) {
   const p = brandNormalizeHex(primary, '#0D6E66');
   const a = brandNormalizeHex(accent, '#B84A1B');
@@ -1026,6 +1033,9 @@ function applyReadableBrandVars(primary, accent, target = document.documentEleme
     brandReadableHex(brandMixHex(accentInk, paper, 0.28), paper, 3.0)
   );
   target.style.setProperty('--brand-accent-on-dark', brandReadableHex(a, deep, 4.5));
+  target.style.setProperty('--brand-on-primary', brandOnColor(p));
+  target.style.setProperty('--brand-on-primary-deep', brandOnColor(deep));
+  target.style.setProperty('--brand-on-accent', brandOnColor(a));
   target.style.setProperty('--line', `color-mix(in srgb, ${primaryInk} 22%, #c5cdca)`);
 }
 
@@ -3251,6 +3261,7 @@ function initSetupNamePairPreview(scope = document) {
     root.dataset.namePairBound = '1';
 
     const nameInput = root.querySelector('[data-setup-assoc-name]');
+    const nameDeInput = root.querySelector('[data-setup-assoc-name-de]');
     const legalSelect = root.querySelector('[data-setup-legal-name]');
     const preview = root.querySelector('[data-setup-full-name-preview]');
     const legalMeaning = root.querySelector('[data-setup-legal-meaning]');
@@ -3280,13 +3291,19 @@ function initSetupNamePairPreview(scope = document) {
 
     const sync = () => {
       const name = capitalizeName(nameInput.value);
+      const nameDe = capitalizeName(nameDeInput?.value || '');
       const legal = String(legalSelect.value || '').trim().toUpperCase();
       if (!name || !legal) {
         preview.hidden = true;
         preview.textContent = '';
         return;
       }
-      const full = nameContainsLegal(name, legal) ? name : `${name} ${legal}`;
+      let display = name;
+      if (nameDe && nameDe.toLocaleLowerCase('it-IT') !== name.toLocaleLowerCase('it-IT')) {
+        display = `${name} / ${nameDe}`;
+      }
+      const hasLegal = nameContainsLegal(name, legal) || nameContainsLegal(nameDe, legal);
+      const full = hasLegal ? display : `${display} ${legal}`;
       const safeName = full
         .replaceAll('&', '&amp;')
         .replaceAll('<', '&lt;')
@@ -3301,6 +3318,8 @@ function initSetupNamePairPreview(scope = document) {
 
     nameInput.addEventListener('input', sync);
     nameInput.addEventListener('change', sync);
+    nameDeInput?.addEventListener('input', sync);
+    nameDeInput?.addEventListener('change', sync);
     legalSelect.addEventListener('change', () => {
       sync();
       syncLegalMeaning();
@@ -3370,7 +3389,9 @@ function nameContainsAps(name) {
   if (!raw) return false;
   const upper = raw.toLocaleUpperCase('it-IT');
   if (/(?:^|[\s\-–,.;:\/(])APS(?:$|[\s\-–,.;:\/)])/.test(upper)) return true;
-  return /associazione\s+di\s+promozione\s+sociale/i.test(raw);
+  if (/(?:^|[\s\-–,.;:\/(])VBO(?:$|[\s\-–,.;:\/)])/.test(upper)) return true;
+  if (/associazione\s+di\s+promozione\s+sociale/i.test(raw)) return true;
+  return /verein\s+zur\s+sozialen\s+f[öo]rderung/i.test(raw);
 }
 
 function nameContainsLegal(name, legal) {
@@ -3909,6 +3930,8 @@ function initSetupRuntsLookup(root) {
 
   const digits = () => String(input.value || '').replace(/\D+/g, '');
   let lookingUp = false;
+  let baseReady = false;
+  let streamFollowUp = false;
   let cooldownTimer = 0;
   const TIMEOUT_MS = 240000;
   const COOLDOWN_SECONDS = Math.max(1, Number(box.dataset.runtsCooldown || 8) || 8);
@@ -3936,10 +3959,19 @@ function initSetupRuntsLookup(root) {
     }
   };
 
+  const attemptsMsg = box.querySelector('[data-setup-runts-attempts-msg]');
+  const runtsPanel = box.querySelector('[data-setup-runts-panel]');
+  const runtsUnavailable = box.querySelector('[data-setup-runts-unavailable]');
+
   let attemptsLeft = Number(box.dataset.runtsLeft);
   if (!Number.isFinite(attemptsLeft)) attemptsLeft = MAX_ATTEMPTS;
   attemptsLeft = Math.max(0, Math.min(MAX_ATTEMPTS, attemptsLeft));
-  if (box.dataset.runtsExhausted === '1' || attemptsLeft <= 0 || readStoredExhausted()) {
+  // Server quota wins: if the host still has attempts, clear a stale browser “exhausted” flag.
+  if (attemptsLeft > 0) {
+    try { sessionStorage.removeItem(storageKey); } catch { /* ignore */ }
+    delete box.dataset.runtsExhausted;
+    box.classList.remove('is-exhausted');
+  } else if (box.dataset.runtsExhausted === '1' || readStoredExhausted()) {
     box.dataset.runtsExhausted = '1';
     attemptsLeft = 0;
     writeStoredExhausted();
@@ -3949,10 +3981,27 @@ function initSetupRuntsLookup(root) {
     form?.dispatchEvent(new CustomEvent('setup:cta-refresh'));
   };
 
+  const syncQuotaUi = () => {
+    const exhausted = box.dataset.runtsExhausted === '1' || attemptsLeft <= 0;
+    box.classList.toggle('is-exhausted', exhausted);
+    if (runtsPanel) runtsPanel.hidden = exhausted;
+    if (runtsUnavailable) runtsUnavailable.hidden = !exhausted;
+    if (attemptsMsg) {
+      if (!exhausted && attemptsLeft < MAX_ATTEMPTS && !box.classList.contains('is-found')) {
+        attemptsMsg.hidden = false;
+        attemptsMsg.textContent = attemptsLeftMessage();
+      } else {
+        attemptsMsg.hidden = true;
+        attemptsMsg.textContent = '';
+      }
+    }
+  };
+
   const hideBtn = () => {
     btn.hidden = true;
     btn.disabled = true;
     btn.setAttribute('aria-hidden', 'true');
+    syncQuotaUi();
   };
   const showBtn = () => {
     if (box.dataset.runtsExhausted === '1' || box.classList.contains('is-found')) {
@@ -3962,6 +4011,7 @@ function initSetupRuntsLookup(root) {
     btn.hidden = false;
     btn.removeAttribute('aria-hidden');
     btn.disabled = lookingUp || digits() === '' || box.dataset.runtsCooldowning === '1';
+    syncQuotaUi();
   };
 
   const markExhausted = () => {
@@ -3973,7 +4023,17 @@ function initSetupRuntsLookup(root) {
       window.clearTimeout(cooldownTimer);
       cooldownTimer = 0;
     }
+    lookingUp = false;
+    root.classList.remove('is-runts-busy');
+    form?.classList.remove('is-runts-busy');
+    box.classList.remove('is-looking');
     hideBtn();
+    refreshCta();
+  };
+
+  const attemptsLeftMessage = () => {
+    const tpl = box.dataset.msgAttemptsLeft || 'Tentativi RUNTS rimasti: :left su :max.';
+    return tpl.replaceAll(':left', String(attemptsLeft)).replaceAll(':max', String(MAX_ATTEMPTS));
   };
 
   const setAttemptsLeft = (left) => {
@@ -3981,11 +4041,7 @@ function initSetupRuntsLookup(root) {
     attemptsLeft = Math.max(0, Math.min(MAX_ATTEMPTS, Math.floor(left)));
     box.dataset.runtsLeft = String(attemptsLeft);
     if (attemptsLeft <= 0) markExhausted();
-  };
-
-  const attemptsLeftMessage = () => {
-    const tpl = box.dataset.msgAttemptsLeft || 'Tentativi RUNTS rimasti: :left su :max.';
-    return tpl.replaceAll(':left', String(attemptsLeft)).replaceAll(':max', String(MAX_ATTEMPTS));
+    else syncQuotaUi();
   };
 
   const logOcrDebug = (payload, where) => {
@@ -4121,13 +4177,27 @@ function initSetupRuntsLookup(root) {
     return parts.join('');
   };
 
-  const foundHtml = (fields, documents, legalPrefill, people) => {
+  const accordion = (section, title, bodyHtml, open = false) => {
+    if (!bodyHtml) return '';
+    return `<details class="setup-runts-acc" data-runts-acc="${escapeHtml(section)}"${open ? ' open' : ''}>
+      <summary class="setup-runts-acc-summary">
+        <span class="setup-runts-acc-mark" aria-hidden="true"></span>
+        <span class="setup-runts-acc-title">${escapeHtml(title)}</span>
+      </summary>
+      <div class="setup-runts-acc-body">${bodyHtml}</div>
+    </details>`;
+  };
+
+  const foundHtml = (fields, documents, legalPrefill, people, opts = {}) => {
     const display = foundLabel(fields);
     const tpl = box.dataset.msgOk || 'Ho trovato :name';
     const parts = [];
     parts.push(
       `<p class="setup-runts-found">${escapeHtml(tpl).replaceAll(':name', `<strong>${escapeHtml(display)}</strong>`)}</p>`
     );
+    if (opts.followUp) {
+      parts.push(`<p class="setup-runts-followup muted" data-setup-runts-followup>${escapeHtml(box.dataset.msgDocsBackground || '')}</p>`);
+    }
 
     const fieldDefs = [
       ['fiscal_code', box.dataset.msgFieldFiscalCode || 'Codice fiscale'],
@@ -4160,16 +4230,19 @@ function initSetupRuntsLookup(root) {
       </li>`);
     }
     if (fieldRows.length > 0) {
-      const heading = escapeHtml(box.dataset.msgFieldsHeading || 'Dati recuperati');
-      parts.push(`<div class="setup-runts-fields">
-        <p class="setup-runts-docs-heading">${heading}</p>
-        <ul class="setup-runts-fields-list">${fieldRows.join('')}</ul>
-      </div>`);
+      const heading = box.dataset.msgFieldsHeading || 'Dati recuperati';
+      parts.push(accordion(
+        'fields',
+        heading,
+        `<ul class="setup-runts-fields-list">${fieldRows.join('')}</ul>`,
+        true
+      ));
     }
 
     const peopleRows = Array.isArray(people) ? people : [];
     if (peopleRows.length > 0) {
-      const heading = escapeHtml(box.dataset.msgPeopleHeading || 'Persone');
+      const base = box.dataset.msgPeopleHeadingShort || box.dataset.msgPeopleHeading || 'Persone';
+      const heading = `${base} (${peopleRows.length})`;
       const items = peopleRows.map((person) => {
         const name = escapeHtml([person?.first_name, person?.last_name].filter(Boolean).join(' ').trim());
         const role = escapeHtml(String(person?.role || '').trim());
@@ -4181,17 +4254,20 @@ function initSetupRuntsLookup(root) {
           ${badge}
         </li>`;
       }).join('');
-      parts.push(`<div class="setup-runts-people">
-        <p class="setup-runts-docs-heading">${heading}</p>
-        <ul class="setup-runts-people-list">${items}</ul>
-      </div>`);
+      parts.push(accordion(
+        'people',
+        heading,
+        `<ul class="setup-runts-people-list">${items}</ul>`,
+        false
+      ));
     }
 
     const docs = Array.isArray(documents) ? documents : [];
     const viewBase = String(box.dataset.docViewBase || '').replace(/\/$/, '');
     const viewLabel = box.dataset.msgDocView || 'Vedi';
     if (docs.length > 0) {
-      const heading = escapeHtml(box.dataset.msgDocsSaved || 'Salvati in Documenti');
+      const base = box.dataset.msgDocsHeadingShort || box.dataset.msgDocsSaved || 'Documenti';
+      const heading = `${base} (${docs.length})`;
       const items = docs.map((doc) => {
         const title = escapeHtml(formatDocTitle(doc?.title));
         const file = escapeHtml(String(doc?.filename || '').trim());
@@ -4207,14 +4283,30 @@ function initSetupRuntsLookup(root) {
           ${openBtn}
         </li>`;
       }).join('');
-      parts.push(`<div class="setup-runts-docs">
-        <p class="setup-runts-docs-heading">${heading}</p>
-        <ul class="setup-runts-docs-list">${items}</ul>
-      </div>`);
+      parts.push(accordion(
+        'docs',
+        heading,
+        `<ul class="setup-runts-docs-list">${items}</ul>`,
+        false
+      ));
+    } else if (opts.docsPending) {
+      parts.push(accordion(
+        'docs',
+        box.dataset.msgDocsPending || 'Documenti in corso…',
+        `<p class="setup-runts-note">${escapeHtml(box.dataset.msgDocsBackground || '')}</p>`,
+        false
+      ));
     }
 
     const legalHtml = legalPrefillBlock(legalPrefill);
-    if (legalHtml) parts.push(legalHtml);
+    if (legalHtml) {
+      parts.push(accordion(
+        'legal',
+        box.dataset.msgLegalHeading || 'Testi legali',
+        legalHtml,
+        false
+      ));
+    }
 
     return `<div class="setup-runts-result">${parts.join('')}</div>`;
   };
@@ -4383,6 +4475,56 @@ function initSetupRuntsLookup(root) {
     }
   };
 
+  const markBaseReady = (payload) => {
+    applyFields(payload.fields || {});
+    box.classList.add('is-found');
+    hideBtn();
+    baseReady = true;
+    streamFollowUp = !!payload.docs_pending;
+    if (progress) progress.hidden = true;
+    if (elapsedEl) elapsedEl.hidden = true;
+    const spinner = live?.querySelector('.setup-scrape-spinner');
+    if (spinner instanceof HTMLElement) spinner.hidden = true;
+    const warning = String(payload.warning || '').trim();
+    let html = foundHtml(
+      payload.fields || {},
+      payload.documents || [],
+      payload.legal_prefill || {},
+      payload.people || [],
+      { followUp: streamFollowUp, docsPending: !!payload.docs_pending }
+    );
+    if (warning) {
+      html = `<p class="setup-runts-warn">${escapeHtml(warning)}</p>${html}`;
+      showStatus('', 'warn', html);
+    } else {
+      showStatus('', '', html);
+    }
+    // Unlock Continua immediately — docs/OCR keep streaming in the background.
+    setLookupBusy(false);
+  };
+
+  const refreshFoundUi = (payload) => {
+    const warning = String(payload.warning || '').trim();
+    let html = foundHtml(
+      payload.fields || {},
+      payload.documents || [],
+      payload.legal_prefill || {},
+      payload.people || [],
+      { followUp: false, docsPending: false }
+    );
+    if (warning) {
+      html = `<p class="setup-runts-warn">${escapeHtml(warning)}</p>${html}`;
+      showStatus('', 'warn', html);
+    } else {
+      showStatus('', '', html);
+    }
+    streamFollowUp = false;
+    const legalPrefill = payload.legal_prefill || {};
+    if (legalPrefill.pending_ocr || legalPrefill.status === 'pending') {
+      startOcrPoll();
+    }
+  };
+
   const blockNavWhileLooking = (event) => {
     if (!lookingUp) return;
     const target = event.target;
@@ -4431,6 +4573,8 @@ function initSetupRuntsLookup(root) {
   input.addEventListener('input', () => {
     if (box.classList.contains('is-found')) {
       box.classList.remove('is-found');
+      baseReady = false;
+      streamFollowUp = false;
       stopOcrPoll();
     }
     sync();
@@ -4438,6 +4582,7 @@ function initSetupRuntsLookup(root) {
   input.addEventListener('change', sync);
   nameInput?.addEventListener('input', syncLabel);
   sync();
+  syncQuotaUi();
 
   btn.addEventListener('click', async () => {
     if (lookingUp) return;
@@ -4449,20 +4594,27 @@ function initSetupRuntsLookup(root) {
     }
     if (box.dataset.runtsExhausted === '1' || box.dataset.runtsCooldowning === '1') return;
     stopOcrPoll();
+    baseReady = false;
+    streamFollowUp = false;
     setLookupBusy(true);
     hideBtn();
     setProgress(4);
     showStatus(phaseText('connect', number), '');
     setElapsed(0);
+    const spinnerStart = live?.querySelector('.setup-scrape-spinner');
+    if (spinnerStart instanceof HTMLElement) spinnerStart.hidden = false;
 
     const startedAt = Date.now();
     const tick = setInterval(() => {
-      setElapsed(Math.floor((Date.now() - startedAt) / 1000));
+      if (!baseReady) {
+        setElapsed(Math.floor((Date.now() - startedAt) / 1000));
+      }
     }, 250);
 
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
     let donePayload = null;
+    let readyPayload = null;
     let streamError = null;
     let streamErrorCode = '';
     let streamRetryAfter = 0;
@@ -4511,13 +4663,25 @@ function initSetupRuntsLookup(root) {
             }
             if (event.type === 'progress') {
               attemptConsumed = true;
-              if (event.percent != null) setProgress(event.percent);
-              showStatus(phaseText(String(event.phase || ''), event.number || number), '');
+              if (!baseReady) {
+                if (event.percent != null) setProgress(event.percent);
+                showStatus(phaseText(String(event.phase || ''), event.number || number), '');
+              } else {
+                const follow = status?.querySelector('[data-setup-runts-followup]');
+                if (follow) {
+                  follow.textContent = phaseText(String(event.phase || ''), event.number || number);
+                }
+              }
               if (event.ocr_debug) logOcrDebug(event, `progress:${event.phase || ''}`);
               if (event.attempts_left != null) setAttemptsLeft(Number(event.attempts_left));
             } else if (event.type === 'start') {
               attemptConsumed = true;
-              showStatus(phaseText('connect', number), '');
+              if (!baseReady) showStatus(phaseText('connect', number), '');
+            } else if (event.type === 'ready') {
+              attemptConsumed = true;
+              readyPayload = event;
+              if (event.attempts_left != null) setAttemptsLeft(Number(event.attempts_left));
+              markBaseReady(event);
             } else if (event.type === 'error') {
               streamError = String(event.error || box.dataset.msgFail || '');
               streamErrorCode = String(event.code || '');
@@ -4536,32 +4700,12 @@ function initSetupRuntsLookup(root) {
       }
 
       if (donePayload?.ok) {
-        applyFields(donePayload.fields || {});
-        box.classList.add('is-found');
-        hideBtn();
-        if (progress) progress.hidden = true;
-        if (elapsedEl) elapsedEl.hidden = true;
-        const spinner = live?.querySelector('.setup-scrape-spinner');
-        if (spinner instanceof HTMLElement) spinner.hidden = true;
-        const warning = String(donePayload.warning || '').trim();
-        const legalPrefill = donePayload.legal_prefill || {};
-        logOcrDebug(legalPrefill, 'done');
-        let html = foundHtml(
-          donePayload.fields || {},
-          donePayload.documents || [],
-          legalPrefill,
-          donePayload.people || []
-        );
-        if (warning) {
-          html = `<p class="setup-runts-warn">${escapeHtml(warning)}</p>${html}`;
-          showStatus('', 'warn', html);
-        } else {
-          showStatus('', '', html);
+        if (!baseReady) {
+          markBaseReady({ ...donePayload, docs_pending: false });
         }
-        if (legalPrefill.pending_ocr || legalPrefill.status === 'pending') {
-          startOcrPoll();
-        }
-      } else {
+        logOcrDebug(donePayload.legal_prefill || {}, 'done');
+        refreshFoundUi(donePayload);
+      } else if (!baseReady && !readyPayload?.ok) {
         const code = streamErrorCode || String(donePayload?.code || '');
         const leftFromPayload = donePayload?.attempts_left;
         if (leftFromPayload != null) setAttemptsLeft(Number(leftFromPayload));
@@ -5061,8 +5205,11 @@ function initSetupWebsiteScrape(root) {
     if (locked && nextBtn) nextBtn.disabled = true;
     if (exitBtn) exitBtn.disabled = locked;
     input.readOnly = locked;
-    if (!btn.hidden) {
-      btn.disabled = locked || !hasValidWebsite();
+    // While scraping, hide the CTA entirely — status bar replaces it (no faded disabled green).
+    if (locked) {
+      hideScrapeButton();
+    } else if (!btn.hidden) {
+      btn.disabled = !hasValidWebsite();
     }
     if (!locked) {
       form?.dispatchEvent(new CustomEvent('setup:cta-refresh'));
@@ -5177,11 +5324,27 @@ function initSetupWebsiteScrape(root) {
     });
   };
 
+  const clearLogoPickSelection = () => {
+    logoPickGrid?.querySelectorAll('.setup-scrape-logo-pick').forEach((el) => {
+      el.classList.remove('is-selected');
+      el.removeAttribute('aria-pressed');
+    });
+    if (logoNoneBtn) {
+      logoNoneBtn.classList.remove('is-selected');
+      logoNoneBtn.removeAttribute('aria-pressed');
+    }
+  };
+
   const pickScrapedLogo = async (url, btnEl) => {
     const uploadUrl = box.dataset.logoUploadUrl || '';
     if (!uploadUrl || !url) {
       showLogoReplaceError();
       return;
+    }
+    clearLogoPickSelection();
+    if (btnEl) {
+      btnEl.classList.add('is-selected');
+      btnEl.setAttribute('aria-pressed', 'true');
     }
     logoPickGrid?.querySelectorAll('.setup-scrape-logo-pick').forEach((el) => el.classList.add('is-busy'));
     if (btnEl) btnEl.classList.add('is-busy');
@@ -5216,10 +5379,21 @@ function initSetupWebsiteScrape(root) {
   };
 
   logoNoneBtn?.addEventListener('click', () => {
-    hideLogoPicks();
-    if (brandPanel && logoCard?.hidden) {
-      brandPanel.hidden = true;
-    }
+    clearLogoPickSelection();
+    logoNoneBtn.classList.add('is-selected');
+    logoNoneBtn.setAttribute('aria-pressed', 'true');
+    logoPickGrid?.querySelectorAll('.setup-scrape-logo-pick').forEach((el) => {
+      el.classList.add('is-busy');
+      el.setAttribute('aria-disabled', 'true');
+    });
+    window.setTimeout(() => {
+      hideLogoPicks();
+      logoNoneBtn.classList.remove('is-selected');
+      logoNoneBtn.removeAttribute('aria-pressed');
+      if (brandPanel && logoCard?.hidden) {
+        brandPanel.hidden = true;
+      }
+    }, 750);
   });
 
   const applyReplacedLogo = (data) => {
@@ -5315,11 +5489,7 @@ function initSetupWebsiteScrape(root) {
     const resultsOpen = !!(results && !results.hidden);
     const retryOpen = failed && !scraping;
 
-    if (failed && !scraping) {
-      hideScrapeButton();
-    } else if (attempted && !scraping) {
-      hideScrapeButton();
-    } else if (!valid && !scraping) {
+    if (scraping || failed || attempted || !valid) {
       hideScrapeButton();
     } else {
       showScrapeButton();
@@ -5330,7 +5500,7 @@ function initSetupWebsiteScrape(root) {
         .replaceAll(':name', `<span class="scrape-name" title="${escapeHtml(displayName)}">${escapeHtml(nameShown)}</span>`)
         .replaceAll(':site', `<span class="scrape-site" title="${escapeHtml(siteFull)}">${escapeHtml(siteShown)}</span>`);
       labelEl.innerHTML = html || escapeHtml(box.dataset.msgNeedUrl || '');
-      btn.disabled = scraping || !valid;
+      btn.disabled = !valid;
     }
 
     const showShell = !btn.hidden || scraping || liveOpen || resultsOpen || retryOpen;
@@ -5699,6 +5869,9 @@ function initSetupWebsiteScrape(root) {
       if (retryBtn) retryBtn.disabled = false;
       if (succeeded) {
         hideScrapeButton();
+      } else {
+        showScrapeButton();
+        btn.disabled = !hasValidWebsite();
       }
       syncLabel();
     }

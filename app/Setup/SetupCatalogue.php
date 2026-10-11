@@ -83,6 +83,14 @@ final class SetupCatalogue
                         'options' => AssociationLegalForms::options(),
                     ],
                     [
+                        'key' => 'name_de',
+                        'env_key' => 'ASSOCIATION_NAME_DE',
+                        'settings_key' => 'association.name_de',
+                        'type' => 'text',
+                        'required' => false,
+                        'label_key' => 'setup.field_assoc_name_de',
+                    ],
+                    [
                         'key' => 'currency',
                         'settings_key' => 'app.currency',
                         'type' => 'select',

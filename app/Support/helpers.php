@@ -140,23 +140,38 @@ if (!function_exists('redirect')) {
     }
 }
 
-/**
- * Full reassurance line for setup ETA (~15 seconds per step), with correct singular/plural.
- */
 if (!function_exists('setup_eta_reassure_line')) {
-    function setup_eta_reassure_line(int $steps): string
+    /** Setup ETA reassurance (~15s/step). With $html, duration is highlighted (escaped). */
+    function setup_eta_reassure_line(int $steps, bool $html = false): string
     {
         $seconds = max(0, $steps) * 15;
+        $wrap = static function (string $duration) use ($html): string {
+            $duration = trim($duration);
+            if (!$html) {
+                return $duration;
+            }
+
+            return '<span class="setup-eta-highlight">' . e($duration) . '</span>';
+        };
+
         if ($seconds < 45) {
-            return __('setup.greeting_reassure_eta_under');
+            return __('setup.greeting_reassure_eta_under', [
+                'duration' => $wrap(__('setup.greeting_reassure_eta_duration_under')),
+            ]);
         }
 
         $minutes = (int) max(1, (int) ceil($seconds / 60));
         if ($minutes === 1) {
-            return __('setup.greeting_reassure_eta_one');
+            return __('setup.greeting_reassure_eta_one', [
+                'duration' => $wrap(__('setup.greeting_reassure_eta_duration_one')),
+            ]);
         }
 
-        return __('setup.greeting_reassure_eta_many', ['count' => (string) $minutes]);
+        return __('setup.greeting_reassure_eta_many', [
+            'duration' => $wrap(__('setup.greeting_reassure_eta_duration_many', [
+                'count' => (string) $minutes,
+            ])),
+        ]);
     }
 }
 
@@ -811,8 +826,22 @@ if (!function_exists('assoc_name_contains_legal')) {
         if (preg_match('/(?:^|[\s\-–—,.;:\/(])' . $quoted . '(?:$|[\s\-–—,.;:\/)])/u', $upper) === 1) {
             return true;
         }
-        if ($legal === 'APS' && mb_stripos($name, 'Associazione di Promozione Sociale', 0, 'UTF-8') !== false) {
-            return true;
+        foreach (\Socly\Setup\AssociationLegalForms::embeddedPhrases($legal) as $phrase) {
+            $phrase = trim($phrase);
+            if ($phrase === '') {
+                continue;
+            }
+            // Short aliases (e.g. VBO): token match like the code itself.
+            if (mb_strlen($phrase, 'UTF-8') <= 6) {
+                $quotedAlias = preg_quote(mb_strtoupper($phrase, 'UTF-8'), '/');
+                if (preg_match('/(?:^|[\s\-–—,.;:\/(])' . $quotedAlias . '(?:$|[\s\-–—,.;:\/)])/u', $upper) === 1) {
+                    return true;
+                }
+                continue;
+            }
+            if (mb_stripos($name, $phrase, 0, 'UTF-8') !== false) {
+                return true;
+            }
         }
         return false;
     }
@@ -846,16 +875,21 @@ if (!function_exists('assoc_lockup_html')) {
     {
         $branding = app()->branding();
         $name = assoc_capitalize_name((string) ($opts['name'] ?? $branding['name'] ?? ''));
+        $nameDe = assoc_capitalize_name((string) ($opts['name_de'] ?? $branding['name_de'] ?? ''));
         $legal = strtoupper(trim((string) ($opts['legal_name'] ?? $branding['legal_name'] ?? '')));
         if ($name === '' || strcasecmp($name, 'SOCLY') === 0) {
             return '';
         }
+        $display = $name;
+        if ($nameDe !== '' && strcasecmp($nameDe, $name) !== 0) {
+            $display = $name . ' / ' . $nameDe;
+        }
         $mod = trim((string) ($opts['class'] ?? ''));
         $class = 'assoc-lockup' . ($mod !== '' ? ' ' . $mod : '');
         $html = '<span class="' . e($class) . '">';
-        $html .= '<span class="assoc-name" title="' . e($name) . '">' . e($name) . '</span>';
-        if ($legal !== '' && !assoc_name_contains_legal($name, $legal)) {
-            $html .= '<span class="assoc-legal">' . e($legal) . '</span>';
+        $html .= '<span class="assoc-name" title="' . e($display) . '">' . e($display) . '</span>';
+        if ($legal !== '' && !assoc_name_contains_legal($name, $legal) && !assoc_name_contains_legal($nameDe, $legal)) {
+            $html .= '<span class="assoc-legal">' . e(\Socly\Setup\AssociationLegalForms::displayCode($legal)) . '</span>';
         }
         $html .= '</span>';
         return $html;
@@ -1049,6 +1083,17 @@ if (!function_exists('brand_readable_hex')) {
     }
 }
 
+if (!function_exists('brand_on_color')) {
+    /** White or near-black text that best contrasts against $bg (WCAG). */
+    function brand_on_color(string $bg): string
+    {
+        $bg = brand_normalize_hex($bg, '#0D6E66');
+        $white = '#FFFFFF';
+        $dark = '#121212';
+        return brand_contrast_ratio($white, $bg) >= brand_contrast_ratio($dark, $bg) ? $white : $dark;
+    }
+}
+
 if (!function_exists('brand_derived_css_vars')) {
     /**
      * Readable brand text colors for light and dark surfaces.
@@ -1071,6 +1116,9 @@ if (!function_exists('brand_derived_css_vars')) {
             '--brand-accent-ink' => $accentInk,
             '--brand-accent-muted' => $accentMuted,
             '--brand-accent-on-dark' => $accentOnDark,
+            '--brand-on-primary' => brand_on_color($primary),
+            '--brand-on-primary-deep' => brand_on_color($deep),
+            '--brand-on-accent' => brand_on_color($accent),
             // Keep form borders readable even when primary is a light tint.
             '--line' => 'color-mix(in srgb, ' . $primaryInk . ' 22%, #c5cdca)',
         ];

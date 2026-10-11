@@ -34,17 +34,23 @@
                 <span><?= e(__('setup.field_assoc_name')) ?></span>
                 <input type="text" name="association_name" value="<?= e((string)$settings['association.name']) ?>" required data-setup-assoc-name>
             </label>
+            <label class="setup-field setup-field-name-de">
+                <span><?= e(__('setup.field_assoc_name_de')) ?> <span class="muted">(<?= e(__('setup.optional_short')) ?>)</span></span>
+                <input type="text" name="association_name_de" value="<?= e((string) ($settings['association.name_de'] ?? '')) ?>" data-setup-assoc-name-de>
+                <p class="setup-field-hint muted"><?= e(__('setup.field_assoc_name_de_hint')) ?></p>
+            </label>
             <label class="setup-field setup-field-legal">
                 <span><?= e(__('setup.field_assoc_legal_name')) ?></span>
                 <?php $legalForms = \Socly\Setup\AssociationLegalForms::all(); $currentLegal = (string)($settings['association.legal_name'] ?? ''); ?>
                 <select name="association_legal_name" required maxlength="6" data-setup-legal-name>
                     <option value="" disabled <?= $currentLegal === '' ? 'selected' : '' ?>><?= e(__('setup.legal_form_placeholder')) ?></option>
                     <?php foreach ($legalForms as $code => $labelKey): ?>
-                        <option value="<?= e($code) ?>" <?= $currentLegal === $code ? 'selected' : '' ?> data-meaning="<?= e(__($labelKey)) ?>">
-                            <?= e($code) ?>
+                        <option value="<?= e($code) ?>" <?= $currentLegal === $code ? 'selected' : '' ?> data-meaning="<?= e(\Socly\Setup\AssociationLegalForms::bilingualMeaning($code)) ?>">
+                            <?= e(\Socly\Setup\AssociationLegalForms::displayCode($code)) ?>
                         </option>
                     <?php endforeach; ?>
                 </select>
+                <p class="setup-bilingual-hint muted"><?= e(__('setup.legal_form_bilingual_hint')) ?></p>
             </label>
             <p class="setup-hint setup-full-name-preview muted" data-setup-full-name-preview hidden></p>
         </div>

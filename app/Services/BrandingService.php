@@ -48,6 +48,38 @@ final class BrandingService
     }
 
     /**
+     * Elegant, readable presets always offered beside logo/site extractions.
+     *
+     * @return list<array{id:string,name:string,primary:string,accent:string,source:string}>
+     */
+    public function safePresetPalettes(): array
+    {
+        return [
+            $this->paletteEntry('preset_classic_blue', __('setup.palette_classic_blue'), '#1F4E79', '#C45C26', 'preset'),
+            $this->paletteEntry('preset_forest', __('setup.palette_forest'), '#1B5E4B', '#B8860B', 'preset'),
+            $this->paletteEntry('preset_modern_grey', __('setup.palette_modern_grey'), '#3D4F5F', '#0D6E66', 'preset'),
+            $this->paletteEntry('socly_default', __('setup.palette_socly'), '#0D6E66', '#B84A1B', 'default'),
+        ];
+    }
+
+    /**
+     * Logo/site suggestions first, then safe presets (deduped by colour pair).
+     *
+     * @return list<array{id:string,name:string,primary:string,accent:string,source:string}>
+     */
+    public function paletteChoicesForSetup(): array
+    {
+        $merged = [];
+        foreach (array_merge($this->paletteSuggestions(), $this->safePresetPalettes()) as $palette) {
+            $key = strtolower($palette['primary'] . '|' . $palette['accent']);
+            if (!isset($merged[$key])) {
+                $merged[$key] = $palette;
+            }
+        }
+        return array_values($merged);
+    }
+
+    /**
      * @param list<array<string,mixed>> $palettes
      * @return list<array{id:string,name:string,primary:string,accent:string,source:string}>
      */

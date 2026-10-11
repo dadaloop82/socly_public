@@ -6,11 +6,12 @@ namespace Socly\Setup;
 
 /**
  * Italian legal-form abbreviations (max 6 chars) for associations / entities.
+ * Labels are bilingual (IT / DE) so Südtirol associations can recognise both forms.
  */
 final class AssociationLegalForms
 {
     /**
-     * @return array<string, string> code => label_key
+     * @return array<string, string> code => label_key (UI locale)
      */
     public static function all(): array
     {
@@ -27,6 +28,66 @@ final class AssociationLegalForms
             'SNC' => 'setup.legal_form_snc',
             'SS' => 'setup.legal_form_ss',
             'COOP' => 'setup.legal_form_coop',
+        ];
+    }
+
+    /**
+     * Fixed IT / DE long-form pairs (independent of UI locale).
+     *
+     * @return array<string, array{it:string,de:string,alias?:string}>
+     */
+    public static function bilingualCatalog(): array
+    {
+        return [
+            'APS' => [
+                'it' => 'Associazione di Promozione Sociale',
+                'de' => 'Verein zur sozialen Förderung',
+                'alias' => 'VBO',
+            ],
+            'ASD' => [
+                'it' => 'Associazione Sportiva Dilettantistica',
+                'de' => 'Amateur-Sportverein',
+            ],
+            'ODV' => [
+                'it' => 'Organizzazione di Volontariato',
+                'de' => 'Freiwilligenorganisation',
+            ],
+            'ETS' => [
+                'it' => 'Ente del Terzo Settore',
+                'de' => 'Körperschaft des Dritten Sektors',
+            ],
+            'SSD' => [
+                'it' => 'Società Sportiva Dilettantistica',
+                'de' => 'Amateur-Sportgesellschaft',
+            ],
+            'ONLUS' => [
+                'it' => 'ONLUS',
+                'de' => 'ONLUS',
+            ],
+            'SRL' => [
+                'it' => 'Società a responsabilità limitata',
+                'de' => 'Gesellschaft mit beschränkter Haftung',
+            ],
+            'SPA' => [
+                'it' => 'Società per azioni',
+                'de' => 'Aktiengesellschaft',
+            ],
+            'SAS' => [
+                'it' => 'Società in accomandita semplice',
+                'de' => 'Kommanditgesellschaft',
+            ],
+            'SNC' => [
+                'it' => 'Società in nome collettivo',
+                'de' => 'Offene Handelsgesellschaft',
+            ],
+            'SS' => [
+                'it' => 'Società semplice',
+                'de' => 'Einfache Gesellschaft',
+            ],
+            'COOP' => [
+                'it' => 'Cooperativa',
+                'de' => 'Genossenschaft',
+            ],
         ];
     }
 
@@ -53,6 +114,65 @@ final class AssociationLegalForms
     }
 
     /**
+     * Select option label: "APS" or "APS / VBO" when a DE alias exists.
+     */
+    public static function displayCode(string $code): string
+    {
+        $code = strtoupper(trim($code));
+        $alias = self::bilingualCatalog()[$code]['alias'] ?? '';
+        if ($alias !== '' && strtoupper($alias) !== $code) {
+            return $code . ' / ' . strtoupper($alias);
+        }
+        return $code;
+    }
+
+    /**
+     * Bilingual meaning shown under the denomination, e.g.
+     * "Associazione di Promozione Sociale · Verein zur sozialen Förderung".
+     */
+    public static function bilingualMeaning(string $code): string
+    {
+        $code = strtoupper(trim($code));
+        $row = self::bilingualCatalog()[$code] ?? null;
+        if ($row === null) {
+            $key = self::all()[$code] ?? '';
+            return $key !== '' ? (string) __($key) : $code;
+        }
+        $it = trim($row['it']);
+        $de = trim($row['de']);
+        if ($it === '' || $de === '' || strcasecmp($it, $de) === 0) {
+            return $it !== '' ? $it : $de;
+        }
+        return $it . ' · ' . $de;
+    }
+
+    /**
+     * Long-form phrases (any language) that count as already embedding this legal code.
+     *
+     * @return list<string>
+     */
+    public static function embeddedPhrases(string $code): array
+    {
+        $code = strtoupper(trim($code));
+        $row = self::bilingualCatalog()[$code] ?? null;
+        if ($row === null) {
+            return [];
+        }
+        $out = [];
+        foreach (['it', 'de'] as $lang) {
+            $phrase = trim((string) ($row[$lang] ?? ''));
+            if ($phrase !== '') {
+                $out[] = $phrase;
+            }
+        }
+        $alias = trim((string) ($row['alias'] ?? ''));
+        if ($alias !== '') {
+            $out[] = $alias;
+        }
+        return $out;
+    }
+
+    /**
      * Map a RUNTS section label to a legal-form abbreviation, if possible.
      */
     public static function fromRuntsSection(string $section, string $denomination = ''): ?string
@@ -61,7 +181,7 @@ final class AssociationLegalForms
         if ($hay === '') {
             return null;
         }
-        if (str_contains($hay, 'PROMOZIONE SOCIALE') || preg_match('/\bAPS\b/', $hay)) {
+        if (str_contains($hay, 'PROMOZIONE SOCIALE') || preg_match('/\bAPS\b/', $hay) || preg_match('/\bVBO\b/', $hay)) {
             return 'APS';
         }
         if (str_contains($hay, 'ORGANIZZAZIONI DI VOLONTARIATO') || preg_match('/\bODV\b/', $hay)) {

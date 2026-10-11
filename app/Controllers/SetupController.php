@@ -1085,6 +1085,7 @@ final class SetupController extends BaseController
         $savedDocuments = [];
         $legalPrefill = ['prefilled' => [], 'pending_ocr' => false, 'methods' => []];
         $detailMeta = [];
+        $docs = [];
         try {
             $emit(['type' => 'progress', 'phase' => 'detail', 'percent' => 70, 'number' => $number]);
             $detail = $this->runtsDetail->fetch($number, $emit);
@@ -1105,64 +1106,6 @@ final class SetupController extends BaseController
                     $warnings[] = trim((string) $detail['warning']);
                 }
                 $docs = is_array($detail['documents'] ?? null) ? $detail['documents'] : [];
-                if ($docs !== []) {
-                    $emit(['type' => 'progress', 'phase' => 'docs_save', 'percent' => 96, 'number' => $number]);
-                    $userId = isset(auth_user()['id']) ? (int) auth_user()['id'] : null;
-                    $savedDocuments = $this->setup->importRuntsDocuments(
-                        $docs,
-                        $request->ip(),
-                        $userId,
-                        (string) ($fields['runts'] ?? $number)
-                    );
-                    $emit(['type' => 'progress', 'phase' => 'docs_ocr', 'percent' => 97, 'number' => $number]);
-                    // Clear sticky OCR status from earlier lookups on this demo.
-                    $this->setup->storeLegalOcrState('none', [], [], false);
-                    $legalPrefill = $this->setup->prefillLegalTextsFromDocuments($savedDocuments, false);
-                    $extractor = new \Socly\Services\PdfTextExtractor();
-                    $ocrDebug = $extractor->ocrDiagnostics();
-                    $ocrDebug['queue'] = null;
-                    $ocrDebug['path'] = 'native_prefill';
-                    if (!empty($legalPrefill['pending_ocr'])) {
-                        $ocrOk = !empty($ocrDebug['available']);
-                        $queued = false;
-                        $queueMeta = [];
-                        if ($ocrOk) {
-                            $queueMeta = $this->setup->queueLegalPrefillFromDocumentsMeta($savedDocuments);
-                            $queued = !empty($queueMeta['ok']);
-                            $ocrDebug['queue'] = $queueMeta;
-                        }
-                        if ($queued) {
-                            $legalPrefill['status'] = 'pending';
-                            $legalPrefill['pending_ocr'] = true;
-                            $ocrDebug['path'] = 'background_queue';
-                        } elseif ($ocrOk) {
-                            // Background spawn failed: short inline OCR that fits Apache's 30s budget.
-                            @set_time_limit(120);
-                            $emit(['type' => 'progress', 'phase' => 'docs_ocr', 'percent' => 98, 'number' => $number]);
-                            $legalPrefill = $this->setup->prefillLegalTextsFromDocumentsFastOcr($savedDocuments);
-                            $ocrDebug['path'] = 'inline_fast_ocr';
-                            $ocrDebug['inline_status'] = (string) ($legalPrefill['status'] ?? '');
-                            $ocrDebug['inline_prefilled'] = $legalPrefill['prefilled'] ?? [];
-                        } else {
-                            $legalPrefill['pending_ocr'] = false;
-                            $legalPrefill['status'] = 'unavailable';
-                            $this->setup->storeLegalOcrState('unavailable', [], [], false);
-                            $ocrDebug['path'] = 'unavailable';
-                        }
-                    } else {
-                        $legalPrefill = $this->setup->enrichLegalPrefillWithExisting($savedDocuments, $legalPrefill);
-                        $ocrDebug['path'] = 'no_pending_ocr';
-                        $ocrDebug['prefill_status'] = (string) ($legalPrefill['status'] ?? '');
-                    }
-                    $legalPrefill['ocr_debug'] = $ocrDebug;
-                    $emit([
-                        'type' => 'progress',
-                        'phase' => 'docs_ocr',
-                        'percent' => 99,
-                        'number' => $number,
-                        'ocr_debug' => $ocrDebug,
-                    ]);
-                }
             } else {
                 $warnings[] = (string) ($detail['error'] ?? __('setup.runts_detail_fail'));
             }
@@ -1170,9 +1113,10 @@ final class SetupController extends BaseController
             $warnings[] = __('setup.runts_detail_fail');
         }
 
+        // Persist base identity ASAP and unlock the wizard — docs/OCR continue after.
         $applied = [];
         try {
-            $emit(['type' => 'progress', 'phase' => 'apply', 'percent' => 98]);
+            $emit(['type' => 'progress', 'phase' => 'apply', 'percent' => 82]);
             $hintResult = $this->setup->applyRuntsHints($fields, $detailMeta);
             $applied = is_array($hintResult['applied'] ?? null) ? $hintResult['applied'] : [];
             if (is_array($hintResult['fields'] ?? null)) {
@@ -1186,15 +1130,6 @@ final class SetupController extends BaseController
             ]);
             return;
         }
-
-        $publicDocs = array_map(static function (array $doc): array {
-            return [
-                'title' => (string) ($doc['title'] ?? ''),
-                'filename' => (string) ($doc['filename'] ?? ''),
-                'category' => (string) ($doc['category'] ?? ''),
-                'id' => (int) ($doc['id'] ?? 0),
-            ];
-        }, $savedDocuments);
 
         $publicPeople = [];
         foreach (is_array($detailMeta['people'] ?? null) ? $detailMeta['people'] : [] as $person) {
@@ -1213,6 +1148,96 @@ final class SetupController extends BaseController
                 'is_legal_rep' => (string) ($person['is_legal_rep'] ?? '') === '1',
             ];
         }
+
+        $displayName = assoc_display_name(
+            (string) ($fields['name'] ?? ''),
+            (string) ($fields['legal_name'] ?? '')
+        ) ?: (string) ($fields['name'] ?? '');
+        $warningSoFar = trim(implode(' ', array_filter($warnings)));
+        $emit([
+            'type' => 'ready',
+            'ok' => true,
+            'warning' => $warningSoFar,
+            'fields' => $fields,
+            'people' => $publicPeople,
+            'applied' => $applied,
+            'documents' => [],
+            'docs_pending' => $docs !== [],
+            'attempts_left' => $attemptsLeft,
+            'message' => __('setup.runts_ok', ['name' => $displayName]),
+        ]);
+
+        try {
+            if ($docs !== []) {
+                $emit(['type' => 'progress', 'phase' => 'docs_save', 'percent' => 90, 'number' => $number]);
+                $userId = isset(auth_user()['id']) ? (int) auth_user()['id'] : null;
+                $savedDocuments = $this->setup->importRuntsDocuments(
+                    $docs,
+                    $request->ip(),
+                    $userId,
+                    (string) ($fields['runts'] ?? $number)
+                );
+                $emit(['type' => 'progress', 'phase' => 'docs_ocr', 'percent' => 94, 'number' => $number]);
+                // Clear sticky OCR status from earlier lookups on this demo.
+                $this->setup->storeLegalOcrState('none', [], [], false);
+                $legalPrefill = $this->setup->prefillLegalTextsFromDocuments($savedDocuments, false);
+                $extractor = new \Socly\Services\PdfTextExtractor();
+                $ocrDebug = $extractor->ocrDiagnostics();
+                $ocrDebug['queue'] = null;
+                $ocrDebug['path'] = 'native_prefill';
+                if (!empty($legalPrefill['pending_ocr'])) {
+                    $ocrOk = !empty($ocrDebug['available']);
+                    $queued = false;
+                    $queueMeta = [];
+                    if ($ocrOk) {
+                        $queueMeta = $this->setup->queueLegalPrefillFromDocumentsMeta($savedDocuments);
+                        $queued = !empty($queueMeta['ok']);
+                        $ocrDebug['queue'] = $queueMeta;
+                    }
+                    if ($queued) {
+                        $legalPrefill['status'] = 'pending';
+                        $legalPrefill['pending_ocr'] = true;
+                        $ocrDebug['path'] = 'background_queue';
+                    } elseif ($ocrOk) {
+                        // Prefer queue; if spawn failed, still avoid blocking the UI (already unlocked).
+                        @set_time_limit(120);
+                        $emit(['type' => 'progress', 'phase' => 'docs_ocr', 'percent' => 96, 'number' => $number]);
+                        $legalPrefill = $this->setup->prefillLegalTextsFromDocumentsFastOcr($savedDocuments);
+                        $ocrDebug['path'] = 'inline_fast_ocr';
+                        $ocrDebug['inline_status'] = (string) ($legalPrefill['status'] ?? '');
+                        $ocrDebug['inline_prefilled'] = $legalPrefill['prefilled'] ?? [];
+                    } else {
+                        $legalPrefill['pending_ocr'] = false;
+                        $legalPrefill['status'] = 'unavailable';
+                        $this->setup->storeLegalOcrState('unavailable', [], [], false);
+                        $ocrDebug['path'] = 'unavailable';
+                    }
+                } else {
+                    $legalPrefill = $this->setup->enrichLegalPrefillWithExisting($savedDocuments, $legalPrefill);
+                    $ocrDebug['path'] = 'no_pending_ocr';
+                    $ocrDebug['prefill_status'] = (string) ($legalPrefill['status'] ?? '');
+                }
+                $legalPrefill['ocr_debug'] = $ocrDebug;
+                $emit([
+                    'type' => 'progress',
+                    'phase' => 'docs_ocr',
+                    'percent' => 98,
+                    'number' => $number,
+                    'ocr_debug' => $ocrDebug,
+                ]);
+            }
+        } catch (\Throwable $e) {
+            $warnings[] = __('setup.runts_docs_fail');
+        }
+
+        $publicDocs = array_map(static function (array $doc): array {
+            return [
+                'title' => (string) ($doc['title'] ?? ''),
+                'filename' => (string) ($doc['filename'] ?? ''),
+                'category' => (string) ($doc['category'] ?? ''),
+                'id' => (int) ($doc['id'] ?? 0),
+            ];
+        }, $savedDocuments);
 
         $warning = trim(implode(' ', array_filter($warnings)));
         $emit([
@@ -1234,12 +1259,7 @@ final class SetupController extends BaseController
             ],
             'elapsed_ms' => $result['elapsed_ms'] ?? null,
             'attempts_left' => $attemptsLeft,
-            'message' => __('setup.runts_ok', [
-                'name' => assoc_display_name(
-                    (string) ($fields['name'] ?? ''),
-                    (string) ($fields['legal_name'] ?? '')
-                ) ?: (string) ($fields['name'] ?? ''),
-            ]),
+            'message' => __('setup.runts_ok', ['name' => $displayName]),
         ]);
     }
 

@@ -21,7 +21,7 @@ $errorStep = flash('setup_error_step');
             </h1>
             <p class="setup-copy" data-setup-line><?= with_socly_word(__(!empty($isIncremental) ? 'setup.greeting_text_incremental' : 'setup.greeting_text', ['count' => (string) $missingCount])) ?></p>
             <p class="setup-copy setup-copy-reassure setup-copy-reassure-strong muted" data-setup-line><?= e(__('setup.greeting_reassure')) ?></p>
-            <p class="setup-copy setup-copy-reassure setup-copy-reassure-eta muted" data-setup-line><?= e(setup_eta_reassure_line((int) $missingCount)) ?></p>
+            <p class="setup-copy setup-copy-reassure setup-copy-reassure-eta" data-setup-line><?= setup_eta_reassure_line((int) $missingCount, true) ?></p>
             <form method="post" action="<?= e(url('/setup/greet')) ?>">
                 <?= csrf_field() ?>
                 <button class="btn setup-cta" type="submit" data-setup-line><?= e(__('setup.start')) ?></button>
@@ -195,8 +195,12 @@ $errorStep = flash('setup_error_step');
                     $palettes = is_array($value['palettes'] ?? null) ? $value['palettes'] : [];
                     unset($value['palettes'], $value['logo_url']);
                     ?>
+                    <?php
+                    $previewPrimary = (string) ($value['primary'] ?? '#0D6E66');
+                    $previewAccent = (string) ($value['accent'] ?? '#B84A1B');
+                    ?>
                     <div class="setup-brand-preview" data-setup-line data-brand-preview
-                         style="--brand-primary: <?= e((string) ($value['primary'] ?? '#0D6E66')) ?>; --brand-accent: <?= e((string) ($value['accent'] ?? '#B84A1B')) ?>;">
+                         style="<?= e(brand_root_style_decls($previewPrimary, $previewAccent)) ?>">
                         <span class="setup-brand-preview-primary"></span>
                         <span class="setup-brand-preview-accent"></span>
                     </div>
@@ -207,12 +211,14 @@ $errorStep = flash('setup_error_step');
                                 <?php
                                 $pPrimary = strtoupper((string) ($palette['primary'] ?? ''));
                                 $pAccent = strtoupper((string) ($palette['accent'] ?? ''));
-                                $isSelected = $pPrimary === strtoupper((string) ($value['primary'] ?? ''))
-                                    && $pAccent === strtoupper((string) ($value['accent'] ?? ''));
+                                $isSelected = $pPrimary === strtoupper($previewPrimary)
+                                    && $pAccent === strtoupper($previewAccent);
+                                $source = (string) ($palette['source'] ?? '');
                                 ?>
-                                <button type="button" class="setup-palette-card<?= $isSelected ? ' is-selected' : '' ?>" data-palette-pick
+                                <button type="button" class="setup-palette-card<?= $isSelected ? ' is-selected' : '' ?><?= in_array($source, ['preset', 'default'], true) ? ' is-preset' : '' ?>" data-palette-pick
                                         data-primary="<?= e((string) ($palette['primary'] ?? '')) ?>"
-                                        data-accent="<?= e((string) ($palette['accent'] ?? '')) ?>">
+                                        data-accent="<?= e((string) ($palette['accent'] ?? '')) ?>"
+                                        data-source="<?= e($source) ?>">
                                     <span class="setup-palette-swatch" style="--swatch-a: <?= e((string) ($palette['primary'] ?? '#0D6E66')) ?>; --swatch-b: <?= e((string) ($palette['accent'] ?? '#B84A1B')) ?>;"></span>
                                     <span class="setup-palette-name"><?= e((string) ($palette['name'] ?? __('setup.palette_custom'))) ?></span>
                                 </button>
@@ -271,7 +277,7 @@ $errorStep = flash('setup_error_step');
                         <?php foreach ($step['fields'] as $field): ?>
                             <?php $fieldKey = (string) ($field['key'] ?? ''); ?>
                             <?php if ($fieldKey === 'runts'): ?>
-                                <div class="setup-runts-block" data-setup-runts
+                                <div class="setup-runts-block<?= !empty($runtsExhausted) ? ' is-exhausted' : '' ?>" data-setup-runts
                                      data-runts-url="<?= e(url('/setup/runts-lookup')) ?>"
                                      data-csrf="<?= e(csrf_token()) ?>"
                                      data-runts-max="<?= (int) ($runtsAttemptsMax ?? 3) ?>"
@@ -302,6 +308,11 @@ $errorStep = flash('setup_error_step');
                                      data-msg-doc-view="<?= e(__('setup.runts_doc_view')) ?>"
                                      data-msg-fields-heading="<?= e(__('setup.runts_fields_heading')) ?>"
                                      data-msg-people-heading="<?= e(__('setup.runts_people_heading')) ?>"
+                                     data-msg-people-heading-short="<?= e(__('setup.runts_people_heading_short')) ?>"
+                                     data-msg-docs-heading-short="<?= e(__('setup.runts_docs_heading_short')) ?>"
+                                     data-msg-docs-pending="<?= e(__('setup.runts_docs_pending')) ?>"
+                                     data-msg-docs-background="<?= e(__('setup.runts_docs_background')) ?>"
+                                     data-msg-legal-heading="<?= e(__('setup.runts_legal_heading')) ?>"
                                      data-msg-field-fiscal-code="<?= e(__('setup.runts_field_fiscal_code')) ?>"
                                      data-msg-field-pec="<?= e(__('setup.runts_field_pec')) ?>"
                                      data-msg-field-website="<?= e(__('setup.runts_field_website')) ?>"
@@ -330,6 +341,16 @@ $errorStep = flash('setup_error_step');
                                      data-msg-limit-wait="<?= e(__('setup.runts_limit_wait')) ?>"
                                      data-msg-limit-exhausted="<?= e(__('setup.runts_limit_exhausted')) ?>"
                                 >
+                                    <div class="setup-runts-unavailable" data-setup-runts-unavailable <?= empty($runtsExhausted) ? 'hidden' : '' ?>>
+                                        <p class="setup-runts-unavailable-text" data-i18n="setup.runts_unavailable"><?= e(__('setup.runts_unavailable')) ?></p>
+                                    </div>
+                                    <div class="setup-runts-panel" data-setup-runts-panel <?= !empty($runtsExhausted) ? 'hidden' : '' ?>>
+                                    <div class="setup-runts-callout" data-setup-runts-callout>
+                                        <span class="setup-runts-callout-icon setup-runts-callout-icon-promo" aria-hidden="true">⚡</span>
+                                        <span class="setup-runts-callout-icon setup-runts-callout-icon-ok" aria-hidden="true">✓</span>
+                                        <p class="setup-runts-callout-text setup-runts-callout-promo" data-i18n="setup.runts_callout"><?= e(__('setup.runts_callout')) ?></p>
+                                        <p class="setup-runts-callout-text setup-runts-callout-ok" data-i18n="setup.runts_callout_found" hidden><?= e(__('setup.runts_callout_found')) ?></p>
+                                    </div>
                                     <label class="setup-field setup-field-runts" for="setup-runts-number">
                                         <span><?= e(__($field['label_key'])) ?></span>
                                         <input
@@ -350,6 +371,7 @@ $errorStep = flash('setup_error_step');
                                         <button type="button" class="btn setup-scrape-btn" data-setup-runts-btn hidden disabled aria-hidden="true">
                                             <span data-setup-runts-label><?= e(__('setup.runts_button_fallback')) ?></span>
                                         </button>
+                                        <p class="setup-runts-attempts muted" data-setup-runts-attempts-msg hidden></p>
                                     </div>
                                     <div class="setup-runts-live" data-setup-runts-live hidden>
                                         <div class="setup-scrape-spinner" aria-hidden="true"></div>
@@ -361,11 +383,12 @@ $errorStep = flash('setup_error_step');
                                             <p class="setup-runts-elapsed muted" data-setup-runts-elapsed hidden></p>
                                         </div>
                                     </div>
+                                    </div><!-- .setup-runts-panel -->
                                 </div>
                                 <?php continue; ?>
                             <?php endif; ?>
-                            <label class="setup-field<?= $fieldKey === 'legal_name' ? ' setup-field-legal' : ($fieldKey === 'currency' ? ' setup-field-currency' : ' setup-field-name') ?>">
-                                <span><?= e(__($field['label_key'])) ?></span>
+                            <label class="setup-field<?= $fieldKey === 'legal_name' ? ' setup-field-legal' : ($fieldKey === 'currency' ? ' setup-field-currency' : ($fieldKey === 'name_de' ? ' setup-field-name-de' : ' setup-field-name')) ?>">
+                                <span><?= e(__($field['label_key'])) ?><?= empty($field['required']) && $fieldKey === 'name_de' ? ' <span class="muted">(' . e(__('setup.optional_short')) . ')</span>' : '' ?></span>
                                 <?php if (($field['type'] ?? '') === 'select'): ?>
                                     <?php $isCurrency = $fieldKey === 'currency'; ?>
                                     <select name="<?= e($fieldKey) ?>" required maxlength="6" <?= $isCurrency ? '' : 'data-setup-legal-name' ?>>
@@ -373,12 +396,18 @@ $errorStep = flash('setup_error_step');
                                             <option value="" disabled <?= (($value[$fieldKey] ?? '') === '') ? 'selected' : '' ?>><?= e(__('setup.legal_form_placeholder')) ?></option>
                                         <?php endif; ?>
                                         <?php foreach ($field['options'] as $opt): ?>
+                                            <?php
+                                                $optVal = (string) ($opt['value'] ?? '');
+                                                $meaning = $isCurrency
+                                                    ? ''
+                                                    : \Socly\Setup\AssociationLegalForms::bilingualMeaning($optVal);
+                                            ?>
                                             <option
-                                                value="<?= e($opt['value']) ?>"
-                                                <?= (string) ($value[$fieldKey] ?? '') === $opt['value'] ? 'selected' : '' ?>
-                                                <?php if (!$isCurrency): ?>data-meaning="<?= e(__($opt['label_key'])) ?>"<?php endif; ?>
+                                                value="<?= e($optVal) ?>"
+                                                <?= (string) ($value[$fieldKey] ?? '') === $optVal ? 'selected' : '' ?>
+                                                <?php if (!$isCurrency): ?>data-meaning="<?= e($meaning) ?>"<?php endif; ?>
                                             >
-                                                <?= e($opt['value']) ?>
+                                                <?= e(\Socly\Setup\AssociationLegalForms::displayCode($optVal)) ?>
                                             </option>
                                         <?php endforeach; ?>
                                     </select>
@@ -389,10 +418,12 @@ $errorStep = flash('setup_error_step');
                                         value="<?= e((string) ($value[$fieldKey] ?? '')) ?>"
                                         <?= !empty($field['required']) ? 'required' : '' ?>
                                         autocomplete="organization"
-                                        data-setup-assoc-name
+                                        <?= $fieldKey === 'name' ? 'data-setup-assoc-name' : ($fieldKey === 'name_de' ? 'data-setup-assoc-name-de' : '') ?>
                                     >
                                     <?php if ($fieldKey === 'name'): ?>
                                         <p class="setup-legal-meaning muted" data-setup-legal-meaning hidden></p>
+                                    <?php elseif ($fieldKey === 'name_de'): ?>
+                                        <p class="setup-field-hint muted"><?= e(__('setup.field_assoc_name_de_hint')) ?></p>
                                     <?php endif; ?>
                                 <?php endif; ?>
                             </label>

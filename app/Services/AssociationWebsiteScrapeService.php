@@ -350,7 +350,7 @@ final class AssociationWebsiteScrapeService
         $text = preg_replace("/[ \t]+/", ' ', $text) ?? $text;
         $found = [];
 
-        $emails = $this->extractEmails($html . ' ' . $text);
+        $emails = $this->extractEmails($html . ' ' . $text, $baseUrl);
         foreach ($emails as $email) {
             if ($this->looksLikePec($email) && empty($found['pec'])) {
                 $found['pec'] = $email;
@@ -949,20 +949,85 @@ final class AssociationWebsiteScrapeService
         return $origin . ($dir === '' || $dir === '.' ? '' : $dir) . '/' . ltrim($url, '/');
     }
 
-    /** @return list<string> */
-    private function extractEmails(string $raw): array
+    /** @return list<string> Best-first: mailto + same host preferred over footer partner emails. */
+    private function extractEmails(string $raw, string $baseUrl = ''): array
     {
-        $emails = [];
+        $siteHost = strtolower((string) (parse_url($baseUrl, PHP_URL_HOST) ?: ''));
+        $siteHost = preg_replace('/^www\./', '', $siteHost) ?? $siteHost;
+
+        /** @var array<string, true> $mailto */
+        $mailto = [];
+        if (preg_match_all('/mailto:\s*([A-Z0-9._%+\-]+@[A-Z0-9.\-]+\.[A-Z]{2,})/i', $raw, $m)) {
+            foreach ($m[1] as $email) {
+                $email = strtolower(trim($email));
+                if ($this->isDiscardEmail($email)) {
+                    continue;
+                }
+                $mailto[$email] = true;
+            }
+        }
+
+        /** @var array<string, true> $all */
+        $all = $mailto;
         if (preg_match_all('/[A-Z0-9._%+\-]+@[A-Z0-9.\-]+\.[A-Z]{2,}/i', $raw, $m)) {
             foreach ($m[0] as $email) {
                 $email = strtolower($email);
-                if (str_contains($email, 'example.') || str_contains($email, 'sentry.') || str_contains($email, 'wixpress')) {
+                if ($this->isDiscardEmail($email)) {
                     continue;
                 }
-                $emails[] = $email;
+                $all[$email] = true;
             }
         }
-        return array_values(array_unique($emails));
+
+        $emails = array_keys($all);
+        usort($emails, function (string $a, string $b) use ($mailto, $siteHost): int {
+            return $this->emailPreferScore($b, $siteHost, isset($mailto[$b]))
+                <=> $this->emailPreferScore($a, $siteHost, isset($mailto[$a]));
+        });
+
+        return array_values($emails);
+    }
+
+    private function isDiscardEmail(string $email): bool
+    {
+        return str_contains($email, 'example.')
+            || str_contains($email, 'sentry.')
+            || str_contains($email, 'wixpress')
+            || str_contains($email, 'schema.org')
+            || str_contains($email, 'w3.org');
+    }
+
+    /**
+     * Prefer contact emails that match the scraped site host and/or come from mailto:.
+     * Do not boost mere shared public suffixes (e.g. fss.bz.it vs dsg.bz.it).
+     */
+    private function emailPreferScore(string $email, string $siteHost, bool $fromMailto): int
+    {
+        $score = 0;
+        if ($fromMailto) {
+            $score += 50;
+        }
+        $at = strrpos($email, '@');
+        if ($at === false) {
+            return $score;
+        }
+        $domain = substr($email, $at + 1);
+        $domain = preg_replace('/^www\./', '', $domain) ?? $domain;
+        if ($siteHost !== '' && $domain !== '') {
+            if ($domain === $siteHost) {
+                $score += 100;
+            } elseif (str_ends_with($domain, '.' . $siteHost)) {
+                // mail.fss.bz.it when site is fss.bz.it
+                $score += 80;
+            } elseif (str_ends_with($siteHost, '.' . $domain)) {
+                // site www.fss.bz.it already stripped; rare parent-domain mailboxes
+                $score += 30;
+            }
+        }
+        if (preg_match('/^(info|segreteria|contatti|contact|segreterie|ufficio|associazione|aps|ets|segreteria\.[a-z]+)@/i', $email)) {
+            $score += 12;
+        }
+        return $score;
     }
 
     private function looksLikePec(string $email): bool

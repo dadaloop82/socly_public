@@ -394,19 +394,7 @@ final class SetupService
                 $out[$field['key']] = $value;
             }
             if ($type === 'colors') {
-                $palettes = $this->branding->paletteSuggestions();
-                if ($palettes === []) {
-                    $palettes = $this->branding->storePaletteSuggestions([
-                        [
-                            'id' => 'socly_default',
-                            'name' => __('setup.palette_socly'),
-                            'primary' => '#0D6E66',
-                            'accent' => '#B84A1B',
-                            'source' => 'default',
-                        ],
-                    ]);
-                }
-                $out['palettes'] = $palettes;
+                $out['palettes'] = $this->branding->paletteChoicesForSetup();
                 $out['logo_url'] = $this->branding->logoUrl();
             }
             return $out;
@@ -2151,6 +2139,16 @@ final class SetupService
                     $errors[$key] = __('validation.max_string', ['max' => '6']);
                     continue;
                 }
+                $pending[] = [
+                    'settings_key' => (string) $field['settings_key'],
+                    'env_key' => (string) ($field['env_key'] ?? ''),
+                    'value' => $value,
+                ];
+                continue;
+            }
+            // Optional DE denomination: always persist (including clear).
+            if ($key === 'name_de') {
+                $value = $value !== '' ? assoc_capitalize_name($value) : '';
                 $pending[] = [
                     'settings_key' => (string) $field['settings_key'],
                     'env_key' => (string) ($field['env_key'] ?? ''),

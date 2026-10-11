@@ -165,6 +165,7 @@ final class App
     {
         $defaults = [
             'name' => 'SOCLY',
+            'name_de' => null,
             'legal_name' => null,
             'primary' => '#0D6E66',
             'accent' => '#B84A1B',
@@ -177,12 +178,14 @@ final class App
             /** @var SettingsService $settings */
             $settings = $this->get(SettingsService::class);
             $name = trim((string) ($settings->get('association.name') ?: ($_ENV['ASSOCIATION_NAME'] ?? '')));
+            $nameDe = trim((string) ($settings->get('association.name_de') ?: ($_ENV['ASSOCIATION_NAME_DE'] ?? '')));
             $legal = trim((string) ($settings->get('association.legal_name') ?: ($_ENV['ASSOCIATION_LEGAL_NAME'] ?? '')));
             $primary = trim((string) ($settings->get('branding.primary') ?: ($_ENV['BRANDING_PRIMARY'] ?? '')));
             $accent = trim((string) ($settings->get('branding.accent') ?: ($_ENV['BRANDING_ACCENT'] ?? '')));
             $logo = $settings->get('branding.logo') ?: null;
             return [
                 'name' => $name !== '' ? $name : null,
+                'name_de' => $nameDe !== '' ? $nameDe : null,
                 'legal_name' => $legal !== '' ? $legal : null,
                 'primary' => $primary !== '' ? $primary : $defaults['primary'],
                 'accent' => $accent !== '' ? $accent : $defaults['accent'],
