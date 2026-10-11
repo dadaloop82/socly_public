@@ -214,6 +214,56 @@ if (!function_exists('socly_msg')) {
     }
 }
 
+if (!function_exists('socly_error_support_email')) {
+    function socly_error_support_email(): string
+    {
+        $email = trim(socly_msg('errors.500_support_email'));
+        if ($email === '' || $email === 'errors.500_support_email' || !str_contains($email, '@')) {
+            return 'info@socly.it';
+        }
+        return $email;
+    }
+}
+
+if (!function_exists('socly_error_logo_src')) {
+    function socly_error_logo_src(): string
+    {
+        try {
+            if (function_exists('socly_mark_url')) {
+                return socly_mark_url('dark');
+            }
+        } catch (Throwable) {
+        }
+        try {
+            if (function_exists('asset')) {
+                return asset('img/socly-mark.png');
+            }
+        } catch (Throwable) {
+        }
+        $script = str_replace('\\', '/', (string) ($_SERVER['SCRIPT_NAME'] ?? ''));
+        $base = rtrim(str_replace('\\', '/', dirname($script)), '/');
+        if (str_ends_with($base, '/public')) {
+            return $base . '/assets/img/socly-mark.png';
+        }
+        return '/assets/img/socly-mark.png';
+    }
+}
+
+if (!function_exists('socly_error_home_url')) {
+    function socly_error_home_url(): string
+    {
+        try {
+            if (function_exists('url')) {
+                return url('/');
+            }
+        } catch (Throwable) {
+        }
+        $script = str_replace('\\', '/', (string) ($_SERVER['SCRIPT_NAME'] ?? ''));
+        $base = rtrim(str_replace('\\', '/', dirname($script)), '/');
+        return ($base === '' ? '/' : $base . '/');
+    }
+}
+
 if (!function_exists('socly_render_error_page')) {
     /** @param array<string, mixed> $extra */
     function socly_render_error_page(Throwable $e, bool $verbose = false, array $extra = []): void
@@ -244,12 +294,18 @@ if (!function_exists('socly_render_error_page')) {
         ];
 
         $short = socly_msg('errors.500_short');
+        $supportEmail = socly_error_support_email();
 
         if ($wantsJson) {
             if (!headers_sent()) {
                 header('Content-Type: application/json; charset=utf-8');
             }
-            $payload = ['ok' => false, 'error' => $short, 'ref' => $ref];
+            $payload = [
+                'ok' => false,
+                'error' => $short,
+                'ref' => $ref,
+                'support_email' => $supportEmail,
+            ];
             if ($verbose) {
                 $payload['detail'] = $detail;
             }
@@ -271,7 +327,7 @@ if (!function_exists('socly_render_error_page')) {
         } elseif (($report['error'] ?? '') === 'not_configured' || !empty($report['skipped'])) {
             $reportNote = '';
         } else {
-            $reportNote = socly_msg('report.auto_failed');
+            $reportNote = socly_msg('report.auto_failed', ['email' => $supportEmail]);
         }
 
         $locale = 'it';
@@ -286,34 +342,77 @@ if (!function_exists('socly_render_error_page')) {
             $locale = 'it';
         }
 
-        echo '<!DOCTYPE html><html lang="' . $esc($locale) . '"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">';
-        echo '<title>' . $esc(socly_msg('errors.500_page_title')) . '</title>';
-        echo '<style>body{font-family:Manrope,system-ui,sans-serif;margin:0;background:#f4f7f6;color:#123;padding:2rem}'
-            . '.box{max-width:44rem;margin:0 auto;background:#fff;border-radius:16px;padding:1.4rem 1.5rem;box-shadow:0 10px 30px rgba(0,0,0,.08)}'
-            . 'h1{margin:0 0 .6rem;font-size:1.45rem}p{line-height:1.45}.muted{color:#567}'
-            . 'pre{white-space:pre-wrap;word-break:break-word;background:#0b1f1c;color:#d7fff3;padding:1rem;border-radius:12px;font-size:.85rem;overflow:auto}'
-            . 'code{background:#eef3f1;padding:.1rem .35rem;border-radius:6px}</style></head><body><div class="box">';
-        echo '<h1>' . $esc(socly_msg('errors.500_title')) . '</h1>';
-        echo '<p>' . $esc(socly_msg('errors.500_text')) . '</p>';
-        echo '<p class="muted">' . $esc(socly_msg('errors.500_ref', ['ref' => $ref])) . '</p>';
+        $logo = socly_error_logo_src();
+        $home = socly_error_home_url();
+        $mailHref = 'mailto:' . $supportEmail . '?subject=' . rawurlencode('SOCLY ' . $ref);
+
+        echo '<!DOCTYPE html><html lang="' . $esc($locale) . '"><head><meta charset="utf-8">'
+            . '<meta name="viewport" content="width=device-width, initial-scale=1">'
+            . '<title>' . $esc(socly_msg('errors.500_page_title')) . '</title>'
+            . '<link rel="preconnect" href="https://fonts.googleapis.com">'
+            . '<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>'
+            . '<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600;9..144,700&family=Manrope:wght@400;600;700;800&display=swap" rel="stylesheet">'
+            . '<style>'
+            . ':root{--ink:#142a28;--muted:#5a6f6c;--paper:#f3f7f5;--card:#fff;--line:#d7e3df;--brand:#0D6E66;--brand-deep:#0a524c;--accent:#B84A1B;}'
+            . '*{box-sizing:border-box}body{margin:0;min-height:100vh;font-family:Manrope,system-ui,sans-serif;color:var(--ink);'
+            . 'background:radial-gradient(900px 420px at 12% -10%,rgba(13,110,102,.16),transparent 60%),'
+            . 'radial-gradient(700px 360px at 100% 0%,rgba(184,74,27,.10),transparent 55%),var(--paper);'
+            . 'display:flex;align-items:center;justify-content:center;padding:1.5rem}'
+            . '.shell{width:min(34rem,100%)}.mark{display:block;height:2.75rem;width:auto;margin:0 0 1.35rem}'
+            . '.card{background:var(--card);border:1px solid var(--line);border-radius:22px;padding:clamp(1.4rem,3vw,2rem);'
+            . 'box-shadow:0 18px 40px rgba(20,42,40,.08)}.card h1{font-family:Fraunces,Georgia,serif;font-size:clamp(1.45rem,3.5vw,1.85rem);'
+            . 'line-height:1.2;letter-spacing:-.02em;margin:0 0 .75rem}.lede{margin:0 0 1.15rem;color:var(--muted);line-height:1.55;font-size:1.02rem}'
+            . '.block{margin:0 0 1.15rem;padding:0.95rem 1rem;border-radius:14px;background:color-mix(in srgb,var(--brand) 6%,#fff);border:1px solid color-mix(in srgb,var(--brand) 14%,var(--line))}'
+            . '.block h2{margin:0 0 .35rem;font-size:.92rem;letter-spacing:.02em;text-transform:uppercase;color:var(--brand-deep)}.block p{margin:0;line-height:1.5;color:var(--ink)}'
+            . '.block a{color:var(--brand-deep);font-weight:700;text-decoration:underline;text-underline-offset:2px}'
+            . '.note{margin:0 0 1rem;color:var(--muted);font-size:.92rem;line-height:1.45}'
+            . '.ref{margin:0 0 .35rem;font-size:.9rem}.ref code{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;background:#eef4f2;padding:.15rem .45rem;border-radius:8px;font-size:.88rem}'
+            . '.hint{margin:0 0 1.25rem;color:var(--muted);font-size:.82rem;line-height:1.4}'
+            . '.actions{display:flex;flex-wrap:wrap;gap:.65rem}.btn{appearance:none;border:0;border-radius:999px;padding:.72rem 1.15rem;font:inherit;font-weight:700;cursor:pointer;text-decoration:none;display:inline-flex;align-items:center;justify-content:center}'
+            . '.btn-primary{background:var(--brand);color:#fff}.btn-primary:hover{background:var(--brand-deep)}'
+            . '.btn-ghost{background:transparent;color:var(--ink);border:1px solid var(--line)}.btn-ghost:hover{border-color:color-mix(in srgb,var(--ink) 22%,var(--line))}'
+            . 'details{margin-top:1.25rem}summary{cursor:pointer;color:var(--muted);font-size:.9rem}'
+            . 'pre{white-space:pre-wrap;word-break:break-word;background:#10221f;color:#d7fff3;padding:1rem;border-radius:12px;font-size:.82rem;overflow:auto;margin:.75rem 0 0}'
+            . '</style></head><body><div class="shell">'
+            . '<img class="mark" src="' . $esc($logo) . '" alt="SOCLY" decoding="async">'
+            . '<div class="card">'
+            . '<h1>' . $esc(socly_msg('errors.500_title')) . '</h1>'
+            . '<p class="lede">' . $esc(socly_msg('errors.500_text')) . '</p>'
+            . '<div class="block"><h2>' . $esc(socly_msg('errors.500_what_title')) . '</h2>'
+            . '<p>' . $esc(socly_msg('errors.500_what_text')) . '</p></div>'
+            . '<div class="block"><h2>' . $esc(socly_msg('errors.500_contact_title')) . '</h2><p>';
+        $contactParts = explode('{{EMAIL}}', socly_msg('errors.500_contact_text', ['email' => '{{EMAIL}}']), 2);
+        echo $esc((string) ($contactParts[0] ?? ''))
+            . '<a href="' . $esc($mailHref) . '">' . $esc($supportEmail) . '</a>'
+            . $esc((string) ($contactParts[1] ?? ''))
+            . '</p></div>';
+
         if ($reportNote !== '') {
-            echo '<p class="muted">' . $esc($reportNote) . '</p>';
+            echo '<p class="note">' . $esc($reportNote) . '</p>';
         }
+
+        echo '<p class="ref">' . $esc(socly_msg('errors.500_ref')) . ' <code>' . $esc($ref) . '</code></p>'
+            . '<p class="hint">' . $esc(socly_msg('errors.500_ref_hint')) . '</p>'
+            . '<div class="actions">'
+            . '<a class="btn btn-primary" href="' . $esc($home) . '">' . $esc(socly_msg('errors.500_home')) . '</a>'
+            . '<a class="btn btn-ghost" href="javascript:location.reload()">' . $esc(socly_msg('errors.500_retry')) . '</a>'
+            . '<a class="btn btn-ghost" href="' . $esc($mailHref) . '">' . $esc($supportEmail) . '</a>'
+            . '</div>';
 
         if ($verbose) {
-            echo '<h2 style="font-size:1.05rem;margin:1.2rem 0 .4rem">' . $esc(socly_msg('errors.500_tech_title')) . '</h2>';
-            echo '<pre>' . $esc(
-                $detail['type'] . "\n"
-                . $detail['message'] . "\n"
-                . 'file: ' . $detail['file'] . ':' . $detail['line'] . "\n"
-                . 'request: ' . $detail['method'] . ' ' . $detail['path'] . "\n"
-                . 'memory: ' . $detail['memory'] . "\n"
-                . 'php: ' . $detail['php']
-            ) . '</pre>';
-            echo '<p class="muted">' . $esc(socly_msg('errors.500_copy_hint')) . '</p>';
+            echo '<details><summary>' . $esc(socly_msg('errors.500_tech_title')) . '</summary>'
+                . '<pre>' . $esc(
+                    $detail['type'] . "\n"
+                    . $detail['message'] . "\n"
+                    . 'file: ' . $detail['file'] . ':' . $detail['line'] . "\n"
+                    . 'request: ' . $detail['method'] . ' ' . $detail['path'] . "\n"
+                    . 'memory: ' . $detail['memory'] . "\n"
+                    . 'php: ' . $detail['php']
+                ) . '</pre>'
+                . '<p class="hint">' . $esc(socly_msg('errors.500_copy_hint')) . '</p></details>';
         }
 
-        echo '</div></body></html>';
+        echo '</div></div></body></html>';
     }
 }
 

@@ -20,6 +20,11 @@ final class GitHubIssueService
 
     public function isConfigured(): bool
     {
+        $flag = strtolower(trim((string) ($_ENV['SOCLY_REPORT_PROBLEMS'] ?? '1')));
+        if (in_array($flag, ['0', 'false', 'off', 'no'], true)) {
+            return false;
+        }
+
         return function_exists('socly_platform_api_url') && socly_platform_api_url() !== '';
     }
 

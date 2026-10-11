@@ -22,30 +22,84 @@ final class InstallerService
 
     public static function writeEnv(array $data): void
     {
+        $existing = [];
+        $envPath = base_path('.env');
+        if (is_file($envPath)) {
+            $existing = \Socly\Support\EnvWriter::parseFile($envPath);
+        }
+
+        $appKey = (string) ($data['app_key'] ?? '');
+        if ($appKey === '') {
+            $appKey = (string) ($existing['APP_KEY'] ?? '');
+        }
+        if ($appKey === '') {
+            $appKey = Encryptor::generateKey();
+        }
+
+        $merged = $existing;
+        $merged['APP_NAME'] = (string) ($data['app_name'] ?? $existing['APP_NAME'] ?? 'SOCLY');
+        $merged['APP_ENV'] = (string) ($data['app_env'] ?? $existing['APP_ENV'] ?? 'production');
+        $merged['APP_DEBUG'] = isset($data['app_debug'])
+            ? (!empty($data['app_debug']) ? 'true' : 'false')
+            : (string) ($existing['APP_DEBUG'] ?? 'false');
+        $merged['APP_URL'] = (string) ($data['app_url'] ?? $existing['APP_URL'] ?? 'http://localhost');
+        $merged['APP_KEY'] = $appKey;
+        $merged['DB_HOST'] = (string) ($data['db_host'] ?? '127.0.0.1');
+        $merged['DB_PORT'] = (string) ($data['db_port'] ?? '3306');
+        $merged['DB_DATABASE'] = (string) ($data['db_database'] ?? 'socly');
+        $merged['DB_USERNAME'] = (string) ($data['db_username'] ?? 'socly');
+        $merged['DB_PASSWORD'] = (string) ($data['db_password'] ?? '');
+        $merged['APP_LOCALE'] = (string) ($data['app_locale'] ?? $existing['APP_LOCALE'] ?? 'it');
+        $merged['SESSION_LIFETIME'] = (string) ($existing['SESSION_LIFETIME'] ?? '120');
+        $merged['UPDATE_NOTIFY'] = (string) ($existing['UPDATE_NOTIFY'] ?? 'true');
+        $merged['UPDATE_MANIFEST_URL'] = (string) ($existing['UPDATE_MANIFEST_URL']
+            ?? 'https://raw.githubusercontent.com/dadaloop82/socly_public/main/latest.json');
+        $merged['UPDATE_REPO'] = (string) ($existing['UPDATE_REPO'] ?? 'git@github.com-socly:dadaloop82/socly.git');
+        $merged['UPDATE_CHANNEL'] = (string) ($existing['UPDATE_CHANNEL'] ?? 'main');
+        $merged['UPDATE_ENABLED'] = isset($data['update_enabled'])
+            ? (!empty($data['update_enabled']) ? 'true' : 'false')
+            : (string) ($existing['UPDATE_ENABLED'] ?? 'false');
+
+        // Preferred key order for readability; leftover keys (e.g. SOCLY_SITE_URL) kept after.
+        $order = [
+            'APP_NAME', 'APP_ENV', 'APP_DEBUG', 'APP_URL', 'APP_KEY',
+            'DB_HOST', 'DB_PORT', 'DB_DATABASE', 'DB_USERNAME', 'DB_PASSWORD',
+            'APP_LOCALE', 'SESSION_LIFETIME',
+            'SOCLY_SITE_URL', 'SOCLY_PLATFORM_API_URL', 'SOCLY_REPORT_PROBLEMS',
+            'UPDATE_NOTIFY', 'UPDATE_MANIFEST_URL', 'UPDATE_REPO', 'UPDATE_CHANNEL', 'UPDATE_ENABLED',
+        ];
         $lines = [
-            'APP_NAME=SOCLY',
-            'APP_ENV=production',
-            'APP_DEBUG=false',
-            'APP_URL=' . ($data['app_url'] ?? 'http://localhost'),
-            'APP_KEY=' . ($data['app_key'] ?? Encryptor::generateKey()),
-            '',
-            'DB_HOST=' . ($data['db_host'] ?? '127.0.0.1'),
-            'DB_PORT=' . ($data['db_port'] ?? '3306'),
-            'DB_DATABASE=' . ($data['db_database'] ?? 'socly'),
-            'DB_USERNAME=' . ($data['db_username'] ?? 'socly'),
-            'DB_PASSWORD=' . ($data['db_password'] ?? ''),
-            '',
-            'APP_LOCALE=' . ($data['app_locale'] ?? 'it'),
-            'SESSION_LIFETIME=120',
-            '',
-            'UPDATE_NOTIFY=true',
-            'UPDATE_MANIFEST_URL=https://raw.githubusercontent.com/dadaloop82/socly_public/main/latest.json',
-            'UPDATE_REPO=git@github.com-socly:dadaloop82/socly.git',
-            'UPDATE_CHANNEL=main',
-            'UPDATE_ENABLED=' . ((isset($data['update_enabled']) ? !empty($data['update_enabled']) : false) ? 'true' : 'false'),
+            '# Socly system environment — written by the install wizard.',
             '',
         ];
-        file_put_contents(base_path('.env'), implode("\n", $lines));
+        $written = [];
+        foreach ($order as $key) {
+            if (!array_key_exists($key, $merged)) {
+                continue;
+            }
+            $lines[] = $key . '=' . self::envEscape((string) $merged[$key]);
+            $written[$key] = true;
+            if (in_array($key, ['APP_KEY', 'DB_PASSWORD', 'SESSION_LIFETIME', 'UPDATE_ENABLED'], true)) {
+                $lines[] = '';
+            }
+        }
+        foreach ($merged as $key => $value) {
+            if (isset($written[$key])) {
+                continue;
+            }
+            $lines[] = $key . '=' . self::envEscape((string) $value);
+        }
+        $lines[] = '';
+        file_put_contents($envPath, implode("\n", $lines));
+        Database::clearReachableCache();
+    }
+
+    private static function envEscape(string $value): string
+    {
+        if ($value !== '' && preg_match('/[\s#"\']/', $value)) {
+            return '"' . str_replace(['\\', '"'], ['\\\\', '\\"'], $value) . '"';
+        }
+        return $value;
     }
 
     public function runMigrations(): void

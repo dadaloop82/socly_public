@@ -31,11 +31,16 @@ $router->get('/', function () {
     try {
         $setup = app(\Socly\Services\SetupService::class);
         if (!$setup->isComplete()) {
-            // After abandoning setup, stay on the guest home instead of bouncing back into the wizard.
-            if (!empty($_SESSION['setup_dismissed']) && $setup->allowsAnonymousSetup()) {
+            // First-run (no association Admin yet): login with “Procedi alla configurazione”.
+            if ($setup->allowsAnonymousSetup()) {
                 redirect('/login');
             }
-            redirect('/setup');
+            // Config started / Admin exists but still incomplete → finish the wizard.
+            if (auth_user() && $setup->isAdmin()) {
+                redirect('/setup');
+            }
+            // Guest: login first; AuthController then sends admins to /setup.
+            redirect('/login');
         }
     } catch (\Throwable) {
     }

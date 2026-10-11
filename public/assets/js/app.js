@@ -153,6 +153,7 @@ document.addEventListener('DOMContentLoaded', () => {
   initDemoLoginNotice();
   initAuthNewsWidget();
   initAuthUpdateCheck();
+  initAuthTermsDialog();
   initBirthDateFields(document);
   initGeoSubmitValidation(document);
   initDocumentUpload(document);
@@ -5887,10 +5888,10 @@ function initSetupLocaleLive(root) {
 
   const checked = radios.find((r) => r.checked);
   if (checked) {
-    picker.querySelectorAll('.setup-locale-card').forEach((card) => {
-      const radio = card.querySelector('[data-setup-locale-radio]');
-      card.classList.toggle('is-selected', !!(radio && radio.checked));
-    });
+    activate(checked);
+  } else {
+    const italian = radios.find((r) => r.value === 'it') || radios[0];
+    if (italian) activate(italian);
   }
 }
 
@@ -7954,14 +7955,36 @@ function initAuthNewsWidget() {
   if (!(slot instanceof HTMLElement)) return;
   const api = slot.dataset.newsApi || '';
   const unavailable = slot.dataset.newsUnavailable || 'News non disponibili';
+  const errorPrefix = slot.dataset.newsErrorPrefix || 'Errore';
   const readMore = slot.dataset.newsReadMore || 'Leggi tutta →';
 
-  const showUnavailable = () => {
+  const showUnavailable = (errorDetail = '') => {
     slot.classList.add('is-empty');
+    const detail = String(errorDetail || '').trim();
     slot.innerHTML = `
       <article class="auth-news-card auth-news-card--empty will-enter">
         <div class="auth-news-body">
           <p class="auth-news-unavailable">${escapeHtml(unavailable)}</p>
+          ${detail ? `<p class="auth-news-error">${escapeHtml(errorPrefix)}: ${escapeHtml(detail)}</p>` : ''}
+        </div>
+      </article>`;
+    slot.hidden = false;
+    enterScope(slot, { reset: true });
+  };
+
+  const showItem = (item) => {
+    slot.classList.remove('is-empty');
+    const heroStyle = item.image ? `background-image:url('${String(item.image).replace(/'/g, "\\'")}')` : '';
+    const excerpt = item.excerpt || item.body || '';
+    const url = item.url || '#';
+    slot.innerHTML = `
+      <article class="auth-news-card will-enter">
+        ${heroStyle ? `<div class="auth-news-hero" style="${heroStyle}"></div>` : ''}
+        <div class="auth-news-body">
+          ${item.published_at ? `<div class="auth-news-date">${formatNewsDate(item.published_at)}</div>` : ''}
+          <h2 class="auth-news-title">${escapeHtml(String(item.title))}</h2>
+          ${excerpt ? `<p class="auth-news-excerpt">${escapeHtml(String(excerpt))}</p>` : ''}
+          <a class="auth-news-link" href="${escapeHtml(String(url))}" target="_blank" rel="noopener noreferrer">${escapeHtml(readMore)}</a>
         </div>
       </article>`;
     slot.hidden = false;
@@ -7969,39 +7992,39 @@ function initAuthNewsWidget() {
   };
 
   if (!api) {
-    showUnavailable();
+    showUnavailable('API non configurata');
     return;
   }
 
   fetch(api + (api.includes('?') ? '&' : '?') + 'limit=1', { credentials: 'omit' })
     .then(async (res) => {
       if (!res.ok) {
-        throw new Error('news_http_' + res.status);
+        const err = new Error('HTTP ' + res.status);
+        err.code = 'http';
+        throw err;
       }
-      const data = await res.json();
+      let data;
+      try {
+        data = await res.json();
+      } catch {
+        const err = new Error('Risposta non valida');
+        err.code = 'parse';
+        throw err;
+      }
       const item = data?.items?.[0];
       if (!item || !item.title) {
-        throw new Error('news_empty');
+        // No published news at all: keep the brand column tidy.
+        slot.hidden = true;
+        slot.innerHTML = '';
+        return;
       }
-      slot.classList.remove('is-empty');
-      const heroStyle = item.image ? `background-image:url('${String(item.image).replace(/'/g, "\\'")}')` : '';
-      const excerpt = item.excerpt || item.body || '';
-      const url = item.url || '#';
-      slot.innerHTML = `
-        <article class="auth-news-card will-enter">
-          ${heroStyle ? `<div class="auth-news-hero" style="${heroStyle}"></div>` : ''}
-          <div class="auth-news-body">
-            ${item.published_at ? `<div class="auth-news-date">${formatNewsDate(item.published_at)}</div>` : ''}
-            <h2 class="auth-news-title">${escapeHtml(String(item.title))}</h2>
-            ${excerpt ? `<p class="auth-news-excerpt">${escapeHtml(String(excerpt))}</p>` : ''}
-            <a class="auth-news-link" href="${escapeHtml(String(url))}" target="_blank" rel="noopener noreferrer">${escapeHtml(readMore)}</a>
-          </div>
-        </article>`;
-      slot.hidden = false;
-      enterScope(slot, { reset: true });
+      showItem(item);
     })
-    .catch(() => {
-      showUnavailable();
+    .catch((err) => {
+      const detail = err && typeof err.message === 'string' && err.message
+        ? err.message
+        : 'Collegamento non riuscito';
+      showUnavailable(detail);
     });
 }
 
@@ -8313,6 +8336,28 @@ function initGeoSubmitValidation(root = document) {
         delete form.dataset.geoResolved;
       }
     }, { capture: true });
+  });
+}
+
+function initAuthTermsDialog() {
+  const openBtn = document.querySelector('[data-auth-terms-open]');
+  const dialog = document.querySelector('[data-auth-terms-dialog]');
+  if (!(openBtn instanceof HTMLElement) || !(dialog instanceof HTMLDialogElement)) return;
+  const closeBtn = dialog.querySelector('[data-auth-terms-close]');
+
+  const open = () => {
+    if (typeof dialog.showModal === 'function') dialog.showModal();
+  };
+  const close = () => {
+    if (typeof dialog.close === 'function') dialog.close();
+  };
+
+  openBtn.addEventListener('click', open);
+  if (closeBtn instanceof HTMLElement) {
+    closeBtn.addEventListener('click', close);
+  }
+  dialog.addEventListener('click', (event) => {
+    if (event.target === dialog) close();
   });
 }
 

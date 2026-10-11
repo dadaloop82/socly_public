@@ -8,52 +8,85 @@ use Socly\Core\Http\Request;
 use Socly\Core\Validator;
 use Socly\Core\View;
 use Socly\Services\AuthService;
-use Socly\Services\SetupService;
 use Socly\Services\SettingsService;
+use Socly\Services\SetupService;
 
 final class AuthController extends BaseController
 {
+    /**
+     * Optional hosted-only preview session (injected from private bindings).
+     *
+     * @param null|object{isPreviewActive():bool,endPreview(string):void} $previewSession
+     */
     public function __construct(
         View $view,
         private readonly AuthService $auth,
         private readonly Validator $validator,
-        private readonly SetupService $setup
+        private readonly SetupService $setup,
+        private readonly ?object $previewSession = null
     ) {
         parent::__construct($view);
     }
 
     public function showLogin(Request $request): void
     {
-        // First visit with no association Admin: enter setup.
-        // After "Esci" from setup: show the guest home with Configura (do not bounce back).
-        if ($this->setup->allowsAnonymousSetup() && empty($_SESSION['setup_dismissed'])) {
-            redirect('/setup');
+        $dbDown = $this->databaseUnreachable();
+
+        // Orphan preview (browser closed without logout): wipe and return to setup CTA.
+        if (!$dbDown && !auth_user() && $this->previewSession?->isPreviewActive()) {
+            $this->previewSession->endPreview($request->ip());
         }
+
+        // Never auto-enter the wizard from login: show the “configuration needed” CTA instead.
         if ($request->input('expired') !== null && empty($_SESSION['_flash']['errors'])) {
             $this->flash('errors', ['session' => __('auth.session_expired')]);
         }
-        $needsSetup = $this->setup->allowsAnonymousSetup();
+
+        // First-run only: show “Benvenuto… procediamo?” (CTA). Incremental incomplete
+        // setups keep the normal login form; after auth, admins are sent to /setup.
+        $needsSetup = $dbDown;
+        if (!$dbDown) {
+            try {
+                $needsSetup = $this->setup->allowsAnonymousSetup();
+            } catch (\Throwable) {
+                $needsSetup = true;
+                $dbDown = true;
+            }
+        }
+
         $this->render('auth/login', [
             'title' => __('auth.welcome_title'),
             'needsSetup' => $needsSetup,
+            'setupUrl' => $dbDown ? url('/install') : url('/setup'),
             'setupRequiredTitle' => $needsSetup
-                ? ($this->setup->isIncrementalSetup()
-                    ? __('auth.setup_required_title_incremental')
-                    : __('auth.setup_required_title_first'))
+                ? ($dbDown ? __('auth.setup_required_title') : __('auth.setup_required_title_first'))
                 : '',
             'setupRequiredI18nKey' => $needsSetup
-                ? ($this->setup->isIncrementalSetup()
-                    ? 'auth.setup_required_title_incremental'
-                    : 'auth.setup_required_title_first')
+                ? ($dbDown ? 'auth.setup_required_title' : 'auth.setup_required_title_first')
                 : '',
-            'showNewsWidget' => true,
+            'setupRequiredTextKey' => $dbDown ? 'auth.db_required_text' : 'auth.setup_required_text',
+            // First-run: orientation checklist instead of news / sales pitch.
+            'showSetupPrep' => $needsSetup && !$dbDown,
+            'showNewsWidget' => !$dbDown && !$needsSetup,
             'newsApiUrl' => socly_news_api_url(),
-            'demoLoginNotice' => $this->demoLoginNotice(),
+            'demoLoginNotice' => $dbDown ? null : $this->demoLoginNotice(),
         ], 'layouts/guest');
+    }
+
+    private function databaseUnreachable(): bool
+    {
+        try {
+            return !app(\Socly\Core\Database::class)->isReachable();
+        } catch (\Throwable $e) {
+            return \Socly\Core\Database::isConnectionException($e);
+        }
     }
 
     public function login(Request $request): void
     {
+        if ($this->databaseUnreachable()) {
+            redirect('/login');
+        }
         // Guest home "Configura" uses GET /setup; block credential login until Admin exists.
         if ($this->setup->allowsAnonymousSetup()) {
             redirect('/setup');
@@ -99,7 +132,11 @@ final class AuthController extends BaseController
 
     public function logout(Request $request): void
     {
+        $preview = $this->previewSession?->isPreviewActive() ?? false;
         $this->auth->logout($request->ip());
+        if ($preview) {
+            $this->previewSession?->endPreview($request->ip());
+        }
         redirect('/login');
     }
 

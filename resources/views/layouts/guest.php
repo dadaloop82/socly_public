@@ -1,10 +1,13 @@
 <?php
 /** @var string $content */
 /** @var bool $showNewsWidget */
+/** @var bool $showSetupPrep */
 /** @var string $newsApiUrl */
 $branding = app()->branding();
 $assocName = trim((string) ($branding['name'] ?? ''));
 $hasAssoc = $assocName !== '' && strcasecmp($assocName, 'SOCLY') !== 0;
+$showSetupPrep = !empty($showSetupPrep);
+$showNewsWidget = !empty($showNewsWidget) && !$showSetupPrep;
 $year = date('Y');
  $version = app_version();
  $siteName = (string) __('app.name');
@@ -67,28 +70,48 @@ $year = date('Y');
                         </span>
                     <?php endif; ?>
                 </h1>
-                <p class="auth-motto" data-i18n-html="auth.motto"><?= with_auth_asterisk(e(__('auth.motto'))) ?></p>
-                <p class="auth-desc" data-i18n-html="auth.product_description"><?= with_auth_asterisk(with_socly_word(__('auth.product_description'))) ?></p>
+                <?php if ($showSetupPrep): ?>
+                    <p class="auth-motto" data-i18n="auth.setup_prep_title"><?= e(__('auth.setup_prep_title')) ?></p>
+                    <p class="auth-desc auth-setup-prep-lede" data-i18n="auth.setup_prep_lede"><?= e(__('auth.setup_prep_lede')) ?></p>
+                <?php else: ?>
+                    <p class="auth-motto" data-i18n-html="auth.motto"><?= with_auth_asterisk(e(__('auth.motto'))) ?></p>
+                    <p class="auth-desc" data-i18n-html="auth.product_description"><?= with_auth_asterisk(with_socly_word(__('auth.product_description'))) ?></p>
+                <?php endif; ?>
             </div>
-            <?php if (!empty($showNewsWidget)): ?>
+            <?php if ($showSetupPrep): ?>
+            <div class="auth-setup-prep" data-auth-setup-prep>
+                <p class="auth-setup-prep-ready" data-i18n="auth.setup_prep_ready"><?= e(__('auth.setup_prep_ready')) ?></p>
+                <ul class="auth-setup-prep-list">
+                    <li data-i18n="auth.setup_prep_item_name"><?= e(__('auth.setup_prep_item_name')) ?></li>
+                    <li data-i18n="auth.setup_prep_item_tax"><?= e(__('auth.setup_prep_item_tax')) ?></li>
+                    <li data-i18n="auth.setup_prep_item_pec"><?= e(__('auth.setup_prep_item_pec')) ?></li>
+                    <li data-i18n="auth.setup_prep_item_seat"><?= e(__('auth.setup_prep_item_seat')) ?></li>
+                    <li data-i18n="auth.setup_prep_item_roles"><?= e(__('auth.setup_prep_item_roles')) ?></li>
+                </ul>
+                <?php if (is_file(code_path('resources/views/auth/extra_setup_cta.php'))): ?>
+                    <p class="auth-setup-prep-demo" data-i18n="auth.setup_prep_demo"><?= e(__('auth.setup_prep_demo')) ?></p>
+                <?php endif; ?>
+            </div>
+            <?php elseif ($showNewsWidget): ?>
             <div
                 class="auth-news-slot"
                 data-auth-news
                 data-news-api="<?= e((string) ($newsApiUrl ?? socly_news_api_url())) ?>"
                 data-news-unavailable="<?= e(__('auth.news_unavailable')) ?>"
+                data-news-error-prefix="<?= e(__('auth.news_error_prefix')) ?>"
                 data-news-read-more="<?= e(__('auth.news_read_more')) ?>"
+                hidden
             ></div>
             <?php endif; ?>
+            <?php if (!$showSetupPrep && !is_temporary_instance()): ?>
             <div class="auth-brand-meta">
-                <p class="auth-license-note" data-i18n-html="auth.license_note"><?= with_auth_asterisk(e(__('auth.license_note'))) ?></p>
-                <?php if (!is_temporary_instance()): ?>
                 <p class="auth-updates-line">
                     <button type="button" class="auth-check-updates" data-auth-check-updates data-updates-endpoint="<?= e(url('/api/updates/check')) ?>">
                         <span data-i18n="auth.check_updates"><?= e(__('auth.check_updates')) ?></span>
                     </button>
                 </p>
-                <?php endif; ?>
             </div>
+            <?php endif; ?>
         </aside>
         <section class="auth-panel">
             <div class="auth-card">
@@ -132,6 +155,15 @@ $year = date('Y');
             </div>
         </div>
     </dialog>
+    <dialog class="setup-exit-dialog auth-terms-dialog" data-auth-terms-dialog>
+        <div class="setup-exit-shell auth-terms-shell">
+            <h2 class="setup-exit-title" data-i18n="auth.terms_title"><?= e(__('auth.terms_title')) ?></h2>
+            <p class="setup-exit-text auth-terms-body" data-i18n-html="auth.license_note"><?= with_auth_asterisk(e(__('auth.license_note'))) ?></p>
+            <div class="setup-exit-actions">
+                <button type="button" class="btn" data-auth-terms-close data-i18n="common.close"><?= e(__('common.close')) ?></button>
+            </div>
+        </div>
+    </dialog>
     <footer class="auth-footer">
         <div class="auth-footer-brand">
             <?= socly_word_html('socly-word-footer') ?>
@@ -142,6 +174,8 @@ $year = date('Y');
             <?php endif; ?>
             <span class="auth-footer-meta">· © <?= e($year) ?></span>
             <span class="auth-footer-version">· v<?= e(app_version()) ?></span>
+            <span class="auth-footer-sep" aria-hidden="true">·</span>
+            <button type="button" class="auth-footer-terms" data-auth-terms-open data-i18n="auth.terms_link"><?= e(__('auth.terms_link')) ?></button>
         </div>
         <nav class="auth-footer-actions">
             <?= view_partial('partials/report_problem') ?>

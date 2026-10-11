@@ -1,6 +1,7 @@
 <?php
 $step = (int)($step ?? 1);
 $data = $data ?? [];
+$recovery = !empty($recovery);
 $labels = [
     1 => __('install.db'),
     2 => __('install.association'),
@@ -10,13 +11,17 @@ $labels = [
     6 => __('install.confirm'),
 ];
 ?>
-<p class="hero-mark"><?= e($labels[$step] ?? __('install.title')) ?></p>
-<p class="muted"><?= e(__('install.step', ['step' => (string)$step])) ?></p>
-<div class="steps">
-    <?php foreach ($labels as $n => $label): ?>
-        <span class="step-pill <?= $n === $step ? 'active' : '' ?>"><?= e((string)$n . '. ' . $label) ?></span>
-    <?php endforeach; ?>
-</div>
+<p class="hero-mark"><?= e($recovery ? __('install.recovery_title') : ($labels[$step] ?? __('install.title'))) ?></p>
+<?php if ($recovery): ?>
+    <p class="muted"><?= e(__('install.recovery_text')) ?></p>
+<?php else: ?>
+    <p class="muted"><?= e(__('install.step', ['step' => (string)$step])) ?></p>
+    <div class="steps">
+        <?php foreach ($labels as $n => $label): ?>
+            <span class="step-pill <?= $n === $step ? 'active' : '' ?>"><?= e((string)$n . '. ' . $label) ?></span>
+        <?php endforeach; ?>
+    </div>
+<?php endif; ?>
 
 <form method="post" action="<?= e(url('/install')) ?>">
     <?= csrf_field() ?>
@@ -159,6 +164,8 @@ $labels = [
     <?php endif; ?>
 
     <div class="actions">
-        <button class="btn" type="submit"><?= e($step === 6 ? __('install.finish') : __('install.next')) ?></button>
+        <button class="btn" type="submit"><?= e(
+            $recovery ? __('install.recovery_save') : ($step === 6 ? __('install.finish') : __('install.next'))
+        ) ?></button>
     </div>
 </form>

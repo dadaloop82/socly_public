@@ -93,11 +93,20 @@ final class App
         if ($this->get('mw.install')->handle($request) !== true) {
             return;
         }
-        if ($this->isInstalled() && $this->get('mw.instance_expired')->handle($request) !== true) {
+
+        $dbReachable = true;
+        try {
+            $dbReachable = $this->get(Database::class)->isReachable();
+        } catch (\Throwable $e) {
+            $dbReachable = !Database::isConnectionException($e);
+        }
+
+        // Skip DB-backed boot when credentials are broken (install/recovery wizard).
+        if ($dbReachable && $this->isInstalled() && $this->get('mw.instance_expired')->handle($request) !== true) {
             return;
         }
 
-        if ($this->isInstalled()) {
+        if ($dbReachable && $this->isInstalled()) {
             try {
                 $this->get(Migrator::class)->migrate();
                 $this->get(\Socly\Services\InstallerService::class)
@@ -116,6 +125,19 @@ final class App
         try {
             $router->dispatch($request);
         } catch (\Throwable $e) {
+            if (Database::isConnectionException($e)) {
+                $path = (string) ($request->path() ?? '');
+                if (!str_starts_with($path, '/login') && !str_starts_with($path, '/install')) {
+                    try {
+                        $this->get('logger')->anomaly('db.unreachable', [
+                            'message' => $e->getMessage(),
+                            'path' => $path,
+                        ]);
+                    } catch (\Throwable) {
+                    }
+                    redirect('/login');
+                }
+            }
             $ref = function_exists('socly_error_ref') ? socly_error_ref() : 'ERR';
             if (function_exists('socly_log_uncaught_error')) {
                 socly_log_uncaught_error($e, $ref);

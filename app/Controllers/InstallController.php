@@ -25,19 +25,39 @@ final class InstallController extends BaseController
 
     public function index(Request $request): void
     {
-        $step = (int) ($request->input('step', $_SESSION['install']['step'] ?? 1));
+        $recovery = app()->isInstalled();
+        // Already installed + DB down: only the credentials step (avoid re-seeding).
+        $step = $recovery ? 1 : (int) ($request->input('step', $_SESSION['install']['step'] ?? 1));
         $step = max(1, min(6, $step));
+
+        $data = $_SESSION['install'] ?? [];
+        if ($data === []) {
+            $data = [
+                'app_url' => (string) ($_ENV['APP_URL'] ?? ('http://' . ($_SERVER['HTTP_HOST'] ?? 'localhost'))),
+                'db_host' => (string) ($_ENV['DB_HOST'] ?? '127.0.0.1'),
+                'db_port' => (string) ($_ENV['DB_PORT'] ?? '3306'),
+                'db_database' => (string) ($_ENV['DB_DATABASE'] ?? 'socly'),
+                'db_username' => (string) ($_ENV['DB_USERNAME'] ?? 'socly'),
+                'db_password' => (string) ($_ENV['DB_PASSWORD'] ?? ''),
+            ];
+        }
+
         $this->render('install/wizard', [
             'step' => $step,
-            'data' => $_SESSION['install'] ?? [],
+            'data' => $data,
             'fields' => InstallerService::defaultFields(),
-            'title' => __('install.title'),
+            'title' => $recovery ? __('install.recovery_title') : __('install.title'),
+            'recovery' => $recovery,
         ], 'layouts/install');
     }
 
     public function save(Request $request): void
     {
         $step = (int) $request->input('step', 1);
+        // Already installed: only credentials may be rewritten (DB recovery).
+        if (app()->isInstalled() && $step !== 1) {
+            redirect('/install');
+        }
         $_SESSION['install'] ??= [];
         $data = $request->all();
         $this->rememberOld($data);
@@ -67,7 +87,8 @@ final class InstallController extends BaseController
                 $this->flash('errors', ['db' => __('install.db_error') . ': ' . $e->getMessage()]);
                 redirect('/install?step=1');
             }
-            $appKey = Encryptor::generateKey();
+            $existingKey = trim((string) ($_ENV['APP_KEY'] ?? ''));
+            $appKey = $existingKey !== '' ? $existingKey : Encryptor::generateKey();
             $_SESSION['install'] = array_merge($_SESSION['install'], [
                 'db_host' => $data['db_host'],
                 'db_port' => $data['db_port'],
@@ -79,6 +100,14 @@ final class InstallController extends BaseController
                 'step' => 2,
             ]);
             InstallerService::writeEnv($_SESSION['install']);
+
+            // Recovery: lock exists, credentials fixed → back to the app (keep APP_KEY).
+            if (app()->isInstalled()) {
+                unset($_SESSION['install'], $_SESSION['_old']);
+                $this->flash('success', __('install.recovery_success'));
+                redirect('/login');
+            }
+
             redirect('/install?step=2');
         }
 

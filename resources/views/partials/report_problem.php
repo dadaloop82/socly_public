@@ -1,5 +1,15 @@
 <?php
-/** Footer "Report a problem" control + dialog. */
+/** Footer "Report a problem" control + dialog. Hidden when relay is disabled. */
+$reportsEnabled = false;
+try {
+    $reportsEnabled = app(\Socly\Services\GitHubIssueService::class)->isConfigured();
+} catch (\Throwable) {
+    $reportsEnabled = false;
+}
+if (!$reportsEnabled) {
+    return;
+}
+
 $reportUrl = url('/api/report-problem');
 ?>
 <button type="button"

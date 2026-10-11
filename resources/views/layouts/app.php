@@ -66,12 +66,14 @@ $configActive = str_contains($uri, '/settings') || str_contains($uri, '/users') 
 >
 <?php
 $temporaryInstance = false;
+$demoPreview = false;
 $temporaryExpiresLabel = '';
 $temporaryExpiresIso = '';
 $temporaryRemainingText = '';
 try {
     if (app()->isInstalled()) {
         $settings = app(\Socly\Services\SettingsService::class);
+        $demoPreview = (string) $settings->get('app.demo_preview', '0') === '1';
         $temporaryInstance = (string) $settings->get('app.temporary_instance', '0') === '1';
         if ($temporaryInstance) {
             $exp = (string) $settings->get('app.instance_expires_at', '');
@@ -107,7 +109,11 @@ try {
 } catch (\Throwable) {
 }
 ?>
-<?php if ($temporaryInstance): ?>
+<?php if ($demoPreview): ?>
+<div class="demo-banner demo-banner--preview" data-demo-preview-banner>
+  <?= e(__('auth.demo_preview_banner')) ?>
+</div>
+<?php elseif ($temporaryInstance): ?>
 <div
   class="demo-banner"
   data-demo-banner
@@ -227,11 +233,15 @@ try {
         <?php endif; ?>
 
         <div class="sidebar-footer">
-            <div class="user-name"><?= e($user['name'] ?? '') ?></div>
-            <div class="user-meta"><?= e($user['email'] ?? '') ?></div>
+            <?php if (!empty($demoPreview)): ?>
+                <div class="user-name"><?= e(__('auth.demo_preview_user')) ?></div>
+            <?php else: ?>
+                <div class="user-name"><?= e($user['name'] ?? '') ?></div>
+                <div class="user-meta"><?= e($user['email'] ?? '') ?></div>
+            <?php endif; ?>
             <form method="post" action="<?= e(url('/logout')) ?>">
                 <?= csrf_field() ?>
-                <button class="btn btn-ghost btn-sm btn-logout" type="submit"><?= e(__('nav.logout')) ?></button>
+                <button class="btn btn-ghost btn-sm btn-logout" type="submit"><?= e(!empty($demoPreview) ? __('auth.demo_exit') : __('nav.logout')) ?></button>
             </form>
         </div>
     </aside>

@@ -512,6 +512,18 @@ if (!function_exists('is_temporary_instance')) {
     }
 }
 
+if (!function_exists('is_demo_preview')) {
+    /** Ephemeral login preview session — wiped when the user exits. */
+    function is_demo_preview(): bool
+    {
+        try {
+            return (string) app(\Socly\Services\SettingsService::class)->get('app.demo_preview', '0') === '1';
+        } catch (\Throwable) {
+            return false;
+        }
+    }
+}
+
 if (!function_exists('ensure_directory')) {
     /** Create a directory if missing; never throws on permission warnings. */
     function ensure_directory(string $path, int $mode = 0775): bool

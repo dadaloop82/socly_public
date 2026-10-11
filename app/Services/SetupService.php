@@ -661,6 +661,14 @@ final class SetupService
 
             return (string) $this->readValue((string) ($step['settings_key'] ?? ''), (string) ($step['env_key'] ?? ''), $default) === '1';
         }
+        // Locale step: pre-select Italian so Continua is enabled on first paint.
+        if (($step['key'] ?? '') === 'app.locale') {
+            return (string) $this->readValue(
+                (string) ($step['settings_key'] ?? ''),
+                (string) ($step['env_key'] ?? ''),
+                'it'
+            );
+        }
         return (string) $this->readValue((string) ($step['settings_key'] ?? ''), (string) ($step['env_key'] ?? ''), '');
     }
 

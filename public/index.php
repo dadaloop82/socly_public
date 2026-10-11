@@ -9,6 +9,23 @@ $app = require dirname(__DIR__) . '/bootstrap/app.php';
 $debug = (bool) $app->config('app.debug', false);
 
 set_exception_handler(static function (Throwable $e) use ($app, $debug): void {
+    // Misconfigured DB credentials → login with “configuration needed”, not a technical 500.
+    if (\Socly\Core\Database::isConnectionException($e)) {
+        $path = (string) (parse_url((string) ($_SERVER['REQUEST_URI'] ?? '/'), PHP_URL_PATH) ?? '/');
+        if (!str_contains($path, '/login') && !str_contains($path, '/install')) {
+            try {
+                $app->get('logger')->anomaly('db.unreachable', [
+                    'message' => $e->getMessage(),
+                    'request' => strtoupper((string) ($_SERVER['REQUEST_METHOD'] ?? 'GET')) . ' ' . (string) ($_SERVER['REQUEST_URI'] ?? '/'),
+                ]);
+            } catch (Throwable) {
+            }
+            if (!headers_sent()) {
+                redirect('/login');
+            }
+        }
+    }
+
     $errorCode = 'SOC-' . date('Ymd') . '-' . strtoupper(bin2hex(random_bytes(3)));
     $errorTime = date('c');
     $errorType = $e::class;
