@@ -283,7 +283,11 @@ final class SetupService
             }
             $raw = $this->settings->get('legal.privacy', '');
             $text = localized(is_string($raw) ? $raw : (is_array($raw) ? $raw : ''));
-            return mb_strlen(trim($text), 'UTF-8') >= 50;
+            // Prefill (RUNTS/OCR) must not skip review — user confirms with Avanti.
+            if (mb_strlen(trim($text), 'UTF-8') < 50) {
+                return false;
+            }
+            return $this->isStepReviewed($step);
         }
 
         if (($step['key'] ?? '') === 'legal.statute') {
@@ -292,7 +296,11 @@ final class SetupService
             }
             $raw = $this->settings->get((string) $step['settings_key'], '');
             $text = localized(is_string($raw) ? $raw : (is_array($raw) ? $raw : ''));
-            return mb_strlen(trim($text), 'UTF-8') >= 50;
+            // Prefill (RUNTS/OCR) must not skip review — user confirms with Avanti.
+            if (mb_strlen(trim($text), 'UTF-8') < 50) {
+                return false;
+            }
+            return $this->isStepReviewed($step);
         }
 
         $val = $this->readValue((string) ($step['settings_key'] ?? ''), (string) ($step['env_key'] ?? ''));
@@ -590,7 +598,20 @@ final class SetupService
         }
 
         if ($type === 'people_list') {
-            $rows = $this->people->listByRole((string) ($step['role'] ?? ''));
+            $role = (string) ($step['role'] ?? '');
+            if ($role === AssociationPeopleService::ROLE_BOARD) {
+                $president = $this->people->getPresident();
+                return [
+                    'people' => $this->boardOfficeRows(),
+                    'president' => $president === null ? null : [
+                        'first_name' => (string) ($president['first_name'] ?? ''),
+                        'last_name' => (string) ($president['last_name'] ?? ''),
+                        'fiscal_code' => (string) ($president['fiscal_code'] ?? ''),
+                    ],
+                    'runts_import' => $this->runtsBoardImportCandidates(),
+                ];
+            }
+            $rows = $this->people->listByRole($role);
             if ($rows === []) {
                 return [['first_name' => '', 'last_name' => '', 'fiscal_code' => '']];
             }
@@ -622,12 +643,24 @@ final class SetupService
                     $text = localized(is_string($decoded) ? $decoded : '');
                     $values = ['it' => $this->clipLegalEditorText($text), 'de' => '', 'en' => ''];
                 }
+                $cleanedIt = $this->stripRuntsDraftNote($values['it']);
+                if ($cleanedIt !== $values['it']) {
+                    $values['it'] = $cleanedIt;
+                    // Persist cleanup so the draft notice never reappears in official docs.
+                    $this->settings->set((string) $step['settings_key'], [
+                        'it' => $values['it'],
+                        'de' => $values['de'],
+                        'en' => $values['en'],
+                    ]);
+                    $this->settings->set((string) $step['settings_key'] . '_from_runts', '1');
+                }
                 if (($step['key'] ?? '') === 'legal.privacy'
                     && trim($values['it']) === ''
                     && $this->isGdprEnabled()
                 ) {
                     $values['it'] = \privacy_sample_draft();
                 }
+                $values['_from_runts'] = $this->legalTextFromRunts((string) ($step['settings_key'] ?? ''));
 
                 return $values;
             } catch (\Throwable $e) {
@@ -646,8 +679,20 @@ final class SetupService
         }
         if ($type === 'checkbox') {
             $default = (($step['key'] ?? '') === 'gdpr.enabled') ? '1' : '0';
+            $enabled = (string) $this->readValue((string) ($step['settings_key'] ?? ''), (string) ($step['env_key'] ?? ''), $default) === '1';
+            if (($step['key'] ?? '') === 'gdpr.enabled') {
+                $imageRaw = $this->rawStored('gdpr.require_image_consent', '');
+                $commsRaw = $this->rawStored('gdpr.require_comms_consent', '');
 
-            return (string) $this->readValue((string) ($step['settings_key'] ?? ''), (string) ($step['env_key'] ?? ''), $default) === '1';
+                return [
+                    'enabled' => $enabled,
+                    // Default on for first-time setup until the association chooses otherwise.
+                    'require_image_consent' => $imageRaw === null ? true : ((string) $imageRaw === '1'),
+                    'require_comms_consent' => $commsRaw === null ? true : ((string) $commsRaw === '1'),
+                ];
+            }
+
+            return $enabled;
         }
         // Locale step: pre-select Italian so Continua is enabled on first paint.
         if (($step['key'] ?? '') === 'app.locale') {
@@ -813,18 +858,30 @@ final class SetupService
             if ($key !== '' && $it !== '') {
                 $this->settings->set('setup.deferred.' . $key, '0');
             }
+            $it = $this->stripRuntsDraftNote($it);
+            $de = $this->stripRuntsDraftNote($de);
+            $en = $this->stripRuntsDraftNote($en);
             $payload = [
                 'it' => $it,
                 'de' => $de !== '' ? $de : $it,
                 'en' => $en !== '' ? $en : $it,
             ];
             $this->settings->set((string) $step['settings_key'], $payload);
+            $this->settings->set((string) $step['settings_key'] . '_from_runts', '0');
+            $this->markStepReviewed($step);
             return ['ok' => true];
         }
 
         if ($type === 'checkbox') {
             $enabled = !empty($input['value']) ? '1' : '0';
             $this->persistScalar($step, $enabled);
+            if (($step['key'] ?? '') === 'gdpr.enabled') {
+                $requireImage = $enabled === '1' && !empty($input['require_image_consent']);
+                $requireComms = $enabled === '1' && !empty($input['require_comms_consent']);
+                $this->settings->set('gdpr.require_image_consent', $requireImage ? '1' : '0');
+                $this->settings->set('gdpr.require_comms_consent', $requireComms ? '1' : '0');
+                $this->members->syncOptionalGdprConsents($requireImage, $requireComms);
+            }
             return ['ok' => true];
         }
 
@@ -917,6 +974,14 @@ final class SetupService
             $current = trim((string) $this->settings->get($meta['settings'], ''));
             if ($current !== '') {
                 continue;
+            }
+            if ($key === 'phone') {
+                $value = normalize_phone_value($value);
+                if ($value === '' || !is_valid_phone_value($value)) {
+                    continue;
+                }
+            } elseif ($key === 'email' || $key === 'pec') {
+                $value = strtolower($value);
             }
             $this->settings->set($meta['settings'], $value);
             $env[$meta['env']] = $value;
@@ -1251,6 +1316,8 @@ final class SetupService
         $applied = [];
         $president = null;
         $vices = [];
+        $secretaries = [];
+        $treasurers = [];
         $board = [];
 
         foreach ($people as $row) {
@@ -1280,9 +1347,18 @@ final class SetupService
                 $vices[] = $person;
                 continue;
             }
+            if (str_contains($role, 'SEGRETAR')) {
+                $secretaries[] = $person;
+                continue;
+            }
+            if (str_contains($role, 'TESORIER') || str_contains($role, 'CASSIER')) {
+                $treasurers[] = $person;
+                continue;
+            }
             if (
                 str_contains($role, 'COMPONENTE')
                 || str_contains($role, 'CONSIGLIO')
+                || str_contains($role, 'CONSIGLIER')
                 || str_contains($role, 'AMMINISTRAZIONE')
                 || str_contains($role, 'ALTRO')
             ) {
@@ -1304,14 +1380,30 @@ final class SetupService
 
         if ($vices !== [] && $this->people->countByRole(AssociationPeopleService::ROLE_VICE_PRESIDENT) === 0) {
             try {
-                $this->people->replaceRole(AssociationPeopleService::ROLE_VICE_PRESIDENT, $vices);
+                $this->people->replaceRole(AssociationPeopleService::ROLE_VICE_PRESIDENT, array_slice($vices, 0, 1));
                 $applied[] = 'vice_president_name';
             } catch (\Throwable) {
             }
         }
 
+        if ($secretaries !== [] && $this->people->countByRole(AssociationPeopleService::ROLE_SECRETARY) === 0) {
+            try {
+                $this->people->replaceRole(AssociationPeopleService::ROLE_SECRETARY, array_slice($secretaries, 0, 1));
+                $applied[] = 'secretary_name';
+            } catch (\Throwable) {
+            }
+        }
+
+        if ($treasurers !== [] && $this->people->countByRole(AssociationPeopleService::ROLE_TREASURER) === 0) {
+            try {
+                $this->people->replaceRole(AssociationPeopleService::ROLE_TREASURER, array_slice($treasurers, 0, 1));
+                $applied[] = 'treasurer_name';
+            } catch (\Throwable) {
+            }
+        }
+
         $exclude = [];
-        foreach (array_filter([$president, ...$vices]) as $p) {
+        foreach (array_filter([$president, ...$vices, ...$secretaries, ...$treasurers]) as $p) {
             if (!is_array($p)) {
                 continue;
             }
@@ -1582,10 +1674,11 @@ final class SetupService
             }
 
             $text = trim((string) $extracted['text']);
-            $note = "[Bozza da PDF RUNTS — verificare e correggere prima della pubblicazione]\n\n";
             // Store Italian only: triplicating OCR text in de/en blew past memory on the privacy step.
-            $payload = ['it' => $note . $text, 'de' => '', 'en' => ''];
+            // Warning banner is shown in the UI — never embed notices inside the editable text.
+            $payload = ['it' => $text, 'de' => '', 'en' => ''];
             $this->settings->set($settingsKey, $payload);
+            $this->settings->set($settingsKey . '_from_runts', '1');
             $prefilled[] = $kind;
             $methods[$kind] = (string) ($extracted['method'] ?? '');
         }
@@ -1926,6 +2019,32 @@ final class SetupService
         }
         return rtrim(mb_substr($text, 0, $max, 'UTF-8'))
             . "\n\n[… testo troncato per visualizzazione — usa il PDF originale se serve il resto]";
+    }
+
+    /** Remove legacy inline RUNTS draft notices from editable legal text. */
+    private function stripRuntsDraftNote(string $text): string
+    {
+        $cleaned = preg_replace(
+            '/^\[Bozza da PDF RUNTS[^\]]*\]\s*/u',
+            '',
+            $text
+        ) ?? $text;
+        $cleaned = preg_replace(
+            '/^\[Draft from RUNTS PDF[^\]]*\]\s*/iu',
+            '',
+            $cleaned
+        ) ?? $cleaned;
+
+        return ltrim($cleaned);
+    }
+
+    private function legalTextFromRunts(string $settingsKey): bool
+    {
+        if ($settingsKey === '') {
+            return false;
+        }
+
+        return (string) $this->settings->get($settingsKey . '_from_runts', '0') === '1';
     }
 
     private function legalTextLooksValid(string $text, string $kind): bool
@@ -2460,6 +2579,9 @@ final class SetupService
     private function savePeopleList(array $step, array $input): array
     {
         $role = (string) ($step['role'] ?? '');
+        if ($role === AssociationPeopleService::ROLE_BOARD) {
+            return $this->saveBoardPeopleList($step, $input);
+        }
         $min = (int) ($step['min'] ?? 0);
         $raw = $input['people'] ?? [];
         if (!is_array($raw)) {
@@ -2514,6 +2636,205 @@ final class SetupService
             $this->settings->set((string) $step['settings_key'], '1');
         }
         return ['ok' => true];
+    }
+
+    /**
+     * Board step: rows may map to vice / secretary / treasurer / board.
+     *
+     * @param array<string, mixed> $step
+     * @param array<string, mixed> $input
+     * @return array{ok:bool,errors?:array<string,string>}
+     */
+    private function saveBoardPeopleList(array $step, array $input): array
+    {
+        $raw = $input['people'] ?? [];
+        if (!is_array($raw)) {
+            $raw = [];
+        }
+        $allowed = [
+            AssociationPeopleService::ROLE_VICE_PRESIDENT,
+            AssociationPeopleService::ROLE_SECRETARY,
+            AssociationPeopleService::ROLE_TREASURER,
+            AssociationPeopleService::ROLE_BOARD,
+        ];
+        $buckets = [
+            AssociationPeopleService::ROLE_VICE_PRESIDENT => [],
+            AssociationPeopleService::ROLE_SECRETARY => [],
+            AssociationPeopleService::ROLE_TREASURER => [],
+            AssociationPeopleService::ROLE_BOARD => [],
+        ];
+        $errors = [];
+        $seenUnique = [];
+        foreach ($raw as $i => $row) {
+            if (!is_array($row)) {
+                continue;
+            }
+            $first = trim((string) ($row['first_name'] ?? ''));
+            $last = trim((string) ($row['last_name'] ?? ''));
+            $cf = strtoupper(preg_replace('/\s+/', '', (string) ($row['fiscal_code'] ?? '')) ?? '');
+            $office = trim((string) ($row['office_role'] ?? AssociationPeopleService::ROLE_BOARD));
+            if (!in_array($office, $allowed, true)) {
+                $office = AssociationPeopleService::ROLE_BOARD;
+            }
+            if ($first === '' && $last === '' && $cf === '') {
+                continue;
+            }
+            if ($first === '' || $last === '') {
+                $errors['people.' . $i] = __('validation.required');
+                continue;
+            }
+            if ($cf === '') {
+                $errors['people.' . $i . '.fiscal_code'] = __('validation.required');
+                continue;
+            }
+            if (!$this->isValidPersonFiscalCode($cf)) {
+                $errors['people.' . $i . '.fiscal_code'] = __('validation.fiscal_code');
+                continue;
+            }
+            if ($office !== AssociationPeopleService::ROLE_BOARD) {
+                if (isset($seenUnique[$office])) {
+                    $errors['people.' . $i . '.office_role'] = __('settings.people_unique_role');
+                    continue;
+                }
+                $seenUnique[$office] = true;
+            }
+            $buckets[$office][] = [
+                'first_name' => $first,
+                'last_name' => $last,
+                'fiscal_code' => $cf,
+            ];
+        }
+        if ($errors) {
+            return ['ok' => false, 'errors' => $errors];
+        }
+        try {
+            foreach ($buckets as $roleKey => $people) {
+                $this->people->replaceRole($roleKey, $people);
+            }
+        } catch (\Throwable) {
+            return ['ok' => false, 'errors' => ['people' => __('settings.people_unique_role')]];
+        }
+        if (!empty($step['settings_key'])) {
+            $this->settings->set((string) $step['settings_key'], '1');
+        }
+        return ['ok' => true];
+    }
+
+    /** @return list<array{first_name:string,last_name:string,fiscal_code:string,office_role:string}> */
+    private function boardOfficeRows(): array
+    {
+        $order = [
+            AssociationPeopleService::ROLE_VICE_PRESIDENT,
+            AssociationPeopleService::ROLE_SECRETARY,
+            AssociationPeopleService::ROLE_TREASURER,
+            AssociationPeopleService::ROLE_BOARD,
+        ];
+        $out = [];
+        foreach ($order as $roleKey) {
+            foreach ($this->people->listByRole($roleKey) as $row) {
+                $out[] = [
+                    'first_name' => (string) ($row['first_name'] ?? ''),
+                    'last_name' => (string) ($row['last_name'] ?? ''),
+                    'fiscal_code' => (string) ($row['fiscal_code'] ?? ''),
+                    'office_role' => $roleKey,
+                ];
+            }
+        }
+        if ($out === []) {
+            return [[
+                'first_name' => '',
+                'last_name' => '',
+                'fiscal_code' => '',
+                'office_role' => AssociationPeopleService::ROLE_BOARD,
+            ]];
+        }
+        return $out;
+    }
+
+    /**
+     * RUNTS board candidates not already present as office holders (excludes president).
+     *
+     * @return list<array{first_name:string,last_name:string,office_role:string,role_label:string}>
+     */
+    private function runtsBoardImportCandidates(): array
+    {
+        $detail = $this->settings->get('association.runts_detail', []);
+        if (!is_array($detail)) {
+            return [];
+        }
+        $people = is_array($detail['people'] ?? null) ? $detail['people'] : [];
+        if ($people === []) {
+            return [];
+        }
+        $existing = [];
+        $president = $this->people->getPresident();
+        if (is_array($president)) {
+            $existing[mb_strtolower(trim(($president['first_name'] ?? '') . '|' . ($president['last_name'] ?? '')), 'UTF-8')] = true;
+        }
+        foreach ($this->boardOfficeRows() as $row) {
+            $key = mb_strtolower(trim(($row['first_name'] ?? '') . '|' . ($row['last_name'] ?? '')), 'UTF-8');
+            if ($key !== '|') {
+                $existing[$key] = true;
+            }
+        }
+        $out = [];
+        foreach ($people as $row) {
+            if (!is_array($row)) {
+                continue;
+            }
+            $first = assoc_capitalize_name(trim((string) ($row['first_name'] ?? '')));
+            $last = assoc_capitalize_name(trim((string) ($row['last_name'] ?? '')));
+            if ($first === '' || $last === '') {
+                continue;
+            }
+            $key = mb_strtolower(trim($first . '|' . $last), 'UTF-8');
+            if (isset($existing[$key])) {
+                continue;
+            }
+            $roleRaw = mb_strtoupper(trim((string) ($row['role'] ?? '')), 'UTF-8');
+            $isLegal = (string) ($row['is_legal_rep'] ?? '') === '1'
+                || str_contains($roleRaw, 'LEGALE RAPPRESENTANTE')
+                || (str_contains($roleRaw, 'PRESIDENTE') && !str_contains($roleRaw, 'VICE'));
+            if ($isLegal) {
+                continue;
+            }
+            $office = $this->mapRuntsRoleToOffice($roleRaw);
+            if ($office === null) {
+                continue;
+            }
+            $out[] = [
+                'first_name' => $first,
+                'last_name' => $last,
+                'office_role' => $office,
+                'role_label' => trim((string) ($row['role'] ?? '')) ?: __('association.role_board'),
+            ];
+            $existing[$key] = true;
+        }
+        return $out;
+    }
+
+    private function mapRuntsRoleToOffice(string $roleUpper): ?string
+    {
+        if (str_contains($roleUpper, 'VICEPRESIDENTE') || str_contains($roleUpper, 'VICE PRESIDENTE')) {
+            return AssociationPeopleService::ROLE_VICE_PRESIDENT;
+        }
+        if (str_contains($roleUpper, 'SEGRETAR')) {
+            return AssociationPeopleService::ROLE_SECRETARY;
+        }
+        if (str_contains($roleUpper, 'TESORIER') || str_contains($roleUpper, 'CASSIER')) {
+            return AssociationPeopleService::ROLE_TREASURER;
+        }
+        if (
+            str_contains($roleUpper, 'COMPONENTE')
+            || str_contains($roleUpper, 'CONSIGLIO')
+            || str_contains($roleUpper, 'CONSIGLIER')
+            || str_contains($roleUpper, 'AMMINISTRAZIONE')
+            || str_contains($roleUpper, 'ALTRO')
+            || $roleUpper === ''
+        ) {
+            return AssociationPeopleService::ROLE_BOARD;
+        }
+        return AssociationPeopleService::ROLE_BOARD;
     }
 
     /**

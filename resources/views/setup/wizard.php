@@ -468,16 +468,20 @@ $errorStep = flash('setup_error_step');
                                     autocomplete="<?= e((string) ($field['autocomplete'] ?? 'off')) ?>"
                                     <?php if (($field['key'] ?? '') === 'fiscal_code'): ?>
                                         maxlength="16"
+                                        minlength="11"
                                         inputmode="text"
                                         spellcheck="false"
+                                        autocapitalize="characters"
                                         data-setup-fiscal-code
                                         placeholder="<?= e(__('setup.field_fiscal_code_placeholder')) ?>"
+                                        title="<?= e(__('setup.tax_fiscal_invalid')) ?>"
                                     <?php elseif (($field['key'] ?? '') === 'vat_number'): ?>
                                         maxlength="13"
                                         inputmode="numeric"
                                         spellcheck="false"
                                         data-setup-vat-number
                                         placeholder="<?= e(__('setup.field_vat_placeholder')) ?>"
+                                        title="<?= e(__('setup.field_vat_placeholder')) ?>"
                                     <?php elseif (($field['key'] ?? '') === 'pec'): ?>
                                         inputmode="email"
                                         spellcheck="false"
@@ -531,103 +535,162 @@ $errorStep = flash('setup_error_step');
                         ],
                     ]) ?>
                 <?php elseif ($stepType === 'president'): ?>
-                    <div class="setup-president" data-setup-line data-geo-scope>
+                    <?php
+                    $presResidenceFilled = trim((string) ($value['city'] ?? '')) !== ''
+                        || trim((string) ($value['address'] ?? '')) !== ''
+                        || trim((string) ($value['postal_code'] ?? '')) !== '';
+                    $presMandateFilled = trim((string) ($value['appointed_at'] ?? '')) !== ''
+                        || trim((string) ($value['mandate_ends_at'] ?? '')) !== '';
+                    ?>
+                    <div class="setup-president" data-setup-line data-geo-scope data-setup-president-sections>
                         <?= view_partial('partials/geo_foreign_bar') ?>
-                        <div class="setup-equal-row">
-                            <label class="setup-field">
-                                <span><?= e(__('setup.field_first_name')) ?> *</span>
-                                <input type="text" name="first_name" value="<?= e((string) ($value['first_name'] ?? '')) ?>" required autocomplete="given-name" data-first-name>
-                            </label>
-                            <label class="setup-field">
-                                <span><?= e(__('setup.field_last_name')) ?> *</span>
-                                <input type="text" name="last_name" value="<?= e((string) ($value['last_name'] ?? '')) ?>" required autocomplete="family-name" data-last-name>
-                            </label>
-                        </div>
-                        <div class="setup-equal-row">
-                            <label class="setup-field">
-                                <span><?= e(__('setup.field_birth_date')) ?> *</span>
-                                <input type="date" name="birth_date" value="<?= e((string) ($value['birth_date'] ?? '')) ?>" required data-birth-date>
-                            </label>
-                            <label class="setup-field">
-                                <span><?= e(__('setup.field_gender')) ?> *</span>
-                                <select name="gender" required data-gender-input>
-                                    <option value="">—</option>
-                                    <option value="M" <?= (string) ($value['gender'] ?? '') === 'M' ? 'selected' : '' ?>><?= e(__('members.gender_m')) ?></option>
-                                    <option value="F" <?= (string) ($value['gender'] ?? '') === 'F' ? 'selected' : '' ?>><?= e(__('members.gender_f')) ?></option>
-                                </select>
-                            </label>
-                        </div>
-                        <?= view_partial('partials/geo_birth_place', [
-                            'name' => 'birth_place',
-                            'value' => (string) ($value['birth_place'] ?? ''),
-                            'required' => true,
-                            'foreign_toggle' => false,
-                            'with_scope' => false,
-                        ]) ?>
-                        <label class="setup-field">
-                            <span><?= e(__('setup.field_person_fiscal_code')) ?> *</span>
-                            <div class="cf-row">
-                                <input type="text" name="fiscal_code" value="<?= e((string) ($value['fiscal_code'] ?? '')) ?>" required maxlength="16" pattern="[A-Za-z0-9]{16}" autocomplete="off" data-fiscal-code placeholder="<?= e(__('members.cf_hint')) ?>">
-                                <button type="button" class="btn btn-ghost" data-cf-generate><?= e(__('members.cf_generate')) ?></button>
+
+                        <details class="setup-section" data-setup-section="identity" open>
+                            <summary class="setup-section-summary">
+                                <span class="setup-section-title"><?= e(__('setup.president_section_identity')) ?></span>
+                                <span class="setup-section-hint muted"><?= e(__('setup.president_section_identity_hint')) ?></span>
+                            </summary>
+                            <div class="setup-section-body">
+                                <div class="setup-equal-row">
+                                    <label class="setup-field">
+                                        <span><?= e(__('setup.field_first_name')) ?> *</span>
+                                        <input type="text" name="first_name" value="<?= e((string) ($value['first_name'] ?? '')) ?>" required autocomplete="given-name" data-first-name>
+                                    </label>
+                                    <label class="setup-field">
+                                        <span><?= e(__('setup.field_last_name')) ?> *</span>
+                                        <input type="text" name="last_name" value="<?= e((string) ($value['last_name'] ?? '')) ?>" required autocomplete="family-name" data-last-name>
+                                    </label>
+                                </div>
+                                <div class="setup-equal-row">
+                                    <label class="setup-field">
+                                        <span><?= e(__('setup.field_gender')) ?> *</span>
+                                        <select name="gender" required data-gender-input>
+                                            <option value="">—</option>
+                                            <option value="M" <?= (string) ($value['gender'] ?? '') === 'M' ? 'selected' : '' ?>><?= e(__('members.gender_m')) ?></option>
+                                            <option value="F" <?= (string) ($value['gender'] ?? '') === 'F' ? 'selected' : '' ?>><?= e(__('members.gender_f')) ?></option>
+                                        </select>
+                                    </label>
+                                    <label class="setup-field">
+                                        <span><?= e(__('setup.field_birth_date')) ?> *</span>
+                                        <input type="date" name="birth_date" value="<?= e((string) ($value['birth_date'] ?? '')) ?>" required data-birth-date
+                                               min="<?= e(date('Y-m-d', strtotime('-100 years'))) ?>"
+                                               max="<?= e(date('Y-m-d', strtotime('-18 years'))) ?>">
+                                    </label>
+                                </div>
+                                <?= view_partial('partials/geo_birth_place', [
+                                    'name' => 'birth_place',
+                                    'value' => (string) ($value['birth_place'] ?? ''),
+                                    'required' => true,
+                                    'foreign_toggle' => false,
+                                    'with_scope' => false,
+                                ]) ?>
+                                <label class="setup-field">
+                                    <span><?= e(__('setup.field_person_fiscal_code')) ?> *</span>
+                                    <div class="cf-row">
+                                        <input type="text" name="fiscal_code" value="<?= e((string) ($value['fiscal_code'] ?? '')) ?>" required maxlength="16" pattern="[A-Za-z0-9]{16}" autocomplete="off" data-fiscal-code placeholder="<?= e(__('setup.field_person_fiscal_code_placeholder')) ?>">
+                                        <button type="button" class="btn btn-ghost" data-cf-generate><?= e(__('members.cf_generate')) ?></button>
+                                    </div>
+                                    <p class="setup-hint muted" data-cf-status
+                                       data-incomplete="<?= e(__('members.cf_incomplete')) ?>"
+                                       data-ready="<?= e(__('members.cf_ready')) ?>"
+                                       data-gender-other="<?= e(__('members.cf_gender_other')) ?>"
+                                       hidden></p>
+                                </label>
                             </div>
-                            <p class="setup-hint muted" data-cf-status
-                               data-incomplete="<?= e(__('members.cf_incomplete')) ?>"
-                               data-ready="<?= e(__('members.cf_ready')) ?>"
-                               data-gender-other="<?= e(__('members.cf_gender_other')) ?>"
-                               hidden></p>
-                        </label>
-                        <p class="setup-subhead"><?= e(__('setup.field_residence')) ?></p>
-                        <?= view_partial('partials/geo_address', [
-                            'names' => [
-                                'city' => 'city',
-                                'postal_code' => 'postal_code',
-                                'address' => 'address',
-                                'house_number' => 'house_number',
-                            ],
-                            'values' => [
-                                'city' => (string) ($value['city'] ?? ''),
-                                'postal_code' => (string) ($value['postal_code'] ?? ''),
-                                'address' => (string) ($value['address'] ?? ''),
-                                'house_number' => (string) ($value['house_number'] ?? ''),
-                            ],
-                            'required' => [
-                                'city' => true,
-                                'postal_code' => true,
-                                'address' => true,
-                                'house_number' => true,
-                            ],
-                            'with_scope' => false,
-                            'foreign_toggle' => false,
-                        ]) ?>
-                        <div class="setup-equal-row">
-                            <label class="setup-field">
-                                <span><?= e(__('setup.field_appointed_at')) ?> *</span>
-                                <input type="date" name="appointed_at" value="<?= e((string) ($value['appointed_at'] ?? '')) ?>" required data-appointed-date
-                                       min="<?= e(date('Y-m-d', strtotime('-50 years'))) ?>"
-                                       max="<?= e(date('Y-m-d')) ?>">
-                            </label>
-                            <label class="setup-field">
-                                <span><?= e(__('setup.field_mandate_ends_at')) ?> *</span>
-                                <input type="date" name="mandate_ends_at" value="<?= e((string) ($value['mandate_ends_at'] ?? '')) ?>" required data-mandate-ends-date
-                                       min="<?= e(date('Y-m-d', strtotime('+1 day'))) ?>"
-                                       max="<?= e(date('Y-m-d', strtotime('+50 years'))) ?>">
-                            </label>
-                        </div>
+                        </details>
+
+                        <details class="setup-section" data-setup-section="residence"<?= $presResidenceFilled ? ' open' : '' ?>>
+                            <summary class="setup-section-summary">
+                                <span class="setup-section-title"><?= e(__('setup.field_residence')) ?></span>
+                                <span class="setup-section-hint muted"><?= e(__('setup.president_section_residence_hint')) ?></span>
+                            </summary>
+                            <div class="setup-section-body">
+                                <?= view_partial('partials/geo_address', [
+                                    'names' => [
+                                        'city' => 'city',
+                                        'postal_code' => 'postal_code',
+                                        'address' => 'address',
+                                        'house_number' => 'house_number',
+                                    ],
+                                    'values' => [
+                                        'city' => (string) ($value['city'] ?? ''),
+                                        'postal_code' => (string) ($value['postal_code'] ?? ''),
+                                        'address' => (string) ($value['address'] ?? ''),
+                                        'house_number' => (string) ($value['house_number'] ?? ''),
+                                    ],
+                                    'required' => [
+                                        'city' => true,
+                                        'postal_code' => true,
+                                        'address' => true,
+                                        'house_number' => true,
+                                    ],
+                                    'with_scope' => false,
+                                    'foreign_toggle' => false,
+                                ]) ?>
+                            </div>
+                        </details>
+
+                        <details class="setup-section" data-setup-section="mandate"<?= $presMandateFilled ? ' open' : '' ?>>
+                            <summary class="setup-section-summary">
+                                <span class="setup-section-title"><?= e(__('setup.president_section_mandate')) ?></span>
+                                <span class="setup-section-hint muted"><?= e(__('setup.president_section_mandate_hint')) ?></span>
+                            </summary>
+                            <div class="setup-section-body">
+                                <div class="setup-equal-row">
+                                    <label class="setup-field">
+                                        <span><?= e(__('setup.field_appointed_at')) ?> *</span>
+                                        <input type="date" name="appointed_at" value="<?= e((string) ($value['appointed_at'] ?? '')) ?>" required data-appointed-date
+                                               min="<?= e(date('Y-m-d', strtotime('-50 years'))) ?>"
+                                               max="<?= e(date('Y-m-d')) ?>">
+                                    </label>
+                                    <label class="setup-field">
+                                        <span><?= e(__('setup.field_mandate_ends_at')) ?> *</span>
+                                        <input type="date" name="mandate_ends_at" value="<?= e((string) ($value['mandate_ends_at'] ?? '')) ?>" required data-mandate-ends-date
+                                               min="<?= e(date('Y-m-d', strtotime('+1 day'))) ?>"
+                                               max="<?= e(date('Y-m-d', strtotime('+50 years'))) ?>">
+                                    </label>
+                                </div>
+                            </div>
+                        </details>
                     </div>
                 <?php elseif ($stepType === 'people_list'): ?>
                     <?php $peopleRole = (string) ($step['role'] ?? ''); ?>
+                    <?php $isBoardStep = $peopleRole === 'board'; ?>
                     <?php $showOrganType = $peopleRole === 'auditor'; ?>
+                    <?php $showOfficeRole = $isBoardStep; ?>
                     <?php
                     $organTypes = [
-                        'revisore_conti' => 'setup.organ_revisore_conti',
-                        'collegio_revisori' => 'setup.organ_collegio_revisori',
-                        'sindaco_unico' => 'setup.organ_sindaco_unico',
+                        'organo_controllo_monocratico' => 'setup.organ_controllo_monocratico',
                         'collegio_sindacale' => 'setup.organ_collegio_sindacale',
+                        'revisore_legale' => 'setup.organ_revisore_legale',
+                        'collegio_probiviri' => 'setup.organ_collegio_probiviri',
                         'odv' => 'setup.organ_odv',
                         'altro' => 'setup.organ_altro',
                     ];
+                    $normalizeOrganType = static function (string $raw) use ($organTypes): string {
+                        $aliases = [
+                            'sindaco_unico' => 'organo_controllo_monocratico',
+                            'revisore_conti' => 'revisore_legale',
+                            'collegio_revisori' => 'collegio_sindacale',
+                        ];
+                        $raw = $aliases[$raw] ?? $raw;
+                        return array_key_exists($raw, $organTypes) ? $raw : $raw;
+                    };
+                    $officeRoles = [
+                        'vice_president' => 'association.role_vice_president',
+                        'secretary' => 'association.role_secretary',
+                        'treasurer' => 'association.role_treasurer',
+                        'board' => 'association.role_board',
+                    ];
+                    $peopleRows = $isBoardStep && is_array($value['people'] ?? null)
+                        ? (array) $value['people']
+                        : (array) $value;
+                    $boardPresident = $isBoardStep && is_array($value['president'] ?? null) ? $value['president'] : null;
+                    $runtsImport = $isBoardStep && is_array($value['runts_import'] ?? null) ? $value['runts_import'] : [];
+                    $cfPlaceholder = __('setup.field_person_fiscal_code_placeholder');
                     ?>
                     <div class="setup-people" data-setup-line data-people-list
+                         data-people-role="<?= e($peopleRole) ?>"
                          data-msg-cf-mismatch="<?= e(__('setup.cf_name_mismatch')) ?>"
                          data-msg-cf-underage="<?= e(__('setup.cf_underage')) ?>"
                          data-msg-cf-continue="<?= e(__('setup.cf_continue_anyway')) ?>"
@@ -637,23 +700,77 @@ $errorStep = flash('setup_error_step');
                          data-msg-cf-calc="<?= e(__('members.cf_generate')) ?>"
                          data-msg-cf-calc-title="<?= e(__('setup.cf_calc_title')) ?>"
                          data-msg-cf-calc-apply="<?= e(__('setup.cf_calc_apply')) ?>">
+                        <?php if ($isBoardStep && is_array($boardPresident) && trim((string) ($boardPresident['first_name'] ?? '')) !== ''): ?>
+                            <div class="setup-people-president" data-setup-board-president>
+                                <div class="setup-people-president-avatar" aria-hidden="true">
+                                    <?= e(mb_strtoupper(mb_substr((string) $boardPresident['first_name'], 0, 1) . mb_substr((string) ($boardPresident['last_name'] ?? ''), 0, 1))) ?>
+                                </div>
+                                <div class="setup-people-president-body">
+                                    <p class="setup-people-president-name">
+                                        <?= e(trim((string) $boardPresident['first_name'] . ' ' . (string) ($boardPresident['last_name'] ?? ''))) ?>
+                                    </p>
+                                    <p class="setup-people-president-meta muted">
+                                        <?= e(__('setup.board_president_included')) ?>
+                                    </p>
+                                </div>
+                                <span class="setup-people-president-badge"><?= e(__('setup.board_already_included')) ?></span>
+                            </div>
+                        <?php endif; ?>
+
+                        <?php if ($isBoardStep && $runtsImport !== []): ?>
+                            <div class="setup-runts-import" data-setup-runts-board-import
+                                 data-runts-people="<?= e(json_encode(array_values($runtsImport), JSON_UNESCAPED_UNICODE) ?: '[]') ?>">
+                                <p class="setup-runts-import-text">
+                                    <?= e(__('setup.board_runts_import_lede', ['count' => (string) count($runtsImport)])) ?>
+                                </p>
+                                <ul class="setup-runts-import-list">
+                                    <?php foreach ($runtsImport as $cand): ?>
+                                        <li><?= e(trim((string) ($cand['first_name'] ?? '') . ' ' . (string) ($cand['last_name'] ?? ''))) ?>
+                                            <span class="muted">· <?= e((string) ($cand['role_label'] ?? '')) ?></span>
+                                        </li>
+                                    <?php endforeach; ?>
+                                </ul>
+                                <button type="button" class="btn btn-ghost btn-sm" data-setup-runts-board-import-btn>
+                                    <?= e(__('setup.board_runts_import_btn')) ?>
+                                </button>
+                            </div>
+                        <?php endif; ?>
+
+                        <?php if ($isBoardStep): ?>
+                            <p class="setup-subhead"><?= e(__('setup.board_other_members')) ?></p>
+                        <?php endif; ?>
+
                         <div class="setup-people-rows" data-people-rows>
-                            <?php foreach ((array) $value as $i => $person): ?>
+                            <?php foreach ($peopleRows as $i => $person): ?>
+                                <?php if (!is_array($person)) continue; ?>
                                 <div class="setup-people-row" data-people-row>
                                     <?php if ($showOrganType): ?>
+                                    <?php $organSelected = $normalizeOrganType((string) ($person['organ_type'] ?? $person['notes'] ?? '')); ?>
                                     <label class="setup-field setup-field-organ-type">
                                         <span><?= e(__('setup.field_organ_type')) ?></span>
                                         <select name="people[<?= (int) $i ?>][organ_type]">
                                             <option value="">—</option>
                                             <?php foreach ($organTypes as $organKey => $organLabelKey): ?>
-                                                <option value="<?= e($organKey) ?>" <?= (string) ($person['organ_type'] ?? $person['notes'] ?? '') === $organKey ? 'selected' : '' ?>>
+                                                <option value="<?= e($organKey) ?>" <?= $organSelected === $organKey ? 'selected' : '' ?>>
                                                     <?= e(__($organLabelKey)) ?>
                                                 </option>
                                             <?php endforeach; ?>
                                         </select>
                                     </label>
                                     <?php endif; ?>
-                                    <div class="setup-people-main">
+                                    <?php if ($showOfficeRole): ?>
+                                    <label class="setup-field setup-field-office-role">
+                                        <span><?= e(__('setup.field_board_office')) ?></span>
+                                        <select name="people[<?= (int) $i ?>][office_role]" data-people-office>
+                                            <?php foreach ($officeRoles as $officeKey => $officeLabelKey): ?>
+                                                <option value="<?= e($officeKey) ?>" <?= (string) ($person['office_role'] ?? 'board') === $officeKey ? 'selected' : '' ?>>
+                                                    <?= e(__($officeLabelKey)) ?>
+                                                </option>
+                                            <?php endforeach; ?>
+                                        </select>
+                                    </label>
+                                    <?php endif; ?>
+                                    <div class="setup-people-main<?= $showOfficeRole ? ' is-with-office' : '' ?>">
                                         <label class="setup-field">
                                             <span><?= e(__('setup.field_first_name')) ?></span>
                                             <input type="text" name="people[<?= (int) $i ?>][first_name]" value="<?= e((string) ($person['first_name'] ?? '')) ?>" autocomplete="given-name" data-people-first>
@@ -663,9 +780,9 @@ $errorStep = flash('setup_error_step');
                                             <input type="text" name="people[<?= (int) $i ?>][last_name]" value="<?= e((string) ($person['last_name'] ?? '')) ?>" autocomplete="family-name" data-people-last>
                                         </label>
                                         <label class="setup-field setup-field-people-cf">
-                                            <span><?= e(__('setup.field_person_fiscal_code')) ?> *</span>
+                                            <span data-people-cf-label><?= e(__('setup.field_person_fiscal_code')) ?><span data-people-cf-star hidden> *</span></span>
                                             <div class="setup-people-cf-row">
-                                                <input type="text" name="people[<?= (int) $i ?>][fiscal_code]" value="<?= e((string) ($person['fiscal_code'] ?? '')) ?>" maxlength="16" minlength="16" pattern="[A-Za-z]{6}[0-9LmnpqrstuvLMNPQRSTUV]{2}[A-Ea-eHhLlMmPpRrSsTt][0-9LmnpqrstuvLMNPQRSTUV]{2}[A-Za-z][0-9LmnpqrstuvLMNPQRSTUV]{3}[A-Za-z]" autocomplete="off" data-people-cf placeholder="<?= e(__('members.cf_hint')) ?>" title="<?= e(__('validation.fiscal_code')) ?>">
+                                                <input type="text" name="people[<?= (int) $i ?>][fiscal_code]" value="<?= e((string) ($person['fiscal_code'] ?? '')) ?>" maxlength="16" minlength="16" pattern="[A-Za-z]{6}[0-9LmnpqrstuvLMNPQRSTUV]{2}[A-Ea-eHhLlMmPpRrSsTt][0-9LmnpqrstuvLMNPQRSTUV]{2}[A-Za-z][0-9LmnpqrstuvLMNPQRSTUV]{3}[A-Za-z]" autocomplete="off" data-people-cf placeholder="<?= e($cfPlaceholder) ?>" title="<?= e(__('validation.fiscal_code')) ?>">
                                                 <button type="button" class="btn btn-ghost btn-sm" data-people-cf-calc><?= e(__('members.cf_generate')) ?></button>
                                                 <button type="button" class="btn btn-ghost btn-sm setup-people-remove" data-people-remove aria-label="<?= e(__('setup.remove_person')) ?>">×</button>
                                             </div>
@@ -688,7 +805,19 @@ $errorStep = flash('setup_error_step');
                                     </select>
                                 </label>
                                 <?php endif; ?>
-                                <div class="setup-people-main">
+                                <?php if ($showOfficeRole): ?>
+                                <label class="setup-field setup-field-office-role">
+                                    <span><?= e(__('setup.field_board_office')) ?></span>
+                                    <select name="people[__i__][office_role]" data-people-office>
+                                        <?php foreach ($officeRoles as $officeKey => $officeLabelKey): ?>
+                                            <option value="<?= e($officeKey) ?>" <?= $officeKey === 'board' ? 'selected' : '' ?>>
+                                                <?= e(__($officeLabelKey)) ?>
+                                            </option>
+                                        <?php endforeach; ?>
+                                    </select>
+                                </label>
+                                <?php endif; ?>
+                                <div class="setup-people-main<?= $showOfficeRole ? ' is-with-office' : '' ?>">
                                     <label class="setup-field">
                                         <span><?= e(__('setup.field_first_name')) ?></span>
                                         <input type="text" name="people[__i__][first_name]" value="" autocomplete="given-name" data-people-first>
@@ -698,9 +827,9 @@ $errorStep = flash('setup_error_step');
                                         <input type="text" name="people[__i__][last_name]" value="" autocomplete="family-name" data-people-last>
                                     </label>
                                     <label class="setup-field setup-field-people-cf">
-                                        <span><?= e(__('setup.field_person_fiscal_code')) ?> *</span>
+                                        <span data-people-cf-label><?= e(__('setup.field_person_fiscal_code')) ?><span data-people-cf-star hidden> *</span></span>
                                         <div class="setup-people-cf-row">
-                                            <input type="text" name="people[__i__][fiscal_code]" value="" maxlength="16" minlength="16" pattern="[A-Za-z]{6}[0-9LmnpqrstuvLMNPQRSTUV]{2}[A-Ea-eHhLlMmPpRrSsTt][0-9LmnpqrstuvLMNPQRSTUV]{2}[A-Za-z][0-9LmnpqrstuvLMNPQRSTUV]{3}[A-Za-z]" autocomplete="off" data-people-cf placeholder="<?= e(__('members.cf_hint')) ?>" title="<?= e(__('validation.fiscal_code')) ?>">
+                                            <input type="text" name="people[__i__][fiscal_code]" value="" maxlength="16" minlength="16" pattern="[A-Za-z]{6}[0-9LmnpqrstuvLMNPQRSTUV]{2}[A-Ea-eHhLlMmPpRrSsTt][0-9LmnpqrstuvLMNPQRSTUV]{2}[A-Za-z][0-9LmnpqrstuvLMNPQRSTUV]{3}[A-Za-z]" autocomplete="off" data-people-cf placeholder="<?= e($cfPlaceholder) ?>" title="<?= e(__('validation.fiscal_code')) ?>">
                                             <button type="button" class="btn btn-ghost btn-sm" data-people-cf-calc><?= e(__('members.cf_generate')) ?></button>
                                             <button type="button" class="btn btn-ghost btn-sm setup-people-remove" data-people-remove aria-label="<?= e(__('setup.remove_person')) ?>">×</button>
                                         </div>
@@ -879,15 +1008,50 @@ $errorStep = flash('setup_error_step');
                     </label>
                     <?php endif; ?>
                 <?php elseif ($stepType === 'checkbox'): ?>
-                    <label class="checkbox-row setup-check" data-setup-line>
-                        <input type="checkbox" name="value" value="1" <?= !empty($value) ? 'checked' : '' ?>>
-                        <span data-i18n="setup.gdpr_label"><?= e(__('setup.gdpr_label')) ?></span>
-                    </label>
+                    <?php if (($step['key'] ?? '') === 'gdpr.enabled'): ?>
+                        <?php
+                        $gdprEnabled = is_array($value) ? !empty($value['enabled']) : !empty($value);
+                        $gdprImage = is_array($value)
+                            ? !empty($value['require_image_consent'])
+                            : true;
+                        $gdprComms = is_array($value)
+                            ? !empty($value['require_comms_consent'])
+                            : true;
+                        ?>
+                        <div class="setup-gdpr-options" data-setup-line data-setup-gdpr-options>
+                            <label class="checkbox-row setup-check setup-check-prominent">
+                                <input type="checkbox" name="value" value="1" data-gdpr-master <?= $gdprEnabled ? 'checked' : '' ?>>
+                                <span data-i18n="setup.gdpr_label"><?= e(__('setup.gdpr_label')) ?></span>
+                            </label>
+                            <p class="setup-gdpr-model-note" data-gdpr-extras>
+                                <span class="setup-gdpr-model-note-icon" aria-hidden="true">ℹ</span>
+                                <span data-i18n="setup.gdpr_model_note"><?= e(__('setup.gdpr_model_note')) ?></span>
+                            </p>
+                            <div class="setup-gdpr-extras" data-gdpr-extras>
+                                <label class="checkbox-row setup-check">
+                                    <input type="checkbox" name="require_image_consent" value="1" data-gdpr-extra <?= $gdprImage ? 'checked' : '' ?>>
+                                    <span data-i18n="setup.gdpr_image_consent"><?= e(__('setup.gdpr_image_consent')) ?></span>
+                                </label>
+                                <label class="checkbox-row setup-check">
+                                    <input type="checkbox" name="require_comms_consent" value="1" data-gdpr-extra <?= $gdprComms ? 'checked' : '' ?>>
+                                    <span data-i18n="setup.gdpr_comms_consent"><?= e(__('setup.gdpr_comms_consent')) ?></span>
+                                </label>
+                            </div>
+                        </div>
+                    <?php else: ?>
+                        <label class="checkbox-row setup-check" data-setup-line>
+                            <input type="checkbox" name="value" value="1" <?= !empty($value) ? 'checked' : '' ?>>
+                            <span data-i18n="setup.gdpr_label"><?= e(__('setup.gdpr_label')) ?></span>
+                        </label>
+                    <?php endif; ?>
                 <?php elseif ($stepType === 'textarea'): ?>
                     <?php
                     $isPrivacyStep = ($step['key'] ?? '') === 'legal.privacy';
                     $legalPrefix = $isPrivacyStep ? 'privacy' : 'statute';
                     $legalValues = is_array($value) ? $value : ['it' => (string) $value, 'de' => '', 'en' => ''];
+                    $showRuntsBanner = !empty($legalValues['_from_runts'])
+                        || preg_match('/^\[Bozza da PDF RUNTS/u', (string) ($legalValues['it'] ?? '')) === 1;
+                    unset($legalValues['_from_runts']);
                     $legalPlaceholder = $isPrivacyStep
                         ? __('setup.privacy_sample_note')
                         : __('setup.step_statute_desc');
@@ -913,6 +1077,7 @@ $errorStep = flash('setup_error_step');
                             'namePrefix' => $legalPrefix,
                             'values' => $legalValues,
                             'placeholder' => (string) $legalPlaceholder,
+                            'showRuntsBanner' => $showRuntsBanner,
                         ]) ?>
                     </div>
                     <p class="setup-hint muted" data-setup-line data-i18n="setup.legal_min_chars_hint"><?= e(__('setup.legal_min_chars_hint', ['min' => '50'])) ?></p>
@@ -1381,13 +1546,21 @@ $errorStep = flash('setup_error_step');
                     </div>
                 <?php endif; ?>
 
+                </div><!-- .setup-form-scroll -->
+
                 <?php if (in_array($stepType, ['president', 'people_list', 'textarea', 'smtp_config'], true)): ?>
+                    <?php
+                    $isAuditorsDefer = $stepType === 'people_list' && (string) ($step['role'] ?? '') === 'auditor';
+                    $deferLabelKey = $isAuditorsDefer ? 'setup.defer_step_skip' : 'setup.defer_step';
+                    ?>
                     <p class="setup-defer-wrap" data-setup-line>
-                        <button type="button" class="setup-defer-link" data-setup-defer-step data-i18n="setup.defer_step"><?= e(__('setup.defer_step')) ?></button>
+                        <button type="button" class="setup-defer-link" data-setup-defer-step data-i18n="<?= e($deferLabelKey) ?>"><?= e(__($deferLabelKey)) ?></button>
+                        <?php if ($isAuditorsDefer): ?>
+                            <span class="setup-defer-sep" aria-hidden="true"> · </span>
+                            <button type="button" class="setup-defer-link" data-setup-defer-step data-i18n="setup.defer_step"><?= e(__('setup.defer_step')) ?></button>
+                        <?php endif; ?>
                     </p>
                 <?php endif; ?>
-
-                </div><!-- .setup-form-scroll -->
 
                 <div class="setup-actions" data-setup-line>
                     <?php if (!empty($backHref)): ?>
@@ -1479,16 +1652,18 @@ $errorStep = flash('setup_error_step');
                 </div>
                 <div class="setup-equal-row">
                     <label class="setup-field">
-                        <span><?= e(__('setup.field_birth_date')) ?> *</span>
-                        <input type="date" name="birth_date" required data-cf-dialog-birth>
-                    </label>
-                    <label class="setup-field">
                         <span><?= e(__('setup.field_gender')) ?> *</span>
                         <select name="gender" required data-cf-dialog-gender>
                             <option value="">—</option>
                             <option value="M"><?= e(__('members.gender_m')) ?></option>
                             <option value="F"><?= e(__('members.gender_f')) ?></option>
                         </select>
+                    </label>
+                    <label class="setup-field">
+                        <span><?= e(__('setup.field_birth_date')) ?> *</span>
+                        <input type="date" name="birth_date" required data-cf-dialog-birth data-birth-date
+                               min="<?= e(date('Y-m-d', strtotime('-100 years'))) ?>"
+                               max="<?= e(date('Y-m-d', strtotime('-18 years'))) ?>">
                     </label>
                 </div>
                 <?= view_partial('partials/geo_birth_place', [

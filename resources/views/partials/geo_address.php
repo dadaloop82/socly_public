@@ -52,6 +52,15 @@ $rootClass = trim('geo-address setup-address geo-layout-' . $layout . ' ' . $ext
 $anyEnabled = !empty($enabled['city']) || !empty($enabled['postal_code']) || !empty($enabled['province']) || !empty($enabled['address']) || !empty($enabled['house_number']);
 $showForeignToggle = !isset($foreign_toggle) || (bool) $foreign_toggle;
 $flagName = (string) ($flag_name ?? 'address_foreign');
+$addressForcePanel = static function () : string {
+    return '<div class="geo-force-panel" data-geo-address-force-panel hidden>'
+        . '<p class="geo-inline-warn" data-geo-address-warn></p>'
+        . '<div class="geo-force-actions">'
+        . '<button type="button" class="btn btn-ghost btn-sm" data-geo-address-suggest-use hidden></button>'
+        . '<button type="button" class="btn btn-ghost btn-sm" data-geo-address-force></button>'
+        . '</div>'
+        . '</div>';
+};
 ?>
 <?php if ($anyEnabled): ?>
 <div class="<?= e($rootClass) ?>"<?= $withScope ? ' data-geo-scope' : '' ?>>
@@ -88,12 +97,14 @@ $flagName = (string) ($flag_name ?? 'address_foreign');
                         value="<?= e((string) $values['address']) ?>"
                         data-address-input
                         autocomplete="street-address"
-                        placeholder="<?= e(__('members.address_hint')) ?>"
+                        placeholder="<?= e(__('members.address_placeholder')) ?>"
                         <?= !empty($ids['address']) ? 'id="' . e($ids['address']) . '"' : '' ?>
                         <?= $req((bool) $required['address']) ?>
                     >
+                    <span class="suggest-spinner" aria-hidden="true"></span>
                     <div class="suggest-list" data-address-suggest hidden></div>
                 </div>
+                <?= $addressForcePanel() ?>
             </label>
             <?php endif; ?>
             <?php if (!empty($enabled['house_number'])): ?>
@@ -213,12 +224,14 @@ $flagName = (string) ($flag_name ?? 'address_foreign');
                         value="<?= e((string) $values['address']) ?>"
                         data-address-input
                         autocomplete="street-address"
-                        placeholder="<?= e(__('members.address_hint')) ?>"
+                        placeholder="<?= e(__('members.address_placeholder')) ?>"
                         <?= !empty($ids['address']) ? 'id="' . e($ids['address']) . '"' : '' ?>
                         <?= $req((bool) $required['address']) ?>
                     >
+                    <span class="suggest-spinner" aria-hidden="true"></span>
                     <div class="suggest-list" data-address-suggest hidden></div>
                 </div>
+                <?= $addressForcePanel() ?>
             </label>
             <?php endif; ?>
             <?php if (!empty($enabled['house_number'])): ?>

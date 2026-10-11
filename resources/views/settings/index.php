@@ -335,10 +335,26 @@
 
 <form method="post" action="<?= e(url('/settings/legal')) ?>" data-leave-guard data-settings-autosave>
         <?= csrf_field() ?>
-        <label class="setup-check setup-check-prominent">
-            <input type="checkbox" name="gdpr_enabled" value="1" <?= $settings['gdpr.enabled']==='1'?'checked':'' ?>>
-            <span><?= e(__('setup.gdpr_label')) ?></span>
-        </label>
+        <div class="setup-gdpr-options" data-setup-gdpr-options>
+            <label class="setup-check setup-check-prominent">
+                <input type="checkbox" name="gdpr_enabled" value="1" data-gdpr-master <?= $settings['gdpr.enabled']==='1'?'checked':'' ?>>
+                <span><?= e(__('setup.gdpr_label')) ?></span>
+            </label>
+            <p class="setup-gdpr-model-note" data-gdpr-extras>
+                <span class="setup-gdpr-model-note-icon" aria-hidden="true">ℹ</span>
+                <span><?= e(__('setup.gdpr_model_note')) ?></span>
+            </p>
+            <div class="setup-gdpr-extras" data-gdpr-extras>
+                <label class="setup-check">
+                    <input type="checkbox" name="require_image_consent" value="1" data-gdpr-extra <?= ($settings['gdpr.require_image_consent'] ?? '0') === '1' ? 'checked' : '' ?>>
+                    <span><?= e(__('setup.gdpr_image_consent')) ?></span>
+                </label>
+                <label class="setup-check">
+                    <input type="checkbox" name="require_comms_consent" value="1" data-gdpr-extra <?= ($settings['gdpr.require_comms_consent'] ?? '0') === '1' ? 'checked' : '' ?>>
+                    <span><?= e(__('setup.gdpr_comms_consent')) ?></span>
+                </label>
+            </div>
+        </div>
         <p class="setup-hint muted"><?= e(__('setup.step_gdpr_desc')) ?></p>
         <h3 class="section-title" style="margin-top:1.25rem"><?= e(__('settings.legal_privacy')) ?></h3>
         <p class="muted"><?= e(__('settings.legal_privacy_hint')) ?></p>

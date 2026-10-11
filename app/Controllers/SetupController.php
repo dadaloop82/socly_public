@@ -590,10 +590,35 @@ final class SetupController extends BaseController
         }
 
         if ($type === 'people_list') {
-            return is_array($draft['people'] ?? null) ? $draft['people'] : $value;
+            $draftPeople = is_array($draft['people'] ?? null) ? $draft['people'] : null;
+            if ($draftPeople === null) {
+                return $value;
+            }
+            // Board step uses a structured value (people + president + runts_import).
+            if (is_array($value) && array_key_exists('people', $value)) {
+                $merged = $value;
+                $merged['people'] = $draftPeople;
+                return $merged;
+            }
+            return $draftPeople;
         }
 
         if ($type === 'checkbox') {
+            if (($step['key'] ?? '') === 'gdpr.enabled') {
+                $base = is_array($value) ? $value : [
+                    'enabled' => !empty($value),
+                    'require_image_consent' => true,
+                    'require_comms_consent' => true,
+                ];
+                $base['enabled'] = !empty($draft['value']);
+                if (array_key_exists('require_image_consent', $draft)) {
+                    $base['require_image_consent'] = !empty($draft['require_image_consent']);
+                }
+                if (array_key_exists('require_comms_consent', $draft)) {
+                    $base['require_comms_consent'] = !empty($draft['require_comms_consent']);
+                }
+                return $base;
+            }
             return !empty($draft['value']);
         }
 

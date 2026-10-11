@@ -133,6 +133,7 @@ document.addEventListener('DOMContentLoaded', () => {
   initSettingsAssociationForms();
   initSettingsAutosave();
   initLegalDocEditors(document);
+  initSetupGdprOptions(document);
   initLogoFilePickers(document);
   initPlaceSuggest(document);
   initDashboardTabs();
@@ -1285,8 +1286,11 @@ function initSetupWizard() {
   initSetupFitAssocNames(root);
   initSetupTaxIds(root);
   initSetupContacts(root);
+  initSetupPresidentSections(root);
+  initSetupFormScrollHint(root);
   initLegalDocEditors(root);
   initSetupLegalPdf(root);
+  initSetupGdprOptions(root);
   initSetupFieldsAddNow(root);
   initPasswordGenerators(root);
   initPasswordToggles(root);
@@ -2465,6 +2469,8 @@ function initPhoneInputs(scope = document) {
     });
     decorateDial();
 
+    const nationalDigits = (dial, raw) => stripDialFromNational(raw, dial).replace(/\D/g, '');
+
     const validate = () => {
       const dial = dialSelect?.value || defaultDial;
       let national = stripDialFromNational(input.value, dial);
@@ -2475,19 +2481,25 @@ function initPhoneInputs(scope = document) {
       input.classList.toggle('input-invalid', national !== '' && !ok);
       if (national !== '' && !ok) {
         input.setCustomValidity(invalidMsg || 'Invalid phone');
+        paintSetupValidity(input, 'err', invalidMsg || 'Invalid phone');
+      } else if (national !== '') {
+        input.setCustomValidity('');
+        paintSetupValidity(input, 'ok');
       } else {
         input.setCustomValidity('');
+        paintSetupValidity(input, '');
       }
     };
 
     const syncCombined = () => {
       const dial = dialSelect?.value || defaultDial;
-      const national = stripDialFromNational(input.value, dial);
-      if (national === '') {
+      const digits = nationalDigits(dial, input.value);
+      if (digits === '') {
         input.dataset.combinedPhone = '';
         return;
       }
-      input.dataset.combinedPhone = `+${dial} ${formatNationalPhone(dial, national)}`;
+      // Compact E.164 for storage / SMS (no spaces or punctuation).
+      input.dataset.combinedPhone = `+${String(dial).replace(/\D/g, '')}${digits}`;
     };
 
     input.addEventListener('blur', () => {
@@ -2501,19 +2513,20 @@ function initPhoneInputs(scope = document) {
     input.addEventListener('input', () => {
       input.setCustomValidity('');
       input.classList.remove('input-valid', 'input-invalid');
+      paintSetupValidity(input, '');
     });
 
     field.closest('form')?.addEventListener('submit', () => {
       validate();
-      const combined = input.dataset.combinedPhone
-        || (input.value.trim() !== ''
-          ? `+${dialSelect?.value || defaultDial} ${formatNationalPhone(dialSelect?.value || defaultDial, stripDialFromNational(input.value, dialSelect?.value || defaultDial))}`
-          : '');
-      input.value = combined;
+      syncCombined();
+      const dial = String(dialSelect?.value || defaultDial).replace(/\D/g, '');
+      const digits = nationalDigits(dial, input.value);
+      input.value = digits === '' ? '' : (input.dataset.combinedPhone || `+${dial}${digits}`);
     }, { capture: true });
 
     if (input.value.trim() !== '') {
       validate();
+      syncCombined();
     }
   });
 
@@ -2530,6 +2543,9 @@ function initPhoneInputs(scope = document) {
       input.classList.toggle('input-valid', value !== '' && ok);
       input.classList.toggle('input-invalid', value !== '' && !ok);
       input.setCustomValidity(value !== '' && !ok ? (invalidMsg || 'Invalid phone') : '');
+      if (value !== '' && ok) paintSetupValidity(input, 'ok');
+      else if (value !== '') paintSetupValidity(input, 'err', invalidMsg || 'Invalid phone');
+      else paintSetupValidity(input, '');
     };
     input.addEventListener('blur', validate);
     input.addEventListener('change', validate);
@@ -3113,6 +3129,82 @@ function initLegalDocEditors(scope = document) {
       tab.addEventListener('click', () => activate(tab.dataset.legalTab || 'it'));
     });
 
+    const expandBtn = root.querySelector('[data-legal-expand]');
+    const expandOpen = expandBtn?.dataset.msgExpand || 'Espandi a schermo intero';
+    const expandClose = expandBtn?.dataset.msgCollapse || 'Chiudi';
+    let expandAnchor = null;
+
+    const bindFieldsToForm = (formEl) => {
+      if (!(formEl instanceof HTMLFormElement)) return;
+      if (!formEl.id) formEl.id = 'setup-legal-host-form';
+      root.querySelectorAll('[name]').forEach((el) => {
+        if (el instanceof HTMLElement) {
+          el.setAttribute('form', formEl.id);
+        }
+      });
+    };
+    const unbindFieldsFromForm = () => {
+      root.querySelectorAll('[name][form]').forEach((el) => {
+        if (el instanceof HTMLElement) {
+          el.removeAttribute('form');
+        }
+      });
+    };
+
+    const setExpanded = (open) => {
+      if (!(expandBtn instanceof HTMLElement)) return;
+      if (open) {
+        const hostForm = root.closest('form');
+        if (!expandAnchor) {
+          expandAnchor = document.createComment('legal-doc-expand-anchor');
+          root.parentNode?.insertBefore(expandAnchor, root);
+        }
+        bindFieldsToForm(hostForm);
+        document.body.appendChild(root);
+        root.classList.add('is-expanded');
+        document.body.classList.add('legal-doc-expanded');
+        expandBtn.setAttribute('aria-expanded', 'true');
+        expandBtn.setAttribute('aria-label', expandClose);
+        expandBtn.setAttribute('title', expandClose);
+        const activePanel = root.querySelector('.legal-doc-panel:not([hidden]) [data-legal-textarea]');
+        if (activePanel instanceof HTMLElement) activePanel.focus();
+      } else {
+        root.classList.remove('is-expanded');
+        document.body.classList.remove('legal-doc-expanded');
+        if (expandAnchor?.parentNode) {
+          expandAnchor.parentNode.insertBefore(root, expandAnchor);
+          expandAnchor.remove();
+          expandAnchor = null;
+        }
+        unbindFieldsFromForm();
+        expandBtn.setAttribute('aria-expanded', 'false');
+        expandBtn.setAttribute('aria-label', expandOpen);
+        expandBtn.setAttribute('title', expandOpen);
+      }
+    };
+
+    if (expandBtn instanceof HTMLElement) {
+      expandBtn.addEventListener('click', () => {
+        setExpanded(!root.classList.contains('is-expanded'));
+      });
+      document.addEventListener('keydown', (event) => {
+        if (event.key === 'Escape' && root.classList.contains('is-expanded')) {
+          setExpanded(false);
+        }
+      });
+    }
+
+    const setTabCheck = (code, on) => {
+      const mark = root.querySelector(`[data-legal-tab-check="${code}"]`);
+      if (mark instanceof HTMLElement) {
+        mark.hidden = !on;
+      }
+      const tab = root.querySelector(`[data-legal-tab="${code}"]`);
+      if (tab instanceof HTMLElement) {
+        tab.classList.toggle('is-translated', !!on);
+      }
+    };
+
     const translateBtn = root.querySelector('[data-legal-translate]');
     const source = root.querySelector('[data-legal-textarea="it"]');
     const targetDe = root.querySelector('[data-legal-textarea="de"]');
@@ -3137,7 +3229,10 @@ function initLegalDocEditors(scope = document) {
       }
       const original = translateBtn.textContent;
       translateBtn.disabled = true;
+      translateBtn.classList.add('is-busy');
       translateBtn.textContent = busyMsg;
+      setTabCheck('de', false);
+      setTabCheck('en', false);
       try {
         for (const [target, el] of [['de', targetDe], ['en', targetEn]]) {
           const res = await fetch(url, {
@@ -3156,11 +3251,13 @@ function initLegalDocEditors(scope = document) {
           }
           el.value = data.text;
           el.dispatchEvent(new Event('input', { bubbles: true }));
+          setTabCheck(target, true);
         }
       } catch {
         window.alert(failMsg);
       } finally {
         translateBtn.disabled = false;
+        translateBtn.classList.remove('is-busy');
         translateBtn.textContent = original;
       }
     });
@@ -4789,31 +4886,89 @@ function initSetupCtaGate(root) {
   refresh();
 }
 
-/** Live validity icons inside inputs (✓ / ✕) — no "Corretto" text under fields. */
+/** Ensure ✓ / ✕ / spinner wrap exists inside the field. */
+function ensureSetupValidityWrap(el) {
+  if (!(el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement || el instanceof HTMLSelectElement)) {
+    return null;
+  }
+  if (el.type === 'radio' || el.type === 'checkbox' || el.type === 'hidden' || el.type === 'file') {
+    return null;
+  }
+  let wrap = el.closest('.setup-input-validity');
+  if (wrap) return wrap;
+  wrap = document.createElement('div');
+  wrap.className = 'setup-input-validity';
+  el.parentNode?.insertBefore(wrap, el);
+  wrap.appendChild(el);
+  const mark = document.createElement('span');
+  mark.className = 'setup-input-validity-mark';
+  mark.setAttribute('aria-hidden', 'true');
+  wrap.appendChild(mark);
+  return wrap;
+}
+
+/**
+ * Paint field validity: ok | err | pending | '' (clear).
+ * pending = spinner while geo/address validation is in flight.
+ */
+function paintSetupValidity(el, state, message = '') {
+  if (!(el instanceof HTMLElement)) return;
+  const wrap = ensureSetupValidityWrap(el);
+  el.classList.toggle('is-valid', state === 'ok');
+  el.classList.toggle('is-invalid', state === 'err');
+  el.classList.toggle('is-pending', state === 'pending');
+  if (wrap) {
+    wrap.classList.toggle('is-valid', state === 'ok');
+    wrap.classList.toggle('is-invalid', state === 'err');
+    wrap.classList.toggle('is-pending', state === 'pending');
+    const mark = wrap.querySelector('.setup-input-validity-mark');
+    if (mark) {
+      mark.textContent = state === 'ok' ? '✓' : (state === 'err' ? '✕' : '');
+      mark.setAttribute('aria-hidden', 'true');
+    }
+  }
+  const field = el.closest('.setup-field') || el.closest('.setup-locale-grid')?.parentElement;
+  if (!field) return;
+  let hint = field.querySelector(':scope > .setup-field-feedback');
+  if (!hint && state === 'err') {
+    hint = document.createElement('p');
+    hint.className = 'setup-field-hint setup-field-feedback';
+    field.appendChild(hint);
+  }
+  if (!hint) return;
+  if (state === 'err') {
+    const msg = String(message || '').trim();
+    hint.hidden = msg === '';
+    hint.textContent = msg;
+    hint.classList.add('is-error');
+    hint.classList.remove('is-ok');
+  } else {
+    hint.hidden = true;
+    hint.textContent = '';
+    hint.classList.remove('is-error', 'is-ok');
+  }
+}
+
+/** Show/hide the in-field spinner while address/city validation runs. */
+function setSetupFieldValidating(el, on) {
+  if (!(el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement)) return;
+  if (on) {
+    el.dataset.geoValidating = '1';
+    el.setAttribute('aria-busy', 'true');
+    paintSetupValidity(el, 'pending');
+  } else {
+    delete el.dataset.geoValidating;
+    el.removeAttribute('aria-busy');
+  }
+}
+
+/** Live validity icons inside inputs (✓ / ✕ / spinner) — no "Corretto" text under fields. */
 function initSetupFieldFeedback(root) {
   const form = root.querySelector('[data-setup-form]');
   if (!form) return;
   const msgRequired = form.dataset.msgFieldRequired || 'Required';
 
-  const ensureWrap = (el) => {
-    if (!(el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement || el instanceof HTMLSelectElement)) {
-      return null;
-    }
-    if (el.type === 'radio' || el.type === 'checkbox' || el.type === 'hidden' || el.type === 'file') {
-      return null;
-    }
-    let wrap = el.closest('.setup-input-validity');
-    if (wrap) return wrap;
-    wrap = document.createElement('div');
-    wrap.className = 'setup-input-validity';
-    el.parentNode?.insertBefore(wrap, el);
-    wrap.appendChild(el);
-    const mark = document.createElement('span');
-    mark.className = 'setup-input-validity-mark';
-    mark.setAttribute('aria-hidden', 'true');
-    wrap.appendChild(mark);
-    return wrap;
-  };
+  const ensureWrap = ensureSetupValidityWrap;
 
   const ensureErrHint = (field) => {
     let hint = field.querySelector(':scope > .setup-field-feedback');
@@ -4826,32 +4981,10 @@ function initSetupFieldFeedback(root) {
   };
 
   const paint = (el, state, message) => {
-    if (!(el instanceof HTMLElement)) return;
-    el.classList.toggle('is-valid', state === 'ok');
-    el.classList.toggle('is-invalid', state === 'err');
-    const wrap = ensureWrap(el);
-    if (wrap) {
-      wrap.classList.toggle('is-valid', state === 'ok');
-      wrap.classList.toggle('is-invalid', state === 'err');
-      const mark = wrap.querySelector('.setup-input-validity-mark');
-      if (mark) {
-        mark.textContent = state === 'ok' ? '✓' : (state === 'err' ? '✕' : '');
-      }
-    }
-    const field = el.closest('.setup-field') || el.closest('.setup-locale-grid')?.parentElement;
-    if (!field) return;
-    const hint = ensureErrHint(field);
-    // Only show text for errors (why), never for "ok".
+    paintSetupValidity(el, state, message);
     if (state === 'err') {
-      const msg = String(message || '').trim();
-      hint.hidden = msg === '';
-      hint.textContent = msg;
-      hint.classList.add('is-error');
-      hint.classList.remove('is-ok');
-    } else {
-      hint.hidden = true;
-      hint.textContent = '';
-      hint.classList.remove('is-error', 'is-ok');
+      const field = el.closest('.setup-field') || el.closest('.setup-locale-grid')?.parentElement;
+      if (field) ensureErrHint(field);
     }
   };
 
@@ -4890,6 +5023,10 @@ function initSetupFieldFeedback(root) {
     }
 
     ensureWrap(el);
+    if (el.dataset.geoValidating === '1') {
+      paint(el, 'pending');
+      return;
+    }
     const empty = String(el.value || '').trim() === '';
     if (el.required && empty) {
       paint(el, 'err', msgRequired);
@@ -4897,6 +5034,35 @@ function initSetupFieldFeedback(root) {
     }
     if (empty && !el.required) {
       paint(el, '', '');
+      return;
+    }
+    // Geo fields: never show a false ✓ before pick/resolve; spinner only while busy.
+    if (
+      el.matches?.('[data-address-input], [data-city-input], [data-province-input], [data-birth-place-input]')
+      && el.dataset.geoPicked !== '1'
+      && el.dataset.geoForced !== '1'
+    ) {
+      if (el.dataset.geoValidating === '1' || el.dataset.geoResolveBusy === '1') {
+        paint(el, 'pending');
+        return;
+      }
+      // Still focused (typing / choosing from list): keep mark empty.
+      if (document.activeElement === el) {
+        paint(el, '', '');
+        return;
+      }
+      // Left the field — resolve is about to run / just finished with error.
+      let ok = true;
+      try {
+        ok = typeof el.checkValidity === 'function' ? el.checkValidity() : true;
+      } catch {
+        ok = true;
+      }
+      if (!ok) {
+        paint(el, 'err', el.validationMessage || msgRequired);
+        return;
+      }
+      paint(el, 'pending');
       return;
     }
     let ok = true;
@@ -4920,7 +5086,7 @@ function initSetupFieldFeedback(root) {
     const t = event.target;
     if (t instanceof HTMLElement) evaluate(t);
   });
-  // Keep ✓/✕ in sync when geo customValidity changes the CTA gate — never paint untouched empties.
+  // Keep ✓/✕ in sync when geo/tax customValidity changes the CTA gate — never paint untouched empties.
   form.addEventListener('setup:cta-refresh', () => {
     const seen = new Set();
     const sync = (el) => {
@@ -4929,9 +5095,30 @@ function initSetupFieldFeedback(root) {
       evaluate(el);
     };
     form.querySelectorAll('input.is-valid, input.is-invalid, select.is-valid, select.is-invalid, textarea.is-valid, textarea.is-invalid').forEach(sync);
-    form.querySelectorAll('[data-city-input], [data-address-input], [data-province-input], [data-birth-place-input]').forEach((el) => {
+    form.querySelectorAll([
+      '[data-city-input]',
+      '[data-address-input]',
+      '[data-province-input]',
+      '[data-birth-place-input]',
+      '[data-setup-fiscal-code]',
+      '[data-setup-vat-number]',
+      '[data-setup-pec]',
+      '[data-setup-email]',
+      '[data-phone-input]',
+    ].join(', ')).forEach((el) => {
       if (el instanceof HTMLInputElement && el.value.trim()) sync(el);
     });
+  });
+
+  // Prefill (RUNTS / scrape) should show ✓ immediately on step load.
+  form.querySelectorAll([
+    '[data-setup-fiscal-code]',
+    '[data-setup-vat-number]',
+    '[data-setup-pec]',
+    '[data-setup-email]',
+    '[data-phone-input]',
+  ].join(', ')).forEach((el) => {
+    if (el instanceof HTMLInputElement && el.value.trim()) evaluate(el);
   });
 }
 
@@ -4979,7 +5166,7 @@ function initSetupTaxIds(root) {
     const vat = stripCountry(raw);
     if (country === 'DE') return /^\d{9}$/.test(vat);
     if (country && country !== 'IT') return /^[A-Z0-9]{8,12}$/.test(vat);
-    // Italian optional P.IVA: 11 digits (check digit not enforced client-side).
+    // Italian optional P.IVA: 11 digits (check digit not enforced — optional field).
     return /^\d{11}$/.test(vat);
   };
 
@@ -4999,7 +5186,12 @@ function initSetupTaxIds(root) {
     return check === code[15];
   };
 
-  const isValidEntityCf = (raw) => isValidVat(raw) || isValidPersonCf(raw);
+  // Entity CF: 11 numeric digits (ente) or 16-char personal CF (checksum).
+  const isValidEntityCf = (raw) => {
+    const code = normalize(raw);
+    if (/^\d{11}$/.test(code)) return true;
+    return isValidPersonCf(code);
+  };
 
   const setHint = (el, message, isError) => {
     if (!(el instanceof HTMLElement)) return;
@@ -5009,6 +5201,28 @@ function initSetupTaxIds(root) {
     el.classList.toggle('is-error', !!isError && msg !== '');
   };
 
+  const paintField = (el, state) => {
+    if (!(el instanceof HTMLInputElement)) return;
+    el.classList.toggle('is-valid', state === 'ok');
+    el.classList.toggle('is-invalid', state === 'err');
+    let wrap = el.closest('.setup-input-validity');
+    if (!wrap && el.parentNode) {
+      wrap = document.createElement('div');
+      wrap.className = 'setup-input-validity';
+      el.parentNode.insertBefore(wrap, el);
+      wrap.appendChild(el);
+      const mark = document.createElement('span');
+      mark.className = 'setup-input-validity-mark';
+      mark.setAttribute('aria-hidden', 'true');
+      wrap.appendChild(mark);
+    }
+    if (!wrap) return;
+    wrap.classList.toggle('is-valid', state === 'ok');
+    wrap.classList.toggle('is-invalid', state === 'err');
+    const mark = wrap.querySelector('.setup-input-validity-mark');
+    if (mark) mark.textContent = state === 'ok' ? '✓' : (state === 'err' ? '✕' : '');
+  };
+
   const refresh = () => {
     const fiscal = normalize(fiscalInput.value);
     fiscalInput.value = fiscal;
@@ -5016,9 +5230,15 @@ function initSetupTaxIds(root) {
     if (fiscal !== '' && !fiscalOk) {
       fiscalInput.setCustomValidity(box.dataset.msgFiscalInvalid || 'Invalid');
       setHint(fiscalHint, box.dataset.msgFiscalInvalid || '', true);
+      paintField(fiscalInput, 'err');
+    } else if (fiscal !== '' && fiscalOk) {
+      fiscalInput.setCustomValidity('');
+      setHint(fiscalHint, '', false);
+      paintField(fiscalInput, 'ok');
     } else {
       fiscalInput.setCustomValidity('');
       setHint(fiscalHint, '', false);
+      paintField(fiscalInput, '');
     }
 
     if (vatInput instanceof HTMLInputElement) {
@@ -5045,6 +5265,8 @@ function initSetupTaxIds(root) {
       }
       vatInput.setCustomValidity(vatOk ? '' : (box.dataset.msgVatInvalid || 'Invalid'));
       setHint(vatHint, hint, err);
+      if (vatInput.value === '') paintField(vatInput, '');
+      else paintField(vatInput, vatOk ? 'ok' : 'err');
     }
 
     form?.dispatchEvent(new CustomEvent('setup:cta-refresh'));
@@ -5055,6 +5277,125 @@ function initSetupTaxIds(root) {
   vatInput?.addEventListener('input', refresh);
   vatInput?.addEventListener('blur', refresh);
   refresh();
+}
+
+/** Soft “more below” fade on the setup scroll pane. */
+function initSetupFormScrollHint(root) {
+  const scroller = root.querySelector('.setup-form-scroll');
+  if (!(scroller instanceof HTMLElement)) return;
+  const sync = () => {
+    const max = scroller.scrollHeight - scroller.clientHeight;
+    const scrollable = max > 8;
+    scroller.classList.toggle('is-scrollable', scrollable);
+    const atBottom = !scrollable || scroller.scrollTop >= max - 4;
+    scroller.classList.toggle('is-at-bottom', atBottom);
+  };
+  scroller.addEventListener('scroll', sync, { passive: true });
+  window.addEventListener('resize', sync);
+  // Re-measure after accordion open/close and late layout.
+  root.querySelectorAll('details.setup-section').forEach((el) => {
+    el.addEventListener('toggle', () => requestAnimationFrame(sync));
+  });
+  requestAnimationFrame(sync);
+  setTimeout(sync, 320);
+}
+
+/**
+ * President step accordion: open closed sections that still need required values
+ * when Continua is pressed, so “false bottom” never hides validation.
+ */
+function initSetupPresidentSections(root) {
+  const host = root.querySelector('[data-setup-president-sections]');
+  const form = root.querySelector('[data-setup-form]');
+  if (!(host instanceof HTMLElement) || !(form instanceof HTMLFormElement)) return;
+
+  const sections = () => [...host.querySelectorAll('details.setup-section')];
+
+  const markNeedsAttention = () => {
+    sections().forEach((section) => {
+      if (!(section instanceof HTMLDetailsElement)) return;
+      const incomplete = [...section.querySelectorAll('input, select, textarea')].some((el) => {
+        if (!(el instanceof HTMLInputElement || el instanceof HTMLSelectElement || el instanceof HTMLTextAreaElement)) {
+          return false;
+        }
+        if (el.disabled || el.type === 'hidden' || !el.required) return false;
+        return String(el.value || '').trim() === '' || !el.checkValidity();
+      });
+      section.classList.toggle('is-needs-attention', incomplete && !section.open);
+    });
+  };
+
+  const openSectionsWithInvalid = () => {
+    let firstInvalid = null;
+    sections().forEach((section) => {
+      if (!(section instanceof HTMLDetailsElement)) return;
+      const invalids = [...section.querySelectorAll('input, select, textarea')].filter((el) => {
+        if (!(el instanceof HTMLInputElement || el instanceof HTMLSelectElement || el instanceof HTMLTextAreaElement)) {
+          return false;
+        }
+        if (el.disabled || el.type === 'hidden') return false;
+        return !el.checkValidity();
+      });
+      if (invalids.length === 0) {
+        section.classList.remove('is-needs-attention');
+        return;
+      }
+      section.open = true;
+      section.classList.remove('is-needs-attention');
+      if (!firstInvalid) firstInvalid = invalids[0];
+    });
+    if (firstInvalid instanceof HTMLElement) {
+      try {
+        firstInvalid.focus({ preventScroll: false });
+        firstInvalid.reportValidity?.();
+      } catch {
+        /* ignore */
+      }
+    }
+    return firstInvalid;
+  };
+
+  sections().forEach((section) => {
+    section.addEventListener('toggle', markNeedsAttention);
+  });
+  host.addEventListener('input', markNeedsAttention);
+  host.addEventListener('change', markNeedsAttention);
+  markNeedsAttention();
+
+  form.addEventListener('click', (event) => {
+    const btn = event.target instanceof Element
+      ? event.target.closest('.setup-cta[type="submit"]')
+      : null;
+    if (!btn || form.querySelector('[data-setup-defer-flag]')?.value === '1') return;
+    // Open closed panels before native validation runs.
+    markNeedsAttention();
+    const needsOpen = sections().some((section) => (
+      section instanceof HTMLDetailsElement
+      && !section.open
+      && section.classList.contains('is-needs-attention')
+    ));
+    if (needsOpen) {
+      event.preventDefault();
+      openSectionsWithInvalid();
+      // Second pass: let the browser show the first native message after open.
+      requestAnimationFrame(() => {
+        if (!form.checkValidity()) {
+          form.reportValidity();
+        } else {
+          form.requestSubmit?.(btn instanceof HTMLButtonElement ? btn : undefined);
+        }
+      });
+    }
+  }, true);
+
+  form.addEventListener('invalid', (event) => {
+    const t = event.target;
+    if (!(t instanceof HTMLElement) || !host.contains(t)) return;
+    const section = t.closest('details.setup-section');
+    if (section instanceof HTMLDetailsElement && !section.open) {
+      section.open = true;
+    }
+  }, true);
 }
 
 function initSetupContacts(root) {
@@ -5104,13 +5445,34 @@ function initSetupContacts(root) {
       emailInput.setCustomValidity(email !== '' && !isValidEmail(email) ? (box.dataset.msgEmailInvalid || 'Invalid') : '');
     }
 
+    // Paint ✓ immediately for prefilled / just-validated contacts (same as tax step).
+    if (pec !== '' && pecInput.checkValidity()) {
+      paintSetupValidity(pecInput, 'ok');
+    } else if (pec !== '') {
+      paintSetupValidity(pecInput, 'err', pecInput.validationMessage);
+    } else {
+      paintSetupValidity(pecInput, '');
+    }
+    if (emailInput instanceof HTMLInputElement) {
+      const email = emailInput.value.trim();
+      if (email !== '' && emailInput.checkValidity()) {
+        paintSetupValidity(emailInput, 'ok');
+      } else if (email !== '') {
+        paintSetupValidity(emailInput, 'err', emailInput.validationMessage);
+      } else {
+        paintSetupValidity(emailInput, '');
+      }
+    }
+
     form?.dispatchEvent(new Event('setup:cta-refresh', { bubbles: true }));
   };
 
   pecInput.addEventListener('input', refresh);
   pecInput.addEventListener('change', refresh);
+  pecInput.addEventListener('blur', refresh);
   emailInput?.addEventListener('input', refresh);
   emailInput?.addEventListener('change', refresh);
+  emailInput?.addEventListener('blur', refresh);
   refresh();
 }
 
@@ -5885,6 +6247,33 @@ function initSetupWebsiteScrape(root) {
   });
 };
 
+function initSetupGdprOptions(scope = document) {
+  scope.querySelectorAll('[data-setup-gdpr-options]').forEach((root) => {
+    if (root.dataset.gdprOptionsBound === '1') return;
+    root.dataset.gdprOptionsBound = '1';
+    const master = root.querySelector('[data-gdpr-master]');
+    if (!(master instanceof HTMLInputElement)) return;
+
+    const sync = () => {
+      const on = master.checked;
+      root.querySelectorAll('[data-gdpr-extras]').forEach((block) => {
+        if (block instanceof HTMLElement) {
+          block.classList.toggle('is-disabled', !on);
+          block.hidden = false;
+        }
+      });
+      root.querySelectorAll('[data-gdpr-extra]').forEach((input) => {
+        if (input instanceof HTMLInputElement) {
+          input.disabled = !on;
+        }
+      });
+    };
+
+    master.addEventListener('change', sync);
+    sync();
+  });
+}
+
 function initSetupLegalPdf(root) {
   root.querySelectorAll('[data-setup-legal-pdf]').forEach((block) => {
     if (block.dataset.legalPdfBound === '1') return;
@@ -6359,10 +6748,13 @@ function initPeopleList(list) {
     rows.querySelectorAll('[data-people-row]').forEach((row) => {
       const first = row.querySelector('input[name*="[first_name]"]')?.value?.trim() || '';
       const last = row.querySelector('input[name*="[last_name]"]')?.value?.trim() || '';
-      const organ = row.querySelector('select[name*="[organ_type]"]')?.value?.trim() || '';
       const cfInput = row.querySelector('input[data-people-cf], input[name*="[fiscal_code]"]');
-      const filled = !!(first || last || organ);
-      setCfValidity(cfInput, filled);
+      const nameFilled = !!(first || last);
+      const star = row.querySelector('[data-people-cf-star]');
+      if (star instanceof HTMLElement) {
+        star.hidden = !nameFilled;
+      }
+      setCfValidity(cfInput, nameFilled);
     });
     form?.dispatchEvent(new Event('setup:cta-refresh', { bubbles: true }));
   };
@@ -6463,6 +6855,7 @@ function initPeopleList(list) {
     }
     setDialogStatus('');
     initPlaceSuggest(dialog);
+    initBirthDateFields(dialog);
     if (typeof dialog.showModal === 'function') dialog.showModal();
     else dialog.setAttribute('open', 'open');
     (dialogFirst instanceof HTMLInputElement ? dialogFirst : dialogBirth)?.focus();
@@ -6479,6 +6872,59 @@ function initPeopleList(list) {
     reindex();
     initPlaceSuggest(list.closest('form') || list || document);
     syncPeopleCfRequired();
+  });
+
+  const importBox = list.closest('.setup-people')?.querySelector('[data-setup-runts-board-import]')
+    || root.querySelector('[data-setup-runts-board-import]');
+  const importBtn = importBox?.querySelector('[data-setup-runts-board-import-btn]');
+  importBtn?.addEventListener('click', () => {
+    let people = [];
+    try {
+      people = JSON.parse(importBox?.dataset?.runtsPeople || '[]');
+    } catch {
+      people = [];
+    }
+    if (!Array.isArray(people) || people.length === 0) return;
+
+    const isRowEmpty = (row) => {
+      const first = row.querySelector('[data-people-first]')?.value?.trim() || '';
+      const last = row.querySelector('[data-people-last]')?.value?.trim() || '';
+      const cf = row.querySelector('[data-people-cf]')?.value?.trim() || '';
+      return !first && !last && !cf;
+    };
+
+    // Drop a single blank starter row before importing.
+    const current = [...rows.querySelectorAll('[data-people-row]')];
+    if (current.length === 1 && isRowEmpty(current[0])) {
+      current[0].remove();
+    }
+
+    people.forEach((person) => {
+      const first = String(person?.first_name || '').trim();
+      const last = String(person?.last_name || '').trim();
+      if (!first || !last) return;
+      const already = [...rows.querySelectorAll('[data-people-row]')].some((row) => {
+        const f = row.querySelector('[data-people-first]')?.value?.trim().toLowerCase() || '';
+        const l = row.querySelector('[data-people-last]')?.value?.trim().toLowerCase() || '';
+        return f === first.toLowerCase() && l === last.toLowerCase();
+      });
+      if (already) return;
+      const html = template.innerHTML.replaceAll('__i__', String(rows.children.length));
+      rows.insertAdjacentHTML('beforeend', html);
+      const row = rows.lastElementChild;
+      if (!(row instanceof HTMLElement)) return;
+      const firstInput = row.querySelector('[data-people-first]');
+      const lastInput = row.querySelector('[data-people-last]');
+      const officeSelect = row.querySelector('[data-people-office]');
+      if (firstInput instanceof HTMLInputElement) firstInput.value = first;
+      if (lastInput instanceof HTMLInputElement) lastInput.value = last;
+      if (officeSelect instanceof HTMLSelectElement && person.office_role) {
+        officeSelect.value = String(person.office_role);
+      }
+    });
+    reindex();
+    syncPeopleCfRequired();
+    if (importBox instanceof HTMLElement) importBox.hidden = true;
   });
 
   rows.addEventListener('click', (event) => {
@@ -6609,7 +7055,7 @@ function initPeopleList(list) {
         const organ = row.querySelector('select[name*="[organ_type]"]')?.value?.trim() || '';
         if (!first && !last && !cf && !organ) return;
         const cfInput = row.querySelector('input[name*="[fiscal_code]"]');
-        if ((first || last || organ) && !cf) {
+        if ((first || last) && !cf) {
           blocked = true;
           if (cfInput instanceof HTMLInputElement) {
             cfInput.setCustomValidity(msgCfRequired);
@@ -6721,10 +7167,122 @@ function clearGeoCityError(input) {
 
 function clearGeoFieldError(input) {
   clearGeoCityError(input);
+  if (input instanceof HTMLInputElement) {
+    input.classList.remove('is-geo-forced', 'is-invalid', 'input-invalid');
+  }
+}
+
+function geoAddressForcePanel(input) {
+  if (!(input instanceof HTMLInputElement)) return null;
+  return input.closest('.suggest-field, .setup-field, label')?.querySelector('[data-geo-address-force-panel]')
+    || null;
+}
+
+function hideGeoAddressForcePanel(input) {
+  const panel = geoAddressForcePanel(input);
+  if (!(panel instanceof HTMLElement)) return;
+  panel.hidden = true;
+  panel.classList.remove('is-forced');
+  const warn = panel.querySelector('[data-geo-address-warn]');
+  if (warn) warn.textContent = '';
+  const suggestBtn = panel.querySelector('[data-geo-address-suggest-use]');
+  if (suggestBtn instanceof HTMLButtonElement) {
+    suggestBtn.hidden = true;
+    suggestBtn.onclick = null;
+  }
+}
+
+function showGeoAddressForcePanel(input, options = {}) {
+  if (!(input instanceof HTMLInputElement)) return;
+  const panel = geoAddressForcePanel(input);
+  if (!(panel instanceof HTMLElement)) return;
+  const typed = input.value.trim();
+  const hintTpl = document.body?.dataset?.msgGeoAddressNotFoundHint
+    || '⚠️ Non troviamo questa via sulle mappe. Se sei sicuro, conferma l’indirizzo inserito.';
+  const forceTpl = document.body?.dataset?.msgGeoAddressForceNamed
+    || document.body?.dataset?.msgGeoAddressForce
+    || 'Conferma indirizzo inserito';
+  const useTpl = document.body?.dataset?.msgGeoAddressUseSuggestion || 'Usa «:suggestion»';
+  const warn = panel.querySelector('[data-geo-address-warn]');
+  const forceBtn = panel.querySelector('[data-geo-address-force]');
+  const suggestBtn = panel.querySelector('[data-geo-address-suggest-use]');
+  if (warn) {
+    warn.textContent = String(options.message || hintTpl).replaceAll(':value', typed);
+  }
+  if (forceBtn instanceof HTMLButtonElement) {
+    forceBtn.textContent = forceTpl.replaceAll(':value', typed || '…');
+    forceBtn.hidden = false;
+    forceBtn.onclick = () => applyGeoAddressForce(input);
+  }
+  if (suggestBtn instanceof HTMLButtonElement) {
+    const suggestion = String(options.suggestionLabel || '').trim();
+    const applySuggestion = options.applySuggestion;
+    if (suggestion && typeof applySuggestion === 'function') {
+      suggestBtn.hidden = false;
+      suggestBtn.textContent = useTpl.replaceAll(':suggestion', suggestion);
+      suggestBtn.onclick = () => {
+        applySuggestion();
+        input.dataset.geoPicked = '1';
+        delete input.dataset.geoForced;
+        input.classList.remove('is-geo-forced');
+        clearGeoFieldError(input);
+        hideGeoAddressForcePanel(input);
+        refreshGeoScopeValidity(geoScopeFor(input));
+        input.closest('form')?.dispatchEvent(new Event('setup:cta-refresh', { bubbles: true }));
+      };
+    } else {
+      suggestBtn.hidden = true;
+      suggestBtn.onclick = null;
+    }
+  }
+  panel.hidden = false;
+  panel.classList.toggle('is-forced', input.dataset.geoForced === '1');
+  input.dataset.geoPicked = '0';
+  delete input.dataset.geoForced;
+  input.classList.remove('is-geo-forced');
+  input.classList.add('input-invalid');
+  const msg = document.body?.dataset?.msgGeoAddressRequired
+    || 'Seleziona una via dall’elenco oppure conferma l’indirizzo inserito.';
+  input.setCustomValidity(msg);
+  refreshGeoScopeValidity(geoScopeFor(input));
+  input.closest('form')?.dispatchEvent(new Event('setup:cta-refresh', { bubbles: true }));
+}
+
+function applyGeoAddressForce(input) {
+  if (!(input instanceof HTMLInputElement) || !input.value.trim()) return;
+  input.dataset.geoForced = '1';
+  input.dataset.geoPicked = '1';
+  input.classList.remove('input-invalid', 'is-invalid');
+  input.classList.add('is-geo-forced');
+  input.setCustomValidity('');
+  const panel = geoAddressForcePanel(input);
+  if (panel instanceof HTMLElement) {
+    panel.hidden = false;
+    panel.classList.add('is-forced');
+    const warn = panel.querySelector('[data-geo-address-warn]');
+    if (warn) {
+      warn.textContent = document.body?.dataset?.msgGeoAddressForcedOk
+        || 'Indirizzo confermato così com’è (non trovato sulle mappe).';
+    }
+    const suggestBtn = panel.querySelector('[data-geo-address-suggest-use]');
+    if (suggestBtn instanceof HTMLButtonElement) suggestBtn.hidden = true;
+    const forceBtn = panel.querySelector('[data-geo-address-force]');
+    if (forceBtn instanceof HTMLButtonElement) forceBtn.hidden = true;
+  }
+  refreshGeoScopeValidity(geoScopeFor(input));
+  input.closest('form')?.dispatchEvent(new Event('setup:cta-refresh', { bubbles: true }));
 }
 
 async function showGeoFieldNotFound(input, template, options = {}) {
   if (!input) return;
+  // Streets: inline warn + force — never a blocking modal.
+  if (input.matches('[data-address-input]')) {
+    showGeoAddressForcePanel(input, {
+      message: document.body?.dataset?.msgGeoAddressNotFoundHint
+        || geoFieldNotFoundMessage(template, input.value.trim()),
+    });
+    return;
+  }
   const message = geoFieldNotFoundMessage(template, input.value.trim());
   input.dataset.geoPicked = '0';
   input.classList.add('input-invalid');
@@ -6801,7 +7359,11 @@ function refreshGeoScopeValidity(scope) {
   }
   if (addressInput instanceof HTMLInputElement) {
     const value = addressInput.value.trim();
-    if (addressInput.required && value && addressInput.dataset.geoPicked !== '1') {
+    if (addressInput.dataset.geoForced === '1' && value) {
+      addressInput.dataset.geoPicked = '1';
+      addressInput.setCustomValidity('');
+      addressInput.classList.add('is-geo-forced');
+    } else if (addressInput.required && value && addressInput.dataset.geoPicked !== '1') {
       addressInput.setCustomValidity(msgAddress);
     } else if (addressInput.validationMessage === msgAddress) {
       addressInput.setCustomValidity('');
@@ -6832,6 +7394,17 @@ function refreshGeoScopeValidity(scope) {
       provinceInput.setCustomValidity('');
     }
   }
+
+  // Drop stale CAP↔city mismatch messages when the pair is now coherent
+  // (e.g. city corrected from Rotondella → Policoro while CAP stayed 75025).
+  const postalInput = scope.querySelector('[data-postal-code]');
+  if (postalInput instanceof HTMLInputElement && postalInput.validationMessage) {
+    const cap = postalInput.value.replace(/\D+/g, '');
+    const expectedCap = String(scope.dataset.geoExpectedCap || '').replace(/\D+/g, '');
+    if (cap.length === 5 && expectedCap && cap === expectedCap) {
+      postalInput.setCustomValidity('');
+    }
+  }
 }
 
 function refreshGeoFormValidity(form) {
@@ -6852,13 +7425,22 @@ async function handleGeoResolveResult(data, input, applyItem, confirmTemplate, o
   const notFoundTemplate = options.notFoundTemplate
     || document.body?.dataset?.msgGeoCityNotFound
     || 'Valore non trovato.';
+  const isAddress = input.matches?.('[data-address-input]');
   if (data.action === 'none') {
     input.dataset.geoPicked = '1';
     clearGeoFieldError(input);
+    if (isAddress) hideGeoAddressForcePanel(input);
     input.closest('form')?.dispatchEvent(new Event('setup:cta-refresh', { bubbles: true }));
     return true;
   }
   if (data.action === 'not_found') {
+    if (isAddress) {
+      showGeoAddressForcePanel(input, {
+        message: document.body?.dataset?.msgGeoAddressNotFoundHint
+          || geoFieldNotFoundMessage(notFoundTemplate, input.value.trim()),
+      });
+      return false;
+    }
     if (options.silent) {
       input.dataset.geoPicked = '0';
       input.closest('form')?.dispatchEvent(new Event('setup:cta-refresh', { bubbles: true }));
@@ -6870,11 +7452,24 @@ async function handleGeoResolveResult(data, input, applyItem, confirmTemplate, o
   if (data.action === 'apply' && data.item) {
     applyItem(data.item);
     input.dataset.geoPicked = '1';
+    delete input.dataset.geoForced;
     clearGeoFieldError(input);
+    if (isAddress) hideGeoAddressForcePanel(input);
     input.closest('form')?.dispatchEvent(new Event('setup:cta-refresh', { bubbles: true }));
     return true;
   }
   if (data.action !== 'confirm' || !data.item) return false;
+  // Address: never block with a modal — offer suggestion + force inline.
+  if (isAddress) {
+    const suggestion = data.label || data.item.label || data.item.address || data.item.name || '';
+    showGeoAddressForcePanel(input, {
+      message: document.body?.dataset?.msgGeoAddressNotFoundHint
+        || geoFieldNotFoundMessage(notFoundTemplate, input.value.trim()),
+      suggestionLabel: suggestion,
+      applySuggestion: () => applyItem(data.item),
+    });
+    return false;
+  }
   if (options.silent) {
     applyItem(data.item);
     input.dataset.geoPicked = '1';
@@ -7162,9 +7757,12 @@ function initPlaceSuggest(root = document) {
               cityInput.value = item.city;
               cityInput.dataset.geoPicked = '1';
               clearGeoFieldError(cityInput);
-              if (postalInput instanceof HTMLInputElement && item.cap) {
-                postalInput.value = item.cap;
-                postalInput.dataset.geoPicked = '1';
+              if (postalInput instanceof HTMLInputElement) {
+                postalInput.setCustomValidity('');
+                if (item.cap) {
+                  postalInput.value = item.cap;
+                  postalInput.dataset.geoPicked = '1';
+                }
               }
               applyProvince(item);
               addressInput?.focus();
@@ -7199,11 +7797,27 @@ function initPlaceSuggest(root = document) {
           },
         },
       });
+      const clearStaleCapCityError = () => {
+        if (postalInput instanceof HTMLInputElement) {
+          postalInput.setCustomValidity('');
+        }
+        // City changed: previous expected CAP may belong to another comune.
+        delete scope.dataset.geoExpectedCap;
+      };
+      cityInput.addEventListener('input', clearStaleCapCityError);
       cityInput.addEventListener('change', () => {
+        clearStaleCapCityError();
         if (addressInput?.dataset.suggestBound === '1') {
           addressInput.dispatchEvent(new Event('input', { bubbles: true }));
         }
         refreshGeoScopeValidity(scope);
+      });
+    }
+
+    if (postalInput instanceof HTMLInputElement && postalInput.dataset.capClearBound !== '1') {
+      postalInput.dataset.capClearBound = '1';
+      postalInput.addEventListener('input', () => {
+        postalInput.setCustomValidity('');
       });
     }
 
@@ -7217,17 +7831,32 @@ function initPlaceSuggest(root = document) {
       bindSuggest({
         input: addressInput,
         list: addressList,
-        minChars: 3,
+        minChars: 2,
+        debounceMs: 280,
+        liveFeedback: true,
+        loadingLabel: () => {
+          const city = pairedCity?.value?.trim() || '';
+          const tpl = document.body?.dataset?.msgGeoAddressSearching || 'Cerco vie a :city…';
+          return tpl.replaceAll(':city', city || '…');
+        },
+        emptyLabel: (q) => {
+          const tpl = document.body?.dataset?.msgGeoAddressNone
+            || 'Nessuna via trovata per «:query».';
+          return tpl.replaceAll(':query', q);
+        },
         fetchItems: async (q) => {
           const city = pairedCity?.value?.trim() || '';
           if (!city) {
-            return [{ label: cityFirstMsg, apply: () => pairedCity?.focus() }];
+            return [{ label: cityFirstMsg, apply: () => pairedCity?.focus(), disabled: true }];
           }
           const house = houseNumberInput instanceof HTMLInputElement ? houseNumberInput.value.trim() : '';
           const qs = new URLSearchParams({ q, city });
           if (house) qs.set('house_number', house);
-          const res = await fetch(`${addressesUrl}?${qs.toString()}`);
-          const data = await res.json();
+          const res = await fetch(`${addressesUrl}?${qs.toString()}`, {
+            headers: { Accept: 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+          });
+          if (!res.ok) return [];
+          const data = await res.json().catch(() => ({}));
           const seen = new Set();
           return (data.items || []).flatMap((item) => {
             const key = [
@@ -7261,7 +7890,7 @@ function initPlaceSuggest(root = document) {
           form?.dispatchEvent(new Event('setup:cta-refresh', { bubbles: true }));
         },
         resolve: {
-          minChars: 3,
+          minChars: 2,
           skipIf: () => !(pairedCity?.value?.trim() || ''),
           run: async (raw) => {
             const city = pairedCity?.value?.trim() || '';
@@ -7291,13 +7920,64 @@ function initPlaceSuggest(root = document) {
   });
 }
 
-function bindSuggest({ input, list, fetchItems, minChars = 2, onPick, resolve = null }) {
+function bindSuggest({
+  input,
+  list,
+  fetchItems,
+  minChars = 2,
+  debounceMs = 220,
+  onPick,
+  resolve = null,
+  liveFeedback = false,
+  loadingLabel = null,
+  emptyLabel = null,
+  onEmpty = null,
+}) {
   if (!input || !list) return;
   let active = -1;
   let items = [];
   let pickedFromList = false;
+  let fetchSeq = 0;
   const field = input.closest('.suggest-field');
+  const wrap = input.closest('.suggest-wrap');
   input.dataset.geoPicked = input.dataset.geoPicked || '0';
+
+  let spinner = wrap?.querySelector('.suggest-spinner');
+  if (!spinner && wrap) {
+    spinner = document.createElement('span');
+    spinner.className = 'suggest-spinner';
+    spinner.setAttribute('aria-hidden', 'true');
+    wrap.appendChild(spinner);
+  }
+
+  const setLoading = (on) => {
+    wrap?.classList.toggle('is-loading', !!on);
+    if (on) {
+      setSetupFieldValidating(input, true);
+      return;
+    }
+    // Blur resolve still in flight: keep the spinner.
+    if (input.dataset.geoResolveBusy === '1') return;
+    setSetupFieldValidating(input, false);
+    if (document.activeElement === input) {
+      paintSetupValidity(input, '');
+    } else {
+      input.closest('form')?.dispatchEvent(new Event('setup:cta-refresh', { bubbles: true }));
+    }
+  };
+
+  const positionList = () => {
+    if (list.hidden) return;
+    const rect = input.getBoundingClientRect();
+    const maxH = Math.min(280, Math.max(140, window.innerHeight - rect.bottom - 12));
+    list.style.position = 'fixed';
+    list.style.left = `${Math.max(8, rect.left)}px`;
+    list.style.width = `${Math.max(180, rect.width)}px`;
+    list.style.top = `${rect.bottom + 4}px`;
+    list.style.right = 'auto';
+    list.style.maxHeight = `${maxH}px`;
+    list.style.zIndex = '5000';
+  };
 
   const hide = () => {
     list.hidden = true;
@@ -7305,6 +7985,25 @@ function bindSuggest({ input, list, fetchItems, minChars = 2, onPick, resolve = 
     active = -1;
     items = [];
     field?.classList.remove('is-open');
+    setLoading(false);
+    list.style.position = '';
+    list.style.left = '';
+    list.style.width = '';
+    list.style.top = '';
+    list.style.right = '';
+    list.style.maxHeight = '';
+    list.style.zIndex = '';
+  };
+
+  const showStatusRow = (text, kind = 'loading') => {
+    list.innerHTML = '';
+    const row = document.createElement('div');
+    row.className = `suggest-status is-${kind}`;
+    row.textContent = text;
+    list.appendChild(row);
+    list.hidden = false;
+    field?.classList.add('is-open');
+    positionList();
   };
 
   const render = () => {
@@ -7313,13 +8012,20 @@ function bindSuggest({ input, list, fetchItems, minChars = 2, onPick, resolve = 
       const btn = document.createElement('button');
       btn.type = 'button';
       btn.textContent = item.label;
+      if (item.disabled) {
+        btn.disabled = true;
+        btn.classList.add('is-disabled');
+      }
       if (idx === active) btn.classList.add('active');
       btn.addEventListener('mousedown', (e) => {
         e.preventDefault();
+        if (item.disabled || typeof item.apply !== 'function') return;
         item.apply();
         pickedFromList = true;
         input.dataset.geoPicked = '1';
+        delete input.dataset.geoForced;
         clearGeoCityError(input);
+        if (input.matches('[data-address-input]')) hideGeoAddressForcePanel(input);
         hide();
         onPick?.();
       });
@@ -7327,6 +8033,7 @@ function bindSuggest({ input, list, fetchItems, minChars = 2, onPick, resolve = 
     });
     list.hidden = items.length === 0;
     field?.classList.toggle('is-open', !list.hidden);
+    if (!list.hidden) positionList();
   };
 
   const run = debounce(async () => {
@@ -7335,39 +8042,84 @@ function bindSuggest({ input, list, fetchItems, minChars = 2, onPick, resolve = 
       hide();
       return;
     }
-    try {
-      items = await fetchItems(q);
-      active = -1;
-      render();
-    } catch (err) {
-      hide();
+    const seq = ++fetchSeq;
+    setLoading(true);
+    if (liveFeedback) {
+      const label = typeof loadingLabel === 'function'
+        ? loadingLabel(q)
+        : (loadingLabel || '…');
+      showStatusRow(label, 'loading');
     }
-  }, 300);
+    try {
+      const next = await fetchItems(q);
+      if (seq !== fetchSeq) return;
+      items = Array.isArray(next) ? next : [];
+      active = -1;
+      if (items.length === 0 && liveFeedback) {
+        const label = typeof emptyLabel === 'function'
+          ? emptyLabel(q)
+          : (emptyLabel || '');
+        if (label) showStatusRow(label, 'empty');
+        else hide();
+        onEmpty?.(q);
+      } else {
+        render();
+      }
+    } catch (err) {
+      if (seq === fetchSeq) hide();
+    } finally {
+      if (seq === fetchSeq) setLoading(false);
+    }
+  }, debounceMs);
+
+  const onReposition = () => {
+    if (!list.hidden) positionList();
+  };
+  window.addEventListener('resize', onReposition);
+  window.addEventListener('scroll', onReposition, true);
 
   input.addEventListener('input', () => {
     pickedFromList = false;
     input.dataset.geoPicked = '0';
+    delete input.dataset.geoForced;
+    input.classList.remove('is-geo-forced');
     clearGeoFieldError(input);
+    if (input.matches('[data-address-input]')) hideGeoAddressForcePanel(input);
     input.closest('form')?.dispatchEvent(new Event('setup:cta-refresh', { bubbles: true }));
+    const q = input.value.trim();
+    if (q.length >= minChars) {
+      // Immediate visual feedback before the debounced fetch returns.
+      setLoading(true);
+      if (liveFeedback) {
+        const label = typeof loadingLabel === 'function'
+          ? loadingLabel(q)
+          : (loadingLabel || '…');
+        showStatusRow(label, 'loading');
+      }
+    } else {
+      hide();
+    }
     run();
   });
   input.addEventListener('keydown', (e) => {
     if (list.hidden) return;
-    const buttons = [...list.querySelectorAll('button')];
+    const buttons = [...list.querySelectorAll('button:not(:disabled)')];
     if (e.key === 'ArrowDown') {
       e.preventDefault();
-      active = Math.min(active + 1, buttons.length - 1);
+      active = Math.min(active + 1, Math.max(0, items.filter((it) => !it.disabled).length - 1));
       render();
     } else if (e.key === 'ArrowUp') {
       e.preventDefault();
       active = Math.max(active - 1, 0);
       render();
-    } else if (e.key === 'Enter' && active >= 0 && items[active]) {
+    } else if (e.key === 'Enter' && active >= 0 && items[active] && !items[active].disabled) {
       e.preventDefault();
       items[active].apply();
       pickedFromList = true;
       input.dataset.geoPicked = '1';
+      delete input.dataset.geoForced;
       clearGeoCityError(input);
+      if (input.matches('[data-address-input]')) hideGeoAddressForcePanel(input);
       hide();
       onPick?.();
     } else if (e.key === 'Escape') {
@@ -7377,15 +8129,21 @@ function bindSuggest({ input, list, fetchItems, minChars = 2, onPick, resolve = 
   input.addEventListener('blur', () => {
     setTimeout(async () => {
       hide();
-      if (pickedFromList || input.dataset.geoPicked === '1' || !resolve) return;
+      if (pickedFromList || input.dataset.geoPicked === '1' || input.dataset.geoForced === '1' || !resolve) return;
       const raw = input.value.trim();
       const resolveMin = resolve.minChars ?? minChars;
       if (raw.length < resolveMin) return;
       if (typeof resolve.skipIf === 'function' && resolve.skipIf(raw)) return;
+      input.dataset.geoResolveBusy = '1';
+      setSetupFieldValidating(input, true);
       try {
         await resolve.run(raw);
       } catch (err) {
         /* ignore resolve errors on blur */
+      } finally {
+        delete input.dataset.geoResolveBusy;
+        setSetupFieldValidating(input, false);
+        input.closest('form')?.dispatchEvent(new Event('setup:cta-refresh', { bubbles: true }));
       }
     }, 180);
   });
@@ -8212,21 +8970,33 @@ function initBirthDateFields(root = document) {
   const scope = root && root.querySelectorAll ? root : document;
   const today = new Date();
   const maxAdult = new Date(today.getFullYear() - 18, today.getMonth(), today.getDate());
+  const oldest = new Date(today.getFullYear() - 100, today.getMonth(), today.getDate());
   const maxStr = localIsoDate(maxAdult);
+  const minStr = localIsoDate(oldest);
   const todayStr = localIsoDate(today);
   const msgFuture = document.body?.dataset?.msgBirthFuture || 'La data di nascita non può essere nel futuro.';
   const msgMinor = document.body?.dataset?.msgBirthMinor || 'La persona deve avere almeno 18 anni.';
+  const msgTooOld = document.body?.dataset?.msgBirthTooOld
+    || 'La data di nascita deve rientrare negli ultimi 100 anni.';
 
   scope.querySelectorAll('[data-birth-date]').forEach((input) => {
     if (!(input instanceof HTMLInputElement) || input.dataset.birthBound === '1') return;
     input.dataset.birthBound = '1';
     input.max = maxStr;
+    input.min = minStr;
     const validate = () => {
       const v = input.value;
       if (!v) {
         input.setCustomValidity('');
         input.closest('form')?.dispatchEvent(new Event('setup:cta-refresh', { bubbles: true }));
         return true;
+      }
+      // Reject absurd years (e.g. 0001) even if the browser accepts them.
+      const year = Number.parseInt(v.slice(0, 4), 10);
+      if (!Number.isFinite(year) || year < 1000 || v < minStr) {
+        input.setCustomValidity(msgTooOld);
+        input.closest('form')?.dispatchEvent(new Event('setup:cta-refresh', { bubbles: true }));
+        return false;
       }
       if (v > todayStr) {
         input.setCustomValidity(msgFuture);
@@ -8244,6 +9014,7 @@ function initBirthDateFields(root = document) {
     };
     input.addEventListener('change', validate);
     input.addEventListener('input', validate);
+    validate();
   });
 
   const msgAppointedFuture = document.body?.dataset?.msgAppointedFuture || 'La data di nomina non può essere nel futuro.';
@@ -8312,36 +9083,41 @@ async function resolvePendingGeoFields(form, options = {}) {
     if (scope?.dataset?.geoForeign === '1') continue;
     const raw = cityInput.value.trim();
     if (raw.length < 2) continue;
-    const data = await resolveGeoQuery(citiesUrl, { q: raw });
-    const postalInput = scope.querySelector('[data-postal-code]');
-    const provinceInput = scope.querySelector('[data-province-input]');
-    const existingProvince = provinceInput instanceof HTMLInputElement ? provinceInput.value.trim() : '';
-    const resolved = await handleGeoResolveResult(data, cityInput, (item) => {
-      cityInput.value = item.city || item.label || raw;
-      cityInput.dataset.geoPicked = '1';
-      clearGeoFieldError(cityInput);
-      if (postalInput instanceof HTMLInputElement && item.cap && !postalInput.value.trim()) {
-        postalInput.value = item.cap;
-        postalInput.dataset.geoPicked = '1';
-      }
-      if (item.provincia) scope.dataset.geoProvinceSigla = String(item.provincia);
-      if (item.provincia_name) scope.dataset.geoProvinceName = String(item.provincia_name);
-      if (item.cap) scope.dataset.geoExpectedCap = String(item.cap);
-      // If province was empty, fill it; if already set, leave it for the coherence pass.
-      if (provinceInput instanceof HTMLInputElement && !existingProvince) {
-        const provinceName = String(item.provincia_name || '').trim();
-        if (provinceName) {
-          provinceInput.value = provinceName;
-          provinceInput.dataset.geoPicked = '1';
-          clearGeoFieldError(provinceInput);
+    setSetupFieldValidating(cityInput, true);
+    try {
+      const data = await resolveGeoQuery(citiesUrl, { q: raw });
+      const postalInput = scope.querySelector('[data-postal-code]');
+      const provinceInput = scope.querySelector('[data-province-input]');
+      const existingProvince = provinceInput instanceof HTMLInputElement ? provinceInput.value.trim() : '';
+      const resolved = await handleGeoResolveResult(data, cityInput, (item) => {
+        cityInput.value = item.city || item.label || raw;
+        cityInput.dataset.geoPicked = '1';
+        clearGeoFieldError(cityInput);
+        if (postalInput instanceof HTMLInputElement && item.cap && !postalInput.value.trim()) {
+          postalInput.value = item.cap;
+          postalInput.dataset.geoPicked = '1';
         }
-      }
-      const addressInput = scope.querySelector('[data-address-input]');
-      if (addressInput instanceof HTMLInputElement) {
-        addressInput.dispatchEvent(new Event('input', { bubbles: true }));
-      }
-    }, confirmCityTpl, { notFoundTemplate: cityNotFoundTpl, silent });
-    if (!resolved) ok = false;
+        if (item.provincia) scope.dataset.geoProvinceSigla = String(item.provincia);
+        if (item.provincia_name) scope.dataset.geoProvinceName = String(item.provincia_name);
+        if (item.cap) scope.dataset.geoExpectedCap = String(item.cap);
+        // If province was empty, fill it; if already set, leave it for the coherence pass.
+        if (provinceInput instanceof HTMLInputElement && !existingProvince) {
+          const provinceName = String(item.provincia_name || '').trim();
+          if (provinceName) {
+            provinceInput.value = provinceName;
+            provinceInput.dataset.geoPicked = '1';
+            clearGeoFieldError(provinceInput);
+          }
+        }
+        const addressInput = scope.querySelector('[data-address-input]');
+        if (addressInput instanceof HTMLInputElement) {
+          addressInput.dispatchEvent(new Event('input', { bubbles: true }));
+        }
+      }, confirmCityTpl, { notFoundTemplate: cityNotFoundTpl, silent });
+      if (!resolved) ok = false;
+    } finally {
+      setSetupFieldValidating(cityInput, false);
+    }
   }
 
   for (const provinceInput of form.querySelectorAll('[data-province-input]')) {
@@ -8360,28 +9136,33 @@ async function resolvePendingGeoFields(form, options = {}) {
   for (const addressInput of form.querySelectorAll('[data-address-input]')) {
     if (!(addressInput instanceof HTMLInputElement) || addressInput.dataset.geoPicked === '1') continue;
     const raw = addressInput.value.trim();
-    if (raw.length < 3) continue;
+    if (raw.length < 2) continue;
     const scope = addressInput.closest('[data-geo-scope], [data-people-row], .setup-address, .setup-president, [data-member-form], form') || form;
     if (scope?.dataset?.geoForeign === '1') continue;
     const city = scope.querySelector('[data-city-input]')?.value?.trim() || '';
     if (!city) continue;
     const houseNumberInput = scope.querySelector('[data-house-number]');
     const postalInput = scope.querySelector('[data-postal-code]');
-    const data = await resolveGeoQuery(addressesUrl, {
-      q: raw,
-      city,
-      house_number: houseNumberInput instanceof HTMLInputElement ? houseNumberInput.value.trim() : '',
-    });
-    const resolved = await handleGeoResolveResult(data, addressInput, (item) => {
-      addressInput.value = item.address || item.label || raw;
-      if (houseNumberInput instanceof HTMLInputElement && item.house_number) {
-        houseNumberInput.value = item.house_number;
-      }
-      if (postalInput instanceof HTMLInputElement && item.postal_code) {
-        postalInput.value = item.postal_code;
-      }
-    }, confirmAddressTpl, { notFoundTemplate: addressNotFoundTpl, silent });
-    if (!resolved) ok = false;
+    setSetupFieldValidating(addressInput, true);
+    try {
+      const data = await resolveGeoQuery(addressesUrl, {
+        q: raw,
+        city,
+        house_number: houseNumberInput instanceof HTMLInputElement ? houseNumberInput.value.trim() : '',
+      });
+      const resolved = await handleGeoResolveResult(data, addressInput, (item) => {
+        addressInput.value = item.address || item.label || raw;
+        if (houseNumberInput instanceof HTMLInputElement && item.house_number) {
+          houseNumberInput.value = item.house_number;
+        }
+        if (postalInput instanceof HTMLInputElement && item.postal_code) {
+          postalInput.value = item.postal_code;
+        }
+      }, confirmAddressTpl, { notFoundTemplate: addressNotFoundTpl, silent });
+      if (!resolved) ok = false;
+    } finally {
+      setSetupFieldValidating(addressInput, false);
+    }
   }
 
   // Final coherence: city / CAP / province must belong together.
@@ -8449,14 +9230,19 @@ async function resolvePendingGeoFields(form, options = {}) {
         provinceInput.dataset.geoPicked = '1';
       }
     }
-    if (postalInput instanceof HTMLInputElement && cap.length === 5 && expectedCap && cap !== expectedCap) {
+    if (postalInput instanceof HTMLInputElement && cap.length === 5) {
       // Confirm CAP via CAP endpoint (cities can have multiple CAP).
-      let capOk = false;
-      if (urls.capUrl) {
+      let capOk = !expectedCap || cap === expectedCap;
+      if (!capOk && urls.capUrl) {
         const capData = await resolveGeoQuery(urls.capUrl, { q: cap, city });
-        if (capData?.action === 'apply' || capData?.action === 'confirm' || capData?.action === 'none') {
+        if (capData?.action === 'none') {
+          // CAP belongs to the typed city (exact match on server).
+          capOk = true;
+        } else if (capData?.action === 'apply' || capData?.action === 'confirm') {
           const capCity = String(capData.item?.city || '').toLowerCase();
-          if (!capCity || capCity === city.toLowerCase()) capOk = true;
+          // Only accept if the CAP result names the same city — never keep a
+          // mismatch message that still quotes a previous city value.
+          capOk = !!capCity && capCity === city.toLowerCase();
         }
       }
       if (!capOk) {
@@ -8464,7 +9250,7 @@ async function resolvePendingGeoFields(form, options = {}) {
         postalInput.setCustomValidity(msg);
         if (!silent) postalInput.reportValidity();
         ok = false;
-      } else if (postalInput.validationMessage) {
+      } else {
         postalInput.setCustomValidity('');
       }
     }

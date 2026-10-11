@@ -369,7 +369,8 @@ if (!function_exists('parse_stored_phone')) {
             $national = preg_replace('/\D+/', '', $cleaned) ?? '';
         }
 
-        $national = trim(preg_replace('/\s+/', ' ', preg_replace('/\D/', ' ', (string) $national) ?? '') ?? '');
+        // Always keep national as bare digits (spaces/dashes/parens stripped).
+        $national = preg_replace('/\D+/', '', (string) $national) ?? '';
 
         return ['dial' => $dial, 'national' => $national];
     }
@@ -379,12 +380,13 @@ if (!function_exists('format_stored_phone')) {
     function format_stored_phone(string $dial, string $national): string
     {
         $dial = preg_replace('/\D+/', '', $dial) ?? '';
-        $national = trim(preg_replace('/\s+/', ' ', preg_replace('/[^\d\s]/', '', $national) ?? '') ?? '');
+        $national = preg_replace('/\D+/', '', $national) ?? '';
         if ($dial === '' || $national === '') {
             return '';
         }
 
-        return '+' . $dial . ' ' . $national;
+        // Compact E.164 — no spaces — for SMS / automated dialing.
+        return '+' . $dial . $national;
     }
 }
 
@@ -426,27 +428,42 @@ if (!function_exists('is_valid_phone_value')) {
 }
 
 if (!function_exists('validate_adult_birth_date')) {
-    /** @return string|null Validation message key or null if valid/empty */
+    /**
+     * Adult birth date: not in the future, at least 18, and within the last 100 years.
+     *
+     * @return string|null Validation message key or null if valid/empty
+     */
     function validate_adult_birth_date(?string $date): ?string
     {
         $date = trim((string) $date);
         if ($date === '') {
             return null;
         }
-        if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $date)) {
+        if (!preg_match('/^(\d{4})-(\d{2})-(\d{2})$/', $date, $m)) {
             return 'validation.date';
         }
-        $ts = strtotime($date);
-        if ($ts === false) {
+        $year = (int) $m[1];
+        $month = (int) $m[2];
+        $day = (int) $m[3];
+        if ($year < 1000 || !checkdate($month, $day, $year)) {
             return 'validation.date';
         }
-        $today = strtotime('today');
-        if ($ts > $today) {
+        try {
+            $born = new \DateTimeImmutable($date);
+            $today = new \DateTimeImmutable('today');
+        } catch (\Exception) {
+            return 'validation.date';
+        }
+        if ($born > $today) {
             return 'validation.birth_date_future';
         }
-        $minAdult = strtotime('-18 years', $today);
-        if ($ts > $minAdult) {
+        $minAdult = $today->modify('-18 years');
+        if ($born > $minAdult) {
             return 'validation.birth_date_minor';
+        }
+        $oldest = $today->modify('-100 years');
+        if ($born < $oldest) {
+            return 'validation.birth_date_too_old';
         }
         return null;
     }

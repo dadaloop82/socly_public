@@ -12,6 +12,9 @@ final class GeoService
     /** @var list<array{nome:string,belfiore:string,provincia:string,cap:string}>|null */
     private static ?array $comuni = null;
 
+    /** @var array<string, string|null> Short-lived HTTP response cache (same PHP request / worker). */
+    private static array $httpCache = [];
+
     /** @return list<array{label:string,city:string,belfiore:string,provincia:string,cap:string}> */
     public function searchComuni(string $query, int $limit = 12): array
     {
@@ -170,30 +173,131 @@ final class GeoService
         $city = trim($city);
         $houseNumber = trim($houseNumber);
         // Address suggestions are always scoped to the preselected city.
-        if ($city === '' || mb_strlen($query) < 3) {
+        if ($city === '' || mb_strlen($query) < 2) {
+            return [];
+        }
+
+        // Photon is built for typeahead (partial streets like "Via Ro"); Nominatim is a fallback.
+        $photon = $this->searchAddressesPhoton($query, $city, $limit, $houseNumber);
+        if ($photon !== []) {
+            return $photon;
+        }
+
+        return $this->searchAddressesNominatim($query, $city, $limit, $houseNumber);
+    }
+
+    /**
+     * Fast autocomplete via Photon (Komoot). One request, prefix-friendly.
+     *
+     * @return list<array{label:string,address:string,house_number:string,city:string,postal_code:string,lat:float,lon:float}>
+     */
+    private function searchAddressesPhoton(string $query, string $city, int $limit, string $houseNumber = ''): array
+    {
+        $q = $houseNumber !== '' ? trim($query . ' ' . $houseNumber) : $query;
+        $params = [
+            'q' => $q . ' ' . $city,
+            'lang' => 'en',
+            'limit' => max($limit * 3, 12),
+            'osm_tag' => 'highway',
+        ];
+        // Avoid Nominatim bbox lookup here — it is slow/rate-limited and blocks typeahead.
+        // City name in the query + post-filter is enough for suggestions.
+
+        $json = $this->httpGet('https://photon.komoot.io/api/?' . http_build_query($params));
+        if ($json === null || $json === '') {
+            return [];
+        }
+        $decoded = json_decode($json, true);
+        $features = is_array($decoded) ? ($decoded['features'] ?? null) : null;
+        if (!is_array($features) || $features === []) {
             return [];
         }
 
         $cityNeedle = $this->normalizePlace($city);
+        $comune = $this->findComune($city);
+        $cityCap = trim((string) ($comune['cap'] ?? ''));
+        $out = [];
+        $seen = [];
+        foreach ($features as $feature) {
+            if (!is_array($feature)) {
+                continue;
+            }
+            $props = is_array($feature['properties'] ?? null) ? $feature['properties'] : [];
+            $geometry = is_array($feature['geometry'] ?? null) ? $feature['geometry'] : [];
+            $coords = is_array($geometry['coordinates'] ?? null) ? $geometry['coordinates'] : [];
+            $road = trim((string) ($props['street'] ?? ''));
+            if ($road === '') {
+                $road = trim((string) ($props['name'] ?? ''));
+            }
+            if ($road === '') {
+                continue;
+            }
+            $rowHouse = trim((string) ($props['housenumber'] ?? $props['house_number'] ?? ''));
+            // When Photon returns a highway feature, name is the road; housenumber stays empty.
+            if ($rowHouse === '' && $houseNumber !== '' && $this->roadMatchesQuery($query, $road)) {
+                $rowHouse = $houseNumber;
+            }
+            $cityName = trim((string) (
+                $props['city'] ?? $props['town'] ?? $props['village'] ?? $props['municipality']
+                ?? $props['locality'] ?? ''
+            ));
+            $lat = isset($coords[1]) ? (float) $coords[1] : 0.0;
+            $lon = isset($coords[0]) ? (float) $coords[0] : 0.0;
+            // Match city on Photon locality fields only — never on the road label
+            // (e.g. "Via Policoro" in another comune must not pass).
+            $cityOk = $this->addressMatchesCity($cityNeedle, $cityName, '', $props);
+            if (!$cityOk || !$this->roadSuggestMatches($query, $road)) {
+                continue;
+            }
+            $postalCode = trim((string) ($props['postcode'] ?? ''));
+            if ($postalCode === '' && $cityCap !== '') {
+                $postalCode = $cityCap;
+            }
+            $streetLabel = trim($road . ($rowHouse !== '' ? ' ' . $rowHouse : ''));
+            $item = [
+                'label' => trim($streetLabel . ', ' . $city),
+                'address' => $road,
+                'house_number' => $rowHouse,
+                'city' => $city,
+                'postal_code' => $postalCode,
+                'lat' => $lat,
+                'lon' => $lon,
+            ];
+            $uniqueKey = $this->addressUniqueKey($item);
+            if (isset($seen[$uniqueKey])) {
+                continue;
+            }
+            $seen[$uniqueKey] = true;
+            $out[] = $item;
+            if (count($out) >= $limit) {
+                break;
+            }
+        }
+
+        return $out;
+    }
+
+    /**
+     * Nominatim fallback — few requests, stop early, cache-friendly.
+     *
+     * @return list<array{label:string,address:string,house_number:string,city:string,postal_code:string,lat:float,lon:float}>
+     */
+    private function searchAddressesNominatim(string $query, string $city, int $limit, string $houseNumber = ''): array
+    {
+        $cityNeedle = $this->normalizePlace($city);
         $bbox = $this->cityBoundingBox($city);
         $data = [];
-        foreach ($this->streetQueryVariants($query) as $street) {
+        $variants = $this->streetQueryVariants($query);
+        // Live typing: prefer the raw query (+ Via prefix variant at most). Avoid exploding Nominatim.
+        $variants = array_slice($variants, 0, 2);
+        foreach ($variants as $street) {
             $streetWithNo = $houseNumber !== '' ? trim($street . ' ' . $houseNumber) : $street;
             $paramSets = [
-                [
-                    'street' => $streetWithNo,
-                    'city' => $city,
-                    'country' => 'Italy',
-                    'format' => 'jsonv2',
-                    'addressdetails' => 1,
-                    'limit' => max($limit * 3, 10),
-                    'countrycodes' => 'it',
-                ],
                 [
                     'q' => $streetWithNo . ', ' . $city . ', Italia',
                     'format' => 'jsonv2',
                     'addressdetails' => 1,
-                    'limit' => max($limit * 3, 10),
+                    'limit' => max($limit * 2, 8),
                     'countrycodes' => 'it',
                 ],
             ];
@@ -202,7 +306,7 @@ final class GeoService
                     'q' => $streetWithNo,
                     'format' => 'jsonv2',
                     'addressdetails' => 1,
-                    'limit' => max($limit * 3, 10),
+                    'limit' => max($limit * 2, 8),
                     'countrycodes' => 'it',
                     'viewbox' => $bbox['viewbox'],
                     'bounded' => 1,
@@ -218,9 +322,9 @@ final class GeoService
                     continue;
                 }
                 $data = array_merge($data, $decoded);
-            }
-            if ($data !== [] && $houseNumber !== '') {
-                break;
+                if (count($data) >= $limit) {
+                    break 2;
+                }
             }
         }
         if ($data === []) {
@@ -245,14 +349,15 @@ final class GeoService
             $lon = (float) ($row['lon'] ?? 0);
             $cityOk = $this->addressMatchesCity($cityNeedle, $cityName, $display, $addr);
             $inBox = $bbox !== null && $this->pointInBoundingBox($lat, $lon, $bbox);
-            $roadMatches = $this->roadMatchesQuery($query, $road);
-            // Accept city-tagged hits, or same road inside the comune bbox (OSM often
-            // tags border roads with the neighbouring town — e.g. Via Granara / Dozza).
+            $roadMatches = $this->roadSuggestMatches($query, $road);
+            // Require the road to relate to what the user typed (avoid "Via R" → random Via X).
+            if (!$roadMatches) {
+                continue;
+            }
             if (!$cityOk && !($inBox && $roadMatches)) {
                 continue;
             }
             $postalCode = trim((string) ($addr['postcode'] ?? ''));
-            // Border roads mistagged to a neighbour often carry that town's CAP — prefer the selected comune CAP.
             if (!$cityOk && $inBox) {
                 $comune = $this->findComune($city);
                 $cityCap = trim((string) ($comune['cap'] ?? ''));
@@ -456,7 +561,7 @@ final class GeoService
     {
         $query = trim($query);
         $city = trim($city);
-        if ($city === '' || mb_strlen($query) < 3) {
+        if ($city === '' || mb_strlen($query) < 2) {
             return ['action' => 'none'];
         }
 
@@ -854,6 +959,39 @@ final class GeoService
         return $qCore !== '' && $rCore !== '' && ($qCore === $rCore || $this->placesSimilar($qCore, $rCore));
     }
 
+    /** Prefix match for live typing: "via ro" → "via roma". */
+    private function roadPrefixMatches(string $query, string $road): bool
+    {
+        $q = $this->normalizePlace($query);
+        $r = $this->normalizePlace($road);
+        if ($q === '' || $r === '') {
+            return false;
+        }
+        if (str_starts_with($r, $q)) {
+            return true;
+        }
+        $strip = static function (string $value): string {
+            return trim(preg_replace('/^(via|viale|corso|piazza|piazzale|largo|vicolo|strada|contrada|localita)\\s+/u', '', $value) ?? $value);
+        };
+        $qCore = $strip($q);
+        $rCore = $strip($r);
+        return $qCore !== '' && $rCore !== '' && str_starts_with($rCore, $qCore);
+    }
+
+    /** Match rules for typeahead: prefer prefixes; avoid "vi" matching inside "… paolo vi". */
+    private function roadSuggestMatches(string $query, string $road): bool
+    {
+        if ($this->roadPrefixMatches($query, $road)) {
+            return true;
+        }
+        $q = $this->normalizePlace($query);
+        // Short fragments are prefix-only so every "Via…" does not collapse to noise.
+        if (mb_strlen($q) < 4) {
+            return false;
+        }
+        return $this->roadMatchesQuery($query, $road);
+    }
+
     /**
      * @return array{viewbox:string,south:float,north:float,west:float,east:float}|null
      */
@@ -917,6 +1055,9 @@ final class GeoService
 
     private function httpGet(string $url): ?string
     {
+        if (array_key_exists($url, self::$httpCache)) {
+            return self::$httpCache[$url];
+        }
         if (function_exists('curl_init')) {
             $ch = curl_init($url);
             curl_setopt_array($ch, [
@@ -929,9 +1070,9 @@ final class GeoService
             $code = (int) curl_getinfo($ch, CURLINFO_HTTP_CODE);
             curl_close($ch);
             if ($body === false || $code >= 400) {
-                return null;
+                return self::$httpCache[$url] = null;
             }
-            return (string) $body;
+            return self::$httpCache[$url] = (string) $body;
         }
         $ctx = stream_context_create([
             'http' => [
@@ -940,6 +1081,6 @@ final class GeoService
             ],
         ]);
         $body = @file_get_contents($url, false, $ctx);
-        return $body === false ? null : $body;
+        return self::$httpCache[$url] = ($body === false ? null : $body);
     }
 }

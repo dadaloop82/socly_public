@@ -237,13 +237,14 @@ final class Validator
     }
 
     /**
-     * Entity fiscal code: 11-digit VAT-style CF, or 16-char codice fiscale with check digit.
+     * Entity fiscal code: 11-digit numeric CF (ente), or 16-char personal CF with check digit.
+     * Tiny associations sometimes use the legal rep’s 16-char CF; both forms are accepted.
      */
     public function isValidEntityFiscalCode(string $code): bool
     {
-        $code = strtoupper(preg_replace('/\s+/', '', $code) ?? '');
+        $code = strtoupper(preg_replace('/[\s.\-]/', '', $code) ?? '');
         if (preg_match('/^\d{11}$/', $code) === 1) {
-            return $this->isValidVatCheckDigit($code);
+            return true;
         }
         return $this->isValidFiscalCode($code);
     }

@@ -79,7 +79,92 @@ final class MemberService
             ];
         }
 
+        $commsKey = null;
+        foreach (['newsletter_consent', 'comms_consent', 'marketing_consent', 'newsletter_ack'] as $candidate) {
+            if (array_key_exists($candidate, $fields)) {
+                $commsKey = $candidate;
+                break;
+            }
+        }
+        if ($commsKey === null) {
+            foreach ($this->fieldDefinitions(true) as $def) {
+                $key = (string) ($def['key'] ?? '');
+                if ($key !== '' && (string) ($def['field_type'] ?? '') === 'checkbox'
+                    && preg_match('/newsletter|comms|marketing|comunicaz/i', $key)
+                ) {
+                    $commsKey = $key;
+                    break;
+                }
+            }
+        }
+        if ($commsKey !== null) {
+            $commsOk = $isChecked($fields[$commsKey] ?? null);
+            $badges[] = [
+                'key' => 'comms',
+                'ok' => $commsOk,
+                'label' => $commsOk ? __('members.gdpr_comms_ok') : __('members.gdpr_comms_missing'),
+            ];
+        }
+
         return $badges;
+    }
+
+    /**
+     * Enable/disable enrollment checkboxes for photo liberatoria and newsletter consents.
+     */
+    public function syncOptionalGdprConsents(bool $requireImage, bool $requireComms): void
+    {
+        $defs = [
+            'image_consent' => [
+                'enabled' => $requireImage,
+                'sort_order' => 220,
+                'label' => [
+                    'it' => 'Liberatoria per la pubblicazione di foto e video',
+                    'de' => 'Einwilligung zur Veröffentlichung von Fotos und Videos',
+                    'en' => 'Consent to publish photos and videos',
+                ],
+            ],
+            'newsletter_consent' => [
+                'enabled' => $requireComms,
+                'sort_order' => 230,
+                'label' => [
+                    'it' => 'Consenso a newsletter e comunicazioni su eventi (email/WhatsApp)',
+                    'de' => 'Einwilligung zu Newsletter und Veranstaltungsinfos (E-Mail/WhatsApp)',
+                    'en' => 'Consent to newsletter and event communications (email/WhatsApp)',
+                ],
+            ],
+        ];
+
+        foreach ($defs as $key => $meta) {
+            $enabled = !empty($meta['enabled']);
+            $exists = $this->db->fetch(
+                'SELECT id FROM member_field_definitions WHERE `key` = :k',
+                ['k' => $key]
+            );
+            if ($exists) {
+                $this->db->update('member_field_definitions', [
+                    'is_enabled' => $enabled ? 1 : 0,
+                    'is_required' => $enabled ? 1 : 0,
+                    'validation_rule' => $enabled ? 'accepted' : '',
+                    'field_type' => 'checkbox',
+                    'form_step' => self::STEP_ACKNOWLEDGEMENTS,
+                ], 'id = :id', ['id' => (int) $exists['id']]);
+                continue;
+            }
+            if (!$enabled) {
+                continue;
+            }
+            $this->db->insert('member_field_definitions', [
+                'key' => $key,
+                'field_type' => 'checkbox',
+                'label_json' => json_encode($meta['label'], JSON_UNESCAPED_UNICODE),
+                'is_required' => 1,
+                'validation_rule' => 'accepted',
+                'is_enabled' => 1,
+                'sort_order' => (int) $meta['sort_order'],
+                'form_step' => self::STEP_ACKNOWLEDGEMENTS,
+            ]);
+        }
     }
 
     /** @param array<string,mixed>|null $member */

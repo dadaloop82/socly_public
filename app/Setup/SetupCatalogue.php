@@ -283,8 +283,9 @@ final class SetupCatalogue
                 'storage' => 'people',
                 'type' => 'people_list',
                 'role' => 'board',
-                'min' => 1,
-                'required' => true,
+                // Presidente is already on the step; additional members are optional (defer allowed).
+                'min' => 0,
+                'required' => false,
                 'title_key' => 'setup.step_board_title',
                 'description_key' => 'setup.step_board_desc',
                 'settings_key' => 'association.board_configured',

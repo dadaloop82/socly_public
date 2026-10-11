@@ -91,6 +91,8 @@ final class SettingsController extends BaseController
                 'branding.accent' => $this->settings->get('branding.accent', '#B84A1B'),
                 'app.locale' => $this->settings->get('app.locale', 'it'),
                 'gdpr.enabled' => $this->settings->get('gdpr.enabled', '0'),
+                'gdpr.require_image_consent' => $this->settings->get('gdpr.require_image_consent', '0'),
+                'gdpr.require_comms_consent' => $this->settings->get('gdpr.require_comms_consent', '0'),
                 'legal.privacy' => $this->legalTexts('legal.privacy'),
                 'legal.statute' => $this->legalTexts('legal.statute'),
                 'membership.enrollment_validation' => $this->settings->get('membership.enrollment_validation', 'none'),
@@ -183,7 +185,13 @@ final class SettingsController extends BaseController
         ];
         $this->settings->set('legal.privacy', $privacy);
         $this->settings->set('legal.statute', $statute);
-        $this->settings->set('gdpr.enabled', !empty($data['gdpr_enabled']) ? '1' : '0');
+        $gdprOn = !empty($data['gdpr_enabled']);
+        $requireImage = $gdprOn && !empty($data['require_image_consent']);
+        $requireComms = $gdprOn && !empty($data['require_comms_consent']);
+        $this->settings->set('gdpr.enabled', $gdprOn ? '1' : '0');
+        $this->settings->set('gdpr.require_image_consent', $requireImage ? '1' : '0');
+        $this->settings->set('gdpr.require_comms_consent', $requireComms ? '1' : '0');
+        $this->members->syncOptionalGdprConsents($requireImage, $requireComms);
         $privacyText = localized($privacy);
         $statuteText = localized($statute);
         if (mb_strlen(trim($privacyText), 'UTF-8') >= 50) {
@@ -193,14 +201,22 @@ final class SettingsController extends BaseController
             $this->settings->set('setup.deferred.legal.statute', '0');
         }
         \Socly\Support\EnvWriter::setUserValues([
-            'GDPR_ENABLED' => !empty($data['gdpr_enabled']) ? '1' : '0',
+            'GDPR_ENABLED' => $gdprOn ? '1' : '0',
         ]);
         $this->audit->log('settings.saved', 'settings', 'legal', null, [
             'privacy_len' => array_map('mb_strlen', $privacy),
             'statute_len' => array_map('mb_strlen', $statute),
-            'gdpr' => !empty($data['gdpr_enabled']),
+            'gdpr' => $gdprOn,
+            'gdpr_image' => $requireImage,
+            'gdpr_comms' => $requireComms,
         ], $request->ip());
-        $this->plugins->fire('settings.saved', ['legal.privacy', 'legal.statute', 'gdpr.enabled']);
+        $this->plugins->fire('settings.saved', [
+            'legal.privacy',
+            'legal.statute',
+            'gdpr.enabled',
+            'gdpr.require_image_consent',
+            'gdpr.require_comms_consent',
+        ]);
         $this->settingsFinish($request, 'legal');
     }
 

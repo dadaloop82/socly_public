@@ -46,12 +46,19 @@ $configActive = str_contains($uri, '/settings') || str_contains($uri, '/users') 
     data-provinces-url="<?= e(url('/api/geo/provinces')) ?>"
     data-max-upload-bytes="<?= (int) upload_limit_bytes() ?>"
     data-msg-city-first="<?= e(__('members.address_city_first')) ?>"
+    data-msg-geo-address-searching="<?= e(__('members.geo_address_searching')) ?>"
+    data-msg-geo-address-none="<?= e(__('members.geo_address_none')) ?>"
     data-msg-geo-confirm-city="<?= e(__('members.geo_confirm_city')) ?>"
     data-msg-geo-confirm-address="<?= e(__('members.geo_confirm_address')) ?>"
     data-msg-geo-confirm-birth="<?= e(__('members.geo_confirm_birth')) ?>"
     data-msg-geo-confirm-province="<?= e(__('members.geo_confirm_province')) ?>"
     data-msg-geo-city-not-found="<?= e(__('members.geo_city_not_found')) ?>"
     data-msg-geo-address-not-found="<?= e(__('members.geo_address_not_found')) ?>"
+    data-msg-geo-address-not-found-hint="<?= e(__('members.geo_address_not_found_hint')) ?>"
+    data-msg-geo-address-force="<?= e(__('members.geo_address_force')) ?>"
+    data-msg-geo-address-force-named="<?= e(__('members.geo_address_force_named')) ?>"
+    data-msg-geo-address-use-suggestion="<?= e(__('members.geo_address_use_suggestion')) ?>"
+    data-msg-geo-address-forced-ok="<?= e(__('members.geo_address_forced_ok')) ?>"
     data-msg-geo-province-not-found="<?= e(__('members.geo_province_not_found')) ?>"
     data-msg-geo-province-city-mismatch="<?= e(__('members.geo_province_city_mismatch')) ?>"
     data-msg-geo-cap-city-mismatch="<?= e(__('members.geo_cap_city_mismatch')) ?>"
@@ -63,6 +70,7 @@ $configActive = str_contains($uri, '/settings') || str_contains($uri, '/users') 
     data-msg-geo-address-required="<?= e(__('members.geo_address_required')) ?>"
     data-msg-birth-future="<?= e(__('validation.birth_date_future')) ?>"
     data-msg-birth-minor="<?= e(__('validation.birth_date_minor')) ?>"
+    data-msg-birth-too-old="<?= e(__('validation.birth_date_too_old')) ?>"
 >
 <?php
 $temporaryInstance = false;
