@@ -971,38 +971,22 @@ $errorStep = flash('setup_error_step');
                         <?php endforeach; ?>
                     </fieldset>
                     <?php elseif (($step['key'] ?? '') === 'membership.enrollment_validation'): ?>
-                    <div class="setup-enrollment" data-setup-enrollment data-setup-line>
-                        <label class="setup-field">
-                            <span><?= e(__($step['title_key'])) ?></span>
-                            <select name="value" required data-enrollment-select>
-                                <?php foreach ($step['options'] as $opt): ?>
-                                    <?php
-                                        $optVal = (string) ($opt['value'] ?? '');
-                                        $otpBlocked = $optVal === 'otp_email' && !$mailReadyForSelect;
-                                    ?>
-                                    <option value="<?= e($optVal) ?>" <?= (string) $value === $optVal ? 'selected' : '' ?> <?= $otpBlocked ? 'disabled' : '' ?>><?= e(__($opt['label_key'])) ?><?= $otpBlocked ? ' — ' . e(__('setup.mail_required_short')) : '' ?></option>
-                                <?php endforeach; ?>
-                            </select>
-                        </label>
-                        <?php foreach ($step['options'] as $opt): ?>
-                            <?php $optVal = (string) ($opt['value'] ?? ''); ?>
-                            <template data-enrollment-detail-for="<?= e($optVal) ?>"><?= e(__('setup.enrollment_detail_' . $optVal)) ?></template>
-                        <?php endforeach; ?>
-                        <p class="setup-enrollment-detail muted" data-enrollment-detail aria-live="polite" style="white-space:pre-line"></p>
+                    <div data-setup-line>
+                        <?= view_partial('partials/enrollment_method_picker', [
+                            'name' => 'value',
+                            'value' => (string) $value,
+                            'mailReady' => $mailReadyForSelect,
+                            'mailSetupHref' => url('/setup?step_key=mail.smtp'),
+                            'showFieldLabel' => false,
+                        ]) ?>
                     </div>
-                    <?php if (!$mailReadyForSelect): ?>
-                        <p class="setup-hint muted" data-setup-line><?= e(__('setup.mail_required_for_otp')) ?></p>
-                    <?php endif; ?>
                     <?php else: ?>
                     <label class="setup-field" data-setup-line>
                         <span><?= e(__($step['title_key'])) ?></span>
                         <select name="value" required>
                             <?php foreach ($step['options'] as $opt): ?>
-                                <?php
-                                    $optVal = (string) ($opt['value'] ?? '');
-                                    $otpBlocked = $optVal === 'otp_email' && !$mailReadyForSelect;
-                                ?>
-                                <option value="<?= e($optVal) ?>" <?= (string) $value === $optVal ? 'selected' : '' ?> <?= $otpBlocked ? 'disabled' : '' ?>><?= e(__($opt['label_key'])) ?><?= $otpBlocked ? ' — ' . e(__('setup.mail_required_short')) : '' ?></option>
+                                <?php $optVal = (string) ($opt['value'] ?? ''); ?>
+                                <option value="<?= e($optVal) ?>" <?= (string) $value === $optVal ? 'selected' : '' ?>><?= e(__($opt['label_key'])) ?></option>
                             <?php endforeach; ?>
                         </select>
                     </label>
@@ -1084,6 +1068,7 @@ $errorStep = flash('setup_error_step');
                 <?php elseif ($stepType === 'member_types'): ?>
                     <?php
                     $types = is_array($value['types'] ?? null) ? $value['types'] : [];
+                    $draftNew = is_array($value['new_types'] ?? null) ? $value['new_types'] : null;
                     $singleType = !empty($value['single_type']) || count($types) === 1;
                     $currencyCode = (string) ($value['currency'] ?? 'EUR');
                     $currencyDisplay = (string) ($value['currency_display'] ?? '€');
@@ -1092,6 +1077,30 @@ $errorStep = flash('setup_error_step');
                         'de' => ['flag' => locale_flag_url('de'), 'label' => 'Deutsch'],
                         'en' => ['flag' => locale_flag_url('en'), 'label' => 'English'],
                     ];
+                    if ($draftNew === null) {
+                        $draftNew = $types === []
+                            ? [[
+                                'name_it' => (string) ($value['name_it'] ?? 'Ordinaria'),
+                                'name_de' => (string) ($value['name_de'] ?? 'Ordentlich'),
+                                'name_en' => (string) ($value['name_en'] ?? 'Ordinary'),
+                                'price' => (string) ($value['price'] ?? '0'),
+                                'is_active' => true,
+                            ]]
+                            : [[
+                                'name_it' => (string) ($value['name_it'] ?? ''),
+                                'name_de' => (string) ($value['name_de'] ?? ''),
+                                'name_en' => (string) ($value['name_en'] ?? ''),
+                                'price' => (string) ($value['price'] ?? ''),
+                                'is_active' => array_key_exists('is_active', $value) ? !empty($value['is_active']) : true,
+                            ]];
+                        // When editing existing types, start with one empty "add" card only if draft empty names.
+                        if ($types !== [] && trim((string) ($draftNew[0]['name_it'] ?? '')) === '' && trim((string) ($draftNew[0]['price'] ?? '')) === '') {
+                            // keep one empty card for adding
+                        }
+                    }
+                    if ($draftNew === []) {
+                        $draftNew = [['name_it' => '', 'name_de' => '', 'name_en' => '', 'price' => '', 'is_active' => true]];
+                    }
                     ?>
                     <div class="setup-membership" data-setup-line data-setup-member-types
                          data-translate-url="<?= e(url('/api/translate')) ?>"
@@ -1099,7 +1108,8 @@ $errorStep = flash('setup_error_step');
                          data-currency-display="<?= e($currencyDisplay) ?>"
                          data-msg-free-title="<?= e(__('setup.type_free_confirm')) ?>"
                          data-msg-free-confirm="<?= e(__('setup.type_free_confirm_ok')) ?>"
-                         data-msg-free-cancel="<?= e(__('common.cancel')) ?>">
+                         data-msg-free-cancel="<?= e(__('common.cancel')) ?>"
+                         data-has-existing="<?= $types !== [] ? '1' : '0' ?>">
                         <?php if ($types !== []): ?>
                             <p class="setup-hint muted"><?= e(__('setup.types_edit_hint')) ?></p>
                             <div class="setup-membership-list">
@@ -1119,9 +1129,9 @@ $errorStep = flash('setup_error_step');
                                         </div>
                                         <div class="setup-equal-row">
                                             <label class="setup-field">
-                                                <span><?= e(__('install.type_price')) ?> (<?= e($currencyDisplay) ?>) *</span>
+                                                <span><?= e(__('install.type_price')) ?> *</span>
                                                 <div class="setup-price-with-currency">
-                                                    <input type="number" step="0.01" min="0" name="types[<?= $tid ?>][price]" value="<?= e((string) ($typeRow['price'] ?? '0')) ?>" required data-type-price data-type-name-ref="types[<?= $tid ?>][name_it]">
+                                                    <input type="number" step="0.01" min="0" name="types[<?= $tid ?>][price]" value="<?= e((string) ($typeRow['price'] ?? '0')) ?>" required data-type-price data-type-name-ref="types[<?= $tid ?>][name_it]" inputmode="decimal">
                                                     <span class="setup-price-currency" aria-hidden="true"><?= e($currencyDisplay) ?></span>
                                                 </div>
                                             </label>
@@ -1137,44 +1147,93 @@ $errorStep = flash('setup_error_step');
                                 <?php endforeach; ?>
                             </div>
                         <?php endif; ?>
-                        <?php if ($types !== []): ?>
-                        <h3 class="setup-subhead"><?= e(__('settings.add_type')) ?></h3>
-                        <?php endif; ?>
-                        <div class="setup-membership-card setup-membership-card-new">
-                            <div class="setup-equal-row setup-langs-row">
-                                <?php foreach ($langFlags as $langCode => $langMeta): ?>
-                                <label class="setup-field">
-                                    <span class="setup-lang-flag-label">
-                                        <img src="<?= e($langMeta['flag']) ?>" width="18" height="14" alt="" loading="lazy" decoding="async">
-                                        <?= e($langMeta['label']) ?><?= $langCode === 'it' && $types === [] ? ' *' : '' ?>
-                                    </span>
-                                    <input type="text" name="name_<?= e($langCode) ?>" value="<?= e((string) ($value['name_' . $langCode] ?? '')) ?>" <?= $langCode === 'it' && $types === [] ? 'required' : '' ?> <?= $langCode === 'it' ? 'data-type-name-it' : 'data-type-name-' . e($langCode) ?> placeholder="<?= e(__('setup.type_name_placeholder')) ?>">
-                                </label>
-                                <?php endforeach; ?>
-                            </div>
-                            <div class="setup-equal-row">
-                                <label class="setup-field">
-                                    <span><?= e(__('install.type_price')) ?> (<?= e($currencyDisplay) ?>)<?= $types === [] ? ' *' : '' ?></span>
-                                    <div class="setup-price-with-currency">
-                                        <input type="number" step="0.01" min="0" name="price" value="<?= e((string) ($value['price'] ?? '')) ?>" <?= $types === [] ? 'required' : '' ?> placeholder="0.00" data-type-price data-type-name-ref="name_it">
-                                        <span class="setup-price-currency" aria-hidden="true"><?= e($currencyDisplay) ?></span>
+                        <div class="setup-membership-new-list" data-member-types-new>
+                            <?php foreach ($draftNew as $ni => $newRow): ?>
+                                <?php
+                                $ni = (int) $ni;
+                                $requireNew = $types === [];
+                                ?>
+                                <div class="setup-membership-card setup-membership-card-new" data-member-type-new-row>
+                                    <div class="setup-membership-card-head">
+                                        <button type="button" class="btn btn-ghost btn-sm setup-membership-remove" data-member-type-remove aria-label="<?= e(__('setup.remove_type')) ?>" <?= ($requireNew && count($draftNew) <= 1) ? 'hidden' : '' ?>>×</button>
                                     </div>
-                                </label>
-                                <?php if ($types !== []): ?>
-                                <label class="checkbox-row setup-check setup-check-inline">
-                                    <input type="checkbox" name="is_active" value="1" <?= !empty($value['is_active']) ? 'checked' : '' ?>>
-                                    <span><?= e(__('settings.is_active')) ?></span>
-                                </label>
-                                <?php else: ?>
-                                    <input type="hidden" name="is_active" value="1">
-                                <?php endif; ?>
-                            </div>
-                            <button type="button" class="btn btn-ghost btn-sm" data-type-translate-now><?= e(__('settings.legal_translate')) ?></button>
+                                    <div class="setup-equal-row setup-langs-row">
+                                        <?php foreach ($langFlags as $langCode => $langMeta): ?>
+                                        <label class="setup-field">
+                                            <span class="setup-lang-flag-label">
+                                                <img src="<?= e($langMeta['flag']) ?>" width="18" height="14" alt="" loading="lazy" decoding="async">
+                                                <?= e($langMeta['label']) ?><?= $langCode === 'it' && $requireNew ? ' *' : '' ?>
+                                            </span>
+                                            <input type="text" name="new_types[<?= $ni ?>][name_<?= e($langCode) ?>]" value="<?= e((string) ($newRow['name_' . $langCode] ?? '')) ?>" <?= $langCode === 'it' && $requireNew ? 'required' : '' ?> <?= $langCode === 'it' ? 'data-type-name-it' : 'data-type-name-' . e($langCode) ?> placeholder="<?= e(__('setup.type_name_placeholder')) ?>">
+                                        </label>
+                                        <?php endforeach; ?>
+                                    </div>
+                                    <div class="setup-equal-row">
+                                        <label class="setup-field">
+                                            <span><?= e(__('install.type_price')) ?><?= $requireNew ? ' *' : '' ?></span>
+                                            <div class="setup-price-with-currency">
+                                                <input type="number" step="0.01" min="0" name="new_types[<?= $ni ?>][price]" value="<?= e((string) ($newRow['price'] ?? '')) ?>" <?= $requireNew ? 'required' : '' ?> placeholder="0.00" data-type-price data-type-name-ref="new_types[<?= $ni ?>][name_it]" inputmode="decimal">
+                                                <span class="setup-price-currency" aria-hidden="true"><?= e($currencyDisplay) ?></span>
+                                            </div>
+                                        </label>
+                                        <?php if ($types !== []): ?>
+                                        <label class="checkbox-row setup-check setup-check-inline">
+                                            <input type="checkbox" name="new_types[<?= $ni ?>][is_active]" value="1" <?= !empty($newRow['is_active']) ? 'checked' : '' ?>>
+                                            <span><?= e(__('settings.is_active')) ?></span>
+                                        </label>
+                                        <?php else: ?>
+                                            <input type="hidden" name="new_types[<?= $ni ?>][is_active]" value="1">
+                                        <?php endif; ?>
+                                    </div>
+                                    <button type="button" class="btn btn-ghost btn-sm" data-type-translate-now><?= e(__('settings.legal_translate')) ?></button>
+                                </div>
+                            <?php endforeach; ?>
                         </div>
+                        <button type="button" class="btn btn-ghost" data-member-type-add><?= e(__('settings.add_type')) ?></button>
+                        <template data-member-type-template>
+                            <div class="setup-membership-card setup-membership-card-new" data-member-type-new-row>
+                                <div class="setup-membership-card-head">
+                                    <button type="button" class="btn btn-ghost btn-sm setup-membership-remove" data-member-type-remove aria-label="<?= e(__('setup.remove_type')) ?>">×</button>
+                                </div>
+                                <div class="setup-equal-row setup-langs-row">
+                                    <?php foreach ($langFlags as $langCode => $langMeta): ?>
+                                    <label class="setup-field">
+                                        <span class="setup-lang-flag-label">
+                                            <img src="<?= e($langMeta['flag']) ?>" width="18" height="14" alt="" loading="lazy" decoding="async">
+                                            <?= e($langMeta['label']) ?>
+                                        </span>
+                                        <input type="text" name="new_types[__i__][name_<?= e($langCode) ?>]" value="" <?= $langCode === 'it' ? 'data-type-name-it' : 'data-type-name-' . e($langCode) ?> placeholder="<?= e(__('setup.type_name_placeholder')) ?>">
+                                    </label>
+                                    <?php endforeach; ?>
+                                </div>
+                                <div class="setup-equal-row">
+                                    <label class="setup-field">
+                                        <span><?= e(__('install.type_price')) ?></span>
+                                        <div class="setup-price-with-currency">
+                                            <input type="number" step="0.01" min="0" name="new_types[__i__][price]" value="" placeholder="0.00" data-type-price data-type-name-ref="new_types[__i__][name_it]" inputmode="decimal">
+                                            <span class="setup-price-currency" aria-hidden="true"><?= e($currencyDisplay) ?></span>
+                                        </div>
+                                    </label>
+                                    <?php if ($types !== []): ?>
+                                    <label class="checkbox-row setup-check setup-check-inline">
+                                        <input type="checkbox" name="new_types[__i__][is_active]" value="1" checked>
+                                        <span><?= e(__('settings.is_active')) ?></span>
+                                    </label>
+                                    <?php else: ?>
+                                        <input type="hidden" name="new_types[__i__][is_active]" value="1">
+                                    <?php endif; ?>
+                                </div>
+                                <button type="button" class="btn btn-ghost btn-sm" data-type-translate-now><?= e(__('settings.legal_translate')) ?></button>
+                            </div>
+                        </template>
                     </div>
                 <?php elseif ($stepType === 'membership_periods'): ?>
-                    <?php $periods = is_array($value['periods'] ?? null) ? $value['periods'] : []; ?>
-                    <div class="setup-membership" data-setup-line data-setup-membership-periods>
+                    <?php
+                    $periods = is_array($value['periods'] ?? null) ? $value['periods'] : [];
+                    $requireNewPeriod = $periods === [] || !empty($value['needs_current_year']);
+                    ?>
+                    <div class="setup-membership" data-setup-line data-setup-membership-periods
+                         data-msg-next-period="<?= e(__('setup.periods_next_period_auto')) ?>">
                         <?php if (!empty($value['needs_current_year'])): ?>
                             <p class="setup-hint setup-hint-warn"><?= e(__('setup.periods_need_current_year')) ?></p>
                         <?php endif; ?>
@@ -1194,17 +1253,16 @@ $errorStep = flash('setup_error_step');
                                                 <input type="date" name="periods[<?= $pid ?>][ends_on]" value="<?= e((string) ($period['ends_on'] ?? '')) ?>" required data-period-end>
                                             </label>
                                         </div>
-                                        <label class="checkbox-row setup-check">
-                                            <input type="checkbox" name="periods[<?= $pid ?>][is_current]" value="1" <?= !empty($period['is_current']) ? 'checked' : '' ?>>
-                                            <span><?= e(__('settings.is_current')) ?></span>
-                                        </label>
-                                        <?php if (!empty($period['is_current']) && !empty($value['next_period_starts_on']) && !empty($value['next_period_ends_on'])): ?>
-                                            <p class="setup-period-next muted" data-setup-next-period>
-                                                <?= e(__('setup.periods_next_period', [
-                                                    'from' => date('d/m/Y', strtotime((string) $value['next_period_starts_on'])),
-                                                    'to' => date('d/m/Y', strtotime((string) $value['next_period_ends_on'])),
-                                                ])) ?>
-                                            </p>
+                                        <?php if (!empty($period['is_current'])): ?>
+                                            <input type="hidden" name="periods[<?= $pid ?>][is_current]" value="1">
+                                            <?php if (!empty($value['next_period_starts_on']) && !empty($value['next_period_ends_on'])): ?>
+                                                <p class="setup-period-next muted" data-setup-next-period>
+                                                    <?= e(__('setup.periods_next_period', [
+                                                        'from' => date('d/m/Y', strtotime((string) $value['next_period_starts_on'])),
+                                                        'to' => date('d/m/Y', strtotime((string) $value['next_period_ends_on'])),
+                                                    ])) ?>
+                                                </p>
+                                            <?php endif; ?>
                                         <?php endif; ?>
                                     </div>
                                 <?php endforeach; ?>
@@ -1216,18 +1274,18 @@ $errorStep = flash('setup_error_step');
                         <div class="setup-membership-card setup-membership-card-new">
                             <div class="setup-equal-row">
                                 <label class="setup-field">
-                                    <span><?= e(__('install.starts_on')) ?><?= ($periods === [] || !empty($value['needs_current_year'])) ? ' *' : '' ?></span>
-                                    <input type="date" name="starts_on" value="<?= e((string) ($value['starts_on'] ?? '')) ?>" <?= ($periods === [] || !empty($value['needs_current_year'])) ? 'required' : '' ?> data-period-start>
+                                    <span><?= e(__('install.starts_on')) ?><?= $requireNewPeriod ? ' *' : '' ?></span>
+                                    <input type="date" name="starts_on" value="<?= e((string) ($value['starts_on'] ?? '')) ?>" <?= $requireNewPeriod ? 'required' : '' ?> data-period-start>
                                 </label>
                                 <label class="setup-field">
-                                    <span><?= e(__('install.ends_on')) ?><?= ($periods === [] || !empty($value['needs_current_year'])) ? ' *' : '' ?></span>
-                                    <input type="date" name="ends_on" value="<?= e((string) ($value['ends_on'] ?? '')) ?>" <?= ($periods === [] || !empty($value['needs_current_year'])) ? 'required' : '' ?> data-period-end>
+                                    <span><?= e(__('install.ends_on')) ?><?= $requireNewPeriod ? ' *' : '' ?></span>
+                                    <input type="date" name="ends_on" value="<?= e((string) ($value['ends_on'] ?? '')) ?>" <?= $requireNewPeriod ? 'required' : '' ?> data-period-end>
                                 </label>
                             </div>
-                            <label class="checkbox-row setup-check">
-                                <input type="checkbox" name="is_current" value="1" <?= !empty($value['is_current']) ? 'checked' : '' ?>>
-                                <span><?= e(__('settings.is_current')) ?></span>
-                            </label>
+                            <?php if ($requireNewPeriod): ?>
+                                <input type="hidden" name="is_current" value="1">
+                            <?php endif; ?>
+                            <p class="setup-period-next muted" data-setup-next-period-preview hidden></p>
                         </div>
                     </div>
                 <?php elseif ($stepType === 'member_fields'): ?>
@@ -1243,6 +1301,7 @@ $errorStep = flash('setup_error_step');
                             'typeOptions' => $typeOptions,
                             'allowTypeEdit' => true,
                             'setupMode' => true,
+                            'wizardMode' => true,
                             'autosaveUrl' => url('/setup/fields/autosave'),
                         ]) ?>
 
@@ -1274,7 +1333,7 @@ $errorStep = flash('setup_error_step');
                             </div>
                             <button
                                 type="button"
-                                class="btn btn-ghost"
+                                class="btn btn-ghost setup-fields-add-now-btn"
                                 data-fields-add-now
                                 data-msg-need-label="<?= e(__('setup.fields_need_label')) ?>"
                                 data-msg-adding="<?= e(__('setup.fields_adding')) ?>"
@@ -1302,6 +1361,8 @@ $errorStep = flash('setup_error_step');
                         data-discover-busy="<?= e(__('setup.mail_discover_busy')) ?>"
                         data-test-busy="<?= e(__('setup.mail_test_busy')) ?>"
                         data-test-ok="<?= e(__('mail.test_ok')) ?>"
+                        data-test-ok-to="<?= e(__('mail.test_ok_to')) ?>"
+                        data-verify-fail="<?= e(__('mail.verify_fail')) ?>"
                         data-verify-busy="<?= e(__('setup.mail_verify_busy')) ?>"
                         data-password-required="<?= e(__('mail.password_required')) ?>"
                         data-email-invalid="<?= e(__('validation.email')) ?>"
@@ -1338,13 +1399,13 @@ $errorStep = flash('setup_error_step');
                                     ]) ?>
                                 </div>
                                 <div class="setup-smtp-discover-row" data-smtp-discover-row>
-                                    <button type="button" class="btn setup-scrape-btn" data-smtp-discover-btn>
+                                    <button type="button" class="btn btn-ghost setup-smtp-discover-btn" data-smtp-discover-btn>
                                         <span data-smtp-discover-label><?= e(__('setup.mail_discover_btn')) ?></span>
                                     </button>
                                 </div>
                                 <div class="setup-smtp-live" data-smtp-live hidden>
                                     <div class="setup-scrape-spinner" aria-hidden="true"></div>
-                                    <p class="setup-hint muted setup-smtp-live-status" data-smtp-discover-status hidden></p>
+                                    <p class="setup-hint muted setup-smtp-live-status setup-smtp-feedback" data-smtp-discover-status hidden role="status" aria-live="polite"></p>
                                 </div>
                             </div>
 
@@ -1380,7 +1441,7 @@ $errorStep = flash('setup_error_step');
                                 <div class="setup-smtp-actions">
                                     <button type="button" class="btn btn-ghost" data-smtp-verify-btn><?= e(__('setup.mail_verify_btn')) ?></button>
                                 </div>
-                                <p class="setup-hint muted" data-smtp-verify-status hidden></p>
+                                <p class="setup-hint muted setup-smtp-feedback" data-smtp-verify-status hidden role="status" aria-live="polite"></p>
                             </div>
 
                             <div class="setup-smtp-section setup-smtp-test" data-smtp-test-section <?= $mailReady ? '' : 'hidden' ?>>
@@ -1391,7 +1452,7 @@ $errorStep = flash('setup_error_step');
                                 <div class="setup-smtp-actions">
                                     <button type="button" class="btn btn-ghost" data-smtp-test-btn <?= $mailReady ? '' : 'disabled' ?>><?= e(__('setup.mail_test_btn')) ?></button>
                                 </div>
-                                <p class="setup-hint muted" data-smtp-test-status <?= $mailReady ? '' : 'hidden' ?>><?= $mailReady ? e(__('mail.test_ok_badge')) : '' ?></p>
+                                <p class="setup-hint muted setup-smtp-feedback" data-smtp-test-status <?= $mailReady ? '' : 'hidden' ?> role="status" aria-live="polite"><?= $mailReady ? e(__('mail.test_ok_badge')) : '' ?></p>
                                 <p class="setup-hint muted"><?= e(__('setup.mail_save_hint')) ?></p>
                             </div>
                         </div>

@@ -6,7 +6,8 @@
  * @var list<array<string,mixed>> $formSteps
  * @var list<string> $typeOptions
  * @var bool $allowTypeEdit
- * @var bool $setupMode
+ * @var bool $setupMode Compact UI (no type column / step chrome)
+ * @var bool $wizardMode Onboarding wizard: no autosave copy, hide privacy consents
  * @var string $autosaveUrl
  */
 $fields = is_array($fields ?? null) ? $fields : [];
@@ -14,6 +15,7 @@ $formSteps = is_array($formSteps ?? null) ? $formSteps : [];
 $typeOptions = is_array($typeOptions ?? null) ? $typeOptions : \Socly\Support\MemberFieldTypes::keys();
 $allowTypeEdit = !isset($allowTypeEdit) || (bool) $allowTypeEdit;
 $setupMode = !empty($setupMode);
+$wizardMode = !empty($wizardMode);
 $autosaveUrl = trim((string) ($autosaveUrl ?? ''));
 
 $members = app(\Socly\Services\MemberService::class);
@@ -24,9 +26,29 @@ if ($setupMode) {
         static fn (array $step): bool => empty($step['is_system'])
     ));
 }
-$isSetupToggleableField = static function (string $key) use ($members): bool {
-    return !\Socly\Support\MemberFieldTypes::isCoreArchiveField($key)
-        && !$members->isSystemLockedFieldKey($key);
+$addressBundleKeys = ['city', 'address', 'house_number', 'postal_code'];
+$consentFieldKeys = [
+    'privacy_ack',
+    'statute_ack',
+    'image_consent',
+    'photo_consent',
+    'image_ack',
+    'photo_ack',
+    'images_consent',
+    'newsletter_consent',
+    'comms_consent',
+    'marketing_consent',
+    'newsletter_ack',
+];
+$isSetupConsentField = static function (string $key, array $field = []) use ($consentFieldKeys, $members): bool {
+    if (in_array($key, $consentFieldKeys, true) || $members->isSystemLockedFieldKey($key)) {
+        return true;
+    }
+    $step = (string) ($field['form_step'] ?? '');
+    return $step === \Socly\Services\MemberService::STEP_ACKNOWLEDGEMENTS;
+};
+$isSetupToggleableField = static function (string $key, array $field = []) use ($members): bool {
+    return !\Socly\Support\MemberFieldTypes::isCoreArchiveField($key);
 };
 $placeholders = $members->systemStepPlaceholders();
 $defaultStepKey = (string) ($editorSteps[0]['key'] ?? 'profile');
@@ -152,7 +174,7 @@ foreach ($editorSteps as $s) {
 <div
     class="setup-fields-editor<?= $setupMode ? ' setup-fields-editor-compact' : '' ?>"
     data-fields-editor
-    <?= $setupMode ? 'data-fields-setup-mode="1"' : '' ?>
+    <?= $wizardMode ? 'data-fields-setup-mode="1"' : '' ?>
     data-step-prefix="step_"
     data-autosave-url="<?= e($autosaveUrl) ?>"
     data-csrf="<?= e(csrf_token()) ?>"
@@ -169,15 +191,20 @@ foreach ($editorSteps as $s) {
 >
     <div class="setup-fields-editor-meta">
         <div>
-            <?php if ($setupMode): ?>
+            <?php if ($wizardMode): ?>
                 <p class="setup-hint muted"><?= e(__('setup.fields_setup_hint')) ?></p>
+            <?php elseif ($setupMode): ?>
+                <p class="setup-hint muted"><?= e(__('setup.fields_hint')) ?></p>
+                <p class="setup-hint muted"><?= e(__('setup.fields_autosave_hint')) ?></p>
             <?php else: ?>
                 <p class="setup-hint muted"><?= e(__('setup.fields_reorder_hint')) ?></p>
                 <p class="setup-hint muted"><?= e(__('setup.fields_steps_hint')) ?></p>
                 <p class="setup-hint muted"><?= e(__('setup.fields_autosave_hint')) ?></p>
             <?php endif; ?>
         </div>
-        <p class="setup-fields-autosave-status muted" data-fields-autosave-status aria-live="polite"></p>
+        <?php if (!$wizardMode): ?>
+            <p class="setup-fields-autosave-status muted" data-fields-autosave-status aria-live="polite"></p>
+        <?php endif; ?>
     </div>
 
     <div class="setup-fields-steps" data-fields-steps>
@@ -275,16 +302,129 @@ foreach ($editorSteps as $s) {
                             $visibleStepFields = $setupMode
                                 ? array_values(array_filter(
                                     $stepFields,
-                                    static fn (array $field): bool => $isSetupToggleableField((string) ($field['key'] ?? ''))
+                                    static function (array $field) use ($isSetupToggleableField, $wizardMode, $isSetupConsentField): bool {
+                                        $key = (string) ($field['key'] ?? '');
+                                        if (!$isSetupToggleableField($key, $field)) {
+                                            return false;
+                                        }
+                                        // Onboarding: privacy consents stay on steps 13–14, not here.
+                                        if ($wizardMode && $isSetupConsentField($key, $field)) {
+                                            return false;
+                                        }
+                                        return true;
+                                    }
                                 ))
                                 : $stepFields;
+                            $addressBundleFields = [];
+                            $renderFields = [];
+                            if ($setupMode) {
+                                foreach ($visibleStepFields as $field) {
+                                    $fkey = (string) ($field['key'] ?? '');
+                                    if (in_array($fkey, $addressBundleKeys, true)) {
+                                        $addressBundleFields[$fkey] = $field;
+                                    } else {
+                                        $renderFields[] = $field;
+                                    }
+                                }
+                            } else {
+                                $renderFields = $visibleStepFields;
+                            }
                             ?>
-                            <?php if ($visibleStepFields === [] && ($setupMode || $stepPlaceholders === [])): ?>
+                            <?php if ($renderFields === [] && $addressBundleFields === [] && ($setupMode || $stepPlaceholders === [])): ?>
                                 <tr class="setup-fields-empty-row" data-fields-empty-row>
                                     <td colspan="<?= $setupMode ? 4 : 5 ?>" class="muted"><?= e($setupMode ? __('setup.fields_settings_empty') : __('setup.fields_step_empty')) ?></td>
                                 </tr>
                             <?php else: ?>
-                                <?php foreach ($visibleStepFields as $field): ?>
+                                <?php if ($setupMode && $addressBundleFields !== []): ?>
+                                    <?php
+                                    $bundleEnabled = false;
+                                    $bundleRequired = false;
+                                    foreach ($addressBundleFields as $af) {
+                                        if (!empty($af['is_enabled'])) {
+                                            $bundleEnabled = true;
+                                        }
+                                        if (!empty($af['is_required'])) {
+                                            $bundleRequired = true;
+                                        }
+                                    }
+                                    $bundleStep = $stepKey;
+                                    foreach ($addressBundleFields as $af) {
+                                        $bundleStep = (string) ($af['form_step'] ?? $stepKey);
+                                        break;
+                                    }
+                                    ?>
+                                    <tr data-address-bundle data-field-step="<?= e($bundleStep) ?>">
+                                        <td class="setup-fields-col-drag">
+                                            <span class="setup-fields-drag-locked" title="<?= e(__('setup.fields_system_locked')) ?>" aria-hidden="true">•</span>
+                                            <?php foreach ($addressBundleKeys as $addrKey): ?>
+                                                <?php if (!isset($addressBundleFields[$addrKey])) {
+                                                    continue;
+                                                } ?>
+                                                <input type="hidden" name="field_order[]" value="<?= e($addrKey) ?>">
+                                                <input type="hidden" name="field_step[<?= e($addrKey) ?>]" value="<?= e($bundleStep) ?>" data-field-step-input>
+                                                <input type="hidden" name="field_types[<?= e($addrKey) ?>]" value="<?= e((string) ($addressBundleFields[$addrKey]['field_type'] ?? $addrKey)) ?>">
+                                            <?php endforeach; ?>
+                                        </td>
+                                        <th scope="row">
+                                            <span class="setup-fields-name"><?= e(__('setup.fields_address_bundle')) ?></span>
+                                        </th>
+                                        <td class="setup-fields-col-check">
+                                            <label class="setup-fields-toggle">
+                                                <input
+                                                    type="checkbox"
+                                                    data-address-bundle-enabled
+                                                    <?= $bundleEnabled ? 'checked' : '' ?>
+                                                    aria-label="<?= e(__('setup.fields_col_enabled') . ': ' . __('setup.fields_address_bundle')) ?>"
+                                                >
+                                            </label>
+                                            <?php foreach ($addressBundleKeys as $addrKey): ?>
+                                                <?php if (!isset($addressBundleFields[$addrKey])) {
+                                                    continue;
+                                                } ?>
+                                                <input
+                                                    type="checkbox"
+                                                    class="setup-fields-bundle-sync"
+                                                    name="fields[]"
+                                                    value="<?= e($addrKey) ?>"
+                                                    data-address-bundle-field="enabled"
+                                                    <?= $bundleEnabled ? 'checked' : '' ?>
+                                                    hidden
+                                                    tabindex="-1"
+                                                    aria-hidden="true"
+                                                >
+                                            <?php endforeach; ?>
+                                        </td>
+                                        <td class="setup-fields-col-check">
+                                            <label class="setup-fields-toggle">
+                                                <input
+                                                    type="checkbox"
+                                                    data-address-bundle-required
+                                                    <?= $bundleRequired ? 'checked' : '' ?>
+                                                    <?= $bundleEnabled ? '' : 'disabled' ?>
+                                                    aria-label="<?= e(__('setup.fields_col_required') . ': ' . __('setup.fields_address_bundle')) ?>"
+                                                >
+                                            </label>
+                                            <?php foreach ($addressBundleKeys as $addrKey): ?>
+                                                <?php if (!isset($addressBundleFields[$addrKey])) {
+                                                    continue;
+                                                } ?>
+                                                <input
+                                                    type="checkbox"
+                                                    class="setup-fields-bundle-sync"
+                                                    name="required[]"
+                                                    value="<?= e($addrKey) ?>"
+                                                    data-address-bundle-field="required"
+                                                    <?= $bundleRequired ? 'checked' : '' ?>
+                                                    <?= $bundleEnabled ? '' : 'disabled' ?>
+                                                    hidden
+                                                    tabindex="-1"
+                                                    aria-hidden="true"
+                                                >
+                                            <?php endforeach; ?>
+                                        </td>
+                                    </tr>
+                                <?php endif; ?>
+                                <?php foreach ($renderFields as $field): ?>
                                     <?php
                                     $fkey = (string) ($field['key'] ?? '');
                                     $renderFieldRow(

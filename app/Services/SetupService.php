@@ -460,15 +460,12 @@ final class SetupService
             $nextStart = '';
             $nextEnd = '';
             if ($current !== null) {
-                $ends = trim((string) ($current['ends_on'] ?? ''));
-                if ($ends !== '' && preg_match('/^\d{4}-\d{2}-\d{2}$/', $ends)) {
-                    $endDt = \DateTimeImmutable::createFromFormat('Y-m-d', $ends);
-                    if ($endDt) {
-                        $nextStartDt = $endDt->modify('+1 day');
-                        $nextEndDt = $nextStartDt->modify('+1 year -1 day');
-                        $nextStart = $nextStartDt->format('Y-m-d');
-                        $nextEnd = $nextEndDt->format('Y-m-d');
-                    }
+                $next = $this->members->nextPeriodWindow(
+                    trim((string) ($current['starts_on'] ?? '')),
+                    trim((string) ($current['ends_on'] ?? ''))
+                );
+                if ($next !== null) {
+                    [$nextStart, $nextEnd] = $next;
                 }
             }
             return [
@@ -643,16 +640,25 @@ final class SetupService
                     $text = localized(is_string($decoded) ? $decoded : '');
                     $values = ['it' => $this->clipLegalEditorText($text), 'de' => '', 'en' => ''];
                 }
-                $cleanedIt = $this->stripRuntsDraftNote($values['it']);
-                if ($cleanedIt !== $values['it']) {
-                    $values['it'] = $cleanedIt;
-                    // Persist cleanup so the draft notice never reappears in official docs.
+                $beforeClean = $values;
+                $hadRuntsNote = $this->stripRuntsDraftNote($values['it']) !== $values['it'];
+                $values['it'] = $this->stripInlineLegalDraftBanners($values['it']);
+                $values['de'] = $this->stripInlineLegalDraftBanners($values['de']);
+                $values['en'] = $this->stripInlineLegalDraftBanners($values['en']);
+                if (
+                    $values['it'] !== $beforeClean['it']
+                    || $values['de'] !== $beforeClean['de']
+                    || $values['en'] !== $beforeClean['en']
+                ) {
+                    // Persist cleanup so draft banners never reappear in official docs.
                     $this->settings->set((string) $step['settings_key'], [
                         'it' => $values['it'],
                         'de' => $values['de'],
                         'en' => $values['en'],
                     ]);
-                    $this->settings->set((string) $step['settings_key'] . '_from_runts', '1');
+                    if ($hadRuntsNote) {
+                        $this->settings->set((string) $step['settings_key'] . '_from_runts', '1');
+                    }
                 }
                 if (($step['key'] ?? '') === 'legal.privacy'
                     && trim($values['it']) === ''
@@ -858,9 +864,9 @@ final class SetupService
             if ($key !== '' && $it !== '') {
                 $this->settings->set('setup.deferred.' . $key, '0');
             }
-            $it = $this->stripRuntsDraftNote($it);
-            $de = $this->stripRuntsDraftNote($de);
-            $en = $this->stripRuntsDraftNote($en);
+            $it = $this->stripInlineLegalDraftBanners($it);
+            $de = $this->stripInlineLegalDraftBanners($de);
+            $en = $this->stripInlineLegalDraftBanners($en);
             $payload = [
                 'it' => $it,
                 'de' => $de !== '' ? $de : $it,
@@ -2031,6 +2037,29 @@ final class SetupService
         ) ?? $text;
         $cleaned = preg_replace(
             '/^\[Draft from RUNTS PDF[^\]]*\]\s*/iu',
+            '',
+            $cleaned
+        ) ?? $cleaned;
+
+        return ltrim($cleaned);
+    }
+
+    /** Remove intrusive draft banners that must never ship in official privacy/statute texts. */
+    private function stripInlineLegalDraftBanners(string $text): string
+    {
+        $cleaned = $this->stripRuntsDraftNote($text);
+        $cleaned = preg_replace(
+            '/^INFORMATIVA\s+PRIVACY\s*\(\s*BOZZA\s*[—–-]\s*DA\s+ADATTARE\s*\)\s*/iu',
+            '',
+            $cleaned
+        ) ?? $cleaned;
+        $cleaned = preg_replace(
+            '/^PRIVACY\s+NOTICE\s*\(\s*DRAFT\s*[—–-]\s*ADAPT\s+AS\s+NEEDED\s*\)\s*/iu',
+            '',
+            $cleaned
+        ) ?? $cleaned;
+        $cleaned = preg_replace(
+            '/^DATENSCHUTZHINWEIS\s*\(\s*ENTWURF\s*[—–-]\s*ANPASSEN\s*\)\s*/iu',
             '',
             $cleaned
         ) ?? $cleaned;

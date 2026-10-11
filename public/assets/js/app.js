@@ -3579,6 +3579,8 @@ function initSetupSmtp(root) {
   const discoverBusy = box.dataset.discoverBusy || '';
   const testBusy = box.dataset.testBusy || '';
   const testOkMsg = box.dataset.testOk || '';
+  const testOkToTpl = box.dataset.testOkTo || testOkMsg;
+  const verifyFailMsg = box.dataset.verifyFail || discoverFail;
   const verifyBusy = box.dataset.verifyBusy || discoverBusy;
   const csrf =
     box.dataset.csrf ||
@@ -3591,13 +3593,25 @@ function initSetupSmtp(root) {
   let savedConnectionOk = connectionOk;
   const initialManual = box.dataset.smtpInitialManual === '1';
   let manualRevealedByFailure = false;
+  let allowSmtpSubmit = false;
+  let smtpPipelineBusy = false;
   const wizardRoot = root.matches?.('[data-setup-wizard]') ? root : root.querySelector?.('[data-setup-wizard]');
+  const ctaBtn = form?.querySelector('button.setup-cta[type="submit"]');
+
+  const scrollSmtpReveal = (el) => {
+    if (!(el instanceof HTMLElement) || el.hidden) return;
+    window.requestAnimationFrame(() => {
+      el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    });
+  };
 
   const setSmtpBusy = (busy) => {
     box.classList.toggle('is-smtp-busy', !!busy);
     wizardRoot?.classList.toggle('is-smtp-busy', !!busy);
     if (smtpLive) smtpLive.hidden = !busy;
-    const disable = !!busy || !!skip?.checked;
+    if (ctaBtn && busy) {
+      ctaBtn.disabled = true;
+    }
     box.querySelectorAll('input, select, textarea, button').forEach((el) => {
       if (el === skip) return;
       if (busy) {
@@ -3608,8 +3622,8 @@ function initSetupSmtp(root) {
         delete el.dataset.smtpBusyWasDisabled;
       }
     });
-    if (!busy && discoverBtn && !skip?.checked && !manual?.hidden) {
-      discoverBtn.disabled = false;
+    if (!busy && discoverBtn) {
+      discoverBtn.disabled = !!skip?.checked || !manual?.hidden;
     }
     if (!busy && verifyBtn && !skip?.checked) {
       verifyBtn.disabled = false;
@@ -3617,11 +3631,18 @@ function initSetupSmtp(root) {
     if (!busy && testBtn) {
       testBtn.disabled = !connectionOk || !!skip?.checked;
     }
+    if (!busy && ctaBtn) {
+      form?.dispatchEvent(new Event('setup:cta-refresh'));
+    }
   };
 
-  const setManualMode = (visible) => {
+  const setManualMode = (visible, { scroll = true } = {}) => {
+    const wasHidden = !!manual?.hidden;
     if (manual) manual.hidden = !visible;
     if (discoverRow) discoverRow.hidden = visible;
+    if (visible && scroll && wasHidden) {
+      scrollSmtpReveal(manual);
+    }
   };
 
   // Never show the test block until SMTP was validated in this session / previously.
@@ -3635,16 +3656,30 @@ function initSetupSmtp(root) {
     if (testBtn) testBtn.disabled = true;
   }
 
-  const showStatus = (el, message, isError = false) => {
+  const showStatus = (el, message, isError = false, { pending = false } = {}) => {
     if (!el) return;
-    el.textContent = message || '';
-    el.hidden = !message;
-    el.classList.toggle('setup-hint-warn', !!isError && !!message);
-    el.classList.toggle('setup-smtp-status-ok', !isError && !!message);
-    el.classList.toggle('is-error', !!isError && !!message);
-    if (smtpLive && el === discoverStatus) {
-      smtpLive.hidden = !message && !box.classList.contains('is-smtp-busy');
+    let text = message || '';
+    // Avoid doubling symbols already provided by CSS ::before.
+    if (text) {
+      text = text.replace(/^[✓❌]\s*/, '');
     }
+    el.textContent = text;
+    el.hidden = !text;
+    el.classList.toggle('setup-hint-warn', !!isError && !!text);
+    el.classList.toggle('setup-smtp-status-ok', !isError && !pending && !!text);
+    el.classList.toggle('setup-smtp-status-pending', pending && !!text);
+    el.classList.toggle('is-error', !!isError && !!text);
+    if (smtpLive && el === discoverStatus) {
+      smtpLive.hidden = !text && !box.classList.contains('is-smtp-busy');
+    }
+  };
+
+  const testSuccessMessage = (email) => {
+    const addr = (email || testToInput?.value || fromInput?.value || '').trim();
+    if (testOkToTpl && addr) {
+      return testOkToTpl.replace(':email', addr);
+    }
+    return testOkMsg;
   };
 
   const clearFieldHints = () => {
@@ -3682,7 +3717,8 @@ function initSetupSmtp(root) {
     return ok;
   };
 
-  const setConnectionOk = (ok) => {
+  const setConnectionOk = (ok, { scroll = false } = {}) => {
+    const wasHidden = !!testSection?.hidden;
     connectionOk = !!ok;
     if (!testSection) return;
     testSection.hidden = !connectionOk;
@@ -3691,6 +3727,9 @@ function initSetupSmtp(root) {
       testToInput.required = connectionOk;
     }
     if (testBtn) testBtn.disabled = !connectionOk || !!skip?.checked;
+    if (connectionOk && scroll && wasHidden) {
+      scrollSmtpReveal(testSection);
+    }
   };
 
   const invalidateConnection = () => {
@@ -3812,16 +3851,20 @@ function initSetupSmtp(root) {
       .replace(':encryption', encLabel);
   };
 
-  const showConnectionSuccess = (data, { verified = false } = {}) => {
+  const showConnectionSuccess = (data, { verified = false, keepManual = false } = {}) => {
     clearFieldHints();
     applySmtpFields(data);
-    setConnectionOk(true);
+    setConnectionOk(true, { scroll: !keepManual });
     savedConnectionOk = true;
     manualRevealedByFailure = false;
-    setManualMode(false);
+    if (!keepManual) {
+      setManualMode(false, { scroll: false });
+    }
     // Always clear stale auto-discovery errors and show success in the simple section.
     showStatus(discoverStatus, connectionSuccessMessage(data, { verified }), false);
-    showStatus(verifyStatus, '', false);
+    if (!keepManual) {
+      showStatus(verifyStatus, '', false);
+    }
   };
 
   const handleDiscoverResult = (data, statusEl, { revealManualOnFail = true } = {}) => {
@@ -3841,7 +3884,7 @@ function initSetupSmtp(root) {
         manualRevealedByFailure = true;
         setManualMode(true);
       } else if (revealManualOnFail && fieldError) {
-        setManualMode(false);
+        setManualMode(false, { scroll: false });
       } else if (revealManualOnFail) {
         manualRevealedByFailure = true;
         setManualMode(true);
@@ -3850,6 +3893,7 @@ function initSetupSmtp(root) {
         fieldError ||
         data.error ||
         data.errors?.host ||
+        verifyFailMsg ||
         discoverFail.replace(':tried', String(data.tried || 0));
       if (fieldError) {
         showStatus(statusEl, '', false);
@@ -3860,8 +3904,62 @@ function initSetupSmtp(root) {
     }
 
     const verified = statusEl === verifyStatus;
-    showConnectionSuccess(data, { verified });
+    // Successful auto-discovery: reveal technical params + Verifica (smooth scroll).
+    if (!verified && data.host) {
+      applySmtpFields(data);
+      setManualMode(true);
+      showStatus(discoverStatus, connectionSuccessMessage(data, { verified: false }), false);
+      showStatus(verifyStatus, '', false);
+      return true;
+    }
+    showConnectionSuccess(data, { verified, keepManual: verified });
     return true;
+  };
+
+  const fetchDiscover = async ({ includeHost = false } = {}) => {
+    const response = await fetch(discoverUrl, {
+      method: 'POST',
+      body: payloadFromForm({ includeHost }),
+      headers: { Accept: 'application/json', 'X-CSRF-Token': csrf },
+      credentials: 'same-origin',
+    });
+    return response.json().catch(() => ({}));
+  };
+
+  const sendTestEmail = async (statusEl) => {
+    if (!testUrl) return false;
+    showStatus(statusEl, testBusy, false, { pending: true });
+    try {
+      const response = await fetch(testUrl, {
+        method: 'POST',
+        body: payloadFromForm(),
+        headers: { Accept: 'application/json', 'X-CSRF-Token': csrf },
+        credentials: 'same-origin',
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok || !data.ok) {
+        applyFieldErrors(data);
+        if (data.needs_manual) {
+          manualRevealedByFailure = true;
+          setManualMode(true);
+        }
+        const fieldError = data.errors?.password || data.errors?.from_address;
+        showStatus(
+          statusEl,
+          fieldError ? String(fieldError) : (data.error || data.errors?.test || verifyFailMsg || discoverFail),
+          true
+        );
+        return false;
+      }
+      clearFieldHints();
+      applySmtpFields(data);
+      const to = (testToInput?.value || fromInput?.value || '').trim();
+      showStatus(statusEl, data.message || testSuccessMessage(to), false);
+      return true;
+    } catch {
+      showStatus(statusEl, verifyFailMsg || discoverFail, true);
+      return false;
+    }
   };
 
   let discovering = false;
@@ -3869,7 +3967,7 @@ function initSetupSmtp(root) {
   discoverBtn?.addEventListener('click', async (event) => {
     event.preventDefault();
     event.stopPropagation();
-    if (discovering || !discoverUrl || !fromInput || !passwordInput) return;
+    if (discovering || smtpPipelineBusy || !discoverUrl || !fromInput || !passwordInput) return;
     if (!validateSimpleFields()) return;
 
     discovering = true;
@@ -3877,24 +3975,18 @@ function initSetupSmtp(root) {
     discoverBtn.disabled = true;
     discoverBtn.setAttribute('aria-busy', 'true');
     discoverBtn.setAttribute('aria-disabled', 'true');
-    showStatus(discoverStatus, discoverBusy, false);
+    showStatus(discoverStatus, discoverBusy, false, { pending: true });
 
     try {
       // Force full auto-search: do not reuse a previously suggested host.
-      const response = await fetch(discoverUrl, {
-        method: 'POST',
-        body: payloadFromForm({ includeHost: false }),
-        headers: { Accept: 'application/json', 'X-CSRF-Token': csrf },
-        credentials: 'same-origin',
-      });
-      const data = await response.json().catch(() => ({}));
+      const data = await fetchDiscover({ includeHost: false });
       handleDiscoverResult(data, discoverStatus, { revealManualOnFail: true });
     } catch {
       setConnectionOk(false);
       savedConnectionOk = false;
       manualRevealedByFailure = true;
       setManualMode(true);
-      showStatus(discoverStatus, discoverFail.replace(':tried', '0'), true);
+      showStatus(discoverStatus, verifyFailMsg || discoverFail.replace(':tried', '0'), true);
     } finally {
       discovering = false;
       setSmtpBusy(false);
@@ -3914,12 +4006,12 @@ function initSetupSmtp(root) {
   verifyBtn?.addEventListener('click', async (event) => {
     event.preventDefault();
     event.stopPropagation();
-    if (verifying || !discoverUrl || !fromInput || !passwordInput) return;
+    if (verifying || smtpPipelineBusy || !discoverUrl || !fromInput || !passwordInput) return;
     if (!validateSimpleFields()) return;
     if (!(hostInput?.value || '').trim()) {
       manualRevealedByFailure = true;
       setManualMode(true);
-      showStatus(verifyStatus, discoverFail.replace(':tried', '0'), true);
+      showStatus(verifyStatus, verifyFailMsg || discoverFail.replace(':tried', '0'), true);
       return;
     }
 
@@ -3929,23 +4021,21 @@ function initSetupSmtp(root) {
     verifyBtn.setAttribute('aria-busy', 'true');
     verifyBtn.setAttribute('aria-disabled', 'true');
     showStatus(discoverStatus, '', false);
-    showStatus(verifyStatus, verifyBusy, false);
+    showStatus(verifyStatus, verifyBusy, false, { pending: true });
 
     try {
-      const response = await fetch(discoverUrl, {
-        method: 'POST',
-        body: payloadFromForm({ includeHost: true }),
-        headers: { Accept: 'application/json', 'X-CSRF-Token': csrf },
-        credentials: 'same-origin',
-      });
-      const data = await response.json().catch(() => ({}));
-      handleDiscoverResult(data, verifyStatus, { revealManualOnFail: true });
+      const data = await fetchDiscover({ includeHost: true });
+      const ok = handleDiscoverResult(data, verifyStatus, { revealManualOnFail: true });
+      if (ok) {
+        await sendTestEmail(verifyStatus);
+        scrollSmtpReveal(verifyStatus);
+      }
     } catch {
       setConnectionOk(false);
       savedConnectionOk = false;
       manualRevealedByFailure = true;
       setManualMode(true);
-      showStatus(verifyStatus, discoverFail.replace(':tried', '0'), true);
+      showStatus(verifyStatus, verifyFailMsg || discoverFail.replace(':tried', '0'), true);
     } finally {
       verifying = false;
       setSmtpBusy(false);
@@ -3959,47 +4049,81 @@ function initSetupSmtp(root) {
   testBtn?.addEventListener('click', async (event) => {
     event.preventDefault();
     event.stopPropagation();
-    if (!testUrl || !fromInput || !connectionOk) return;
+    if (!testUrl || !fromInput || !connectionOk || smtpPipelineBusy) return;
 
-    showStatus(testStatus, testBusy, false);
     testBtn.disabled = true;
     testBtn.setAttribute('aria-busy', 'true');
+    try {
+      await sendTestEmail(testStatus);
+      if (discoverStatus && connectionOk) {
+        showStatus(discoverStatus, connectionSuccessMessage({}, { verified: true }), false);
+      }
+    } finally {
+      testBtn.disabled = !!skip?.checked || !connectionOk;
+      testBtn.removeAttribute('aria-busy');
+    }
+  });
+
+  // Continua: run autodiscovery (+ connection check) before advancing when credentials are filled.
+  form?.addEventListener('submit', async (event) => {
+    if (allowSmtpSubmit || skip?.checked || smtpPipelineBusy) return;
+    if (!box.isConnected || !form.contains(box)) return;
+    if (fields?.hidden) return;
+
+    // Already verified in this session / previously: let the server save + re-test.
+    if (connectionOk && (hostInput?.value || '').trim()) return;
+
+    const from = (fromInput?.value || '').trim();
+    const password = passwordInput?.value || '';
+    const hasStoredPassword = box.dataset.hasPassword === '1';
+    if (!from && !password && !hasStoredPassword) return;
+    if (!validateSimpleFields()) {
+      event.preventDefault();
+      event.stopPropagation();
+      return;
+    }
+
+    event.preventDefault();
+    event.stopPropagation();
+    smtpPipelineBusy = true;
+    setSmtpBusy(true);
+    showStatus(discoverStatus, discoverBusy, false, { pending: true });
+    showStatus(verifyStatus, '', false);
 
     try {
-      const response = await fetch(testUrl, {
-        method: 'POST',
-        body: payloadFromForm(),
-        headers: { Accept: 'application/json', 'X-CSRF-Token': csrf },
-        credentials: 'same-origin',
+      const includeHost = !!(hostInput?.value || '').trim() && !manual?.hidden;
+      const data = await fetchDiscover({ includeHost });
+      const statusEl = includeHost || !manual?.hidden ? verifyStatus : discoverStatus;
+      const ok = handleDiscoverResult(data, includeHost ? verifyStatus : discoverStatus, {
+        revealManualOnFail: true,
       });
-      const data = await response.json().catch(() => ({}));
-
-      if (!response.ok || !data.ok) {
-        applyFieldErrors(data);
-        if (data.needs_manual) {
-          manualRevealedByFailure = true;
-          setManualMode(true);
-        }
-        const fieldError = data.errors?.password || data.errors?.from_address;
-        showStatus(
-          testStatus,
-          fieldError ? String(fieldError) : (data.error || data.errors?.test || discoverFail),
-          true
-        );
+      if (!ok) {
+        scrollSmtpReveal(manual?.hidden ? discoverStatus : (manual || verifyStatus));
         return;
       }
-
-      clearFieldHints();
-      applySmtpFields(data);
-      showStatus(testStatus, data.message || testOkMsg, false);
-      if (discoverStatus) {
-        showStatus(discoverStatus, connectionSuccessMessage(data, { verified: true }), false);
+      // Send test email now for clear green feedback; server skips a redundant re-test.
+      const feedbackEl = !manual?.hidden ? verifyStatus : (statusEl || discoverStatus);
+      const tested = await sendTestEmail(feedbackEl);
+      if (!tested) {
+        scrollSmtpReveal(feedbackEl || manual || testSection);
+        return;
+      }
+      allowSmtpSubmit = true;
+      if (typeof form.requestSubmit === 'function') {
+        form.requestSubmit(ctaBtn || undefined);
+      } else {
+        HTMLFormElement.prototype.submit.call(form);
       }
     } catch {
-      showStatus(testStatus, discoverFail, true);
+      manualRevealedByFailure = true;
+      setManualMode(true);
+      showStatus(discoverStatus, verifyFailMsg || discoverFail.replace(':tried', '0'), true);
     } finally {
-      testBtn.disabled = !!skip?.checked;
-      testBtn.removeAttribute('aria-busy');
+      smtpPipelineBusy = false;
+      if (!allowSmtpSubmit) {
+        setSmtpBusy(false);
+        setSkipped(!!skip?.checked);
+      }
     }
   });
 }
@@ -6493,6 +6617,10 @@ function initSetupMemberTypes(root = document) {
     const freeTpl = block.dataset.msgFreeTitle || 'Confermi che il tesseramento «:name» è gratuito?';
     const freeOk = block.dataset.msgFreeConfirm || 'Conferma';
     const freeCancel = block.dataset.msgFreeCancel || 'Annulla';
+    const hasExisting = block.dataset.hasExisting === '1';
+    const newList = block.querySelector('[data-member-types-new]');
+    const template = block.querySelector('template[data-member-type-template]');
+    const addBtn = block.querySelector('[data-member-type-add]');
 
     const fetchTranslation = async (text, target) => {
       if (!translateUrl || !text) return null;
@@ -6550,22 +6678,18 @@ function initSetupMemberTypes(root = document) {
       }
     };
 
-    block.querySelectorAll('[data-type-name-it]').forEach((itInput) => {
-      if (itInput.dataset.typeI18nBound === '1') return;
-      itInput.dataset.typeI18nBound = '1';
-      const card = itInput.closest('.setup-membership-card') || block;
+    const bindCardI18n = (card) => {
+      const itInput = card.querySelector('[data-type-name-it]');
       const deInput = card.querySelector('[data-type-name-de]');
       const enInput = card.querySelector('[data-type-name-en]');
-      if (!deInput || !enInput) return;
-
+      if (!itInput || !deInput || !enInput || itInput.dataset.typeI18nBound === '1') return;
+      itInput.dataset.typeI18nBound = '1';
       itInput.addEventListener('blur', () => { translateCard(card, false); });
       deInput.addEventListener('input', () => { deInput.dataset.userTouched = '1'; });
       enInput.addEventListener('input', () => { enInput.dataset.userTouched = '1'; });
-    });
-
-    block.querySelectorAll('[data-type-translate-now]').forEach((btn) => {
-      btn.addEventListener('click', async () => {
-        const card = btn.closest('.setup-membership-card') || block;
+      card.querySelector('[data-type-translate-now]')?.addEventListener('click', async (event) => {
+        const btn = event.currentTarget;
+        if (!(btn instanceof HTMLButtonElement)) return;
         btn.disabled = true;
         try {
           await translateCard(card, true);
@@ -6573,7 +6697,55 @@ function initSetupMemberTypes(root = document) {
           btn.disabled = false;
         }
       });
+    };
+
+    const reindexNewTypes = () => {
+      if (!newList) return;
+      const rows = [...newList.querySelectorAll('[data-member-type-new-row]')];
+      rows.forEach((row, i) => {
+        row.querySelectorAll('input[name]').forEach((input) => {
+          input.name = input.name.replace(/new_types\[(?:\d+|__i__)\]/, `new_types[${i}]`);
+        });
+        const price = row.querySelector('[data-type-price]');
+        if (price instanceof HTMLInputElement) {
+          price.dataset.typeNameRef = `new_types[${i}][name_it]`;
+        }
+        const removeBtn = row.querySelector('[data-member-type-remove]');
+        if (removeBtn instanceof HTMLElement) {
+          const keepOne = !hasExisting && rows.length <= 1;
+          removeBtn.hidden = keepOne;
+        }
+      });
+    };
+
+    block.querySelectorAll('.setup-membership-card').forEach((card) => bindCardI18n(card));
+
+    addBtn?.addEventListener('click', () => {
+      if (!newList || !(template instanceof HTMLTemplateElement)) return;
+      const node = template.content.firstElementChild?.cloneNode(true);
+      if (!(node instanceof HTMLElement)) return;
+      newList.appendChild(node);
+      reindexNewTypes();
+      bindCardI18n(node);
+      node.querySelector('[data-type-name-it]')?.focus?.();
+      block.dispatchEvent(new Event('setup:cta-refresh', { bubbles: true }));
     });
+
+    newList?.addEventListener('click', (event) => {
+      const btn = event.target instanceof Element
+        ? event.target.closest('[data-member-type-remove]')
+        : null;
+      if (!btn) return;
+      const row = btn.closest('[data-member-type-new-row]');
+      if (!(row instanceof HTMLElement) || !newList) return;
+      const rows = newList.querySelectorAll('[data-member-type-new-row]');
+      if (!hasExisting && rows.length <= 1) return;
+      row.remove();
+      reindexNewTypes();
+      block.dispatchEvent(new Event('setup:cta-refresh', { bubbles: true }));
+    });
+
+    reindexNewTypes();
 
     const form = block.closest('form');
     if (form && form.dataset.memberTypesFreeGate !== '1') {
@@ -6617,32 +6789,94 @@ function initSetupMemberTypes(root = document) {
 }
 
 function initSetupEnrollment(root = document) {
-  const box = root.querySelector('[data-setup-enrollment]');
-  if (!box || box.dataset.enrollmentReady === '1') return;
-  box.dataset.enrollmentReady = '1';
-  const select = box.querySelector('[data-enrollment-select]');
-  const detail = box.querySelector('[data-enrollment-detail]');
-  const sync = () => {
-    const val = select?.value || 'none';
-    const tpl = box.querySelector(`[data-enrollment-detail-for="${val}"]`);
-    if (detail) {
-      detail.textContent = tpl?.textContent?.trim() || '';
-      detail.hidden = detail.textContent === '';
-    }
-  };
-  select?.addEventListener('change', sync);
-  sync();
+  root.querySelectorAll('[data-setup-enrollment]').forEach((box) => {
+    if (box.dataset.enrollmentReady === '1') return;
+    box.dataset.enrollmentReady = '1';
+
+    const radios = [...box.querySelectorAll('[data-enrollment-radio]')];
+    const select = box.querySelector('[data-enrollment-select]');
+    const detail = box.querySelector('[data-enrollment-detail]');
+
+    const currentValue = () => {
+      const checked = box.querySelector('[data-enrollment-radio]:checked');
+      if (checked) return checked.value || 'none';
+      return select?.value || 'none';
+    };
+
+    const sync = () => {
+      const val = currentValue();
+      box.querySelectorAll('[data-enrollment-card]').forEach((card) => {
+        const input = card.querySelector('[data-enrollment-radio]');
+        const on = !!(input && input.checked && !input.disabled);
+        card.classList.toggle('is-selected', on);
+      });
+      const tpl = box.querySelector(`[data-enrollment-detail-for="${val}"]`);
+      if (detail) {
+        detail.textContent = tpl?.textContent?.trim() || '';
+        detail.hidden = detail.textContent === '';
+      }
+    };
+
+    radios.forEach((radio) => {
+      radio.addEventListener('change', sync);
+      // Disabled OTP card: show mail hint if user tries to activate it.
+      radio.addEventListener('click', (event) => {
+        if (!radio.disabled) return;
+        event.preventDefault();
+        const hint = box.querySelector('[data-enrollment-otp-hint]');
+        if (hint) {
+          hint.classList.add('is-emphasised');
+          hint.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        }
+      });
+    });
+    // Clicking the disabled card label should also emphasise the hint.
+    box.querySelectorAll('.setup-enrollment-card.is-disabled').forEach((card) => {
+      card.addEventListener('click', (event) => {
+        event.preventDefault();
+        const hint = box.querySelector('[data-enrollment-otp-hint]');
+        if (hint) {
+          hint.classList.add('is-emphasised');
+          hint.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        }
+      });
+    });
+    select?.addEventListener('change', sync);
+    sync();
+  });
 }
 
 function initSetupMembershipPeriods(root = document) {
   const msg = document.body?.dataset?.msgPeriodEndBeforeStart
     || 'La data di fine deve essere uguale o successiva alla data di inizio.';
+  const nextTpl = root.querySelector('[data-setup-membership-periods]')?.dataset?.msgNextPeriod
+    || document.body?.dataset?.msgNextPeriod
+    || 'Prossimo periodo automatico: :from → :to';
+
+  const shiftYear = (iso) => {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(iso)) return '';
+    const [y, m, d] = iso.split('-').map((n) => Number(n));
+    const dt = new Date(Date.UTC(y + 1, m - 1, d));
+    if (Number.isNaN(dt.getTime())) return '';
+    // Keep calendar day when possible (handles leap-day edge by Date UTC rollover).
+    const yy = dt.getUTCFullYear();
+    const mm = String(dt.getUTCMonth() + 1).padStart(2, '0');
+    const dd = String(dt.getUTCDate()).padStart(2, '0');
+    return `${yy}-${mm}-${dd}`;
+  };
+
+  const formatIt = (iso) => {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(iso)) return '';
+    const [y, m, d] = iso.split('-');
+    return `${d}/${m}/${y}`;
+  };
 
   root.querySelectorAll('[data-setup-membership-periods]').forEach((block) => {
     if (block.dataset.periodsBound === '1') return;
     block.dataset.periodsBound = '1';
+    const previewTpl = block.dataset.msgNextPeriod || nextTpl;
 
-    const bindPair = (startInput, endInput) => {
+    const bindPair = (startInput, endInput, previewEl = null) => {
       if (!startInput || !endInput) return;
       const validate = () => {
         const start = startInput.value;
@@ -6651,15 +6885,53 @@ function initSetupMembershipPeriods(root = document) {
         if (start && end && end < start) {
           endInput.setCustomValidity(msg);
         }
+        if (previewEl instanceof HTMLElement) {
+          const nextStart = shiftYear(start);
+          const nextEnd = shiftYear(end);
+          if (nextStart && nextEnd && (!end || end >= start)) {
+            previewEl.hidden = false;
+            previewEl.textContent = String(previewTpl)
+              .replaceAll(':from', formatIt(nextStart))
+              .replaceAll(':to', formatIt(nextEnd));
+          } else {
+            previewEl.hidden = true;
+            previewEl.textContent = '';
+          }
+        }
       };
       startInput.addEventListener('change', validate);
       endInput.addEventListener('change', validate);
       startInput.addEventListener('input', validate);
       endInput.addEventListener('input', validate);
+      // Native date pickers open on the current value when set; keep focus path clean.
+      [startInput, endInput].forEach((input) => {
+        input.addEventListener('focus', () => {
+          if (!input.value) return;
+          try {
+            input.showPicker?.();
+          } catch {
+            // Some browsers only allow showPicker from a direct user gesture on click.
+          }
+        });
+        input.addEventListener('click', () => {
+          if (!input.value) return;
+          try {
+            input.showPicker?.();
+          } catch {
+            /* ignore */
+          }
+        });
+      });
+      validate();
     };
 
     block.querySelectorAll('.setup-membership-card').forEach((card) => {
-      bindPair(card.querySelector('[data-period-start]'), card.querySelector('[data-period-end]'));
+      const preview = card.querySelector('[data-setup-next-period-preview]');
+      bindPair(
+        card.querySelector('[data-period-start]'),
+        card.querySelector('[data-period-end]'),
+        preview
+      );
     });
   });
 }
@@ -10464,6 +10736,8 @@ function setFieldsAutosaveStatus(editor, state, message) {
 }
 
 function queueFieldsAutosave(editor, { immediate = false } = {}) {
+  // Onboarding: persist only on Continua (no live autosave / spinners).
+  if (editor?.dataset?.fieldsSetupMode === '1') return;
   const url = (editor.dataset.autosaveUrl || '').trim();
   if (!url) return;
   const form = editor.closest('form');
@@ -10528,7 +10802,46 @@ function queueFieldsAutosave(editor, { immediate = false } = {}) {
   editor._fieldsAutosaveTimer = setTimeout(run, 550);
 }
 
+function bindAddressBundleToggles(scope = document) {
+  scope.querySelectorAll('[data-address-bundle]').forEach((row) => {
+    if (row.dataset.addressBundleBound === '1') return;
+    row.dataset.addressBundleBound = '1';
+    const enabledMaster = row.querySelector('[data-address-bundle-enabled]');
+    const requiredMaster = row.querySelector('[data-address-bundle-required]');
+    const enabledFields = [...row.querySelectorAll('[data-address-bundle-field="enabled"]')];
+    const requiredFields = [...row.querySelectorAll('[data-address-bundle-field="required"]')];
+    if (!(enabledMaster instanceof HTMLInputElement) || !(requiredMaster instanceof HTMLInputElement)) {
+      return;
+    }
+
+    const sync = () => {
+      const on = enabledMaster.checked;
+      enabledFields.forEach((input) => {
+        if (input instanceof HTMLInputElement) {
+          input.checked = on;
+          input.disabled = false;
+        }
+      });
+      if (!on) {
+        requiredMaster.checked = false;
+      }
+      requiredMaster.disabled = !on;
+      requiredFields.forEach((input) => {
+        if (input instanceof HTMLInputElement) {
+          input.checked = on && requiredMaster.checked;
+          input.disabled = !on;
+        }
+      });
+    };
+
+    enabledMaster.addEventListener('change', sync);
+    requiredMaster.addEventListener('change', sync);
+    sync();
+  });
+}
+
 function initSetupFieldsAddNow(root = document) {
+  bindAddressBundleToggles(root);
   root.querySelectorAll('[data-fields-add-now]').forEach((btn) => {
     if (btn.dataset.addNowBound === '1') return;
     btn.dataset.addNowBound = '1';
@@ -10579,6 +10892,7 @@ function initSetupFieldsAddNow(root = document) {
 }
 
 function initFieldsSortable(scope = document) {
+  bindAddressBundleToggles(scope);
   scope.querySelectorAll('[data-fields-editor]').forEach((editor) => {
     if (editor.dataset.fieldsEditorBound === '1') return;
     editor.dataset.fieldsEditorBound = '1';

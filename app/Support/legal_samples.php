@@ -44,6 +44,7 @@ if (!function_exists('privacy_sample_draft')) {
             '[indirizzo]' => $address !== '' ? $address : '[indirizzo]',
             '[address]' => $address !== '' ? $address : '[address]',
             '[Adresse]' => $address !== '' ? $address : '[Adresse]',
+            'registered office at [address]' => $address !== '' ? ('registered office at ' . $address) : 'registered office at [address]',
             'registered office [address]' => $address !== '' ? ('registered office ' . $address) : 'registered office [address]',
             'Sitz [Adresse]' => $address !== '' ? ('Sitz ' . $address) : 'Sitz [Adresse]',
             '[indirizzo email / PEC]' => $contact !== '' ? $contact : '[indirizzo email / PEC]',

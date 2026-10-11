@@ -340,6 +340,16 @@ final class MailService
         $this->settings->set('mail.configured', '1');
 
         if ($requireTestPass) {
+            // Client-side Continua pipeline may have just verified; avoid a second test email.
+            $lastTestAt = strtotime((string) $this->settings->get('mail.last_test_at', '')) ?: 0;
+            $recentlyVerified = $this->isReady() && $lastTestAt > 0 && (time() - $lastTestAt) < 180;
+            if ($recentlyVerified
+                && $host === trim((string) $this->settings->get('mail.host', ''))
+                && $username === trim((string) $this->settings->get('mail.username', ''))
+                && $fromAddress === trim((string) $this->settings->get('mail.from_address', ''))
+            ) {
+                return ['ok' => true];
+            }
             $testTo = trim((string) ($input['test_to'] ?? $fromAddress));
             $test = $this->sendTest($testTo !== '' ? $testTo : $fromAddress);
             if (!$test['ok']) {

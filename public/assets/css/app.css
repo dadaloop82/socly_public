@@ -4644,9 +4644,43 @@ html:has(.setup-body) {
   gap: 0.65rem;
   align-items: center;
 }
-.setup-smtp-status-ok {
-  color: color-mix(in srgb, var(--brand-primary) 70%, var(--ink));
+.setup-smtp-status-ok,
+.setup-smtp-feedback.setup-smtp-status-ok {
+  color: #1b7a3d;
+  font-weight: 650;
+}
+.setup-smtp-status-ok:not(:empty)::before,
+.setup-smtp-feedback.setup-smtp-status-ok:not(:empty)::before {
+  content: '✓ ';
+}
+.setup-smtp-status-pending {
+  color: var(--muted);
   font-weight: 600;
+}
+.setup-smtp-feedback.is-error,
+.setup-smtp-feedback.setup-hint-warn {
+  color: #b42318;
+  font-weight: 650;
+}
+.setup-smtp-feedback.is-error:not(:empty)::before,
+.setup-smtp-feedback.setup-hint-warn:not(:empty)::before {
+  content: '❌ ';
+}
+.setup-smtp-discover-btn.btn-ghost {
+  color: var(--brand-primary);
+  border-color: color-mix(in srgb, var(--brand-primary) 55%, var(--line));
+  background: #fff;
+  width: 100%;
+  min-height: 2.85rem;
+  justify-content: center;
+  text-align: center;
+  border-radius: 14px;
+  font-weight: 650;
+}
+.setup-smtp-discover-btn.btn-ghost:hover:not(:disabled) {
+  color: var(--brand-primary-deep);
+  border-color: var(--brand-primary);
+  background: color-mix(in srgb, var(--brand-primary) 8%, white);
 }
 .setup-smtp-manual {
   margin: 0;
@@ -4675,10 +4709,6 @@ html:has(.setup-body) {
 .setup-smtp-discover-row {
   margin-top: 0.25rem;
 }
-.setup-smtp-discover-row .setup-scrape-btn {
-  width: 100%;
-  min-height: 2.85rem;
-}
 .setup-smtp-live {
   display: grid;
   grid-template-columns: auto 1fr;
@@ -4691,7 +4721,7 @@ html:has(.setup-body) {
 }
 .setup-smtp-live[hidden] { display: none !important; }
 .setup-smtp-live-status { margin: 0; }
-.setup-smtp.is-smtp-busy .setup-scrape-btn {
+.setup-smtp.is-smtp-busy .setup-smtp-discover-btn {
   opacity: 0.55;
   cursor: wait;
   pointer-events: none;
@@ -5323,6 +5353,35 @@ button.setup-scrape-logo-frame:focus-visible .setup-scrape-logo-overlay {
 .setup-membership-card-new {
   border-style: dashed;
   background: color-mix(in srgb, var(--brand-primary) 5%, white);
+  position: relative;
+}
+.setup-membership-new-list {
+  display: grid;
+  gap: 0.85rem;
+}
+.setup-membership-card-head {
+  position: absolute;
+  top: 0.45rem;
+  right: 0.45rem;
+  z-index: 1;
+}
+.setup-membership-card-new .setup-langs-row {
+  padding-right: 1.75rem;
+}
+.setup-membership-remove {
+  width: 2rem;
+  height: 2rem;
+  padding: 0;
+  line-height: 1;
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: color-mix(in srgb, var(--ink) 55%, var(--muted));
+}
+.setup-membership-remove:hover {
+  color: var(--brand-primary);
+}
+.setup-membership-remove[hidden] {
+  display: none !important;
 }
 .setup-langs-row {
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -5742,6 +5801,23 @@ button.setup-scrape-logo-frame:focus-visible .setup-scrape-logo-overlay {
 .setup-fields-add .btn {
   margin-top: 0.35rem;
 }
+.setup-fields-add-now-btn.btn-ghost {
+  color: var(--brand-primary);
+  border-color: color-mix(in srgb, var(--brand-primary) 55%, var(--line));
+  background: #fff;
+}
+.setup-fields-add-now-btn.btn-ghost:hover {
+  color: var(--brand-primary-deep);
+  border-color: var(--brand-primary);
+  background: color-mix(in srgb, var(--brand-primary) 8%, white);
+}
+.setup-fields-bundle-sync {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  pointer-events: none;
+}
 .config-accordion-body .setup-fields-add .setup-field > span {
   display: block;
   font-size: 0.86rem;
@@ -5950,16 +6026,25 @@ button.setup-scrape-logo-frame:focus-visible .setup-scrape-logo-overlay {
   box-shadow: 0 0 0 1px color-mix(in srgb, var(--line) 70%, transparent);
 }
 .setup-price-with-currency {
-  display: grid;
-  grid-template-columns: 1fr auto;
-  gap: 0.45rem;
-  align-items: center;
+  position: relative;
+  display: block;
+  width: 100%;
+}
+.setup-price-with-currency input {
+  width: 100%;
+  box-sizing: border-box;
+  padding-right: 2.35rem;
 }
 .setup-price-currency {
-  min-width: 2rem;
-  text-align: center;
+  position: absolute;
+  right: 0.8rem;
+  top: 50%;
+  transform: translateY(-50%);
   font-weight: 700;
-  color: var(--brand-primary-deep);
+  font-size: 0.95rem;
+  line-height: 1;
+  color: color-mix(in srgb, var(--ink) 72%, var(--muted));
+  pointer-events: none;
 }
 .setup-locale-grid-compact {
   margin-top: 0.35rem;
@@ -7744,15 +7829,126 @@ a.org-node:hover {
 .setup-component-row-locked input[type="checkbox"]:disabled {
   opacity: 1;
 }
+.setup-enrollment {
+  display: grid;
+  gap: 0.85rem;
+}
+.setup-enrollment .setup-field-label {
+  margin: 0;
+  font-size: 0.92rem;
+  font-weight: 650;
+  color: var(--brand-primary-deep);
+}
+.setup-enrollment-cards {
+  display: grid;
+  gap: 0.65rem;
+}
+.setup-enrollment-card {
+  position: relative;
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 0.85rem;
+  align-items: start;
+  cursor: pointer;
+  margin: 0;
+  padding: 0.95rem 1rem;
+  border: 1px solid color-mix(in srgb, var(--ink) 12%, transparent);
+  border-radius: 14px;
+  background: #fff;
+  transition: background-color .15s ease, border-color .15s ease, box-shadow .15s ease;
+}
+.setup-enrollment-card > input[type="radio"] {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+.setup-enrollment-card-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.4rem;
+  height: 2.4rem;
+  border-radius: 12px;
+  color: var(--brand-primary);
+  background: color-mix(in srgb, var(--brand-primary) 10%, white);
+  flex-shrink: 0;
+}
+.setup-enrollment-card-body {
+  display: grid;
+  gap: 0.2rem;
+  min-width: 0;
+}
+.setup-enrollment-card-title {
+  font-size: 1rem;
+  font-weight: 700;
+  line-height: 1.3;
+  color: var(--ink);
+}
+.setup-enrollment-card-desc {
+  font-size: 0.88rem;
+  line-height: 1.45;
+  color: color-mix(in srgb, var(--ink) 68%, transparent);
+}
+.setup-enrollment-card-note {
+  margin-top: 0.2rem;
+  font-size: 0.8rem;
+  line-height: 1.45;
+  color: color-mix(in srgb, var(--brand-primary-deep) 72%, var(--muted));
+}
+.setup-enrollment-card-lock {
+  margin-top: 0.25rem;
+  font-size: 0.78rem;
+  font-weight: 650;
+  color: var(--muted);
+}
+.setup-enrollment-card:hover:not(.is-disabled) {
+  background: color-mix(in srgb, var(--brand-primary) 6%, #fff);
+  border-color: color-mix(in srgb, var(--brand-primary) 28%, transparent);
+}
+.setup-enrollment-card.is-selected,
+.setup-enrollment-card:has(> input:checked) {
+  background: color-mix(in srgb, var(--brand-primary) 10%, #fff);
+  border-color: color-mix(in srgb, var(--brand-primary) 45%, transparent);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--brand-primary) 22%, transparent);
+}
+.setup-enrollment-card.is-selected .setup-enrollment-card-title,
+.setup-enrollment-card:has(> input:checked) .setup-enrollment-card-title {
+  color: var(--brand-primary-deep);
+}
+.setup-enrollment-card.is-disabled {
+  cursor: not-allowed;
+  opacity: 0.62;
+  background: color-mix(in srgb, var(--surface) 70%, #fff);
+  filter: grayscale(0.25);
+}
+.setup-enrollment-otp-hint {
+  margin: 0;
+  line-height: 1.5;
+}
+.setup-enrollment-otp-hint.is-emphasised {
+  color: var(--brand-primary-deep);
+  font-weight: 650;
+}
+.setup-enrollment-mail-link {
+  display: inline-block;
+  margin-left: 0.25rem;
+  font-weight: 700;
+}
 .setup-enrollment-detail {
-  margin: 0.35rem 0 0;
+  margin: 0;
   padding: 0.75rem 0.85rem;
   border-radius: 0.65rem;
   background: color-mix(in srgb, var(--brand-paper) 55%, white);
   border: 1px solid color-mix(in srgb, var(--brand-primary) 14%, var(--line));
   line-height: 1.55;
+  font-size: 0.9rem;
 }
 .setup-enrollment-detail[hidden] { display: none !important; }
+@media (min-width: 720px) {
+  .setup-enrollment-cards {
+    grid-template-columns: 1fr 1fr;
+  }
+}
 .setup-password-strength {
   display: grid;
   gap: 0.45rem;

@@ -617,30 +617,14 @@
     <div class="config-accordion-body">
         <form method="post" action="<?= e(url('/settings/enrollment')) ?>" data-leave-guard data-settings-autosave>
             <?= csrf_field() ?>
-            <div class="setup-enrollment" data-setup-enrollment>
-                <label class="setup-field">
-                    <span><?= e(__('settings.enrollment_method')) ?></span>
-                    <select name="enrollment_validation" required data-enrollment-select>
-                <?php
-                $enroll = (string) ($settings['membership.enrollment_validation'] ?? 'none');
-                $enrollOpts = [
-                    'none' => 'setup.enrollment_none',
-                    'print_scan' => 'setup.enrollment_print_scan',
-                    'tablet_sign' => 'setup.enrollment_tablet_sign',
-                    'otp_email' => 'setup.enrollment_otp_email',
-                ];
-                foreach ($enrollOpts as $val => $labelKey):
-                    $otpBlocked = $val === 'otp_email' && empty($mailReady);
-                ?>
-                    <option value="<?= e($val) ?>" <?= $enroll === $val ? 'selected' : '' ?> <?= $otpBlocked ? 'disabled' : '' ?>><?= e(__($labelKey)) ?><?= $otpBlocked ? ' — ' . e(__('setup.mail_required_short')) : '' ?></option>
-                <?php endforeach; ?>
-                    </select>
-                </label>
-                <?php foreach ($enrollOpts as $val => $labelKey): ?>
-                    <template data-enrollment-detail-for="<?= e($val) ?>"><?= e(__('setup.enrollment_detail_' . $val)) ?></template>
-                <?php endforeach; ?>
-                <p class="setup-enrollment-detail muted" data-enrollment-detail aria-live="polite"></p>
-            </div>
+            <?= view_partial('partials/enrollment_method_picker', [
+                'name' => 'enrollment_validation',
+                'value' => (string) ($settings['membership.enrollment_validation'] ?? 'none'),
+                'mailReady' => !empty($mailReady),
+                'mailSetupHref' => url('/settings#mail'),
+                'showFieldLabel' => true,
+                'fieldLabel' => (string) __('settings.enrollment_method'),
+            ]) ?>
             <p class="settings-autosave-status muted" data-settings-autosave-status aria-live="polite"></p>
         </form>
     </div>

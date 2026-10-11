@@ -717,10 +717,15 @@ final class MemberService
             if ($key === '') {
                 continue;
             }
+            $listedInForm = isset($sortByKey[$key]) || isset($fieldSteps[$key]) || isset($types[$key]);
+            $core = MemberFieldTypes::isCoreArchiveField($key);
+            // Setup wizard hides privacy-consent rows; don't wipe their GDPR toggles on Continua.
+            if (!$listedInForm && !$core) {
+                continue;
+            }
             $locked = MemberFieldTypes::lockedTypeForKey($key);
             $typeRaw = (string) ($types[$key] ?? $field['field_type'] ?? MemberFieldTypes::TEXT);
             $type = $locked ?? MemberFieldTypes::resolve($typeRaw, $key);
-            $core = MemberFieldTypes::isCoreArchiveField($key);
             $isEnabled = $core || in_array($key, $enabled, true);
             $isRequired = $isEnabled && ($core || in_array($key, $required, true));
             $payload = [
@@ -876,12 +881,29 @@ final class MemberService
             ], 'id = :id', ['id' => $id]);
         }
 
-        $nameIt = trim((string) ($input['name_it'] ?? ''));
-        $nameDe = trim((string) ($input['name_de'] ?? ''));
-        $nameEn = trim((string) ($input['name_en'] ?? ''));
-        $priceRaw = trim((string) ($input['price'] ?? ''));
+        $newTypes = $input['new_types'] ?? null;
+        if (!is_array($newTypes)) {
+            // Backward compatible single-row payload (name_it / price).
+            $newTypes = [[
+                'name_it' => (string) ($input['name_it'] ?? ''),
+                'name_de' => (string) ($input['name_de'] ?? ''),
+                'name_en' => (string) ($input['name_en'] ?? ''),
+                'price' => (string) ($input['price'] ?? ''),
+                'is_active' => $input['is_active'] ?? '1',
+            ]];
+        }
 
-        if ($nameIt !== '') {
+        foreach ($newTypes as $row) {
+            if (!is_array($row)) {
+                continue;
+            }
+            $nameIt = trim((string) ($row['name_it'] ?? ''));
+            $nameDe = trim((string) ($row['name_de'] ?? ''));
+            $nameEn = trim((string) ($row['name_en'] ?? ''));
+            $priceRaw = trim((string) ($row['price'] ?? ''));
+            if ($nameIt === '') {
+                continue;
+            }
             if ($priceRaw === '' || !is_numeric($priceRaw) || (float) $priceRaw < 0) {
                 return ['ok' => false, 'errors' => ['price' => __('validation.required')]];
             }
@@ -893,7 +915,7 @@ final class MemberService
             $this->db->insert('member_types', [
                 'name_json' => json_encode($names, JSON_UNESCAPED_UNICODE),
                 'price' => (float) $priceRaw,
-                'is_active' => !empty($input['is_active']) ? 1 : 1,
+                'is_active' => !empty($row['is_active']) ? 1 : 1,
                 'sort_order' => count($this->types(false)),
             ]);
         }
@@ -935,13 +957,20 @@ final class MemberService
             return;
         }
         $starts = (string) ($current['starts_on'] ?? '');
-        if ($starts === '' || !$this->isValidPeriodDate($starts) || !$this->isValidPeriodDate($ends)) {
+        $next = $this->nextPeriodWindow($starts, $ends);
+        if ($next === null) {
             return;
         }
+        [$nextStarts, $nextEnds] = $next;
 
-        $nextStarts = date('Y-m-d', strtotime($starts . ' +1 year'));
-        $nextEnds = date('Y-m-d', strtotime($ends . ' +1 year'));
-        if (!$this->isValidPeriodDate($nextStarts) || !$this->isValidPeriodDate($nextEnds)) {
+        // Avoid duplicate windows if rollover already ran.
+        $exists = $this->db->fetch(
+            'SELECT id FROM membership_periods WHERE starts_on = :s AND ends_on = :e LIMIT 1',
+            ['s' => $nextStarts, 'e' => $nextEnds]
+        );
+        if ($exists) {
+            $this->db->query('UPDATE membership_periods SET is_current = 0');
+            $this->db->update('membership_periods', ['is_current' => 1], 'id = :id', ['id' => (int) $exists['id']]);
             return;
         }
 
@@ -952,6 +981,32 @@ final class MemberService
             'ends_on' => $nextEnds,
             'is_current' => 1,
         ]);
+    }
+
+    /**
+     * Next associative year window: +1 calendar year on both ends
+     * (solar years and sports/school years that cross Dec 31).
+     *
+     * @return array{0:string,1:string}|null
+     */
+    public function nextPeriodWindow(string $starts, string $ends): ?array
+    {
+        if (!$this->isValidPeriodDate($starts) || !$this->isValidPeriodDate($ends) || $ends < $starts) {
+            return null;
+        }
+        try {
+            $startDt = new \DateTimeImmutable($starts);
+            $endDt = new \DateTimeImmutable($ends);
+            $nextStarts = $startDt->modify('+1 year')->format('Y-m-d');
+            $nextEnds = $endDt->modify('+1 year')->format('Y-m-d');
+        } catch (\Throwable) {
+            return null;
+        }
+        if (!$this->isValidPeriodDate($nextStarts) || !$this->isValidPeriodDate($nextEnds) || $nextEnds < $nextStarts) {
+            return null;
+        }
+
+        return [$nextStarts, $nextEnds];
     }
 
     public function hasPeriodForYear(int $year): bool
