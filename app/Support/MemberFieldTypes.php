@@ -229,10 +229,11 @@ final class MemberFieldTypes
     {
         return [
             'base' => ['first_name', 'last_name', 'gender', 'preferred_language'],
+            'photo' => ['photo'],
             'birth' => ['birth_date', 'birth_place'],
             'fiscal' => ['fiscal_code'],
             'residence' => ['city', 'postal_code', 'address', 'house_number'],
-            'contact' => ['email', 'phone', 'photo'],
+            'contact' => ['email', 'phone'],
         ];
     }
 

@@ -3,6 +3,9 @@
         <h1 class="page-title"><?= e(__('settings.title')) ?></h1>
         <p class="page-lede"><?= e(__('settings.lede')) ?></p>
     </div>
+    <?php if (can('dashboard.view')): ?>
+        <a class="btn btn-ghost" href="<?= e(url('/dashboard')) ?>"><?= e(__('nav.back_to_dashboard')) ?></a>
+    <?php endif; ?>
 </div>
 
 <div class="config-accordions" data-config-accordions

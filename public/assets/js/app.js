@@ -1779,7 +1779,15 @@ function initMemberWizard() {
     }
     photoTarget.removeAttribute('src');
     photoTarget.hidden = true;
-    if (photoPlaceholder) photoPlaceholder.hidden = false;
+    if (photoPlaceholder) {
+      photoPlaceholder.hidden = false;
+      const genderSelect = form.querySelector('[data-gender-input]');
+      const genderRaw =
+        genderSelect instanceof HTMLSelectElement || genderSelect instanceof HTMLInputElement
+          ? genderSelect.value
+          : '';
+      seedPhotoPlaceholder(photoPlaceholder, form, photoGenderFromValue(genderRaw));
+    }
     photoWrap?.classList.add('is-empty');
   };
 
@@ -1825,13 +1833,67 @@ function initMemberWizard() {
     const liveSrc = (livePhoto?.currentSrc || livePhoto?.src || '').trim();
     if (liveSrc) {
       syncTesseraPhoto(liveSrc);
-    } else if (!photoTarget?.getAttribute('src')) {
-      syncTesseraPhoto('');
+    } else {
+      const existing = (photoTarget?.getAttribute('src') || '').trim();
+      const keepServerPhoto =
+        existing !== '' &&
+        !existing.startsWith('blob:') &&
+        !existing.startsWith('data:') &&
+        existing.includes('/photo');
+      if (!keepServerPhoto) {
+        syncTesseraPhoto('');
+      }
     }
   };
 
   paymentStatus?.addEventListener('change', syncCard);
   partialAmountInput?.addEventListener('input', syncCard);
+
+  const guardianField = form.querySelector('[data-guardian-field]');
+  const guardianSelect = form.querySelector('[data-guardian-select]');
+  const guardianBadge = form.querySelector('[data-guardian-badge]');
+  const treasuryNote = form.querySelector('[data-payment-treasury-note]');
+  const paymentMethodSelect = form.querySelector('[name="payment_method"]');
+
+  const ageFromBirthDate = (raw) => {
+    const value = String(raw || '').trim();
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return null;
+    const birth = new Date(`${value}T12:00:00`);
+    if (Number.isNaN(birth.getTime())) return null;
+    const today = new Date();
+    let age = today.getFullYear() - birth.getFullYear();
+    const m = today.getMonth() - birth.getMonth();
+    if (m < 0 || (m === 0 && today.getDate() < birth.getDate())) age -= 1;
+    return age;
+  };
+
+  const syncGuardianRequirement = () => {
+    if (!guardianField) return;
+    const birthInput = form.querySelector('[data-birth-date]');
+    const age = ageFromBirthDate(birthInput?.value || '');
+    const typeName = String(typeSelect?.selectedOptions?.[0]?.dataset?.typeName || '').toLowerCase();
+    const juniorType = typeName.includes('junior') || typeName.includes('minoren');
+    const required = juniorType || (age !== null && age < 18);
+    guardianField.classList.toggle('is-guardian-required', required);
+    if (guardianBadge) guardianBadge.hidden = !required;
+    if (guardianSelect instanceof HTMLSelectElement) {
+      guardianSelect.required = required;
+      guardianSelect.setAttribute('aria-required', required ? 'true' : 'false');
+    }
+  };
+
+  const syncTreasuryNote = () => {
+    if (!treasuryNote) return;
+    const status = paymentStatus?.value || 'unpaid';
+    treasuryNote.hidden = !(status === 'paid' || status === 'partial');
+  };
+
+  form.querySelector('[data-birth-date]')?.addEventListener('change', syncGuardianRequirement);
+  form.querySelector('[data-birth-date]')?.addEventListener('input', syncGuardianRequirement);
+  typeSelect?.addEventListener('change', syncGuardianRequirement);
+  paymentStatus?.addEventListener('change', syncTreasuryNote);
+  syncGuardianRequirement();
+  syncTreasuryNote();
 
   const showStep = (n, { animateEnter = true } = {}) => {
     step = Math.min(Math.max(n, 1), total);
@@ -2013,12 +2075,22 @@ function initMemberWizard() {
 
     if (form.dataset.memberLeaveGuard === 'create' && form.dataset.treasuryEnabled === '1' && !form.dataset.treasuryResolved) {
       const status = paymentStatus?.value || 'unpaid';
+      const method = paymentMethodSelect?.value || 'cash';
       const opt = typeSelect?.selectedOptions?.[0];
       const price = Number(opt?.dataset.price || 0);
       let paid = 0;
       if (status === 'paid') paid = price;
       else if (status === 'partial') paid = Math.max(0, Number(partialAmountInput?.value || 0));
       if (paid > 0) {
+        // Cash payments go straight to Prima Cassa (backend auto-register).
+        if (method === 'cash') {
+          form.dataset.treasuryResolved = '1';
+          const skipInput = form.querySelector('[data-treasury-skip]');
+          const registerInput = form.querySelector('[data-treasury-register]');
+          if (skipInput) skipInput.value = '';
+          if (registerInput) registerInput.value = '';
+          return;
+        }
         e.preventDefault();
         form.dataset.treasuryPendingAmount = String(paid);
         const askDialog = document.querySelector('[data-treasury-ask-dialog]');
@@ -2235,11 +2307,127 @@ function initMemberForm() {
   initPhoneInputs(form);
   initEmailValidation(form);
   initPhotoCapture(form);
+  initPhotoGenderPlaceholder(form);
   initPlaceSuggest(form);
   initFiscalCodeAuto(form);
   initMemberLeaveGuard(form);
   initEnrollmentPad(form);
   initEnrollmentOtp(form);
+}
+
+function photoGenderFromValue(raw) {
+  const gender = String(raw || '').trim().toUpperCase();
+  if (gender === 'M') return 'm';
+  if (gender === 'F') return 'f';
+  return 'neutral';
+}
+
+function photoPlaceholderUrl(form, gender) {
+  const base = (form?.dataset?.photoAvatarBase || '/assets/img/avatars').replace(/\/$/, '');
+  const file = gender === 'm'
+    ? 'placeholder-male.svg'
+    : (gender === 'f' ? 'placeholder-female.svg' : 'placeholder-neutral.svg');
+  return `${base}/${file}`;
+}
+
+function ensurePhotoPlaceholderLayer(el, form, gender, active = true) {
+  const layer = document.createElement('span');
+  layer.className = active ? 'photo-ph-layer is-active' : 'photo-ph-layer';
+  layer.setAttribute('aria-hidden', 'true');
+  layer.style.backgroundImage = `url("${photoPlaceholderUrl(form, gender)}")`;
+  el.appendChild(layer);
+  return layer;
+}
+
+function seedPhotoPlaceholder(el, form, gender) {
+  if (!(el instanceof HTMLElement)) return;
+  el.querySelectorAll('.photo-ph-layer').forEach((node) => node.remove());
+  ensurePhotoPlaceholderLayer(el, form, gender, true);
+  el.dataset.photoGender = gender;
+}
+
+function crossfadePhotoPlaceholder(el, form, gender) {
+  if (!(el instanceof HTMLElement)) return;
+  const prev = el.dataset.photoGender || 'neutral';
+  if (prev === gender) {
+    if (!el.querySelector('.photo-ph-layer')) {
+      seedPhotoPlaceholder(el, form, gender);
+    }
+    return;
+  }
+
+  let current = el.querySelector('.photo-ph-layer.is-active');
+  if (!(current instanceof HTMLElement)) {
+    seedPhotoPlaceholder(el, form, prev);
+    current = el.querySelector('.photo-ph-layer.is-active');
+  }
+  if (!(current instanceof HTMLElement)) return;
+
+  if (el._photoGenderTimer) {
+    window.clearTimeout(el._photoGenderTimer);
+    el._photoGenderTimer = null;
+  }
+  // Drop any unfinished incoming layers.
+  el.querySelectorAll('.photo-ph-layer:not(.is-active)').forEach((node) => node.remove());
+
+  const next = ensurePhotoPlaceholderLayer(el, form, gender, false);
+  // Double rAF so the browser registers opacity:0 before transitioning to 1.
+  window.requestAnimationFrame(() => {
+    window.requestAnimationFrame(() => {
+      next.classList.add('is-active');
+      current.classList.remove('is-active');
+      const cleanup = () => {
+        if (current.isConnected) current.remove();
+        el.dataset.photoGender = gender;
+        el._photoGenderTimer = null;
+      };
+      current.addEventListener('transitionend', cleanup, { once: true });
+      el._photoGenderTimer = window.setTimeout(cleanup, 500);
+    });
+  });
+}
+
+function applyPhotoGenderPlaceholder(form, genderRaw, { animate = true } = {}) {
+  if (!(form instanceof HTMLElement)) return;
+  const gender = photoGenderFromValue(genderRaw);
+  const reduceMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches;
+  const targets = [...form.querySelectorAll('[data-photo-placeholder].photo-placeholder, .photo-placeholder[data-photo-placeholder]')];
+  // Tessera placeholder (may lack data-photo-placeholder in older markup).
+  form.querySelectorAll('[data-tessera-photo-placeholder]').forEach((el) => {
+    if (el instanceof HTMLElement && !targets.includes(el)) targets.push(el);
+  });
+
+  targets.forEach((el) => {
+    if (!(el instanceof HTMLElement)) return;
+    if (!animate || reduceMotion) {
+      seedPhotoPlaceholder(el, form, gender);
+      return;
+    }
+    crossfadePhotoPlaceholder(el, form, gender);
+  });
+}
+
+function preloadPhotoPlaceholders(form) {
+  ['neutral', 'm', 'f'].forEach((gender) => {
+    const img = new Image();
+    img.src = photoPlaceholderUrl(form, gender);
+  });
+}
+
+function initPhotoGenderPlaceholder(form) {
+  if (!(form instanceof HTMLElement) || form.dataset.photoGenderBound === '1') return;
+  form.dataset.photoGenderBound = '1';
+  preloadPhotoPlaceholders(form);
+  const genderSelect = form.querySelector('[data-gender-input]');
+  const sync = (animate = true) => {
+    const value = genderSelect instanceof HTMLSelectElement || genderSelect instanceof HTMLInputElement
+      ? genderSelect.value
+      : '';
+    applyPhotoGenderPlaceholder(form, value, { animate });
+  };
+  // `change` only — `input` would fire twice and cancel the fade.
+  genderSelect?.addEventListener('change', () => sync(true));
+  sync(false);
 }
 
 function initEnrollmentPad(form) {
@@ -2606,6 +2794,16 @@ function initPhoneInputs(scope = document) {
     const input = field.querySelector('[data-phone-input]');
     if (!input) return;
 
+    // Unwrap legacy validity wrappers that break the dial + number flex row.
+    const staleWrap = input.closest('.setup-input-validity');
+    if (staleWrap && field.contains(staleWrap) && staleWrap.parentNode === field) {
+      staleWrap.querySelectorAll('.setup-input-validity-mark').forEach((mark) => mark.remove());
+      while (staleWrap.firstChild) {
+        field.insertBefore(staleWrap.firstChild, staleWrap);
+      }
+      staleWrap.remove();
+    }
+
     const invalidMsg = input.dataset.invalid || '';
     const defaultDial = (input.dataset.defaultDial || '39').replace(/\D/g, '') || '39';
 
@@ -2632,15 +2830,11 @@ function initPhoneInputs(scope = document) {
       const ok = national === '' || isValidPhone(dial, national);
       input.classList.toggle('input-valid', national !== '' && ok);
       input.classList.toggle('input-invalid', national !== '' && !ok);
+      // Do not wrap with setup-input-validity: reparenting breaks focus and the dial flex row.
       if (national !== '' && !ok) {
         input.setCustomValidity(invalidMsg || 'Invalid phone');
-        paintSetupValidity(input, 'err', invalidMsg || 'Invalid phone');
-      } else if (national !== '') {
-        input.setCustomValidity('');
-        paintSetupValidity(input, 'ok');
       } else {
         input.setCustomValidity('');
-        paintSetupValidity(input, '');
       }
     };
 
@@ -2666,7 +2860,6 @@ function initPhoneInputs(scope = document) {
     input.addEventListener('input', () => {
       input.setCustomValidity('');
       input.classList.remove('input-valid', 'input-invalid');
-      paintSetupValidity(input, '');
     });
 
     field.closest('form')?.addEventListener('submit', () => {
@@ -2921,11 +3114,11 @@ function initPhotoCapture(form) {
   const canUseNativeCapture = () => !!(captureInput && isMobileLike());
 
   const cameraAvailable = canUseLiveCamera() || canUseNativeCapture();
-  if (openBtn) {
+  if (openBtn instanceof HTMLButtonElement) {
     openBtn.hidden = !cameraAvailable;
+    openBtn.setAttribute('aria-hidden', cameraAvailable ? 'false' : 'true');
   }
   if (!cameraAvailable) {
-    captureInput?.remove();
     if (hint && hint.dataset.uploadOnly) {
       hint.textContent = hint.dataset.uploadOnly;
     }
@@ -2943,7 +3136,15 @@ function initPhotoCapture(form) {
     if (img) {
       const ph = document.createElement('div');
       ph.className = 'photo-placeholder';
+      ph.setAttribute('data-photo-placeholder', '');
       ph.setAttribute('aria-hidden', 'true');
+      const genderSelect = form.querySelector('[data-gender-input]');
+      const gender = photoGenderFromValue(
+        genderSelect instanceof HTMLSelectElement || genderSelect instanceof HTMLInputElement
+          ? genderSelect.value
+          : ''
+      );
+      seedPhotoPlaceholder(ph, form, gender);
       const host = img.closest('[data-photo-lightbox-open]') || img;
       host.replaceWith(ph);
     }
@@ -2954,7 +3155,16 @@ function initPhotoCapture(form) {
       tesseraPhoto.removeAttribute('src');
       tesseraPhoto.hidden = true;
     }
-    if (tesseraPh) tesseraPh.hidden = false;
+    if (tesseraPh instanceof HTMLElement) {
+      tesseraPh.hidden = false;
+      const genderSelect = form.querySelector('[data-gender-input]');
+      const gender = photoGenderFromValue(
+        genderSelect instanceof HTMLSelectElement || genderSelect instanceof HTMLInputElement
+          ? genderSelect.value
+          : ''
+      );
+      seedPhotoPlaceholder(tesseraPh, form, gender);
+    }
     tesseraWrap?.classList.add('is-empty');
   };
 
@@ -5258,6 +5468,10 @@ function ensureSetupValidityWrap(el) {
   }
   if (el.type === 'radio' || el.type === 'checkbox' || el.type === 'hidden' || el.type === 'file') {
     return null;
+  }
+  // Phone dial + national row must stay a flat flex; wrapping steals focus and shifts layout.
+  if (el.closest('[data-phone-field]')) {
+    return el.closest('.setup-input-validity');
   }
   let wrap = el.closest('.setup-input-validity');
   if (wrap) return wrap;
@@ -8901,11 +9115,7 @@ function initMobileNav() {
 }
 
 function initTopbarScroll() {
-  const topbar = document.querySelector('[data-topbar]');
-  const configBtn = topbar?.querySelector('[data-topbar-config]');
-  if (!topbar || !configBtn) {
-    return;
-  }
+  /* Topbar is mobile-only; desktop gear was removed in favour of sidebar Configurazione. */
 }
 
 function dismissFlashAlert(alertEl) {
@@ -9569,6 +9779,38 @@ function initBirthDateFields(root = document) {
   const msgTooOld = document.body?.dataset?.msgBirthTooOld
     || 'La data di nascita deve rientrare negli ultimi 100 anni.';
 
+  const ageFromIso = (iso) => {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(iso)) return null;
+    const year = Number.parseInt(iso.slice(0, 4), 10);
+    const month = Number.parseInt(iso.slice(5, 7), 10);
+    const day = Number.parseInt(iso.slice(8, 10), 10);
+    if (!Number.isFinite(year) || year < 1000) return null;
+    const born = new Date(year, month - 1, day);
+    if (Number.isNaN(born.getTime())) return null;
+    const now = new Date();
+    const todayLocal = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    if (born > todayLocal) return null;
+    let age = todayLocal.getFullYear() - born.getFullYear();
+    const m = todayLocal.getMonth() - born.getMonth();
+    if (m < 0 || (m === 0 && todayLocal.getDate() < born.getDate())) age -= 1;
+    if (age < 0 || age > 150) return null;
+    return age;
+  };
+
+  const syncBirthAge = (input) => {
+    const ageEl = input.closest('.birth-date-row, .field-block')?.querySelector('[data-birth-age]');
+    if (!(ageEl instanceof HTMLElement)) return;
+    const age = ageFromIso(input.value.trim());
+    if (age === null) {
+      ageEl.textContent = '';
+      ageEl.hidden = true;
+      return;
+    }
+    const tpl = ageEl.dataset.template || ':age anni';
+    ageEl.textContent = tpl.replaceAll(':age', String(age));
+    ageEl.hidden = false;
+  };
+
   scope.querySelectorAll('[data-birth-date]').forEach((input) => {
     if (!(input instanceof HTMLInputElement) || input.dataset.birthBound === '1') return;
     input.dataset.birthBound = '1';
@@ -9578,6 +9820,7 @@ function initBirthDateFields(root = document) {
     input.min = minStr;
     const validate = () => {
       const v = input.value;
+      syncBirthAge(input);
       if (!v) {
         input.setCustomValidity('');
         input.classList.remove('input-invalid');

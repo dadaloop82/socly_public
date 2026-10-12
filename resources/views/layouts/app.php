@@ -150,16 +150,29 @@ if ($user && app()->isInstalled() && !$temporaryInstance && can('settings.manage
     <aside class="sidebar" id="app-sidebar" data-sidebar aria-label="<?= e(__('nav.menu')) ?>">
         <div class="sidebar-brand<?= assoc_logo_url() ? ' has-assoc-logo' : '' ?>">
             <button type="button" class="sidebar-close" data-sidebar-close aria-label="<?= e(__('nav.close_menu')) ?>">×</button>
-            <div class="sidebar-brand-stack">
-                <?= socly_mark_img('sidebar-mark', 'SOCLY', 'light') ?>
-                <?php if ($hasAssoc): ?>
-                    <p class="sidebar-for">
-                        <span class="per"><?= e(__('auth.for')) ?></span>
-                        <?= assoc_lockup_html(['class' => 'assoc-lockup-sidebar']) ?>
-                    </p>
-                <?php endif; ?>
-                <?= assoc_logo_img('assoc-logo sidebar-assoc-logo') ?>
-            </div>
+            <?php if (can('dashboard.view')): ?>
+                <a class="sidebar-brand-stack sidebar-brand-home" href="<?= e(url('/dashboard')) ?>" title="<?= e(__('nav.dashboard')) ?>">
+                    <?= socly_mark_img('sidebar-mark', 'SOCLY', 'light') ?>
+                    <?php if ($hasAssoc): ?>
+                        <p class="sidebar-for">
+                            <span class="per"><?= e(__('auth.for')) ?></span>
+                            <?= assoc_lockup_html(['class' => 'assoc-lockup-sidebar']) ?>
+                        </p>
+                    <?php endif; ?>
+                    <?= assoc_logo_img('assoc-logo sidebar-assoc-logo') ?>
+                </a>
+            <?php else: ?>
+                <div class="sidebar-brand-stack">
+                    <?= socly_mark_img('sidebar-mark', 'SOCLY', 'light') ?>
+                    <?php if ($hasAssoc): ?>
+                        <p class="sidebar-for">
+                            <span class="per"><?= e(__('auth.for')) ?></span>
+                            <?= assoc_lockup_html(['class' => 'assoc-lockup-sidebar']) ?>
+                        </p>
+                    <?php endif; ?>
+                    <?= assoc_logo_img('assoc-logo sidebar-assoc-logo') ?>
+                </div>
+            <?php endif; ?>
         </div>
 
         <nav class="nav">
@@ -311,9 +324,17 @@ if ($user && app()->isInstalled() && !$temporaryInstance && can('settings.manage
                 <div class="user-meta"><?= e($user['email'] ?? '') ?></div>
             <?php endif; ?>
             <div class="sidebar-footer-version">v<?= e(app_version()) ?></div>
-            <?php if ($isAdminConfig): ?>
+            <?php if ($configActive && can('dashboard.view')): ?>
                 <a
-                    class="sidebar-settings-link<?= $configActive ? ' is-active' : '' ?>"
+                    class="sidebar-settings-link sidebar-back-link"
+                    href="<?= e(url('/dashboard')) ?>"
+                >
+                    <span class="sidebar-back-icon" aria-hidden="true"></span>
+                    <?= e(__('nav.back_to_dashboard')) ?>
+                </a>
+            <?php elseif ($isAdminConfig): ?>
+                <a
+                    class="sidebar-settings-link"
                     href="<?= e(url('/settings')) ?>"
                 >
                     <span class="sidebar-settings-icon" aria-hidden="true"></span>
@@ -339,17 +360,6 @@ if ($user && app()->isInstalled() && !$temporaryInstance && can('settings.manage
                 <?php endif; ?>
             </div>
             <div class="topbar-spacer" aria-hidden="true"></div>
-            <?php if ($isAdminConfig): ?>
-                <a
-                    class="topbar-config<?= $configActive ? ' is-active' : '' ?>"
-                    href="<?= e(url('/settings')) ?>"
-                    title="<?= e(__('nav.settings')) ?>"
-                    aria-label="<?= e(__('nav.open_settings')) ?>"
-                    data-topbar-config
-                >
-                    <span class="topbar-config-icon" aria-hidden="true"></span>
-                </a>
-            <?php endif; ?>
         </header>
         <main class="main">
             <?php if ($msg = flash('success')): ?>

@@ -204,6 +204,14 @@ $renderTextField = static function (array $field) use ($fieldValue, $icons): str
     }
 
     if ($type === 'language') {
+        if ($val === '') {
+            $sessionLocale = (string) ($_SESSION['locale'] ?? '');
+            $fallbackLocale = function_exists('app_locale') ? app_locale() : 'it';
+            $currentLocale = in_array($sessionLocale, ['it', 'de', 'en'], true)
+                ? $sessionLocale
+                : (in_array($fallbackLocale, ['it', 'de', 'en'], true) ? $fallbackLocale : 'it');
+            $val = $currentLocale;
+        }
         return '<div class="field-block field-block--language" data-field="' . e($key) . '">'
             . '<label class="field-label" for="field-' . e($key) . '">'
             . '<span class="field-icon" data-icon="globe" aria-hidden="true"></span>'
@@ -246,6 +254,40 @@ $renderTextField = static function (array $field) use ($fieldValue, $icons): str
 
     $requiredAttr = $required ? ' data-field-required="1"' : ' data-field-required="0"';
 
+    if ($key === 'birth_date') {
+        $ageYears = null;
+        if (preg_match('/^(\d{4})-(\d{2})-(\d{2})$/', $val, $bm)) {
+            try {
+                $born = new \DateTimeImmutable($val);
+                $today = new \DateTimeImmutable('today');
+                if ($born <= $today) {
+                    $ageYears = (int) $born->diff($today)->y;
+                }
+            } catch (\Exception) {
+                $ageYears = null;
+            }
+        }
+        $ageText = $ageYears !== null
+            ? __('members.age_years', ['age' => (string) $ageYears])
+            : '';
+
+        return '<div class="field-block field-block--birth-date" data-field="' . e($key) . '"' . $requiredAttr . '>'
+            . '<label class="field-label" for="field-' . e($key) . '">'
+            . '<span class="field-icon" data-icon="' . e($icon) . '" aria-hidden="true"></span>'
+            . e($label) . ($required ? ' *' : '')
+            . '</label>'
+            . '<div class="birth-date-row">'
+            . '<input id="field-' . e($key) . '" class="' . trim($emphasis) . '" type="date" name="fields[' . e($key) . ']" value="' . e($val) . '"' . $attrs . '>'
+            . '<output class="birth-age" data-birth-age'
+            . ' data-template="' . e(__('members.age_years')) . '"'
+            . ' aria-live="polite"'
+            . ($ageText === '' ? ' hidden' : '') . '>'
+            . e($ageText)
+            . '</output>'
+            . '</div>'
+            . '</div>';
+    }
+
     return '<div class="field-block" data-field="' . e($key) . '"' . $requiredAttr . '>'
         . '<label class="field-label" for="field-' . e($key) . '">'
         . '<span class="field-icon" data-icon="' . e($icon) . '" aria-hidden="true"></span>'
@@ -268,6 +310,7 @@ $buildProfileFieldsHtml = function (array $list, ?string $stepKey = null) use (
     $geoAddressKeys,
     $allGeoFieldsByKey,
     $geoHomeStepKey,
+    $profileByKey,
     $reqFor,
     $valFor,
     $isEdit,
@@ -316,6 +359,7 @@ $buildProfileFieldsHtml = function (array $list, ?string $stepKey = null) use (
             . '<div class="cf-row">'
             . '<input id="field-' . e($key) . '" type="text" name="fields[' . e($key) . ']" value="' . e($val) . '"'
             . ' placeholder="' . e(__('members.cf_hint')) . '"'
+            . ' size="18"'
             . ' data-fiscal-code autocomplete="off" maxlength="16" pattern="[A-Za-z0-9]{16}"'
             . ($required ? ' required' : '') . '>'
             . '<button type="button" class="btn btn-ghost" data-cf-generate>'
@@ -330,62 +374,61 @@ $buildProfileFieldsHtml = function (array $list, ?string $stepKey = null) use (
             . '</div>';
     };
 
-    $renderPhoto = static function (array $field) use ($fieldValue, $isEdit, $member): void {
+    $renderPhoto = static function (array $field) use ($fieldValue, $valFor, $isEdit, $member): void {
         $key = (string) ($field['key'] ?? 'photo');
         $val = $fieldValue($field);
-        $label = localized($field['label_json'] ?? $field['label'] ?? 'photo');
+        $required = !empty($field['is_required']);
+        $genderRaw = strtoupper(trim($valFor('gender')));
+        $photoGender = $genderRaw === 'M' ? 'm' : ($genderRaw === 'F' ? 'f' : 'neutral');
         ?>
-        <div class="photo-field field-block" data-field="<?= e($key) ?>" data-field-required="<?= !empty($field['is_required']) ? '1' : '0' ?>">
-                <label class="field-label">
-                    <span class="field-icon" data-icon="camera" aria-hidden="true"></span>
-                    <?= e($label) ?><?= !empty($field['is_required']) ? ' *' : '' ?>
-                </label>
-                <div class="photo-upload">
-                    <?php if ($isEdit && $val !== ''): ?>
-                        <button type="button" class="photo-preview-btn" data-photo-lightbox-open aria-label="<?= e(__('members.photo_preview_open')) ?>">
-                            <img class="photo-preview" src="<?= e(url('/members/'.$member['id'].'/photo')) ?>" alt="">
+        <div class="photo-field field-block" data-field="<?= e($key) ?>" data-field-required="<?= $required ? '1' : '0' ?>">
+            <div class="photo-upload photo-upload--card">
+                <?php if ($isEdit && $val !== ''): ?>
+                    <button type="button" class="photo-preview-btn" data-photo-lightbox-open aria-label="<?= e(__('members.photo_preview_open')) ?>">
+                        <img class="photo-preview" src="<?= e(url('/members/'.$member['id'].'/photo')) ?>" alt="">
+                    </button>
+                <?php else: ?>
+                    <div class="photo-placeholder" data-photo-placeholder data-photo-gender="<?= e($photoGender) ?>" aria-hidden="true"></div>
+                <?php endif; ?>
+                <div class="photo-controls">
+                    <div class="photo-actions">
+                        <label class="btn btn-sm btn-ghost file-btn">
+                            <span class="field-icon" data-icon="upload" aria-hidden="true"></span>
+                            <?= e(__('members.photo_upload')) ?>
+                            <input
+                                type="file"
+                                name="fields[photo]"
+                                accept="image/jpeg,image/png,image/webp"
+                                data-photo-input
+                                data-invalid="<?= e(__('validation.photo')) ?>"
+                                data-max-bytes="3145728"
+                                <?= $required ? ' required' : '' ?>
+                                hidden
+                            >
+                        </label>
+                        <button type="button" class="btn btn-sm" data-camera-open>
+                            <span class="field-icon" data-icon="camera" aria-hidden="true"></span>
+                            <?= e(__('members.photo_capture')) ?>
                         </button>
-                    <?php else: ?>
-                        <div class="photo-placeholder" aria-hidden="true"></div>
-                    <?php endif; ?>
-                    <div class="photo-controls">
-                        <div class="photo-actions">
-                            <label class="btn btn-sm btn-ghost file-btn">
-                                <span class="field-icon" data-icon="upload" aria-hidden="true"></span>
-                                <?= e(__('members.photo_upload')) ?>
-                                <input
-                                    type="file"
-                                    name="fields[photo]"
-                                    accept="image/jpeg,image/png,image/webp"
-                                    data-photo-input
-                                    data-invalid="<?= e(__('validation.photo')) ?>"
-                                    data-max-bytes="3145728"
-                                    hidden
-                                >
-                            </label>
-                            <button type="button" class="btn btn-sm" data-camera-open hidden>
-                                <span class="field-icon" data-icon="camera" aria-hidden="true"></span>
-                                <?= e(__('members.photo_capture')) ?>
-                            </button>
-                            <input type="file" accept="image/*" capture="user" data-camera-capture hidden>
-                        </div>
-                        <p class="muted" data-photo-hint data-upload-only="<?= e(__('members.photo_hint_upload_only')) ?>" data-invalid="<?= e(__('validation.photo')) ?>"><?= e(__('members.photo_hint')) ?></p>
-                        <p
-                            class="field-hint"
-                            data-camera-error
-                            data-unavailable="<?= e(__('members.photo_camera_unavailable')) ?>"
-                            data-not-ready="<?= e(__('members.photo_camera_not_ready')) ?>"
-                            hidden
-                        ></p>
-                        <?php if ($isEdit && $val !== ''): ?>
-                            <label class="checkbox-row">
-                                <input type="checkbox" name="remove_photo" value="1">
-                                <?= e(__('members.photo_remove')) ?>
-                            </label>
-                        <?php endif; ?>
+                        <input type="file" accept="image/*" capture="user" data-camera-capture hidden>
                     </div>
+                    <p class="muted" data-photo-hint data-upload-only="<?= e(__('members.photo_hint_upload_only')) ?>" data-invalid="<?= e(__('validation.photo')) ?>"><?= e(__('members.photo_hint')) ?></p>
+                    <p
+                        class="field-hint"
+                        data-camera-error
+                        data-unavailable="<?= e(__('members.photo_camera_unavailable')) ?>"
+                        data-not-ready="<?= e(__('members.photo_camera_not_ready')) ?>"
+                        hidden
+                    ></p>
+                    <?php if ($isEdit && $val !== ''): ?>
+                        <label class="checkbox-row">
+                            <input type="checkbox" name="remove_photo" value="1">
+                            <?= e(__('members.photo_remove')) ?>
+                        </label>
+                    <?php endif; ?>
                 </div>
             </div>
+        </div>
         <?php
     };
 
@@ -412,22 +455,51 @@ $buildProfileFieldsHtml = function (array $list, ?string $stepKey = null) use (
 
     ob_start();
 
-    if ($blockHasAny(['first_name', 'last_name', 'gender', 'preferred_language'])): ?>
-        <div class="member-profile-block">
-            <h3 class="member-profile-block-title"><?= e(__('members.profile_block_base')) ?></h3>
-            <?php
-            $nameRow = array_filter([
-                $pick('first_name') ? $renderTextField($pick('first_name')) : null,
-                $pick('last_name') ? $renderTextField($pick('last_name')) : null,
-            ]);
-            $emitRow($nameRow, 'member-field-row member-field-row--identity-names');
+    $baseKeys = ['first_name', 'last_name', 'gender', 'preferred_language'];
+    $hasBase = $blockHasAny($baseKeys);
+    $photoField = $pick('photo');
+    $profileHasBase = false;
+    foreach ($baseKeys as $baseKey) {
+        if (isset($profileByKey[$baseKey])) {
+            $profileHasBase = true;
+            break;
+        }
+    }
+    // Keep photography next to anagrafica even when the field lives on another step.
+    if ($hasBase && $photoField === null && isset($profileByKey['photo'])) {
+        $photoField = $profileByKey['photo'];
+    } elseif (!$hasBase && $photoField !== null && $profileHasBase) {
+        $photoField = null;
+    }
+    if ($hasBase || $photoField !== null): ?>
+        <div class="member-profile-identity<?= ($hasBase && $photoField !== null) ? ' member-profile-identity--split' : '' ?>">
+            <?php if ($hasBase): ?>
+                <div class="member-profile-block member-profile-block--base">
+                    <h3 class="member-profile-block-title"><?= e(__('members.profile_block_base')) ?></h3>
+                    <?php
+                    $nameRow = array_filter([
+                        $pick('first_name') ? $renderTextField($pick('first_name')) : null,
+                        $pick('last_name') ? $renderTextField($pick('last_name')) : null,
+                    ]);
+                    $emitRow($nameRow, 'member-field-row member-field-row--identity-names');
 
-            $metaRow = array_filter([
-                $pick('gender') ? $renderTextField($pick('gender')) : null,
-                $pick('preferred_language') ? $renderTextField($pick('preferred_language')) : null,
-            ]);
-            $emitRow($metaRow, 'member-field-row member-field-row--identity-meta');
-            ?>
+                    $metaRow = array_filter([
+                        $pick('gender') ? $renderTextField($pick('gender')) : null,
+                        $pick('preferred_language') ? $renderTextField($pick('preferred_language')) : null,
+                    ]);
+                    $emitRow($metaRow, 'member-field-row member-field-row--identity-meta');
+                    ?>
+                </div>
+            <?php endif; ?>
+            <?php if ($photoField !== null): ?>
+                <div class="member-profile-block member-profile-block--photo">
+                    <h3 class="member-profile-block-title">
+                        <?= e(__('members.profile_block_photo')) ?>
+                        <?= !empty($photoField['is_required']) ? ' *' : '' ?>
+                    </h3>
+                    <?php $renderPhoto($photoField); ?>
+                </div>
+            <?php endif; ?>
         </div>
     <?php endif;
 
@@ -435,35 +507,32 @@ $buildProfileFieldsHtml = function (array $list, ?string $stepKey = null) use (
     if ($blockHasAny(['birth_date', 'birth_place']) || $fiscalField !== null): ?>
         <div class="member-profile-block member-profile-block--birth">
             <h3 class="member-profile-block-title"><?= e(__('members.profile_block_birth')) ?></h3>
-            <?php if ($blockHasAny(['birth_date', 'birth_place'])): ?>
-                <div class="member-field-row member-field-row--birth">
-                    <?php
-                    $birthDate = $pick('birth_date');
-                    if ($birthDate !== null) {
-                        echo $renderTextField($birthDate);
-                    }
-                    $birthPlace = $pick('birth_place');
-                    if ($birthPlace !== null):
-                    ?>
-                        <div class="geo-birth-host" data-field="birth_place">
-                            <?= view_partial('partials/geo_birth_place', [
-                                'name' => 'fields[birth_place]',
-                                'value' => $fieldValue($birthPlace),
-                                'required' => !empty($birthPlace['is_required']),
-                                'id' => 'field-birth_place',
-                                'class' => 'member-geo-birth',
-                                'flag_name' => 'birth_place_foreign',
-                                'foreign_inline' => true,
-                            ]) ?>
-                        </div>
-                    <?php endif; ?>
-                </div>
-            <?php endif; ?>
-            <?php if ($fiscalField !== null): ?>
-                <div class="member-field-row member-field-row--fiscal">
-                    <?= $renderFiscal($fiscalField) ?>
-                </div>
-            <?php endif; ?>
+            <div class="member-field-row member-field-row--birth member-field-row--birth-fiscal">
+                <?php
+                $birthDate = $pick('birth_date');
+                if ($birthDate !== null) {
+                    echo $renderTextField($birthDate);
+                }
+                $birthPlace = $pick('birth_place');
+                if ($birthPlace !== null):
+                ?>
+                    <div class="geo-birth-host" data-field="birth_place">
+                        <?= view_partial('partials/geo_birth_place', [
+                            'name' => 'fields[birth_place]',
+                            'value' => $fieldValue($birthPlace),
+                            'required' => !empty($birthPlace['is_required']),
+                            'id' => 'field-birth_place',
+                            'class' => 'member-geo-birth',
+                            'flag_name' => 'birth_place_foreign',
+                            'foreign_inline' => true,
+                        ]) ?>
+                    </div>
+                <?php endif;
+                if ($fiscalField !== null) {
+                    echo $renderFiscal($fiscalField);
+                }
+                ?>
+            </div>
         </div>
     <?php endif;
 
@@ -535,7 +604,7 @@ $buildProfileFieldsHtml = function (array $list, ?string $stepKey = null) use (
         </div>
     <?php endif;
 
-    if ($blockHasAny(['email', 'phone', 'photo'])): ?>
+    if ($blockHasAny(['email', 'phone'])): ?>
         <div class="member-profile-block">
             <h3 class="member-profile-block-title"><?= e(__('members.profile_block_contact')) ?></h3>
             <?php
@@ -547,10 +616,6 @@ $buildProfileFieldsHtml = function (array $list, ?string $stepKey = null) use (
                 }
             }
             $emitRow($contactRow, 'member-field-row member-field-row--contact');
-            $photoField = $pick('photo');
-            if ($photoField !== null) {
-                $renderPhoto($photoField);
-            }
             ?>
         </div>
     <?php endif;
@@ -577,9 +642,6 @@ $paymentExtraHtml = $buildProfileFieldsHtml($paymentExtraFields, \Socly\Services
             <p class="page-lede"><?= e($pageLede) ?></p>
         <?php endif; ?>
     </div>
-    <div class="actions">
-        <a class="btn btn-ghost" href="<?= e(url('/members')) ?>" data-member-leave><?= e(__('common.back')) ?></a>
-    </div>
 </div>
 
 <form
@@ -592,6 +654,7 @@ $paymentExtraHtml = $buildProfileFieldsHtml($paymentExtraFields, \Socly\Services
     data-member-leave-guard="<?= $isEdit ? 'edit' : 'create' ?>"
     data-photo-preview-open="<?= e(__('members.photo_preview_open')) ?>"
     data-photo-preview-close="<?= e(__('members.photo_preview_close')) ?>"
+    data-photo-avatar-base="<?= e(asset('img/avatars')) ?>"
     data-total-steps="<?= (int)$totalSteps ?>"
     data-cities-url="<?= e(url('/api/geo/cities')) ?>"
     data-addresses-url="<?= e(url('/api/geo/addresses')) ?>"
@@ -665,6 +728,8 @@ $paymentExtraHtml = $buildProfileFieldsHtml($paymentExtraFields, \Socly\Services
             if ($isEdit && !empty($member['id']) && trim((string) ($fieldValues['photo'] ?? '')) !== '') {
                 $tesseraPhotoSrc = url('/members/' . (int) $member['id'] . '/photo');
             }
+            $tesseraGenderRaw = strtoupper(trim($valFor('gender')));
+            $tesseraPhotoGender = $tesseraGenderRaw === 'M' ? 'm' : ($tesseraGenderRaw === 'F' ? 'f' : 'neutral');
             $tesseraName = trim($fieldValue([
                 'key' => 'first_name',
             ]) . ' ' . $fieldValue([
@@ -697,10 +762,10 @@ $paymentExtraHtml = $buildProfileFieldsHtml($paymentExtraFields, \Socly\Services
                                         src="<?= e($tesseraPhotoSrc) ?>"
                                         alt=""
                                     >
-                                    <span class="tessera-photo-placeholder" data-tessera-photo-placeholder hidden></span>
+                                    <span class="tessera-photo-placeholder photo-placeholder" data-photo-placeholder data-tessera-photo-placeholder data-photo-gender="<?= e($tesseraPhotoGender) ?>" hidden></span>
                                 <?php else: ?>
                                     <img class="tessera-photo-img" data-tessera-photo alt="" hidden>
-                                    <span class="tessera-photo-placeholder" data-tessera-photo-placeholder></span>
+                                    <span class="tessera-photo-placeholder photo-placeholder" data-photo-placeholder data-tessera-photo-placeholder data-photo-gender="<?= e($tesseraPhotoGender) ?>"></span>
                                 <?php endif; ?>
                             </div>
                             <div class="tessera-meta">
@@ -727,23 +792,6 @@ $paymentExtraHtml = $buildProfileFieldsHtml($paymentExtraFields, \Socly\Services
                         </select>
                     </div>
                 </div>
-
-                <?php if (!$isEdit): ?>
-                <div class="payment-summary" data-tessera-payment-summary>
-                    <div>
-                        <span class="muted"><?= e(__('members.type')) ?></span>
-                        <strong data-payment-type-label>—</strong>
-                    </div>
-                    <div>
-                        <span class="muted"><?= e(__('members.wizard_quota')) ?></span>
-                        <strong data-payment-amount>0,00 €</strong>
-                    </div>
-                    <div data-payment-due-wrap>
-                        <span class="muted"><?= e(__('members.wizard_still_due')) ?></span>
-                        <strong data-payment-due>0,00 €</strong>
-                    </div>
-                </div>
-                <?php endif; ?>
 
                 <div class="grid-2">
                     <div class="field-block">
@@ -773,8 +821,31 @@ $paymentExtraHtml = $buildProfileFieldsHtml($paymentExtraFields, \Socly\Services
                     </div>
                 </div>
 
-                <div class="field-block" data-guardian-field>
-                    <label class="field-label"><?= e(__('members.guardian_label')) ?></label>
+                <?php if (!$isEdit): ?>
+                <div class="payment-summary" data-tessera-payment-summary>
+                    <div>
+                        <strong data-payment-type-label>—</strong>
+                    </div>
+                    <div>
+                        <span class="muted"><?= e(__('members.wizard_quota')) ?></span>
+                        <strong data-payment-amount>0,00 €</strong>
+                    </div>
+                    <div data-payment-due-wrap>
+                        <span class="muted"><?= e(__('members.wizard_still_due')) ?></span>
+                        <strong data-payment-due>0,00 €</strong>
+                    </div>
+                </div>
+                <?php endif; ?>
+
+                <div
+                    class="field-block"
+                    data-guardian-field
+                    data-guardian-required-label="<?= e(__('members.guardian_required_badge')) ?>"
+                >
+                    <div class="guardian-label-row">
+                        <label class="field-label"><?= e(__('members.guardian_label')) ?></label>
+                        <span class="guardian-required-badge" data-guardian-badge hidden><?= e(__('members.guardian_required_badge')) ?></span>
+                    </div>
                     <select name="guardian_member_id" data-guardian-select>
                         <option value=""><?= e(__('members.guardian_none')) ?></option>
                         <?php foreach ($guardianCandidates as $candidate): ?>
@@ -784,11 +855,11 @@ $paymentExtraHtml = $buildProfileFieldsHtml($paymentExtraFields, \Socly\Services
                             ><?= e((string) ($candidate['display_name'] ?? $candidate['member_number'])) ?></option>
                         <?php endforeach; ?>
                     </select>
-                    <p class="muted"><?= e(__('members.guardian_hint')) ?></p>
+                    <p class="muted" data-guardian-hint><?= e(__('members.guardian_hint')) ?></p>
                 </div>
 
                 <?php if (!$isEdit): ?>
-                <div class="grid-2">
+                <div class="grid-2" data-payment-fields>
                     <div class="field-block">
                         <label class="field-label"><?= e(__('members.payment')) ?></label>
                         <select name="payment_status" required>
@@ -810,6 +881,11 @@ $paymentExtraHtml = $buildProfileFieldsHtml($paymentExtraFields, \Socly\Services
                     <label class="field-label"><?= e(__('members.partial_amount')) ?></label>
                     <input type="number" step="0.01" min="0" name="partial_amount" value="<?= e($oldPartialAmount) ?>">
                 </div>
+                <?php if ($treasuryEnabled): ?>
+                <p class="field-hint muted payment-treasury-note" data-payment-treasury-note>
+                    <?= e(__('members.payment_treasury_note')) ?>
+                </p>
+                <?php endif; ?>
                 <?php endif; ?>
 
                 <div class="field-block">
@@ -959,7 +1035,6 @@ $paymentExtraHtml = $buildProfileFieldsHtml($paymentExtraFields, \Socly\Services
     <div class="wizard-actions">
         <button type="button" class="btn btn-ghost" data-wizard-prev hidden><?= e(__('members.wizard_prev')) ?></button>
         <div class="wizard-actions-right">
-            <a class="btn btn-ghost" href="<?= e(url('/members')) ?>" data-member-leave><?= e(__('common.cancel')) ?></a>
             <button type="button" class="btn" data-wizard-next><?= e(__('members.wizard_next')) ?></button>
             <button type="submit" class="btn" data-wizard-submit hidden disabled><?= e(__('members.save')) ?></button>
         </div>
