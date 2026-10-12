@@ -1385,16 +1385,16 @@ $errorStep = flash('setup_error_step');
                                 <div class="setup-equal-row setup-smtp-credentials">
                                     <label class="setup-field setup-field-grow">
                                         <span><?= e(__('mail.from_address')) ?> *</span>
-                                        <input type="email" name="from_address" value="<?= e((string) ($value['from_address'] ?? '')) ?>" required autocomplete="off" placeholder="noreply@tuodominio.it" data-smtp-from>
+                                        <input type="email" name="from_address" value="<?= e((string) ($value['from_address'] ?? '')) ?>" <?= $mailSkipped ? 'disabled' : 'required' ?> autocomplete="off" placeholder="noreply@tuodominio.it" data-smtp-from>
                                         <p class="field-hint setup-field-hint" data-smtp-from-hint hidden></p>
                                     </label>
                                     <?= view_partial('partials/password_input', [
                                         'name' => 'password',
                                         'label' => (string) __('mail.password'),
-                                        'required' => empty($value['has_password']),
+                                        'required' => !$mailSkipped && empty($value['has_password']),
                                         'placeholder' => !empty($value['has_password']) ? (string) __('mail.password_keep') : '',
                                         'autocomplete' => 'new-password',
-                                        'input_attrs' => 'data-smtp-password',
+                                        'input_attrs' => 'data-smtp-password' . ($mailSkipped ? ' disabled' : ''),
                                         'hint_attrs' => 'data-smtp-password-hint',
                                     ]) ?>
                                 </div>
@@ -1460,6 +1460,17 @@ $errorStep = flash('setup_error_step');
                 <?php elseif ($stepType === 'component_select'): ?>
                     <?php
                         $components = is_array($value['components'] ?? null) ? $value['components'] : [];
+                        $coreKeys = ['members' => 0, 'org_roles' => 1];
+                        usort($components, static function (array $a, array $b) use ($coreKeys): int {
+                            $aKey = (string) ($a['key'] ?? '');
+                            $bKey = (string) ($b['key'] ?? '');
+                            $aOrd = $coreKeys[$aKey] ?? 100;
+                            $bOrd = $coreKeys[$bKey] ?? 100;
+                            if ($aOrd !== $bOrd) {
+                                return $aOrd <=> $bOrd;
+                            }
+                            return 0;
+                        });
                     ?>
                     <div class="setup-components" data-setup-line>
                         <p class="setup-hint muted"><?= e(__('setup.step_components_hint')) ?></p>
@@ -1467,28 +1478,38 @@ $errorStep = flash('setup_error_step');
                             <?php foreach ($components as $component): ?>
                                 <?php
                                     $cKey = (string) ($component['key'] ?? '');
-                                    $locked = in_array($cKey, ['members', 'org_roles'], true);
+                                    $locked = isset($coreKeys[$cKey]);
                                     $checked = $locked || !empty($component['enabled']);
                                 ?>
-                                <label class="setup-component-row<?= $checked ? ' is-selected' : '' ?><?= $locked ? ' setup-component-row-locked' : '' ?>">
-                                    <input
-                                        type="checkbox"
-                                        name="components[]"
-                                        value="<?= e($cKey) ?>"
-                                        <?= $checked ? 'checked' : '' ?>
-                                        <?= $locked ? 'disabled' : '' ?>
-                                    >
-                                    <?php if ($locked): ?>
+                                <?php if ($locked): ?>
+                                    <div class="setup-component-row is-selected setup-component-row-core" data-component-core>
+                                        <span class="setup-component-core-mark" aria-hidden="true">✓</span>
                                         <input type="hidden" name="components[]" value="<?= e($cKey) ?>">
-                                    <?php endif; ?>
-                                    <span class="setup-component-row-body">
-                                        <span class="setup-component-row-top">
-                                            <strong class="setup-component-name"><?= e(__((string) ($component['name'] ?? ''))) ?></strong>
-                                            <span class="setup-component-price"><?= e(__('components.price_included')) ?></span>
+                                        <span class="setup-component-row-body">
+                                            <span class="setup-component-row-top">
+                                                <strong class="setup-component-name"><?= e(__((string) ($component['name'] ?? ''))) ?></strong>
+                                                <span class="setup-component-core-badge"><?= e(__('components.core_badge')) ?></span>
+                                            </span>
+                                            <span class="setup-component-desc"><?= e(__((string) ($component['description'] ?? ''))) ?></span>
                                         </span>
-                                        <span class="setup-component-desc"><?= e(__((string) ($component['description'] ?? ''))) ?></span>
-                                    </span>
-                                </label>
+                                    </div>
+                                <?php else: ?>
+                                    <label class="setup-component-row<?= $checked ? ' is-selected' : '' ?>">
+                                        <input
+                                            type="checkbox"
+                                            name="components[]"
+                                            value="<?= e($cKey) ?>"
+                                            <?= $checked ? 'checked' : '' ?>
+                                        >
+                                        <span class="setup-component-row-body">
+                                            <span class="setup-component-row-top">
+                                                <strong class="setup-component-name"><?= e(__((string) ($component['name'] ?? ''))) ?></strong>
+                                                <span class="setup-component-price"><?= e(__('components.price_included')) ?></span>
+                                            </span>
+                                            <span class="setup-component-desc"><?= e(__((string) ($component['description'] ?? ''))) ?></span>
+                                        </span>
+                                    </label>
+                                <?php endif; ?>
                             <?php endforeach; ?>
                         </div>
                         <?php if (!empty($errors['components'])): ?>
@@ -1500,8 +1521,27 @@ $errorStep = flash('setup_error_step');
                         $mailReady = !empty($value['mail_ready']);
                         $anyPlatform = !empty($value['news_opt_in']) || !empty($value['usage_stats_opt_in']) || !empty($value['showcase_consent']);
                     ?>
-                    <div class="setup-platform-consents" data-setup-line data-platform-consents data-mail-ready="<?= $mailReady ? '1' : '0' ?>">
-                        <p class="setup-hint muted"><?= e(__('setup.platform_hint')) ?></p>
+                    <?php
+                        $presFirst = trim((string) ($value['president_first_placeholder'] ?? ''));
+                        $presLast = trim((string) ($value['president_last_placeholder'] ?? ''));
+                        $confirmPhFirst = $presFirst !== ''
+                            ? __('setup.platform_confirm_ph_first', ['name' => $presFirst])
+                            : __('setup.platform_confirm_first');
+                        $confirmPhLast = $presLast !== ''
+                            ? __('setup.platform_confirm_ph_last', ['name' => $presLast])
+                            : __('setup.platform_confirm_last');
+                    ?>
+                    <div
+                        class="setup-platform-consents"
+                        data-setup-line
+                        data-platform-consents
+                        data-mail-ready="<?= $mailReady ? '1' : '0' ?>"
+                        data-president-first="<?= e($presFirst) ?>"
+                        data-president-last="<?= e($presLast) ?>"
+                        data-msg-required="<?= e(__('setup.platform_confirm_required')) ?>"
+                        data-msg-mismatch="<?= e(__('setup.platform_confirm_mismatch')) ?>"
+                    >
+                        <p class="setup-hint muted setup-platform-intro"><?= e(__('setup.platform_hint')) ?></p>
                         <label class="checkbox-row setup-check">
                             <input type="checkbox" name="news_opt_in" value="1" data-platform-opt <?= !empty($value['news_opt_in']) ? 'checked' : '' ?>>
                             <span><?= e(__('setup.platform_news')) ?></span>
@@ -1514,17 +1554,17 @@ $errorStep = flash('setup_error_step');
                             <input type="checkbox" name="showcase_consent" value="1" data-platform-opt <?= !empty($value['showcase_consent']) ? 'checked' : '' ?>>
                             <span><?= e(__('setup.platform_showcase')) ?></span>
                         </label>
-                        <p class="setup-hint muted"><?= e(__('setup.platform_showcase_hint')) ?></p>
+                        <p class="setup-hint muted setup-platform-showcase-note"><?= e(__('setup.platform_showcase_hint')) ?></p>
                         <div class="setup-platform-confirm" data-platform-confirm <?= $anyPlatform ? '' : 'hidden' ?>>
-                            <p class="setup-hint"><?= e(__('setup.platform_confirm_hint')) ?></p>
+                            <p class="setup-hint setup-platform-confirm-lede"><?= e(__('setup.platform_confirm_hint')) ?></p>
                             <div class="setup-equal-row">
                                 <label class="setup-field">
                                     <span><?= e(__('setup.platform_confirm_first')) ?> *</span>
-                                    <input type="text" name="confirm_first_name" value="" autocomplete="off" data-platform-confirm-input placeholder="<?= e((string) ($value['president_first_placeholder'] ?? '')) ?>" <?= $anyPlatform ? 'required' : '' ?>>
+                                    <input type="text" name="confirm_first_name" value="" autocomplete="off" data-platform-confirm-input placeholder="<?= e($confirmPhFirst) ?>" <?= $anyPlatform ? 'required' : '' ?>>
                                 </label>
                                 <label class="setup-field">
                                     <span><?= e(__('setup.platform_confirm_last')) ?> *</span>
-                                    <input type="text" name="confirm_last_name" value="" autocomplete="off" data-platform-confirm-input placeholder="<?= e((string) ($value['president_last_placeholder'] ?? '')) ?>" <?= $anyPlatform ? 'required' : '' ?>>
+                                    <input type="text" name="confirm_last_name" value="" autocomplete="off" data-platform-confirm-input placeholder="<?= e($confirmPhLast) ?>" <?= $anyPlatform ? 'required' : '' ?>>
                                 </label>
                             </div>
                         </div>
@@ -1554,7 +1594,16 @@ $errorStep = flash('setup_error_step');
                         </div>
                         <div class="setup-password-tools">
                             <button type="button" class="btn btn-ghost btn-sm" data-password-generate><?= e(__('setup.admin_password_generate')) ?></button>
-                            <span class="setup-hint muted"><?= e(__('setup.admin_password_rules')) ?></span>
+                            <button
+                                type="button"
+                                class="btn btn-ghost btn-sm setup-password-copy-btn"
+                                data-password-copy
+                                hidden
+                                data-label="<?= e(__('setup.admin_password_copy')) ?>"
+                                data-copied="<?= e(__('setup.admin_password_copied')) ?>"
+                            ><?= e(__('setup.admin_password_copy')) ?></button>
+                            <span class="setup-hint muted" data-password-copy-status hidden></span>
+                            <span class="setup-hint muted" data-password-rules-hint><?= e(__('setup.admin_password_rules')) ?></span>
                         </div>
                         <div class="setup-password-strength">
                             <p class="setup-field-label"><?= e(__('setup.admin_password_strength')) ?></p>

@@ -128,8 +128,8 @@ document.addEventListener('DOMContentLoaded', () => {
   initMemberWizard();
   initMembersList();
   initLegalDocs();
-  initSetupWizard();
   initSetupSmtp(document);
+  initSetupWizard();
   initSettingsAssociationForms();
   initSettingsAutosave();
   initLegalDocEditors(document);
@@ -423,8 +423,11 @@ function initPasswordGenerators(scope = document) {
     button.dataset.passwordGenerateBound = '1';
     button.addEventListener('click', () => {
       const form = button.closest('form');
+      const tools = button.closest('.setup-password-tools') || button.parentElement;
       const password = form?.querySelector('[name="password"]');
       const confirmation = form?.querySelector('[name="password_confirmation"]');
+      const copyBtn = tools?.querySelector('[data-password-copy]');
+      const copyStatus = tools?.querySelector('[data-password-copy-status]');
       if (!password) return;
       const upper = 'ABCDEFGHJKLMNPQRSTUVWXYZ';
       const lower = 'abcdefghijkmnopqrstuvwxyz';
@@ -443,8 +446,57 @@ function initPasswordGenerators(scope = document) {
       password.type = 'text';
       password.dispatchEvent(new Event('input', { bubbles: true }));
       confirmation?.dispatchEvent(new Event('input', { bubbles: true }));
+      if (copyBtn instanceof HTMLButtonElement) {
+        copyBtn.hidden = false;
+        copyBtn.textContent = copyBtn.dataset.label || copyBtn.textContent;
+        copyBtn.classList.remove('is-copied');
+      }
+      if (copyStatus instanceof HTMLElement) {
+        copyStatus.hidden = true;
+        copyStatus.textContent = '';
+        copyStatus.classList.remove('setup-password-copy-ok');
+      }
       password.focus();
       password.select();
+    });
+  });
+
+  scope.querySelectorAll('[data-password-copy]').forEach((button) => {
+    if (button.dataset.passwordCopyBound === '1') return;
+    button.dataset.passwordCopyBound = '1';
+    button.addEventListener('click', async () => {
+      const form = button.closest('form');
+      const tools = button.closest('.setup-password-tools') || button.parentElement;
+      const password = form?.querySelector('[name="password"]');
+      const status = tools?.querySelector('[data-password-copy-status]');
+      const value = String(password?.value || '');
+      if (!value) return;
+      let ok = false;
+      try {
+        if (navigator.clipboard?.writeText) {
+          await navigator.clipboard.writeText(value);
+          ok = true;
+        }
+      } catch {
+        ok = false;
+      }
+      if (!ok && password) {
+        try {
+          password.focus();
+          password.select();
+          ok = document.execCommand('copy');
+        } catch {
+          ok = false;
+        }
+      }
+      if (ok) {
+        button.classList.add('is-copied');
+        if (status instanceof HTMLElement) {
+          status.hidden = false;
+          status.textContent = button.dataset.copied || 'Password copiata negli appunti!';
+          status.classList.add('setup-password-copy-ok');
+        }
+      }
     });
   });
 }
@@ -894,21 +946,79 @@ function initPlatformConsents(scope) {
   if (scope.matches?.('[data-platform-consents]')) {
     roots.push(scope);
   }
+  const normalizePersonName = (value) => {
+    let s = String(value || '').trim().replace(/\s+/g, ' ');
+    if (s === '') return '';
+    try {
+      if (typeof s.normalize === 'function') {
+        s = s.normalize('NFD').replace(/\p{M}/gu, '');
+      }
+    } catch {
+      /* ignore */
+    }
+    return s.toLowerCase();
+  };
+
   roots.forEach((root) => {
     if (root.dataset.platformBound === '1') return;
     root.dataset.platformBound = '1';
+    const form = root.closest('form');
     const opts = [...root.querySelectorAll('[data-platform-opt]')];
     const confirm = root.querySelector('[data-platform-confirm]');
     const inputs = [...root.querySelectorAll('[data-platform-confirm-input]')];
+    const firstInput = inputs.find((el) => el.name === 'confirm_first_name');
+    const lastInput = inputs.find((el) => el.name === 'confirm_last_name');
+    const expectedFirst = normalizePersonName(root.dataset.presidentFirst || '');
+    const expectedLast = normalizePersonName(root.dataset.presidentLast || '');
+    const msgRequired = root.dataset.msgRequired || 'Required';
+    const msgMismatch = root.dataset.msgMismatch || 'Mismatch';
+
+    const refreshCta = () => {
+      form?.dispatchEvent(new Event('setup:cta-refresh'));
+    };
+
     const sync = () => {
       const any = opts.some((el) => el.checked);
       if (confirm) confirm.hidden = !any;
+      if (!any) {
+        inputs.forEach((el) => {
+          el.required = false;
+          el.value = '';
+          el.setCustomValidity('');
+        });
+        refreshCta();
+        return;
+      }
       inputs.forEach((el) => {
-        el.required = any;
-        if (!any) el.value = '';
+        el.required = true;
       });
+      if (firstInput instanceof HTMLInputElement) {
+        const got = normalizePersonName(firstInput.value);
+        if (got === '') {
+          firstInput.setCustomValidity(msgRequired);
+        } else if (expectedFirst !== '' && got !== expectedFirst) {
+          firstInput.setCustomValidity(msgMismatch);
+        } else {
+          firstInput.setCustomValidity('');
+        }
+      }
+      if (lastInput instanceof HTMLInputElement) {
+        const got = normalizePersonName(lastInput.value);
+        if (got === '') {
+          lastInput.setCustomValidity(msgRequired);
+        } else if (expectedLast !== '' && got !== expectedLast) {
+          lastInput.setCustomValidity(msgMismatch);
+        } else {
+          lastInput.setCustomValidity('');
+        }
+      }
+      refreshCta();
     };
     opts.forEach((el) => el.addEventListener('change', sync));
+    inputs.forEach((el) => {
+      el.addEventListener('input', sync);
+      el.addEventListener('change', sync);
+    });
     sync();
   });
 }
@@ -1280,6 +1390,8 @@ function initSetupWizard() {
   initLogoFilePickers(root);
   initSetupNamePairPreview(root);
   initPlatformConsents(root);
+  // SMTP before CTA gate: pre-checked "skip mail" must clear required fields first.
+  initSetupSmtp(root);
   initSetupCtaGate(root);
   initSetupFieldFeedback(root);
   initSetupGeoGate(root);
@@ -3755,26 +3867,29 @@ function initSetupSmtp(root) {
         ? (skipHint.dataset.hintSkip || '')
         : (skipHint.dataset.hintEnable || '');
     }
-    if (!fields) return;
-    fields.hidden = skipped;
-    requiredInputs.forEach((input) => {
+    if (fields) {
+      fields.hidden = skipped;
+      requiredInputs.forEach((input) => {
+        if (skipped) {
+          input.dataset.smtpWasRequired = input.required ? '1' : '';
+          input.required = false;
+          input.disabled = true;
+        } else {
+          input.required = input.dataset.smtpWasRequired === '1';
+          input.disabled = false;
+        }
+      });
+      if (discoverBtn) discoverBtn.disabled = skipped;
+      if (verifyBtn) verifyBtn.disabled = skipped;
       if (skipped) {
-        input.dataset.smtpWasRequired = input.required ? '1' : '';
-        input.required = false;
-        input.disabled = true;
+        savedConnectionOk = connectionOk;
+        setConnectionOk(false);
       } else {
-        input.required = input.dataset.smtpWasRequired === '1';
-        input.disabled = false;
+        setConnectionOk(savedConnectionOk);
       }
-    });
-    if (discoverBtn) discoverBtn.disabled = skipped;
-    if (verifyBtn) verifyBtn.disabled = skipped;
-    if (skipped) {
-      savedConnectionOk = connectionOk;
-      setConnectionOk(false);
-    } else {
-      setConnectionOk(savedConnectionOk);
     }
+    // Skip may be pre-checked in HTML; refresh Continua after clearing required fields.
+    form?.dispatchEvent(new Event('setup:cta-refresh'));
   };
 
   skip?.addEventListener('change', () => {
@@ -5411,7 +5526,8 @@ function initSetupFormScrollHint(root) {
     const max = scroller.scrollHeight - scroller.clientHeight;
     const scrollable = max > 8;
     scroller.classList.toggle('is-scrollable', scrollable);
-    const atBottom = !scrollable || scroller.scrollTop >= max - 4;
+    // Clear fade a bit early so the why-note stays fully readable near the bottom.
+    const atBottom = !scrollable || scroller.scrollTop >= max - 24;
     scroller.classList.toggle('is-at-bottom', atBottom);
   };
   scroller.addEventListener('scroll', sync, { passive: true });
