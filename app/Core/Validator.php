@@ -118,6 +118,14 @@ final class Validator
                     }
                 }
                 break;
+            case 'member_birth_date':
+                if ($value !== null && $value !== '') {
+                    $birthErr = validate_birth_date_bounds((string) $value);
+                    if ($birthErr !== null) {
+                        $fail(__($birthErr));
+                    }
+                }
+                break;
             case 'in':
                 if ($value !== null && $value !== '' && !in_array((string) $value, $params, true)) {
                     $fail(__('validation.in'));

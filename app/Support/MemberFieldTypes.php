@@ -148,7 +148,7 @@ final class MemberFieldTypes
         }
         $base = self::baseRule($type);
         if ($key === 'birth_date') {
-            $base = 'date|adult_birth_date';
+            $base = 'date|member_birth_date';
         }
         if ($required && !str_contains($base, 'required') && !str_contains($base, 'accepted')) {
             return 'required|' . $base;
@@ -218,6 +218,48 @@ final class MemberFieldTypes
             'privacy_ack',
             'statute_ack',
         ], true);
+    }
+
+    /**
+     * Canonical member profile form blocks (UI order; independent of DB sort_order).
+     *
+     * @return array<string, list<string>>
+     */
+    public static function profileFormBlocks(): array
+    {
+        return [
+            'base' => ['first_name', 'last_name', 'gender', 'preferred_language'],
+            'birth' => ['birth_date', 'birth_place'],
+            'fiscal' => ['fiscal_code'],
+            'residence' => ['city', 'postal_code', 'address', 'house_number'],
+            'contact' => ['email', 'phone', 'photo'],
+        ];
+    }
+
+    /** @return list<string> */
+    public static function profileFormRenderKeys(): array
+    {
+        $keys = [];
+        foreach (self::profileFormBlocks() as $blockKeys) {
+            foreach ($blockKeys as $key) {
+                $keys[] = $key;
+            }
+        }
+
+        return $keys;
+    }
+
+    /** @return array<string, int> */
+    public static function profileFormSortOrderMap(): array
+    {
+        $map = [];
+        $sort = 10;
+        foreach (self::profileFormRenderKeys() as $key) {
+            $map[$key] = $sort;
+            $sort += 10;
+        }
+
+        return $map;
     }
 
     public static function slugifyKey(string $label): string

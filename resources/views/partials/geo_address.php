@@ -51,7 +51,9 @@ $req = static fn (bool $need): string => $need ? ' required' : '';
 $rootClass = trim('geo-address setup-address geo-layout-' . $layout . ' ' . $extraClass);
 $anyEnabled = !empty($enabled['city']) || !empty($enabled['postal_code']) || !empty($enabled['province']) || !empty($enabled['address']) || !empty($enabled['house_number']);
 $showForeignToggle = !isset($foreign_toggle) || (bool) $foreign_toggle;
+$foreignInline = !empty($foreign_inline);
 $flagName = (string) ($flag_name ?? 'address_foreign');
+$foreignInlineLabel = (string) ($foreign_label ?? __('members.city_foreign'));
 $addressForcePanel = static function () : string {
     return '<div class="geo-force-panel" data-geo-address-force-panel hidden>'
         . '<p class="geo-inline-warn" data-geo-address-warn></p>'
@@ -64,14 +66,28 @@ $addressForcePanel = static function () : string {
 ?>
 <?php if ($anyEnabled): ?>
 <div class="<?= e($rootClass) ?>"<?= $withScope ? ' data-geo-scope' : '' ?>>
-    <?php if ($showForeignToggle): ?>
+    <?php if ($showForeignToggle && !$foreignInline): ?>
     <?= view_partial('partials/geo_foreign_bar', ['flag_name' => $flagName]) ?>
     <?php endif; ?>
     <?php if ($layout === 'inline'): ?>
         <div class="geo-address-row geo-address-row-inline setup-address-row">
             <?php if (!empty($enabled['city'])): ?>
-            <label class="setup-field suggest-field setup-field-grow geo-field">
-                <span><?= e(__('setup.field_city')) ?><?= e($star((bool) $required['city'])) ?></span>
+            <div class="setup-field suggest-field setup-field-grow geo-field">
+                <div class="geo-field-label-row geo-field-label-row--split">
+                    <?php if (!empty($ids['city'])): ?>
+                        <label class="geo-field-text-label" for="<?= e($ids['city']) ?>"><?= e(__('setup.field_city')) ?><?= e($star((bool) $required['city'])) ?></label>
+                    <?php else: ?>
+                        <span class="geo-field-text-label"><?= e(__('setup.field_city')) ?><?= e($star((bool) $required['city'])) ?></span>
+                    <?php endif; ?>
+                    <?php if ($foreignInline): ?>
+                        <?= view_partial('partials/geo_foreign_bar', [
+                            'flag_name' => $flagName,
+                            'variant' => 'inline',
+                            'label_off' => $foreignInlineLabel,
+                            'label_on' => __('members.city_foreign_on'),
+                        ]) ?>
+                    <?php endif; ?>
+                </div>
                 <div class="suggest-wrap">
                     <input
                         type="text"
@@ -85,7 +101,7 @@ $addressForcePanel = static function () : string {
                     >
                     <div class="suggest-list" data-city-suggest hidden></div>
                 </div>
-            </label>
+            </div>
             <?php endif; ?>
             <?php if (!empty($enabled['address'])): ?>
             <label class="setup-field suggest-field setup-field-grow geo-field">
@@ -160,8 +176,22 @@ $addressForcePanel = static function () : string {
         <?php if (!empty($enabled['city']) || !empty($enabled['postal_code']) || !empty($enabled['province'])): ?>
         <div class="geo-address-row setup-address-row">
             <?php if (!empty($enabled['city'])): ?>
-            <label class="setup-field suggest-field setup-field-grow geo-field">
-                <span><?= e(__('setup.field_city')) ?><?= e($star((bool) $required['city'])) ?></span>
+            <div class="setup-field suggest-field setup-field-grow geo-field">
+                <div class="geo-field-label-row geo-field-label-row--split">
+                    <?php if (!empty($ids['city'])): ?>
+                        <label class="geo-field-text-label" for="<?= e($ids['city']) ?>"><?= e(__('setup.field_city')) ?><?= e($star((bool) $required['city'])) ?></label>
+                    <?php else: ?>
+                        <span class="geo-field-text-label"><?= e(__('setup.field_city')) ?><?= e($star((bool) $required['city'])) ?></span>
+                    <?php endif; ?>
+                    <?php if ($foreignInline): ?>
+                        <?= view_partial('partials/geo_foreign_bar', [
+                            'flag_name' => $flagName,
+                            'variant' => 'inline',
+                            'label_off' => $foreignInlineLabel,
+                            'label_on' => __('members.city_foreign_on'),
+                        ]) ?>
+                    <?php endif; ?>
+                </div>
                 <div class="suggest-wrap">
                     <input
                         type="text"
@@ -175,7 +205,7 @@ $addressForcePanel = static function () : string {
                     >
                     <div class="suggest-list" data-city-suggest hidden></div>
                 </div>
-            </label>
+            </div>
             <?php endif; ?>
             <?php if (!empty($enabled['postal_code'])): ?>
             <label class="setup-field setup-field-cap geo-field">

@@ -427,13 +427,13 @@ if (!function_exists('is_valid_phone_value')) {
     }
 }
 
-if (!function_exists('validate_adult_birth_date')) {
+if (!function_exists('validate_birth_date_bounds')) {
     /**
-     * Adult birth date: not in the future, at least 18, and within the last 100 years.
+     * Birth date bounds: not in the future and within the last 100 years.
      *
      * @return string|null Validation message key or null if valid/empty
      */
-    function validate_adult_birth_date(?string $date): ?string
+    function validate_birth_date_bounds(?string $date): ?string
     {
         $date = trim((string) $date);
         if ($date === '') {
@@ -457,13 +457,39 @@ if (!function_exists('validate_adult_birth_date')) {
         if ($born > $today) {
             return 'validation.birth_date_future';
         }
-        $minAdult = $today->modify('-18 years');
-        if ($born > $minAdult) {
-            return 'validation.birth_date_minor';
-        }
         $oldest = $today->modify('-100 years');
         if ($born < $oldest) {
             return 'validation.birth_date_too_old';
+        }
+        return null;
+    }
+}
+
+if (!function_exists('validate_adult_birth_date')) {
+    /**
+     * Adult birth date: bounds + at least 18 years old (setup/org officers).
+     *
+     * @return string|null Validation message key or null if valid/empty
+     */
+    function validate_adult_birth_date(?string $date): ?string
+    {
+        $bounds = validate_birth_date_bounds($date);
+        if ($bounds !== null) {
+            return $bounds;
+        }
+        $date = trim((string) $date);
+        if ($date === '') {
+            return null;
+        }
+        try {
+            $born = new \DateTimeImmutable($date);
+            $today = new \DateTimeImmutable('today');
+        } catch (\Exception) {
+            return 'validation.date';
+        }
+        $minAdult = $today->modify('-18 years');
+        if ($born > $minAdult) {
+            return 'validation.birth_date_minor';
         }
         return null;
     }

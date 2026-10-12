@@ -136,7 +136,9 @@ $defaultTab = $tabs[0]['id'] ?? '';
                     <?php if (can('members.manage')): ?>
                         <a class="btn btn-sm" href="<?= e(url('/members/create')) ?>"><?= e(__('members.create')) ?></a>
                     <?php endif; ?>
-                    <a class="btn btn-ghost btn-sm" href="<?= e(url('/members')) ?>"><?= e(__('dashboard.open_members')) ?></a>
+                    <?php if ($hasMembers): ?>
+                        <a class="btn btn-ghost btn-sm" href="<?= e(url('/members')) ?>"><?= e(__('dashboard.open_members')) ?></a>
+                    <?php endif; ?>
                 </div>
             </div>
 

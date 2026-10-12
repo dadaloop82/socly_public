@@ -20,6 +20,7 @@ $dial = $parsed['dial'] !== '' ? $parsed['dial'] : $defaultDial;
 $national = $parsed['national'];
 $invalidMsg = __('validation.phone');
 $hint = __('members.phone_hint');
+$placeholder = __('members.phone_placeholder');
 ?>
 <div class="phone-field<?= $extraClass !== '' ? ' ' . e($extraClass) : '' ?>" data-phone-field>
     <select
@@ -44,7 +45,7 @@ $hint = __('members.phone_hint');
         data-phone-input
         inputmode="tel"
         autocomplete="tel"
-        placeholder="<?= e($hint) ?>"
+        placeholder="<?= e($placeholder) ?>"
         data-hint="<?= e($hint) ?>"
         data-invalid="<?= e($invalidMsg) ?>"
         data-default-dial="<?= e($defaultDial) ?>"

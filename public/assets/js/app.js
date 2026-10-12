@@ -121,6 +121,8 @@ document.addEventListener('DOMContentLoaded', () => {
   initMembersFilterMobile();
   initMobileNav();
   initTopbarScroll();
+  initFlashDismiss();
+  initSidebarUpdate();
   initOrgHideVacant();
   initSidebarDeadlines();
   initConfigAccordions();
@@ -2782,6 +2784,71 @@ function initEmailValidation(scope) {
   });
 }
 
+function initPhotoLightbox(form) {
+  if (!(form instanceof HTMLElement) || form.dataset.photoLightboxBound === '1') return;
+  form.dataset.photoLightboxBound = '1';
+
+  let dialog = document.querySelector('[data-photo-lightbox]');
+  if (!(dialog instanceof HTMLDialogElement)) {
+    dialog = document.createElement('dialog');
+    dialog.className = 'photo-lightbox';
+    dialog.setAttribute('data-photo-lightbox', '');
+    dialog.innerHTML = `
+      <div class="photo-lightbox-shell">
+        <button type="button" class="photo-lightbox-close" data-photo-lightbox-close aria-label="">×</button>
+        <img class="photo-lightbox-img" data-photo-lightbox-img alt="">
+      </div>
+    `;
+    document.body.appendChild(dialog);
+  }
+
+  const imgEl = dialog.querySelector('[data-photo-lightbox-img]');
+  const closeBtn = dialog.querySelector('[data-photo-lightbox-close]');
+  const closeLabel = form.dataset.photoPreviewClose
+    || document.body?.dataset?.msgPhotoPreviewClose
+    || 'Chiudi anteprima';
+  if (closeBtn instanceof HTMLButtonElement) {
+    closeBtn.setAttribute('aria-label', closeLabel);
+  }
+
+  const close = () => {
+    if (typeof dialog.close === 'function' && dialog.open) {
+      dialog.close();
+    }
+  };
+
+  const open = (src) => {
+    if (!(imgEl instanceof HTMLImageElement) || !src) return;
+    imgEl.src = src;
+    if (typeof dialog.showModal === 'function') {
+      dialog.showModal();
+    }
+  };
+
+  form.addEventListener('click', (event) => {
+    const trigger = event.target instanceof Element
+      ? event.target.closest('[data-photo-lightbox-open]')
+      : null;
+    if (!trigger || !form.contains(trigger)) return;
+    event.preventDefault();
+    const preview = trigger.querySelector('.photo-preview') || (trigger.matches('img.photo-preview') ? trigger : null);
+    const src = preview instanceof HTMLImageElement ? (preview.currentSrc || preview.src) : '';
+    if (src) open(src);
+  });
+
+  closeBtn?.addEventListener('click', (event) => {
+    event.preventDefault();
+    close();
+  });
+  dialog.addEventListener('click', (event) => {
+    if (event.target === dialog) close();
+  });
+  dialog.addEventListener('cancel', (event) => {
+    event.preventDefault();
+    close();
+  });
+}
+
 function initPhotoCapture(form) {
   const input = form.querySelector('[data-photo-input]');
   const captureInput = form.querySelector('[data-camera-capture]');
@@ -2838,7 +2905,8 @@ function initPhotoCapture(form) {
       const ph = document.createElement('div');
       ph.className = 'photo-placeholder';
       ph.setAttribute('aria-hidden', 'true');
-      img.replaceWith(ph);
+      const host = img.closest('[data-photo-lightbox-open]') || img;
+      host.replaceWith(ph);
     }
     const tesseraPhoto = form.querySelector('[data-tessera-photo]');
     const tesseraPh = form.querySelector('[data-tessera-photo-placeholder]');
@@ -2899,6 +2967,22 @@ function initPhotoCapture(form) {
     showPreview(file);
   };
 
+  const ensurePreviewButton = (img) => {
+    if (!(img instanceof HTMLImageElement)) return null;
+    let btn = img.closest('[data-photo-lightbox-open]');
+    if (btn) return btn;
+    btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'photo-preview-btn';
+    btn.setAttribute('data-photo-lightbox-open', '');
+    btn.setAttribute('aria-label', form.dataset.photoPreviewOpen
+      || document.body?.dataset?.msgPhotoPreviewOpen
+      || 'Ingrandisci foto');
+    img.replaceWith(btn);
+    btn.appendChild(img);
+    return btn;
+  };
+
   const showPreview = (file) => {
     if (!file) return;
     const url = URL.createObjectURL(file);
@@ -2912,6 +2996,7 @@ function initPhotoCapture(form) {
       else form.querySelector('.photo-upload')?.prepend(img);
     }
     img.src = url;
+    ensurePreviewButton(img);
     const tesseraPhoto = form.querySelector('[data-tessera-photo]');
     const tesseraPh = form.querySelector('[data-tessera-photo-placeholder]');
     const tesseraWrap = form.querySelector('[data-tessera-photo-wrap]');
@@ -2922,6 +3007,8 @@ function initPhotoCapture(form) {
       tesseraWrap?.classList.remove('is-empty');
     }
   };
+
+  initPhotoLightbox(form);
 
   input?.addEventListener('change', () => {
     const file = input.files && input.files[0];
@@ -7692,6 +7779,22 @@ async function showGeoCityNotFound(input, template) {
   await showGeoFieldNotFound(input, template);
 }
 
+function fillGeoCapFromCityItem(scope, item) {
+  if (!scope || !item || scope.dataset.geoForeign === '1') return;
+  const postalInput = scope.querySelector('[data-postal-code]');
+  if (!(postalInput instanceof HTMLInputElement)) return;
+  const cap = String(item.cap || item.postal_code || '').replace(/\D+/g, '');
+  if (cap.length !== 5) return;
+  const current = postalInput.value.replace(/\D+/g, '');
+  if (current !== '' && current !== cap) return;
+  postalInput.value = cap;
+  postalInput.dataset.geoPicked = '1';
+  postalInput.setCustomValidity('');
+  scope.dataset.geoExpectedCap = cap;
+  if (item.provincia) scope.dataset.geoProvinceSigla = String(item.provincia);
+  if (item.provincia_name) scope.dataset.geoProvinceName = String(item.provincia_name);
+}
+
 function applyGeoComuneToScope(scope, item) {
   if (!scope || !item) return;
   const cityInput = scope.querySelector('[data-city-input]');
@@ -7817,6 +7920,9 @@ async function handleGeoResolveResult(data, input, applyItem, confirmTemplate, o
   if (data.action === 'none') {
     input.dataset.geoPicked = '1';
     clearGeoFieldError(input);
+    if (input.matches?.('[data-city-input]') && data.item) {
+      fillGeoCapFromCityItem(geoScopeFor(input), data.item);
+    }
     if (isAddress) hideGeoAddressForcePanel(input);
     input.closest('form')?.dispatchEvent(new Event('setup:cta-refresh', { bubbles: true }));
     return true;
@@ -7900,14 +8006,25 @@ function initPlaceSuggest(root = document) {
     const toggle = scope.querySelector('[data-geo-foreign-toggle]');
     const flag = scope.querySelector('[data-geo-foreign-flag]');
     const hint = scope.querySelector('[data-geo-foreign-hint]');
-    if (!(toggle instanceof HTMLButtonElement) || toggle.dataset.foreignBound === '1') return;
+    const inlineLabel = toggle?.closest('.geo-foreign-inline')?.querySelector('[data-geo-foreign-label]');
+    if (!toggle || toggle.dataset.foreignBound === '1') return;
     toggle.dataset.foreignBound = '1';
     const applyForeign = (on) => {
       scope.dataset.geoForeign = on ? '1' : '0';
-      toggle.setAttribute('aria-pressed', on ? 'true' : 'false');
-      toggle.textContent = on
-        ? (toggle.dataset.labelOn || toggle.textContent)
-        : (toggle.dataset.labelOff || toggle.textContent);
+      if (toggle instanceof HTMLButtonElement) {
+        toggle.setAttribute('aria-pressed', on ? 'true' : 'false');
+        toggle.classList.toggle('is-active', on);
+        toggle.textContent = on
+          ? (toggle.dataset.labelOn || toggle.textContent)
+          : (toggle.dataset.labelOff || toggle.textContent);
+      } else if (toggle instanceof HTMLInputElement && toggle.type === 'checkbox') {
+        toggle.checked = on;
+      }
+      if (inlineLabel instanceof HTMLElement) {
+        inlineLabel.textContent = on
+          ? (toggle.dataset.labelOn || inlineLabel.textContent)
+          : (toggle.dataset.labelOff || inlineLabel.textContent);
+      }
       if (flag instanceof HTMLInputElement) flag.value = on ? '1' : '0';
       if (hint instanceof HTMLElement) hint.hidden = !on;
       scope.classList.toggle('is-geo-foreign', on);
@@ -7939,9 +8056,15 @@ function initPlaceSuggest(root = document) {
       scope.closest('form')?.dispatchEvent(new Event('setup:cta-refresh', { bubbles: true }));
     };
     if (flag instanceof HTMLInputElement && flag.value === '1') applyForeign(true);
-    toggle.addEventListener('click', () => {
-      applyForeign(scope.dataset.geoForeign !== '1');
-    });
+    if (toggle instanceof HTMLInputElement && toggle.type === 'checkbox') {
+      toggle.addEventListener('change', () => {
+        applyForeign(toggle.checked);
+      });
+    } else if (toggle instanceof HTMLButtonElement) {
+      toggle.addEventListener('click', () => {
+        applyForeign(scope.dataset.geoForeign !== '1');
+      });
+    }
   });
 
   scopeRoot.querySelectorAll('[data-birth-place-input]').forEach((birthInput) => {
@@ -8147,11 +8270,8 @@ function initPlaceSuggest(root = document) {
               clearGeoFieldError(cityInput);
               if (postalInput instanceof HTMLInputElement) {
                 postalInput.setCustomValidity('');
-                if (item.cap) {
-                  postalInput.value = item.cap;
-                  postalInput.dataset.geoPicked = '1';
-                }
               }
+              fillGeoCapFromCityItem(scope, item);
               applyProvince(item);
               addressInput?.focus();
               form?.dispatchEvent(new Event('setup:cta-refresh', { bubbles: true }));
@@ -8172,9 +8292,7 @@ function initPlaceSuggest(root = document) {
             const data = await resolveGeoQuery(citiesUrl, { q: raw });
             await handleGeoResolveResult(data, cityInput, (item) => {
               cityInput.value = item.city || item.label || raw;
-              if (postalInput && item.cap) {
-                postalInput.value = item.cap;
-              }
+              fillGeoCapFromCityItem(scope, item);
               applyProvince(item);
               if (addressInput) {
                 addressInput.dispatchEvent(new Event('input', { bubbles: true }));
@@ -8733,28 +8851,57 @@ function initTopbarScroll() {
   if (!topbar || !configBtn) {
     return;
   }
+}
 
-  let lastY = window.scrollY || 0;
-  let ticking = false;
+function dismissFlashAlert(alertEl) {
+  if (!alertEl || alertEl.hidden) {
+    return;
+  }
+  alertEl.classList.add('is-leaving');
+  window.setTimeout(() => {
+    alertEl.remove();
+  }, 280);
+}
 
-  const update = () => {
-    ticking = false;
-    const y = window.scrollY || 0;
-    const goingDown = y > lastY;
-    const hide = goingDown && y > 24;
-    topbar.classList.toggle('is-config-hidden', hide);
-    lastY = y;
-  };
+function initFlashDismiss() {
+  document.querySelectorAll('[data-flash-success]').forEach((alertEl) => {
+    const dismissBtn = alertEl.querySelector('.alert-dismiss');
+    dismissBtn?.addEventListener('click', () => dismissFlashAlert(alertEl));
+    const ms = Number.parseInt(String(alertEl.getAttribute('data-auto-dismiss-ms') || ''), 10);
+    if (Number.isFinite(ms) && ms > 0) {
+      window.setTimeout(() => dismissFlashAlert(alertEl), ms);
+    }
+  });
+}
 
-  window.addEventListener('scroll', () => {
-    if (ticking) {
+function initSidebarUpdate() {
+  document.querySelectorAll('[data-sidebar-update]').forEach((block) => {
+    const remote = String(block.getAttribute('data-update-remote') || '').trim();
+    if (remote === '') {
       return;
     }
-    ticking = true;
-    window.requestAnimationFrame(update);
-  }, { passive: true });
+    const storageKey = `socly_update_dismiss_${remote}`;
+    try {
+      if (window.localStorage.getItem(storageKey) === '1') {
+        block.hidden = true;
+        return;
+      }
+    } catch {
+      /* ignore */
+    }
 
-  update();
+    const dismissBtn = block.querySelector('[data-sidebar-update-dismiss]');
+    dismissBtn?.addEventListener('click', (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      block.hidden = true;
+      try {
+        window.localStorage.setItem(storageKey, '1');
+      } catch {
+        /* ignore */
+      }
+    });
+  });
 }
 
 function initDeadlineCategory(root = document) {
@@ -9359,7 +9506,7 @@ function initBirthDateFields(root = document) {
   const today = new Date();
   const maxAdult = new Date(today.getFullYear() - 18, today.getMonth(), today.getDate());
   const oldest = new Date(today.getFullYear() - 100, today.getMonth(), today.getDate());
-  const maxStr = localIsoDate(maxAdult);
+  const adultMaxStr = localIsoDate(maxAdult);
   const minStr = localIsoDate(oldest);
   const todayStr = localIsoDate(today);
   const msgFuture = document.body?.dataset?.msgBirthFuture || 'La data di nascita non può essere nel futuro.';
@@ -9370,12 +9517,15 @@ function initBirthDateFields(root = document) {
   scope.querySelectorAll('[data-birth-date]').forEach((input) => {
     if (!(input instanceof HTMLInputElement) || input.dataset.birthBound === '1') return;
     input.dataset.birthBound = '1';
+    const allowMinor = input.dataset.birthAllowMinor === '1';
+    const maxStr = allowMinor ? todayStr : adultMaxStr;
     input.max = maxStr;
     input.min = minStr;
     const validate = () => {
       const v = input.value;
       if (!v) {
         input.setCustomValidity('');
+        input.classList.remove('input-invalid');
         input.closest('form')?.dispatchEvent(new Event('setup:cta-refresh', { bubbles: true }));
         return true;
       }
@@ -9383,25 +9533,34 @@ function initBirthDateFields(root = document) {
       const year = Number.parseInt(v.slice(0, 4), 10);
       if (!Number.isFinite(year) || year < 1000 || v < minStr) {
         input.setCustomValidity(msgTooOld);
+        input.classList.add('input-invalid');
         input.closest('form')?.dispatchEvent(new Event('setup:cta-refresh', { bubbles: true }));
         return false;
       }
       if (v > todayStr) {
         input.setCustomValidity(msgFuture);
+        input.classList.add('input-invalid');
         input.closest('form')?.dispatchEvent(new Event('setup:cta-refresh', { bubbles: true }));
         return false;
       }
-      if (v > maxStr) {
+      if (!allowMinor && v > adultMaxStr) {
         input.setCustomValidity(msgMinor);
+        input.classList.add('input-invalid');
         input.closest('form')?.dispatchEvent(new Event('setup:cta-refresh', { bubbles: true }));
         return false;
       }
       input.setCustomValidity('');
+      input.classList.remove('input-invalid');
       input.closest('form')?.dispatchEvent(new Event('setup:cta-refresh', { bubbles: true }));
       return true;
     };
     input.addEventListener('change', validate);
     input.addEventListener('input', validate);
+    input.addEventListener('blur', () => {
+      if (!validate() && typeof input.reportValidity === 'function') {
+        input.reportValidity();
+      }
+    });
     validate();
   });
 

@@ -580,6 +580,22 @@ final class MemberService
         }
     }
 
+    /** Keep core profile fields in standard Italian anagrafica order in lists/exports. */
+    public function normalizeProfileFieldSortOrder(): void
+    {
+        $orderMap = MemberFieldTypes::profileFormSortOrderMap();
+        foreach ($orderMap as $key => $sort) {
+            try {
+                $this->db->query(
+                    'UPDATE member_field_definitions SET sort_order = :sort WHERE `key` = :key',
+                    ['sort' => $sort, 'key' => $key]
+                );
+            } catch (\Throwable) {
+                // ignore
+            }
+        }
+    }
+
     public function totalCount(): int
     {
         try {

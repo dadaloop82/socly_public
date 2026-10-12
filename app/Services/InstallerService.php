@@ -270,15 +270,6 @@ final class InstallerService
     {
         return [
             [
-                'key' => 'photo',
-                'field_type' => 'photo',
-                'label' => ['it' => 'Foto', 'de' => 'Foto', 'en' => 'Photo'],
-                'is_required' => false,
-                'validation_rule' => 'string|max:255',
-                'is_enabled' => true,
-                'sort_order' => 0,
-            ],
-            [
                 'key' => 'first_name',
                 'field_type' => 'text',
                 'label' => ['it' => 'Nome', 'de' => 'Vorname', 'en' => 'First name'],
@@ -315,20 +306,20 @@ final class InstallerService
                 'sort_order' => 28,
             ],
             [
-                'key' => 'birth_place',
-                'field_type' => 'birth_place',
-                'label' => ['it' => 'Luogo di nascita', 'de' => 'Geburtsort', 'en' => 'Place of birth'],
-                'is_required' => true,
-                'validation_rule' => 'required|string|max:120',
-                'is_enabled' => true,
-                'sort_order' => 30,
-            ],
-            [
                 'key' => 'birth_date',
                 'field_type' => 'date',
                 'label' => ['it' => 'Data di nascita', 'de' => 'Geburtsdatum', 'en' => 'Date of birth'],
                 'is_required' => true,
                 'validation_rule' => 'required|date',
+                'is_enabled' => true,
+                'sort_order' => 30,
+            ],
+            [
+                'key' => 'birth_place',
+                'field_type' => 'birth_place',
+                'label' => ['it' => 'Luogo di nascita', 'de' => 'Geburtsort', 'en' => 'Place of birth'],
+                'is_required' => true,
+                'validation_rule' => 'required|string|max:120',
                 'is_enabled' => true,
                 'sort_order' => 40,
             ],
@@ -394,6 +385,15 @@ final class InstallerService
                 'validation_rule' => 'phone',
                 'is_enabled' => true,
                 'sort_order' => 100,
+            ],
+            [
+                'key' => 'photo',
+                'field_type' => 'photo',
+                'label' => ['it' => 'Foto', 'de' => 'Foto', 'en' => 'Photo'],
+                'is_required' => false,
+                'validation_rule' => 'string|max:255',
+                'is_enabled' => true,
+                'sort_order' => 110,
             ],
             [
                 'key' => 'privacy_ack',

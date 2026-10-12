@@ -36,7 +36,7 @@ final class DashboardController extends BaseController
         $showTreasury = $this->components->isEnabled('treasury') && can(Permission::TREASURY_VIEW);
         $showDeadlines = $this->components->isEnabled('deadlines') && can(Permission::DEADLINES_VIEW);
         $showDocuments = $this->components->isEnabled('documents') && can(Permission::DOCUMENTS_VIEW);
-        $showOrg = false;
+        $showOrg = $this->components->isEnabled('org_roles') && can(Permission::ORG_VIEW);
 
         $stats = $showMembers
             ? $this->members->dashboardStats()

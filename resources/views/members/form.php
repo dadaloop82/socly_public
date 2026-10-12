@@ -163,7 +163,7 @@ $renderTextField = static function (array $field) use ($fieldValue, $icons): str
         $attrs .= ' data-phone-input inputmode="tel" autocomplete="tel"'
             . ' data-hint="' . e(__('members.phone_hint')) . '"'
             . ' data-invalid="' . e(__('validation.phone')) . '"';
-        $placeholder = __('members.phone_hint');
+        $placeholder = __('members.phone_placeholder');
     } elseif ($type === 'email') {
         $attrs .= ' data-email-input autocomplete="email"';
         $placeholder = __('members.email_placeholder');
@@ -172,7 +172,7 @@ $renderTextField = static function (array $field) use ($fieldValue, $icons): str
     } elseif ($key === 'last_name') {
         $attrs .= ' data-last-name autocomplete="family-name"';
     } elseif ($type === 'date' || $key === 'birth_date') {
-        $attrs .= ' data-birth-date';
+        $attrs .= ' data-birth-date data-birth-allow-minor="1"';
     } elseif ($type === 'fiscal_code') {
         $attrs .= ' data-fiscal-code autocomplete="off" maxlength="16"';
         $placeholder = __('members.cf_hint');
@@ -191,7 +191,7 @@ $renderTextField = static function (array $field) use ($fieldValue, $icons): str
     }
 
     if ($type === 'gender') {
-        return '<div class="field-block" data-field="' . e($key) . '">'
+        return '<div class="field-block field-block--gender" data-field="' . e($key) . '">'
             . '<label class="field-label" for="field-' . e($key) . '">'
             . '<span class="field-icon" data-icon="users" aria-hidden="true"></span>'
             . e($label) . ($required ? ' *' : '')
@@ -204,7 +204,7 @@ $renderTextField = static function (array $field) use ($fieldValue, $icons): str
     }
 
     if ($type === 'language') {
-        return '<div class="field-block" data-field="' . e($key) . '">'
+        return '<div class="field-block field-block--language" data-field="' . e($key) . '">'
             . '<label class="field-label" for="field-' . e($key) . '">'
             . '<span class="field-icon" data-icon="globe" aria-hidden="true"></span>'
             . e($label) . ($required ? ' *' : '')
@@ -244,7 +244,9 @@ $renderTextField = static function (array $field) use ($fieldValue, $icons): str
             . '</div>';
     }
 
-    return '<div class="field-block" data-field="' . e($key) . '">'
+    $requiredAttr = $required ? ' data-field-required="1"' : ' data-field-required="0"';
+
+    return '<div class="field-block" data-field="' . e($key) . '"' . $requiredAttr . '>'
         . '<label class="field-label" for="field-' . e($key) . '">'
         . '<span class="field-icon" data-icon="' . e($icon) . '" aria-hidden="true"></span>'
         . e($label) . ($required ? ' *' : '')
@@ -260,28 +262,10 @@ $valFor = static function (string $k) use ($profileByKey, $fieldValue): string {
     return isset($profileByKey[$k]) ? $fieldValue($profileByKey[$k]) : '';
 };
 
-$isRowBreakField = static function (array $field) use ($geoAddressKeySet): bool {
-    $key = (string) ($field['key'] ?? '');
-    $type = \Socly\Support\MemberFieldTypes::resolve((string) ($field['field_type'] ?? 'text'), $key);
-    if (isset($geoAddressKeySet[$key]) || $key === 'photo') {
-        return true;
-    }
-    return in_array($type, [
-        \Socly\Support\MemberFieldTypes::PHOTO,
-        \Socly\Support\MemberFieldTypes::TEXTAREA,
-        \Socly\Support\MemberFieldTypes::CITY,
-        \Socly\Support\MemberFieldTypes::STREET,
-        \Socly\Support\MemberFieldTypes::HOUSE_NUMBER,
-        \Socly\Support\MemberFieldTypes::POSTAL_CODE,
-    ], true);
-};
-
 $buildProfileFieldsHtml = function (array $list, ?string $stepKey = null) use (
     $fieldValue,
     $renderTextField,
-    $isRowBreakField,
     $geoAddressKeys,
-    $geoAddressKeySet,
     $allGeoFieldsByKey,
     $geoHomeStepKey,
     $reqFor,
@@ -300,50 +284,67 @@ $buildProfileFieldsHtml = function (array $list, ?string $stepKey = null) use (
     $renderFullGeoHere = $stepKey === null
         || $geoHomeStepKey === null
         || $stepKey === $geoHomeStepKey;
-    ob_start();
-    $renderedKeys = [];
-    $fieldCount = count($list);
-    $index = 0;
-    $pending = [];
 
-    $flushPending = static function () use (&$pending): void {
-        if ($pending === []) {
-            return;
-        }
-        echo '<div class="member-field-row cols-4">';
-        foreach ($pending as $html) {
-            echo $html;
-        }
-        echo '</div>';
-        $pending = [];
+    $pick = static function (string $key) use ($listByKey): ?array {
+        return $listByKey[$key] ?? null;
     };
 
-    while ($index < $fieldCount):
-        $field = $list[$index];
-        $key = (string) ($field['key'] ?? '');
-        if ($key === '' || isset($renderedKeys[$key])) {
-            $index++;
+    $canonicalKeys = array_fill_keys(\Socly\Support\MemberFieldTypes::profileFormRenderKeys(), true);
+    $extras = [];
+    foreach ($list as $field) {
+        $ek = (string) ($field['key'] ?? '');
+        if ($ek === '' || isset($canonicalKeys[$ek])) {
             continue;
         }
+        $extras[] = $field;
+    }
+    usort($extras, static function (array $a, array $b): int {
+        return ((int) ($a['sort_order'] ?? 0)) <=> ((int) ($b['sort_order'] ?? 0));
+    });
 
-        $type = \Socly\Support\MemberFieldTypes::resolve((string) ($field['field_type'] ?? 'text'), $key);
+    $renderFiscal = static function (array $field) use ($fieldValue): string {
+        $key = (string) ($field['key'] ?? 'fiscal_code');
+        $val = $fieldValue($field);
+        $label = localized($field['label_json'] ?? $field['label'] ?? $key);
+        $required = !empty($field['is_required']);
 
-        if ($key === 'photo' || $type === \Socly\Support\MemberFieldTypes::PHOTO):
-            $flushPending();
-            $val = $fieldValue($field);
-            $label = localized($field['label_json'] ?? $field['label'] ?? 'photo');
-            $renderedKeys[$key] = true;
-            $index++;
-            ?>
-            <div class="member-field-row is-full">
-            <div class="photo-field field-block" data-field="<?= e($key) ?>">
+        return '<div class="field-block" data-field="' . e($key) . '" data-field-required="' . ($required ? '1' : '0') . '">'
+            . '<label class="field-label" for="field-' . e($key) . '">'
+            . '<span class="field-icon" data-icon="hash" aria-hidden="true"></span>'
+            . e($label) . ($required ? ' *' : '')
+            . '</label>'
+            . '<div class="cf-row">'
+            . '<input id="field-' . e($key) . '" type="text" name="fields[' . e($key) . ']" value="' . e($val) . '"'
+            . ' placeholder="' . e(__('members.cf_hint')) . '"'
+            . ' data-fiscal-code autocomplete="off" maxlength="16" pattern="[A-Za-z0-9]{16}"'
+            . ($required ? ' required' : '') . '>'
+            . '<button type="button" class="btn btn-ghost" data-cf-generate>'
+            . '<span class="field-icon" data-icon="spark" aria-hidden="true"></span>'
+            . e(__('members.cf_generate'))
+            . '</button>'
+            . '</div>'
+            . '<p class="field-hint muted" data-cf-status aria-live="polite"'
+            . ' data-incomplete="' . e(__('members.cf_incomplete')) . '"'
+            . ' data-ready="' . e(__('members.cf_ready')) . '"'
+            . ' data-gender-other="' . e(__('members.cf_gender_other')) . '" hidden></p>'
+            . '</div>';
+    };
+
+    $renderPhoto = static function (array $field) use ($fieldValue, $isEdit, $member): void {
+        $key = (string) ($field['key'] ?? 'photo');
+        $val = $fieldValue($field);
+        $label = localized($field['label_json'] ?? $field['label'] ?? 'photo');
+        ?>
+        <div class="photo-field field-block" data-field="<?= e($key) ?>" data-field-required="<?= !empty($field['is_required']) ? '1' : '0' ?>">
                 <label class="field-label">
                     <span class="field-icon" data-icon="camera" aria-hidden="true"></span>
                     <?= e($label) ?><?= !empty($field['is_required']) ? ' *' : '' ?>
                 </label>
                 <div class="photo-upload">
                     <?php if ($isEdit && $val !== ''): ?>
-                        <img class="photo-preview" src="<?= e(url('/members/'.$member['id'].'/photo')) ?>" alt="">
+                        <button type="button" class="photo-preview-btn" data-photo-lightbox-open aria-label="<?= e(__('members.photo_preview_open')) ?>">
+                            <img class="photo-preview" src="<?= e(url('/members/'.$member['id'].'/photo')) ?>" alt="">
+                        </button>
                     <?php else: ?>
                         <div class="photo-placeholder" aria-hidden="true"></div>
                     <?php endif; ?>
@@ -385,32 +386,103 @@ $buildProfileFieldsHtml = function (array $list, ?string $stepKey = null) use (
                     </div>
                 </div>
             </div>
-            </div>
-            <?php
-            continue;
-        endif;
+        <?php
+    };
 
-        if (isset($geoAddressKeySet[$key]) || in_array($type, [
-            \Socly\Support\MemberFieldTypes::CITY,
-            \Socly\Support\MemberFieldTypes::STREET,
-            \Socly\Support\MemberFieldTypes::HOUSE_NUMBER,
-            \Socly\Support\MemberFieldTypes::POSTAL_CODE,
-        ], true)):
-            $flushPending();
-            foreach ($geoAddressKeys as $gk) {
-                $renderedKeys[$gk] = true;
+    $emitRow = static function (array $cells, string $rowClass = 'member-field-row'): void {
+        if ($cells === []) {
+            return;
+        }
+        echo '<div class="' . e($rowClass) . '">';
+        foreach ($cells as $html) {
+            echo $html;
+        }
+        echo '</div>';
+    };
+
+    $blockHasAny = static function (array $keys) use ($pick): bool {
+        foreach ($keys as $key) {
+            if ($pick($key) !== null) {
+                return true;
             }
-            foreach (array_keys($geoBagByKey) as $gk) {
-                $renderedKeys[$gk] = true;
-            }
-            $index++;
-            if (!$renderFullGeoHere) {
-                continue;
-            }
+        }
+
+        return false;
+    };
+
+    ob_start();
+
+    if ($blockHasAny(['first_name', 'last_name', 'gender', 'preferred_language'])): ?>
+        <div class="member-profile-block">
+            <h3 class="member-profile-block-title"><?= e(__('members.profile_block_base')) ?></h3>
+            <?php
+            $nameRow = array_filter([
+                $pick('first_name') ? $renderTextField($pick('first_name')) : null,
+                $pick('last_name') ? $renderTextField($pick('last_name')) : null,
+            ]);
+            $emitRow($nameRow, 'member-field-row member-field-row--identity-names');
+
+            $metaRow = array_filter([
+                $pick('gender') ? $renderTextField($pick('gender')) : null,
+                $pick('preferred_language') ? $renderTextField($pick('preferred_language')) : null,
+            ]);
+            $emitRow($metaRow, 'member-field-row member-field-row--identity-meta');
             ?>
-            <div class="member-field-row is-full geo-address-host" data-field="residence">
+        </div>
+    <?php endif;
+
+    $fiscalField = $pick('fiscal_code');
+    if ($blockHasAny(['birth_date', 'birth_place']) || $fiscalField !== null): ?>
+        <div class="member-profile-block member-profile-block--birth">
+            <h3 class="member-profile-block-title"><?= e(__('members.profile_block_birth')) ?></h3>
+            <?php if ($blockHasAny(['birth_date', 'birth_place'])): ?>
+                <div class="member-field-row member-field-row--birth">
+                    <?php
+                    $birthDate = $pick('birth_date');
+                    if ($birthDate !== null) {
+                        echo $renderTextField($birthDate);
+                    }
+                    $birthPlace = $pick('birth_place');
+                    if ($birthPlace !== null):
+                    ?>
+                        <div class="geo-birth-host" data-field="birth_place">
+                            <?= view_partial('partials/geo_birth_place', [
+                                'name' => 'fields[birth_place]',
+                                'value' => $fieldValue($birthPlace),
+                                'required' => !empty($birthPlace['is_required']),
+                                'id' => 'field-birth_place',
+                                'class' => 'member-geo-birth',
+                                'flag_name' => 'birth_place_foreign',
+                                'foreign_inline' => true,
+                            ]) ?>
+                        </div>
+                    <?php endif; ?>
+                </div>
+            <?php endif; ?>
+            <?php if ($fiscalField !== null): ?>
+                <div class="member-field-row member-field-row--fiscal">
+                    <?= $renderFiscal($fiscalField) ?>
+                </div>
+            <?php endif; ?>
+        </div>
+    <?php endif;
+
+    $hasResidence = false;
+    foreach (['city', 'postal_code', 'address', 'house_number'] as $gk) {
+        if (isset($geoBagByKey[$gk])) {
+            $hasResidence = true;
+            break;
+        }
+    }
+    if ($hasResidence && $renderFullGeoHere): ?>
+        <div class="member-profile-block">
+            <h3 class="member-profile-block-title"><?= e(__('members.profile_block_residence')) ?></h3>
+            <div class="geo-address-host" data-field="residence">
                 <?= view_partial('partials/geo_address', [
                     'layout' => 'rows',
+                    'class' => 'geo-address-member',
+                    'foreign_toggle' => false,
+                    'foreign_inline' => true,
                     'names' => [
                         'city' => 'fields[city]',
                         'postal_code' => 'fields[postal_code]',
@@ -443,77 +515,45 @@ $buildProfileFieldsHtml = function (array $list, ?string $stepKey = null) use (
                     ],
                 ]) ?>
             </div>
-            <?php
-            continue;
-        endif;
+        </div>
+    <?php endif;
 
-        if ($key === 'fiscal_code' || $type === \Socly\Support\MemberFieldTypes::FISCAL_CODE):
-            $val = $fieldValue($field);
-            $label = localized($field['label_json'] ?? $field['label'] ?? $key);
-            $renderedKeys[$key] = true;
-            $index++;
-            $pending[] = '<div class="field-block" data-field="' . e($key) . '">'
-                . '<label class="field-label" for="field-' . e($key) . '">'
-                . '<span class="field-icon" data-icon="hash" aria-hidden="true"></span>'
-                . e($label) . (!empty($field['is_required']) ? ' *' : '')
-                . '</label>'
-                . '<div class="cf-row">'
-                . '<input id="field-' . e($key) . '" type="text" name="fields[' . e($key) . ']" value="' . e($val) . '"'
-                . ' placeholder="' . e(__('members.cf_hint')) . '"'
-                . ' data-fiscal-code autocomplete="off" maxlength="16" pattern="[A-Za-z0-9]{16}"'
-                . (!empty($field['is_required']) ? ' required' : '') . '>'
-                . '<button type="button" class="btn btn-ghost" data-cf-generate>'
-                . '<span class="field-icon" data-icon="spark" aria-hidden="true"></span>'
-                . e(__('members.cf_generate'))
-                . '</button>'
-                . '</div>'
-                . '<p class="field-hint muted" data-cf-status aria-live="polite"'
-                . ' data-incomplete="' . e(__('members.cf_incomplete')) . '"'
-                . ' data-ready="' . e(__('members.cf_ready')) . '"'
-                . ' data-gender-other="' . e(__('members.cf_gender_other')) . '" hidden></p>'
-                . '</div>';
-            if (count($pending) >= 4) {
-                $flushPending();
+    if ($extras !== []): ?>
+        <div class="member-profile-block member-profile-block--extra">
+            <?php foreach ($extras as $extra): ?>
+                <?php
+                $type = \Socly\Support\MemberFieldTypes::resolve((string) ($extra['field_type'] ?? 'text'), (string) ($extra['key'] ?? ''));
+                $full = in_array($type, [
+                    \Socly\Support\MemberFieldTypes::TEXTAREA,
+                    \Socly\Support\MemberFieldTypes::PHOTO,
+                ], true);
+                ?>
+                <div class="member-field-row is-full">
+                    <?= $renderTextField($extra) ?>
+                </div>
+            <?php endforeach; ?>
+        </div>
+    <?php endif;
+
+    if ($blockHasAny(['email', 'phone', 'photo'])): ?>
+        <div class="member-profile-block">
+            <h3 class="member-profile-block-title"><?= e(__('members.profile_block_contact')) ?></h3>
+            <?php
+            $contactRow = [];
+            foreach (['email', 'phone'] as $contactKey) {
+                $cf = $pick($contactKey);
+                if ($cf !== null) {
+                    $contactRow[] = $renderTextField($cf);
+                }
             }
-            continue;
-        endif;
-
-        if ($key === 'birth_place' || $type === \Socly\Support\MemberFieldTypes::BIRTH_PLACE):
-            $flushPending();
-            $renderedKeys[$key] = true;
-            $index++;
+            $emitRow($contactRow, 'member-field-row member-field-row--contact');
+            $photoField = $pick('photo');
+            if ($photoField !== null) {
+                $renderPhoto($photoField);
+            }
             ?>
-            <div class="member-field-row is-full geo-birth-host" data-field="<?= e($key) ?>">
-                <?= view_partial('partials/geo_birth_place', [
-                    'name' => 'fields[' . $key . ']',
-                    'value' => $fieldValue($field),
-                    'required' => !empty($field['is_required']),
-                    'id' => 'field-' . $key,
-                    'class' => 'member-geo-birth',
-                    'flag_name' => 'birth_place_foreign',
-                ]) ?>
-            </div>
-            <?php
-            continue;
-        endif;
-
-        if ($type === \Socly\Support\MemberFieldTypes::TEXTAREA || $isRowBreakField($field)):
-            $flushPending();
-            $renderedKeys[$key] = true;
-            $index++;
-            echo '<div class="member-field-row is-full">' . $renderTextField($field) . '</div>';
-            continue;
-        endif;
-
-        $renderedKeys[$key] = true;
-        $index++;
-        $pending[] = $renderTextField($field);
-        if (count($pending) >= 4) {
-            $flushPending();
-        }
-    endwhile;
-
-    $flushPending();
+        </div>
+    <?php endif;
 
     return (string) ob_get_clean();
 };
@@ -550,6 +590,8 @@ $paymentExtraHtml = $buildProfileFieldsHtml($paymentExtraFields, \Socly\Services
     data-member-form
     data-wizard
     data-member-leave-guard="<?= $isEdit ? 'edit' : 'create' ?>"
+    data-photo-preview-open="<?= e(__('members.photo_preview_open')) ?>"
+    data-photo-preview-close="<?= e(__('members.photo_preview_close')) ?>"
     data-total-steps="<?= (int)$totalSteps ?>"
     data-cities-url="<?= e(url('/api/geo/cities')) ?>"
     data-addresses-url="<?= e(url('/api/geo/addresses')) ?>"

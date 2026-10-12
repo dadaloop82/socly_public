@@ -116,6 +116,14 @@ try {
     }
 } catch (\Throwable) {
 }
+$updateInfo = null;
+if ($user && app()->isInstalled() && !$temporaryInstance && can('settings.manage')) {
+    try {
+        $updateInfo = app(\Socly\Services\UpdateService::class)->check();
+    } catch (\Throwable) {
+        $updateInfo = null;
+    }
+}
 ?>
 <?php if ($demoPreview): ?>
 <div class="demo-banner demo-banner--preview" data-demo-preview-banner>
@@ -241,11 +249,76 @@ try {
         <?php endif; ?>
 
         <div class="sidebar-footer">
+            <?php if (!empty($updateInfo['available'])): ?>
+                <?php
+                $updateRemote = (string) ($updateInfo['remote'] ?? '');
+                $updateCurrent = (string) ($updateInfo['current'] ?? '');
+                ?>
+                <details
+                    class="sidebar-update"
+                    data-sidebar-update
+                    data-update-remote="<?= e($updateRemote) ?>"
+                >
+                    <summary class="sidebar-update-summary">
+                        <span class="sidebar-update-pill"><?= e(__('updates.sidebar_compact', [
+                            'current' => $updateCurrent,
+                            'remote' => $updateRemote,
+                        ])) ?></span>
+                        <button
+                            type="button"
+                            class="sidebar-update-dismiss"
+                            data-sidebar-update-dismiss
+                            aria-label="<?= e(__('updates.dismiss')) ?>"
+                        >×</button>
+                    </summary>
+                    <div class="sidebar-update-body">
+                        <p class="sidebar-update-copy"><?= e(__('updates.available_text', [
+                            'current' => $updateCurrent,
+                            'remote' => $updateRemote,
+                        ])) ?></p>
+                        <?php if (empty($updateInfo['install_available'])): ?>
+                            <p class="sidebar-update-hint"><?= e(__('updates.manual_hint')) ?></p>
+                        <?php endif; ?>
+                        <div class="sidebar-update-actions">
+                            <?php
+                            $notesUrl = trim((string) ($updateInfo['notes_url'] ?? ''));
+                            $downloadUrl = trim((string) ($updateInfo['download_url'] ?? ''));
+                            $guideUrl = trim((string) ($updateInfo['install_guide_url'] ?? ''));
+                            ?>
+                            <?php if ($notesUrl !== ''): ?>
+                                <a class="btn btn-sm btn-ghost" href="<?= e($notesUrl) ?>" target="_blank" rel="noopener noreferrer"><?= e(__('updates.notes')) ?></a>
+                            <?php endif; ?>
+                            <?php if ($downloadUrl !== ''): ?>
+                                <a class="btn btn-sm btn-ghost" href="<?= e($downloadUrl) ?>" target="_blank" rel="noopener noreferrer"><?= e(__('updates.download')) ?></a>
+                            <?php endif; ?>
+                            <?php if ($guideUrl !== '' && empty($updateInfo['install_available'])): ?>
+                                <a class="btn btn-sm btn-ghost" href="<?= e($guideUrl) ?>" target="_blank" rel="noopener noreferrer"><?= e(__('updates.guide')) ?></a>
+                            <?php endif; ?>
+                            <?php if (!empty($updateInfo['install_available'])): ?>
+                                <form method="post" action="<?= e(url('/updates/install')) ?>">
+                                    <?= csrf_field() ?>
+                                    <button class="btn btn-sm" type="submit"><?= e(__('updates.install')) ?></button>
+                                </form>
+                            <?php endif; ?>
+                        </div>
+                    </div>
+                </details>
+            <?php endif; ?>
             <?php if (!empty($demoPreview)): ?>
                 <div class="user-name"><?= e(__('auth.demo_preview_user')) ?></div>
             <?php else: ?>
                 <div class="user-name"><?= e($user['name'] ?? '') ?></div>
                 <div class="user-meta"><?= e($user['email'] ?? '') ?></div>
+            <?php endif; ?>
+            <div class="sidebar-footer-version">v<?= e(app_version()) ?></div>
+            <?php if ($isAdminConfig): ?>
+                <a
+                    class="sidebar-settings-link<?= $configActive ? ' is-active' : '' ?>"
+                    href="<?= e(url('/settings')) ?>"
+                >
+                    <span class="sidebar-settings-icon" aria-hidden="true"></span>
+                    <?= e(__('nav.settings')) ?>
+                </a>
             <?php endif; ?>
             <form method="post" action="<?= e(url('/logout')) ?>">
                 <?= csrf_field() ?>
@@ -279,7 +352,17 @@ try {
             <?php endif; ?>
         </header>
         <main class="main">
-            <?php if ($msg = flash('success')): ?><div class="alert alert-success"><?= e(is_string($msg) ? $msg : '') ?></div><?php endif; ?>
+            <?php if ($msg = flash('success')): ?>
+                <div
+                    class="alert alert-success alert-dismissible"
+                    data-flash-success
+                    data-auto-dismiss-ms="4500"
+                    role="status"
+                >
+                    <span class="alert-body"><?= e(is_string($msg) ? $msg : '') ?></span>
+                    <button type="button" class="alert-dismiss" aria-label="<?= e(__('common.close')) ?>">×</button>
+                </div>
+            <?php endif; ?>
             <?php if ($errors = flash('errors')): ?>
                 <div class="alert alert-error">
                     <?php if (is_array($errors)): foreach ($errors as $err): ?>
@@ -310,53 +393,6 @@ try {
                             </li>
                         <?php endforeach; ?>
                     </ul>
-                </div>
-            <?php endif; ?>
-            <?php
-            $updateInfo = null;
-            // Demo / temporary instances never show update prompts (shared code mirror).
-            if (!$temporaryInstance && can('settings.manage')) {
-                try {
-                    $updateInfo = app(\Socly\Services\UpdateService::class)->check();
-                } catch (\Throwable) {
-                    $updateInfo = null;
-                }
-            }
-            ?>
-            <?php if (!empty($updateInfo['available'])): ?>
-                <div class="update-banner">
-                    <div class="update-banner-copy">
-                        <strong><?= e(__('updates.available_title')) ?></strong>
-                        <span><?= e(__('updates.available_text', [
-                            'current' => (string) ($updateInfo['current'] ?? ''),
-                            'remote' => (string) ($updateInfo['remote'] ?? ''),
-                        ])) ?></span>
-                        <?php if (empty($updateInfo['install_available'])): ?>
-                            <span class="update-banner-hint"><?= e(__('updates.manual_hint')) ?></span>
-                        <?php endif; ?>
-                    </div>
-                    <div class="update-banner-actions">
-                        <?php
-                        $notesUrl = trim((string) ($updateInfo['notes_url'] ?? ''));
-                        $downloadUrl = trim((string) ($updateInfo['download_url'] ?? ''));
-                        $guideUrl = trim((string) ($updateInfo['install_guide_url'] ?? ''));
-                        ?>
-                        <?php if ($notesUrl !== ''): ?>
-                            <a class="btn btn-sm btn-ghost" href="<?= e($notesUrl) ?>" target="_blank" rel="noopener noreferrer"><?= e(__('updates.notes')) ?></a>
-                        <?php endif; ?>
-                        <?php if ($downloadUrl !== ''): ?>
-                            <a class="btn btn-sm btn-ghost" href="<?= e($downloadUrl) ?>" target="_blank" rel="noopener noreferrer"><?= e(__('updates.download')) ?></a>
-                        <?php endif; ?>
-                        <?php if ($guideUrl !== '' && empty($updateInfo['install_available'])): ?>
-                            <a class="btn btn-sm btn-ghost" href="<?= e($guideUrl) ?>" target="_blank" rel="noopener noreferrer"><?= e(__('updates.guide')) ?></a>
-                        <?php endif; ?>
-                        <?php if (!empty($updateInfo['install_available'])): ?>
-                            <form method="post" action="<?= e(url('/updates/install')) ?>">
-                                <?= csrf_field() ?>
-                                <button class="btn btn-sm" type="submit"><?= e(__('updates.install')) ?></button>
-                            </form>
-                        <?php endif; ?>
-                    </div>
                 </div>
             <?php endif; ?>
             <?= $content ?>

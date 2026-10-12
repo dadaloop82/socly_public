@@ -523,8 +523,12 @@ final class GeoService
         $exact = $this->findComune($query);
         if ($exact !== null) {
             $item = $this->formatComuneItem($exact);
+            $uniqueCap = $this->uniqueCapForComune((string) ($item['city'] ?? $query));
+            if ($uniqueCap !== null) {
+                $item['cap'] = $uniqueCap;
+            }
             if ($item['city'] === $query) {
-                return ['action' => 'none'];
+                return ['action' => 'none', 'item' => $item];
             }
             return ['action' => 'apply', 'item' => $item, 'label' => $item['label']];
         }
@@ -613,7 +617,14 @@ final class GeoService
         }
 
         if ($canonicalNorm === $typedNorm && $canonical === $typedRaw) {
-            return ['action' => 'none'];
+            $item = $top;
+            if (isset($item['city'])) {
+                $uniqueCap = $this->uniqueCapForComune((string) $item['city']);
+                if ($uniqueCap !== null) {
+                    $item['cap'] = $uniqueCap;
+                }
+            }
+            return ['action' => 'none', 'item' => $item];
         }
 
         if ($canonicalNorm === $typedNorm || $this->placesSimilar($typedNorm, $canonicalNorm)) {
@@ -696,6 +707,30 @@ final class GeoService
             }
         }
         return false;
+    }
+
+    /** When a comune maps to exactly one CAP in the registry, return it (for auto-fill). */
+    public function uniqueCapForComune(string $name): ?string
+    {
+        $norm = $this->normalizePlace(trim($name));
+        if ($norm === '') {
+            return null;
+        }
+        $caps = [];
+        foreach ($this->comuni() as $row) {
+            if ($this->normalizePlace((string) ($row['nome'] ?? '')) !== $norm) {
+                continue;
+            }
+            $cap = preg_replace('/\D+/', '', (string) ($row['cap'] ?? '')) ?? '';
+            if (strlen($cap) === 5) {
+                $caps[$cap] = true;
+            }
+        }
+        if (count($caps) !== 1) {
+            return null;
+        }
+
+        return array_key_first($caps);
     }
 
     /** @param array{nome:string,belfiore:string,provincia:string,cap:string} $row */
