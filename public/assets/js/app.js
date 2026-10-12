@@ -126,6 +126,7 @@ document.addEventListener('DOMContentLoaded', () => {
   initOrgHideVacant();
   initSidebarDeadlines();
   initConfigAccordions();
+  initPersonNameCase(document);
   initMemberForm();
   initMemberWizard();
   initMembersList();
@@ -2187,12 +2188,50 @@ function initMembersList() {
   syncBulkBar();
 }
 
+function personNameCase(raw) {
+  const name = String(raw || '').trim().replace(/\s+/g, ' ');
+  if (!name) return '';
+  const lower = name.toLocaleLowerCase('it-IT');
+  return lower.replace(/(^|[\s\-'])(\p{L})/gu, (_, sep, ch) => sep + ch.toLocaleUpperCase('it-IT'));
+}
+
+function initPersonNameCase(root = document) {
+  const scope = root && root.querySelectorAll ? root : document;
+  const selector = [
+    '[data-first-name]',
+    '[data-last-name]',
+    '[data-people-first]',
+    '[data-people-last]',
+    '[data-cf-dialog-first]',
+    '[data-cf-dialog-last]',
+    'input[name="confirm_first_name"]',
+    'input[name="confirm_last_name"]',
+  ].join(', ');
+
+  const apply = (input) => {
+    if (!(input instanceof HTMLInputElement) || input.disabled || input.readOnly) return;
+    const next = personNameCase(input.value);
+    if (next === input.value) return;
+    input.value = next;
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+    input.dispatchEvent(new Event('change', { bubbles: true }));
+  };
+
+  scope.querySelectorAll(selector).forEach((input) => {
+    if (!(input instanceof HTMLInputElement) || input.dataset.personNameCaseBound === '1') return;
+    input.dataset.personNameCaseBound = '1';
+    input.addEventListener('blur', () => apply(input));
+    input.closest('form')?.addEventListener('submit', () => apply(input), { capture: true });
+  });
+}
+
 function initMemberForm() {
   const form = document.querySelector('[data-member-form]');
   if (!form) {
     return;
   }
 
+  initPersonNameCase(form);
   initPhoneInputs(form);
   initEmailValidation(form);
   initPhotoCapture(form);
@@ -5222,14 +5261,35 @@ function ensureSetupValidityWrap(el) {
   }
   let wrap = el.closest('.setup-input-validity');
   if (wrap) return wrap;
+  if (!el.parentNode) return null;
+  // Reparenting a focused input blurs it — restore caret after wrap.
+  const hadFocus = document.activeElement === el;
+  let selectionStart = null;
+  let selectionEnd = null;
+  if (hadFocus && typeof el.selectionStart === 'number' && typeof el.selectionEnd === 'number') {
+    selectionStart = el.selectionStart;
+    selectionEnd = el.selectionEnd;
+  }
   wrap = document.createElement('div');
   wrap.className = 'setup-input-validity';
-  el.parentNode?.insertBefore(wrap, el);
+  el.parentNode.insertBefore(wrap, el);
   wrap.appendChild(el);
   const mark = document.createElement('span');
   mark.className = 'setup-input-validity-mark';
   mark.setAttribute('aria-hidden', 'true');
   wrap.appendChild(mark);
+  if (hadFocus) {
+    try {
+      el.focus({ preventScroll: true });
+    } catch (_) {
+      el.focus();
+    }
+    if (selectionStart !== null && selectionEnd !== null) {
+      try {
+        el.setSelectionRange(selectionStart, selectionEnd);
+      } catch (_) { /* select/number inputs */ }
+    }
+  }
   return wrap;
 }
 
@@ -5531,17 +5591,7 @@ function initSetupTaxIds(root) {
     if (!(el instanceof HTMLInputElement)) return;
     el.classList.toggle('is-valid', state === 'ok');
     el.classList.toggle('is-invalid', state === 'err');
-    let wrap = el.closest('.setup-input-validity');
-    if (!wrap && el.parentNode) {
-      wrap = document.createElement('div');
-      wrap.className = 'setup-input-validity';
-      el.parentNode.insertBefore(wrap, el);
-      wrap.appendChild(el);
-      const mark = document.createElement('span');
-      mark.className = 'setup-input-validity-mark';
-      mark.setAttribute('aria-hidden', 'true');
-      wrap.appendChild(mark);
-    }
+    const wrap = ensureSetupValidityWrap(el);
     if (!wrap) return;
     wrap.classList.toggle('is-valid', state === 'ok');
     wrap.classList.toggle('is-invalid', state === 'err');
@@ -7345,7 +7395,9 @@ function initPeopleList(list) {
     const html = template.innerHTML.replaceAll('__i__', String(rows.children.length));
     rows.insertAdjacentHTML('beforeend', html);
     reindex();
-    initPlaceSuggest(list.closest('form') || list || document);
+    const scope = list.closest('form') || list || document;
+    initPlaceSuggest(scope);
+    initPersonNameCase(scope);
     syncPeopleCfRequired();
   });
 
@@ -7391,13 +7443,14 @@ function initPeopleList(list) {
       const firstInput = row.querySelector('[data-people-first]');
       const lastInput = row.querySelector('[data-people-last]');
       const officeSelect = row.querySelector('[data-people-office]');
-      if (firstInput instanceof HTMLInputElement) firstInput.value = first;
-      if (lastInput instanceof HTMLInputElement) lastInput.value = last;
+      if (firstInput instanceof HTMLInputElement) firstInput.value = personNameCase(first);
+      if (lastInput instanceof HTMLInputElement) lastInput.value = personNameCase(last);
       if (officeSelect instanceof HTMLSelectElement && person.office_role) {
         officeSelect.value = String(person.office_role);
       }
     });
     reindex();
+    initPersonNameCase(list.closest('form') || list || document);
     syncPeopleCfRequired();
     if (importBox instanceof HTMLElement) importBox.hidden = true;
   });
@@ -7484,8 +7537,8 @@ function initPeopleList(list) {
       const firstInput = calcTargetRow.querySelector('[data-people-first], input[name*="[first_name]"]');
       const lastInput = calcTargetRow.querySelector('[data-people-last], input[name*="[last_name]"]');
       const cfInput = calcTargetRow.querySelector('[data-people-cf], input[name*="[fiscal_code]"]');
-      if (firstInput instanceof HTMLInputElement && !firstInput.value.trim()) firstInput.value = first;
-      if (lastInput instanceof HTMLInputElement && !lastInput.value.trim()) lastInput.value = last;
+      if (firstInput instanceof HTMLInputElement && !firstInput.value.trim()) firstInput.value = personNameCase(first);
+      if (lastInput instanceof HTMLInputElement && !lastInput.value.trim()) lastInput.value = personNameCase(last);
       if (cfInput instanceof HTMLInputElement) {
         cfInput.value = String(data.fiscal_code).toUpperCase();
         cfInput.dispatchEvent(new Event('input', { bubbles: true }));
@@ -8447,6 +8500,8 @@ function bindSuggest({
   const field = input.closest('.suggest-field');
   const wrap = input.closest('.suggest-wrap');
   input.dataset.geoPicked = input.dataset.geoPicked || '0';
+  // Pre-wrap before typing so the first suggest fetch does not reparent the focused input.
+  ensureSetupValidityWrap(input);
 
   let spinner = wrap?.querySelector('.suggest-spinner');
   if (!spinner && wrap) {

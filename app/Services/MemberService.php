@@ -1382,6 +1382,7 @@ final class MemberService
         if (!$type) {
             return ['ok' => false, 'errors' => ['member_type_id' => __('validation.required')]];
         }
+        $fieldData = $this->normalizePersonNameFields($fieldData);
         $fieldErrors = $this->validateFields($fieldData);
         if ($photoFile && ($photoFile['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_NO_FILE) {
             $photoError = $this->validatePhotoUpload($photoFile);
@@ -1503,6 +1504,7 @@ final class MemberService
         if (!$before) {
             return ['ok' => false, 'errors' => ['id' => __('validation.required')]];
         }
+        $fieldData = $this->normalizePersonNameFields($fieldData);
         $fieldErrors = $this->validateFields($fieldData);
         if ($photoFile && ($photoFile['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_NO_FILE) {
             $photoError = $this->validatePhotoUpload($photoFile);
@@ -1574,6 +1576,24 @@ final class MemberService
         $this->audit->log('member.deleted', 'member', (string) $id, $before, null, $ip);
         $this->plugins->fire('member.deleted', $id);
         return true;
+    }
+
+    /**
+     * Title-case first_name / last_name (each word, hyphens, apostrophes).
+     *
+     * @param array<string,mixed> $fieldData
+     * @return array<string,mixed>
+     */
+    private function normalizePersonNameFields(array $fieldData): array
+    {
+        foreach (['first_name', 'last_name'] as $key) {
+            if (!array_key_exists($key, $fieldData) || !is_string($fieldData[$key])) {
+                continue;
+            }
+            $fieldData[$key] = person_name_case($fieldData[$key]);
+        }
+
+        return $fieldData;
     }
 
     /** @return array<string,string> */

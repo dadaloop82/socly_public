@@ -6827,15 +6827,15 @@ button.setup-scrape-logo-frame:focus-visible .setup-scrape-logo-overlay {
   box-sizing: border-box;
 }
 .phone-dial-select {
-  flex: 0 0 5.25rem;
-  width: 5.25rem;
-  max-width: 5.25rem;
-  min-width: 5.25rem;
-  padding-left: 1.9rem;
-  padding-right: 0.35rem;
+  flex: 0 0 8rem;
+  width: 8rem;
+  max-width: 8rem;
+  min-width: 8rem;
+  padding-left: 2rem;
+  padding-right: 0.55rem;
   background-repeat: no-repeat;
-  background-position: 0.45rem center;
-  background-size: 1.05rem auto;
+  background-position: 0.55rem center;
+  background-size: 1.1rem auto;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;

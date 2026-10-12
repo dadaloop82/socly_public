@@ -851,6 +851,30 @@ if (!function_exists('sentence_case')) {
     }
 }
 
+if (!function_exists('person_name_case')) {
+    /**
+     * Person name casing: each distinct word starts uppercase, rest lowercase.
+     * Also capitalizes after hyphen or apostrophe (Jean-Pierre, D'Angelo).
+     */
+    function person_name_case(?string $name): string
+    {
+        $name = trim(preg_replace('/\s+/u', ' ', (string) $name) ?? '');
+        if ($name === '') {
+            return '';
+        }
+        $name = mb_strtolower($name, 'UTF-8');
+        $out = preg_replace_callback(
+            '/(?:^|[\s\-\'’])\p{L}/u',
+            static function (array $m): string {
+                return mb_strtoupper($m[0], 'UTF-8');
+            },
+            $name
+        );
+
+        return is_string($out) ? $out : $name;
+    }
+}
+
 if (!function_exists('assoc_name_contains_legal')) {
     /**
      * True when the association name already embeds the legal-form code (or APS long form),

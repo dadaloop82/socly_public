@@ -1336,8 +1336,8 @@ final class SetupService
                 continue;
             }
             $person = [
-                'first_name' => assoc_capitalize_name($first),
-                'last_name' => assoc_capitalize_name($last),
+                'first_name' => person_name_case($first),
+                'last_name' => person_name_case($last),
             ];
             $role = mb_strtoupper(trim((string) ($row['role'] ?? '')), 'UTF-8');
             $isLegal = (string) ($row['is_legal_rep'] ?? '') === '1'
@@ -2811,8 +2811,8 @@ final class SetupService
             if (!is_array($row)) {
                 continue;
             }
-            $first = assoc_capitalize_name(trim((string) ($row['first_name'] ?? '')));
-            $last = assoc_capitalize_name(trim((string) ($row['last_name'] ?? '')));
+            $first = person_name_case(trim((string) ($row['first_name'] ?? '')));
+            $last = person_name_case(trim((string) ($row['last_name'] ?? '')));
             if ($first === '' || $last === '') {
                 continue;
             }
