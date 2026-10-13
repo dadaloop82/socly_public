@@ -36,14 +36,7 @@ $canPayments = can('payments.manage');
     </div>
 </div>
 
-<form class="panel filter-bar members-filter" method="get">
-    <div class="panel-header members-filter-head">
-        <div>
-            <h2 class="section-title"><?= e(__('members.search')) ?></h2>
-            <p class="section-lede"><?= e(__('members.filter_lede')) ?></p>
-        </div>
-        <button class="btn btn-sm members-filter-submit-desktop" type="submit"><?= e(__('members.search')) ?></button>
-    </div>
+<form class="panel filter-bar members-filter" method="get" data-members-filter>
     <?php
     $memberStatusOptions = [];
     foreach (\Socly\Services\MemberService::memberStatuses() as $st) {
@@ -58,13 +51,12 @@ $canPayments = can('payments.manage');
         $memberTypeOptions[(string) (int) $type['id']] = localized($type['name_json']);
     }
     ?>
-    <div class="members-filter-q">
-        <label class="members-filter-q-label" for="members-q"><?= e(__('members.search')) ?></label>
-        <div class="members-filter-q-row">
+    <div class="members-filter-row">
+        <div class="members-filter-q">
             <?= field('search', [
                 'name' => 'q',
                 'id' => 'members-q',
-                'label' => '',
+                'label' => (string) __('members.search'),
                 'value' => (string) $filters['q'],
                 'context' => 'filter',
                 'placeholder' => (string) __('members.search_placeholder'),
@@ -72,17 +64,16 @@ $canPayments = can('payments.manage');
                     'data-placeholder-desktop' => (string) __('members.search_placeholder'),
                     'data-placeholder-mobile' => (string) __('members.search_placeholder_mobile'),
                     'enterkeyhint' => 'search',
+                    'autocomplete' => 'off',
                 ],
             ]) ?>
-            <button class="btn btn-sm members-filter-submit-mobile" type="submit"><?= e(__('members.search')) ?></button>
         </div>
-    </div>
-    <div class="members-filter-extra grid-3">
         <?= field('select', [
             'name' => 'status',
             'label' => (string) __('members.status'),
             'value' => (string) ($filters['status'] ?? ''),
             'context' => 'filter',
+            'empty_label' => (string) __('members.filter_all'),
             'options' => $memberStatusOptions,
         ]) ?>
         <?= field('select', [
@@ -90,6 +81,7 @@ $canPayments = can('payments.manage');
             'label' => (string) __('members.payment'),
             'value' => (string) ($filters['payment'] ?? ''),
             'context' => 'filter',
+            'empty_label' => (string) __('members.filter_all'),
             'options' => $memberPaymentOptions,
         ]) ?>
         <?= field('select', [
@@ -97,6 +89,7 @@ $canPayments = can('payments.manage');
             'label' => (string) __('members.type'),
             'value' => (string) ($filters['member_type_id'] ?? ''),
             'context' => 'filter',
+            'empty_label' => (string) __('members.filter_all'),
             'options' => $memberTypeOptions,
         ]) ?>
     </div>
@@ -117,13 +110,15 @@ $canPayments = can('payments.manage');
         </div>
     <?php else: ?>
         <?php if ($canManage): ?>
-        <div class="members-bulk-bar" data-members-bulk-bar hidden>
-            <span class="members-bulk-count" data-members-bulk-count>0</span>
-            <span class="muted"><?= e(__('members.bulk_selected')) ?></span>
-            <div class="members-bulk-actions">
-                <button type="button" class="btn btn-sm btn-ghost" data-members-bulk-action="payment_reminder" <?= empty($mailReady) ? 'disabled title="' . e(__('mail.required_for_reminder')) . '"' : '' ?>><?= e(__('members.bulk_remind')) ?></button>
-                <button type="button" class="btn btn-sm btn-ghost" data-members-bulk-action="group_email" <?= empty($mailReady) ? 'disabled title="' . e(__('mail.required_for_group')) . '"' : '' ?>><?= e(__('members.bulk_email')) ?></button>
-                <button type="button" class="btn btn-sm btn-ghost" data-members-bulk-action="mass_renewal" data-confirm="<?= e(__('members.bulk_renew_confirm')) ?>"><?= e(__('members.bulk_renew')) ?></button>
+        <div class="members-bulk-bar" data-members-bulk-bar aria-hidden="true">
+            <div class="members-bulk-bar-inner">
+                <span class="members-bulk-count" data-members-bulk-count>0</span>
+                <span class="muted"><?= e(__('members.bulk_selected')) ?></span>
+                <div class="members-bulk-actions">
+                    <button type="button" class="btn btn-sm btn-ghost" data-members-bulk-action="payment_reminder" <?= empty($mailReady) ? 'disabled title="' . e(__('mail.required_for_reminder')) . '"' : '' ?>><?= e(__('members.bulk_remind')) ?></button>
+                    <button type="button" class="btn btn-sm btn-ghost" data-members-bulk-action="group_email" <?= empty($mailReady) ? 'disabled title="' . e(__('mail.required_for_group')) . '"' : '' ?>><?= e(__('members.bulk_email')) ?></button>
+                    <button type="button" class="btn btn-sm btn-ghost" data-members-bulk-action="mass_renewal" data-confirm="<?= e(__('members.bulk_renew_confirm')) ?>"><?= e(__('members.bulk_renew')) ?></button>
+                </div>
             </div>
         </div>
         <?php endif; ?>
@@ -167,6 +162,22 @@ $canPayments = can('payments.manage');
                     $balanceDue = (float) ($item['balance_due'] ?? 0);
                     $canCollect = $canPayments && $balanceDue > 0;
                     $canRemind = $canManage && $balanceDue > 0 && !empty($mailReady);
+                    $memberStatus = (string) ($item['status'] ?? '');
+                    $statusBadgeClass = match ($memberStatus) {
+                        'active' => 'badge-ok',
+                        'pending' => 'badge-warn',
+                        'suspended' => 'badge-due',
+                        'expired', 'cancelled' => 'badge-muted',
+                        default => '',
+                    };
+                    $periodEndsOn = format_date((string) ($item['period_ends_on'] ?? ''));
+                    $periodLabel = trim((string) ($item['period_label'] ?? ''));
+                    $metaBits = ['#' . (string) $item['member_number']];
+                    if ($periodEndsOn !== '') {
+                        $metaBits[] = __('members.expires_short', ['date' => $periodEndsOn]);
+                    } elseif ($periodLabel !== '') {
+                        $metaBits[] = $periodLabel;
+                    }
                     ?>
                     <tr<?= $issueLabels !== [] ? ' class="member-row-anomaly"' : '' ?> data-member-row="<?= (int) $item['id'] ?>">
                         <?php if ($canManage): ?>
@@ -203,13 +214,13 @@ $canPayments = can('payments.manage');
                                     <a class="member-list-name" href="<?= e(url('/members/'.$item['id'])) ?>">
                                         <?= e($fullName !== '' ? $fullName : $item['member_number']) ?>
                                     </a>
-                                    <div class="muted member-list-meta">#<?= e($item['member_number']) ?></div>
+                                    <div class="muted member-list-meta"><?= e(implode(' · ', $metaBits)) ?></div>
                                 </div>
                             </div>
                         </td>
                         <td data-label="<?= e(__('members.type')) ?>"><?= e(localized($item['type_name_json'])) ?></td>
                         <td data-label="<?= e(__('members.status')) ?>">
-                            <span class="badge<?= ($item['status'] ?? '') === 'pending' ? ' badge-warn' : '' ?>"><?= e(__('members.status_'.$item['status'])) ?></span>
+                            <span class="badge<?= $statusBadgeClass !== '' ? ' ' . e($statusBadgeClass) : '' ?>"><?= e(__('members.status_'.$memberStatus)) ?></span>
                         </td>
                         <?php
                         $gdprBadges = is_array($item['gdpr_badges'] ?? null) ? $item['gdpr_badges'] : [];

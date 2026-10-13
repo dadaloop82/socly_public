@@ -712,19 +712,27 @@ $paymentExtraHtml = $buildProfileFieldsHtml($paymentExtraFields, \Socly\Services
                 <?php if (!$isEdit): ?>
                 <div class="payment-summary member-profile-block member-profile-block--payment-summary" data-tessera-payment-summary>
                     <div class="payment-summary-head">
-                        <span class="payment-summary-kicker"><?= e(__('members.wizard_summary_kicker')) ?></span>
-                        <strong class="payment-summary-type" data-payment-type-label>—</strong>
+                        <div class="payment-summary-titles">
+                            <span class="payment-summary-kicker"><?= e(__('members.wizard_summary_kicker')) ?></span>
+                            <strong class="payment-summary-type" data-payment-type-label>—</strong>
+                        </div>
+                        <span class="payment-summary-status" data-payment-status-label hidden></span>
                     </div>
                     <div class="payment-summary-metrics">
                         <div class="payment-summary-metric">
                             <span class="payment-summary-label"><?= e(__('members.wizard_quota')) ?></span>
                             <strong class="payment-summary-value" data-payment-amount>0,00 €</strong>
                         </div>
+                        <div class="payment-summary-metric payment-summary-metric--paid" data-payment-paid-wrap>
+                            <span class="payment-summary-label"><?= e(__('members.amount_paid')) ?></span>
+                            <strong class="payment-summary-value" data-payment-paid>0,00 €</strong>
+                        </div>
                         <div class="payment-summary-metric payment-summary-metric--due" data-payment-due-wrap>
                             <span class="payment-summary-label"><?= e(__('members.wizard_still_due')) ?></span>
                             <strong class="payment-summary-value" data-payment-due>0,00 €</strong>
                         </div>
                     </div>
+                    <p class="payment-summary-method" data-payment-method-label hidden></p>
                 </div>
                 <?php endif; ?>
 
@@ -803,9 +811,9 @@ $paymentExtraHtml = $buildProfileFieldsHtml($paymentExtraFields, \Socly\Services
 
                 <?php if (!$isEdit):
                     $paymentStatusCards = [
-                        'unpaid' => ['label' => __('members.payment_unpaid'), 'icon' => 'clock'],
-                        'partial' => ['label' => __('members.payment_partial'), 'icon' => 'split'],
                         'paid' => ['label' => __('members.payment_paid'), 'icon' => 'check'],
+                        'partial' => ['label' => __('members.payment_partial'), 'icon' => 'split'],
+                        'unpaid' => ['label' => __('members.payment_unpaid'), 'icon' => 'clock'],
                     ];
                     $paymentMethodCards = [
                         'cash' => ['label' => __('payments.cash'), 'icon' => 'cash'],
@@ -820,8 +828,19 @@ $paymentExtraHtml = $buildProfileFieldsHtml($paymentExtraFields, \Socly\Services
                         'bank' => '<svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" focusable="false"><path fill="currentColor" d="M3 10h18v2H3zm2 3h3v5H5zm5 0h3v5h-3zm5 0h3v5h-3zM2 20h20v2H2zM12 3 2 8v2h20V8z"/></svg>',
                         'other' => '<svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" focusable="false"><path fill="currentColor" d="M12 7a2 2 0 1 0-2-2 2 2 0 0 0 2 2zm0 7a2 2 0 1 0-2-2 2 2 0 0 0 2 2zm0 7a2 2 0 1 0-2-2 2 2 0 0 0 2 2z"/></svg>',
                     ];
+                    $showPaymentMethod = in_array($oldPaymentStatus, ['paid', 'partial'], true);
                 ?>
-                <div class="member-profile-block tessera-payment-panel" data-payment-fields>
+                <div
+                    class="member-profile-block tessera-payment-panel"
+                    data-payment-fields
+                    data-payment-status-paid-label="<?= e(__('members.payment_paid')) ?>"
+                    data-payment-status-partial-label="<?= e(__('members.payment_partial')) ?>"
+                    data-payment-status-unpaid-label="<?= e(__('members.payment_unpaid')) ?>"
+                    data-payment-method-prefix="<?= e(__('members.payment_method')) ?>"
+                    data-payment-method-cash-label="<?= e(__('payments.cash')) ?>"
+                    data-payment-method-bank-label="<?= e(__('payments.bank')) ?>"
+                    data-payment-method-other-label="<?= e(__('payments.other')) ?>"
+                >
                     <?= field('radio_cards', [
                         'name' => 'payment_status',
                         'label' => __('members.payment'),
@@ -834,11 +853,12 @@ $paymentExtraHtml = $buildProfileFieldsHtml($paymentExtraFields, \Socly\Services
                             'icon' => $paymentIcons[$card['icon']] ?? '',
                         ], array_keys($paymentStatusCards), array_values($paymentStatusCards)),
                     ]) ?>
+                    <div data-payment-method-wrap<?= $showPaymentMethod ? '' : ' hidden' ?>>
                     <?= field('radio_cards', [
                         'name' => 'payment_method',
                         'label' => __('members.payment_method'),
                         'value' => $oldPaymentMethod,
-                        'required' => true,
+                        'required' => $showPaymentMethod,
                         'context' => 'member',
                         'options' => array_map(static fn (string $val, array $card): array => [
                             'value' => $val,
@@ -846,6 +866,7 @@ $paymentExtraHtml = $buildProfileFieldsHtml($paymentExtraFields, \Socly\Services
                             'icon' => $paymentIcons[$card['icon']] ?? '',
                         ], array_keys($paymentMethodCards), array_values($paymentMethodCards)),
                     ]) ?>
+                    </div>
                     <div data-partial-wrap<?= $oldPaymentStatus === 'partial' ? '' : ' hidden' ?>>
                         <?= field('number', [
                             'name' => 'partial_amount',

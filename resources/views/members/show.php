@@ -72,7 +72,17 @@ $balanceDue = (float) ($member['balance_due'] ?? 0);
             </div>
             <div class="detail-item">
                 <div class="label"><?= e(__('members.status')) ?></div>
-                <div class="value"><span class="badge<?= ($member['status'] ?? '') === 'pending' ? ' badge-warn' : '' ?>"><?= e(__('members.status_'.$member['status'])) ?></span></div>
+                <?php
+                $showStatus = (string) ($member['status'] ?? '');
+                $showStatusBadge = match ($showStatus) {
+                    'active' => 'badge-ok',
+                    'pending' => 'badge-warn',
+                    'suspended' => 'badge-due',
+                    'expired', 'cancelled' => 'badge-muted',
+                    default => '',
+                };
+                ?>
+                <div class="value"><span class="badge<?= $showStatusBadge !== '' ? ' ' . e($showStatusBadge) : '' ?>"><?= e(__('members.status_'.$showStatus)) ?></span></div>
             </div>
             <?php if (!empty($member['gdpr_badges'])): ?>
             <div class="detail-item detail-item-wide">

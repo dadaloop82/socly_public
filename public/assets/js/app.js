@@ -108,17 +108,33 @@ function escapeHtml(value) {
 document.addEventListener('DOMContentLoaded', () => {
   const paymentInputs = [...document.querySelectorAll('[name="payment_status"]')];
   const partial = document.querySelector('[data-partial-wrap]');
-  if (paymentInputs.length && partial) {
+  const methodWrap = document.querySelector('[data-payment-method-wrap]');
+  if (paymentInputs.length && (partial || methodWrap)) {
     const sync = () => {
       const checked = document.querySelector('[name="payment_status"]:checked');
-      const isPartial = (checked?.value || 'unpaid') === 'partial';
-      partial.hidden = !isPartial;
-      const amount = partial.querySelector('[data-partial-amount], [name="partial_amount"]');
-      if (amount instanceof HTMLInputElement) {
-        amount.required = isPartial;
-        if (!isPartial) {
-          amount.classList.remove('input-invalid');
+      const status = checked?.value || 'unpaid';
+      const isPartial = status === 'partial';
+      const needsMethod = status === 'paid' || status === 'partial';
+      if (partial) {
+        partial.hidden = !isPartial;
+        const amount = partial.querySelector('[data-partial-amount], [name="partial_amount"]');
+        if (amount instanceof HTMLInputElement) {
+          amount.required = isPartial;
+          if (!isPartial) {
+            amount.classList.remove('input-invalid');
+          }
         }
+      }
+      if (methodWrap) {
+        methodWrap.hidden = !needsMethod;
+        methodWrap.querySelectorAll('[name="payment_method"]').forEach((input) => {
+          if (input instanceof HTMLInputElement) {
+            input.required = needsMethod;
+            if (!needsMethod) {
+              input.classList.remove('input-invalid');
+            }
+          }
+        });
       }
     };
     paymentInputs.forEach((input) => input.addEventListener('change', sync));
@@ -201,17 +217,36 @@ function initOpenCreatePanels(root = document) {
   });
 }
 
-/** Compact members search placeholder on small screens. */
+/** Compact members search placeholder + live filter submit. */
 function initMembersFilterMobile() {
-  const input = document.querySelector('.members-filter [name="q"]');
-  if (!(input instanceof HTMLInputElement)) return;
-  const desktop = input.dataset.placeholderDesktop || input.placeholder;
-  const mobile = input.dataset.placeholderMobile || desktop;
-  const sync = () => {
-    input.placeholder = window.matchMedia('(max-width: 640px)').matches ? mobile : desktop;
-  };
-  sync();
-  window.matchMedia('(max-width: 640px)').addEventListener('change', sync);
+  const form = document.querySelector('[data-members-filter]');
+  const input = form?.querySelector('[name="q"]') || document.querySelector('.members-filter [name="q"]');
+  if (input instanceof HTMLInputElement) {
+    const desktop = input.dataset.placeholderDesktop || input.placeholder;
+    const mobile = input.dataset.placeholderMobile || desktop;
+    const sync = () => {
+      input.placeholder = window.matchMedia('(max-width: 640px)').matches ? mobile : desktop;
+    };
+    sync();
+    window.matchMedia('(max-width: 640px)').addEventListener('change', sync);
+  }
+  if (!(form instanceof HTMLFormElement)) return;
+
+  const submitLive = debounce(() => {
+    if (typeof form.requestSubmit === 'function') form.requestSubmit();
+    else form.submit();
+  }, 320);
+
+  form.querySelectorAll('select').forEach((el) => {
+    el.addEventListener('change', () => {
+      submitLive.cancel?.();
+      if (typeof form.requestSubmit === 'function') form.requestSubmit();
+      else form.submit();
+    });
+  });
+  if (input instanceof HTMLInputElement) {
+    input.addEventListener('input', submitLive);
+  }
 }
 
 /**
@@ -1797,18 +1832,40 @@ function initMemberWizard() {
   const photoWrap = form.querySelector('[data-tessera-photo-wrap]');
   const numberInput = form.querySelector('[data-member-number]');
   const typeSelect = form.querySelector('[data-member-type]');
+  const paymentFields = form.querySelector('[data-payment-fields]');
   const paymentTypeLabel = form.querySelector('[data-payment-type-label]');
   const paymentAmount = form.querySelector('[data-payment-amount]');
+  const paymentPaid = form.querySelector('[data-payment-paid]');
   const paymentDue = form.querySelector('[data-payment-due]');
+  const paymentDueWrap = form.querySelector('[data-payment-due-wrap]');
+  const paymentStatusLabel = form.querySelector('[data-payment-status-label]');
+  const paymentMethodLabel = form.querySelector('[data-payment-method-label]');
+  const paymentMethodWrap = form.querySelector('[data-payment-method-wrap]');
   const paymentStatusInputs = [...form.querySelectorAll('[name="payment_status"]')];
   const paymentMethodInputs = [...form.querySelectorAll('[name="payment_method"]')];
   const partialAmountInput = form.querySelector('[name="partial_amount"]');
   const paymentStatusValue = () =>
     form.querySelector('[name="payment_status"]:checked')?.value || 'unpaid';
   const paymentMethodValue = () =>
-    form.querySelector('[name="payment_method"]:checked')?.value || 'cash';
+    form.querySelector('[name="payment_method"]:checked')?.value || '';
   const money = (n) =>
     `${Number(n || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €`;
+  const paymentStatusText = (status) => {
+    const map = {
+      paid: paymentFields?.dataset.paymentStatusPaidLabel,
+      partial: paymentFields?.dataset.paymentStatusPartialLabel,
+      unpaid: paymentFields?.dataset.paymentStatusUnpaidLabel,
+    };
+    return map[status] || status;
+  };
+  const paymentMethodText = (method) => {
+    const map = {
+      cash: paymentFields?.dataset.paymentMethodCashLabel,
+      bank: paymentFields?.dataset.paymentMethodBankLabel,
+      other: paymentFields?.dataset.paymentMethodOtherLabel,
+    };
+    return map[method] || method;
+  };
 
   const syncTesseraPhoto = (src) => {
     if (!photoTarget) return;
@@ -1865,28 +1922,65 @@ function initMemberWizard() {
       }
       if (paymentTypeLabel) paymentTypeLabel.textContent = typeLabel || '—';
       const price = Number(opt?.dataset.price || 0);
+      const status = paymentStatusValue();
+      let paidAmt = 0;
+      let due = price;
+      if (status === 'paid') {
+        paidAmt = price;
+        due = 0;
+      } else if (status === 'partial') {
+        paidAmt = Math.max(0, Number(partialAmountInput?.value || 0));
+        due = Math.max(0, price - paidAmt);
+        if (partialAmountInput instanceof HTMLInputElement) {
+          partialAmountInput.max = String(price > 0 ? price : '');
+          if (price > 0 && paidAmt > price) {
+            partialAmountInput.value = String(price);
+            paidAmt = price;
+            due = 0;
+          }
+        }
+      }
       if (paymentAmount) {
         paymentAmount.textContent = money(price);
       }
+      if (paymentPaid) {
+        paymentPaid.textContent = money(paidAmt);
+      }
       if (paymentDue) {
-        const status = paymentStatusValue();
-        let due = price;
-        if (status === 'paid') {
-          due = 0;
-        } else if (status === 'partial') {
-          const paid = Math.max(0, Number(partialAmountInput?.value || 0));
-          due = Math.max(0, price - paid);
-          if (partialAmountInput instanceof HTMLInputElement) {
-            partialAmountInput.max = String(price > 0 ? price : '');
-            if (price > 0 && paid > price) {
-              partialAmountInput.value = String(price);
-              due = 0;
-            }
-          }
-        }
         paymentDue.textContent = money(due);
         paymentDue.classList.toggle('stat-negative', due > 0);
         paymentDue.classList.toggle('stat-positive', due <= 0);
+      }
+      paymentDueWrap?.classList.toggle('is-settled', due <= 0);
+    }
+    const status = paymentStatusValue();
+    if (paymentStatusLabel) {
+      paymentStatusLabel.hidden = false;
+      paymentStatusLabel.textContent = paymentStatusText(status);
+      paymentStatusLabel.classList.remove('is-paid', 'is-partial', 'is-unpaid');
+      paymentStatusLabel.classList.add(`is-${status}`);
+    }
+    const needsMethod = status === 'paid' || status === 'partial';
+    if (paymentMethodWrap) {
+      paymentMethodWrap.hidden = !needsMethod;
+      paymentMethodInputs.forEach((input) => {
+        if (input instanceof HTMLInputElement) {
+          input.required = needsMethod;
+          if (!needsMethod) input.classList.remove('input-invalid');
+        }
+      });
+    }
+    if (paymentMethodLabel) {
+      const method = paymentMethodValue();
+      if (needsMethod && method) {
+        const prefix = paymentFields?.dataset.paymentMethodPrefix || '';
+        paymentMethodLabel.hidden = false;
+        paymentMethodLabel.textContent = prefix
+          ? `${prefix}: ${paymentMethodText(method)}`
+          : paymentMethodText(method);
+      } else {
+        paymentMethodLabel.hidden = true;
+        paymentMethodLabel.textContent = '';
       }
     }
     const livePhoto = form.querySelector('.photo-upload .photo-preview, .photo-field .photo-preview');
@@ -2015,7 +2109,10 @@ function initMemberWizard() {
     });
   });
   paymentMethodInputs.forEach((input) => {
-    input.addEventListener('change', () => syncChoiceCards(paymentMethodInputs));
+    input.addEventListener('change', () => {
+      syncChoiceCards(paymentMethodInputs);
+      syncCard();
+    });
   });
   syncGuardianRequirement();
   syncTreasuryNote();
@@ -2314,7 +2411,11 @@ function initMembersList() {
 
   const syncBulkBar = () => {
     const ids = selectedIds();
-    if (bulkBar) bulkBar.hidden = ids.length === 0;
+    const open = ids.length > 0;
+    if (bulkBar) {
+      bulkBar.classList.toggle('is-open', open);
+      bulkBar.setAttribute('aria-hidden', open ? 'false' : 'true');
+    }
     if (bulkCount) bulkCount.textContent = String(ids.length);
     if (selectAll) {
       selectAll.indeterminate = ids.length > 0 && ids.length < checkboxes.length;
@@ -3542,10 +3643,12 @@ function initPhotoCapture(form) {
 
 function debounce(fn, wait = 280) {
   let t;
-  return (...args) => {
+  const wrapped = (...args) => {
     clearTimeout(t);
     t = setTimeout(() => fn(...args), wait);
   };
+  wrapped.cancel = () => clearTimeout(t);
+  return wrapped;
 }
 
 function initLogoFilePickers(scope = document) {
@@ -8229,10 +8332,15 @@ function fillGeoCapFromCityItem(scope, item) {
   if (!scope || !item || scope.dataset.geoForeign === '1') return;
   const postalInput = scope.querySelector('[data-postal-code]');
   if (!(postalInput instanceof HTMLInputElement)) return;
-  const cap = String(item.cap || item.postal_code || '').replace(/\D+/g, '');
+  // Prefer an explicit 5-digit CAP; if the registry has a range/list, take the first valid one.
+  const raw = String(item.cap || item.postal_code || '');
+  const match = raw.match(/\d{5}/);
+  const cap = match ? match[0] : raw.replace(/\D+/g, '');
   if (cap.length !== 5) return;
   const current = postalInput.value.replace(/\D+/g, '');
-  if (current !== '' && current !== cap) return;
+  // Always sync CAP from the validated city when empty or still matching the previous expected CAP.
+  const expected = String(scope.dataset.geoExpectedCap || '').replace(/\D+/g, '');
+  if (current !== '' && current !== cap && current !== expected) return;
   postalInput.value = cap;
   postalInput.dataset.geoPicked = '1';
   postalInput.setCustomValidity('');

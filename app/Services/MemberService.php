@@ -1247,7 +1247,7 @@ final class MemberService
         $offset = max(0, ($page - 1) * $perPage);
         $items = $this->db->fetchAll(
             "SELECT m.*, mt.name_json AS type_name_json, mt.price AS type_price,
-                    mp.label AS period_label
+                    mp.label AS period_label, mp.ends_on AS period_ends_on
              FROM members m
              INNER JOIN member_types mt ON mt.id = m.member_type_id
              INNER JOIN membership_periods mp ON mp.id = m.membership_period_id

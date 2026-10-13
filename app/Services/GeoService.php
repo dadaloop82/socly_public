@@ -716,21 +716,22 @@ final class GeoService
         if ($norm === '') {
             return null;
         }
+        // Use a list (not assoc keys): PHP casts numeric string keys like "39100" to int.
         $caps = [];
         foreach ($this->comuni() as $row) {
             if ($this->normalizePlace((string) ($row['nome'] ?? '')) !== $norm) {
                 continue;
             }
             $cap = preg_replace('/\D+/', '', (string) ($row['cap'] ?? '')) ?? '';
-            if (strlen($cap) === 5) {
-                $caps[$cap] = true;
+            if (strlen($cap) === 5 && !in_array($cap, $caps, true)) {
+                $caps[] = $cap;
             }
         }
         if (count($caps) !== 1) {
             return null;
         }
 
-        return array_key_first($caps);
+        return $caps[0];
     }
 
     /** @param array{nome:string,belfiore:string,provincia:string,cap:string} $row */
