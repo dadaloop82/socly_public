@@ -38,16 +38,16 @@ $formOpen = $old !== [];
 
 <form class="panel filter-bar members-filter" method="get" action="<?= e(url('/documents')) ?>" role="search" style="margin-bottom:1rem">
     <label class="visually-hidden" for="doc-archive-q-top"><?= e(__('documents.search')) ?></label>
-    <input
-        id="doc-archive-q-top"
-        class="members-filter-q"
-        type="search"
-        name="q"
-        value="<?= e((string) ($search_query ?? '')) ?>"
-        placeholder="<?= e(__('documents.search_placeholder')) ?>"
-        maxlength="120"
-        autocomplete="off"
-    >
+    <?= field('search', [
+        'name' => 'q',
+        'id' => 'doc-archive-q-top',
+        'label' => '',
+        'value' => (string) ($search_query ?? ''),
+        'context' => 'filter',
+        'placeholder' => (string) __('documents.search_placeholder'),
+        'input_class' => 'members-filter-q',
+        'maxlength' => 120,
+    ]) ?>
     <button class="btn btn-sm" type="submit"><?= e(__('documents.search')) ?></button>
     <?php if (trim((string) ($search_query ?? '')) !== ''): ?>
         <a class="btn btn-ghost btn-sm" href="<?= e(url('/documents')) ?>"><?= e(__('documents.search_clear')) ?></a>
@@ -78,8 +78,16 @@ $formOpen = $old !== [];
         data-msg-change="<?= e(__('documents.change_file')) ?>"
     >
         <?= csrf_field() ?>
-        <input type="hidden" name="uploaded_path" value="<?= e((string) ($values['uploaded_path'] ?? '')) ?>" data-doc-uploaded-path>
-        <input type="hidden" name="uploaded_mime" value="<?= e((string) ($values['uploaded_mime'] ?? '')) ?>" data-doc-uploaded-mime>
+        <?= field('hidden', [
+            'name' => 'uploaded_path',
+            'value' => (string) ($values['uploaded_path'] ?? ''),
+            'attrs' => ['data-doc-uploaded-path' => true],
+        ]) ?>
+        <?= field('hidden', [
+            'name' => 'uploaded_mime',
+            'value' => (string) ($values['uploaded_mime'] ?? ''),
+            'attrs' => ['data-doc-uploaded-mime' => true],
+        ]) ?>
         <?php
         $has_existing_file = false;
         require __DIR__ . '/_form_fields.php';

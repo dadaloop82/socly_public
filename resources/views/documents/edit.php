@@ -54,8 +54,16 @@ $docId = (int) ($document['id'] ?? 0);
     data-msg-change="<?= e(__('documents.change_file')) ?>"
 >
     <?= csrf_field() ?>
-    <input type="hidden" name="uploaded_path" value="<?= e((string) ($values['uploaded_path'] ?? '')) ?>" data-doc-uploaded-path>
-    <input type="hidden" name="uploaded_mime" value="<?= e((string) ($values['uploaded_mime'] ?? '')) ?>" data-doc-uploaded-mime>
+    <?= field('hidden', [
+        'name' => 'uploaded_path',
+        'value' => (string) ($values['uploaded_path'] ?? ''),
+        'attrs' => ['data-doc-uploaded-path' => true],
+    ]) ?>
+    <?= field('hidden', [
+        'name' => 'uploaded_mime',
+        'value' => (string) ($values['uploaded_mime'] ?? ''),
+        'attrs' => ['data-doc-uploaded-mime' => true],
+    ]) ?>
     <div class="panel-header">
         <div>
             <h2 class="section-title"><?= e((string) ($document['title'] ?? __('documents.edit'))) ?></h2>

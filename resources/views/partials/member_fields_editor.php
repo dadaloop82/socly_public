@@ -112,52 +112,91 @@ $renderFieldRow = static function (
             <?php else: ?>
                 <span class="setup-fields-drag-locked" title="<?= e(__('setup.fields_system_locked')) ?>" aria-hidden="true">•</span>
             <?php endif; ?>
-            <input type="hidden" name="field_order[]" value="<?= e($fkey) ?>">
-            <input type="hidden" name="field_step[<?= e($fkey) ?>]" value="<?= e($stepKey) ?>" data-field-step-input>
+            <?= field('hidden', ['name' => 'field_order[]', 'value' => $fkey]) ?>
+            <?= field('hidden', [
+                'name' => 'field_step[' . $fkey . ']',
+                'value' => $stepKey,
+                'attrs' => ['data-field-step-input' => true],
+            ]) ?>
         </td>
         <th scope="row"><span class="setup-fields-name"><?= e($flabel) ?></span></th>
         <?php if (!$setupMode): ?>
         <td>
             <?php if (!$allowTypeEdit || $lockedType !== null): ?>
-                <input type="hidden" name="field_types[<?= e($fkey) ?>]" value="<?= e($lockedType ?? $resolvedType) ?>">
+                <?= field('hidden', ['name' => 'field_types[' . $fkey . ']', 'value' => $lockedType ?? $resolvedType]) ?>
                 <span class="setup-fields-type-locked" title="<?= e(\Socly\Support\MemberFieldTypes::description($lockedType ?? $resolvedType)) ?>">
                     <?= e(\Socly\Support\MemberFieldTypes::label($lockedType ?? $resolvedType)) ?>
                 </span>
             <?php else: ?>
-                <label class="setup-fields-type">
-                    <select name="field_types[<?= e($fkey) ?>]" aria-label="<?= e(__('setup.fields_col_type') . ': ' . $flabel) ?>">
-                        <?php foreach ($typeOptions as $opt): ?>
-                            <option value="<?= e($opt) ?>" <?= $resolvedType === $opt ? 'selected' : '' ?>><?= e(\Socly\Support\MemberFieldTypes::label($opt)) ?></option>
-                        <?php endforeach; ?>
-                    </select>
-                </label>
+                <?= field('select', [
+                    'name' => 'field_types[' . $fkey . ']',
+                    'label' => '',
+                    'context' => 'inline',
+                    'wrapper_class' => 'setup-fields-type',
+                    'include_empty' => false,
+                    'value' => $resolvedType,
+                    'options' => array_map(
+                        static fn (string $opt): array => [
+                            'value' => $opt,
+                            'label' => \Socly\Support\MemberFieldTypes::label($opt),
+                        ],
+                        $typeOptions
+                    ),
+                    'attrs' => ['aria-label' => __('setup.fields_col_type') . ': ' . $flabel],
+                ]) ?>
             <?php endif; ?>
         </td>
         <?php else: ?>
-            <input type="hidden" name="field_types[<?= e($fkey) ?>]" value="<?= e($lockedType ?? $resolvedType) ?>">
+            <?= field('hidden', ['name' => 'field_types[' . $fkey . ']', 'value' => $lockedType ?? $resolvedType]) ?>
         <?php endif; ?>
         <td class="setup-fields-col-check">
             <?php if ($coreLocked): ?>
-                <input type="hidden" name="fields[]" value="<?= e($fkey) ?>">
-                <label class="setup-fields-toggle is-locked" title="<?= e(__('setup.fields_core_locked')) ?>">
-                    <input type="checkbox" checked disabled aria-label="<?= e(__('setup.fields_col_enabled') . ': ' . $flabel) ?>">
-                </label>
+                <?= field('hidden', ['name' => 'fields[]', 'value' => $fkey]) ?>
+                <?= field('checkbox', [
+                    'name' => '',
+                    'label' => '',
+                    'checked' => true,
+                    'disabled' => true,
+                    'context' => 'inline',
+                    'wrapper_class' => 'setup-fields-toggle is-locked',
+                    'wrap_attrs' => ['title' => (string) __('setup.fields_core_locked')],
+                    'attrs' => ['aria-label' => __('setup.fields_col_enabled') . ': ' . $flabel],
+                ]) ?>
             <?php else: ?>
-                <label class="setup-fields-toggle">
-                    <input type="checkbox" name="fields[]" value="<?= e($fkey) ?>" <?= $enabledChecked ? 'checked' : '' ?> aria-label="<?= e(__('setup.fields_col_enabled') . ': ' . $flabel) ?>">
-                </label>
+                <?= field('checkbox', [
+                    'name' => 'fields[]',
+                    'check_value' => $fkey,
+                    'label' => '',
+                    'checked' => $enabledChecked,
+                    'context' => 'inline',
+                    'wrapper_class' => 'setup-fields-toggle',
+                    'attrs' => ['aria-label' => __('setup.fields_col_enabled') . ': ' . $flabel],
+                ]) ?>
             <?php endif; ?>
         </td>
         <td class="setup-fields-col-check">
             <?php if ($coreLocked): ?>
-                <input type="hidden" name="required[]" value="<?= e($fkey) ?>">
-                <label class="setup-fields-toggle is-locked" title="<?= e(__('setup.fields_core_locked')) ?>">
-                    <input type="checkbox" checked disabled aria-label="<?= e(__('setup.fields_col_required') . ': ' . $flabel) ?>">
-                </label>
+                <?= field('hidden', ['name' => 'required[]', 'value' => $fkey]) ?>
+                <?= field('checkbox', [
+                    'name' => '',
+                    'label' => '',
+                    'checked' => true,
+                    'disabled' => true,
+                    'context' => 'inline',
+                    'wrapper_class' => 'setup-fields-toggle is-locked',
+                    'wrap_attrs' => ['title' => (string) __('setup.fields_core_locked')],
+                    'attrs' => ['aria-label' => __('setup.fields_col_required') . ': ' . $flabel],
+                ]) ?>
             <?php else: ?>
-                <label class="setup-fields-toggle">
-                    <input type="checkbox" name="required[]" value="<?= e($fkey) ?>" <?= $requiredChecked ? 'checked' : '' ?> aria-label="<?= e(__('setup.fields_col_required') . ': ' . $flabel) ?>">
-                </label>
+                <?= field('checkbox', [
+                    'name' => 'required[]',
+                    'check_value' => $fkey,
+                    'label' => '',
+                    'checked' => $requiredChecked,
+                    'context' => 'inline',
+                    'wrapper_class' => 'setup-fields-toggle',
+                    'attrs' => ['aria-label' => __('setup.fields_col_required') . ': ' . $flabel],
+                ]) ?>
             <?php endif; ?>
         </td>
     </tr>
@@ -249,26 +288,53 @@ foreach ($editorSteps as $s) {
                     <?php endif; ?>
                 </header>
                 <?php if (!$isSystem): ?>
-                    <input type="hidden" name="form_steps[]" value="<?= e($stepKey) ?>" data-step-key-input>
+                    <?= field('hidden', [
+                        'name' => 'form_steps[]',
+                        'value' => $stepKey,
+                        'attrs' => ['data-step-key-input' => true],
+                    ]) ?>
                     <?php if (!$setupMode): ?>
                         <div class="setup-fields-step-titles">
                             <label class="setup-field">
                                 <span><?= e(__('setup.fields_step_title_it')) ?></span>
-                                <input type="text" name="form_step_title_it[<?= e($stepKey) ?>]" value="<?= e($titleIt) ?>" data-step-title="it" required>
+                                <?= field('text', [
+                                    'name' => 'form_step_title_it[' . $stepKey . ']',
+                                    'label' => '',
+                                    'context' => 'inline',
+                                    'value' => $titleIt,
+                                    'required' => true,
+                                    'attrs' => ['data-step-title' => 'it'],
+                                ]) ?>
                             </label>
                             <label class="setup-field">
                                 <span><?= e(__('setup.fields_step_title_de')) ?></span>
-                                <input type="text" name="form_step_title_de[<?= e($stepKey) ?>]" value="<?= e($titleDe) ?>" data-step-title="de">
+                                <?= field('text', [
+                                    'name' => 'form_step_title_de[' . $stepKey . ']',
+                                    'label' => '',
+                                    'context' => 'inline',
+                                    'value' => $titleDe,
+                                    'attrs' => ['data-step-title' => 'de'],
+                                ]) ?>
                             </label>
                             <label class="setup-field">
                                 <span><?= e(__('setup.fields_step_title_en')) ?></span>
-                                <input type="text" name="form_step_title_en[<?= e($stepKey) ?>]" value="<?= e($titleEn) ?>" data-step-title="en">
+                                <?= field('text', [
+                                    'name' => 'form_step_title_en[' . $stepKey . ']',
+                                    'label' => '',
+                                    'context' => 'inline',
+                                    'value' => $titleEn,
+                                    'attrs' => ['data-step-title' => 'en'],
+                                ]) ?>
                             </label>
                         </div>
                     <?php else: ?>
-                        <input type="hidden" name="form_step_title_it[<?= e($stepKey) ?>]" value="<?= e($titleIt !== '' ? $titleIt : $displayTitle) ?>" data-step-title="it">
-                        <input type="hidden" name="form_step_title_de[<?= e($stepKey) ?>]" value="<?= e($titleDe) ?>">
-                        <input type="hidden" name="form_step_title_en[<?= e($stepKey) ?>]" value="<?= e($titleEn) ?>">
+                        <?= field('hidden', [
+                            'name' => 'form_step_title_it[' . $stepKey . ']',
+                            'value' => $titleIt !== '' ? $titleIt : $displayTitle,
+                            'attrs' => ['data-step-title' => 'it'],
+                        ]) ?>
+                        <?= field('hidden', ['name' => 'form_step_title_de[' . $stepKey . ']', 'value' => $titleDe]) ?>
+                        <?= field('hidden', ['name' => 'form_step_title_en[' . $stepKey . ']', 'value' => $titleEn]) ?>
                     <?php endif; ?>
                 <?php endif; ?>
                 <div class="setup-fields-table-wrap">
@@ -360,66 +426,85 @@ foreach ($editorSteps as $s) {
                                                 <?php if (!isset($addressBundleFields[$addrKey])) {
                                                     continue;
                                                 } ?>
-                                                <input type="hidden" name="field_order[]" value="<?= e($addrKey) ?>">
-                                                <input type="hidden" name="field_step[<?= e($addrKey) ?>]" value="<?= e($bundleStep) ?>" data-field-step-input>
-                                                <input type="hidden" name="field_types[<?= e($addrKey) ?>]" value="<?= e((string) ($addressBundleFields[$addrKey]['field_type'] ?? $addrKey)) ?>">
+                                                <?= field('hidden', ['name' => 'field_order[]', 'value' => $addrKey]) ?>
+                                                <?= field('hidden', [
+                                                    'name' => 'field_step[' . $addrKey . ']',
+                                                    'value' => $bundleStep,
+                                                    'attrs' => ['data-field-step-input' => true],
+                                                ]) ?>
+                                                <?= field('hidden', [
+                                                    'name' => 'field_types[' . $addrKey . ']',
+                                                    'value' => (string) ($addressBundleFields[$addrKey]['field_type'] ?? $addrKey),
+                                                ]) ?>
                                             <?php endforeach; ?>
                                         </td>
                                         <th scope="row">
                                             <span class="setup-fields-name"><?= e(__('setup.fields_address_bundle')) ?></span>
                                         </th>
                                         <td class="setup-fields-col-check">
-                                            <label class="setup-fields-toggle">
-                                                <input
-                                                    type="checkbox"
-                                                    data-address-bundle-enabled
-                                                    <?= $bundleEnabled ? 'checked' : '' ?>
-                                                    aria-label="<?= e(__('setup.fields_col_enabled') . ': ' . __('setup.fields_address_bundle')) ?>"
-                                                >
-                                            </label>
+                                            <?= field('checkbox', [
+                                                'name' => '',
+                                                'label' => '',
+                                                'checked' => $bundleEnabled,
+                                                'context' => 'inline',
+                                                'wrapper_class' => 'setup-fields-toggle',
+                                                'attrs' => [
+                                                    'data-address-bundle-enabled' => true,
+                                                    'aria-label' => __('setup.fields_col_enabled') . ': ' . __('setup.fields_address_bundle'),
+                                                ],
+                                            ]) ?>
                                             <?php foreach ($addressBundleKeys as $addrKey): ?>
                                                 <?php if (!isset($addressBundleFields[$addrKey])) {
                                                     continue;
                                                 } ?>
-                                                <input
-                                                    type="checkbox"
-                                                    class="setup-fields-bundle-sync"
-                                                    name="fields[]"
-                                                    value="<?= e($addrKey) ?>"
-                                                    data-address-bundle-field="enabled"
-                                                    <?= $bundleEnabled ? 'checked' : '' ?>
-                                                    hidden
-                                                    tabindex="-1"
-                                                    aria-hidden="true"
-                                                >
+                                                <?= field('checkbox', [
+                                                    'name' => 'fields[]',
+                                                    'check_value' => $addrKey,
+                                                    'label' => '',
+                                                    'checked' => $bundleEnabled,
+                                                    'context' => 'inline',
+                                                    'input_class' => 'setup-fields-bundle-sync',
+                                                    'attrs' => [
+                                                        'data-address-bundle-field' => 'enabled',
+                                                        'hidden' => true,
+                                                        'tabindex' => '-1',
+                                                        'aria-hidden' => 'true',
+                                                    ],
+                                                ]) ?>
                                             <?php endforeach; ?>
                                         </td>
                                         <td class="setup-fields-col-check">
-                                            <label class="setup-fields-toggle">
-                                                <input
-                                                    type="checkbox"
-                                                    data-address-bundle-required
-                                                    <?= $bundleRequired ? 'checked' : '' ?>
-                                                    <?= $bundleEnabled ? '' : 'disabled' ?>
-                                                    aria-label="<?= e(__('setup.fields_col_required') . ': ' . __('setup.fields_address_bundle')) ?>"
-                                                >
-                                            </label>
+                                            <?= field('checkbox', [
+                                                'name' => '',
+                                                'label' => '',
+                                                'checked' => $bundleRequired,
+                                                'disabled' => !$bundleEnabled,
+                                                'context' => 'inline',
+                                                'wrapper_class' => 'setup-fields-toggle',
+                                                'attrs' => [
+                                                    'data-address-bundle-required' => true,
+                                                    'aria-label' => __('setup.fields_col_required') . ': ' . __('setup.fields_address_bundle'),
+                                                ],
+                                            ]) ?>
                                             <?php foreach ($addressBundleKeys as $addrKey): ?>
                                                 <?php if (!isset($addressBundleFields[$addrKey])) {
                                                     continue;
                                                 } ?>
-                                                <input
-                                                    type="checkbox"
-                                                    class="setup-fields-bundle-sync"
-                                                    name="required[]"
-                                                    value="<?= e($addrKey) ?>"
-                                                    data-address-bundle-field="required"
-                                                    <?= $bundleRequired ? 'checked' : '' ?>
-                                                    <?= $bundleEnabled ? '' : 'disabled' ?>
-                                                    hidden
-                                                    tabindex="-1"
-                                                    aria-hidden="true"
-                                                >
+                                                <?= field('checkbox', [
+                                                    'name' => 'required[]',
+                                                    'check_value' => $addrKey,
+                                                    'label' => '',
+                                                    'checked' => $bundleRequired,
+                                                    'disabled' => !$bundleEnabled,
+                                                    'context' => 'inline',
+                                                    'input_class' => 'setup-fields-bundle-sync',
+                                                    'attrs' => [
+                                                        'data-address-bundle-field' => 'required',
+                                                        'hidden' => true,
+                                                        'tabindex' => '-1',
+                                                        'aria-hidden' => 'true',
+                                                    ],
+                                                ]) ?>
                                             <?php endforeach; ?>
                                         </td>
                                     </tr>
@@ -462,19 +547,42 @@ foreach ($editorSteps as $s) {
                     <?= e(__('setup.fields_remove_step')) ?>
                 </button>
             </header>
-            <input type="hidden" name="form_steps[]" value="__KEY__" data-step-key-input>
+            <?= field('hidden', [
+                'name' => 'form_steps[]',
+                'value' => '__KEY__',
+                'attrs' => ['data-step-key-input' => true],
+            ]) ?>
             <div class="setup-fields-step-titles">
                 <label class="setup-field">
                     <span><?= e(__('setup.fields_step_title_it')) ?></span>
-                    <input type="text" name="form_step_title_it[__KEY__]" value="" data-step-title="it" required>
+                    <?= field('text', [
+                        'name' => 'form_step_title_it[__KEY__]',
+                        'label' => '',
+                        'context' => 'inline',
+                        'value' => '',
+                        'required' => true,
+                        'attrs' => ['data-step-title' => 'it'],
+                    ]) ?>
                 </label>
                 <label class="setup-field">
                     <span><?= e(__('setup.fields_step_title_de')) ?></span>
-                    <input type="text" name="form_step_title_de[__KEY__]" value="" data-step-title="de">
+                    <?= field('text', [
+                        'name' => 'form_step_title_de[__KEY__]',
+                        'label' => '',
+                        'context' => 'inline',
+                        'value' => '',
+                        'attrs' => ['data-step-title' => 'de'],
+                    ]) ?>
                 </label>
                 <label class="setup-field">
                     <span><?= e(__('setup.fields_step_title_en')) ?></span>
-                    <input type="text" name="form_step_title_en[__KEY__]" value="" data-step-title="en">
+                    <?= field('text', [
+                        'name' => 'form_step_title_en[__KEY__]',
+                        'label' => '',
+                        'context' => 'inline',
+                        'value' => '',
+                        'attrs' => ['data-step-title' => 'en'],
+                    ]) ?>
                 </label>
             </div>
             <div class="setup-fields-table-wrap">

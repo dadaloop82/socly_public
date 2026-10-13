@@ -80,15 +80,17 @@ $icons = [
                 data-enrollment-card
                 data-enrollment-value="<?= e($optVal) ?>"
             >
-                <input
-                    type="radio"
-                    name="<?= e($name) ?>"
-                    value="<?= e($optVal) ?>"
-                    data-enrollment-radio
-                    <?= $checked ? 'checked' : '' ?>
-                    <?= $otpBlocked ? 'disabled' : '' ?>
-                    <?= $attachRequired ? 'required' : '' ?>
-                >
+                <?= field('control', [
+                    'input_type' => 'radio',
+                    'name' => $name,
+                    'value' => $optVal,
+                    'attrs' => array_filter([
+                        'data-enrollment-radio' => true,
+                        'checked' => $checked,
+                        'disabled' => $otpBlocked,
+                        'required' => $attachRequired,
+                    ]),
+                ]) ?>
                 <span class="setup-enrollment-card-icon" aria-hidden="true"><?= $icon ?></span>
                 <span class="setup-enrollment-card-body">
                     <span class="setup-enrollment-card-title"><?= e($card['title']) ?></span>

@@ -1448,6 +1448,7 @@ return [
         'delete' => 'Delete',
         'yes' => 'Yes',
         'no' => 'No',
+        'choose_file' => 'Choose file',
         'password' => 'Password',
         'show_password' => 'Show password',
         'hide_password' => 'Hide password',

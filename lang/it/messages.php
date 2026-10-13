@@ -1882,6 +1882,7 @@ return [
         'delete' => 'Elimina',
         'yes' => 'Sì',
         'no' => 'No',
+        'choose_file' => 'Scegli file',
         'password' => 'Password',
         'show_password' => 'Mostra password',
         'hide_password' => 'Nascondi password',

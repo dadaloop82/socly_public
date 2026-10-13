@@ -83,12 +83,14 @@ $locales = [
             data-legal-panel="<?= e($code) ?>"
             <?= $first ? '' : 'hidden' ?>
         >
-            <textarea
-                name="<?= e($namePrefix) ?>_<?= e($code) ?>"
-                rows="5"
-                data-legal-textarea="<?= e($code) ?>"
-                <?= $code === 'it' && $placeholder !== '' ? 'placeholder="' . e($placeholder) . '"' : '' ?>
-            ><?= e((string) ($values[$code] ?? '')) ?></textarea>
+            <?= field('textarea', [
+                'name' => $namePrefix . '_' . $code,
+                'value' => (string) ($values[$code] ?? ''),
+                'rows' => 5,
+                'placeholder' => ($code === 'it' && $placeholder !== '') ? $placeholder : '',
+                'attrs' => ['data-legal-textarea' => $code],
+                'bare' => true,
+            ]) ?>
         </div>
     <?php $first = false; endforeach; ?>
 </div>

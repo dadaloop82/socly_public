@@ -1446,6 +1446,7 @@ return [
         'delete' => 'Löschen',
         'yes' => 'Ja',
         'no' => 'Nein',
+        'choose_file' => 'Datei wählen',
         'password' => 'Passwort',
         'show_password' => 'Passwort anzeigen',
         'hide_password' => 'Passwort verbergen',

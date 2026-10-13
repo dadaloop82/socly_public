@@ -42,19 +42,30 @@ $requireNew = $periodRows === [] || $needsCurrentYear;
                 <div class="setup-membership-card">
                     <p class="setup-period-label muted"><?= e((string) ($period['label'] ?? '')) ?></p>
                     <div class="setup-equal-row">
-                        <label class="setup-field">
-                            <span><?= e(__('install.starts_on')) ?> *</span>
-                            <input type="date" name="periods[<?= $pid ?>][starts_on]" value="<?= e((string) ($period['starts_on'] ?? '')) ?>" required data-period-start>
-                        </label>
-                        <label class="setup-field">
-                            <span><?= e(__('install.ends_on')) ?> *</span>
-                            <input type="date" name="periods[<?= $pid ?>][ends_on]" value="<?= e((string) ($period['ends_on'] ?? '')) ?>" required data-period-end>
-                        </label>
+                        <?= field('date', [
+                            'name' => 'periods[' . $pid . '][starts_on]',
+                            'label' => (string) __('install.starts_on'),
+                            'value' => (string) ($period['starts_on'] ?? ''),
+                            'required' => true,
+                            'context' => 'setup',
+                            'attrs' => ['data-period-start' => true],
+                        ]) ?>
+                        <?= field('date', [
+                            'name' => 'periods[' . $pid . '][ends_on]',
+                            'label' => (string) __('install.ends_on'),
+                            'value' => (string) ($period['ends_on'] ?? ''),
+                            'required' => true,
+                            'context' => 'setup',
+                            'attrs' => ['data-period-end' => true],
+                        ]) ?>
                     </div>
-                    <label class="setup-check setup-check-prominent">
-                        <input type="checkbox" name="periods[<?= $pid ?>][is_current]" value="1" <?= !empty($period['is_current']) ? 'checked' : '' ?>>
-                        <span><?= e(__('settings.is_current')) ?></span>
-                    </label>
+                    <?= field('checkbox', [
+                        'name' => 'periods[' . $pid . '][is_current]',
+                        'label' => (string) __('settings.is_current'),
+                        'checked' => !empty($period['is_current']),
+                        'context' => 'setup',
+                        'label_class' => 'checkbox-row setup-check setup-check-prominent',
+                    ]) ?>
                 </div>
             <?php endforeach; ?>
         </div>
@@ -65,18 +76,29 @@ $requireNew = $periodRows === [] || $needsCurrentYear;
     <?php endif; ?>
     <div class="setup-membership-card setup-membership-card-new">
         <div class="setup-equal-row">
-            <label class="setup-field">
-                <span><?= e(__('install.starts_on')) ?><?= $requireNew ? ' *' : '' ?></span>
-                <input type="date" name="starts_on" value="<?= e((string) $newDefaults['starts_on']) ?>" <?= $requireNew ? 'required' : '' ?> data-period-start>
-            </label>
-            <label class="setup-field">
-                <span><?= e(__('install.ends_on')) ?><?= $requireNew ? ' *' : '' ?></span>
-                <input type="date" name="ends_on" value="<?= e((string) $newDefaults['ends_on']) ?>" <?= $requireNew ? 'required' : '' ?> data-period-end>
-            </label>
+            <?= field('date', [
+                'name' => 'starts_on',
+                'label' => (string) __('install.starts_on'),
+                'value' => (string) $newDefaults['starts_on'],
+                'required' => $requireNew,
+                'context' => 'setup',
+                'attrs' => ['data-period-start' => true],
+            ]) ?>
+            <?= field('date', [
+                'name' => 'ends_on',
+                'label' => (string) __('install.ends_on'),
+                'value' => (string) $newDefaults['ends_on'],
+                'required' => $requireNew,
+                'context' => 'setup',
+                'attrs' => ['data-period-end' => true],
+            ]) ?>
         </div>
-        <label class="setup-check setup-check-prominent">
-            <input type="checkbox" name="is_current" value="1" <?= !empty($newDefaults['is_current']) ? 'checked' : '' ?>>
-            <span><?= e(__('settings.is_current')) ?></span>
-        </label>
+        <?= field('checkbox', [
+            'name' => 'is_current',
+            'label' => (string) __('settings.is_current'),
+            'checked' => !empty($newDefaults['is_current']),
+            'context' => 'setup',
+            'label_class' => 'checkbox-row setup-check setup-check-prominent',
+        ]) ?>
     </div>
 </div>

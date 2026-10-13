@@ -3,8 +3,16 @@
 
 <form method="post" action="<?= e(url('/password/forgot')) ?>">
     <?= csrf_field() ?>
-    <label for="email"><?= e(__('auth.email')) ?></label>
-    <input id="email" type="email" name="email" value="<?= e((string)old('email')) ?>" required autofocus autocomplete="username">
+    <?= field('email', [
+        'name' => 'email',
+        'id' => 'email',
+        'label' => (string) __('auth.email'),
+        'value' => (string) old('email'),
+        'required' => true,
+        'autocomplete' => 'username',
+        'input_class' => 'auth-field-control',
+        'attrs' => ['autofocus' => true],
+    ]) ?>
     <button class="btn btn-block" type="submit"><?= e(__('auth.forgot_submit')) ?></button>
 </form>
 <p class="auth-links" style="margin-top:1.1rem;justify-content:center">

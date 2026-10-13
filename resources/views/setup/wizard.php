@@ -183,10 +183,10 @@ $errorStep = flash('setup_error_step');
                 data-msg-field-required="<?= e(__('validation.required')) ?>"
             >
                 <?= csrf_field() ?>
-                <input type="hidden" name="step_index" value="<?= (int) $stepIndex ?>">
-                <input type="hidden" name="step_key" value="<?= e((string) ($step['key'] ?? '')) ?>">
-                <input type="hidden" name="setup_exit" value="0" data-setup-exit-flag>
-                <input type="hidden" name="setup_defer" value="0" data-setup-defer-flag>
+                <?= field('hidden', ['name' => 'step_index', 'value' => (string) (int) $stepIndex]) ?>
+                <?= field('hidden', ['name' => 'step_key', 'value' => (string) ($step['key'] ?? '')]) ?>
+                <?= field('hidden', ['name' => 'setup_exit', 'value' => '0', 'attrs' => ['data-setup-exit-flag' => true]]) ?>
+                <?= field('hidden', ['name' => 'setup_defer', 'value' => '0', 'attrs' => ['data-setup-defer-flag' => true]]) ?>
 
                 <div class="setup-form-scroll">
 
@@ -227,13 +227,15 @@ $errorStep = flash('setup_error_step');
                     <?php endif; ?>
                     <div class="setup-colors setup-color-picker-grid" data-setup-line>
                         <?php foreach ($step['fields'] as $field): ?>
-                            <label class="setup-field setup-color-picker-card">
-                                <span><?= e(__($field['label_key'])) ?></span>
-                                <span class="setup-color-picker-control">
-                                    <input type="color" name="<?= e($field['key']) ?>" value="<?= e((string) ($value[$field['key']] ?? '#0D6E66')) ?>" required data-brand-color="<?= e($field['key']) ?>">
-                                    <code><?= e(strtoupper((string) ($value[$field['key']] ?? '#0D6E66'))) ?></code>
-                                </span>
-                            </label>
+                            <?php $colorKey = (string) ($field['key'] ?? ''); ?>
+                            <?= field('color', [
+                                'name' => $colorKey,
+                                'label' => (string) __($field['label_key']),
+                                'value' => (string) ($value[$colorKey] ?? '#0D6E66'),
+                                'required' => true,
+                                'setup_brand' => true,
+                                'brand_key' => $colorKey,
+                            ]) ?>
                         <?php endforeach; ?>
                     </div>
                 <?php elseif ($stepType === 'logo'): ?>
@@ -256,11 +258,15 @@ $errorStep = flash('setup_error_step');
                             >
                         </div>
                         <div class="setup-logo-actions">
-                            <label class="btn btn-ghost file-btn">
-                                <span class="field-icon" data-icon="upload" aria-hidden="true"></span>
-                                <?= e(__('setup.logo_upload')) ?>
-                                <input type="file" accept="image/png,image/jpeg,image/webp,image/gif,image/svg+xml" data-setup-logo-input hidden>
-                            </label>
+                            <?= field('file', [
+                                'name' => '',
+                                'button_label' => (string) __('setup.logo_upload'),
+                                'accept' => 'image/png,image/jpeg,image/webp,image/gif,image/svg+xml',
+                                'context' => 'setup',
+                                'button_class' => 'btn btn-ghost file-btn',
+                                'icon' => 'upload',
+                                'attrs' => ['data-setup-logo-input' => true],
+                            ]) ?>
                             <button type="button" class="btn btn-ghost setup-logo-remove" data-setup-logo-remove<?= $hasLogo ? '' : ' hidden' ?>>
                                 <?= e(__('setup.logo_remove')) ?>
                             </button>
@@ -351,22 +357,24 @@ $errorStep = flash('setup_error_step');
                                         <p class="setup-runts-callout-text setup-runts-callout-promo" data-i18n="setup.runts_callout"><?= e(__('setup.runts_callout')) ?></p>
                                         <p class="setup-runts-callout-text setup-runts-callout-ok" data-i18n="setup.runts_callout_found" hidden><?= e(__('setup.runts_callout_found')) ?></p>
                                     </div>
-                                    <label class="setup-field setup-field-runts" for="setup-runts-number">
-                                        <span><?= e(__($field['label_key'])) ?></span>
-                                        <input
-                                            id="setup-runts-number"
-                                            type="text"
-                                            name="runts"
-                                            value="<?= e((string) ($value['runts'] ?? '')) ?>"
-                                            inputmode="numeric"
-                                            autocomplete="off"
-                                            spellcheck="false"
-                                            maxlength="6"
-                                            placeholder="<?= e(__('setup.field_runts_placeholder')) ?>"
-                                            data-setup-runts-input
-                                        >
-                                        <p class="setup-runts-hint" data-setup-runts-hint><?= e(__('setup.runts_hint')) ?></p>
-                                    </label>
+                                    <?= field('text', [
+                                        'id' => 'setup-runts-number',
+                                        'name' => 'runts',
+                                        'label' => (string) __($field['label_key']),
+                                        'value' => (string) ($value['runts'] ?? ''),
+                                        'context' => 'setup',
+                                        'wrapper_class' => 'setup-field-runts',
+                                        'inputmode' => 'numeric',
+                                        'autocomplete' => 'off',
+                                        'maxlength' => 6,
+                                        'placeholder' => (string) __('setup.field_runts_placeholder'),
+                                        'attrs' => [
+                                            'data-setup-runts-input' => true,
+                                            'spellcheck' => 'false',
+                                        ],
+                                        'hint' => (string) __('setup.runts_hint'),
+                                        'hint_attrs' => ['class' => 'setup-runts-hint', 'data-setup-runts-hint' => true],
+                                    ]) ?>
                                     <div class="setup-runts-actions">
                                         <button type="button" class="btn setup-scrape-btn" data-setup-runts-btn hidden disabled aria-hidden="true">
                                             <span data-setup-runts-label><?= e(__('setup.runts_button_fallback')) ?></span>
@@ -387,46 +395,60 @@ $errorStep = flash('setup_error_step');
                                 </div>
                                 <?php continue; ?>
                             <?php endif; ?>
-                            <label class="setup-field<?= $fieldKey === 'legal_name' ? ' setup-field-legal' : ($fieldKey === 'currency' ? ' setup-field-currency' : ($fieldKey === 'name_de' ? ' setup-field-name-de' : ' setup-field-name')) ?>">
-                                <span><?= e(__($field['label_key'])) ?><?= empty($field['required']) && $fieldKey === 'name_de' ? ' <span class="muted">(' . e(__('setup.optional_short')) . ')</span>' : '' ?></span>
-                                <?php if (($field['type'] ?? '') === 'select'): ?>
-                                    <?php $isCurrency = $fieldKey === 'currency'; ?>
-                                    <select name="<?= e($fieldKey) ?>" required maxlength="6" <?= $isCurrency ? '' : 'data-setup-legal-name' ?>>
-                                        <?php if (!$isCurrency): ?>
-                                            <option value="" disabled <?= (($value[$fieldKey] ?? '') === '') ? 'selected' : '' ?>><?= e(__('setup.legal_form_placeholder')) ?></option>
-                                        <?php endif; ?>
-                                        <?php foreach ($field['options'] as $opt): ?>
-                                            <?php
-                                                $optVal = (string) ($opt['value'] ?? '');
-                                                $meaning = $isCurrency
-                                                    ? ''
-                                                    : \Socly\Setup\AssociationLegalForms::bilingualMeaning($optVal);
-                                            ?>
-                                            <option
-                                                value="<?= e($optVal) ?>"
-                                                <?= (string) ($value[$fieldKey] ?? '') === $optVal ? 'selected' : '' ?>
-                                                <?php if (!$isCurrency): ?>data-meaning="<?= e($meaning) ?>"<?php endif; ?>
-                                            >
-                                                <?= e(\Socly\Setup\AssociationLegalForms::displayCode($optVal)) ?>
-                                            </option>
-                                        <?php endforeach; ?>
-                                    </select>
-                                <?php else: ?>
-                                    <input
-                                        type="text"
-                                        name="<?= e($fieldKey) ?>"
-                                        value="<?= e((string) ($value[$fieldKey] ?? '')) ?>"
-                                        <?= !empty($field['required']) ? 'required' : '' ?>
-                                        autocomplete="organization"
-                                        <?= $fieldKey === 'name' ? 'data-setup-assoc-name' : ($fieldKey === 'name_de' ? 'data-setup-assoc-name-de' : '') ?>
-                                    >
-                                    <?php if ($fieldKey === 'name'): ?>
-                                        <p class="setup-legal-meaning muted" data-setup-legal-meaning hidden></p>
-                                    <?php elseif ($fieldKey === 'name_de'): ?>
-                                        <p class="setup-field-hint muted"><?= e(__('setup.field_assoc_name_de_hint')) ?></p>
-                                    <?php endif; ?>
+                            <?php
+                            $pairWrapper = $fieldKey === 'legal_name' ? 'setup-field-legal' : ($fieldKey === 'currency' ? 'setup-field-currency' : ($fieldKey === 'name_de' ? 'setup-field-name-de' : 'setup-field-name'));
+                            $pairLabel = (string) __($field['label_key']);
+                            if (empty($field['required']) && $fieldKey === 'name_de') {
+                                $pairLabel .= ' (' . __('setup.optional_short') . ')';
+                            }
+                            ?>
+                            <?php if (($field['type'] ?? '') === 'select'): ?>
+                                <?php
+                                $isCurrency = $fieldKey === 'currency';
+                                $selectOptions = [];
+                                foreach ($field['options'] as $opt) {
+                                    $optVal = (string) ($opt['value'] ?? '');
+                                    $selectOptions[] = [
+                                        'value' => $optVal,
+                                        'label' => $isCurrency ? $optVal : \Socly\Setup\AssociationLegalForms::displayCode($optVal),
+                                        'attrs' => $isCurrency ? [] : ['data-meaning' => \Socly\Setup\AssociationLegalForms::bilingualMeaning($optVal)],
+                                    ];
+                                }
+                                ?>
+                                <?= field('select', [
+                                    'name' => $fieldKey,
+                                    'label' => $pairLabel,
+                                    'value' => (string) ($value[$fieldKey] ?? ''),
+                                    'required' => true,
+                                    'context' => 'setup',
+                                    'wrapper_class' => $pairWrapper,
+                                    'options' => $selectOptions,
+                                    'include_empty' => !$isCurrency,
+                                    'empty_label' => (string) __('setup.legal_form_placeholder'),
+                                    'attrs' => array_filter([
+                                        'data-setup-legal-name' => $isCurrency ? false : true,
+                                        'maxlength' => '6',
+                                    ]),
+                                ]) ?>
+                            <?php else: ?>
+                                <?= field('text', [
+                                    'name' => $fieldKey,
+                                    'label' => $pairLabel,
+                                    'value' => (string) ($value[$fieldKey] ?? ''),
+                                    'required' => !empty($field['required']),
+                                    'context' => 'setup',
+                                    'wrapper_class' => $pairWrapper,
+                                    'autocomplete' => 'organization',
+                                    'attrs' => array_filter([
+                                        'data-setup-assoc-name' => $fieldKey === 'name' ? true : false,
+                                        'data-setup-assoc-name-de' => $fieldKey === 'name_de' ? true : false,
+                                    ]),
+                                    'hint' => $fieldKey === 'name_de' ? (string) __('setup.field_assoc_name_de_hint') : '',
+                                ]) ?>
+                                <?php if ($fieldKey === 'name'): ?>
+                                    <p class="setup-legal-meaning muted" data-setup-legal-meaning hidden></p>
                                 <?php endif; ?>
-                            </label>
+                            <?php endif; ?>
                         <?php endforeach; ?>
                         <p class="setup-hint setup-full-name-preview muted" data-setup-full-name-preview hidden></p>
                     </div>
@@ -448,63 +470,86 @@ $errorStep = flash('setup_error_step');
                     >
                         <?php foreach ($step['fields'] as $field): ?>
                             <?php $fieldType = (string) ($field['type'] ?? 'text'); ?>
+                            <?php
+                            $fgKey = (string) ($field['key'] ?? '');
+                            $fgLabel = (string) __($field['label_key']);
+                            $fgRequired = !empty($field['required']);
+                            $fgValue = (string) ($value[$fgKey] ?? '');
+                            ?>
                             <?php if ($fieldType === 'tel'): ?>
-                                <div class="setup-field">
-                                    <span><?= e(__($field['label_key'])) ?><?= !empty($field['required']) ? ' *' : '' ?></span>
-                                    <?= view_partial('partials/phone_field', [
-                                        'name' => (string) ($field['key'] ?? 'phone'),
-                                        'value' => (string) ($value[$field['key']] ?? ''),
-                                        'required' => !empty($field['required']),
-                                    ]) ?>
-                                </div>
+                                <?= field('phone', [
+                                    'name' => $fgKey !== '' ? $fgKey : 'phone',
+                                    'label' => $fgLabel,
+                                    'value' => $fgValue,
+                                    'required' => $fgRequired,
+                                    'context' => 'setup',
+                                ]) ?>
+                            <?php elseif ($fieldType === 'email' || $fgKey === 'pec'): ?>
+                                <?= field('email', [
+                                    'name' => $fgKey,
+                                    'label' => $fgLabel,
+                                    'value' => $fgValue,
+                                    'required' => $fgRequired,
+                                    'context' => 'setup',
+                                    'autocomplete' => (string) ($field['autocomplete'] ?? 'off'),
+                                    'placeholder' => $fgKey === 'pec'
+                                        ? (string) __('setup.field_pec_placeholder')
+                                        : (string) __('setup.field_email_placeholder'),
+                                    'attrs' => [
+                                        'data-setup-' . ($fgKey === 'pec' ? 'pec' : 'email') => true,
+                                        'spellcheck' => 'false',
+                                    ],
+                                ]) ?>
+                            <?php elseif ($fgKey === 'fiscal_code'): ?>
+                                <?= field('text', [
+                                    'name' => $fgKey,
+                                    'label' => $fgLabel,
+                                    'value' => $fgValue,
+                                    'required' => $fgRequired,
+                                    'context' => 'setup',
+                                    'maxlength' => 16,
+                                    'minlength' => 11,
+                                    'placeholder' => (string) __('setup.field_fiscal_code_placeholder'),
+                                    'attrs' => [
+                                        'data-setup-fiscal-code' => true,
+                                        'inputmode' => 'text',
+                                        'spellcheck' => 'false',
+                                        'autocapitalize' => 'characters',
+                                        'title' => (string) __('setup.tax_fiscal_invalid'),
+                                    ],
+                                ]) ?>
+                                <p class="setup-hint muted" data-setup-fiscal-hint hidden></p>
+                            <?php elseif ($fgKey === 'vat_number'): ?>
+                                <?= field('text', [
+                                    'name' => $fgKey,
+                                    'label' => $fgLabel,
+                                    'value' => $fgValue,
+                                    'required' => $fgRequired,
+                                    'context' => 'setup',
+                                    'maxlength' => 13,
+                                    'placeholder' => (string) __('setup.field_vat_placeholder'),
+                                    'attrs' => [
+                                        'data-setup-vat-number' => true,
+                                        'inputmode' => 'numeric',
+                                        'spellcheck' => 'false',
+                                        'title' => (string) __('setup.field_vat_placeholder'),
+                                    ],
+                                ]) ?>
+                                <p class="setup-hint muted" data-setup-vat-hint hidden></p>
                             <?php else: ?>
-                            <label class="setup-field">
-                                <span><?= e(__($field['label_key'])) ?><?= !empty($field['required']) ? ' *' : '' ?></span>
-                                <input
-                                    type="<?= e($fieldType === 'email' ? 'email' : 'text') ?>"
-                                    name="<?= e($field['key']) ?>"
-                                    value="<?= e((string) ($value[$field['key']] ?? '')) ?>"
-                                    <?= !empty($field['required']) ? 'required' : '' ?>
-                                    autocomplete="<?= e((string) ($field['autocomplete'] ?? 'off')) ?>"
-                                    <?php if (($field['key'] ?? '') === 'fiscal_code'): ?>
-                                        maxlength="16"
-                                        minlength="11"
-                                        inputmode="text"
-                                        spellcheck="false"
-                                        autocapitalize="characters"
-                                        data-setup-fiscal-code
-                                        placeholder="<?= e(__('setup.field_fiscal_code_placeholder')) ?>"
-                                        title="<?= e(__('setup.tax_fiscal_invalid')) ?>"
-                                    <?php elseif (($field['key'] ?? '') === 'vat_number'): ?>
-                                        maxlength="13"
-                                        inputmode="numeric"
-                                        spellcheck="false"
-                                        data-setup-vat-number
-                                        placeholder="<?= e(__('setup.field_vat_placeholder')) ?>"
-                                        title="<?= e(__('setup.field_vat_placeholder')) ?>"
-                                    <?php elseif (($field['key'] ?? '') === 'pec'): ?>
-                                        inputmode="email"
-                                        spellcheck="false"
-                                        data-setup-pec
-                                        placeholder="<?= e(__('setup.field_pec_placeholder')) ?>"
-                                    <?php elseif (($field['key'] ?? '') === 'email'): ?>
-                                        inputmode="email"
-                                        spellcheck="false"
-                                        data-setup-email
-                                        placeholder="<?= e(__('setup.field_email_placeholder')) ?>"
-                                    <?php endif; ?>
-                                >
-                                <?php if (($field['key'] ?? '') === 'fiscal_code'): ?>
-                                    <p class="setup-hint muted" data-setup-fiscal-hint hidden></p>
-                                <?php elseif (($field['key'] ?? '') === 'vat_number'): ?>
-                                    <p class="setup-hint muted" data-setup-vat-hint hidden></p>
-                                <?php endif; ?>
-                            </label>
+                                <?= field('text', [
+                                    'name' => $fgKey,
+                                    'label' => $fgLabel,
+                                    'value' => $fgValue,
+                                    'required' => $fgRequired,
+                                    'context' => 'setup',
+                                    'autocomplete' => (string) ($field['autocomplete'] ?? 'off'),
+                                ]) ?>
                             <?php endif; ?>
                         <?php endforeach; ?>
                     </div>
                 <?php elseif ($stepType === 'address_block'): ?>
-                    <?= view_partial('partials/geo_address', [
+                    <?= field('address', [
                         'names' => [
                             'city' => 'city',
                             'postal_code' => 'postal_code',
@@ -519,7 +564,7 @@ $errorStep = flash('setup_error_step');
                             'address' => (string) ($value['address'] ?? ''),
                             'house_number' => (string) ($value['house_number'] ?? ''),
                         ],
-                        'required' => [
+                        'required_map' => [
                             'city' => true,
                             'postal_code' => true,
                             'province' => false,
@@ -552,50 +597,65 @@ $errorStep = flash('setup_error_step');
                             </summary>
                             <div class="setup-section-body">
                                 <div class="setup-equal-row">
-                                    <label class="setup-field">
-                                        <span><?= e(__('setup.field_first_name')) ?> *</span>
-                                        <input type="text" name="first_name" value="<?= e((string) ($value['first_name'] ?? '')) ?>" required autocomplete="given-name" data-first-name>
-                                    </label>
-                                    <label class="setup-field">
-                                        <span><?= e(__('setup.field_last_name')) ?> *</span>
-                                        <input type="text" name="last_name" value="<?= e((string) ($value['last_name'] ?? '')) ?>" required autocomplete="family-name" data-last-name>
-                                    </label>
+                                    <?= field('text', [
+                                        'name' => 'first_name',
+                                        'label' => (string) __('setup.field_first_name'),
+                                        'value' => (string) ($value['first_name'] ?? ''),
+                                        'required' => true,
+                                        'context' => 'setup',
+                                        'autocomplete' => 'given-name',
+                                        'attrs' => ['data-first-name' => true],
+                                    ]) ?>
+                                    <?= field('text', [
+                                        'name' => 'last_name',
+                                        'label' => (string) __('setup.field_last_name'),
+                                        'value' => (string) ($value['last_name'] ?? ''),
+                                        'required' => true,
+                                        'context' => 'setup',
+                                        'autocomplete' => 'family-name',
+                                        'attrs' => ['data-last-name' => true],
+                                    ]) ?>
                                 </div>
                                 <div class="setup-equal-row">
-                                    <label class="setup-field">
-                                        <span><?= e(__('setup.field_gender')) ?> *</span>
-                                        <select name="gender" required data-gender-input>
-                                            <option value="">—</option>
-                                            <option value="M" <?= (string) ($value['gender'] ?? '') === 'M' ? 'selected' : '' ?>><?= e(__('members.gender_m')) ?></option>
-                                            <option value="F" <?= (string) ($value['gender'] ?? '') === 'F' ? 'selected' : '' ?>><?= e(__('members.gender_f')) ?></option>
-                                        </select>
-                                    </label>
-                                    <label class="setup-field">
-                                        <span><?= e(__('setup.field_birth_date')) ?> *</span>
-                                        <input type="date" name="birth_date" value="<?= e((string) ($value['birth_date'] ?? '')) ?>" required data-birth-date
-                                               min="<?= e(date('Y-m-d', strtotime('-100 years'))) ?>"
-                                               max="<?= e(date('Y-m-d', strtotime('-18 years'))) ?>">
-                                    </label>
+                                    <?= field('gender', [
+                                        'name' => 'gender',
+                                        'label' => (string) __('setup.field_gender'),
+                                        'value' => (string) ($value['gender'] ?? ''),
+                                        'required' => true,
+                                        'context' => 'setup',
+                                    ]) ?>
+                                    <?= field('birth_date', [
+                                        'name' => 'birth_date',
+                                        'label' => (string) __('setup.field_birth_date'),
+                                        'value' => (string) ($value['birth_date'] ?? ''),
+                                        'required' => true,
+                                        'context' => 'setup',
+                                        'min' => date('Y-m-d', strtotime('-100 years')),
+                                        'max' => date('Y-m-d', strtotime('-18 years')),
+                                        'attrs' => ['data-birth-date' => true],
+                                    ]) ?>
                                 </div>
-                                <?= view_partial('partials/geo_birth_place', [
+                                <?= field('birth_place', [
                                     'name' => 'birth_place',
                                     'value' => (string) ($value['birth_place'] ?? ''),
                                     'required' => true,
                                     'foreign_toggle' => false,
                                     'with_scope' => false,
                                 ]) ?>
-                                <label class="setup-field">
-                                    <span><?= e(__('setup.field_person_fiscal_code')) ?> *</span>
-                                    <div class="cf-row">
-                                        <input type="text" name="fiscal_code" value="<?= e((string) ($value['fiscal_code'] ?? '')) ?>" required maxlength="16" pattern="[A-Za-z0-9]{16}" autocomplete="off" data-fiscal-code placeholder="<?= e(__('setup.field_person_fiscal_code_placeholder')) ?>">
-                                        <button type="button" class="btn btn-ghost" data-cf-generate><?= e(__('members.cf_generate')) ?></button>
-                                    </div>
-                                    <p class="setup-hint muted" data-cf-status
-                                       data-incomplete="<?= e(__('members.cf_incomplete')) ?>"
-                                       data-ready="<?= e(__('members.cf_ready')) ?>"
-                                       data-gender-other="<?= e(__('members.cf_gender_other')) ?>"
-                                       hidden></p>
-                                </label>
+                                <?= field('fiscal_code', [
+                                    'name' => 'fiscal_code',
+                                    'label' => (string) __('setup.field_person_fiscal_code'),
+                                    'value' => (string) ($value['fiscal_code'] ?? ''),
+                                    'required' => true,
+                                    'context' => 'setup',
+                                    'placeholder' => (string) __('setup.field_person_fiscal_code_placeholder'),
+                                    'pattern' => '[A-Za-z0-9]{16}',
+                                ]) ?>
+                                <p class="setup-hint muted" data-cf-status
+                                   data-incomplete="<?= e(__('members.cf_incomplete')) ?>"
+                                   data-ready="<?= e(__('members.cf_ready')) ?>"
+                                   data-gender-other="<?= e(__('members.cf_gender_other')) ?>"
+                                   hidden></p>
                             </div>
                         </details>
 
@@ -605,7 +665,7 @@ $errorStep = flash('setup_error_step');
                                 <span class="setup-section-hint muted"><?= e(__('setup.president_section_residence_hint')) ?></span>
                             </summary>
                             <div class="setup-section-body">
-                                <?= view_partial('partials/geo_address', [
+                                <?= field('address', [
                                     'names' => [
                                         'city' => 'city',
                                         'postal_code' => 'postal_code',
@@ -618,7 +678,7 @@ $errorStep = flash('setup_error_step');
                                         'address' => (string) ($value['address'] ?? ''),
                                         'house_number' => (string) ($value['house_number'] ?? ''),
                                     ],
-                                    'required' => [
+                                    'required_map' => [
                                         'city' => true,
                                         'postal_code' => true,
                                         'address' => true,
@@ -637,18 +697,26 @@ $errorStep = flash('setup_error_step');
                             </summary>
                             <div class="setup-section-body">
                                 <div class="setup-equal-row">
-                                    <label class="setup-field">
-                                        <span><?= e(__('setup.field_appointed_at')) ?> *</span>
-                                        <input type="date" name="appointed_at" value="<?= e((string) ($value['appointed_at'] ?? '')) ?>" required data-appointed-date
-                                               min="<?= e(date('Y-m-d', strtotime('-50 years'))) ?>"
-                                               max="<?= e(date('Y-m-d')) ?>">
-                                    </label>
-                                    <label class="setup-field">
-                                        <span><?= e(__('setup.field_mandate_ends_at')) ?> *</span>
-                                        <input type="date" name="mandate_ends_at" value="<?= e((string) ($value['mandate_ends_at'] ?? '')) ?>" required data-mandate-ends-date
-                                               min="<?= e(date('Y-m-d', strtotime('+1 day'))) ?>"
-                                               max="<?= e(date('Y-m-d', strtotime('+50 years'))) ?>">
-                                    </label>
+                                    <?= field('date', [
+                                        'name' => 'appointed_at',
+                                        'label' => (string) __('setup.field_appointed_at'),
+                                        'value' => (string) ($value['appointed_at'] ?? ''),
+                                        'required' => true,
+                                        'context' => 'setup',
+                                        'min' => date('Y-m-d', strtotime('-50 years')),
+                                        'max' => date('Y-m-d'),
+                                        'attrs' => ['data-appointed-date' => true],
+                                    ]) ?>
+                                    <?= field('date', [
+                                        'name' => 'mandate_ends_at',
+                                        'label' => (string) __('setup.field_mandate_ends_at'),
+                                        'value' => (string) ($value['mandate_ends_at'] ?? ''),
+                                        'required' => true,
+                                        'context' => 'setup',
+                                        'min' => date('Y-m-d', strtotime('+1 day')),
+                                        'max' => date('Y-m-d', strtotime('+50 years')),
+                                        'attrs' => ['data-mandate-ends-date' => true],
+                                    ]) ?>
                                 </div>
                             </div>
                         </details>
@@ -688,6 +756,14 @@ $errorStep = flash('setup_error_step');
                     $boardPresident = $isBoardStep && is_array($value['president'] ?? null) ? $value['president'] : null;
                     $runtsImport = $isBoardStep && is_array($value['runts_import'] ?? null) ? $value['runts_import'] : [];
                     $cfPlaceholder = __('setup.field_person_fiscal_code_placeholder');
+                    $organOptions = [['value' => '', 'label' => '—']];
+                    foreach ($organTypes as $organKey => $organLabelKey) {
+                        $organOptions[] = ['value' => $organKey, 'label' => (string) __($organLabelKey)];
+                    }
+                    $officeOptions = [];
+                    foreach ($officeRoles as $officeKey => $officeLabelKey) {
+                        $officeOptions[] = ['value' => $officeKey, 'label' => (string) __($officeLabelKey)];
+                    }
                     ?>
                     <div class="setup-people" data-setup-line data-people-list
                          data-people-role="<?= e($peopleRole) ?>"
@@ -746,43 +822,64 @@ $errorStep = flash('setup_error_step');
                                 <div class="setup-people-row" data-people-row>
                                     <?php if ($showOrganType): ?>
                                     <?php $organSelected = $normalizeOrganType((string) ($person['organ_type'] ?? $person['notes'] ?? '')); ?>
-                                    <label class="setup-field setup-field-organ-type">
-                                        <span><?= e(__('setup.field_organ_type')) ?></span>
-                                        <select name="people[<?= (int) $i ?>][organ_type]">
-                                            <option value="">—</option>
-                                            <?php foreach ($organTypes as $organKey => $organLabelKey): ?>
-                                                <option value="<?= e($organKey) ?>" <?= $organSelected === $organKey ? 'selected' : '' ?>>
-                                                    <?= e(__($organLabelKey)) ?>
-                                                </option>
-                                            <?php endforeach; ?>
-                                        </select>
-                                    </label>
+                                    <?= field('select', [
+                                        'name' => 'people[' . (int) $i . '][organ_type]',
+                                        'label' => (string) __('setup.field_organ_type'),
+                                        'value' => $organSelected,
+                                        'context' => 'setup',
+                                        'wrapper_class' => 'setup-field-organ-type',
+                                        'include_empty' => false,
+                                        'options' => $organOptions,
+                                    ]) ?>
                                     <?php endif; ?>
                                     <?php if ($showOfficeRole): ?>
-                                    <label class="setup-field setup-field-office-role">
-                                        <span><?= e(__('setup.field_board_office')) ?></span>
-                                        <select name="people[<?= (int) $i ?>][office_role]" data-people-office>
-                                            <?php foreach ($officeRoles as $officeKey => $officeLabelKey): ?>
-                                                <option value="<?= e($officeKey) ?>" <?= (string) ($person['office_role'] ?? 'board') === $officeKey ? 'selected' : '' ?>>
-                                                    <?= e(__($officeLabelKey)) ?>
-                                                </option>
-                                            <?php endforeach; ?>
-                                        </select>
-                                    </label>
+                                    <?= field('select', [
+                                        'name' => 'people[' . (int) $i . '][office_role]',
+                                        'label' => (string) __('setup.field_board_office'),
+                                        'value' => (string) ($person['office_role'] ?? 'board'),
+                                        'context' => 'setup',
+                                        'wrapper_class' => 'setup-field-office-role',
+                                        'include_empty' => false,
+                                        'options' => $officeOptions,
+                                        'attrs' => ['data-people-office' => true],
+                                    ]) ?>
                                     <?php endif; ?>
                                     <div class="setup-people-main<?= $showOfficeRole ? ' is-with-office' : '' ?>">
-                                        <label class="setup-field">
-                                            <span><?= e(__('setup.field_first_name')) ?></span>
-                                            <input type="text" name="people[<?= (int) $i ?>][first_name]" value="<?= e((string) ($person['first_name'] ?? '')) ?>" autocomplete="given-name" data-people-first>
-                                        </label>
-                                        <label class="setup-field">
-                                            <span><?= e(__('setup.field_last_name')) ?></span>
-                                            <input type="text" name="people[<?= (int) $i ?>][last_name]" value="<?= e((string) ($person['last_name'] ?? '')) ?>" autocomplete="family-name" data-people-last>
-                                        </label>
+                                        <?= field('text', [
+                                            'name' => 'people[' . (int) $i . '][first_name]',
+                                            'label' => (string) __('setup.field_first_name'),
+                                            'value' => (string) ($person['first_name'] ?? ''),
+                                            'context' => 'setup',
+                                            'autocomplete' => 'given-name',
+                                            'attrs' => ['data-people-first' => true],
+                                        ]) ?>
+                                        <?= field('text', [
+                                            'name' => 'people[' . (int) $i . '][last_name]',
+                                            'label' => (string) __('setup.field_last_name'),
+                                            'value' => (string) ($person['last_name'] ?? ''),
+                                            'context' => 'setup',
+                                            'autocomplete' => 'family-name',
+                                            'attrs' => ['data-people-last' => true],
+                                        ]) ?>
                                         <label class="setup-field setup-field-people-cf">
                                             <span data-people-cf-label><?= e(__('setup.field_person_fiscal_code')) ?><span data-people-cf-star hidden> *</span></span>
                                             <div class="setup-people-cf-row">
-                                                <input type="text" name="people[<?= (int) $i ?>][fiscal_code]" value="<?= e((string) ($person['fiscal_code'] ?? '')) ?>" maxlength="16" minlength="16" pattern="[A-Za-z]{6}[0-9LmnpqrstuvLMNPQRSTUV]{2}[A-Ea-eHhLlMmPpRrSsTt][0-9LmnpqrstuvLMNPQRSTUV]{2}[A-Za-z][0-9LmnpqrstuvLMNPQRSTUV]{3}[A-Za-z]" autocomplete="off" data-people-cf placeholder="<?= e($cfPlaceholder) ?>" title="<?= e(__('validation.fiscal_code')) ?>">
+                                                <?= field('text', [
+                                                    'name' => 'people[' . (int) $i . '][fiscal_code]',
+                                                    'label' => '',
+                                                    'value' => (string) ($person['fiscal_code'] ?? ''),
+                                                    'context' => 'inline',
+                                                    'wrapper_class' => 'sf-field--people-cf-inline',
+                                                    'maxlength' => 16,
+                                                    'minlength' => 16,
+                                                    'pattern' => '[A-Za-z]{6}[0-9LmnpqrstuvLMNPQRSTUV]{2}[A-Ea-eHhLlMmPpRrSsTt][0-9LmnpqrstuvLMNPQRSTUV]{2}[A-Za-z][0-9LmnpqrstuvLMNPQRSTUV]{3}[A-Za-z]',
+                                                    'placeholder' => $cfPlaceholder,
+                                                    'attrs' => [
+                                                        'data-people-cf' => true,
+                                                        'autocomplete' => 'off',
+                                                        'title' => (string) __('validation.fiscal_code'),
+                                                    ],
+                                                ]) ?>
                                                 <button type="button" class="btn btn-ghost btn-sm" data-people-cf-calc><?= e(__('members.cf_generate')) ?></button>
                                                 <button type="button" class="btn btn-ghost btn-sm setup-people-remove" data-people-remove aria-label="<?= e(__('setup.remove_person')) ?>">×</button>
                                             </div>
@@ -795,41 +892,64 @@ $errorStep = flash('setup_error_step');
                         <template data-people-template>
                             <div class="setup-people-row" data-people-row>
                                 <?php if ($showOrganType): ?>
-                                <label class="setup-field setup-field-organ-type">
-                                    <span><?= e(__('setup.field_organ_type')) ?></span>
-                                    <select name="people[__i__][organ_type]">
-                                        <option value="">—</option>
-                                        <?php foreach ($organTypes as $organKey => $organLabelKey): ?>
-                                            <option value="<?= e($organKey) ?>"><?= e(__($organLabelKey)) ?></option>
-                                        <?php endforeach; ?>
-                                    </select>
-                                </label>
+                                <?= field('select', [
+                                    'name' => 'people[__i__][organ_type]',
+                                    'label' => (string) __('setup.field_organ_type'),
+                                    'value' => '',
+                                    'context' => 'setup',
+                                    'wrapper_class' => 'setup-field-organ-type',
+                                    'include_empty' => false,
+                                    'options' => $organOptions,
+                                ]) ?>
                                 <?php endif; ?>
                                 <?php if ($showOfficeRole): ?>
-                                <label class="setup-field setup-field-office-role">
-                                    <span><?= e(__('setup.field_board_office')) ?></span>
-                                    <select name="people[__i__][office_role]" data-people-office>
-                                        <?php foreach ($officeRoles as $officeKey => $officeLabelKey): ?>
-                                            <option value="<?= e($officeKey) ?>" <?= $officeKey === 'board' ? 'selected' : '' ?>>
-                                                <?= e(__($officeLabelKey)) ?>
-                                            </option>
-                                        <?php endforeach; ?>
-                                    </select>
-                                </label>
+                                <?= field('select', [
+                                    'name' => 'people[__i__][office_role]',
+                                    'label' => (string) __('setup.field_board_office'),
+                                    'value' => 'board',
+                                    'context' => 'setup',
+                                    'wrapper_class' => 'setup-field-office-role',
+                                    'include_empty' => false,
+                                    'options' => $officeOptions,
+                                    'attrs' => ['data-people-office' => true],
+                                ]) ?>
                                 <?php endif; ?>
                                 <div class="setup-people-main<?= $showOfficeRole ? ' is-with-office' : '' ?>">
-                                    <label class="setup-field">
-                                        <span><?= e(__('setup.field_first_name')) ?></span>
-                                        <input type="text" name="people[__i__][first_name]" value="" autocomplete="given-name" data-people-first>
-                                    </label>
-                                    <label class="setup-field">
-                                        <span><?= e(__('setup.field_last_name')) ?></span>
-                                        <input type="text" name="people[__i__][last_name]" value="" autocomplete="family-name" data-people-last>
-                                    </label>
+                                    <?= field('text', [
+                                        'name' => 'people[__i__][first_name]',
+                                        'label' => (string) __('setup.field_first_name'),
+                                        'value' => '',
+                                        'context' => 'setup',
+                                        'autocomplete' => 'given-name',
+                                        'attrs' => ['data-people-first' => true],
+                                    ]) ?>
+                                    <?= field('text', [
+                                        'name' => 'people[__i__][last_name]',
+                                        'label' => (string) __('setup.field_last_name'),
+                                        'value' => '',
+                                        'context' => 'setup',
+                                        'autocomplete' => 'family-name',
+                                        'attrs' => ['data-people-last' => true],
+                                    ]) ?>
                                     <label class="setup-field setup-field-people-cf">
                                         <span data-people-cf-label><?= e(__('setup.field_person_fiscal_code')) ?><span data-people-cf-star hidden> *</span></span>
                                         <div class="setup-people-cf-row">
-                                            <input type="text" name="people[__i__][fiscal_code]" value="" maxlength="16" minlength="16" pattern="[A-Za-z]{6}[0-9LmnpqrstuvLMNPQRSTUV]{2}[A-Ea-eHhLlMmPpRrSsTt][0-9LmnpqrstuvLMNPQRSTUV]{2}[A-Za-z][0-9LmnpqrstuvLMNPQRSTUV]{3}[A-Za-z]" autocomplete="off" data-people-cf placeholder="<?= e($cfPlaceholder) ?>" title="<?= e(__('validation.fiscal_code')) ?>">
+                                            <?= field('text', [
+                                                'name' => 'people[__i__][fiscal_code]',
+                                                'label' => '',
+                                                'value' => '',
+                                                'context' => 'inline',
+                                                'wrapper_class' => 'sf-field--people-cf-inline',
+                                                'maxlength' => 16,
+                                                'minlength' => 16,
+                                                'pattern' => '[A-Za-z]{6}[0-9LmnpqrstuvLMNPQRSTUV]{2}[A-Ea-eHhLlMmPpRrSsTt][0-9LmnpqrstuvLMNPQRSTUV]{2}[A-Za-z][0-9LmnpqrstuvLMNPQRSTUV]{3}[A-Za-z]',
+                                                'placeholder' => $cfPlaceholder,
+                                                'attrs' => [
+                                                    'data-people-cf' => true,
+                                                    'autocomplete' => 'off',
+                                                    'title' => (string) __('validation.fiscal_code'),
+                                                ],
+                                            ]) ?>
                                             <button type="button" class="btn btn-ghost btn-sm" data-people-cf-calc><?= e(__('members.cf_generate')) ?></button>
                                             <button type="button" class="btn btn-ghost btn-sm setup-people-remove" data-people-remove aria-label="<?= e(__('setup.remove_person')) ?>">×</button>
                                         </div>
@@ -843,19 +963,21 @@ $errorStep = flash('setup_error_step');
                     $siteName = trim((string) ($assocName ?? ''));
                     $siteLegal = trim((string) ($assocLegal ?? ''));
                     ?>
-                    <label class="setup-field" data-setup-line>
-                        <span><?= e(__('setup.field_website')) ?></span>
-                        <input
-                            type="text"
-                            name="value"
-                            value="<?= e((string) $value) ?>"
-                            placeholder="<?= e(__('setup.website_placeholder')) ?>"
-                            autocomplete="url"
-                            inputmode="url"
-                            spellcheck="false"
-                            data-setup-website-input
-                        >
-                    </label>
+                    <?= field('text', [
+                        'name' => 'value',
+                        'label' => (string) __('setup.field_website'),
+                        'value' => (string) $value,
+                        'context' => 'setup',
+                        'wrapper_class' => 'setup-field',
+                        'placeholder' => (string) __('setup.website_placeholder'),
+                        'autocomplete' => 'url',
+                        'inputmode' => 'url',
+                        'attrs' => [
+                            'data-setup-line' => true,
+                            'data-setup-website-input' => true,
+                            'spellcheck' => 'false',
+                        ],
+                    ]) ?>
                     <div class="setup-scrape" data-setup-line data-setup-scrape hidden
                          data-scrape-url="<?= e(url('/setup/scrape')) ?>"
                          data-logo-upload-url="<?= e(url('/setup/logo')) ?>"
@@ -919,8 +1041,15 @@ $errorStep = flash('setup_error_step');
                                         <img src="" alt="<?= e(__('setup.field_logo')) ?>" data-setup-scrape-logo-img>
                                         <span class="setup-scrape-logo-overlay"><?= e(__('setup.scrape_logo_change')) ?></span>
                                     </button>
-                                    <input type="file" accept="image/png,image/jpeg,image/webp,image/gif,image/svg+xml"
-                                           class="setup-scrape-logo-file" data-setup-scrape-logo-input>
+                                    <?= field('file', [
+                                        'name' => '',
+                                        'as_button' => false,
+                                        'accept' => 'image/png,image/jpeg,image/webp,image/gif,image/svg+xml',
+                                        'input_class' => 'setup-scrape-logo-file',
+                                        'context' => 'inline',
+                                        'label' => '',
+                                        'attrs' => ['data-setup-scrape-logo-input' => true],
+                                    ]) ?>
                                     <p class="setup-hint muted setup-scrape-logo-hint"><?= e(__('setup.scrape_logo_change_hint')) ?></p>
                                 </div>
                             </div>
@@ -959,16 +1088,28 @@ $errorStep = flash('setup_error_step');
                         $isLocaleStep = ($step['key'] ?? '') === 'app.locale';
                     ?>
                     <?php if ($isLocaleStep): ?>
-                    <fieldset class="setup-locale-grid" data-setup-line data-setup-locale-picker>
+                    <?php
+                        $setupLocaleCardOptions = [];
+                        foreach ($step['options'] as $opt) {
+                            $optVal = (string) ($opt['value'] ?? '');
+                            $labelKey = (string) ($opt['label_key'] ?? '');
+                            $setupLocaleCardOptions[] = [
+                                'value' => $optVal,
+                                'label' => $labelKey !== '' ? (string) __($labelKey) : $optVal,
+                                'flag' => locale_flag_url($optVal),
+                                'label_attrs' => $labelKey !== '' ? ['data-i18n' => $labelKey] : [],
+                            ];
+                        }
+                    ?>
+                    <fieldset data-setup-line data-setup-locale-picker>
                         <legend class="setup-field-label" data-i18n="<?= e((string) ($step['title_key'] ?? '')) ?>"><?= e(__($step['title_key'])) ?></legend>
-                        <?php foreach ($step['options'] as $opt): ?>
-                            <?php $optVal = (string) ($opt['value'] ?? ''); ?>
-                            <label class="setup-locale-card">
-                                <input type="radio" name="value" value="<?= e($optVal) ?>" data-setup-locale-radio <?= (string) $value === $optVal ? 'checked' : '' ?> required>
-                                <img src="<?= e(locale_flag_url($optVal)) ?>" width="28" height="21" alt="" loading="lazy" decoding="async">
-                                <span data-i18n="<?= e((string) ($opt['label_key'] ?? '')) ?>"><?= e(__($opt['label_key'])) ?></span>
-                            </label>
-                        <?php endforeach; ?>
+                        <?= field('locale_cards', [
+                            'name' => 'value',
+                            'value' => (string) $value,
+                            'options' => $setupLocaleCardOptions,
+                            'attrs' => ['data-setup-locale-radio' => true],
+                            'required' => true,
+                        ]) ?>
                     </fieldset>
                     <?php elseif (($step['key'] ?? '') === 'membership.enrollment_validation'): ?>
                     <div data-setup-line>
@@ -981,15 +1122,25 @@ $errorStep = flash('setup_error_step');
                         ]) ?>
                     </div>
                     <?php else: ?>
-                    <label class="setup-field" data-setup-line>
-                        <span><?= e(__($step['title_key'])) ?></span>
-                        <select name="value" required>
-                            <?php foreach ($step['options'] as $opt): ?>
-                                <?php $optVal = (string) ($opt['value'] ?? ''); ?>
-                                <option value="<?= e($optVal) ?>" <?= (string) $value === $optVal ? 'selected' : '' ?>><?= e(__($opt['label_key'])) ?></option>
-                            <?php endforeach; ?>
-                        </select>
-                    </label>
+                    <?php
+                    $genericSelectOptions = [];
+                    foreach ($step['options'] as $opt) {
+                        $genericSelectOptions[] = [
+                            'value' => (string) ($opt['value'] ?? ''),
+                            'label' => (string) __($opt['label_key']),
+                        ];
+                    }
+                    ?>
+                    <?= field('select', [
+                        'name' => 'value',
+                        'label' => (string) __($step['title_key']),
+                        'value' => (string) $value,
+                        'required' => true,
+                        'context' => 'setup',
+                        'include_empty' => false,
+                        'options' => $genericSelectOptions,
+                        'wrap_attrs' => ['data-setup-line' => true],
+                    ]) ?>
                     <?php endif; ?>
                 <?php elseif ($stepType === 'checkbox'): ?>
                     <?php if (($step['key'] ?? '') === 'gdpr.enabled'): ?>
@@ -1003,30 +1154,47 @@ $errorStep = flash('setup_error_step');
                             : true;
                         ?>
                         <div class="setup-gdpr-options" data-setup-line data-setup-gdpr-options>
-                            <label class="checkbox-row setup-check setup-check-prominent">
-                                <input type="checkbox" name="value" value="1" data-gdpr-master <?= $gdprEnabled ? 'checked' : '' ?>>
-                                <span data-i18n="setup.gdpr_label"><?= e(__('setup.gdpr_label')) ?></span>
-                            </label>
+                            <?= field('checkbox', [
+                                'name' => 'value',
+                                'label' => (string) __('setup.gdpr_label'),
+                                'checked' => $gdprEnabled,
+                                'context' => 'setup',
+                                'label_class' => 'checkbox-row setup-check setup-check-prominent',
+                                'attrs' => ['data-gdpr-master' => true, 'data-i18n' => 'setup.gdpr_label'],
+                            ]) ?>
                             <p class="setup-gdpr-model-note" data-gdpr-extras>
                                 <span class="setup-gdpr-model-note-icon" aria-hidden="true">ℹ</span>
                                 <span data-i18n="setup.gdpr_model_note"><?= e(__('setup.gdpr_model_note')) ?></span>
                             </p>
                             <div class="setup-gdpr-extras" data-gdpr-extras>
-                                <label class="checkbox-row setup-check">
-                                    <input type="checkbox" name="require_image_consent" value="1" data-gdpr-extra <?= $gdprImage ? 'checked' : '' ?>>
-                                    <span data-i18n="setup.gdpr_image_consent"><?= e(__('setup.gdpr_image_consent')) ?></span>
-                                </label>
-                                <label class="checkbox-row setup-check">
-                                    <input type="checkbox" name="require_comms_consent" value="1" data-gdpr-extra <?= $gdprComms ? 'checked' : '' ?>>
-                                    <span data-i18n="setup.gdpr_comms_consent"><?= e(__('setup.gdpr_comms_consent')) ?></span>
-                                </label>
+                                <?= field('checkbox', [
+                                    'name' => 'require_image_consent',
+                                    'label' => (string) __('setup.gdpr_image_consent'),
+                                    'checked' => $gdprImage,
+                                    'context' => 'setup',
+                                    'label_class' => 'checkbox-row setup-check',
+                                    'attrs' => ['data-gdpr-extra' => true, 'data-i18n' => 'setup.gdpr_image_consent'],
+                                ]) ?>
+                                <?= field('checkbox', [
+                                    'name' => 'require_comms_consent',
+                                    'label' => (string) __('setup.gdpr_comms_consent'),
+                                    'checked' => $gdprComms,
+                                    'context' => 'setup',
+                                    'label_class' => 'checkbox-row setup-check',
+                                    'attrs' => ['data-gdpr-extra' => true, 'data-i18n' => 'setup.gdpr_comms_consent'],
+                                ]) ?>
                             </div>
                         </div>
                     <?php else: ?>
-                        <label class="checkbox-row setup-check" data-setup-line>
-                            <input type="checkbox" name="value" value="1" <?= !empty($value) ? 'checked' : '' ?>>
-                            <span data-i18n="setup.gdpr_label"><?= e(__('setup.gdpr_label')) ?></span>
-                        </label>
+                        <?= field('checkbox', [
+                            'name' => 'value',
+                            'label' => (string) __('setup.gdpr_label'),
+                            'checked' => !empty($value),
+                            'context' => 'setup',
+                            'label_class' => 'checkbox-row setup-check',
+                            'wrap_attrs' => ['data-setup-line' => true],
+                            'attrs' => ['data-i18n' => 'setup.gdpr_label'],
+                        ]) ?>
                     <?php endif; ?>
                 <?php elseif ($stepType === 'textarea'): ?>
                     <?php
@@ -1050,10 +1218,15 @@ $errorStep = flash('setup_error_step');
                          data-msg-reading="<?= e(__('setup.legal_pdf_reading')) ?>"
                          data-msg-fail="<?= e(__('setup.legal_pdf_fail')) ?>"
                          data-msg-ok="<?= e(__('setup.legal_pdf_ok')) ?>">
-                        <label class="btn btn-ghost file-btn">
-                            <input type="file" accept="application/pdf,.pdf" hidden data-setup-legal-pdf-input>
-                            <span data-i18n="setup.legal_pdf_upload"><?= e(__('setup.legal_pdf_upload')) ?></span>
-                        </label>
+                        <?= field('file', [
+                            'name' => '',
+                            'button_label' => (string) __('setup.legal_pdf_upload'),
+                            'accept' => 'application/pdf,.pdf',
+                            'context' => 'setup',
+                            'button_class' => 'btn btn-ghost file-btn',
+                            'pick_label_attrs' => ['data-i18n' => 'setup.legal_pdf_upload'],
+                            'attrs' => ['data-setup-legal-pdf-input' => true],
+                        ]) ?>
                         <p class="setup-hint muted" data-setup-legal-pdf-status hidden></p>
                     </div>
                     <div data-setup-line>
@@ -1123,7 +1296,13 @@ $errorStep = flash('setup_error_step');
                                                     <img src="<?= e($langMeta['flag']) ?>" width="18" height="14" alt="" loading="lazy" decoding="async">
                                                     <?= e($langMeta['label']) ?><?= $langCode === 'it' ? ' *' : '' ?>
                                                 </span>
-                                                <input type="text" name="types[<?= $tid ?>][name_<?= e($langCode) ?>]" value="<?= e((string) ($typeRow['name_' . $langCode] ?? '')) ?>" <?= $langCode === 'it' ? 'required data-type-name-it' : 'data-type-name-' . e($langCode) ?>>
+                                                <?= view_partial('partials/member_type_field', [
+                                                    'kind' => 'name',
+                                                    'name' => 'types[' . $tid . '][name_' . $langCode . ']',
+                                                    'value' => (string) ($typeRow['name_' . $langCode] ?? ''),
+                                                    'required' => $langCode === 'it',
+                                                    'langCode' => $langCode,
+                                                ]) ?>
                                             </label>
                                             <?php endforeach; ?>
                                         </div>
@@ -1131,17 +1310,29 @@ $errorStep = flash('setup_error_step');
                                             <label class="setup-field">
                                                 <span><?= e(__('install.type_price')) ?> *</span>
                                                 <div class="setup-price-with-currency">
-                                                    <input type="number" step="0.01" min="0" name="types[<?= $tid ?>][price]" value="<?= e((string) ($typeRow['price'] ?? '0')) ?>" required data-type-price data-type-name-ref="types[<?= $tid ?>][name_it]" inputmode="decimal">
+                                                    <?= view_partial('partials/member_type_field', [
+                                                        'kind' => 'price',
+                                                        'name' => 'types[' . $tid . '][price]',
+                                                        'value' => (string) ($typeRow['price'] ?? '0'),
+                                                        'required' => true,
+                                                        'currencyDisplay' => $currencyDisplay,
+                                                        'typeNameRef' => 'types[' . $tid . '][name_it]',
+                                                    ]) ?>
                                                     <span class="setup-price-currency" aria-hidden="true"><?= e($currencyDisplay) ?></span>
                                                 </div>
                                             </label>
-                                            <label class="checkbox-row setup-check setup-check-inline">
-                                                <input type="checkbox" name="types[<?= $tid ?>][is_active]" value="1" <?= !empty($typeRow['is_active']) ? 'checked' : '' ?><?= $singleType ? ' checked disabled' : '' ?>>
-                                                <?php if ($singleType): ?>
-                                                    <input type="hidden" name="types[<?= $tid ?>][is_active]" value="1">
-                                                <?php endif; ?>
-                                                <span><?= e(__('settings.is_active')) ?></span>
-                                            </label>
+                                            <?= view_partial('partials/member_type_field', [
+                                                'kind' => 'active',
+                                                'name' => 'types[' . $tid . '][is_active]',
+                                                'checked' => !empty($typeRow['is_active']) || $singleType,
+                                                'disabled' => $singleType,
+                                            ]) ?>
+                                            <?php if ($singleType): ?>
+                                                <?= view_partial('partials/member_type_field', [
+                                                    'kind' => 'active_hidden',
+                                                    'name' => 'types[' . $tid . '][is_active]',
+                                                ]) ?>
+                                            <?php endif; ?>
                                         </div>
                                     </div>
                                 <?php endforeach; ?>
@@ -1164,7 +1355,14 @@ $errorStep = flash('setup_error_step');
                                                 <img src="<?= e($langMeta['flag']) ?>" width="18" height="14" alt="" loading="lazy" decoding="async">
                                                 <?= e($langMeta['label']) ?><?= $langCode === 'it' && $requireNew ? ' *' : '' ?>
                                             </span>
-                                            <input type="text" name="new_types[<?= $ni ?>][name_<?= e($langCode) ?>]" value="<?= e((string) ($newRow['name_' . $langCode] ?? '')) ?>" <?= $langCode === 'it' && $requireNew ? 'required' : '' ?> <?= $langCode === 'it' ? 'data-type-name-it' : 'data-type-name-' . e($langCode) ?> placeholder="<?= e(__('setup.type_name_placeholder')) ?>">
+                                            <?= view_partial('partials/member_type_field', [
+                                                'kind' => 'name',
+                                                'name' => 'new_types[' . $ni . '][name_' . $langCode . ']',
+                                                'value' => (string) ($newRow['name_' . $langCode] ?? ''),
+                                                'required' => $langCode === 'it' && $requireNew,
+                                                'langCode' => $langCode,
+                                                'placeholder' => (string) __('setup.type_name_placeholder'),
+                                            ]) ?>
                                         </label>
                                         <?php endforeach; ?>
                                     </div>
@@ -1172,17 +1370,28 @@ $errorStep = flash('setup_error_step');
                                         <label class="setup-field">
                                             <span><?= e(__('install.type_price')) ?><?= $requireNew ? ' *' : '' ?></span>
                                             <div class="setup-price-with-currency">
-                                                <input type="number" step="0.01" min="0" name="new_types[<?= $ni ?>][price]" value="<?= e((string) ($newRow['price'] ?? '')) ?>" <?= $requireNew ? 'required' : '' ?> placeholder="0.00" data-type-price data-type-name-ref="new_types[<?= $ni ?>][name_it]" inputmode="decimal">
+                                                <?= view_partial('partials/member_type_field', [
+                                                    'kind' => 'price',
+                                                    'name' => 'new_types[' . $ni . '][price]',
+                                                    'value' => (string) ($newRow['price'] ?? ''),
+                                                    'required' => $requireNew,
+                                                    'currencyDisplay' => $currencyDisplay,
+                                                    'typeNameRef' => 'new_types[' . $ni . '][name_it]',
+                                                ]) ?>
                                                 <span class="setup-price-currency" aria-hidden="true"><?= e($currencyDisplay) ?></span>
                                             </div>
                                         </label>
                                         <?php if ($types !== []): ?>
-                                        <label class="checkbox-row setup-check setup-check-inline">
-                                            <input type="checkbox" name="new_types[<?= $ni ?>][is_active]" value="1" <?= !empty($newRow['is_active']) ? 'checked' : '' ?>>
-                                            <span><?= e(__('settings.is_active')) ?></span>
-                                        </label>
+                                        <?= view_partial('partials/member_type_field', [
+                                            'kind' => 'active',
+                                            'name' => 'new_types[' . $ni . '][is_active]',
+                                            'checked' => !empty($newRow['is_active']),
+                                        ]) ?>
                                         <?php else: ?>
-                                            <input type="hidden" name="new_types[<?= $ni ?>][is_active]" value="1">
+                                            <?= view_partial('partials/member_type_field', [
+                                                'kind' => 'active_hidden',
+                                                'name' => 'new_types[' . $ni . '][is_active]',
+                                            ]) ?>
                                         <?php endif; ?>
                                     </div>
                                     <button type="button" class="btn btn-ghost btn-sm" data-type-translate-now><?= e(__('settings.legal_translate')) ?></button>
@@ -1202,7 +1411,13 @@ $errorStep = flash('setup_error_step');
                                             <img src="<?= e($langMeta['flag']) ?>" width="18" height="14" alt="" loading="lazy" decoding="async">
                                             <?= e($langMeta['label']) ?>
                                         </span>
-                                        <input type="text" name="new_types[__i__][name_<?= e($langCode) ?>]" value="" <?= $langCode === 'it' ? 'data-type-name-it' : 'data-type-name-' . e($langCode) ?> placeholder="<?= e(__('setup.type_name_placeholder')) ?>">
+                                        <?= view_partial('partials/member_type_field', [
+                                            'kind' => 'name',
+                                            'name' => 'new_types[__i__][name_' . $langCode . ']',
+                                            'value' => '',
+                                            'langCode' => $langCode,
+                                            'placeholder' => (string) __('setup.type_name_placeholder'),
+                                        ]) ?>
                                     </label>
                                     <?php endforeach; ?>
                                 </div>
@@ -1210,17 +1425,27 @@ $errorStep = flash('setup_error_step');
                                     <label class="setup-field">
                                         <span><?= e(__('install.type_price')) ?></span>
                                         <div class="setup-price-with-currency">
-                                            <input type="number" step="0.01" min="0" name="new_types[__i__][price]" value="" placeholder="0.00" data-type-price data-type-name-ref="new_types[__i__][name_it]" inputmode="decimal">
+                                            <?= view_partial('partials/member_type_field', [
+                                                'kind' => 'price',
+                                                'name' => 'new_types[__i__][price]',
+                                                'value' => '',
+                                                'currencyDisplay' => $currencyDisplay,
+                                                'typeNameRef' => 'new_types[__i__][name_it]',
+                                            ]) ?>
                                             <span class="setup-price-currency" aria-hidden="true"><?= e($currencyDisplay) ?></span>
                                         </div>
                                     </label>
                                     <?php if ($types !== []): ?>
-                                    <label class="checkbox-row setup-check setup-check-inline">
-                                        <input type="checkbox" name="new_types[__i__][is_active]" value="1" checked>
-                                        <span><?= e(__('settings.is_active')) ?></span>
-                                    </label>
+                                    <?= view_partial('partials/member_type_field', [
+                                        'kind' => 'active',
+                                        'name' => 'new_types[__i__][is_active]',
+                                        'checked' => true,
+                                    ]) ?>
                                     <?php else: ?>
-                                        <input type="hidden" name="new_types[__i__][is_active]" value="1">
+                                        <?= view_partial('partials/member_type_field', [
+                                            'kind' => 'active_hidden',
+                                            'name' => 'new_types[__i__][is_active]',
+                                        ]) ?>
                                     <?php endif; ?>
                                 </div>
                                 <button type="button" class="btn btn-ghost btn-sm" data-type-translate-now><?= e(__('settings.legal_translate')) ?></button>
@@ -1244,17 +1469,25 @@ $errorStep = flash('setup_error_step');
                                     <div class="setup-membership-card<?= !empty($period['is_current']) ? ' is-current-period' : '' ?>">
                                         <p class="setup-period-label muted"><?= e((string) ($period['label'] ?? '')) ?><?= !empty($period['is_current']) ? ' · ' . e(__('settings.is_current')) : '' ?></p>
                                         <div class="setup-equal-row">
-                                            <label class="setup-field">
-                                                <span><?= e(__('install.starts_on')) ?> *</span>
-                                                <input type="date" name="periods[<?= $pid ?>][starts_on]" value="<?= e((string) ($period['starts_on'] ?? '')) ?>" required data-period-start>
-                                            </label>
-                                            <label class="setup-field">
-                                                <span><?= e(__('install.ends_on')) ?> *</span>
-                                                <input type="date" name="periods[<?= $pid ?>][ends_on]" value="<?= e((string) ($period['ends_on'] ?? '')) ?>" required data-period-end>
-                                            </label>
+                                            <?= field('date', [
+                                                'name' => 'periods[' . $pid . '][starts_on]',
+                                                'label' => (string) __('install.starts_on'),
+                                                'value' => (string) ($period['starts_on'] ?? ''),
+                                                'required' => true,
+                                                'context' => 'setup',
+                                                'attrs' => ['data-period-start' => true],
+                                            ]) ?>
+                                            <?= field('date', [
+                                                'name' => 'periods[' . $pid . '][ends_on]',
+                                                'label' => (string) __('install.ends_on'),
+                                                'value' => (string) ($period['ends_on'] ?? ''),
+                                                'required' => true,
+                                                'context' => 'setup',
+                                                'attrs' => ['data-period-end' => true],
+                                            ]) ?>
                                         </div>
                                         <?php if (!empty($period['is_current'])): ?>
-                                            <input type="hidden" name="periods[<?= $pid ?>][is_current]" value="1">
+                                            <?= field('hidden', ['name' => 'periods[' . $pid . '][is_current]', 'value' => '1']) ?>
                                             <?php if (!empty($value['next_period_starts_on']) && !empty($value['next_period_ends_on'])): ?>
                                                 <p class="setup-period-next muted" data-setup-next-period>
                                                     <?= e(__('setup.periods_next_period', [
@@ -1273,17 +1506,25 @@ $errorStep = flash('setup_error_step');
                         <?php endif; ?>
                         <div class="setup-membership-card setup-membership-card-new">
                             <div class="setup-equal-row">
-                                <label class="setup-field">
-                                    <span><?= e(__('install.starts_on')) ?><?= $requireNewPeriod ? ' *' : '' ?></span>
-                                    <input type="date" name="starts_on" value="<?= e((string) ($value['starts_on'] ?? '')) ?>" <?= $requireNewPeriod ? 'required' : '' ?> data-period-start>
-                                </label>
-                                <label class="setup-field">
-                                    <span><?= e(__('install.ends_on')) ?><?= $requireNewPeriod ? ' *' : '' ?></span>
-                                    <input type="date" name="ends_on" value="<?= e((string) ($value['ends_on'] ?? '')) ?>" <?= $requireNewPeriod ? 'required' : '' ?> data-period-end>
-                                </label>
+                                <?= field('date', [
+                                    'name' => 'starts_on',
+                                    'label' => (string) __('install.starts_on'),
+                                    'value' => (string) ($value['starts_on'] ?? ''),
+                                    'required' => $requireNewPeriod,
+                                    'context' => 'setup',
+                                    'attrs' => ['data-period-start' => true],
+                                ]) ?>
+                                <?= field('date', [
+                                    'name' => 'ends_on',
+                                    'label' => (string) __('install.ends_on'),
+                                    'value' => (string) ($value['ends_on'] ?? ''),
+                                    'required' => $requireNewPeriod,
+                                    'context' => 'setup',
+                                    'attrs' => ['data-period-end' => true],
+                                ]) ?>
                             </div>
                             <?php if ($requireNewPeriod): ?>
-                                <input type="hidden" name="is_current" value="1">
+                                <?= field('hidden', ['name' => 'is_current', 'value' => '1']) ?>
                             <?php endif; ?>
                             <p class="setup-period-next muted" data-setup-next-period-preview hidden></p>
                         </div>
@@ -1308,28 +1549,49 @@ $errorStep = flash('setup_error_step');
                         <div class="setup-membership-card setup-membership-card-new setup-fields-add">
                             <h3 class="setup-subhead"><?= e(__('settings.add_field')) ?></h3>
                             <div class="setup-equal-row">
-                                <label class="setup-field setup-field-grow">
-                                    <span><?= e(__('setup.fields_new_label')) ?></span>
-                                    <input type="text" name="new_label" value="<?= e((string) ($value['new_label'] ?? '')) ?>" placeholder="<?= e(__('setup.fields_new_label_ph')) ?>" data-new-field-label>
-                                </label>
-                                <label class="setup-field">
-                                    <span><?= e(__('setup.fields_col_type')) ?> *</span>
-                                    <select name="new_type" data-new-field-type>
-                                        <?php foreach ($typeOptions as $opt): ?>
-                                            <option value="<?= e($opt) ?>" <?= (string) ($value['new_type'] ?? 'text') === $opt ? 'selected' : '' ?>><?= e(\Socly\Support\MemberFieldTypes::label($opt)) ?></option>
-                                        <?php endforeach; ?>
-                                    </select>
-                                </label>
+                                <?= field('text', [
+                                    'name' => 'new_label',
+                                    'label' => (string) __('setup.fields_new_label'),
+                                    'value' => (string) ($value['new_label'] ?? ''),
+                                    'context' => 'setup',
+                                    'wrapper_class' => 'setup-field-grow',
+                                    'placeholder' => (string) __('setup.fields_new_label_ph'),
+                                    'attrs' => ['data-new-field-label' => true],
+                                ]) ?>
+                                <?php
+                                $newFieldTypeOptions = [];
+                                foreach ($typeOptions as $opt) {
+                                    $newFieldTypeOptions[] = ['value' => $opt, 'label' => \Socly\Support\MemberFieldTypes::label($opt)];
+                                }
+                                ?>
+                                <?= field('select', [
+                                    'name' => 'new_type',
+                                    'label' => (string) __('setup.fields_col_type'),
+                                    'value' => (string) ($value['new_type'] ?? 'text'),
+                                    'required' => true,
+                                    'context' => 'setup',
+                                    'include_empty' => false,
+                                    'options' => $newFieldTypeOptions,
+                                    'attrs' => ['data-new-field-type' => true],
+                                ]) ?>
                             </div>
                             <div class="setup-equal-row">
-                                <label class="checkbox-row setup-check setup-check-inline">
-                                    <input type="checkbox" name="new_enabled" value="1" data-new-field-enabled <?= !empty($value['new_enabled']) ? 'checked' : '' ?>>
-                                    <span><?= e(__('setup.fields_col_enabled')) ?></span>
-                                </label>
-                                <label class="checkbox-row setup-check setup-check-inline">
-                                    <input type="checkbox" name="new_required" value="1" data-new-field-required <?= !empty($value['new_required']) ? 'checked' : '' ?>>
-                                    <span><?= e(__('setup.fields_col_required')) ?></span>
-                                </label>
+                                <?= field('checkbox', [
+                                    'name' => 'new_enabled',
+                                    'label' => (string) __('setup.fields_col_enabled'),
+                                    'checked' => !empty($value['new_enabled']),
+                                    'context' => 'setup',
+                                    'label_class' => 'checkbox-row setup-check setup-check-inline',
+                                    'attrs' => ['data-new-field-enabled' => true],
+                                ]) ?>
+                                <?= field('checkbox', [
+                                    'name' => 'new_required',
+                                    'label' => (string) __('setup.fields_col_required'),
+                                    'checked' => !empty($value['new_required']),
+                                    'context' => 'setup',
+                                    'label_class' => 'checkbox-row setup-check setup-check-inline',
+                                    'attrs' => ['data-new-field-required' => true],
+                                ]) ?>
                             </div>
                             <button
                                 type="button"
@@ -1368,10 +1630,14 @@ $errorStep = flash('setup_error_step');
                         data-email-invalid="<?= e(__('validation.email')) ?>"
                         data-has-password="<?= !empty($value['has_password']) ? '1' : '0' ?>"
                     >
-                        <label class="checkbox-row setup-check setup-smtp-skip">
-                            <input type="checkbox" name="outbound_disabled" value="1" data-smtp-skip <?= $mailSkipped ? 'checked' : '' ?>>
-                            <span><?= e(__('setup.mail_skip_outbound')) ?></span>
-                        </label>
+                        <?= field('checkbox', [
+                            'name' => 'outbound_disabled',
+                            'label' => (string) __('setup.mail_skip_outbound'),
+                            'checked' => $mailSkipped,
+                            'context' => 'setup',
+                            'label_class' => 'checkbox-row setup-check setup-smtp-skip',
+                            'attrs' => ['data-smtp-skip' => true],
+                        ]) ?>
                         <p
                             class="setup-hint muted"
                             data-smtp-skip-hint
@@ -1383,17 +1649,27 @@ $errorStep = flash('setup_error_step');
                             <div class="setup-smtp-section">
                                 <p class="setup-hint muted"><?= e(__('setup.mail_simple_hint')) ?></p>
                                 <div class="setup-equal-row setup-smtp-credentials">
-                                    <label class="setup-field setup-field-grow">
-                                        <span><?= e(__('mail.from_address')) ?> *</span>
-                                        <input type="email" name="from_address" value="<?= e((string) ($value['from_address'] ?? '')) ?>" <?= $mailSkipped ? 'disabled' : 'required' ?> autocomplete="off" placeholder="noreply@tuodominio.it" data-smtp-from>
-                                        <p class="field-hint setup-field-hint" data-smtp-from-hint hidden></p>
-                                    </label>
-                                    <?= view_partial('partials/password_input', [
+                                    <?= field('email', [
+                                        'name' => 'from_address',
+                                        'label' => (string) __('mail.from_address'),
+                                        'value' => (string) ($value['from_address'] ?? ''),
+                                        'required' => !$mailSkipped,
+                                        'disabled' => $mailSkipped,
+                                        'context' => 'setup',
+                                        'wrapper_class' => 'setup-field-grow',
+                                        'placeholder' => 'noreply@tuodominio.it',
+                                        'autocomplete' => 'off',
+                                        'attrs' => ['data-smtp-from' => true],
+                                    ]) ?>
+                                    <p class="field-hint setup-field-hint" data-smtp-from-hint hidden></p>
+                                    <?= field('password', [
                                         'name' => 'password',
                                         'label' => (string) __('mail.password'),
                                         'required' => !$mailSkipped && empty($value['has_password']),
+                                        'disabled' => $mailSkipped,
                                         'placeholder' => !empty($value['has_password']) ? (string) __('mail.password_keep') : '',
                                         'autocomplete' => 'new-password',
+                                        'context' => 'setup',
                                         'input_attrs' => 'data-smtp-password' . ($mailSkipped ? ' disabled' : ''),
                                         'hint_attrs' => 'data-smtp-password-hint',
                                     ]) ?>
@@ -1413,31 +1689,59 @@ $errorStep = flash('setup_error_step');
                                 <p class="setup-smtp-manual-title"><?= e(__('setup.mail_manual_title')) ?></p>
                                 <p class="setup-hint muted"><?= e(__('setup.mail_manual_hint')) ?></p>
                                 <div class="setup-equal-row">
-                                    <label class="setup-field">
-                                        <span><?= e(__('mail.host')) ?> *</span>
-                                        <input type="text" name="host" value="<?= e((string) ($value['host'] ?? '')) ?>" placeholder="smtp.example.com" autocomplete="off" data-smtp-host>
-                                    </label>
-                                    <label class="setup-field">
-                                        <span><?= e(__('mail.port')) ?> *</span>
-                                        <input type="number" name="port" value="<?= e((string) ($value['port'] ?? '587')) ?>" min="1" max="65535" data-smtp-port>
-                                    </label>
+                                    <?= field('text', [
+                                        'name' => 'host',
+                                        'label' => (string) __('mail.host'),
+                                        'value' => (string) ($value['host'] ?? ''),
+                                        'required' => true,
+                                        'context' => 'setup',
+                                        'placeholder' => 'smtp.example.com',
+                                        'autocomplete' => 'off',
+                                        'attrs' => ['data-smtp-host' => true],
+                                    ]) ?>
+                                    <?= field('number', [
+                                        'name' => 'port',
+                                        'label' => (string) __('mail.port'),
+                                        'value' => (string) ($value['port'] ?? '587'),
+                                        'required' => true,
+                                        'context' => 'setup',
+                                        'min' => 1,
+                                        'max' => 65535,
+                                        'attrs' => ['data-smtp-port' => true],
+                                    ]) ?>
                                 </div>
-                                <label class="setup-field">
-                                    <span><?= e(__('mail.encryption')) ?> *</span>
-                                    <select name="encryption" data-smtp-encryption>
-                                        <option value="tls" <?= $mailEnc === 'tls' ? 'selected' : '' ?>><?= e(__('mail.encryption_tls')) ?></option>
-                                        <option value="ssl" <?= $mailEnc === 'ssl' ? 'selected' : '' ?>><?= e(__('mail.encryption_ssl')) ?></option>
-                                        <option value="none" <?= $mailEnc === 'none' ? 'selected' : '' ?>><?= e(__('mail.encryption_none')) ?></option>
-                                    </select>
-                                </label>
-                                <label class="setup-field">
-                                    <span><?= e(__('mail.username')) ?> *</span>
-                                    <input type="text" name="username" value="<?= e((string) ($value['username'] ?? '')) ?>" autocomplete="off" placeholder="<?= e(__('mail.username_default_hint')) ?>" data-smtp-username>
-                                </label>
-                                <label class="setup-field">
-                                    <span><?= e(__('mail.from_name')) ?></span>
-                                    <input type="text" name="from_name" value="<?= e((string) ($value['from_name'] ?? '')) ?>" autocomplete="organization" data-smtp-from-name>
-                                </label>
+                                <?= field('select', [
+                                    'name' => 'encryption',
+                                    'label' => (string) __('mail.encryption'),
+                                    'value' => $mailEnc,
+                                    'required' => true,
+                                    'context' => 'setup',
+                                    'include_empty' => false,
+                                    'options' => [
+                                        ['value' => 'tls', 'label' => (string) __('mail.encryption_tls')],
+                                        ['value' => 'ssl', 'label' => (string) __('mail.encryption_ssl')],
+                                        ['value' => 'none', 'label' => (string) __('mail.encryption_none')],
+                                    ],
+                                    'attrs' => ['data-smtp-encryption' => true],
+                                ]) ?>
+                                <?= field('text', [
+                                    'name' => 'username',
+                                    'label' => (string) __('mail.username'),
+                                    'value' => (string) ($value['username'] ?? ''),
+                                    'required' => true,
+                                    'context' => 'setup',
+                                    'autocomplete' => 'off',
+                                    'placeholder' => (string) __('mail.username_default_hint'),
+                                    'attrs' => ['data-smtp-username' => true],
+                                ]) ?>
+                                <?= field('text', [
+                                    'name' => 'from_name',
+                                    'label' => (string) __('mail.from_name'),
+                                    'value' => (string) ($value['from_name'] ?? ''),
+                                    'context' => 'setup',
+                                    'autocomplete' => 'organization',
+                                    'attrs' => ['data-smtp-from-name' => true],
+                                ]) ?>
                                 <div class="setup-smtp-actions">
                                     <button type="button" class="btn btn-ghost" data-smtp-verify-btn><?= e(__('setup.mail_verify_btn')) ?></button>
                                 </div>
@@ -1445,10 +1749,16 @@ $errorStep = flash('setup_error_step');
                             </div>
 
                             <div class="setup-smtp-section setup-smtp-test" data-smtp-test-section <?= $mailReady ? '' : 'hidden' ?>>
-                                <label class="setup-field">
-                                    <span><?= e(__('mail.test_to')) ?> *</span>
-                                    <input type="email" name="test_to" value="<?= e($assocEmail) ?>" <?= $mailReady ? 'required' : '' ?> autocomplete="off" data-smtp-test-to <?= $mailReady ? '' : 'disabled' ?>>
-                                </label>
+                                <?= field('email', [
+                                    'name' => 'test_to',
+                                    'label' => (string) __('mail.test_to'),
+                                    'value' => $assocEmail,
+                                    'required' => $mailReady,
+                                    'disabled' => !$mailReady,
+                                    'context' => 'setup',
+                                    'autocomplete' => 'off',
+                                    'attrs' => ['data-smtp-test-to' => true],
+                                ]) ?>
                                 <div class="setup-smtp-actions">
                                     <button type="button" class="btn btn-ghost" data-smtp-test-btn <?= $mailReady ? '' : 'disabled' ?>><?= e(__('setup.mail_test_btn')) ?></button>
                                 </div>
@@ -1484,7 +1794,7 @@ $errorStep = flash('setup_error_step');
                                 <?php if ($locked): ?>
                                     <div class="setup-component-row is-selected setup-component-row-core" data-component-core>
                                         <span class="setup-component-core-mark" aria-hidden="true">✓</span>
-                                        <input type="hidden" name="components[]" value="<?= e($cKey) ?>">
+                                        <?= field('hidden', ['name' => 'components[]', 'value' => $cKey]) ?>
                                         <span class="setup-component-row-body">
                                             <span class="setup-component-row-top">
                                                 <strong class="setup-component-name"><?= e(__((string) ($component['name'] ?? ''))) ?></strong>
@@ -1495,12 +1805,13 @@ $errorStep = flash('setup_error_step');
                                     </div>
                                 <?php else: ?>
                                     <label class="setup-component-row<?= $checked ? ' is-selected' : '' ?>">
-                                        <input
-                                            type="checkbox"
-                                            name="components[]"
-                                            value="<?= e($cKey) ?>"
-                                            <?= $checked ? 'checked' : '' ?>
-                                        >
+                                        <?= field('checkbox', [
+                                            'bare' => true,
+                                            'name' => 'components[]',
+                                            'value' => $checked ? $cKey : '',
+                                            'check_value' => $cKey,
+                                            'checked' => $checked,
+                                        ]) ?>
                                         <span class="setup-component-row-body">
                                             <span class="setup-component-row-top">
                                                 <strong class="setup-component-name"><?= e(__((string) ($component['name'] ?? ''))) ?></strong>
@@ -1542,53 +1853,83 @@ $errorStep = flash('setup_error_step');
                         data-msg-mismatch="<?= e(__('setup.platform_confirm_mismatch')) ?>"
                     >
                         <p class="setup-hint muted setup-platform-intro"><?= e(__('setup.platform_hint')) ?></p>
-                        <label class="checkbox-row setup-check">
-                            <input type="checkbox" name="news_opt_in" value="1" data-platform-opt <?= !empty($value['news_opt_in']) ? 'checked' : '' ?>>
-                            <span><?= e(__('setup.platform_news')) ?></span>
-                        </label>
-                        <label class="checkbox-row setup-check">
-                            <input type="checkbox" name="usage_stats_opt_in" value="1" data-platform-opt <?= !empty($value['usage_stats_opt_in']) ? 'checked' : '' ?>>
-                            <span><?= e(__('setup.platform_stats')) ?></span>
-                        </label>
-                        <label class="checkbox-row setup-check">
-                            <input type="checkbox" name="showcase_consent" value="1" data-platform-opt <?= !empty($value['showcase_consent']) ? 'checked' : '' ?>>
-                            <span><?= e(__('setup.platform_showcase')) ?></span>
-                        </label>
+                        <?= field('checkbox', [
+                            'name' => 'news_opt_in',
+                            'label' => (string) __('setup.platform_news'),
+                            'checked' => !empty($value['news_opt_in']),
+                            'context' => 'setup',
+                            'label_class' => 'checkbox-row setup-check',
+                            'attrs' => ['data-platform-opt' => true],
+                        ]) ?>
+                        <?= field('checkbox', [
+                            'name' => 'usage_stats_opt_in',
+                            'label' => (string) __('setup.platform_stats'),
+                            'checked' => !empty($value['usage_stats_opt_in']),
+                            'context' => 'setup',
+                            'label_class' => 'checkbox-row setup-check',
+                            'attrs' => ['data-platform-opt' => true],
+                        ]) ?>
+                        <?= field('checkbox', [
+                            'name' => 'showcase_consent',
+                            'label' => (string) __('setup.platform_showcase'),
+                            'checked' => !empty($value['showcase_consent']),
+                            'context' => 'setup',
+                            'label_class' => 'checkbox-row setup-check',
+                            'attrs' => ['data-platform-opt' => true],
+                        ]) ?>
                         <p class="setup-hint muted setup-platform-showcase-note"><?= e(__('setup.platform_showcase_hint')) ?></p>
                         <div class="setup-platform-confirm" data-platform-confirm <?= $anyPlatform ? '' : 'hidden' ?>>
                             <p class="setup-hint setup-platform-confirm-lede"><?= e(__('setup.platform_confirm_hint')) ?></p>
                             <div class="setup-equal-row">
-                                <label class="setup-field">
-                                    <span><?= e(__('setup.platform_confirm_first')) ?> *</span>
-                                    <input type="text" name="confirm_first_name" value="" autocomplete="off" data-platform-confirm-input placeholder="<?= e($confirmPhFirst) ?>" <?= $anyPlatform ? 'required' : '' ?>>
-                                </label>
-                                <label class="setup-field">
-                                    <span><?= e(__('setup.platform_confirm_last')) ?> *</span>
-                                    <input type="text" name="confirm_last_name" value="" autocomplete="off" data-platform-confirm-input placeholder="<?= e($confirmPhLast) ?>" <?= $anyPlatform ? 'required' : '' ?>>
-                                </label>
+                                <?= field('text', [
+                                    'name' => 'confirm_first_name',
+                                    'label' => (string) __('setup.platform_confirm_first'),
+                                    'value' => '',
+                                    'required' => $anyPlatform,
+                                    'context' => 'setup',
+                                    'autocomplete' => 'off',
+                                    'placeholder' => $confirmPhFirst,
+                                    'attrs' => ['data-platform-confirm-input' => true],
+                                ]) ?>
+                                <?= field('text', [
+                                    'name' => 'confirm_last_name',
+                                    'label' => (string) __('setup.platform_confirm_last'),
+                                    'value' => '',
+                                    'required' => $anyPlatform,
+                                    'context' => 'setup',
+                                    'autocomplete' => 'off',
+                                    'placeholder' => $confirmPhLast,
+                                    'attrs' => ['data-platform-confirm-input' => true],
+                                ]) ?>
                             </div>
                         </div>
                     </div>
                 <?php elseif ($stepType === 'admin_account'): ?>
                     <div class="setup-admin-account" data-setup-line>
                         <p class="setup-hint muted"><?= e(__('setup.admin_access_hint')) ?></p>
-                        <label class="setup-field">
-                            <span><?= e(__('setup.field_admin_email')) ?> *</span>
-                            <input type="email" name="email" value="<?= e((string) ($value['email'] ?? '')) ?>" required autocomplete="email">
-                        </label>
+                        <?= field('email', [
+                            'name' => 'email',
+                            'label' => (string) __('setup.field_admin_email'),
+                            'value' => (string) ($value['email'] ?? ''),
+                            'required' => true,
+                            'context' => 'setup',
+                            'autocomplete' => 'email',
+                        ]) ?>
                         <div class="setup-equal-row">
-                            <?= view_partial('partials/password_input', [
+                            <?= field('password', [
                                 'name' => 'password',
                                 'label' => (string) __('setup.field_admin_password'),
                                 'required' => true,
                                 'autocomplete' => 'new-password',
+                                'context' => 'setup',
                                 'minlength' => 8,
                             ]) ?>
-                            <?= view_partial('partials/password_input', [
+                            <?= field('password', [
                                 'name' => 'password_confirmation',
                                 'label' => (string) __('setup.field_admin_password_confirmation'),
                                 'required' => true,
                                 'autocomplete' => 'new-password',
+                                'context' => 'setup',
                                 'minlength' => 8,
                             ]) ?>
                         </div>
@@ -1613,28 +1954,29 @@ $errorStep = flash('setup_error_step');
                         </div>
                         <label class="setup-field setup-admin-locale" data-setup-admin-locale>
                             <span><?= e(__('setup.field_admin_locale')) ?></span>
-                            <div class="setup-locale-grid setup-locale-grid-compact" role="radiogroup" aria-label="<?= e(__('setup.field_admin_locale')) ?>">
-                                <?php foreach (['it' => 'Italiano', 'de' => 'Deutsch', 'en' => 'English'] as $loc => $locLabel): ?>
-                                    <label class="setup-locale-card">
-                                        <input type="radio" name="locale" value="<?= e($loc) ?>" <?= (string) ($value['locale'] ?? 'it') === $loc ? 'checked' : '' ?> required>
-                                        <img src="<?= e(locale_flag_url($loc)) ?>" width="28" height="21" alt="" loading="lazy" decoding="async">
-                                        <span><?= e($locLabel) ?></span>
-                                    </label>
-                                <?php endforeach; ?>
-                            </div>
+                            <?= field('locale_cards', [
+                                'name' => 'locale',
+                                'value' => (string) ($value['locale'] ?? 'it'),
+                                'locales' => ['it', 'de', 'en'],
+                                'required' => true,
+                                'grid_class' => 'setup-locale-grid-compact',
+                            ]) ?>
                         </label>
                     </div>
                 <?php else: ?>
-                    <label class="setup-field" data-setup-line>
-                        <span><?= e(__($step['title_key'])) ?></span>
-                        <input
-                            type="<?= e($stepType === 'tel' ? 'tel' : ($stepType === 'email' ? 'email' : 'text')) ?>"
-                            name="value"
-                            value="<?= e((string) $value) ?>"
-                            <?= !empty($step['required']) ? 'required' : '' ?>
-                            autocomplete="off"
-                        >
-                    </label>
+                    <?php
+                    $fallbackType = $stepType === 'email' ? 'email' : ($stepType === 'tel' ? 'phone' : 'text');
+                    $fallbackProps = [
+                        'name' => 'value',
+                        'label' => (string) __($step['title_key']),
+                        'value' => (string) $value,
+                        'required' => !empty($step['required']),
+                        'context' => 'setup',
+                        'autocomplete' => 'off',
+                        'wrap_attrs' => ['data-setup-line' => true],
+                    ];
+                    echo field($fallbackType, $fallbackProps);
+                    ?>
                 <?php endif; ?>
 
                 <?php
@@ -1751,32 +2093,49 @@ $errorStep = flash('setup_error_step');
             <p class="setup-exit-text" data-setup-people-cf-title><?= e(__('setup.cf_calc_title')) ?></p>
             <div class="setup-cf-calc-fields" data-setup-people-cf-form>
                 <div class="setup-equal-row">
-                    <label class="setup-field">
-                        <span><?= e(__('setup.field_first_name')) ?> *</span>
-                        <input type="text" name="first_name" required autocomplete="given-name" data-cf-dialog-first>
-                    </label>
-                    <label class="setup-field">
-                        <span><?= e(__('setup.field_last_name')) ?> *</span>
-                        <input type="text" name="last_name" required autocomplete="family-name" data-cf-dialog-last>
-                    </label>
+                    <?= field('text', [
+                        'name' => 'first_name',
+                        'label' => (string) __('setup.field_first_name'),
+                        'value' => '',
+                        'required' => true,
+                        'context' => 'setup',
+                        'autocomplete' => 'given-name',
+                        'attrs' => ['data-cf-dialog-first' => true],
+                    ]) ?>
+                    <?= field('text', [
+                        'name' => 'last_name',
+                        'label' => (string) __('setup.field_last_name'),
+                        'value' => '',
+                        'required' => true,
+                        'context' => 'setup',
+                        'autocomplete' => 'family-name',
+                        'attrs' => ['data-cf-dialog-last' => true],
+                    ]) ?>
                 </div>
                 <div class="setup-equal-row">
-                    <label class="setup-field">
-                        <span><?= e(__('setup.field_gender')) ?> *</span>
-                        <select name="gender" required data-cf-dialog-gender>
-                            <option value="">—</option>
-                            <option value="M"><?= e(__('members.gender_m')) ?></option>
-                            <option value="F"><?= e(__('members.gender_f')) ?></option>
-                        </select>
-                    </label>
-                    <label class="setup-field">
-                        <span><?= e(__('setup.field_birth_date')) ?> *</span>
-                        <input type="date" name="birth_date" required data-cf-dialog-birth data-birth-date
-                               min="<?= e(date('Y-m-d', strtotime('-100 years'))) ?>"
-                               max="<?= e(date('Y-m-d', strtotime('-18 years'))) ?>">
-                    </label>
+                    <?= field('gender', [
+                        'name' => 'gender',
+                        'label' => (string) __('setup.field_gender'),
+                        'value' => '',
+                        'required' => true,
+                        'context' => 'setup',
+                        'attrs' => ['data-cf-dialog-gender' => true],
+                    ]) ?>
+                    <?= field('birth_date', [
+                        'name' => 'birth_date',
+                        'label' => (string) __('setup.field_birth_date'),
+                        'value' => '',
+                        'required' => true,
+                        'context' => 'setup',
+                        'min' => date('Y-m-d', strtotime('-100 years')),
+                        'max' => date('Y-m-d', strtotime('-18 years')),
+                        'attrs' => [
+                            'data-cf-dialog-birth' => true,
+                            'data-birth-date' => true,
+                        ],
+                    ]) ?>
                 </div>
-                <?= view_partial('partials/geo_birth_place', [
+                <?= field('birth_place', [
                     'name' => 'birth_place',
                     'value' => '',
                     'required' => true,

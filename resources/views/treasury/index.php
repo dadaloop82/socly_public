@@ -71,19 +71,20 @@ $formOpen = $old !== [];
         </div>
         <button class="btn btn-sm treasury-filter-submit-desktop" type="submit"><?= e(__('treasury.search')) ?></button>
     </div>
+    <?php $sort = (string) ($ledger_sort ?? 'date_desc'); ?>
     <div class="treasury-filter-q">
         <label class="treasury-filter-q-label" for="treasury-q"><?= e(__('treasury.search')) ?></label>
         <div class="treasury-filter-q-row">
-            <input
-                id="treasury-q"
-                type="search"
-                name="q"
-                value="<?= e((string) ($search_query ?? '')) ?>"
-                placeholder="<?= e(__('treasury.search_placeholder')) ?>"
-                maxlength="120"
-                autocomplete="off"
-                enterkeyhint="search"
-            >
+            <?= field('search', [
+                'name' => 'q',
+                'id' => 'treasury-q',
+                'label' => '',
+                'value' => (string) ($search_query ?? ''),
+                'context' => 'filter',
+                'placeholder' => (string) __('treasury.search_placeholder'),
+                'maxlength' => 120,
+                'attrs' => ['enterkeyhint' => 'search'],
+            ]) ?>
             <button class="btn btn-sm treasury-filter-submit-mobile" type="submit"><?= e(__('treasury.search')) ?></button>
             <?php if (trim((string) ($search_query ?? '')) !== ''): ?>
                 <a class="btn btn-ghost btn-sm" href="<?= e(url('/treasury')) ?>"><?= e(__('treasury.search_clear')) ?></a>
@@ -91,23 +92,34 @@ $formOpen = $old !== [];
         </div>
     </div>
     <div class="grid-2" style="margin-top:0.85rem;gap:0.85rem">
-        <div>
-            <label for="treasury-group"><?= e(__('treasury.group_by_category')) ?></label>
-            <select id="treasury-group" name="group" data-treasury-filter-auto>
-                <option value="1" <?= !empty($group_by_category) ? 'selected' : '' ?>><?= e(__('treasury.group_by_category')) ?></option>
-                <option value="0" <?= empty($group_by_category) ? 'selected' : '' ?>><?= e(__('treasury.group_by_category_off')) ?></option>
-            </select>
-        </div>
-        <div>
-            <label for="treasury-sort"><?= e(__('treasury.sort_by')) ?></label>
-            <?php $sort = (string) ($ledger_sort ?? 'date_desc'); ?>
-            <select id="treasury-sort" name="sort" data-treasury-filter-auto>
-                <option value="date_desc" <?= $sort === 'date_desc' ? 'selected' : '' ?>><?= e(__('treasury.sort_date_desc')) ?></option>
-                <option value="date_asc" <?= $sort === 'date_asc' ? 'selected' : '' ?>><?= e(__('treasury.sort_date_asc')) ?></option>
-                <option value="created_desc" <?= $sort === 'created_desc' ? 'selected' : '' ?>><?= e(__('treasury.sort_created_desc')) ?></option>
-                <option value="invoice_desc" <?= $sort === 'invoice_desc' ? 'selected' : '' ?>><?= e(__('treasury.sort_invoice_desc')) ?></option>
-            </select>
-        </div>
+        <?= field('select', [
+            'name' => 'group',
+            'id' => 'treasury-group',
+            'label' => (string) __('treasury.group_by_category'),
+            'value' => !empty($group_by_category) ? '1' : '0',
+            'context' => 'filter',
+            'include_empty' => false,
+            'options' => [
+                '1' => (string) __('treasury.group_by_category'),
+                '0' => (string) __('treasury.group_by_category_off'),
+            ],
+            'attrs' => ['data-treasury-filter-auto' => true],
+        ]) ?>
+        <?= field('select', [
+            'name' => 'sort',
+            'id' => 'treasury-sort',
+            'label' => (string) __('treasury.sort_by'),
+            'value' => $sort,
+            'context' => 'filter',
+            'include_empty' => false,
+            'options' => [
+                'date_desc' => (string) __('treasury.sort_date_desc'),
+                'date_asc' => (string) __('treasury.sort_date_asc'),
+                'created_desc' => (string) __('treasury.sort_created_desc'),
+                'invoice_desc' => (string) __('treasury.sort_invoice_desc'),
+            ],
+            'attrs' => ['data-treasury-filter-auto' => true],
+        ]) ?>
     </div>
 </form>
 <?php endif; ?>

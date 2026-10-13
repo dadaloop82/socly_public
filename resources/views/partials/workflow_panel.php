@@ -16,46 +16,71 @@ $events = \Socly\Services\WorkflowService::events();
     <h3 class="setup-subhead"><?= e($editing ? __('workflow.edit') : __('workflow.create')) ?></h3>
     <form method="post" action="<?= e(url('/settings/workflow')) ?>" class="workflow-rule-form" data-leave-guard>
         <?= csrf_field() ?>
-        <input type="hidden" name="action" value="save">
-        <input type="hidden" name="id" value="<?= (int) ($editing['id'] ?? 0) ?>">
-        <label class="setup-field">
-            <span><?= e(__('workflow.name')) ?> *</span>
-            <input type="text" name="name" required maxlength="160" value="<?= e((string) old('name', $editing['name'] ?? '')) ?>">
-        </label>
-        <label class="setup-field">
-            <span><?= e(__('workflow.event')) ?> *</span>
-            <select name="event_key" required>
-                <?php foreach ($eventGroups as $groupKey => $groupEvents): ?>
-                    <optgroup label="<?= e(__($groupKey)) ?>">
-                        <?php foreach ($groupEvents as $k => $labelKey): ?>
-                            <option value="<?= e($k) ?>" <?= (string) old('event_key', $editing['event_key'] ?? '') === $k ? 'selected' : '' ?>><?= e(__($labelKey)) ?></option>
-                        <?php endforeach; ?>
-                    </optgroup>
-                <?php endforeach; ?>
-            </select>
-        </label>
+        <?= field('hidden', ['name' => 'action', 'value' => 'save']) ?>
+        <?= field('hidden', ['name' => 'id', 'value' => (string) (int) ($editing['id'] ?? 0)]) ?>
+        <?= field('text', [
+            'name' => 'name',
+            'label' => (string) __('workflow.name'),
+            'value' => (string) old('name', $editing['name'] ?? ''),
+            'required' => true,
+            'context' => 'setup',
+            'maxlength' => 160,
+        ]) ?>
+        <?php
+        $eventOptionGroups = [];
+        foreach ($eventGroups as $groupKey => $groupEvents) {
+            $opts = [];
+            foreach ($groupEvents as $k => $labelKey) {
+                $opts[] = ['value' => (string) $k, 'label' => (string) __($labelKey)];
+            }
+            $eventOptionGroups[] = ['label' => (string) __($groupKey), 'options' => $opts];
+        }
+        ?>
+        <?= field('select', [
+            'name' => 'event_key',
+            'label' => (string) __('workflow.event'),
+            'value' => (string) old('event_key', $editing['event_key'] ?? ''),
+            'required' => true,
+            'context' => 'setup',
+            'include_empty' => false,
+            'groups' => $eventOptionGroups,
+        ]) ?>
         <div class="setup-equal-row">
-            <label class="setup-field">
-                <span><?= e(__('workflow.template')) ?> *</span>
-                <select name="template_slug" required>
-                    <option value="">—</option>
-                    <?php foreach ($emailTemplates as $t): ?>
-                        <option value="<?= e((string) ($t['slug'] ?? '')) ?>" <?= (string) old('template_slug', $editing['template_slug'] ?? '') === (string) ($t['slug'] ?? '') ? 'selected' : '' ?>>
-                            <?= e((string) ($t['name'] ?? '')) ?> (<?= e((string) ($t['slug'] ?? '')) ?>)
-                        </option>
-                    <?php endforeach; ?>
-                </select>
-            </label>
-            <label class="setup-field">
-                <span><?= e(__('workflow.delay')) ?></span>
-                <input type="number" name="delay_minutes" min="0" max="10080" value="<?= (int) old('delay_minutes', $editing['delay_minutes'] ?? 0) ?>">
-                <span class="setup-hint muted"><?= e(__('workflow.delay_hint')) ?></span>
-            </label>
+            <?php
+            $templateOptions = [];
+            foreach ($emailTemplates as $t) {
+                $slug = (string) ($t['slug'] ?? '');
+                $templateOptions[] = [
+                    'value' => $slug,
+                    'label' => (string) ($t['name'] ?? '') . ' (' . $slug . ')',
+                ];
+            }
+            ?>
+            <?= field('select', [
+                'name' => 'template_slug',
+                'label' => (string) __('workflow.template'),
+                'value' => (string) old('template_slug', $editing['template_slug'] ?? ''),
+                'required' => true,
+                'context' => 'setup',
+                'options' => $templateOptions,
+            ]) ?>
+            <?= field('number', [
+                'name' => 'delay_minutes',
+                'label' => (string) __('workflow.delay'),
+                'value' => (string) (int) old('delay_minutes', $editing['delay_minutes'] ?? 0),
+                'context' => 'setup',
+                'min' => 0,
+                'max' => 10080,
+                'hint' => (string) __('workflow.delay_hint'),
+            ]) ?>
         </div>
-        <label class="setup-check setup-check-prominent">
-            <input type="checkbox" name="enabled" value="1" <?= old('enabled', $editing['enabled'] ?? 1) ? 'checked' : '' ?>>
-            <span><?= e(__('workflow.enabled')) ?></span>
-        </label>
+        <?= field('checkbox', [
+            'name' => 'enabled',
+            'label' => (string) __('workflow.enabled'),
+            'checked' => (bool) old('enabled', $editing['enabled'] ?? 1),
+            'context' => 'setup',
+            'label_class' => 'checkbox-row setup-check setup-check-prominent',
+        ]) ?>
         <div class="actions form-actions form-actions-end">
             <button class="btn" type="submit"><?= e(__('common.save')) ?></button>
             <?php if ($editing): ?>

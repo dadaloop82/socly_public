@@ -223,8 +223,13 @@ $balanceDue = (float) ($member['balance_due'] ?? 0);
         <?php if (can('members.manage')): ?>
             <form class="member-enrollment-upload" method="post" action="<?= e(url('/members/'.$member['id'].'/enrollment-scan')) ?>" enctype="multipart/form-data" style="margin-top:1rem;display:grid;gap:0.65rem;max-width:28rem">
                 <?= csrf_field() ?>
-                <label class="field-label"><?= e(__('members.enrollment_upload_scan')) ?></label>
-                <input type="file" name="enrollment_scan" accept="application/pdf,image/jpeg,image/png,.pdf,.jpg,.jpeg,.png" required>
+                <?= field('file', [
+                    'name' => 'enrollment_scan',
+                    'label' => (string) __('members.enrollment_upload_scan'),
+                    'accept' => 'application/pdf,image/jpeg,image/png,.pdf,.jpg,.jpeg,.png',
+                    'required' => true,
+                    'as_button' => false,
+                ]) ?>
                 <p class="muted" style="margin:0"><?= e(__('members.enrollment_upload_hint')) ?></p>
                 <button type="submit" class="btn btn-sm"><?= e(__('members.enrollment_upload_submit')) ?></button>
             </form>

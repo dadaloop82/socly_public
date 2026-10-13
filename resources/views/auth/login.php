@@ -24,21 +24,27 @@ if ($setupUrl === '') {
         <span class="auth-lang-rotate-item h2" data-rotate-lang="de">Sprache wählen</span>
         <span class="auth-lang-rotate-item h2" data-rotate-lang="en">Choose language</span>
     </div>
-    <fieldset class="auth-locale-grid setup-locale-grid" role="radiogroup" aria-label="<?= e(__('auth.choose_language')) ?>" data-lang-group>
+    <?php
+    $loginLocaleCardOptions = [];
+    foreach (['it' => 'Italiano', 'de' => 'Deutsch', 'en' => 'English'] as $loc => $label) {
+        $loginLocaleCardOptions[] = [
+            'value' => $loc,
+            'label' => $label,
+            'flag' => locale_flag_url($loc),
+            'label_attrs' => ['data-lang-label' => $loc],
+        ];
+    }
+    ?>
+    <fieldset role="radiogroup" aria-label="<?= e(__('auth.choose_language')) ?>" data-lang-group>
         <legend class="visually-hidden"><?= e(__('auth.choose_language')) ?></legend>
-        <?php foreach (['it' => 'Italiano', 'de' => 'Deutsch', 'en' => 'English'] as $loc => $label): ?>
-            <label class="setup-locale-card auth-locale-card">
-                <input
-                    type="radio"
-                    name="lang"
-                    value="<?= e($loc) ?>"
-                    data-lang-radio
-                    <?= $currentLocale === $loc ? 'checked' : '' ?>
-                >
-                <img src="<?= e(locale_flag_url($loc)) ?>" width="28" height="21" alt="" loading="lazy" decoding="async">
-                <span data-lang-label="<?= e($loc) ?>"><?= e($label) ?></span>
-            </label>
-        <?php endforeach; ?>
+        <?= field('locale_cards', [
+            'name' => 'lang',
+            'value' => $currentLocale,
+            'options' => $loginLocaleCardOptions,
+            'attrs' => ['data-lang-radio' => true],
+            'grid_class' => 'auth-locale-grid',
+            'card_class' => 'setup-locale-card auth-locale-card',
+        ]) ?>
     </fieldset>
 </div>
 
@@ -58,26 +64,46 @@ if ($setupUrl === '') {
 
     <form method="post" action="<?= e(url('/login')) ?>">
         <?= csrf_field() ?>
-        <input type="hidden" name="lang" value="<?= e($currentLocale) ?>" data-login-lang>
+        <?= field('hidden', [
+            'name' => 'lang',
+            'value' => $currentLocale,
+            'attrs' => ['data-login-lang' => true],
+        ]) ?>
         <label for="email" data-i18n="auth.email"><?= e(__('auth.email')) ?></label>
-        <input id="email" type="email" name="email" value="<?= e((string)old('email')) ?>" required autofocus autocomplete="username" placeholder="<?= e(__('auth.email_placeholder')) ?>" data-i18n-placeholder="auth.email_placeholder">
+        <?= field('email', [
+            'name' => 'email',
+            'id' => 'email',
+            'label' => '',
+            'value' => (string) old('email'),
+            'required' => true,
+            'placeholder' => (string) __('auth.email_placeholder'),
+            'autocomplete' => 'username',
+            'input_class' => 'auth-field-control',
+            'attrs' => [
+                'autofocus' => true,
+                'data-i18n-placeholder' => 'auth.email_placeholder',
+            ],
+        ]) ?>
 
         <label for="password" data-i18n="auth.password"><?= e(__('auth.password')) ?></label>
-        <?= view_partial('partials/password_input', [
+        <?= field('password', [
             'name' => 'password',
             'id' => 'password',
             'label' => '',
             'required' => true,
             'placeholder' => (string) __('auth.password_placeholder'),
             'autocomplete' => 'current-password',
-            'wrapper_class' => 'password-field password-field--bare',
+            'wrapper_class' => 'password-field--bare',
             'input_attrs' => 'data-i18n-placeholder="auth.password_placeholder"',
         ]) ?>
 
-        <label class="checkbox-row auth-remember">
-            <input type="checkbox" name="remember" value="1">
-            <span data-i18n="auth.remember"><?= e(__('auth.remember')) ?></span>
-        </label>
+        <?= field('checkbox', [
+            'name' => 'remember',
+            'id' => 'remember',
+            'label' => (string) __('auth.remember'),
+            'check_value' => '1',
+            'wrapper_class' => 'auth-remember',
+        ]) ?>
 
         <div class="auth-links">
             <a href="<?= e(url('/password/forgot')) ?>" data-i18n="auth.forgot"><?= e(__('auth.forgot')) ?></a>

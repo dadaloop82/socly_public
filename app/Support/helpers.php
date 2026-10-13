@@ -39,6 +39,26 @@ if (!function_exists('view_partial')) {
     }
 }
 
+if (!function_exists('field')) {
+    /**
+     * Render a standard reusable field module.
+     *
+     * @param array<string, mixed> $props
+     */
+    function field(string $type, array $props = []): string
+    {
+        return \Socly\Support\Fields::render($type, $props);
+    }
+}
+
+if (!function_exists('field_attrs')) {
+    /** @param array<string, mixed> $attrs */
+    function field_attrs(array $attrs): string
+    {
+        return \Socly\Support\Fields::attrs($attrs);
+    }
+}
+
 if (!function_exists('base_url')) {
     function base_url(): string
     {

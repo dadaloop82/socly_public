@@ -33,8 +33,19 @@
         <form method="post" action="<?= e(url('/plugins/'.$plugin['id'].'/settings')) ?>">
             <?= csrf_field() ?>
             <?php foreach ($plugin['settings'] as $key => $def): ?>
-                <label><?= e($def['label'] ?? $key) ?></label>
-                <input type="<?= !empty($def['encrypted']) ? 'password' : 'text' ?>" name="<?= e($key) ?>" value="<?= e((string)($plugin['values'][$key] ?? '')) ?>">
+                <?php if (!empty($def['encrypted'])): ?>
+                    <?= field('password', [
+                        'name' => (string) $key,
+                        'label' => (string) ($def['label'] ?? $key),
+                        'value' => (string) ($plugin['values'][$key] ?? ''),
+                    ]) ?>
+                <?php else: ?>
+                    <?= field('text', [
+                        'name' => (string) $key,
+                        'label' => (string) ($def['label'] ?? $key),
+                        'value' => (string) ($plugin['values'][$key] ?? ''),
+                    ]) ?>
+                <?php endif; ?>
             <?php endforeach; ?>
             <button class="btn" type="submit"><?= e(__('common.save')) ?></button>
         </form>

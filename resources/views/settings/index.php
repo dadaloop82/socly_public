@@ -33,42 +33,76 @@
         <?= csrf_field() ?>
         <div class="setup-name-pair settings-name-pair" data-setup-name-pair
              data-preview-template="<?= e(__('setup.full_name_preview')) ?>">
-            <label class="setup-field setup-field-name">
-                <span><?= e(__('setup.field_assoc_name')) ?></span>
-                <input type="text" name="association_name" value="<?= e((string)$settings['association.name']) ?>" required data-setup-assoc-name>
-            </label>
-            <label class="setup-field setup-field-name-de">
-                <span><?= e(__('setup.field_assoc_name_de')) ?> <span class="muted">(<?= e(__('setup.optional_short')) ?>)</span></span>
-                <input type="text" name="association_name_de" value="<?= e((string) ($settings['association.name_de'] ?? '')) ?>" data-setup-assoc-name-de>
-                <p class="setup-field-hint muted"><?= e(__('setup.field_assoc_name_de_hint')) ?></p>
-            </label>
-            <label class="setup-field setup-field-legal">
-                <span><?= e(__('setup.field_assoc_legal_name')) ?></span>
-                <?php $legalForms = \Socly\Setup\AssociationLegalForms::all(); $currentLegal = (string)($settings['association.legal_name'] ?? ''); ?>
-                <select name="association_legal_name" required maxlength="6" data-setup-legal-name>
-                    <option value="" disabled <?= $currentLegal === '' ? 'selected' : '' ?>><?= e(__('setup.legal_form_placeholder')) ?></option>
-                    <?php foreach ($legalForms as $code => $labelKey): ?>
-                        <option value="<?= e($code) ?>" <?= $currentLegal === $code ? 'selected' : '' ?> data-meaning="<?= e(\Socly\Setup\AssociationLegalForms::bilingualMeaning($code)) ?>">
-                            <?= e(\Socly\Setup\AssociationLegalForms::displayCode($code)) ?>
-                        </option>
-                    <?php endforeach; ?>
-                </select>
-                <p class="setup-bilingual-hint muted"><?= e(__('setup.legal_form_bilingual_hint')) ?></p>
-            </label>
+            <?= field('text', [
+                'name' => 'association_name',
+                'label' => (string) __('setup.field_assoc_name'),
+                'value' => (string) $settings['association.name'],
+                'required' => true,
+                'context' => 'setup',
+                'wrapper_class' => 'setup-field-name',
+                'autocomplete' => 'organization',
+                'attrs' => ['data-setup-assoc-name' => true],
+            ]) ?>
+            <?= field('text', [
+                'name' => 'association_name_de',
+                'label' => (string) __('setup.field_assoc_name_de') . ' (' . __('setup.optional_short') . ')',
+                'value' => (string) ($settings['association.name_de'] ?? ''),
+                'context' => 'setup',
+                'wrapper_class' => 'setup-field-name-de',
+                'autocomplete' => 'organization',
+                'hint' => (string) __('setup.field_assoc_name_de_hint'),
+                'attrs' => ['data-setup-assoc-name-de' => true],
+            ]) ?>
+            <?php
+            $legalForms = \Socly\Setup\AssociationLegalForms::all();
+            $currentLegal = (string) ($settings['association.legal_name'] ?? '');
+            $legalOptions = [];
+            foreach ($legalForms as $code => $labelKey) {
+                $legalOptions[] = [
+                    'value' => (string) $code,
+                    'label' => \Socly\Setup\AssociationLegalForms::displayCode((string) $code),
+                    'attrs' => ['data-meaning' => \Socly\Setup\AssociationLegalForms::bilingualMeaning((string) $code)],
+                ];
+            }
+            ?>
+            <?= field('select', [
+                'name' => 'association_legal_name',
+                'label' => (string) __('setup.field_assoc_legal_name'),
+                'value' => $currentLegal,
+                'required' => true,
+                'context' => 'setup',
+                'wrapper_class' => 'setup-field-legal',
+                'options' => $legalOptions,
+                'empty_label' => (string) __('setup.legal_form_placeholder'),
+                'include_empty' => true,
+                'attrs' => ['data-setup-legal-name' => true, 'maxlength' => '6'],
+                'hint' => (string) __('setup.legal_form_bilingual_hint'),
+            ]) ?>
             <p class="setup-hint setup-full-name-preview muted" data-setup-full-name-preview hidden></p>
         </div>
         <div class="grid-2">
             <div>
-                <label><?= e(__('setup.field_fiscal_code')) ?></label>
-                <input type="text" name="association_fiscal_code" value="<?= e((string)($settings['association.fiscal_code'] ?? '')) ?>" required maxlength="16">
+                <?= field('text', [
+                    'name' => 'association_fiscal_code',
+                    'label' => (string) __('setup.field_fiscal_code'),
+                    'value' => (string) ($settings['association.fiscal_code'] ?? ''),
+                    'required' => true,
+                    'context' => 'setup',
+                    'maxlength' => 16,
+                ]) ?>
             </div>
             <div>
-                <label><?= e(__('setup.field_vat_number')) ?></label>
-                <input type="text" name="association_vat" value="<?= e((string)($settings['association.vat_number'] ?? '')) ?>" maxlength="11">
+                <?= field('text', [
+                    'name' => 'association_vat',
+                    'label' => (string) __('setup.field_vat_number'),
+                    'value' => (string) ($settings['association.vat_number'] ?? ''),
+                    'context' => 'setup',
+                    'maxlength' => 11,
+                ]) ?>
             </div>
         </div>
         <h3 class="section-title" style="margin-top:1rem"><?= e(__('setup.step_seat_title')) ?></h3>
-        <?= view_partial('partials/geo_address', [
+        <?= field('address', [
             'names' => [
                 'city' => 'association_city',
                 'postal_code' => 'association_postal_code',
@@ -83,7 +117,7 @@
                 'address' => (string) ($settings['association.address'] ?? ''),
                 'house_number' => (string) ($settings['association.house_number'] ?? ''),
             ],
-            'required' => [
+            'required_map' => [
                 'city' => true,
                 'postal_code' => true,
                 'province' => true,
@@ -100,25 +134,42 @@
         ]) ?>
         <div class="grid-2" style="margin-top:1rem">
             <div>
-                <label><?= e(__('setup.field_pec')) ?></label>
-                <input type="email" name="association_pec" value="<?= e((string)($settings['association.pec'] ?? '')) ?>" required>
+                <?= field('email', [
+                    'name' => 'association_pec',
+                    'label' => (string) __('setup.field_pec'),
+                    'value' => (string) ($settings['association.pec'] ?? ''),
+                    'required' => true,
+                    'context' => 'setup',
+                ]) ?>
             </div>
             <div>
-                <label><?= e(__('setup.field_email')) ?></label>
-                <input type="email" name="association_email" value="<?= e((string)($settings['association.email'] ?? '')) ?>">
+                <?= field('email', [
+                    'name' => 'association_email',
+                    'label' => (string) __('setup.field_email'),
+                    'value' => (string) ($settings['association.email'] ?? ''),
+                    'context' => 'setup',
+                ]) ?>
             </div>
         </div>
         <div class="grid-2">
             <div>
-                <label><?= e(__('setup.field_phone')) ?></label>
-                <?= view_partial('partials/phone_field', [
+                <?= field('phone', [
                     'name' => 'association_phone',
+                    'label' => (string) __('setup.field_phone'),
                     'value' => (string) ($settings['association.phone'] ?? ''),
+                    'context' => 'setup',
                 ]) ?>
             </div>
             <div>
-                <label><?= e(__('setup.field_runts')) ?></label>
-                <input type="text" name="association_runts" value="<?= e((string)($settings['association.runts'] ?? '')) ?>" inputmode="numeric" maxlength="6" autocomplete="off">
+                <?= field('text', [
+                    'name' => 'association_runts',
+                    'label' => (string) __('setup.field_runts'),
+                    'value' => (string) ($settings['association.runts'] ?? ''),
+                    'context' => 'setup',
+                    'inputmode' => 'numeric',
+                    'maxlength' => 6,
+                    'autocomplete' => 'off',
+                ]) ?>
             </div>
         </div>
         <div class="setup-logo settings-logo-block" data-setup-logo>
@@ -127,21 +178,27 @@
                 <div class="setup-logo-preview" data-setup-logo-preview>
                     <img src="<?= e($settingsLogo) ?>" alt="<?= e(__('setup.field_logo')) ?>" data-setup-logo-img>
                 </div>
-                <label class="checkbox-row setup-check">
-                    <input type="checkbox" name="remove_logo" value="1">
-                    <span><?= e(__('setup.logo_remove')) ?></span>
-                </label>
+                <?= field('checkbox', [
+                    'name' => 'remove_logo',
+                    'label' => (string) __('setup.logo_remove'),
+                    'context' => 'setup',
+                    'label_class' => 'checkbox-row setup-check',
+                ]) ?>
             <?php else: ?>
                 <div class="setup-logo-preview" data-setup-logo-preview hidden>
                     <img alt="<?= e(__('setup.field_logo')) ?>" data-setup-logo-img hidden>
                 </div>
             <?php endif; ?>
             <div class="setup-logo-actions">
-                <label class="btn btn-ghost file-btn">
-                    <span class="field-icon" data-icon="upload" aria-hidden="true"></span>
-                    <?= e(__('setup.logo_upload')) ?>
-                    <input type="file" name="logo" accept="image/png,image/jpeg,image/webp,image/gif,image/svg+xml" data-setup-logo-input hidden>
-                </label>
+                <?= field('file', [
+                    'name' => 'logo',
+                    'button_label' => (string) __('setup.logo_upload'),
+                    'accept' => 'image/png,image/jpeg,image/webp,image/gif,image/svg+xml',
+                    'context' => 'setup',
+                    'button_class' => 'btn btn-ghost file-btn',
+                    'icon' => 'upload',
+                    'attrs' => ['data-setup-logo-input' => true],
+                ]) ?>
             </div>
             <div class="setup-logo-upload-progress" data-setup-logo-progress hidden>
                 <span class="setup-logo-upload-progress-bar" data-setup-logo-progress-bar style="--progress: 0%"></span>
@@ -168,30 +225,31 @@
             <span class="setup-brand-preview-accent"></span>
         </div>
         <div class="setup-colors setup-color-picker-grid" data-setup-line>
-            <label class="setup-field setup-color-picker-card">
-                <span><?= e(__('install.primary')) ?></span>
-                <span class="setup-color-picker-control">
-                    <input type="color" name="primary" value="<?= e((string)$settings['branding.primary']) ?>" required data-brand-color="primary">
-                    <code><?= e(strtoupper((string)$settings['branding.primary'])) ?></code>
-                </span>
-            </label>
-            <label class="setup-field setup-color-picker-card">
-                <span><?= e(__('install.accent')) ?></span>
-                <span class="setup-color-picker-control">
-                    <input type="color" name="accent" value="<?= e((string)$settings['branding.accent']) ?>" required data-brand-color="accent">
-                    <code><?= e(strtoupper((string)$settings['branding.accent'])) ?></code>
-                </span>
-            </label>
+            <?= field('color', [
+                'name' => 'primary',
+                'label' => (string) __('install.primary'),
+                'value' => (string) $settings['branding.primary'],
+                'required' => true,
+                'setup_brand' => true,
+                'brand_key' => 'primary',
+            ]) ?>
+            <?= field('color', [
+                'name' => 'accent',
+                'label' => (string) __('install.accent'),
+                'value' => (string) $settings['branding.accent'],
+                'required' => true,
+                'setup_brand' => true,
+                'brand_key' => 'accent',
+            ]) ?>
         </div>
-        <fieldset class="setup-locale-grid" data-setup-line>
+        <fieldset data-setup-line>
             <legend class="setup-field-label"><?= e(__('install.locale')) ?></legend>
-            <?php foreach (['it','de','en'] as $loc): ?>
-                <label class="setup-locale-card">
-                    <input type="radio" name="locale" value="<?= $loc ?>" <?= $settings['app.locale']===$loc?'checked':'' ?> required>
-                    <img src="<?= e(locale_flag_url($loc)) ?>" width="28" height="21" alt="" loading="lazy" decoding="async">
-                    <span><?= e(match ($loc) { 'it' => 'Italiano', 'de' => 'Deutsch', default => 'English' }) ?></span>
-                </label>
-            <?php endforeach; ?>
+            <?= field('locale_cards', [
+                'name' => 'locale',
+                'value' => (string) ($settings['app.locale'] ?? 'it'),
+                'locales' => ['it', 'de', 'en'],
+                'required' => true,
+            ]) ?>
         </fieldset>
         <p class="settings-autosave-status muted" data-settings-autosave-status aria-live="polite"></p>
     </form>
@@ -208,37 +266,52 @@
 <form method="post" action="<?= e(url('/settings/people')) ?>" data-cities-url="<?= e(url('/api/geo/cities')) ?>" data-addresses-url="<?= e(url('/api/geo/addresses')) ?>" data-settings-geo data-leave-guard>
         <?= csrf_field() ?>
         <p class="muted"><?= e(__('settings.people_hint')) ?></p>
+        <?php
+        $roleOptions = [];
+        foreach ($roles as $role) {
+            $roleOptions[] = [
+                'value' => (string) $role['key'],
+                'label' => (string) __((string) $role['label_key']),
+            ];
+        }
+        ?>
         <div class="assoc-people" data-people-list>
             <div class="assoc-people-rows" data-people-rows>
                 <?php foreach ($people as $i => $person): ?>
                     <?php $roleKey = (string) ($person['role_key'] ?? 'board'); ?>
                     <div class="assoc-person-card" data-people-row data-role="<?= e($roleKey) ?>">
                         <div class="assoc-person-main">
-                            <label class="setup-field">
-                                <span><?= e(__('settings.people_role')) ?></span>
-                                <select name="people[<?= (int) $i ?>][role_key]" required>
-                                    <?php foreach ($roles as $role): ?>
-                                        <option value="<?= e((string) $role['key']) ?>" <?= $roleKey === (string) $role['key'] ? 'selected' : '' ?>>
-                                            <?= e(__((string) $role['label_key'])) ?>
-                                        </option>
-                                    <?php endforeach; ?>
-                                </select>
-                            </label>
-                            <label class="setup-field">
-                                <span><?= e(__('setup.field_first_name')) ?></span>
-                                <input type="text" name="people[<?= (int) $i ?>][first_name]" value="<?= e((string) ($person['first_name'] ?? '')) ?>">
-                            </label>
-                            <label class="setup-field">
-                                <span><?= e(__('setup.field_last_name')) ?></span>
-                                <input type="text" name="people[<?= (int) $i ?>][last_name]" value="<?= e((string) ($person['last_name'] ?? '')) ?>">
-                            </label>
-                            <label class="setup-field">
-                                <span><?= e(__('setup.field_person_fiscal_code')) ?></span>
-                                <input type="text" name="people[<?= (int) $i ?>][fiscal_code]" value="<?= e((string) ($person['fiscal_code'] ?? '')) ?>" maxlength="16">
-                            </label>
+                            <?= field('select', [
+                                'name' => 'people[' . (int) $i . '][role_key]',
+                                'label' => (string) __('settings.people_role'),
+                                'value' => $roleKey,
+                                'required' => true,
+                                'context' => 'setup',
+                                'include_empty' => false,
+                                'options' => $roleOptions,
+                            ]) ?>
+                            <?= field('text', [
+                                'name' => 'people[' . (int) $i . '][first_name]',
+                                'label' => (string) __('setup.field_first_name'),
+                                'value' => (string) ($person['first_name'] ?? ''),
+                                'context' => 'setup',
+                            ]) ?>
+                            <?= field('text', [
+                                'name' => 'people[' . (int) $i . '][last_name]',
+                                'label' => (string) __('setup.field_last_name'),
+                                'value' => (string) ($person['last_name'] ?? ''),
+                                'context' => 'setup',
+                            ]) ?>
+                            <?= field('text', [
+                                'name' => 'people[' . (int) $i . '][fiscal_code]',
+                                'label' => (string) __('setup.field_person_fiscal_code'),
+                                'value' => (string) ($person['fiscal_code'] ?? ''),
+                                'context' => 'setup',
+                                'maxlength' => 16,
+                            ]) ?>
                             <button type="button" class="btn btn-ghost btn-sm" data-people-remove aria-label="<?= e(__('setup.remove_person')) ?>">×</button>
                         </div>
-                        <?= view_partial('partials/geo_address', [
+                        <?= field('address', [
                             'class' => 'assoc-person-extra',
                             'show_hint' => false,
                             'names' => [
@@ -255,14 +328,18 @@
                             ],
                         ]) ?>
                         <div class="setup-address-row assoc-person-dates">
-                            <label class="setup-field">
-                                <span><?= e(__('setup.field_appointed_at')) ?></span>
-                                <input type="date" name="people[<?= (int) $i ?>][appointed_at]" value="<?= e((string) ($person['appointed_at'] ?? '')) ?>">
-                            </label>
-                            <label class="setup-field">
-                                <span><?= e(__('setup.field_mandate_ends_at')) ?></span>
-                                <input type="date" name="people[<?= (int) $i ?>][mandate_ends_at]" value="<?= e((string) ($person['mandate_ends_at'] ?? '')) ?>">
-                            </label>
+                            <?= field('date', [
+                                'name' => 'people[' . (int) $i . '][appointed_at]',
+                                'label' => (string) __('setup.field_appointed_at'),
+                                'value' => (string) ($person['appointed_at'] ?? ''),
+                                'context' => 'setup',
+                            ]) ?>
+                            <?= field('date', [
+                                'name' => 'people[' . (int) $i . '][mandate_ends_at]',
+                                'label' => (string) __('setup.field_mandate_ends_at'),
+                                'value' => (string) ($person['mandate_ends_at'] ?? ''),
+                                'context' => 'setup',
+                            ]) ?>
                         </div>
                     </div>
                 <?php endforeach; ?>
@@ -271,31 +348,37 @@
             <template data-people-template>
                 <div class="assoc-person-card" data-people-row data-role="board">
                     <div class="assoc-person-main">
-                        <label class="setup-field">
-                            <span><?= e(__('settings.people_role')) ?></span>
-                            <select name="people[__i__][role_key]" required>
-                                <?php foreach ($roles as $role): ?>
-                                    <option value="<?= e((string) $role['key']) ?>" <?= (string) $role['key'] === 'board' ? 'selected' : '' ?>>
-                                        <?= e(__((string) $role['label_key'])) ?>
-                                    </option>
-                                <?php endforeach; ?>
-                            </select>
-                        </label>
-                        <label class="setup-field">
-                            <span><?= e(__('setup.field_first_name')) ?></span>
-                            <input type="text" name="people[__i__][first_name]" value="">
-                        </label>
-                        <label class="setup-field">
-                            <span><?= e(__('setup.field_last_name')) ?></span>
-                            <input type="text" name="people[__i__][last_name]" value="">
-                        </label>
-                        <label class="setup-field">
-                            <span><?= e(__('setup.field_person_fiscal_code')) ?></span>
-                            <input type="text" name="people[__i__][fiscal_code]" value="" maxlength="16">
-                        </label>
+                        <?= field('select', [
+                            'name' => 'people[__i__][role_key]',
+                            'label' => (string) __('settings.people_role'),
+                            'value' => 'board',
+                            'required' => true,
+                            'context' => 'setup',
+                            'include_empty' => false,
+                            'options' => $roleOptions,
+                        ]) ?>
+                        <?= field('text', [
+                            'name' => 'people[__i__][first_name]',
+                            'label' => (string) __('setup.field_first_name'),
+                            'value' => '',
+                            'context' => 'setup',
+                        ]) ?>
+                        <?= field('text', [
+                            'name' => 'people[__i__][last_name]',
+                            'label' => (string) __('setup.field_last_name'),
+                            'value' => '',
+                            'context' => 'setup',
+                        ]) ?>
+                        <?= field('text', [
+                            'name' => 'people[__i__][fiscal_code]',
+                            'label' => (string) __('setup.field_person_fiscal_code'),
+                            'value' => '',
+                            'context' => 'setup',
+                            'maxlength' => 16,
+                        ]) ?>
                         <button type="button" class="btn btn-ghost btn-sm" data-people-remove aria-label="<?= e(__('setup.remove_person')) ?>">×</button>
                     </div>
-                    <?= view_partial('partials/geo_address', [
+                    <?= field('address', [
                         'class' => 'assoc-person-extra',
                         'show_hint' => false,
                         'names' => [
@@ -312,14 +395,18 @@
                         ],
                     ]) ?>
                     <div class="setup-address-row assoc-person-dates">
-                        <label class="setup-field">
-                            <span><?= e(__('setup.field_appointed_at')) ?></span>
-                            <input type="date" name="people[__i__][appointed_at]" value="">
-                        </label>
-                        <label class="setup-field">
-                            <span><?= e(__('setup.field_mandate_ends_at')) ?></span>
-                            <input type="date" name="people[__i__][mandate_ends_at]" value="">
-                        </label>
+                        <?= field('date', [
+                            'name' => 'people[__i__][appointed_at]',
+                            'label' => (string) __('setup.field_appointed_at'),
+                            'value' => '',
+                            'context' => 'setup',
+                        ]) ?>
+                        <?= field('date', [
+                            'name' => 'people[__i__][mandate_ends_at]',
+                            'label' => (string) __('setup.field_mandate_ends_at'),
+                            'value' => '',
+                            'context' => 'setup',
+                        ]) ?>
                     </div>
                 </div>
             </template>
@@ -339,23 +426,35 @@
 <form method="post" action="<?= e(url('/settings/legal')) ?>" data-leave-guard data-settings-autosave>
         <?= csrf_field() ?>
         <div class="setup-gdpr-options" data-setup-gdpr-options>
-            <label class="setup-check setup-check-prominent">
-                <input type="checkbox" name="gdpr_enabled" value="1" data-gdpr-master <?= $settings['gdpr.enabled']==='1'?'checked':'' ?>>
-                <span><?= e(__('setup.gdpr_label')) ?></span>
-            </label>
+            <?= field('checkbox', [
+                'name' => 'gdpr_enabled',
+                'label' => (string) __('setup.gdpr_label'),
+                'checked' => ($settings['gdpr.enabled'] ?? '') === '1',
+                'context' => 'setup',
+                'label_class' => 'checkbox-row setup-check setup-check-prominent',
+                'attrs' => ['data-gdpr-master' => true],
+            ]) ?>
             <p class="setup-gdpr-model-note" data-gdpr-extras>
                 <span class="setup-gdpr-model-note-icon" aria-hidden="true">ℹ</span>
                 <span><?= e(__('setup.gdpr_model_note')) ?></span>
             </p>
             <div class="setup-gdpr-extras" data-gdpr-extras>
-                <label class="setup-check">
-                    <input type="checkbox" name="require_image_consent" value="1" data-gdpr-extra <?= ($settings['gdpr.require_image_consent'] ?? '0') === '1' ? 'checked' : '' ?>>
-                    <span><?= e(__('setup.gdpr_image_consent')) ?></span>
-                </label>
-                <label class="setup-check">
-                    <input type="checkbox" name="require_comms_consent" value="1" data-gdpr-extra <?= ($settings['gdpr.require_comms_consent'] ?? '0') === '1' ? 'checked' : '' ?>>
-                    <span><?= e(__('setup.gdpr_comms_consent')) ?></span>
-                </label>
+                <?= field('checkbox', [
+                    'name' => 'require_image_consent',
+                    'label' => (string) __('setup.gdpr_image_consent'),
+                    'checked' => ($settings['gdpr.require_image_consent'] ?? '0') === '1',
+                    'context' => 'setup',
+                    'label_class' => 'checkbox-row setup-check',
+                    'attrs' => ['data-gdpr-extra' => true],
+                ]) ?>
+                <?= field('checkbox', [
+                    'name' => 'require_comms_consent',
+                    'label' => (string) __('setup.gdpr_comms_consent'),
+                    'checked' => ($settings['gdpr.require_comms_consent'] ?? '0') === '1',
+                    'context' => 'setup',
+                    'label_class' => 'checkbox-row setup-check',
+                    'attrs' => ['data-gdpr-extra' => true],
+                ]) ?>
             </div>
         </div>
         <p class="setup-hint muted"><?= e(__('setup.step_gdpr_desc')) ?></p>
@@ -430,18 +529,28 @@
             <h3 class="setup-subhead"><?= e(__('settings.add_field')) ?></h3>
             <p class="setup-hint muted"><?= e(__('setup.fields_add_hint')) ?></p>
             <div class="setup-equal-row">
-                <label class="setup-field setup-field-grow">
-                    <span><?= e(__('setup.fields_new_label')) ?></span>
-                    <input type="text" name="new_label" placeholder="<?= e(__('setup.fields_new_label_ph')) ?>">
-                </label>
-                <label class="setup-field">
-                    <span><?= e(__('setup.fields_col_type')) ?></span>
-                    <select name="new_type">
-                        <?php foreach (\Socly\Support\MemberFieldTypes::keys() as $t): ?>
-                            <option value="<?= e($t) ?>"><?= e(\Socly\Support\MemberFieldTypes::label($t)) ?></option>
-                        <?php endforeach; ?>
-                    </select>
-                </label>
+                <?= field('text', [
+                    'name' => 'new_label',
+                    'label' => (string) __('setup.fields_new_label'),
+                    'value' => '',
+                    'context' => 'setup',
+                    'wrapper_class' => 'setup-field-grow',
+                    'placeholder' => (string) __('setup.fields_new_label_ph'),
+                ]) ?>
+                <?php
+                $fieldTypeOptions = [];
+                foreach (\Socly\Support\MemberFieldTypes::keys() as $t) {
+                    $fieldTypeOptions[] = ['value' => $t, 'label' => \Socly\Support\MemberFieldTypes::label($t)];
+                }
+                ?>
+                <?= field('select', [
+                    'name' => 'new_type',
+                    'label' => (string) __('setup.fields_col_type'),
+                    'value' => 'text',
+                    'context' => 'setup',
+                    'include_empty' => false,
+                    'options' => $fieldTypeOptions,
+                ]) ?>
             </div>
             <button class="btn" type="submit"><?= e(__('common.save')) ?></button>
         </div>
@@ -489,10 +598,14 @@
             data-csrf="<?= e(csrf_token()) ?>"
         >
             <?= csrf_field() ?>
-            <label class="setup-check setup-check-prominent setup-smtp-skip">
-                <input type="checkbox" name="outbound_disabled" value="1" data-smtp-skip <?= $mailSkipped ? 'checked' : '' ?>>
-                <span><?= e(__('setup.mail_skip_outbound')) ?></span>
-            </label>
+            <?= field('checkbox', [
+                'name' => 'outbound_disabled',
+                'label' => (string) __('setup.mail_skip_outbound'),
+                'checked' => $mailSkipped,
+                'context' => 'setup',
+                'label_class' => 'checkbox-row setup-check setup-check-prominent setup-smtp-skip',
+                'attrs' => ['data-smtp-skip' => true],
+            ]) ?>
             <p
                 class="setup-hint muted"
                 data-smtp-skip-hint
@@ -503,17 +616,25 @@
                 <div class="setup-smtp-section">
                     <p class="setup-hint muted"><?= e(__('setup.mail_simple_hint')) ?></p>
                     <div class="setup-equal-row setup-smtp-credentials">
-                        <label class="setup-field setup-field-grow">
-                            <span><?= e(__('mail.from_address')) ?> *</span>
-                            <input type="email" name="from_address" value="<?= e((string) $mailCfg['from_address']) ?>" required autocomplete="off" placeholder="noreply@tuodominio.it" data-smtp-from>
-                            <p class="field-hint setup-field-hint" data-smtp-from-hint hidden></p>
-                        </label>
-                        <?= view_partial('partials/password_input', [
+                        <?= field('email', [
+                            'name' => 'from_address',
+                            'label' => (string) __('mail.from_address'),
+                            'value' => (string) $mailCfg['from_address'],
+                            'required' => true,
+                            'context' => 'setup',
+                            'wrapper_class' => 'setup-field-grow',
+                            'placeholder' => 'noreply@tuodominio.it',
+                            'autocomplete' => 'off',
+                            'attrs' => ['data-smtp-from' => true],
+                        ]) ?>
+                        <p class="field-hint setup-field-hint" data-smtp-from-hint hidden></p>
+                        <?= field('password', [
                             'name' => 'password',
                             'label' => (string) __('mail.password'),
                             'required' => empty($mailCfg['has_password']),
                             'placeholder' => !empty($mailCfg['has_password']) ? (string) __('mail.password_keep') : '',
                             'autocomplete' => 'new-password',
+                            'context' => 'setup',
                             'input_attrs' => 'data-smtp-password',
                             'hint_attrs' => 'data-smtp-password-hint',
                         ]) ?>
@@ -532,41 +653,75 @@
                     <p class="setup-smtp-manual-title"><?= e(__('setup.mail_manual_title')) ?></p>
                     <p class="setup-hint muted"><?= e(__('setup.mail_manual_hint')) ?></p>
                     <div class="setup-equal-row">
-                        <label class="setup-field">
-                            <span><?= e(__('mail.host')) ?> *</span>
-                            <input type="text" name="host" value="<?= e((string) $mailCfg['host']) ?>" placeholder="smtp.example.com" autocomplete="off" data-smtp-host>
-                        </label>
-                        <label class="setup-field">
-                            <span><?= e(__('mail.port')) ?> *</span>
-                            <input type="number" name="port" value="<?= e((string) ($mailCfg['port'] ?: 587)) ?>" min="1" max="65535" data-smtp-port>
-                        </label>
+                        <?= field('text', [
+                            'name' => 'host',
+                            'label' => (string) __('mail.host'),
+                            'value' => (string) $mailCfg['host'],
+                            'required' => true,
+                            'context' => 'setup',
+                            'placeholder' => 'smtp.example.com',
+                            'autocomplete' => 'off',
+                            'attrs' => ['data-smtp-host' => true],
+                        ]) ?>
+                        <?= field('number', [
+                            'name' => 'port',
+                            'label' => (string) __('mail.port'),
+                            'value' => (string) ($mailCfg['port'] ?: 587),
+                            'required' => true,
+                            'context' => 'setup',
+                            'min' => 1,
+                            'max' => 65535,
+                            'attrs' => ['data-smtp-port' => true],
+                        ]) ?>
                     </div>
-                    <label class="setup-field">
-                        <span><?= e(__('mail.encryption')) ?> *</span>
-                        <select name="encryption" data-smtp-encryption>
-                            <option value="tls" <?= $mailEnc === 'tls' ? 'selected' : '' ?>><?= e(__('mail.encryption_tls')) ?></option>
-                            <option value="ssl" <?= $mailEnc === 'ssl' ? 'selected' : '' ?>><?= e(__('mail.encryption_ssl')) ?></option>
-                            <option value="none" <?= $mailEnc === 'none' ? 'selected' : '' ?>><?= e(__('mail.encryption_none')) ?></option>
-                        </select>
-                    </label>
-                    <label class="setup-field">
-                        <span><?= e(__('mail.username')) ?> *</span>
-                        <input type="text" name="username" value="<?= e((string) $mailCfg['username']) ?>" autocomplete="off" placeholder="<?= e(__('mail.username_default_hint')) ?>" data-smtp-username>
-                    </label>
-                    <label class="setup-field">
-                        <span><?= e(__('mail.from_name')) ?></span>
-                        <input type="text" name="from_name" value="<?= e((string) $mailCfg['from_name']) ?>" autocomplete="organization" data-smtp-from-name>
-                    </label>
+                    <?= field('select', [
+                        'name' => 'encryption',
+                        'label' => (string) __('mail.encryption'),
+                        'value' => $mailEnc,
+                        'required' => true,
+                        'context' => 'setup',
+                        'include_empty' => false,
+                        'options' => [
+                            ['value' => 'tls', 'label' => (string) __('mail.encryption_tls')],
+                            ['value' => 'ssl', 'label' => (string) __('mail.encryption_ssl')],
+                            ['value' => 'none', 'label' => (string) __('mail.encryption_none')],
+                        ],
+                        'attrs' => ['data-smtp-encryption' => true],
+                    ]) ?>
+                    <?= field('text', [
+                        'name' => 'username',
+                        'label' => (string) __('mail.username'),
+                        'value' => (string) $mailCfg['username'],
+                        'required' => true,
+                        'context' => 'setup',
+                        'autocomplete' => 'off',
+                        'placeholder' => (string) __('mail.username_default_hint'),
+                        'attrs' => ['data-smtp-username' => true],
+                    ]) ?>
+                    <?= field('text', [
+                        'name' => 'from_name',
+                        'label' => (string) __('mail.from_name'),
+                        'value' => (string) $mailCfg['from_name'],
+                        'context' => 'setup',
+                        'autocomplete' => 'organization',
+                        'attrs' => ['data-smtp-from-name' => true],
+                    ]) ?>
                     <div class="setup-smtp-actions">
                         <button type="button" class="btn btn-ghost" data-smtp-verify-btn><?= e(__('setup.mail_verify_btn')) ?></button>
                     </div>
                     <p class="setup-hint muted" data-smtp-verify-status hidden></p>
                 </div>
                 <div class="setup-smtp-section setup-smtp-test" data-smtp-test-section <?= $mailReady ? '' : 'hidden' ?>>
-                    <label class="setup-field">
-                        <span><?= e(__('mail.test_to')) ?> *</span>
-                        <input type="email" name="test_to" value="<?= e($assocEmail) ?>" <?= $mailReady ? 'required' : '' ?> autocomplete="off" data-smtp-test-to <?= $mailReady ? '' : 'disabled' ?>>
-                    </label>
+                    <?= field('email', [
+                        'name' => 'test_to',
+                        'label' => (string) __('mail.test_to'),
+                        'value' => $assocEmail,
+                        'required' => $mailReady,
+                        'disabled' => !$mailReady,
+                        'context' => 'setup',
+                        'autocomplete' => 'off',
+                        'attrs' => ['data-smtp-test-to' => true],
+                    ]) ?>
                     <div class="setup-smtp-actions">
                         <button type="button" class="btn btn-ghost" data-smtp-test-btn <?= $mailReady ? '' : 'disabled' ?>><?= e(__('setup.mail_test_btn')) ?></button>
                     </div>
@@ -642,18 +797,30 @@
         <form method="post" action="<?= e(url('/settings/platform')) ?>" data-platform-consents data-mail-ready="<?= !empty($mailReady) ? '1' : '0' ?>" data-leave-guard data-settings-autosave>
             <?= csrf_field() ?>
             <p class="setup-hint muted"><?= e(__('setup.platform_hint')) ?></p>
-            <label class="setup-check setup-check-prominent">
-                <input type="checkbox" name="news_opt_in" value="1" data-platform-opt <?= ($settings['platform.news_opt_in'] ?? '1') !== '0' ? 'checked' : '' ?>>
-                <span><?= e(__('settings.platform_news')) ?></span>
-            </label>
-            <label class="setup-check setup-check-prominent">
-                <input type="checkbox" name="usage_stats_opt_in" value="1" data-platform-opt <?= ($settings['platform.usage_stats_opt_in'] ?? '1') !== '0' ? 'checked' : '' ?>>
-                <span><?= e(__('settings.platform_stats')) ?></span>
-            </label>
-            <label class="setup-check setup-check-prominent">
-                <input type="checkbox" name="showcase_consent" value="1" data-platform-opt <?= ($settings['platform.showcase_consent'] ?? '1') !== '0' ? 'checked' : '' ?>>
-                <span><?= e(__('settings.platform_showcase')) ?></span>
-            </label>
+            <?= field('checkbox', [
+                'name' => 'news_opt_in',
+                'label' => (string) __('settings.platform_news'),
+                'checked' => ($settings['platform.news_opt_in'] ?? '1') !== '0',
+                'context' => 'setup',
+                'label_class' => 'checkbox-row setup-check setup-check-prominent',
+                'attrs' => ['data-platform-opt' => true],
+            ]) ?>
+            <?= field('checkbox', [
+                'name' => 'usage_stats_opt_in',
+                'label' => (string) __('settings.platform_stats'),
+                'checked' => ($settings['platform.usage_stats_opt_in'] ?? '1') !== '0',
+                'context' => 'setup',
+                'label_class' => 'checkbox-row setup-check setup-check-prominent',
+                'attrs' => ['data-platform-opt' => true],
+            ]) ?>
+            <?= field('checkbox', [
+                'name' => 'showcase_consent',
+                'label' => (string) __('settings.platform_showcase'),
+                'checked' => ($settings['platform.showcase_consent'] ?? '1') !== '0',
+                'context' => 'setup',
+                'label_class' => 'checkbox-row setup-check setup-check-prominent',
+                'attrs' => ['data-platform-opt' => true],
+            ]) ?>
             <p class="setup-hint muted"><?= e(__('setup.platform_showcase_hint')) ?></p>
             <?php
                 $anyPlatformSettings = (($settings['platform.news_opt_in'] ?? '1') !== '0')
@@ -663,14 +830,26 @@
             <div class="setup-platform-confirm" data-platform-confirm <?= $anyPlatformSettings ? '' : 'hidden' ?>>
                 <p class="setup-hint muted"><?= e(__('setup.platform_confirm_hint')) ?></p>
                 <div class="setup-equal-row">
-                    <label class="setup-field">
-                        <span><?= e(__('setup.platform_confirm_first')) ?> *</span>
-                        <input type="text" name="confirm_first_name" value="" autocomplete="off" data-platform-confirm-input placeholder="<?= e((string) ($presidentFirstPlaceholder ?? '')) ?>" <?= $anyPlatformSettings ? 'required' : '' ?>>
-                    </label>
-                    <label class="setup-field">
-                        <span><?= e(__('setup.platform_confirm_last')) ?> *</span>
-                        <input type="text" name="confirm_last_name" value="" autocomplete="off" data-platform-confirm-input placeholder="<?= e((string) ($presidentLastPlaceholder ?? '')) ?>" <?= $anyPlatformSettings ? 'required' : '' ?>>
-                    </label>
+                    <?= field('text', [
+                        'name' => 'confirm_first_name',
+                        'label' => (string) __('setup.platform_confirm_first'),
+                        'value' => '',
+                        'required' => $anyPlatformSettings,
+                        'context' => 'setup',
+                        'autocomplete' => 'off',
+                        'placeholder' => (string) ($presidentFirstPlaceholder ?? ''),
+                        'attrs' => ['data-platform-confirm-input' => true],
+                    ]) ?>
+                    <?= field('text', [
+                        'name' => 'confirm_last_name',
+                        'label' => (string) __('setup.platform_confirm_last'),
+                        'value' => '',
+                        'required' => $anyPlatformSettings,
+                        'context' => 'setup',
+                        'autocomplete' => 'off',
+                        'placeholder' => (string) ($presidentLastPlaceholder ?? ''),
+                        'attrs' => ['data-platform-confirm-input' => true],
+                    ]) ?>
                 </div>
             </div>
             <p class="settings-autosave-status muted" data-settings-autosave-status aria-live="polite"></p>
@@ -709,7 +888,13 @@
                         $checked = !empty($enabledComponents[$cKey]);
                     ?>
                     <label class="setup-component-row<?= $checked ? ' is-selected' : '' ?>">
-                        <input type="checkbox" name="components[]" value="<?= e($cKey) ?>" <?= $checked ? 'checked' : '' ?>>
+                        <?= field('checkbox', [
+                            'bare' => true,
+                            'name' => 'components[]',
+                            'value' => $checked ? $cKey : '',
+                            'check_value' => $cKey,
+                            'checked' => $checked,
+                        ]) ?>
                         <span class="setup-component-row-body">
                             <span class="setup-component-row-top">
                                 <strong class="setup-component-name"><?= e(__((string) ($component['name_key'] ?? ''))) ?></strong>
@@ -726,10 +911,13 @@
                 <details class="config-sub-accordion" open>
                     <summary><?= e(__('components.treasury.name')) ?></summary>
                     <div class="config-sub-body">
-                        <label class="checkbox-row">
-                            <input type="checkbox" name="treasury_auto_from_payments" value="1" <?= !empty($componentConfigs['treasury']['auto_from_payments']) ? 'checked' : '' ?>>
-                            <?= e(__('settings.treasury_auto_from_payments')) ?>
-                        </label>
+                        <?= field('checkbox', [
+                            'name' => 'treasury_auto_from_payments',
+                            'label' => (string) __('settings.treasury_auto_from_payments'),
+                            'checked' => !empty($componentConfigs['treasury']['auto_from_payments']),
+                            'context' => 'setup',
+                            'label_class' => 'checkbox-row',
+                        ]) ?>
                         <p class="muted"><?= e(__('settings.treasury_auto_from_payments_hint')) ?></p>
                     </div>
                 </details>
@@ -739,8 +927,14 @@
                 <details class="config-sub-accordion">
                     <summary><?= e(__('components.deadlines.name')) ?></summary>
                     <div class="config-sub-body">
-                        <label><?= e(__('settings.deadlines_warn_days')) ?></label>
-                        <input type="number" name="deadlines_warn_days" min="1" max="90" value="<?= e((string) ($componentConfigs['deadlines']['warn_days'] ?? 30)) ?>">
+                        <?= field('number', [
+                            'name' => 'deadlines_warn_days',
+                            'label' => (string) __('settings.deadlines_warn_days'),
+                            'value' => (string) ($componentConfigs['deadlines']['warn_days'] ?? 30),
+                            'context' => 'setup',
+                            'min' => 1,
+                            'max' => 90,
+                        ]) ?>
                     </div>
                 </details>
                 <?php endif; ?>
@@ -749,25 +943,31 @@
                 <details class="config-sub-accordion">
                     <summary><?= e(__('components.documents.name')) ?></summary>
                     <div class="config-sub-body">
-                        <label><?= e(__('settings.documents_default_category')) ?></label>
-                        <select name="documents_default_category">
-                            <?php
-                            $docCats = $componentConfigs['documents']['category_options'] ?? null;
-                            if (!is_array($docCats) || $docCats === []) {
-                                $docCats = ['minutes','board_minutes','statute','regulation','contract','other'];
+                        <?php
+                        $docCats = $componentConfigs['documents']['category_options'] ?? null;
+                        if (!is_array($docCats) || $docCats === []) {
+                            $docCats = ['minutes', 'board_minutes', 'statute', 'regulation', 'contract', 'other'];
+                        }
+                        $docCategoryOptions = [];
+                        foreach ($docCats as $cat) {
+                            $catKey = is_array($cat) ? (string) ($cat['key'] ?? '') : (string) $cat;
+                            if ($catKey === '') {
+                                continue;
                             }
-                            foreach ($docCats as $cat):
-                                $catKey = is_array($cat) ? (string) ($cat['key'] ?? '') : (string) $cat;
-                                $catLabel = is_array($cat)
-                                    ? (string) ($cat['label'] ?? $catKey)
-                                    : __('documents.category_' . $catKey);
-                                if ($catKey === '') {
-                                    continue;
-                                }
-                            ?>
-                                <option value="<?= e($catKey) ?>" <?= ($componentConfigs['documents']['default_category'] ?? 'minutes') === $catKey ? 'selected' : '' ?>><?= e($catLabel) ?></option>
-                            <?php endforeach; ?>
-                        </select>
+                            $catLabel = is_array($cat)
+                                ? (string) ($cat['label'] ?? $catKey)
+                                : (string) __('documents.category_' . $catKey);
+                            $docCategoryOptions[] = ['value' => $catKey, 'label' => $catLabel];
+                        }
+                        ?>
+                        <?= field('select', [
+                            'name' => 'documents_default_category',
+                            'label' => (string) __('settings.documents_default_category'),
+                            'value' => (string) ($componentConfigs['documents']['default_category'] ?? 'minutes'),
+                            'context' => 'setup',
+                            'include_empty' => false,
+                            'options' => $docCategoryOptions,
+                        ]) ?>
                     </div>
                 </details>
                 <?php endif; ?>
@@ -817,8 +1017,15 @@
                                         <form method="post" action="<?= e(url('/plugins/' . rawurlencode((string) ($plugin['id'] ?? '')) . '/settings')) ?>">
                                             <?= csrf_field() ?>
                                             <?php foreach ($plugin['settings'] as $key => $def): ?>
-                                                <label><?= e((string) ($def['label'] ?? $key)) ?></label>
-                                                <input type="<?= !empty($def['encrypted']) ? 'password' : 'text' ?>" name="<?= e((string) $key) ?>" value="<?= e((string) ($plugin['values'][$key] ?? '')) ?>">
+                                                <?php
+                                                $pluginFieldType = !empty($def['encrypted']) ? 'password' : 'text';
+                                                echo field($pluginFieldType, [
+                                                    'name' => (string) $key,
+                                                    'label' => (string) ($def['label'] ?? $key),
+                                                    'value' => (string) ($plugin['values'][$key] ?? ''),
+                                                    'context' => 'setup',
+                                                ]);
+                                                ?>
                                             <?php endforeach; ?>
                                             <button class="btn btn-sm" type="submit"><?= e(__('common.save')) ?></button>
                                         </form>
@@ -839,8 +1046,8 @@
     <p class="config-danger-text"><?= e(__('settings.reset_zone_lede')) ?></p>
     <form method="post" action="<?= e(url('/settings/reset-user-data')) ?>" data-reset-user-form>
         <?= csrf_field() ?>
-        <input type="hidden" name="confirm_reset_1" value="0" data-reset-confirm-1>
-        <input type="hidden" name="confirm_reset_2" value="0" data-reset-confirm-2>
+        <?= field('hidden', ['name' => 'confirm_reset_1', 'value' => '0', 'attrs' => ['data-reset-confirm-1' => true]]) ?>
+        <?= field('hidden', ['name' => 'confirm_reset_2', 'value' => '0', 'attrs' => ['data-reset-confirm-2' => true]]) ?>
         <button type="button" class="btn btn-danger" data-reset-user-open><?= e(__('settings.reset_button')) ?></button>
     </form>
 </section>

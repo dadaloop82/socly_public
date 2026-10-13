@@ -25,133 +25,219 @@ $labels = [
 
 <form method="post" action="<?= e(url('/install')) ?>">
     <?= csrf_field() ?>
-    <input type="hidden" name="step" value="<?= $step ?>">
+    <?= field('hidden', ['name' => 'step', 'value' => (string) $step]) ?>
 
     <?php if ($step === 1): ?>
         <div class="grid-2">
             <div>
-                <label><?= e(__('install.app_url')) ?></label>
-                <input type="url" name="app_url" value="<?= e((string)old('app_url', $data['app_url'] ?? ('http://' . ($_SERVER['HTTP_HOST'] ?? 'localhost')))) ?>" required>
+                <?= field('text', [
+                    'name' => 'app_url',
+                    'label' => (string) __('install.app_url'),
+                    'value' => (string) old('app_url', $data['app_url'] ?? ('http://' . ($_SERVER['HTTP_HOST'] ?? 'localhost'))),
+                    'required' => true,
+                    'input_type' => 'url',
+                ]) ?>
             </div>
             <div>
-                <label><?= e(__('install.db_host')) ?></label>
-                <input type="text" name="db_host" value="<?= e((string)old('db_host', $data['db_host'] ?? '127.0.0.1')) ?>" required>
+                <?= field('text', [
+                    'name' => 'db_host',
+                    'label' => (string) __('install.db_host'),
+                    'value' => (string) old('db_host', $data['db_host'] ?? '127.0.0.1'),
+                    'required' => true,
+                ]) ?>
             </div>
             <div>
-                <label><?= e(__('install.db_port')) ?></label>
-                <input type="number" name="db_port" value="<?= e((string)old('db_port', $data['db_port'] ?? '3306')) ?>" required>
+                <?= field('number', [
+                    'name' => 'db_port',
+                    'label' => (string) __('install.db_port'),
+                    'value' => (string) old('db_port', $data['db_port'] ?? '3306'),
+                    'required' => true,
+                ]) ?>
             </div>
             <div>
-                <label><?= e(__('install.db_database')) ?></label>
-                <input type="text" name="db_database" value="<?= e((string)old('db_database', $data['db_database'] ?? 'socly')) ?>" required>
+                <?= field('text', [
+                    'name' => 'db_database',
+                    'label' => (string) __('install.db_database'),
+                    'value' => (string) old('db_database', $data['db_database'] ?? 'socly'),
+                    'required' => true,
+                ]) ?>
             </div>
             <div>
-                <label><?= e(__('install.db_username')) ?></label>
-                <input type="text" name="db_username" value="<?= e((string)old('db_username', $data['db_username'] ?? 'root')) ?>" required>
+                <?= field('text', [
+                    'name' => 'db_username',
+                    'label' => (string) __('install.db_username'),
+                    'value' => (string) old('db_username', $data['db_username'] ?? 'root'),
+                    'required' => true,
+                ]) ?>
             </div>
             <div>
-                <?= view_partial('partials/password_input', [
+                <?= field('password', [
                     'name' => 'db_password',
                     'label' => (string) __('install.db_password'),
                     'required' => false,
                     'value' => (string) old('db_password', $data['db_password'] ?? ''),
                     'autocomplete' => 'new-password',
-                    'wrapper_class' => 'password-field',
                 ]) ?>
             </div>
         </div>
     <?php elseif ($step === 2): ?>
-        <label><?= e(__('install.association_name')) ?></label>
-        <input type="text" name="association_name" value="<?= e((string)old('association_name', $data['association_name'] ?? '')) ?>" required>
+        <?= field('text', [
+            'name' => 'association_name',
+            'label' => (string) __('install.association_name'),
+            'value' => (string) old('association_name', $data['association_name'] ?? ''),
+            'required' => true,
+        ]) ?>
         <div class="grid-2">
             <div>
-                <label>Email</label>
-                <input type="email" name="association_email" value="<?= e((string)old('association_email', $data['association_email'] ?? '')) ?>">
+                <?= field('email', ['name' => 'association_email', 'label' => 'Email', 'value' => (string) old('association_email', $data['association_email'] ?? '')]) ?>
             </div>
             <div>
-                <label>Phone</label>
-                <input type="text" name="association_phone" value="<?= e((string)old('association_phone', $data['association_phone'] ?? '')) ?>">
+                <?= field('phone', ['name' => 'association_phone', 'label' => 'Phone', 'value' => (string) old('association_phone', $data['association_phone'] ?? '')]) ?>
             </div>
         </div>
-        <label>Address</label>
-        <input type="text" name="association_address" value="<?= e((string)old('association_address', $data['association_address'] ?? '')) ?>">
+        <?= field('text', [
+            'name' => 'association_address',
+            'label' => 'Address',
+            'value' => (string) old('association_address', $data['association_address'] ?? ''),
+        ]) ?>
         <div class="grid-3">
             <div>
-                <label><?= e(__('install.primary')) ?></label>
-                <input type="color" name="primary" value="<?= e((string)old('primary', $data['primary'] ?? '#0D6E66')) ?>">
+                <?= field('color', [
+                    'name' => 'primary',
+                    'label' => (string) __('install.primary'),
+                    'value' => (string) old('primary', $data['primary'] ?? '#0D6E66'),
+                ]) ?>
             </div>
             <div>
-                <label><?= e(__('install.accent')) ?></label>
-                <input type="color" name="accent" value="<?= e((string)old('accent', $data['accent'] ?? '#B84A1B')) ?>">
+                <?= field('color', [
+                    'name' => 'accent',
+                    'label' => (string) __('install.accent'),
+                    'value' => (string) old('accent', $data['accent'] ?? '#B84A1B'),
+                ]) ?>
             </div>
             <div>
-                <label><?= e(__('install.locale')) ?></label>
-                <select name="locale">
-                    <?php foreach (['it','de','en'] as $loc): ?>
-                        <option value="<?= $loc ?>" <?= old('locale', $data['locale'] ?? 'it') === $loc ? 'selected' : '' ?>><?= e(match ($loc) { 'it' => '🇮🇹 Italiano', 'de' => '🇩🇪 Deutsch', default => '🇬🇧 English' }) ?></option>
-                    <?php endforeach; ?>
-                </select>
+                <?= field('select', [
+                    'name' => 'locale',
+                    'label' => (string) __('install.locale'),
+                    'value' => (string) old('locale', $data['locale'] ?? 'it'),
+                    'include_empty' => false,
+                    'options' => [
+                        ['value' => 'it', 'label' => '🇮🇹 Italiano'],
+                        ['value' => 'de', 'label' => '🇩🇪 Deutsch'],
+                        ['value' => 'en', 'label' => '🇬🇧 English'],
+                    ],
+                ]) ?>
             </div>
         </div>
-        <label class="checkbox-row"><input type="checkbox" name="gdpr_enabled" value="1" <?= !empty(old('gdpr_enabled', $data['gdpr_enabled'] ?? false)) ? 'checked' : '' ?>> <?= e(__('install.gdpr')) ?></label>
+        <?= field('checkbox', [
+            'name' => 'gdpr_enabled',
+            'label' => (string) __('install.gdpr'),
+            'checked' => !empty(old('gdpr_enabled', $data['gdpr_enabled'] ?? false)),
+            'label_class' => 'checkbox-row',
+        ]) ?>
     <?php elseif ($step === 3): ?>
-        <label><?= e(__('install.admin_name')) ?></label>
-        <input type="text" name="admin_name" value="<?= e((string)old('admin_name', $data['admin_name'] ?? '')) ?>" required>
-        <label><?= e(__('install.admin_email')) ?></label>
-        <input type="email" name="admin_email" value="<?= e((string)old('admin_email', $data['admin_email'] ?? '')) ?>" required>
+        <?= field('text', [
+            'name' => 'admin_name',
+            'label' => (string) __('install.admin_name'),
+            'value' => (string) old('admin_name', $data['admin_name'] ?? ''),
+            'required' => true,
+        ]) ?>
+        <?= field('email', [
+            'name' => 'admin_email',
+            'label' => (string) __('install.admin_email'),
+            'value' => (string) old('admin_email', $data['admin_email'] ?? ''),
+            'required' => true,
+        ]) ?>
         <div class="grid-2">
             <div>
-                <?= view_partial('partials/password_input', [
+                <?= field('password', [
                     'name' => 'admin_password',
                     'label' => (string) __('install.admin_password'),
                     'required' => true,
                     'autocomplete' => 'new-password',
-                    'wrapper_class' => 'password-field',
                 ]) ?>
             </div>
             <div>
-                <?= view_partial('partials/password_input', [
+                <?= field('password', [
                     'name' => 'admin_password_confirmation',
                     'label' => (string) __('install.admin_password_confirmation'),
                     'required' => true,
                     'autocomplete' => 'new-password',
-                    'wrapper_class' => 'password-field',
                 ]) ?>
             </div>
         </div>
     <?php elseif ($step === 4): ?>
-        <label><?= e(__('install.period_label')) ?></label>
-        <input type="text" name="period_label" value="<?= e((string)old('period_label', $data['period_label'] ?? date('Y'))) ?>" required>
+        <?= field('text', [
+            'name' => 'period_label',
+            'label' => (string) __('install.period_label'),
+            'value' => (string) old('period_label', $data['period_label'] ?? date('Y')),
+            'required' => true,
+        ]) ?>
         <div class="grid-2">
             <div>
-                <label><?= e(__('install.starts_on')) ?></label>
-                <input type="date" name="starts_on" value="<?= e((string)old('starts_on', $data['starts_on'] ?? date('Y-01-01'))) ?>" required>
+                <?= field('date', [
+                    'name' => 'starts_on',
+                    'label' => (string) __('install.starts_on'),
+                    'value' => (string) old('starts_on', $data['starts_on'] ?? date('Y-01-01')),
+                    'required' => true,
+                ]) ?>
             </div>
             <div>
-                <label><?= e(__('install.ends_on')) ?></label>
-                <input type="date" name="ends_on" value="<?= e((string)old('ends_on', $data['ends_on'] ?? date('Y-12-31'))) ?>" required>
+                <?= field('date', [
+                    'name' => 'ends_on',
+                    'label' => (string) __('install.ends_on'),
+                    'value' => (string) old('ends_on', $data['ends_on'] ?? date('Y-12-31')),
+                    'required' => true,
+                ]) ?>
             </div>
         </div>
-        <label><?= e(__('install.type_name')) ?> (IT)</label>
-        <input type="text" name="type_name_it" value="<?= e((string)old('type_name_it', $data['type_name_it'] ?? 'Ordinario')) ?>" required>
+        <?= field('text', [
+            'name' => 'type_name_it',
+            'label' => (string) __('install.type_name') . ' (IT)',
+            'value' => (string) old('type_name_it', $data['type_name_it'] ?? 'Ordinario'),
+            'required' => true,
+        ]) ?>
         <div class="grid-2">
             <div>
-                <label><?= e(__('install.type_name')) ?> (DE)</label>
-                <input type="text" name="type_name_de" value="<?= e((string)old('type_name_de', $data['type_name_de'] ?? 'Ordentlich')) ?>">
+                <?= field('text', [
+                    'name' => 'type_name_de',
+                    'label' => (string) __('install.type_name') . ' (DE)',
+                    'value' => (string) old('type_name_de', $data['type_name_de'] ?? 'Ordentlich'),
+                ]) ?>
             </div>
             <div>
-                <label><?= e(__('install.type_name')) ?> (EN)</label>
-                <input type="text" name="type_name_en" value="<?= e((string)old('type_name_en', $data['type_name_en'] ?? 'Ordinary')) ?>">
+                <?= field('text', [
+                    'name' => 'type_name_en',
+                    'label' => (string) __('install.type_name') . ' (EN)',
+                    'value' => (string) old('type_name_en', $data['type_name_en'] ?? 'Ordinary'),
+                ]) ?>
             </div>
         </div>
-        <label><?= e(__('install.type_price')) ?></label>
-        <input type="number" step="0.01" name="type_price" value="<?= e((string)old('type_price', $data['type_price'] ?? '50')) ?>" required>
+        <?= field('number', [
+            'name' => 'type_price',
+            'label' => (string) __('install.type_price'),
+            'value' => (string) old('type_price', $data['type_price'] ?? '50'),
+            'required' => true,
+            'step' => '0.01',
+        ]) ?>
     <?php elseif ($step === 5): ?>
         <?php foreach ($fields as $field): ?>
             <div class="panel" style="box-shadow:none;margin-bottom:0.7rem">
                 <strong><?= e(localized($field['label'])) ?></strong>
-                <div class="checkbox-row"><input type="checkbox" name="fields[]" value="<?= e($field['key']) ?>" <?= in_array($field['key'], old('fields', $data['fields_enabled'] ?? array_column($fields,'key')), true) ? 'checked' : '' ?>> <?= e(__('install.field_enabled')) ?></div>
-                <div class="checkbox-row"><input type="checkbox" name="required[]" value="<?= e($field['key']) ?>" <?= in_array($field['key'], old('required', $data['fields_required'] ?? ['first_name','last_name']), true) ? 'checked' : '' ?>> <?= e(__('install.field_required')) ?></div>
+                <?= field('checkbox', [
+                    'name' => 'fields[]',
+                    'check_value' => (string) $field['key'],
+                    'label' => (string) __('install.field_enabled'),
+                    'checked' => in_array($field['key'], old('fields', $data['fields_enabled'] ?? array_column($fields, 'key')), true),
+                    'label_class' => 'checkbox-row',
+                ]) ?>
+                <?= field('checkbox', [
+                    'name' => 'required[]',
+                    'check_value' => (string) $field['key'],
+                    'label' => (string) __('install.field_required'),
+                    'checked' => in_array($field['key'], old('required', $data['fields_required'] ?? ['first_name', 'last_name']), true),
+                    'label_class' => 'checkbox-row',
+                ]) ?>
             </div>
         <?php endforeach; ?>
     <?php else: ?>

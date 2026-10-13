@@ -52,13 +52,13 @@ try {
                                     <img src="<?= e(locale_flag_url($code)) ?>" width="22" height="16" alt="" loading="lazy" decoding="async">
                                     <?= e($langLabels[$code]) ?><?= $code === 'it' ? ' *' : '' ?>
                                 </span>
-                                <input
-                                    type="text"
-                                    name="types[<?= $tid ?>][name_<?= e($code) ?>]"
-                                    value="<?= e((string) ($typeRow['name_' . $code] ?? '')) ?>"
-                                    <?= $code === 'it' ? 'required' : '' ?>
-                                    data-type-name-<?= e($code) ?>
-                                >
+                                <?= view_partial('partials/member_type_field', [
+                                    'kind' => 'name',
+                                    'name' => 'types[' . $tid . '][name_' . $code . ']',
+                                    'value' => (string) ($typeRow['name_' . $code] ?? ''),
+                                    'required' => $code === 'it',
+                                    'langCode' => $code,
+                                ]) ?>
                             </label>
                         <?php endforeach; ?>
                     </div>
@@ -66,17 +66,29 @@ try {
                         <label class="setup-field">
                             <span><?= e(__('install.type_price')) ?> *</span>
                             <div class="setup-price-with-currency">
-                                <input type="number" step="0.01" min="0" name="types[<?= $tid ?>][price]" value="<?= e((string) ($typeRow['price'] ?? '0')) ?>" required data-type-price data-type-name-ref="types[<?= $tid ?>][name_it]" inputmode="decimal">
+                                <?= view_partial('partials/member_type_field', [
+                                    'kind' => 'price',
+                                    'name' => 'types[' . $tid . '][price]',
+                                    'value' => (string) ($typeRow['price'] ?? '0'),
+                                    'required' => true,
+                                    'currencyDisplay' => $currencyDisplay,
+                                    'typeNameRef' => 'types[' . $tid . '][name_it]',
+                                ]) ?>
                                 <span class="setup-price-currency" aria-hidden="true"><?= e($currencyDisplay) ?></span>
                             </div>
                         </label>
-                        <label class="setup-check setup-check-inline setup-check-prominent">
-                            <input type="checkbox" name="types[<?= $tid ?>][is_active]" value="1" <?= !empty($typeRow['is_active']) ? 'checked' : '' ?><?= $singleType ? ' checked disabled' : '' ?>>
-                            <?php if ($singleType): ?>
-                                <input type="hidden" name="types[<?= $tid ?>][is_active]" value="1">
-                            <?php endif; ?>
-                            <span><?= e(__('settings.is_active')) ?></span>
-                        </label>
+                        <?= view_partial('partials/member_type_field', [
+                            'kind' => 'active',
+                            'name' => 'types[' . $tid . '][is_active]',
+                            'checked' => !empty($typeRow['is_active']) || $singleType,
+                            'disabled' => $singleType,
+                        ]) ?>
+                        <?php if ($singleType): ?>
+                            <?= view_partial('partials/member_type_field', [
+                                'kind' => 'active_hidden',
+                                'name' => 'types[' . $tid . '][is_active]',
+                            ]) ?>
+                        <?php endif; ?>
                     </div>
                 </div>
             <?php endforeach; ?>
@@ -97,14 +109,14 @@ try {
                                 <img src="<?= e(locale_flag_url($code)) ?>" width="22" height="16" alt="" loading="lazy" decoding="async">
                                 <?= e($langLabels[$code]) ?><?= $isEmpty && $code === 'it' ? ' *' : '' ?>
                             </span>
-                            <input
-                                type="text"
-                                name="new_types[<?= $ni ?>][name_<?= e($code) ?>]"
-                                value="<?= e((string) ($newRow['name_' . $code] ?? '')) ?>"
-                                <?= $isEmpty && $code === 'it' ? 'required' : '' ?>
-                                data-type-name-<?= e($code) ?>
-                                placeholder="<?= $code === 'it' ? e(__('setup.type_name_placeholder')) : '' ?>"
-                            >
+                            <?= view_partial('partials/member_type_field', [
+                                'kind' => 'name',
+                                'name' => 'new_types[' . $ni . '][name_' . $code . ']',
+                                'value' => (string) ($newRow['name_' . $code] ?? ''),
+                                'required' => $isEmpty && $code === 'it',
+                                'langCode' => $code,
+                                'placeholder' => $code === 'it' ? (string) __('setup.type_name_placeholder') : '',
+                            ]) ?>
                         </label>
                     <?php endforeach; ?>
                 </div>
@@ -112,17 +124,28 @@ try {
                     <label class="setup-field">
                         <span><?= e(__('install.type_price')) ?><?= $isEmpty ? ' *' : '' ?></span>
                         <div class="setup-price-with-currency">
-                            <input type="number" step="0.01" min="0" name="new_types[<?= $ni ?>][price]" value="<?= e((string) ($newRow['price'] ?? '')) ?>" <?= $isEmpty ? 'required' : '' ?> placeholder="0.00" data-type-price data-type-name-ref="new_types[<?= $ni ?>][name_it]" inputmode="decimal">
+                            <?= view_partial('partials/member_type_field', [
+                                'kind' => 'price',
+                                'name' => 'new_types[' . $ni . '][price]',
+                                'value' => (string) ($newRow['price'] ?? ''),
+                                'required' => $isEmpty,
+                                'currencyDisplay' => $currencyDisplay,
+                                'typeNameRef' => 'new_types[' . $ni . '][name_it]',
+                            ]) ?>
                             <span class="setup-price-currency" aria-hidden="true"><?= e($currencyDisplay) ?></span>
                         </div>
                     </label>
                     <?php if ($typeRows !== []): ?>
-                        <label class="setup-check setup-check-inline setup-check-prominent">
-                            <input type="checkbox" name="new_types[<?= $ni ?>][is_active]" value="1" <?= !empty($newRow['is_active']) ? 'checked' : '' ?>>
-                            <span><?= e(__('settings.is_active')) ?></span>
-                        </label>
+                        <?= view_partial('partials/member_type_field', [
+                            'kind' => 'active',
+                            'name' => 'new_types[' . $ni . '][is_active]',
+                            'checked' => !empty($newRow['is_active']),
+                        ]) ?>
                     <?php else: ?>
-                        <input type="hidden" name="new_types[<?= $ni ?>][is_active]" value="1">
+                        <?= view_partial('partials/member_type_field', [
+                            'kind' => 'active_hidden',
+                            'name' => 'new_types[' . $ni . '][is_active]',
+                        ]) ?>
                     <?php endif; ?>
                 </div>
                 <button type="button" class="btn btn-ghost btn-sm" data-type-translate-now><?= e(__('settings.legal_translate')) ?></button>
@@ -142,13 +165,13 @@ try {
                             <img src="<?= e(locale_flag_url($code)) ?>" width="22" height="16" alt="" loading="lazy" decoding="async">
                             <?= e($langLabels[$code]) ?>
                         </span>
-                        <input
-                            type="text"
-                            name="new_types[__i__][name_<?= e($code) ?>]"
-                            value=""
-                            data-type-name-<?= e($code) ?>
-                            placeholder="<?= $code === 'it' ? e(__('setup.type_name_placeholder')) : '' ?>"
-                        >
+                        <?= view_partial('partials/member_type_field', [
+                            'kind' => 'name',
+                            'name' => 'new_types[__i__][name_' . $code . ']',
+                            'value' => '',
+                            'langCode' => $code,
+                            'placeholder' => $code === 'it' ? (string) __('setup.type_name_placeholder') : '',
+                        ]) ?>
                     </label>
                 <?php endforeach; ?>
             </div>
@@ -156,17 +179,27 @@ try {
                 <label class="setup-field">
                     <span><?= e(__('install.type_price')) ?></span>
                     <div class="setup-price-with-currency">
-                        <input type="number" step="0.01" min="0" name="new_types[__i__][price]" value="" placeholder="0.00" data-type-price data-type-name-ref="new_types[__i__][name_it]" inputmode="decimal">
+                        <?= view_partial('partials/member_type_field', [
+                            'kind' => 'price',
+                            'name' => 'new_types[__i__][price]',
+                            'value' => '',
+                            'currencyDisplay' => $currencyDisplay,
+                            'typeNameRef' => 'new_types[__i__][name_it]',
+                        ]) ?>
                         <span class="setup-price-currency" aria-hidden="true"><?= e($currencyDisplay) ?></span>
                     </div>
                 </label>
                 <?php if ($typeRows !== []): ?>
-                    <label class="setup-check setup-check-inline setup-check-prominent">
-                        <input type="checkbox" name="new_types[__i__][is_active]" value="1" checked>
-                        <span><?= e(__('settings.is_active')) ?></span>
-                    </label>
+                    <?= view_partial('partials/member_type_field', [
+                        'kind' => 'active',
+                        'name' => 'new_types[__i__][is_active]',
+                        'checked' => true,
+                    ]) ?>
                 <?php else: ?>
-                    <input type="hidden" name="new_types[__i__][is_active]" value="1">
+                    <?= view_partial('partials/member_type_field', [
+                        'kind' => 'active_hidden',
+                        'name' => 'new_types[__i__][is_active]',
+                    ]) ?>
                 <?php endif; ?>
             </div>
             <button type="button" class="btn btn-ghost btn-sm" data-type-translate-now><?= e(__('settings.legal_translate')) ?></button>

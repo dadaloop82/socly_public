@@ -15,124 +15,167 @@ $showNewCategory = $selectedCategory === '__new__';
 $hasExistingFile = !empty($has_existing_file);
 $fileName = (string) ($values['uploaded_name'] ?? '');
 $fileReady = $hasExistingFile || trim((string) ($values['uploaded_path'] ?? '')) !== '';
+
+$documentLanguageOptions = array_map(
+    static fn (string $lang): array => [
+        'value' => $lang,
+        'label' => (string) __('documents.language_' . $lang),
+    ],
+    $languages
+);
+
+$documentCategoryGroups = [];
+if (!empty($category_groups) && is_array($category_groups)) {
+    foreach ($category_groups as $group) {
+        $opts = [];
+        foreach (($group['options'] ?? []) as $cat) {
+            $opts[] = ['value' => (string) $cat['key'], 'label' => (string) $cat['label']];
+        }
+        $documentCategoryGroups[] = [
+            'label' => (string) ($group['label'] ?? ''),
+            'options' => $opts,
+        ];
+    }
+} else {
+    $documentCategoryFlat = [];
+    foreach ($categories as $cat) {
+        $documentCategoryFlat[] = ['value' => (string) $cat['key'], 'label' => (string) $cat['label']];
+    }
+}
+$documentCategoryNewOption = ['value' => '__new__', 'label' => (string) __('documents.category_new')];
+
+$documentMemberOptions = [];
+foreach (($members ?? []) as $member) {
+    $documentMemberOptions[] = [
+        'value' => (string) (int) $member['id'],
+        'label' => trim(($member['last_name'] ?? '') . ' ' . ($member['first_name'] ?? '')),
+    ];
+}
+
+$documentSiblingOptions = [];
+foreach (($sibling_options ?? []) as $sib) {
+    $label = (string) ($sib['title'] ?? '');
+    if (!empty($sib['language'])) {
+        $label .= ' (' . (string) $sib['language'] . ')';
+    }
+    $documentSiblingOptions[] = [
+        'value' => (string) (int) $sib['id'],
+        'label' => $label,
+    ];
+}
 ?>
 <div class="grid-3">
-    <div>
-        <label><?= e(__('documents.title_field')) ?> *</label>
-        <input type="text" name="title" value="<?= e((string) ($values['title'] ?? '')) ?>" required maxlength="190">
-    </div>
-    <div>
-        <label><?= e(__('documents.number')) ?></label>
-        <input type="text" name="document_number" value="<?= e((string) ($values['document_number'] ?? '')) ?>" maxlength="80">
-    </div>
-    <div>
-        <label><?= e(__('documents.date')) ?></label>
-        <input type="date" name="document_date" value="<?= e((string) ($values['document_date'] ?? $today)) ?>">
-    </div>
-    <div>
-        <label><?= e(__('documents.language')) ?></label>
-        <select name="language">
-            <option value=""><?= e(__('documents.language_none')) ?></option>
-            <?php foreach ($languages as $lang): ?>
-                <option value="<?= e($lang) ?>" <?= $selectedLanguage === $lang ? 'selected' : '' ?>><?= e(__('documents.language_' . $lang)) ?></option>
-            <?php endforeach; ?>
-        </select>
-    </div>
+    <?= field('text', [
+        'name' => 'title',
+        'label' => (string) __('documents.title_field'),
+        'value' => (string) ($values['title'] ?? ''),
+        'required' => true,
+        'maxlength' => 190,
+    ]) ?>
+    <?= field('text', [
+        'name' => 'document_number',
+        'label' => (string) __('documents.number'),
+        'value' => (string) ($values['document_number'] ?? ''),
+        'maxlength' => 80,
+    ]) ?>
+    <?= field('date', [
+        'name' => 'document_date',
+        'label' => (string) __('documents.date'),
+        'value' => (string) ($values['document_date'] ?? $today),
+    ]) ?>
+    <?= field('select', [
+        'name' => 'language',
+        'label' => (string) __('documents.language'),
+        'value' => $selectedLanguage,
+        'empty_label' => (string) __('documents.language_none'),
+        'options' => $documentLanguageOptions,
+    ]) ?>
 </div>
 <div class="grid-3">
     <div data-doc-category-wrap>
-        <label><?= e(__('documents.category')) ?></label>
-        <select name="category" data-doc-category>
-            <?php if (!empty($category_groups) && is_array($category_groups)): ?>
-                <?php foreach ($category_groups as $group): ?>
-                    <optgroup label="<?= e((string) ($group['label'] ?? '')) ?>">
-                        <?php foreach (($group['options'] ?? []) as $cat): ?>
-                            <option value="<?= e($cat['key']) ?>" <?= $selectedCategory === $cat['key'] ? 'selected' : '' ?>><?= e($cat['label']) ?></option>
-                        <?php endforeach; ?>
-                    </optgroup>
-                <?php endforeach; ?>
-            <?php else: ?>
-                <?php foreach ($categories as $cat): ?>
-                    <option value="<?= e($cat['key']) ?>" <?= $selectedCategory === $cat['key'] ? 'selected' : '' ?>><?= e($cat['label']) ?></option>
-                <?php endforeach; ?>
-            <?php endif; ?>
-            <option value="__new__" <?= $showNewCategory ? 'selected' : '' ?>><?= e(__('documents.category_new')) ?></option>
-        </select>
+        <?= field('select', [
+            'name' => 'category',
+            'label' => (string) __('documents.category'),
+            'value' => $selectedCategory,
+            'include_empty' => false,
+            'groups' => $documentCategoryGroups !== [] ? $documentCategoryGroups : null,
+            'options' => $documentCategoryGroups === [] ? array_merge($documentCategoryFlat, [$documentCategoryNewOption]) : [],
+            'trailing_options' => $documentCategoryGroups !== [] ? [$documentCategoryNewOption] : [],
+            'attrs' => ['data-doc-category' => true],
+        ]) ?>
         <div class="doc-new-category" data-doc-new-category <?= $showNewCategory ? '' : 'hidden' ?>>
-            <label><?= e(__('documents.category_new_label')) ?></label>
-            <input
-                type="text"
-                name="new_category"
-                value="<?= e((string) ($values['new_category'] ?? '')) ?>"
-                maxlength="80"
-                placeholder="<?= e(__('documents.category_new_placeholder')) ?>"
-                data-doc-new-category-input
-                <?= $showNewCategory ? 'required' : '' ?>
-            >
+            <?= field('text', [
+                'name' => 'new_category',
+                'label' => (string) __('documents.category_new_label'),
+                'value' => (string) ($values['new_category'] ?? ''),
+                'maxlength' => 80,
+                'placeholder' => (string) __('documents.category_new_placeholder'),
+                'required' => $showNewCategory,
+                'attrs' => ['data-doc-new-category-input' => true],
+            ]) ?>
         </div>
     </div>
-    <div>
-        <label><?= e(__('documents.status')) ?></label>
-        <select name="status">
-            <?php foreach (\Socly\Services\DocumentService::STATUSES as $st): ?>
-                <option value="<?= e($st) ?>" <?= ($values['status'] ?? 'draft') === $st ? 'selected' : '' ?>><?= e(__('documents.status_' . $st)) ?></option>
-            <?php endforeach; ?>
-        </select>
-    </div>
-    <div>
-        <label><?= e(__('documents.visibility')) ?></label>
-        <select name="visibility">
-            <?php foreach (\Socly\Services\DocumentService::VISIBILITIES as $vis): ?>
-                <option value="<?= e($vis) ?>" <?= ($values['visibility'] ?? 'internal') === $vis ? 'selected' : '' ?>><?= e(__('documents.visibility_' . $vis)) ?></option>
-            <?php endforeach; ?>
-        </select>
-    </div>
+    <?= field('select', [
+        'name' => 'status',
+        'label' => (string) __('documents.status'),
+        'value' => (string) ($values['status'] ?? 'draft'),
+        'include_empty' => false,
+        'options' => array_map(
+            static fn (string $st): array => [
+                'value' => $st,
+                'label' => (string) __('documents.status_' . $st),
+            ],
+            \Socly\Services\DocumentService::STATUSES
+        ),
+    ]) ?>
+    <?= field('select', [
+        'name' => 'visibility',
+        'label' => (string) __('documents.visibility'),
+        'value' => (string) ($values['visibility'] ?? 'internal'),
+        'include_empty' => false,
+        'options' => array_map(
+            static fn (string $vis): array => [
+                'value' => $vis,
+                'label' => (string) __('documents.visibility_' . $vis),
+            ],
+            \Socly\Services\DocumentService::VISIBILITIES
+        ),
+    ]) ?>
 </div>
 <div class="grid-3">
-    <div>
-        <label><?= e(__('documents.expires_at')) ?></label>
-        <input type="date" name="expires_at" value="<?= e((string) ($values['expires_at'] ?? '')) ?>">
-        <p class="muted" style="margin:0.35rem 0 0;font-size:0.85rem"><?= e(__('documents.expires_at_hint')) ?></p>
-    </div>
-    <div>
-        <label><?= e(__('documents.member_link')) ?></label>
-        <select name="member_id">
-            <option value="">—</option>
-            <?php foreach (($members ?? []) as $member): ?>
-                <option value="<?= (int) $member['id'] ?>" <?= (string) ($values['member_id'] ?? '') === (string) $member['id'] ? 'selected' : '' ?>>
-                    <?= e(trim(($member['last_name'] ?? '') . ' ' . ($member['first_name'] ?? ''))) ?>
-                </option>
-            <?php endforeach; ?>
-        </select>
-    </div>
-    <div>
-        <label><?= e(__('documents.sibling')) ?></label>
-        <select name="sibling_document_id">
-            <option value="">—</option>
-            <?php foreach (($sibling_options ?? []) as $sib): ?>
-                <option value="<?= (int) $sib['id'] ?>" <?= (string) ($values['sibling_document_id'] ?? '') === (string) $sib['id'] ? 'selected' : '' ?>>
-                    <?= e((string) ($sib['title'] ?? '')) ?>
-                    <?php if (!empty($sib['language'])): ?>
-                        (<?= e((string) $sib['language']) ?>)
-                    <?php endif; ?>
-                </option>
-            <?php endforeach; ?>
-        </select>
-    </div>
+    <?= field('date', [
+        'name' => 'expires_at',
+        'label' => (string) __('documents.expires_at'),
+        'value' => (string) ($values['expires_at'] ?? ''),
+        'hint' => (string) __('documents.expires_at_hint'),
+        'hint_attrs' => ['style' => 'margin:0.35rem 0 0;font-size:0.85rem'],
+    ]) ?>
+    <?= field('select', [
+        'name' => 'member_id',
+        'label' => (string) __('documents.member_link'),
+        'value' => (string) ($values['member_id'] ?? ''),
+        'options' => $documentMemberOptions,
+    ]) ?>
+    <?= field('select', [
+        'name' => 'sibling_document_id',
+        'label' => (string) __('documents.sibling'),
+        'value' => (string) ($values['sibling_document_id'] ?? ''),
+        'options' => $documentSiblingOptions,
+    ]) ?>
 </div>
 <div class="grid-3">
     <div class="doc-file-field<?= $fileReady ? ' is-uploaded' : '' ?>" data-doc-file-field>
-        <label><?= e(__('documents.file')) ?></label>
         <div class="doc-file-row">
-            <label class="btn btn-ghost file-btn">
-                <span data-doc-pick-label><?= e($fileReady ? __('documents.change_file') : __('documents.choose_file')) ?></span>
-                <input
-                    type="file"
-                    name="document_file"
-                    accept=".pdf,image/jpeg,image/png,image/webp,application/pdf"
-                    data-doc-file-input
-                >
-            </label>
+            <?= field('file', [
+                'label' => (string) __('documents.file'),
+                'name' => 'document_file',
+                'button_label' => $fileReady ? (string) __('documents.change_file') : (string) __('documents.choose_file'),
+                'accept' => '.pdf,image/jpeg,image/png,image/webp,application/pdf',
+                'as_button' => true,
+                'button_class' => 'btn btn-ghost file-btn sf-field__file-btn',
+                'attrs' => ['data-doc-file-input' => true],
+                'pick_label_attrs' => ['data-doc-pick-label' => true],
+            ]) ?>
             <div class="doc-file-meta" data-doc-file-meta>
                 <strong class="doc-file-name" data-doc-file-name <?= $fileName === '' ? 'hidden' : '' ?>><?= e($fileName) ?></strong>
                 <span class="doc-file-status muted" data-doc-file-status>
@@ -149,10 +192,12 @@ $fileReady = $hasExistingFile || trim((string) ($values['uploaded_path'] ?? ''))
         </div>
     </div>
 </div>
-<div>
-    <label><?= e(__('documents.summary')) ?></label>
-    <textarea name="summary" rows="3"><?= e((string) ($values['summary'] ?? '')) ?></textarea>
-</div>
+<?= field('textarea', [
+    'name' => 'summary',
+    'label' => (string) __('documents.summary'),
+    'value' => (string) ($values['summary'] ?? ''),
+    'rows' => 3,
+]) ?>
 <?php if (!empty($document_id) && (int) $document_id > 0 && component_enabled('treasury') && can('treasury.manage')): ?>
     <p class="muted" style="margin-top:0.75rem">
         <a href="<?= e(url('/treasury?document_id=' . (int) $document_id)) ?>"><?= e(__('documents.link_treasury')) ?></a>

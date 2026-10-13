@@ -3,27 +3,28 @@
 
 <form method="post" action="<?= e(url('/password/reset')) ?>">
     <?= csrf_field() ?>
-    <input type="hidden" name="token" value="<?= e((string)($token ?? '')) ?>">
-    <input type="hidden" name="email" value="<?= e((string)($email ?? old('email'))) ?>">
-
-    <label for="password"><?= e(__('auth.new_password')) ?></label>
-    <?= view_partial('partials/password_input', [
-        'name' => 'password',
-        'id' => 'password',
-        'label' => '',
-        'required' => true,
-        'autocomplete' => 'new-password',
-        'wrapper_class' => 'password-field password-field--bare',
+    <?= field('hidden', ['name' => 'token', 'value' => (string) ($token ?? '')]) ?>
+    <?= field('hidden', [
+        'name' => 'email',
+        'value' => (string) ($email ?? old('email')),
     ]) ?>
 
-    <label for="password_confirmation"><?= e(__('auth.new_password_confirmation')) ?></label>
-    <?= view_partial('partials/password_input', [
-        'name' => 'password_confirmation',
-        'id' => 'password_confirmation',
-        'label' => '',
+    <?= field('password', [
+        'name' => 'password',
+        'id' => 'password',
+        'label' => (string) __('auth.new_password'),
         'required' => true,
         'autocomplete' => 'new-password',
-        'wrapper_class' => 'password-field password-field--bare',
+        'wrapper_class' => 'password-field--bare',
+    ]) ?>
+
+    <?= field('password', [
+        'name' => 'password_confirmation',
+        'id' => 'password_confirmation',
+        'label' => (string) __('auth.new_password_confirmation'),
+        'required' => true,
+        'autocomplete' => 'new-password',
+        'wrapper_class' => 'password-field--bare',
     ]) ?>
 
     <button class="btn btn-block" type="submit"><?= e(__('auth.reset_submit')) ?></button>

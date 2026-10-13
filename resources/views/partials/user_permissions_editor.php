@@ -36,17 +36,17 @@ $roleTemplates = \Socly\Services\UserService::roleTemplates();
                 <div class="user-permissions-group-items">
                     <?php foreach ($group['keys'] as $permKey): ?>
                         <?php $checked = in_array($permKey, $selected, true); ?>
-                        <label class="setup-check setup-check-inline user-permission-item">
-                            <input
-                                type="checkbox"
-                                name="<?= e($inputPrefix) ?>permissions[]"
-                                value="<?= e($permKey) ?>"
-                                <?= $checked ? 'checked' : '' ?>
-                                <?= $disabled ? 'disabled' : '' ?>
-                                data-permission-key="<?= e($permKey) ?>"
-                            >
-                            <span><?= e(__(\Socly\Support\Permission::labelKey($permKey))) ?></span>
-                        </label>
+                        <?= field('checkbox', [
+                            'name' => $inputPrefix . 'permissions[]',
+                            'check_value' => $permKey,
+                            'label' => (string) __(\Socly\Support\Permission::labelKey($permKey)),
+                            'checked' => $checked,
+                            'disabled' => $disabled,
+                            'context' => 'inline',
+                            'wrapper_class' => 'user-permission-item',
+                            'label_class' => 'setup-check setup-check-inline user-permission-item',
+                            'attrs' => ['data-permission-key' => $permKey],
+                        ]) ?>
                     <?php endforeach; ?>
                 </div>
             </section>

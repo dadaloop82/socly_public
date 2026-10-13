@@ -29,13 +29,19 @@ $reportUrl = url('/api/report-problem');
         <p class="setup-exit-text report-problem-lede muted" data-i18n="report.lede"><?= e(__('report.lede')) ?></p>
         <label class="report-problem-field">
             <span data-i18n="report.description"><?= e(__('report.description')) ?></span>
-            <textarea name="description"
-                      rows="5"
-                      required
-                      maxlength="4000"
-                      data-report-problem-description
-                      placeholder="<?= e(__('report.description_placeholder')) ?>"
-                      data-i18n-placeholder="report.description_placeholder"></textarea>
+            <?= field('textarea', [
+                'name' => 'description',
+                'label' => '',
+                'context' => 'inline',
+                'required' => true,
+                'rows' => 5,
+                'maxlength' => 4000,
+                'placeholder' => (string) __('report.description_placeholder'),
+                'attrs' => [
+                    'data-report-problem-description' => true,
+                    'data-i18n-placeholder' => 'report.description_placeholder',
+                ],
+            ]) ?>
         </label>
         <p class="report-problem-status muted" data-report-problem-status hidden></p>
         <div class="setup-exit-actions">

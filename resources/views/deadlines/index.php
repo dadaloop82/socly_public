@@ -71,19 +71,19 @@ $filterUrl = static function (string $filter = '') use ($search_query): string {
 
 <form class="panel filter-bar members-filter" method="get" action="<?= e(url('/deadlines')) ?>" role="search" style="margin-bottom:1rem">
     <?php if ($activeFilter !== ''): ?>
-        <input type="hidden" name="filter" value="<?= e($activeFilter) ?>">
+        <?= field('hidden', ['name' => 'filter', 'value' => $activeFilter]) ?>
     <?php endif; ?>
     <label class="visually-hidden" for="deadline-q-top"><?= e(__('deadlines.search')) ?></label>
-    <input
-        id="deadline-q-top"
-        class="members-filter-q"
-        type="search"
-        name="q"
-        value="<?= e((string) ($search_query ?? '')) ?>"
-        placeholder="<?= e(__('deadlines.search_placeholder')) ?>"
-        maxlength="120"
-        autocomplete="off"
-    >
+    <?= field('search', [
+        'name' => 'q',
+        'id' => 'deadline-q-top',
+        'label' => '',
+        'value' => (string) ($search_query ?? ''),
+        'context' => 'filter',
+        'placeholder' => (string) __('deadlines.search_placeholder'),
+        'input_class' => 'members-filter-q',
+        'maxlength' => 120,
+    ]) ?>
     <button class="btn btn-sm" type="submit"><?= e(__('deadlines.search')) ?></button>
     <?php if (trim((string) ($search_query ?? '')) !== ''): ?>
         <a class="btn btn-ghost btn-sm" href="<?= e($filterUrl($activeFilter)) ?>"><?= e(__('deadlines.search_clear')) ?></a>

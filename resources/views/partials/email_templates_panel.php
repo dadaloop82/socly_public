@@ -36,25 +36,42 @@ $isSystemSlug = $editing && in_array((string) ($editing['slug'] ?? ''), $systemS
         <h3 class="setup-subhead"><?= e($editing ? __('email_templates.edit') : __('email_templates.create')) ?></h3>
         <form method="post" action="<?= e(url('/settings/email-templates')) ?>" data-email-template-form data-leave-guard>
             <?= csrf_field() ?>
-            <input type="hidden" name="action" value="save" data-tpl-action-field>
-            <input type="hidden" name="id" value="<?= $editId ?>">
+            <?= field('hidden', ['name' => 'action', 'value' => 'save', 'attrs' => ['data-tpl-action-field' => true]]) ?>
+            <?= field('hidden', ['name' => 'id', 'value' => (string) $editId]) ?>
             <div class="setup-equal-row">
-                <label class="setup-field">
-                    <span><?= e(__('email_templates.name')) ?> *</span>
-                    <input type="text" name="name" required maxlength="120" value="<?= e((string) old('name', $editing['name'] ?? '')) ?>" data-tpl-name>
-                </label>
-                <label class="setup-field">
-                    <span><?= e(__('email_templates.slug')) ?> *</span>
-                    <input type="text" name="slug" required maxlength="80" pattern="[a-z0-9\-]+" value="<?= e((string) old('slug', $editing['slug'] ?? '')) ?>" data-tpl-slug <?= $isSystemSlug ? 'readonly' : '' ?>>
-                </label>
+                <?= field('text', [
+                    'name' => 'name',
+                    'label' => (string) __('email_templates.name'),
+                    'value' => (string) old('name', $editing['name'] ?? ''),
+                    'required' => true,
+                    'context' => 'setup',
+                    'maxlength' => 120,
+                    'attrs' => ['data-tpl-name' => true],
+                ]) ?>
+                <?= field('text', [
+                    'name' => 'slug',
+                    'label' => (string) __('email_templates.slug'),
+                    'value' => (string) old('slug', $editing['slug'] ?? ''),
+                    'required' => true,
+                    'context' => 'setup',
+                    'maxlength' => 80,
+                    'pattern' => '[a-z0-9\\-]+',
+                    'readonly' => $isSystemSlug,
+                    'attrs' => ['data-tpl-slug' => true],
+                ]) ?>
             </div>
-            <label class="setup-field">
-                <span><?= e(__('email_templates.body_format')) ?></span>
-                <select name="body_format" data-tpl-body-format>
-                    <option value="text" <?= $bodyFormat === 'text' ? 'selected' : '' ?>><?= e(__('email_templates.format_text')) ?></option>
-                    <option value="html" <?= $bodyFormat === 'html' ? 'selected' : '' ?>><?= e(__('email_templates.format_html')) ?></option>
-                </select>
-            </label>
+            <?= field('select', [
+                'name' => 'body_format',
+                'label' => (string) __('email_templates.body_format'),
+                'value' => $bodyFormat,
+                'context' => 'setup',
+                'include_empty' => false,
+                'options' => [
+                    ['value' => 'text', 'label' => (string) __('email_templates.format_text')],
+                    ['value' => 'html', 'label' => (string) __('email_templates.format_html')],
+                ],
+                'attrs' => ['data-tpl-body-format' => true],
+            ]) ?>
             <div class="email-template-lang-tabs" role="tablist" data-tpl-lang-tabs>
                 <?php foreach (['it' => 'Italiano', 'en' => 'English', 'de' => 'Deutsch'] as $code => $lab): ?>
                     <button type="button" class="email-template-lang-tab<?= $code === 'it' ? ' is-active' : '' ?>" data-lang-tab="<?= e($code) ?>" role="tab"><?= e($lab) ?></button>
@@ -66,40 +83,73 @@ $isSystemSlug = $editing && in_array((string) ($editing['slug'] ?? ''), $systemS
                     $req = $code === 'it' ? ' required' : '';
                 ?>
                 <div class="email-template-lang-pane<?= $code === 'it' ? ' is-active' : '' ?>" data-lang-pane="<?= e($code) ?>">
-                    <label class="setup-field">
-                        <span><?= e(__('email_templates.subject')) ?> (<?= strtoupper($code) ?>)</span>
-                        <input type="text" name="subject<?= $suf ?>" maxlength="250" value="<?= e((string) old('subject' . $suf, $editing['subject' . $suf] ?? '')) ?>" data-tpl-subject="<?= e($code) ?>"<?= $req ?>>
-                    </label>
-                    <label class="setup-field">
-                        <span><?= e(__('email_templates.body')) ?> (<?= strtoupper($code) ?>)</span>
-                        <textarea name="body<?= $suf ?>" rows="10" class="tpl-body-text" data-tpl-body="<?= e($code) ?>"<?= $req ?>><?= e((string) old('body' . $suf, $editing['body' . $suf] ?? '')) ?></textarea>
+                    <?= field('text', [
+                        'name' => 'subject' . $suf,
+                        'label' => (string) __('email_templates.subject') . ' (' . strtoupper($code) . ')',
+                        'value' => (string) old('subject' . $suf, $editing['subject' . $suf] ?? ''),
+                        'required' => $code === 'it',
+                        'context' => 'setup',
+                        'maxlength' => 250,
+                        'attrs' => ['data-tpl-subject' => $code],
+                    ]) ?>
+                    <div class="setup-field sf-field">
+                        <span class="field-label sf-field__label"><?= e(__('email_templates.body')) ?> (<?= strtoupper($code) ?>)</span>
+                        <?= field('textarea', [
+                            'name' => 'body' . $suf,
+                            'label' => '',
+                            'value' => (string) old('body' . $suf, $editing['body' . $suf] ?? ''),
+                            'required' => $code === 'it',
+                            'context' => 'inline',
+                            'rows' => 10,
+                            'input_class' => 'tpl-body-text',
+                            'attrs' => ['data-tpl-body' => $code],
+                        ]) ?>
                         <div class="tpl-body-html-wrap" data-tpl-html-wrap="<?= e($code) ?>" hidden>
                             <div class="tpl-html-mode-tabs">
                                 <button type="button" class="tpl-html-mode-tab is-active" data-html-mode="source" data-lang="<?= e($code) ?>"><?= e(__('email_templates.html_source')) ?></button>
                                 <button type="button" class="tpl-html-mode-tab" data-html-mode="preview" data-lang="<?= e($code) ?>"><?= e(__('email_templates.html_preview')) ?></button>
                             </div>
-                            <textarea class="tpl-body-source" data-tpl-body-source="<?= e($code) ?>" rows="12" spellcheck="false"></textarea>
+                            <?= field('textarea', [
+                                'name' => '',
+                                'label' => '',
+                                'context' => 'inline',
+                                'rows' => 12,
+                                'input_class' => 'tpl-body-source',
+                                'attrs' => [
+                                    'data-tpl-body-source' => $code,
+                                    'spellcheck' => 'false',
+                                ],
+                            ]) ?>
                             <div class="mail-preview-html tpl-inline-preview" data-tpl-inline-preview="<?= e($code) ?>" hidden></div>
                         </div>
-                    </label>
+                    </div>
                 </div>
             <?php endforeach; ?>
             <div class="email-template-test-box">
                 <h4 class="setup-subhead"><?= e(__('email_templates.test_title')) ?></h4>
                 <p class="setup-hint muted"><?= e(__('email_templates.test_hint')) ?></p>
                 <div class="setup-equal-row">
-                    <label class="setup-field">
-                        <span><?= e(__('email_templates.test_email')) ?></span>
-                        <input type="email" name="test_email" maxlength="190" value="<?= e((string) old('test_email', $defaultTestEmail ?? '')) ?>" data-tpl-test-email>
-                    </label>
-                    <label class="setup-field">
-                        <span><?= e(__('email_templates.test_lang')) ?></span>
-                        <select name="test_lang" data-tpl-test-lang>
-                            <option value="it">IT</option>
-                            <option value="en">EN</option>
-                            <option value="de">DE</option>
-                        </select>
-                    </label>
+                    <?= field('email', [
+                        'name' => 'test_email',
+                        'label' => (string) __('email_templates.test_email'),
+                        'value' => (string) old('test_email', $defaultTestEmail ?? ''),
+                        'context' => 'setup',
+                        'maxlength' => 190,
+                        'attrs' => ['data-tpl-test-email' => true],
+                    ]) ?>
+                    <?= field('select', [
+                        'name' => 'test_lang',
+                        'label' => (string) __('email_templates.test_lang'),
+                        'value' => (string) old('test_lang', 'it'),
+                        'context' => 'setup',
+                        'include_empty' => false,
+                        'options' => [
+                            ['value' => 'it', 'label' => 'IT'],
+                            ['value' => 'en', 'label' => 'EN'],
+                            ['value' => 'de', 'label' => 'DE'],
+                        ],
+                        'attrs' => ['data-tpl-test-lang' => true],
+                    ]) ?>
                 </div>
             </div>
             <div class="actions form-actions form-actions-end">

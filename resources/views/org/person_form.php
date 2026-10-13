@@ -16,6 +16,30 @@ $requiresMandate = !empty($roleMeta['requires_mandate']);
 $action = $isEdit
     ? url('/org/people/' . (int) ($person['id'] ?? 0))
     : url('/org/people');
+
+$roleSelectOptions = [];
+foreach ($roles as $role) {
+    $optLabel = trim((string) ($role['custom_label'] ?? ''));
+    if ($optLabel === '') {
+        $optLabel = __((string) ($role['label_key'] ?? ''));
+    }
+    $optKey = (string) ($role['key'] ?? '');
+    $roleSelectOptions[] = [
+        'value' => $optKey,
+        'label' => $optLabel,
+        'attrs' => ['data-requires-residence' => !empty($role['requires_residence']) ? '1' : '0'],
+    ];
+}
+
+$memberSelectOptions = [];
+foreach ($memberOptions as $memberOption) {
+    $optId = (int) ($memberOption['id'] ?? 0);
+    $optLabel = trim((string) ($memberOption['display_name'] ?? ''));
+    if ($optLabel === '') {
+        $optLabel = trim((string) (($memberOption['last_name'] ?? '') . ' ' . ($memberOption['first_name'] ?? '')));
+    }
+    $memberSelectOptions[] = ['value' => (string) $optId, 'label' => $optLabel];
+}
 ?>
 <div class="page-header">
     <div class="titles">
@@ -58,112 +82,109 @@ $action = $isEdit
     </div>
 
     <div class="grid-3">
-        <div>
-            <label><?= e(__('settings.people_role')) ?> *</label>
-            <select name="role_key" required data-org-role-select>
-                <?php foreach ($roles as $role): ?>
-                    <?php
-                    $optLabel = trim((string) ($role['custom_label'] ?? ''));
-                    if ($optLabel === '') {
-                        $optLabel = __((string) ($role['label_key'] ?? ''));
-                    }
-                    $optKey = (string) ($role['key'] ?? '');
-                    $needsResidence = !empty($role['requires_residence']) ? '1' : '0';
-                    ?>
-                    <option
-                        value="<?= e($optKey) ?>"
-                        data-requires-residence="<?= e($needsResidence) ?>"
-                        <?= $roleKey === $optKey ? 'selected' : '' ?>
-                    ><?= e($optLabel) ?></option>
-                <?php endforeach; ?>
-            </select>
-        </div>
+        <?= field('select', [
+            'name' => 'role_key',
+            'label' => (string) __('settings.people_role'),
+            'value' => $roleKey,
+            'required' => true,
+            'include_empty' => false,
+            'options' => $roleSelectOptions,
+            'attrs' => ['data-org-role-select' => true],
+        ]) ?>
     </div>
 
     <div style="margin-bottom:1rem">
-        <label><?= e(__('org.field_member')) ?> *</label>
-        <select name="member_id" required data-org-member-select>
-                <option value=""><?= e(__('org.member_select_placeholder')) ?></option>
-                <?php foreach ($memberOptions as $memberOption): ?>
-                    <?php
-                    $optId = (int) ($memberOption['id'] ?? 0);
-                    $optLabel = trim((string) ($memberOption['display_name'] ?? ''));
-                    if ($optLabel === '') {
-                        $optLabel = trim((string) (($memberOption['last_name'] ?? '') . ' ' . ($memberOption['first_name'] ?? '')));
-                    }
-                    ?>
-                    <option value="<?= $optId ?>" <?= $memberId === (string) $optId ? 'selected' : '' ?>><?= e($optLabel) ?></option>
-                <?php endforeach; ?>
-            </select>
-            <p class="muted"><?= e(__('org.member_select_lede')) ?></p>
+        <?= field('select', [
+            'name' => 'member_id',
+            'label' => (string) __('org.field_member'),
+            'value' => $memberId,
+            'required' => true,
+            'empty_label' => (string) __('org.member_select_placeholder'),
+            'options' => $memberSelectOptions,
+            'attrs' => ['data-org-member-select' => true],
+        ]) ?>
+        <p class="muted"><?= e(__('org.member_select_lede')) ?></p>
     </div>
 
     <div class="grid-3">
-        <div>
-            <label><?= e(__('setup.field_first_name')) ?> *</label>
-            <input type="text" name="first_name" value="<?= e((string) ($values['first_name'] ?? '')) ?>" required maxlength="120" data-first-name data-org-member-field>
-        </div>
-        <div>
-            <label><?= e(__('setup.field_last_name')) ?> *</label>
-            <input type="text" name="last_name" value="<?= e((string) ($values['last_name'] ?? '')) ?>" required maxlength="120" data-last-name data-org-member-field>
-        </div>
-        <div>
-            <label><?= e(__('setup.field_person_fiscal_code')) ?> *</label>
-            <input type="text" name="fiscal_code" value="<?= e((string) ($values['fiscal_code'] ?? '')) ?>" required maxlength="16" pattern="[A-Za-z0-9]{16}" autocomplete="off" data-fiscal-code data-org-member-field placeholder="<?= e(__('members.cf_hint')) ?>">
-            <button class="btn btn-ghost btn-sm" type="button" data-cf-generate hidden><?= e(__('members.cf_generate')) ?></button>
-            <p class="muted" data-cf-status
-               data-ready="<?= e(__('members.cf_ready')) ?>"
-               data-incomplete="<?= e(__('members.cf_incomplete')) ?>"
-               data-gender-other="<?= e(__('members.cf_gender_other')) ?>"
-               hidden></p>
-        </div>
+        <?= field('text', [
+            'name' => 'first_name',
+            'label' => (string) __('setup.field_first_name'),
+            'value' => (string) ($values['first_name'] ?? ''),
+            'required' => true,
+            'maxlength' => 120,
+            'attrs' => ['data-first-name' => true, 'data-org-member-field' => true],
+        ]) ?>
+        <?= field('text', [
+            'name' => 'last_name',
+            'label' => (string) __('setup.field_last_name'),
+            'value' => (string) ($values['last_name'] ?? ''),
+            'required' => true,
+            'maxlength' => 120,
+            'attrs' => ['data-last-name' => true, 'data-org-member-field' => true],
+        ]) ?>
+        <?= field('fiscal_code', [
+            'name' => 'fiscal_code',
+            'label' => (string) __('setup.field_person_fiscal_code'),
+            'value' => (string) ($values['fiscal_code'] ?? ''),
+            'required' => true,
+            'attrs' => ['data-org-member-field' => true],
+        ]) ?>
     </div>
 
     <div class="grid-3">
-        <div>
-            <label><?= e(__('setup.field_gender')) ?></label>
-            <select name="gender" data-gender-input data-org-member-field>
-                <option value="">—</option>
-                <option value="M" <?= ($values['gender'] ?? '') === 'M' ? 'selected' : '' ?>><?= e(__('members.gender_m')) ?></option>
-                <option value="F" <?= ($values['gender'] ?? '') === 'F' ? 'selected' : '' ?>><?= e(__('members.gender_f')) ?></option>
-            </select>
-        </div>
-        <?= view_partial('partials/geo_birth_place', [
+        <?= field('gender', [
+            'name' => 'gender',
+            'label' => (string) __('setup.field_gender'),
+            'value' => (string) ($values['gender'] ?? ''),
+            'attrs' => ['data-org-member-field' => true],
+        ]) ?>
+        <?= field('birth_place', [
             'name' => 'birth_place',
             'value' => (string) ($values['birth_place'] ?? ''),
             'flag_name' => 'birth_place_foreign',
-            'class' => 'org-geo-birth',
+            'wrapper_class' => 'org-geo-birth',
         ]) ?>
-        <div>
-            <label><?= e(__('setup.field_birth_date')) ?></label>
-            <input type="date" name="birth_date" value="<?= e((string) ($values['birth_date'] ?? '')) ?>" data-birth-date data-org-member-field>
-        </div>
+        <?= field('birth_date', [
+            'name' => 'birth_date',
+            'label' => (string) __('setup.field_birth_date'),
+            'value' => (string) ($values['birth_date'] ?? ''),
+            'show_age' => false,
+            'attrs' => ['data-org-member-field' => true],
+        ]) ?>
     </div>
 
     <div class="grid-3">
-        <div>
-            <label><?= e(__('org.field_email')) ?></label>
-            <input type="email" name="email" value="<?= e((string) ($values['email'] ?? '')) ?>" maxlength="190" data-org-member-field>
-        </div>
-        <div>
-            <label><?= e(__('setup.field_phone')) ?></label>
-            <?= view_partial('partials/phone_field', [
-                'name' => 'phone',
-                'value' => (string) ($values['phone'] ?? ''),
-            ]) ?>
-        </div>
-        <div>
-            <label><?= e(__('org.notes')) ?></label>
-            <input type="text" name="notes" value="<?= e((string) ($values['notes'] ?? '')) ?>">
-        </div>
+        <?= field('email', [
+            'name' => 'email',
+            'label' => (string) __('org.field_email'),
+            'value' => (string) ($values['email'] ?? ''),
+            'maxlength' => 190,
+            'attrs' => ['data-org-member-field' => true],
+        ]) ?>
+        <?= field('phone', [
+            'name' => 'phone',
+            'label' => (string) __('setup.field_phone'),
+            'value' => (string) ($values['phone'] ?? ''),
+            'input_class' => '',
+        ]) ?>
+        <?= field('text', [
+            'name' => 'notes',
+            'label' => (string) __('org.notes'),
+            'value' => (string) ($values['notes'] ?? ''),
+        ]) ?>
     </div>
 
-    <input type="hidden" name="replace_unique_role" value="" data-org-replace-unique>
+    <?= field('hidden', [
+        'name' => 'replace_unique_role',
+        'value' => '',
+        'attrs' => ['data-org-replace-unique' => true],
+    ]) ?>
 
     <div data-org-residence-fields <?= $requiresResidence ? '' : 'hidden' ?>>
-    <?= view_partial('partials/geo_address', [
+    <?= field('address', [
         'show_hint' => true,
-        'required' => [
+        'required_map' => [
             'city' => $requiresResidence,
             'postal_code' => $requiresResidence,
             'address' => $requiresResidence,
@@ -185,18 +206,27 @@ $action = $isEdit
     </div>
 
     <div class="grid-2" style="margin-top:1rem">
-        <div>
-            <label><?= e(__('setup.field_appointed_at')) ?><?= $requiresMandate ? ' *' : '' ?></label>
-            <input type="date" name="appointed_at" value="<?= e((string) ($values['appointed_at'] ?? '')) ?>" <?= $requiresMandate ? 'required' : '' ?>>
-        </div>
-        <div>
-            <label><?= e(__('setup.field_mandate_ends_at')) ?><?= $requiresMandate ? ' *' : '' ?></label>
-            <input type="date" name="mandate_ends_at" value="<?= e((string) ($values['mandate_ends_at'] ?? '')) ?>" <?= $requiresMandate ? 'required' : '' ?>>
-        </div>
+        <?= field('date', [
+            'name' => 'appointed_at',
+            'label' => (string) __('setup.field_appointed_at'),
+            'value' => (string) ($values['appointed_at'] ?? ''),
+            'required' => $requiresMandate,
+        ]) ?>
+        <?= field('date', [
+            'name' => 'mandate_ends_at',
+            'label' => (string) __('setup.field_mandate_ends_at'),
+            'value' => (string) ($values['mandate_ends_at'] ?? ''),
+            'required' => $requiresMandate,
+        ]) ?>
     </div>
     <div style="margin-top:1rem">
-        <label><?= e(__('org.appointment_minutes')) ?></label>
-        <input type="text" name="appointment_minutes" value="<?= e((string) ($values['appointment_minutes'] ?? '')) ?>" maxlength="190" placeholder="<?= e(__('org.appointment_minutes_placeholder')) ?>">
+        <?= field('text', [
+            'name' => 'appointment_minutes',
+            'label' => (string) __('org.appointment_minutes'),
+            'value' => (string) ($values['appointment_minutes'] ?? ''),
+            'maxlength' => 190,
+            'placeholder' => (string) __('org.appointment_minutes_placeholder'),
+        ]) ?>
     </div>
     <div class="form-actions form-actions-end">
         <a class="btn btn-ghost" href="<?= e(url('/org')) ?>"><?= e(__('common.back')) ?></a>

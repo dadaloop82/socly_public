@@ -44,51 +44,61 @@ $canPayments = can('payments.manage');
         </div>
         <button class="btn btn-sm members-filter-submit-desktop" type="submit"><?= e(__('members.search')) ?></button>
     </div>
+    <?php
+    $memberStatusOptions = [];
+    foreach (\Socly\Services\MemberService::memberStatuses() as $st) {
+        $memberStatusOptions[$st] = (string) __('members.status_' . $st);
+    }
+    $memberPaymentOptions = [];
+    foreach (['paid', 'partial', 'due'] as $p) {
+        $memberPaymentOptions[$p] = (string) __('members.payment_' . $p);
+    }
+    $memberTypeOptions = [];
+    foreach ($types as $type) {
+        $memberTypeOptions[(string) (int) $type['id']] = localized($type['name_json']);
+    }
+    ?>
     <div class="members-filter-q">
         <label class="members-filter-q-label" for="members-q"><?= e(__('members.search')) ?></label>
         <div class="members-filter-q-row">
-            <input
-                id="members-q"
-                type="search"
-                name="q"
-                value="<?= e($filters['q']) ?>"
-                placeholder="<?= e(__('members.search_placeholder')) ?>"
-                data-placeholder-desktop="<?= e(__('members.search_placeholder')) ?>"
-                data-placeholder-mobile="<?= e(__('members.search_placeholder_mobile')) ?>"
-                enterkeyhint="search"
-                autocomplete="off"
-            >
+            <?= field('search', [
+                'name' => 'q',
+                'id' => 'members-q',
+                'label' => '',
+                'value' => (string) $filters['q'],
+                'context' => 'filter',
+                'placeholder' => (string) __('members.search_placeholder'),
+                'attrs' => [
+                    'data-placeholder-desktop' => (string) __('members.search_placeholder'),
+                    'data-placeholder-mobile' => (string) __('members.search_placeholder_mobile'),
+                    'enterkeyhint' => 'search',
+                ],
+            ]) ?>
             <button class="btn btn-sm members-filter-submit-mobile" type="submit"><?= e(__('members.search')) ?></button>
         </div>
     </div>
     <div class="members-filter-extra grid-3">
-        <div>
-            <label><?= e(__('members.status')) ?></label>
-            <select name="status">
-                <option value="">—</option>
-                <?php foreach (\Socly\Services\MemberService::memberStatuses() as $st): ?>
-                    <option value="<?= $st ?>" <?= $filters['status']===$st?'selected':'' ?>><?= e(__('members.status_'.$st)) ?></option>
-                <?php endforeach; ?>
-            </select>
-        </div>
-        <div>
-            <label><?= e(__('members.payment')) ?></label>
-            <select name="payment">
-                <option value="">—</option>
-                <?php foreach (['paid','partial','due'] as $p): ?>
-                    <option value="<?= $p ?>" <?= $filters['payment']===$p?'selected':'' ?>><?= e(__('members.payment_'.$p)) ?></option>
-                <?php endforeach; ?>
-            </select>
-        </div>
-        <div>
-            <label><?= e(__('members.type')) ?></label>
-            <select name="member_type_id">
-                <option value="">—</option>
-                <?php foreach ($types as $type): ?>
-                    <option value="<?= (int)$type['id'] ?>" <?= (string)$filters['member_type_id']===(string)$type['id']?'selected':'' ?>><?= e(localized($type['name_json'])) ?></option>
-                <?php endforeach; ?>
-            </select>
-        </div>
+        <?= field('select', [
+            'name' => 'status',
+            'label' => (string) __('members.status'),
+            'value' => (string) ($filters['status'] ?? ''),
+            'context' => 'filter',
+            'options' => $memberStatusOptions,
+        ]) ?>
+        <?= field('select', [
+            'name' => 'payment',
+            'label' => (string) __('members.payment'),
+            'value' => (string) ($filters['payment'] ?? ''),
+            'context' => 'filter',
+            'options' => $memberPaymentOptions,
+        ]) ?>
+        <?= field('select', [
+            'name' => 'member_type_id',
+            'label' => (string) __('members.type'),
+            'value' => (string) ($filters['member_type_id'] ?? ''),
+            'context' => 'filter',
+            'options' => $memberTypeOptions,
+        ]) ?>
     </div>
 </form>
 <?php endif; ?>
@@ -122,7 +132,16 @@ $canPayments = can('payments.manage');
                 <thead>
                 <tr>
                     <?php if ($canManage): ?>
-                        <th class="members-col-check"><input type="checkbox" data-members-select-all aria-label="<?= e(__('members.bulk_select_all')) ?>"></th>
+                        <th class="members-col-check"><?= field('checkbox', [
+                            'name' => '',
+                            'label' => '',
+                            'context' => 'inline',
+                            'wrapper_class' => 'members-col-check-toggle',
+                            'attrs' => [
+                                'data-members-select-all' => true,
+                                'aria-label' => (string) __('members.bulk_select_all'),
+                            ],
+                        ]) ?></th>
                     <?php endif; ?>
                     <th><?= e(__('members.member_number')) ?></th>
                     <th><?= e(__('members.type')) ?></th>
@@ -152,7 +171,16 @@ $canPayments = can('payments.manage');
                     <tr<?= $issueLabels !== [] ? ' class="member-row-anomaly"' : '' ?> data-member-row="<?= (int) $item['id'] ?>">
                         <?php if ($canManage): ?>
                         <td class="members-col-check" data-label="">
-                            <input type="checkbox" name="member_ids[]" value="<?= (int) $item['id'] ?>" data-member-select aria-label="<?= e($fullName !== '' ? $fullName : $item['member_number']) ?>">
+                            <?= field('checkbox', [
+                                'name' => 'member_ids[]',
+                                'check_value' => (string) (int) $item['id'],
+                                'label' => '',
+                                'context' => 'inline',
+                                'attrs' => [
+                                    'data-member-select' => true,
+                                    'aria-label' => $fullName !== '' ? $fullName : (string) $item['member_number'],
+                                ],
+                            ]) ?>
                         </td>
                         <?php endif; ?>
                         <td data-label="<?= e(__('members.member_number')) ?>">
@@ -247,10 +275,10 @@ $canPayments = can('payments.manage');
 <?php if ($canManage && !empty($result['items'])): ?>
 <form method="post" action="<?= e(url('/members/bulk')) ?>" data-members-bulk-form hidden>
     <?= csrf_field() ?>
-    <input type="hidden" name="action" value="" data-members-bulk-action-input>
-    <input type="hidden" name="redirect" value="<?= e($redirectBack) ?>">
-    <input type="hidden" name="subject" value="" data-members-bulk-subject>
-    <input type="hidden" name="body" value="" data-members-bulk-body>
+    <?= field('hidden', ['name' => 'action', 'value' => '', 'attrs' => ['data-members-bulk-action-input' => true]]) ?>
+    <?= field('hidden', ['name' => 'redirect', 'value' => $redirectBack]) ?>
+    <?= field('hidden', ['name' => 'subject', 'value' => '', 'attrs' => ['data-members-bulk-subject' => true]]) ?>
+    <?= field('hidden', ['name' => 'body', 'value' => '', 'attrs' => ['data-members-bulk-body' => true]]) ?>
     <div data-members-bulk-id-host></div>
 </form>
 
@@ -260,26 +288,37 @@ $canPayments = can('payments.manage');
         <p class="muted" data-member-collect-name></p>
         <form method="post" action="" data-member-collect-form>
             <?= csrf_field() ?>
-            <input type="hidden" name="redirect" value="<?= e($redirectBack) ?>">
-            <input type="hidden" name="type" value="membership">
+            <?= field('hidden', ['name' => 'redirect', 'value' => $redirectBack]) ?>
+            <?= field('hidden', ['name' => 'type', 'value' => 'membership']) ?>
             <div class="grid-2" style="margin-top:0.75rem">
-                <div class="field-block">
-                    <label class="field-label"><?= e(__('payments.amount')) ?></label>
-                    <input type="number" step="0.01" min="0.01" name="amount" required data-member-collect-amount>
-                </div>
-                <div class="field-block">
-                    <label class="field-label"><?= e(__('payments.method')) ?></label>
-                    <select name="method" required>
-                        <option value="cash"><?= e(__('payments.cash')) ?></option>
-                        <option value="bank"><?= e(__('payments.bank')) ?></option>
-                        <option value="other"><?= e(__('payments.other')) ?></option>
-                    </select>
-                </div>
+                <?= field('number', [
+                    'name' => 'amount',
+                    'label' => (string) __('payments.amount'),
+                    'context' => 'member',
+                    'required' => true,
+                    'step' => '0.01',
+                    'min' => '0.01',
+                    'attrs' => ['data-member-collect-amount' => true],
+                ]) ?>
+                <?= field('select', [
+                    'name' => 'method',
+                    'label' => (string) __('payments.method'),
+                    'context' => 'member',
+                    'required' => true,
+                    'include_empty' => false,
+                    'options' => [
+                        ['value' => 'cash', 'label' => (string) __('payments.cash')],
+                        ['value' => 'bank', 'label' => (string) __('payments.bank')],
+                        ['value' => 'other', 'label' => (string) __('payments.other')],
+                    ],
+                ]) ?>
             </div>
-            <div class="field-block">
-                <label class="field-label"><?= e(__('payments.note')) ?></label>
-                <input type="text" name="note" maxlength="500">
-            </div>
+            <?= field('text', [
+                'name' => 'note',
+                'label' => (string) __('payments.note'),
+                'context' => 'member',
+                'maxlength' => 500,
+            ]) ?>
             <div class="member-leave-actions">
                 <button type="button" class="btn btn-ghost" data-member-collect-cancel><?= e(__('common.cancel')) ?></button>
                 <button type="submit" class="btn"><?= e(__('members.collect_confirm')) ?></button>
@@ -292,15 +331,23 @@ $canPayments = can('payments.manage');
     <div class="member-leave-shell">
         <h3 class="section-title"><?= e(__('members.bulk_email_title')) ?></h3>
         <p class="muted"><?= e(__('members.bulk_email_lede')) ?></p>
-        <div class="field-block">
-            <label class="field-label"><?= e(__('members.bulk_email_subject')) ?></label>
-            <input type="text" data-members-bulk-email-subject maxlength="160" required>
-        </div>
-        <div class="field-block">
-            <label class="field-label"><?= e(__('members.bulk_email_body')) ?></label>
-            <textarea rows="6" data-members-bulk-email-body required></textarea>
-            <p class="muted"><?= e(__('members.bulk_email_vars')) ?></p>
-        </div>
+        <?= field('text', [
+            'name' => '',
+            'label' => (string) __('members.bulk_email_subject'),
+            'context' => 'member',
+            'required' => true,
+            'maxlength' => 160,
+            'attrs' => ['data-members-bulk-email-subject' => true],
+        ]) ?>
+        <?= field('textarea', [
+            'name' => '',
+            'label' => (string) __('members.bulk_email_body'),
+            'context' => 'member',
+            'required' => true,
+            'rows' => 6,
+            'attrs' => ['data-members-bulk-email-body' => true],
+            'hint' => (string) __('members.bulk_email_vars'),
+        ]) ?>
         <div class="member-leave-actions">
             <button type="button" class="btn btn-ghost" data-members-bulk-email-cancel><?= e(__('common.cancel')) ?></button>
             <button type="button" class="btn" data-members-bulk-email-send><?= e(__('members.bulk_email_send')) ?></button>

@@ -194,10 +194,13 @@ $votingMembersCount = (int) ($votingMembersCount ?? 0);
         </div>
         <?php if ($canEdit): ?>
             <div class="actions org-chart-actions">
-                <label class="checkbox-row org-hide-vacant-toggle">
-                    <input type="checkbox" data-org-hide-vacant>
-                    <span><?= e(__('org.hide_vacant')) ?></span>
-                </label>
+                <?= field('checkbox', [
+                    'name' => '',
+                    'id' => 'org-hide-vacant',
+                    'label' => (string) __('org.hide_vacant'),
+                    'wrapper_class' => 'org-hide-vacant-toggle',
+                    'attrs' => ['data-org-hide-vacant' => true],
+                ]) ?>
                 <a class="btn btn-ghost" href="<?= e(url('/org/history')) ?>"><?= e(__('org.history_title')) ?></a>
                 <a class="btn btn-ghost" href="<?= e(url('/org/export.csv')) ?>"><?= e(__('org.export_csv')) ?></a>
                 <a class="btn btn-ghost" href="<?= e(url('/org/export.pdf')) ?>" target="_blank" rel="noopener"><?= e(__('org.export_pdf')) ?></a>
@@ -205,10 +208,13 @@ $votingMembersCount = (int) ($votingMembersCount ?? 0);
             </div>
         <?php else: ?>
             <div class="actions org-chart-actions">
-                <label class="checkbox-row org-hide-vacant-toggle">
-                    <input type="checkbox" data-org-hide-vacant>
-                    <span><?= e(__('org.hide_vacant')) ?></span>
-                </label>
+                <?= field('checkbox', [
+                    'name' => '',
+                    'id' => 'org-hide-vacant',
+                    'label' => (string) __('org.hide_vacant'),
+                    'wrapper_class' => 'org-hide-vacant-toggle',
+                    'attrs' => ['data-org-hide-vacant' => true],
+                ]) ?>
                 <a class="btn btn-ghost" href="<?= e(url('/org/export.csv')) ?>"><?= e(__('org.export_csv')) ?></a>
                 <a class="btn btn-ghost" href="<?= e(url('/org/export.pdf')) ?>" target="_blank" rel="noopener"><?= e(__('org.export_pdf')) ?></a>
             </div>
@@ -342,15 +348,15 @@ $votingMembersCount = (int) ($votingMembersCount ?? 0);
                 <form class="org-add-organ-form org-add-organ-footer" method="post" action="<?= e(url('/org/organs')) ?>">
                     <?= csrf_field() ?>
                     <label class="visually-hidden" for="org-organ-label"><?= e(__('org.add_organ')) ?></label>
-                    <input
-                        id="org-organ-label"
-                        type="text"
-                        name="label"
-                        maxlength="80"
-                        required
-                        placeholder="<?= e(__('org.add_organ_placeholder')) ?>"
-                        autocomplete="off"
-                    >
+                    <?= field('text', [
+                        'name' => 'label',
+                        'id' => 'org-organ-label',
+                        'label' => '',
+                        'required' => true,
+                        'maxlength' => 80,
+                        'placeholder' => (string) __('org.add_organ_placeholder'),
+                        'autocomplete' => 'off',
+                    ]) ?>
                     <button class="btn btn-ghost" type="submit"><?= e(__('org.add_organ')) ?></button>
                 </form>
             </div>

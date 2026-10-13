@@ -47,24 +47,30 @@ $panelUsers = is_array($panelUsers ?? null) ? $panelUsers : [];
     <p class="setup-hint muted"><?= e(__('users.create_hint')) ?></p>
     <form method="post" action="<?= e(url('/users')) ?>" data-leave-guard data-user-create-form>
         <?= csrf_field() ?>
-        <input type="hidden" name="return" value="settings">
-        <label class="setup-field">
-            <span><?= e(__('users.email')) ?> *</span>
-            <input type="email" name="email" value="<?= e((string) old('email')) ?>" required autocomplete="off">
-        </label>
+        <?= field('hidden', ['name' => 'return', 'value' => 'settings']) ?>
+        <?= field('email', [
+            'name' => 'email',
+            'label' => (string) __('users.email'),
+            'value' => (string) old('email'),
+            'required' => true,
+            'context' => 'setup',
+            'autocomplete' => 'off',
+        ]) ?>
         <div class="setup-equal-row">
-            <?= view_partial('partials/password_input', [
+            <?= field('password', [
                 'name' => 'password',
                 'label' => (string) __('users.password'),
                 'required' => true,
                 'autocomplete' => 'new-password',
+                'context' => 'setup',
                 'minlength' => 8,
             ]) ?>
-            <?= view_partial('partials/password_input', [
+            <?= field('password', [
                 'name' => 'password_confirmation',
                 'label' => (string) __('users.password_confirmation'),
                 'required' => true,
                 'autocomplete' => 'new-password',
+                'context' => 'setup',
                 'minlength' => 8,
             ]) ?>
         </div>
@@ -78,20 +84,22 @@ $panelUsers = is_array($panelUsers ?? null) ? $panelUsers : [];
                 <span></span><span></span><span></span><span></span>
             </div>
         </div>
-        <fieldset class="setup-locale-grid">
+        <fieldset>
             <legend class="setup-field-label"><?= e(__('users.locale')) ?></legend>
-            <?php foreach (['it', 'de', 'en'] as $loc): ?>
-                <label class="setup-locale-card">
-                    <input type="radio" name="locale" value="<?= $loc ?>" <?= old('locale', 'it') === $loc ? 'checked' : '' ?> required>
-                    <img src="<?= e(locale_flag_url($loc)) ?>" width="28" height="21" alt="" loading="lazy" decoding="async">
-                    <span><?= e(match ($loc) { 'it' => 'Italiano', 'de' => 'Deutsch', default => 'English' }) ?></span>
-                </label>
-            <?php endforeach; ?>
+            <?= field('locale_cards', [
+                'name' => 'locale',
+                'value' => (string) old('locale', 'it'),
+                'locales' => ['it', 'de', 'en'],
+                'required' => true,
+            ]) ?>
         </fieldset>
-        <label class="setup-check setup-check-prominent">
-            <input type="checkbox" name="is_active" value="1" <?= old('is_active', '1') ? 'checked' : '' ?>>
-            <span><?= e(__('users.active')) ?></span>
-        </label>
+        <?= field('checkbox', [
+            'name' => 'is_active',
+            'label' => (string) __('users.active'),
+            'checked' => (bool) old('is_active', '1'),
+            'context' => 'setup',
+            'label_class' => 'checkbox-row setup-check setup-check-prominent',
+        ]) ?>
         <?php if (!empty($mailReady)): ?>
             <p class="setup-hint muted"><?= e(__('users.welcome_email_hint')) ?></p>
         <?php endif; ?>
