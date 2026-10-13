@@ -2409,6 +2409,27 @@ function initMembersList() {
   const selectedIds = () =>
     checkboxes.filter((cb) => cb.checked).map((cb) => cb.value);
 
+  root.querySelectorAll('tr.clickable-row[data-href]').forEach((row) => {
+    const go = () => {
+      const href = row.getAttribute('data-href') || '';
+      if (href) window.location.href = href;
+    };
+    row.addEventListener('click', (e) => {
+      if (!(e instanceof MouseEvent) || e.button !== 0) return;
+      if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+      if (e.target instanceof Element && e.target.closest('a, button, input, label, select, textarea, form, [data-stop-row-nav]')) {
+        return;
+      }
+      go();
+    });
+    row.addEventListener('keydown', (e) => {
+      if (e.key !== 'Enter' && e.key !== ' ') return;
+      if (e.target !== row) return;
+      e.preventDefault();
+      go();
+    });
+  });
+
   const syncBulkBar = () => {
     const ids = selectedIds();
     const open = ids.length > 0;
@@ -2494,6 +2515,50 @@ function initMembersList() {
   });
 
   collectDialog?.querySelector('[data-member-collect-cancel]')?.addEventListener('click', () => collectDialog.close());
+
+  root.querySelectorAll('[data-enrollment-dropzone]').forEach((form) => {
+    if (!(form instanceof HTMLFormElement) || form.dataset.dropBound === '1') return;
+    form.dataset.dropBound = '1';
+    const ui = form.querySelector('.member-enrollment-dropzone-ui');
+    const input = form.querySelector('[data-enrollment-file]');
+    const nameEl = form.querySelector('[data-enrollment-file-name]');
+    const syncName = () => {
+      if (!(input instanceof HTMLInputElement) || !(nameEl instanceof HTMLElement)) return;
+      const file = input.files && input.files[0];
+      if (!file) {
+        nameEl.hidden = true;
+        nameEl.textContent = '';
+        return;
+      }
+      nameEl.hidden = false;
+      nameEl.textContent = file.name;
+    };
+    input?.addEventListener('change', syncName);
+    if (!(ui instanceof HTMLElement)) return;
+    ['dragenter', 'dragover'].forEach((evt) => {
+      ui.addEventListener(evt, (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        ui.classList.add('is-dragover');
+      });
+    });
+    ['dragleave', 'drop'].forEach((evt) => {
+      ui.addEventListener(evt, (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        ui.classList.remove('is-dragover');
+      });
+    });
+    ui.addEventListener('drop', (e) => {
+      if (!(e instanceof DragEvent) || !(input instanceof HTMLInputElement)) return;
+      const file = e.dataTransfer?.files?.[0];
+      if (!file) return;
+      const dt = new DataTransfer();
+      dt.items.add(file);
+      input.files = dt.files;
+      syncName();
+    });
+  });
 
   syncBulkBar();
 }

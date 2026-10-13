@@ -179,9 +179,16 @@ $canPayments = can('payments.manage');
                         $metaBits[] = $periodLabel;
                     }
                     ?>
-                    <tr<?= $issueLabels !== [] ? ' class="member-row-anomaly"' : '' ?> data-member-row="<?= (int) $item['id'] ?>">
+                    <tr
+                        class="clickable-row<?= $issueLabels !== [] ? ' member-row-anomaly' : '' ?>"
+                        data-member-row="<?= (int) $item['id'] ?>"
+                        data-href="<?= e(url('/members/'.$item['id'])) ?>"
+                        tabindex="0"
+                        role="link"
+                        aria-label="<?= e(($fullName !== '' ? $fullName : (string) $item['member_number']) . ' — ' . __('members.scheda')) ?>"
+                    >
                         <?php if ($canManage): ?>
-                        <td class="members-col-check" data-label="">
+                        <td class="members-col-check" data-label="" data-stop-row-nav>
                             <?= field('checkbox', [
                                 'name' => 'member_ids[]',
                                 'check_value' => (string) (int) $item['id'],
@@ -201,6 +208,7 @@ $canPayments = can('payments.manage');
                                         class="member-anomaly-mark"
                                         tabindex="0"
                                         role="img"
+                                        data-stop-row-nav
                                         aria-label="<?= e(__('members.anomaly_aria') . ': ' . implode('; ', $issueLabels)) ?>"
                                         title="<?= e($issueText) ?>"
                                     >
@@ -241,7 +249,7 @@ $canPayments = can('payments.manage');
                         <?php endif; ?>
                         <td data-label="<?= e(__('members.payment')) ?>"><span class="badge <?= $item['payment_status']==='paid'?'badge-ok':($item['payment_status']==='due'?'badge-due':'badge-warn') ?>"><?= e(__('members.payment_'.$item['payment_status'])) ?></span></td>
                         <td data-label="<?= e(__('members.balance_due')) ?>"><?= e(number_format($balanceDue, 2, ',', '.')) ?> €</td>
-                        <td data-label="<?= e(__('members.actions')) ?>">
+                        <td data-label="<?= e(__('members.actions')) ?>" data-stop-row-nav>
                             <?= row_actions([
                                 [
                                     'icon' => 'collect',
