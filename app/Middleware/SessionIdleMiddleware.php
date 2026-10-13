@@ -12,7 +12,8 @@ use Socly\Services\AuthService;
  */
 final class SessionIdleMiddleware
 {
-    public const IDLE_SECONDS = 1800; // 30 minutes
+    /** Idle timeout: no authenticated request / activity for this long → login. */
+    public const IDLE_SECONDS = 900; // 15 minutes
 
     public function __construct(
         private readonly AuthService $auth

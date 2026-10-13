@@ -142,10 +142,11 @@ final class MemberService
                 ['k' => $key]
             );
             if ($exists) {
+                // Enabled = show the consent checkbox; leave unchecked allowed (true optional consent).
                 $this->db->update('member_field_definitions', [
                     'is_enabled' => $enabled ? 1 : 0,
-                    'is_required' => $enabled ? 1 : 0,
-                    'validation_rule' => $enabled ? 'accepted' : '',
+                    'is_required' => 0,
+                    'validation_rule' => '',
                     'field_type' => 'checkbox',
                     'form_step' => self::STEP_ACKNOWLEDGEMENTS,
                 ], 'id = :id', ['id' => (int) $exists['id']]);
@@ -158,8 +159,8 @@ final class MemberService
                 'key' => $key,
                 'field_type' => 'checkbox',
                 'label_json' => json_encode($meta['label'], JSON_UNESCAPED_UNICODE),
-                'is_required' => 1,
-                'validation_rule' => 'accepted',
+                'is_required' => 0,
+                'validation_rule' => '',
                 'is_enabled' => 1,
                 'sort_order' => (int) $meta['sort_order'],
                 'form_step' => self::STEP_ACKNOWLEDGEMENTS,
@@ -242,19 +243,88 @@ final class MemberService
         $member['guardian'] = $guardian;
     }
 
-    /** @param array<string,mixed> $data */
-    private function resolveGuardianMemberId(array $data, ?int $memberId): ?int
+    /**
+     * @param array<string,mixed> $data
+     * @return array{id:?int,errors?:array<string,string>}
+     */
+    private function resolveGuardianMemberId(array $data, ?int $memberId): array
     {
         $raw = trim((string) ($data['guardian_member_id'] ?? ''));
-        if ($raw === '') {
-            return null;
+        if ($raw !== '') {
+            $guardianId = (int) $raw;
+            if ($guardianId > 0 && ($memberId === null || $guardianId !== $memberId)) {
+                $exists = $this->db->fetch('SELECT id FROM members WHERE id = :id', ['id' => $guardianId]);
+                if ($exists) {
+                    return ['id' => $guardianId];
+                }
+            }
         }
-        $guardianId = (int) $raw;
-        if ($guardianId <= 0 || ($memberId !== null && $guardianId === $memberId)) {
-            return null;
+
+        $quick = is_array($data['guardian_quick'] ?? null) ? $data['guardian_quick'] : [];
+        $first = trim((string) ($quick['first_name'] ?? ''));
+        $last = trim((string) ($quick['last_name'] ?? ''));
+        if ($first === '' && $last === '') {
+            return ['id' => null];
         }
-        $exists = $this->db->fetch('SELECT id FROM members WHERE id = :id', ['id' => $guardianId]);
-        return $exists ? $guardianId : null;
+        if ($first === '' || $last === '') {
+            return ['id' => null, 'errors' => ['guardian_member_id' => __('members.guardian_quick_incomplete')]];
+        }
+
+        $created = $this->createQuickGuardian($quick);
+        if (!$created['ok']) {
+            return ['id' => null, 'errors' => $created['errors'] ?? ['guardian_member_id' => __('members.guardian_quick_incomplete')]];
+        }
+
+        return ['id' => (int) $created['id']];
+    }
+
+    /**
+     * Minimal parent/guardian member created from the tessera step "on the fly" fields.
+     *
+     * @param array<string,mixed> $quick
+     * @return array{ok:bool,id?:int,errors?:array<string,string>}
+     */
+    private function createQuickGuardian(array $quick): array
+    {
+        $first = trim((string) ($quick['first_name'] ?? ''));
+        $last = trim((string) ($quick['last_name'] ?? ''));
+        if ($first === '' || $last === '') {
+            return ['ok' => false, 'errors' => ['guardian_member_id' => __('members.guardian_quick_incomplete')]];
+        }
+
+        $type = $this->db->fetch('SELECT id, price FROM member_types ORDER BY sort_order ASC, id ASC LIMIT 1');
+        $period = $this->currentPeriod() ?? $this->db->fetch('SELECT id FROM membership_periods ORDER BY starts_on DESC, id DESC LIMIT 1');
+        if (!$type || !$period) {
+            return ['ok' => false, 'errors' => ['guardian_member_id' => __('members.guardian_quick_no_type')]];
+        }
+
+        $price = (float) ($type['price'] ?? 0);
+        $id = $this->db->insert('members', [
+            'member_number' => $this->nextMemberNumber(),
+            'member_type_id' => (int) $type['id'],
+            'guardian_member_id' => null,
+            'membership_period_id' => (int) $period['id'],
+            'status' => 'active',
+            'admitted_at' => date('Y-m-d'),
+            'notes' => __('members.guardian_quick_notes'),
+            'balance_due' => $price,
+        ]);
+
+        $fieldData = [
+            'first_name' => $first,
+            'last_name' => $last,
+        ];
+        $phone = trim((string) ($quick['phone'] ?? ''));
+        $email = trim((string) ($quick['email'] ?? ''));
+        if ($phone !== '') {
+            $fieldData['phone'] = $phone;
+        }
+        if ($email !== '') {
+            $fieldData['email'] = $email;
+        }
+        $this->saveFieldValues($id, $fieldData);
+
+        return ['ok' => true, 'id' => $id];
     }
 
     private function syncAdmittedAt(int $memberId, string $beforeStatus, string $afterStatus, ?string $existingAdmitted): void
@@ -1412,7 +1482,6 @@ final class MemberService
         }
 
         $price = (float) $type['price'];
-        $guardianId = $this->resolveGuardianMemberId($data, null);
         $paidAmount = 0.0;
         if ($data['payment_status'] === 'paid') {
             $paidAmount = $price;
@@ -1429,13 +1498,26 @@ final class MemberService
             $id = $this->db->insert('members', [
                 'member_number' => $data['member_number'],
                 'member_type_id' => (int) $data['member_type_id'],
-                'guardian_member_id' => $guardianId,
+                'guardian_member_id' => null,
                 'membership_period_id' => (int) $data['membership_period_id'],
                 'status' => $data['status'],
                 'admitted_at' => ($data['status'] ?? '') === 'active' ? date('Y-m-d') : null,
                 'notes' => $data['notes'] ?? null,
                 'balance_due' => $balance,
             ]);
+            $guardianResolved = $this->resolveGuardianMemberId($data, $id);
+            if (!empty($guardianResolved['errors'])) {
+                $this->db->rollBack();
+                return ['ok' => false, 'errors' => $guardianResolved['errors']];
+            }
+            if ($guardianResolved['id'] !== null) {
+                $this->db->update(
+                    'members',
+                    ['guardian_member_id' => $guardianResolved['id']],
+                    'id = :id',
+                    ['id' => $id]
+                );
+            }
             if ($photoFile && ($photoFile['error'] ?? UPLOAD_ERR_NO_FILE) === UPLOAD_ERR_OK) {
                 $stored = $this->storeMemberPhoto($id, $photoFile);
                 if ($stored['ok']) {
@@ -1549,10 +1631,14 @@ final class MemberService
             unset($fieldData['photo']);
         }
 
+        $guardianResolved = $this->resolveGuardianMemberId($data, $id);
+        if (!empty($guardianResolved['errors'])) {
+            return ['ok' => false, 'errors' => $guardianResolved['errors']];
+        }
         $this->db->update('members', [
             'member_number' => $data['member_number'],
             'member_type_id' => (int) $data['member_type_id'],
-            'guardian_member_id' => $this->resolveGuardianMemberId($data, $id),
+            'guardian_member_id' => $guardianResolved['id'],
             'membership_period_id' => (int) $data['membership_period_id'],
             'status' => $data['status'],
             'notes' => $data['notes'] ?? null,

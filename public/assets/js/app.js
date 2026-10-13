@@ -106,13 +106,22 @@ function escapeHtml(value) {
 }
 
 document.addEventListener('DOMContentLoaded', () => {
-  const payment = document.querySelector('[name="payment_status"]');
+  const paymentInputs = [...document.querySelectorAll('[name="payment_status"]')];
   const partial = document.querySelector('[data-partial-wrap]');
-  if (payment && partial) {
+  if (paymentInputs.length && partial) {
     const sync = () => {
-      partial.hidden = payment.value !== 'partial';
+      const checked = document.querySelector('[name="payment_status"]:checked');
+      const isPartial = (checked?.value || 'unpaid') === 'partial';
+      partial.hidden = !isPartial;
+      const amount = partial.querySelector('[data-partial-amount], [name="partial_amount"]');
+      if (amount instanceof HTMLInputElement) {
+        amount.required = isPartial;
+        if (!isPartial) {
+          amount.classList.remove('input-invalid');
+        }
+      }
     };
-    payment.addEventListener('change', sync);
+    paymentInputs.forEach((input) => input.addEventListener('change', sync));
     sync();
   }
 
@@ -1029,37 +1038,73 @@ function initPlatformConsents(scope) {
 function initSessionHeartbeat() {
   const pingUrl = document.querySelector('meta[name="session-ping-url"]')?.content;
   const csrf = document.querySelector('meta[name="csrf-token"]')?.content;
+  const loginUrl = document.querySelector('meta[name="login-url"]')?.content || '/login';
+  // Must match SessionIdleMiddleware::IDLE_SECONDS (15 minutes).
+  const IDLE_MS = 15 * 60 * 1000;
+  const BUMP_THROTTLE_MS = 20000;
   if (!pingUrl || !csrf) return;
 
+  let lastActivity = Date.now();
   let lastBump = 0;
+  let redirecting = false;
+
+  const goExpired = () => {
+    if (redirecting) return;
+    redirecting = true;
+    const sep = loginUrl.includes('?') ? '&' : '?';
+    window.location.href = `${loginUrl}${sep}expired=1`;
+  };
+
+  const idleFor = () => Date.now() - lastActivity;
+
   const bump = () => {
+    if (document.visibilityState === 'hidden') return;
+    if (idleFor() >= IDLE_MS) {
+      goExpired();
+      return;
+    }
     const now = Date.now();
-    if (now - lastBump < 15000) return;
+    if (now - lastBump < BUMP_THROTTLE_MS) return;
     lastBump = now;
     fetch(pingUrl, {
       method: 'POST',
       headers: {
-        'Accept': 'application/json',
+        Accept: 'application/json',
         'Content-Type': 'application/x-www-form-urlencoded',
         'X-CSRF-TOKEN': csrf,
       },
       body: '_token=' + encodeURIComponent(csrf),
       credentials: 'same-origin',
-    }).then((res) => {
-      if (res.status === 401) {
-        const login = document.querySelector('meta[name="login-url"]')?.content || '/login';
-        window.location.href = login + (login.includes('?') ? '&' : '?') + 'expired=1';
-      }
-    }).catch(() => {});
+    })
+      .then((res) => {
+        if (res.status === 401) goExpired();
+      })
+      .catch(() => {});
   };
 
-  setInterval(bump, 60000);
-  ['pointerdown', 'keydown', 'scroll', 'visibilitychange'].forEach((evt) => {
-    document.addEventListener(evt, () => {
-      if (document.visibilityState === 'hidden') return;
-      bump();
-    }, { passive: true });
+  const onActivity = () => {
+    if (document.visibilityState === 'hidden') return;
+    lastActivity = Date.now();
+    bump();
+  };
+
+  // Only real user activity renews the session — never a blind interval ping.
+  ['pointerdown', 'keydown', 'scroll', 'touchstart', 'click'].forEach((evt) => {
+    document.addEventListener(evt, onActivity, { passive: true });
   });
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'hidden') return;
+    if (idleFor() >= IDLE_MS) {
+      goExpired();
+      return;
+    }
+    onActivity();
+  });
+
+  // Client-side idle watch: redirect even if the user never navigates again.
+  setInterval(() => {
+    if (idleFor() >= IDLE_MS) goExpired();
+  }, 15000);
 }
 
 function brandNormalizeHex(value, fallback = '') {
@@ -1755,8 +1800,13 @@ function initMemberWizard() {
   const paymentTypeLabel = form.querySelector('[data-payment-type-label]');
   const paymentAmount = form.querySelector('[data-payment-amount]');
   const paymentDue = form.querySelector('[data-payment-due]');
-  const paymentStatus = form.querySelector('[name="payment_status"]');
+  const paymentStatusInputs = [...form.querySelectorAll('[name="payment_status"]')];
+  const paymentMethodInputs = [...form.querySelectorAll('[name="payment_method"]')];
   const partialAmountInput = form.querySelector('[name="partial_amount"]');
+  const paymentStatusValue = () =>
+    form.querySelector('[name="payment_status"]:checked')?.value || 'unpaid';
+  const paymentMethodValue = () =>
+    form.querySelector('[name="payment_method"]:checked')?.value || 'cash';
   const money = (n) =>
     `${Number(n || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €`;
 
@@ -1781,12 +1831,15 @@ function initMemberWizard() {
     photoTarget.hidden = true;
     if (photoPlaceholder) {
       photoPlaceholder.hidden = false;
-      const genderSelect = form.querySelector('[data-gender-input]');
-      const genderRaw =
-        genderSelect instanceof HTMLSelectElement || genderSelect instanceof HTMLInputElement
-          ? genderSelect.value
-          : '';
-      seedPhotoPlaceholder(photoPlaceholder, form, photoGenderFromValue(genderRaw));
+      // Gender art is owned by initPhotoGenderPlaceholder (crossfade) — do not reseed here.
+      if (!photoPlaceholder.querySelector('.photo-ph-layer')) {
+        const genderSelect = form.querySelector('[data-gender-input]');
+        const genderRaw =
+          genderSelect instanceof HTMLSelectElement || genderSelect instanceof HTMLInputElement
+            ? genderSelect.value
+            : '';
+        seedPhotoPlaceholder(photoPlaceholder, form, photoGenderFromValue(genderRaw));
+      }
     }
     photoWrap?.classList.add('is-empty');
   };
@@ -1816,13 +1869,20 @@ function initMemberWizard() {
         paymentAmount.textContent = money(price);
       }
       if (paymentDue) {
-        const status = paymentStatus?.value || 'unpaid';
+        const status = paymentStatusValue();
         let due = price;
         if (status === 'paid') {
           due = 0;
         } else if (status === 'partial') {
           const paid = Math.max(0, Number(partialAmountInput?.value || 0));
           due = Math.max(0, price - paid);
+          if (partialAmountInput instanceof HTMLInputElement) {
+            partialAmountInput.max = String(price > 0 ? price : '');
+            if (price > 0 && paid > price) {
+              partialAmountInput.value = String(price);
+              due = 0;
+            }
+          }
         }
         paymentDue.textContent = money(due);
         paymentDue.classList.toggle('stat-negative', due > 0);
@@ -1846,14 +1906,16 @@ function initMemberWizard() {
     }
   };
 
-  paymentStatus?.addEventListener('change', syncCard);
+  paymentStatusInputs.forEach((input) => input.addEventListener('change', syncCard));
   partialAmountInput?.addEventListener('input', syncCard);
 
   const guardianField = form.querySelector('[data-guardian-field]');
   const guardianSelect = form.querySelector('[data-guardian-select]');
   const guardianBadge = form.querySelector('[data-guardian-badge]');
+  const guardianSearch = form.querySelector('[data-guardian-search]');
+  const guardianQuickFirst = form.querySelector('[data-guardian-quick-first]');
+  const guardianQuickLast = form.querySelector('[data-guardian-quick-last]');
   const treasuryNote = form.querySelector('[data-payment-treasury-note]');
-  const paymentMethodSelect = form.querySelector('[name="payment_method"]');
 
   const ageFromBirthDate = (raw) => {
     const value = String(raw || '').trim();
@@ -1867,33 +1929,98 @@ function initMemberWizard() {
     return age;
   };
 
+  const guardianQuickFilled = () => {
+    const first = String(guardianQuickFirst?.value || '').trim();
+    const last = String(guardianQuickLast?.value || '').trim();
+    return first !== '' && last !== '';
+  };
+
   const syncGuardianRequirement = () => {
     if (!guardianField) return;
     const birthInput = form.querySelector('[data-birth-date]');
     const age = ageFromBirthDate(birthInput?.value || '');
-    const typeName = String(typeSelect?.selectedOptions?.[0]?.dataset?.typeName || '').toLowerCase();
-    const juniorType = typeName.includes('junior') || typeName.includes('minoren');
-    const required = juniorType || (age !== null && age < 18);
-    guardianField.classList.toggle('is-guardian-required', required);
-    if (guardianBadge) guardianBadge.hidden = !required;
+    const isMinor = age !== null && age < 18;
+    guardianField.hidden = !isMinor;
+    guardianField.classList.toggle('is-guardian-required', isMinor);
+    if (guardianBadge) guardianBadge.hidden = !isMinor;
+    if (guardianSearch instanceof HTMLInputElement) {
+      guardianSearch.hidden = !isMinor || !(guardianSelect instanceof HTMLSelectElement) || guardianSelect.options.length < 8;
+    }
     if (guardianSelect instanceof HTMLSelectElement) {
-      guardianSelect.required = required;
-      guardianSelect.setAttribute('aria-required', required ? 'true' : 'false');
+      const hasQuick = guardianQuickFilled();
+      guardianSelect.required = isMinor && !hasQuick;
+      guardianSelect.setAttribute('aria-required', isMinor && !hasQuick ? 'true' : 'false');
+      if (!isMinor) {
+        guardianSelect.value = '';
+        guardianSelect.classList.remove('input-invalid', 'is-invalid');
+        if (guardianQuickFirst) guardianQuickFirst.value = '';
+        if (guardianQuickLast) guardianQuickLast.value = '';
+        form.querySelectorAll('[data-guardian-quick-phone], [data-guardian-quick-email]').forEach((el) => {
+          if (el instanceof HTMLInputElement) el.value = '';
+        });
+      }
     }
   };
 
+  if (guardianSearch instanceof HTMLInputElement && guardianSelect instanceof HTMLSelectElement) {
+    guardianSearch.addEventListener('input', () => {
+      const q = guardianSearch.value.trim().toLowerCase();
+      [...guardianSelect.options].forEach((opt, idx) => {
+        if (idx === 0) {
+          opt.hidden = false;
+          return;
+        }
+        opt.hidden = q !== '' && !String(opt.textContent || '').toLowerCase().includes(q);
+      });
+    });
+  }
+  [guardianQuickFirst, guardianQuickLast].forEach((el) => {
+    el?.addEventListener('input', syncGuardianRequirement);
+  });
+  guardianSelect?.addEventListener('change', () => {
+    if (guardianSelect instanceof HTMLSelectElement && guardianSelect.value !== '') {
+      if (guardianQuickFirst) guardianQuickFirst.value = '';
+      if (guardianQuickLast) guardianQuickLast.value = '';
+      form.querySelectorAll('[data-guardian-quick-phone], [data-guardian-quick-email]').forEach((input) => {
+        if (input instanceof HTMLInputElement) input.value = '';
+      });
+    }
+    syncGuardianRequirement();
+  });
+
   const syncTreasuryNote = () => {
     if (!treasuryNote) return;
-    const status = paymentStatus?.value || 'unpaid';
+    const status = paymentStatusValue();
     treasuryNote.hidden = !(status === 'paid' || status === 'partial');
   };
 
-  form.querySelector('[data-birth-date]')?.addEventListener('change', syncGuardianRequirement);
-  form.querySelector('[data-birth-date]')?.addEventListener('input', syncGuardianRequirement);
-  typeSelect?.addEventListener('change', syncGuardianRequirement);
-  paymentStatus?.addEventListener('change', syncTreasuryNote);
+  const syncChoiceCards = (inputs) => {
+    inputs.forEach((input) => {
+      const card = input.closest('.tessera-choice-card');
+      if (card) card.classList.toggle('is-selected', !!input.checked);
+    });
+  };
+
+  form.querySelectorAll('[data-birth-date]').forEach((birthInput) => {
+    birthInput.addEventListener('change', syncGuardianRequirement);
+    birthInput.addEventListener('input', syncGuardianRequirement);
+    birthInput.addEventListener('blur', syncGuardianRequirement);
+  });
+  form.addEventListener('wizard:step', syncGuardianRequirement);
+  paymentStatusInputs.forEach((input) => {
+    input.addEventListener('change', () => {
+      syncChoiceCards(paymentStatusInputs);
+      syncTreasuryNote();
+      syncCard();
+    });
+  });
+  paymentMethodInputs.forEach((input) => {
+    input.addEventListener('change', () => syncChoiceCards(paymentMethodInputs));
+  });
   syncGuardianRequirement();
   syncTreasuryNote();
+  syncChoiceCards(paymentStatusInputs);
+  syncChoiceCards(paymentMethodInputs);
 
   const showStep = (n, { animateEnter = true } = {}) => {
     step = Math.min(Math.max(n, 1), total);
@@ -1998,10 +2125,20 @@ function initMemberWizard() {
       }
       const mustFill = el.required || el.getAttribute('aria-required') === 'true';
       if (el.type === 'checkbox') {
+        if (el.dataset.requiresRead === '1' && !el.checked) {
+          ok = false;
+          el.classList.add('input-invalid');
+          firstInvalid ||= el;
+          const item = el.closest('[data-ack-item]');
+          item?.querySelector('[data-doc-dialog]')?.showModal?.();
+          return;
+        }
         if (mustFill && !el.checked) {
           ok = false;
           el.classList.add('input-invalid');
           firstInvalid ||= el;
+        } else {
+          el.classList.remove('input-invalid');
         }
         return;
       }
@@ -2074,8 +2211,8 @@ function initMemberWizard() {
     step = total;
 
     if (form.dataset.memberLeaveGuard === 'create' && form.dataset.treasuryEnabled === '1' && !form.dataset.treasuryResolved) {
-      const status = paymentStatus?.value || 'unpaid';
-      const method = paymentMethodSelect?.value || 'cash';
+      const status = paymentStatusValue();
+      const method = paymentMethodValue();
       const opt = typeSelect?.selectedOptions?.[0];
       const price = Number(opt?.dataset.price || 0);
       let paid = 0;
@@ -2382,7 +2519,7 @@ function crossfadePhotoPlaceholder(el, form, gender) {
         el._photoGenderTimer = null;
       };
       current.addEventListener('transitionend', cleanup, { once: true });
-      el._photoGenderTimer = window.setTimeout(cleanup, 500);
+      el._photoGenderTimer = window.setTimeout(cleanup, 650);
     });
   });
 }
@@ -3131,6 +3268,28 @@ function initPhotoCapture(form) {
     errorBox.classList.toggle('is-error', !!msg);
   };
 
+  const photoField = form.querySelector('[data-photo-field]');
+  const uploadBtn = form.querySelector('[data-photo-upload-btn]');
+  const removeBtn = form.querySelector('[data-photo-remove]');
+  const removeFlag = form.querySelector('[data-photo-remove-flag]');
+
+  const syncPhotoActions = (hasPhoto) => {
+    if (photoField instanceof HTMLElement) {
+      photoField.dataset.hasPhoto = hasPhoto ? '1' : '0';
+    }
+    if (uploadBtn instanceof HTMLElement) uploadBtn.hidden = !!hasPhoto;
+    if (removeBtn instanceof HTMLElement) removeBtn.hidden = !hasPhoto;
+    if (openBtn instanceof HTMLButtonElement) {
+      const cameraOk = cameraAvailable && !hasPhoto;
+      openBtn.hidden = !cameraOk;
+      openBtn.setAttribute('aria-hidden', cameraOk ? 'false' : 'true');
+    }
+    if (input instanceof HTMLInputElement) {
+      if (hasPhoto) input.removeAttribute('required');
+      else if (photoField?.dataset.fieldRequired === '1') input.setAttribute('required', '');
+    }
+  };
+
   const clearPhotoPreview = () => {
     const img = form.querySelector('.photo-upload .photo-preview, .photo-field .photo-preview');
     if (img) {
@@ -3166,6 +3325,7 @@ function initPhotoCapture(form) {
       seedPhotoPlaceholder(tesseraPh, form, gender);
     }
     tesseraWrap?.classList.add('is-empty');
+    syncPhotoActions(false);
   };
 
   const validatePhotoFile = (file) => {
@@ -3255,9 +3415,28 @@ function initPhotoCapture(form) {
       if (tesseraPh) tesseraPh.hidden = true;
       tesseraWrap?.classList.remove('is-empty');
     }
+    if (removeFlag instanceof HTMLInputElement) removeFlag.value = '';
+    syncPhotoActions(true);
   };
 
   initPhotoLightbox(form);
+  syncPhotoActions(photoField?.dataset.hasPhoto === '1' || !!form.querySelector('.photo-preview'));
+
+  removeBtn?.addEventListener('click', (event) => {
+    event.preventDefault();
+    if (input instanceof HTMLInputElement) {
+      input.value = '';
+      try {
+        const dt = new DataTransfer();
+        input.files = dt.files;
+      } catch (_) {}
+      input.setCustomValidity('');
+      input.classList.remove('input-invalid');
+    }
+    if (removeFlag instanceof HTMLInputElement) removeFlag.value = '1';
+    showError('');
+    clearPhotoPreview();
+  });
 
   input?.addEventListener('change', () => {
     const file = input.files && input.files[0];
@@ -8926,7 +9105,6 @@ function bindSuggest({
 
 function initFiscalCodeAuto(form) {
   const cfInput = form.querySelector('[data-fiscal-code]');
-  const status = form.querySelector('[data-cf-status]');
   const button = form.querySelector('[data-cf-generate]');
   if (!cfInput) return;
 
@@ -8938,26 +9116,52 @@ function initFiscalCodeAuto(form) {
     birth_place: form.querySelector('[data-birth-place-input]')?.value || '',
   });
 
-  const setStatus = (msg) => {
-    if (!status) return;
-    const text = String(msg || '').trim();
-    status.textContent = text;
-    status.hidden = text === '';
+  const isCfFormatOk = (raw) => /^[A-Z0-9]{16}$/.test(String(raw || '').trim());
+
+  const paintCf = (state, message = '') => {
+    if (state === 'ok') {
+      cfInput.setCustomValidity('');
+      cfInput.classList.add('input-valid');
+      cfInput.classList.remove('input-invalid');
+    } else if (state === 'err') {
+      cfInput.setCustomValidity(String(message || ' ').trim() || ' ');
+      cfInput.classList.remove('input-valid');
+      cfInput.classList.add('input-invalid');
+    } else {
+      cfInput.setCustomValidity('');
+      cfInput.classList.remove('input-valid', 'input-invalid');
+    }
+    paintSetupValidity(cfInput, state, message);
+  };
+
+  const syncManualValidity = () => {
+    const value = cfInput.value.trim();
+    if (value === '') {
+      paintCf('');
+      return;
+    }
+    if (isCfFormatOk(value)) {
+      paintCf('ok');
+      return;
+    }
+    paintCf('err');
   };
 
   const generate = async (force = false) => {
     const payload = fields();
     if (!payload.first_name || !payload.last_name || !payload.birth_date || !payload.gender || !payload.birth_place) {
-      if (force) setStatus(status?.dataset.incomplete || '');
+      if (force) paintCf('err', cfInput.dataset.incomplete || '');
       return;
     }
     if (payload.gender === 'X') {
-      if (force) setStatus(status?.dataset.genderOther || '');
+      if (force) paintCf('err', cfInput.dataset.genderOther || '');
       return;
     }
     if (!force && cfInput.dataset.manual === '1' && cfInput.value.trim() !== '') {
+      syncManualValidity();
       return;
     }
+    paintCf('pending');
     try {
       const body = new URLSearchParams(payload);
       body.set('_token', form.dataset.csrf || '');
@@ -8973,13 +9177,15 @@ function initFiscalCodeAuto(form) {
       if (data.ok && data.fiscal_code) {
         cfInput.value = data.fiscal_code;
         cfInput.dataset.manual = '0';
-        cfInput.classList.add('input-valid');
-        setStatus(status?.dataset.ready || 'OK');
+        paintCf('ok');
       } else if (force) {
-        setStatus(data.error || status?.dataset.incomplete || '');
+        paintCf('err', data.error || cfInput.dataset.incomplete || '');
+      } else {
+        paintCf('');
       }
     } catch (err) {
-      if (force) setStatus('Errore calcolo CF');
+      if (force) paintCf('err');
+      else paintCf('');
     }
   };
 
@@ -8993,12 +9199,12 @@ function initFiscalCodeAuto(form) {
   cfInput.addEventListener('input', () => {
     cfInput.dataset.manual = '1';
     cfInput.value = cfInput.value.toUpperCase();
-    cfInput.classList.remove('input-valid');
-    if (/^[A-Z0-9]{16}$/.test(cfInput.value.trim())) {
-      cfInput.setCustomValidity('');
-      setStatus('');
-    }
+    syncManualValidity();
   });
+  cfInput.addEventListener('blur', syncManualValidity);
+  if (cfInput.value.trim() !== '') {
+    syncManualValidity();
+  }
 }
 
 function initOrgHideVacant() {

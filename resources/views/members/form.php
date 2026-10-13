@@ -35,6 +35,8 @@ $oldPaymentMethod = (string) old('payment_method', 'cash');
 $treasuryEnabled = !empty($treasuryEnabled);
 $guardianCandidates = is_array($guardianCandidates ?? null) ? $guardianCandidates : [];
 $oldGuardianId = (string) old('guardian_member_id', (string) ($member['guardian_member_id'] ?? ''));
+$oldGuardianQuick = old('guardian_quick', []);
+$oldGuardianQuick = is_array($oldGuardianQuick) ? $oldGuardianQuick : [];
 
 $legalAckKeys = ['privacy_ack', 'statute_ack'];
 $gdprEnabled = (string) (app()->isInstalled() ? (app(\Socly\Services\SettingsService::class)->get('gdpr.enabled', '0') ?: '0') : '0') === '1';
@@ -69,14 +71,35 @@ foreach ($formSteps as $step) {
     }
 }
 $ackFields = [];
+$optionalConsentKeys = [
+    'image_consent', 'photo_consent', 'image_ack', 'photo_ack', 'images_consent',
+    'newsletter_consent', 'comms_consent', 'marketing_consent', 'newsletter_ack',
+];
+$optionalConsentFields = [];
 foreach ($fields as $field) {
+    if (empty($field['is_enabled'])) {
+        continue;
+    }
     $fkey = (string) ($field['key'] ?? '');
     if ($fkey === 'statute_ack' || ($fkey === 'privacy_ack' && $gdprEnabled)) {
-        if (!empty($field['is_enabled'])) {
-            $ackFields[] = $field;
-        }
+        $ackFields[] = $field;
+        continue;
+    }
+    $type = (string) ($field['field_type'] ?? '');
+    $isOptionalConsent = in_array($fkey, $optionalConsentKeys, true)
+        || (
+            $type === 'checkbox'
+            && (string) ($field['form_step'] ?? '') === \Socly\Services\MemberService::STEP_ACKNOWLEDGEMENTS
+            && !in_array($fkey, $legalAckKeys, true)
+            && preg_match('/image|photo|immagin|newsletter|comms|marketing|comunicaz|liberatoria/i', $fkey)
+        );
+    if ($isOptionalConsent) {
+        $optionalConsentFields[] = $field;
     }
 }
+usort($optionalConsentFields, static function (array $a, array $b): int {
+    return ((int) ($a['sort_order'] ?? 0)) <=> ((int) ($b['sort_order'] ?? 0));
+});
 $tesseraExtraFields = $fieldsByFormStep[\Socly\Services\MemberService::STEP_TESSERA] ?? [];
 $paymentExtraFields = $fieldsByFormStep[\Socly\Services\MemberService::STEP_PAYMENT] ?? [];
 
@@ -304,6 +327,8 @@ $valFor = static function (string $k) use ($profileByKey, $fieldValue): string {
     return isset($profileByKey[$k]) ? $fieldValue($profileByKey[$k]) : '';
 };
 
+$profileSideHtmlByStep = [];
+
 $buildProfileFieldsHtml = function (array $list, ?string $stepKey = null) use (
     $fieldValue,
     $renderTextField,
@@ -314,7 +339,8 @@ $buildProfileFieldsHtml = function (array $list, ?string $stepKey = null) use (
     $reqFor,
     $valFor,
     $isEdit,
-    $member
+    $member,
+    &$profileSideHtmlByStep
 ): string {
     if ($list === []) {
         return '';
@@ -361,16 +387,14 @@ $buildProfileFieldsHtml = function (array $list, ?string $stepKey = null) use (
             . ' placeholder="' . e(__('members.cf_hint')) . '"'
             . ' size="18"'
             . ' data-fiscal-code autocomplete="off" maxlength="16" pattern="[A-Za-z0-9]{16}"'
+            . ' data-incomplete="' . e(__('members.cf_incomplete')) . '"'
+            . ' data-gender-other="' . e(__('members.cf_gender_other')) . '"'
             . ($required ? ' required' : '') . '>'
             . '<button type="button" class="btn btn-ghost" data-cf-generate>'
             . '<span class="field-icon" data-icon="spark" aria-hidden="true"></span>'
             . e(__('members.cf_generate'))
             . '</button>'
             . '</div>'
-            . '<p class="field-hint muted" data-cf-status aria-live="polite"'
-            . ' data-incomplete="' . e(__('members.cf_incomplete')) . '"'
-            . ' data-ready="' . e(__('members.cf_ready')) . '"'
-            . ' data-gender-other="' . e(__('members.cf_gender_other')) . '" hidden></p>'
             . '</div>';
     };
 
@@ -380,10 +404,17 @@ $buildProfileFieldsHtml = function (array $list, ?string $stepKey = null) use (
         $required = !empty($field['is_required']);
         $genderRaw = strtoupper(trim($valFor('gender')));
         $photoGender = $genderRaw === 'M' ? 'm' : ($genderRaw === 'F' ? 'f' : 'neutral');
+        $hasExistingPhoto = $isEdit && $val !== '';
         ?>
-        <div class="photo-field field-block" data-field="<?= e($key) ?>" data-field-required="<?= $required ? '1' : '0' ?>">
+        <div
+            class="photo-field field-block"
+            data-field="<?= e($key) ?>"
+            data-field-required="<?= $required ? '1' : '0' ?>"
+            data-photo-field
+            data-has-photo="<?= $hasExistingPhoto ? '1' : '0' ?>"
+        >
             <div class="photo-upload photo-upload--card">
-                <?php if ($isEdit && $val !== ''): ?>
+                <?php if ($hasExistingPhoto): ?>
                     <button type="button" class="photo-preview-btn" data-photo-lightbox-open aria-label="<?= e(__('members.photo_preview_open')) ?>">
                         <img class="photo-preview" src="<?= e(url('/members/'.$member['id'].'/photo')) ?>" alt="">
                     </button>
@@ -392,7 +423,7 @@ $buildProfileFieldsHtml = function (array $list, ?string $stepKey = null) use (
                 <?php endif; ?>
                 <div class="photo-controls">
                     <div class="photo-actions">
-                        <label class="btn btn-sm btn-ghost file-btn">
+                        <label class="btn btn-sm btn-ghost file-btn" data-photo-upload-btn<?= $hasExistingPhoto ? ' hidden' : '' ?>>
                             <span class="field-icon" data-icon="upload" aria-hidden="true"></span>
                             <?= e(__('members.photo_upload')) ?>
                             <input
@@ -402,16 +433,25 @@ $buildProfileFieldsHtml = function (array $list, ?string $stepKey = null) use (
                                 data-photo-input
                                 data-invalid="<?= e(__('validation.photo')) ?>"
                                 data-max-bytes="3145728"
-                                <?= $required ? ' required' : '' ?>
+                                <?= $required && !$hasExistingPhoto ? ' required' : '' ?>
                                 hidden
                             >
                         </label>
-                        <button type="button" class="btn btn-sm" data-camera-open>
+                        <button
+                            type="button"
+                            class="btn btn-sm btn-ghost"
+                            data-photo-remove
+                            <?= $hasExistingPhoto ? '' : ' hidden' ?>
+                        >
+                            <?= e(__('members.photo_remove')) ?>
+                        </button>
+                        <button type="button" class="btn btn-sm" data-camera-open<?= $hasExistingPhoto ? ' hidden' : '' ?>>
                             <span class="field-icon" data-icon="camera" aria-hidden="true"></span>
                             <?= e(__('members.photo_capture')) ?>
                         </button>
                         <input type="file" accept="image/*" capture="user" data-camera-capture hidden>
                     </div>
+                    <input type="hidden" name="remove_photo" value="" data-photo-remove-flag>
                     <p class="muted" data-photo-hint data-upload-only="<?= e(__('members.photo_hint_upload_only')) ?>" data-invalid="<?= e(__('validation.photo')) ?>"><?= e(__('members.photo_hint')) ?></p>
                     <p
                         class="field-hint"
@@ -420,12 +460,6 @@ $buildProfileFieldsHtml = function (array $list, ?string $stepKey = null) use (
                         data-not-ready="<?= e(__('members.photo_camera_not_ready')) ?>"
                         hidden
                     ></p>
-                    <?php if ($isEdit && $val !== ''): ?>
-                        <label class="checkbox-row">
-                            <input type="checkbox" name="remove_photo" value="1">
-                            <?= e(__('members.photo_remove')) ?>
-                        </label>
-                    <?php endif; ?>
                 </div>
             </div>
         </div>
@@ -465,41 +499,53 @@ $buildProfileFieldsHtml = function (array $list, ?string $stepKey = null) use (
             break;
         }
     }
-    // Keep photography next to anagrafica even when the field lives on another step.
+    // Keep photography with anagrafica (right column) even when the field lives on another step.
     if ($hasBase && $photoField === null && isset($profileByKey['photo'])) {
         $photoField = $profileByKey['photo'];
     } elseif (!$hasBase && $photoField !== null && $profileHasBase) {
         $photoField = null;
     }
-    if ($hasBase || $photoField !== null): ?>
-        <div class="member-profile-identity<?= ($hasBase && $photoField !== null) ? ' member-profile-identity--split' : '' ?>">
-            <?php if ($hasBase): ?>
-                <div class="member-profile-block member-profile-block--base">
-                    <h3 class="member-profile-block-title"><?= e(__('members.profile_block_base')) ?></h3>
-                    <?php
-                    $nameRow = array_filter([
-                        $pick('first_name') ? $renderTextField($pick('first_name')) : null,
-                        $pick('last_name') ? $renderTextField($pick('last_name')) : null,
-                    ]);
-                    $emitRow($nameRow, 'member-field-row member-field-row--identity-names');
+    if ($hasBase): ?>
+        <div class="member-profile-identity">
+            <div class="member-profile-block member-profile-block--base">
+                <h3 class="member-profile-block-title"><?= e(__('members.profile_block_base')) ?></h3>
+                <?php
+                $nameRow = array_filter([
+                    $pick('first_name') ? $renderTextField($pick('first_name')) : null,
+                    $pick('last_name') ? $renderTextField($pick('last_name')) : null,
+                ]);
+                $emitRow($nameRow, 'member-field-row member-field-row--identity-names');
 
-                    $metaRow = array_filter([
-                        $pick('gender') ? $renderTextField($pick('gender')) : null,
-                        $pick('preferred_language') ? $renderTextField($pick('preferred_language')) : null,
-                    ]);
-                    $emitRow($metaRow, 'member-field-row member-field-row--identity-meta');
-                    ?>
-                </div>
-            <?php endif; ?>
-            <?php if ($photoField !== null): ?>
-                <div class="member-profile-block member-profile-block--photo">
-                    <h3 class="member-profile-block-title">
-                        <?= e(__('members.profile_block_photo')) ?>
-                        <?= !empty($photoField['is_required']) ? ' *' : '' ?>
-                    </h3>
-                    <?php $renderPhoto($photoField); ?>
-                </div>
-            <?php endif; ?>
+                $metaRow = array_filter([
+                    $pick('gender') ? $renderTextField($pick('gender')) : null,
+                    $pick('preferred_language') ? $renderTextField($pick('preferred_language')) : null,
+                ]);
+                $emitRow($metaRow, 'member-field-row member-field-row--identity-meta');
+                ?>
+            </div>
+        </div>
+    <?php endif;
+    if ($photoField !== null && $stepKey !== null):
+        ob_start();
+        ?>
+        <div class="member-profile-block member-profile-block--photo member-profile-block--photo-side">
+            <h3 class="member-profile-block-title">
+                <?= e(__('members.profile_block_photo')) ?>
+                <?= !empty($photoField['is_required']) ? ' *' : '' ?>
+            </h3>
+            <?php $renderPhoto($photoField); ?>
+        </div>
+        <?php
+        $profileSideHtmlByStep[$stepKey] = (string) ob_get_clean();
+    elseif ($photoField !== null && $stepKey === null):
+        // Non-step contexts (rare): keep photo inline.
+        ?>
+        <div class="member-profile-block member-profile-block--photo">
+            <h3 class="member-profile-block-title">
+                <?= e(__('members.profile_block_photo')) ?>
+                <?= !empty($photoField['is_required']) ? ' *' : '' ?>
+            </h3>
+            <?php $renderPhoto($photoField); ?>
         </div>
     <?php endif;
 
@@ -711,8 +757,21 @@ $paymentExtraHtml = $buildProfileFieldsHtml($paymentExtraFields, \Socly\Services
                 <h2 class="section-title"><?= e($stepTitle) ?></h2>
                 <p class="section-lede"><?= e(__('members.profile_lede')) ?></p>
             </div>
-            <div class="member-profile-grid">
-                <?= $profileHtmlByStep[$stepKey] ?? '' ?>
+            <?php
+            $sideHtml = trim((string) ($profileSideHtmlByStep[$stepKey] ?? ''));
+            $hasPhotoSide = $sideHtml !== '';
+            ?>
+            <div class="wizard-panel-body<?= $hasPhotoSide ? ' wizard-panel-body--photo' : '' ?>">
+                <div class="wizard-panel-main member-profile-grid">
+                    <?= $profileHtmlByStep[$stepKey] ?? '' ?>
+                </div>
+                <?php if ($hasPhotoSide): ?>
+                    <aside class="wizard-panel-side wizard-panel-side--photo">
+                        <?= $sideHtml ?>
+                    </aside>
+                <?php else: ?>
+                    <aside class="wizard-panel-side wizard-panel-side--spacer" aria-hidden="true"></aside>
+                <?php endif; ?>
             </div>
         </section>
     <?php endforeach; ?>
@@ -722,7 +781,7 @@ $paymentExtraHtml = $buildProfileFieldsHtml($paymentExtraFields, \Socly\Services
             <h2 class="section-title"><?= e(__('members.wizard_step2_title')) ?></h2>
             <p class="section-lede"><?= e(__('members.wizard_step2_lede')) ?></p>
         </div>
-        <div class="tessera-step-layout">
+        <div class="wizard-panel-body wizard-panel-body--tessera">
             <?php
             $tesseraPhotoSrc = '';
             if ($isEdit && !empty($member['id']) && trim((string) ($fieldValues['photo'] ?? '')) !== '') {
@@ -739,7 +798,214 @@ $paymentExtraHtml = $buildProfileFieldsHtml($paymentExtraFields, \Socly\Services
                 $tesseraName = __('members.wizard_card_name');
             }
             ?>
-            <aside class="tessera-preview" aria-hidden="true">
+            <div class="wizard-panel-main tessera-step-fields member-profile-grid">
+                <?php
+                $defaultStatus = $isEdit ? (string) ($member['status'] ?? 'active') : 'active';
+                $currentStatus = (string) old('status', $defaultStatus);
+                ?>
+                <div class="member-profile-block">
+                    <h3 class="member-profile-block-title"><?= e(__('members.wizard_step2_title')) ?></h3>
+                    <div class="member-field-row member-field-row--tessera-meta">
+                        <div class="field-block field-block--member-number">
+                            <label class="field-label" for="field-member-number"><?= e(__('members.member_number')) ?></label>
+                            <input
+                                id="field-member-number"
+                                type="text"
+                                name="member_number"
+                                data-member-number
+                                inputmode="text"
+                                autocomplete="off"
+                                value="<?= e((string) old('member_number', $member['member_number'] ?? $nextNumber)) ?>"
+                                required
+                            >
+                        </div>
+                        <div class="field-block field-block--status">
+                            <label class="field-label" for="field-member-status"><?= e(__('members.status')) ?></label>
+                            <select id="field-member-status" name="status">
+                                <?php foreach (\Socly\Services\MemberService::memberStatuses() as $st): ?>
+                                    <option value="<?= $st ?>" <?= $currentStatus === $st ? 'selected' : '' ?>><?= e(__('members.status_'.$st)) ?></option>
+                                <?php endforeach; ?>
+                            </select>
+                        </div>
+                        <div class="field-block field-block--type">
+                            <label class="field-label" for="field-member-type"><?= e(__('members.type')) ?></label>
+                            <select id="field-member-type" name="member_type_id" data-member-type required>
+                                <?php foreach ($types as $type): ?>
+                                    <option
+                                        value="<?= (int) $type['id'] ?>"
+                                        data-price="<?= e(number_format((float) $type['price'], 2, '.', '')) ?>"
+                                        data-type-name="<?= e(localized($type['name_json'])) ?>"
+                                        <?= (string) old('member_type_id', $member['member_type_id'] ?? '') === (string) $type['id'] ? 'selected' : '' ?>
+                                    >
+                                        <?= e(localized($type['name_json'])) ?> (<?= e(number_format((float) $type['price'], 2, ',', '.')) ?> €)
+                                    </option>
+                                <?php endforeach; ?>
+                            </select>
+                        </div>
+                        <div class="field-block field-block--period">
+                            <label class="field-label" for="field-member-period"><?= e(__('members.period')) ?></label>
+                            <select id="field-member-period" name="membership_period_id" required>
+                                <?php foreach ($periods as $period): ?>
+                                    <option value="<?= (int) $period['id'] ?>" <?= (string) old('membership_period_id', $member['membership_period_id'] ?? ($period['is_current'] ? $period['id'] : '')) === (string) $period['id'] ? 'selected' : '' ?>>
+                                        <?= e($period['label']) ?><?= $period['is_current'] ? ' ★' : '' ?>
+                                    </option>
+                                <?php endforeach; ?>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+
+                <?php if (!$isEdit): ?>
+                <div class="payment-summary member-profile-block member-profile-block--payment-summary" data-tessera-payment-summary>
+                    <div class="payment-summary-head">
+                        <span class="payment-summary-kicker"><?= e(__('members.wizard_summary_kicker')) ?></span>
+                        <strong class="payment-summary-type" data-payment-type-label>—</strong>
+                    </div>
+                    <div class="payment-summary-metrics">
+                        <div class="payment-summary-metric">
+                            <span class="payment-summary-label"><?= e(__('members.wizard_quota')) ?></span>
+                            <strong class="payment-summary-value" data-payment-amount>0,00 €</strong>
+                        </div>
+                        <div class="payment-summary-metric payment-summary-metric--due" data-payment-due-wrap>
+                            <span class="payment-summary-label"><?= e(__('members.wizard_still_due')) ?></span>
+                            <strong class="payment-summary-value" data-payment-due>0,00 €</strong>
+                        </div>
+                    </div>
+                </div>
+                <?php endif; ?>
+
+                <div class="member-profile-block" data-guardian-field hidden>
+                    <div class="field-block" data-guardian-required-label="<?= e(__('members.guardian_required_badge')) ?>">
+                        <div class="guardian-label-row">
+                            <label class="field-label" for="field-guardian-select"><?= e(__('members.guardian_label')) ?></label>
+                            <span class="guardian-required-badge" data-guardian-badge><?= e(__('members.guardian_required_badge')) ?></span>
+                        </div>
+                        <input
+                            type="search"
+                            class="guardian-search"
+                            data-guardian-search
+                            placeholder="<?= e(__('members.guardian_search_placeholder')) ?>"
+                            autocomplete="off"
+                            hidden
+                        >
+                        <select id="field-guardian-select" name="guardian_member_id" data-guardian-select>
+                            <option value=""><?= e(__('members.guardian_none')) ?></option>
+                            <?php foreach ($guardianCandidates as $candidate): ?>
+                                <option
+                                    value="<?= (int) $candidate['id'] ?>"
+                                    <?= $oldGuardianId === (string) $candidate['id'] ? 'selected' : '' ?>
+                                ><?= e((string) ($candidate['display_name'] ?? $candidate['member_number'])) ?></option>
+                            <?php endforeach; ?>
+                        </select>
+                        <details class="guardian-quick" data-guardian-quick<?= ($oldGuardianQuick['first_name'] ?? '') !== '' || ($oldGuardianQuick['last_name'] ?? '') !== '' ? ' open' : '' ?>>
+                            <summary><?= e(__('members.guardian_quick_summary')) ?></summary>
+                            <div class="guardian-quick-grid">
+                                <div class="field-block">
+                                    <label class="field-label" for="field-guardian-fn"><?= e(__('members.guardian_quick_first_name')) ?></label>
+                                    <input id="field-guardian-fn" type="text" name="guardian_quick[first_name]" value="<?= e((string) ($oldGuardianQuick['first_name'] ?? '')) ?>" data-guardian-quick-first autocomplete="given-name">
+                                </div>
+                                <div class="field-block">
+                                    <label class="field-label" for="field-guardian-ln"><?= e(__('members.guardian_quick_last_name')) ?></label>
+                                    <input id="field-guardian-ln" type="text" name="guardian_quick[last_name]" value="<?= e((string) ($oldGuardianQuick['last_name'] ?? '')) ?>" data-guardian-quick-last autocomplete="family-name">
+                                </div>
+                                <div class="field-block">
+                                    <label class="field-label" for="field-guardian-phone"><?= e(__('members.guardian_quick_phone')) ?></label>
+                                    <input id="field-guardian-phone" type="tel" name="guardian_quick[phone]" value="<?= e((string) ($oldGuardianQuick['phone'] ?? '')) ?>" data-guardian-quick-phone autocomplete="tel">
+                                </div>
+                                <div class="field-block">
+                                    <label class="field-label" for="field-guardian-email"><?= e(__('members.guardian_quick_email')) ?></label>
+                                    <input id="field-guardian-email" type="email" name="guardian_quick[email]" value="<?= e((string) ($oldGuardianQuick['email'] ?? '')) ?>" data-guardian-quick-email autocomplete="email">
+                                </div>
+                            </div>
+                            <p class="muted"><?= e(__('members.guardian_quick_hint')) ?></p>
+                        </details>
+                        <p class="muted" data-guardian-hint><?= e(__('members.guardian_hint')) ?></p>
+                    </div>
+                </div>
+
+                <?php if (!$isEdit):
+                    $paymentStatusCards = [
+                        'unpaid' => ['label' => __('members.payment_unpaid'), 'icon' => 'clock'],
+                        'partial' => ['label' => __('members.payment_partial'), 'icon' => 'split'],
+                        'paid' => ['label' => __('members.payment_paid'), 'icon' => 'check'],
+                    ];
+                    $paymentMethodCards = [
+                        'cash' => ['label' => __('payments.cash'), 'icon' => 'cash'],
+                        'bank' => ['label' => __('payments.bank'), 'icon' => 'bank'],
+                        'other' => ['label' => __('payments.other'), 'icon' => 'other'],
+                    ];
+                    $paymentIcons = [
+                        'clock' => '<svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" focusable="false"><path fill="currentColor" d="M12 2a10 10 0 1 0 10 10A10 10 0 0 0 12 2zm1 11h4v-2h-3V7h-2z"/></svg>',
+                        'split' => '<svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" focusable="false"><path fill="currentColor" d="M4 6h7v2H4zm0 5h16v2H4zm0 5h11v2H4z"/></svg>',
+                        'check' => '<svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" focusable="false"><path fill="currentColor" d="M9.2 16.6 4.8 12.2l1.4-1.4 3 3 8-8 1.4 1.4z"/></svg>',
+                        'cash' => '<svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" focusable="false"><path fill="currentColor" d="M3 6h18v12H3zm2 2v8h14V8zm7 1.5A2.5 2.5 0 1 1 9.5 12 2.5 2.5 0 0 1 12 9.5z"/></svg>',
+                        'bank' => '<svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" focusable="false"><path fill="currentColor" d="M3 10h18v2H3zm2 3h3v5H5zm5 0h3v5h-3zm5 0h3v5h-3zM2 20h20v2H2zM12 3 2 8v2h20V8z"/></svg>',
+                        'other' => '<svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" focusable="false"><path fill="currentColor" d="M12 7a2 2 0 1 0-2-2 2 2 0 0 0 2 2zm0 7a2 2 0 1 0-2-2 2 2 0 0 0 2 2zm0 7a2 2 0 1 0-2-2 2 2 0 0 0 2 2z"/></svg>',
+                    ];
+                ?>
+                <div class="member-profile-block tessera-payment-panel" data-payment-fields>
+                    <div class="field-block">
+                        <span class="field-label"><?= e(__('members.payment')) ?></span>
+                        <div class="tessera-choice-cards" role="radiogroup" aria-label="<?= e(__('members.payment')) ?>">
+                            <?php foreach ($paymentStatusCards as $optVal => $card): ?>
+                                <label class="tessera-choice-card<?= $oldPaymentStatus === $optVal ? ' is-selected' : '' ?>">
+                                    <input type="radio" name="payment_status" value="<?= e($optVal) ?>" <?= $oldPaymentStatus === $optVal ? 'checked' : '' ?> required>
+                                    <span class="tessera-choice-card-icon"><?= $paymentIcons[$card['icon']] ?></span>
+                                    <span class="tessera-choice-card-title"><?= e($card['label']) ?></span>
+                                </label>
+                            <?php endforeach; ?>
+                        </div>
+                    </div>
+                    <div class="field-block">
+                        <span class="field-label"><?= e(__('members.payment_method')) ?></span>
+                        <div class="tessera-choice-cards" role="radiogroup" aria-label="<?= e(__('members.payment_method')) ?>">
+                            <?php foreach ($paymentMethodCards as $optVal => $card): ?>
+                                <label class="tessera-choice-card<?= $oldPaymentMethod === $optVal ? ' is-selected' : '' ?>">
+                                    <input type="radio" name="payment_method" value="<?= e($optVal) ?>" <?= $oldPaymentMethod === $optVal ? 'checked' : '' ?> required>
+                                    <span class="tessera-choice-card-icon"><?= $paymentIcons[$card['icon']] ?></span>
+                                    <span class="tessera-choice-card-title"><?= e($card['label']) ?></span>
+                                </label>
+                            <?php endforeach; ?>
+                        </div>
+                    </div>
+                    <div data-partial-wrap<?= $oldPaymentStatus === 'partial' ? '' : ' hidden' ?> class="field-block tessera-partial-amount">
+                        <label class="field-label" for="field-partial-amount"><?= e(__('members.partial_amount')) ?></label>
+                        <input
+                            id="field-partial-amount"
+                            type="number"
+                            step="0.01"
+                            min="0.01"
+                            name="partial_amount"
+                            inputmode="decimal"
+                            placeholder="0,00"
+                            value="<?= e($oldPartialAmount === '0' ? '' : $oldPartialAmount) ?>"
+                            data-partial-amount
+                            <?= $oldPaymentStatus === 'partial' ? 'required' : '' ?>
+                        >
+                        <p class="muted tessera-partial-hint"><?= e(__('members.partial_amount_hint')) ?></p>
+                    </div>
+                    <?php if ($treasuryEnabled): ?>
+                    <p class="field-hint muted payment-treasury-note" data-payment-treasury-note>
+                        <?= e(__('members.payment_treasury_note')) ?>
+                    </p>
+                    <?php endif; ?>
+                </div>
+                <?php endif; ?>
+
+                <div class="member-profile-block">
+                    <div class="field-block">
+                        <label class="field-label"><?= e(__('members.notes')) ?></label>
+                        <textarea name="notes" rows="3"><?= e((string) old('notes', $member['notes'] ?? '')) ?></textarea>
+                    </div>
+                    <?php if ($tesseraExtraHtml !== ''): ?>
+                        <?= $tesseraExtraHtml ?>
+                    <?php endif; ?>
+                    <?php if (!$isEdit && $paymentExtraHtml !== ''): ?>
+                        <?= $paymentExtraHtml ?>
+                    <?php endif; ?>
+                </div>
+            </div>
+            <aside class="wizard-panel-side tessera-preview" aria-hidden="true">
                 <?php $tesseraLogoUrl = assoc_logo_url(); ?>
                 <div class="tessera-card"<?= $tesseraLogoUrl ? ' style="--tessera-logo:url(\'' . e($tesseraLogoUrl) . '\')"' : '' ?>>
                     <div class="tessera-card-bg" aria-hidden="true"></div>
@@ -777,132 +1043,6 @@ $paymentExtraHtml = $buildProfileFieldsHtml($paymentExtraFields, \Socly\Services
                     </div>
                 </div>
             </aside>
-            <div class="tessera-step-fields">
-                <div class="grid-2">
-                    <div class="field-block">
-                        <label class="field-label"><?= e(__('members.member_number')) ?></label>
-                        <input type="text" name="member_number" data-member-number value="<?= e((string)old('member_number', $member['member_number'] ?? $nextNumber)) ?>" required>
-                    </div>
-                    <div class="field-block">
-                        <label class="field-label"><?= e(__('members.status')) ?></label>
-                        <select name="status">
-                            <?php foreach (\Socly\Services\MemberService::memberStatuses() as $st): ?>
-                                <option value="<?= $st ?>" <?= old('status', $member['status'] ?? 'pending')===$st?'selected':'' ?>><?= e(__('members.status_'.$st)) ?></option>
-                            <?php endforeach; ?>
-                        </select>
-                    </div>
-                </div>
-
-                <div class="grid-2">
-                    <div class="field-block">
-                        <label class="field-label"><?= e(__('members.type')) ?></label>
-                        <select name="member_type_id" data-member-type required>
-                            <?php foreach ($types as $type): ?>
-                                <option
-                                    value="<?= (int)$type['id'] ?>"
-                                    data-price="<?= e(number_format((float)$type['price'], 2, '.', '')) ?>"
-                                    data-type-name="<?= e(localized($type['name_json'])) ?>"
-                                    <?= (string)old('member_type_id', $member['member_type_id'] ?? '') === (string)$type['id'] ? 'selected' : '' ?>
-                                >
-                                    <?= e(localized($type['name_json'])) ?> (<?= e(number_format((float)$type['price'], 2, ',', '.')) ?> €)
-                                </option>
-                            <?php endforeach; ?>
-                        </select>
-                    </div>
-                    <div class="field-block">
-                        <label class="field-label"><?= e(__('members.period')) ?></label>
-                        <select name="membership_period_id" required>
-                            <?php foreach ($periods as $period): ?>
-                                <option value="<?= (int)$period['id'] ?>" <?= (string)old('membership_period_id', $member['membership_period_id'] ?? ($period['is_current']?$period['id']:'')) === (string)$period['id'] ? 'selected' : '' ?>>
-                                    <?= e($period['label']) ?><?= $period['is_current'] ? ' ★' : '' ?>
-                                </option>
-                            <?php endforeach; ?>
-                        </select>
-                    </div>
-                </div>
-
-                <?php if (!$isEdit): ?>
-                <div class="payment-summary" data-tessera-payment-summary>
-                    <div>
-                        <strong data-payment-type-label>—</strong>
-                    </div>
-                    <div>
-                        <span class="muted"><?= e(__('members.wizard_quota')) ?></span>
-                        <strong data-payment-amount>0,00 €</strong>
-                    </div>
-                    <div data-payment-due-wrap>
-                        <span class="muted"><?= e(__('members.wizard_still_due')) ?></span>
-                        <strong data-payment-due>0,00 €</strong>
-                    </div>
-                </div>
-                <?php endif; ?>
-
-                <div
-                    class="field-block"
-                    data-guardian-field
-                    data-guardian-required-label="<?= e(__('members.guardian_required_badge')) ?>"
-                >
-                    <div class="guardian-label-row">
-                        <label class="field-label"><?= e(__('members.guardian_label')) ?></label>
-                        <span class="guardian-required-badge" data-guardian-badge hidden><?= e(__('members.guardian_required_badge')) ?></span>
-                    </div>
-                    <select name="guardian_member_id" data-guardian-select>
-                        <option value=""><?= e(__('members.guardian_none')) ?></option>
-                        <?php foreach ($guardianCandidates as $candidate): ?>
-                            <option
-                                value="<?= (int) $candidate['id'] ?>"
-                                <?= $oldGuardianId === (string) $candidate['id'] ? 'selected' : '' ?>
-                            ><?= e((string) ($candidate['display_name'] ?? $candidate['member_number'])) ?></option>
-                        <?php endforeach; ?>
-                    </select>
-                    <p class="muted" data-guardian-hint><?= e(__('members.guardian_hint')) ?></p>
-                </div>
-
-                <?php if (!$isEdit): ?>
-                <div class="grid-2" data-payment-fields>
-                    <div class="field-block">
-                        <label class="field-label"><?= e(__('members.payment')) ?></label>
-                        <select name="payment_status" required>
-                            <option value="unpaid" <?= $oldPaymentStatus === 'unpaid' ? 'selected' : '' ?>><?= e(__('members.payment_unpaid')) ?></option>
-                            <option value="partial" <?= $oldPaymentStatus === 'partial' ? 'selected' : '' ?>><?= e(__('members.payment_partial')) ?></option>
-                            <option value="paid" <?= $oldPaymentStatus === 'paid' ? 'selected' : '' ?>><?= e(__('members.payment_paid')) ?></option>
-                        </select>
-                    </div>
-                    <div class="field-block">
-                        <label class="field-label"><?= e(__('members.payment_method')) ?></label>
-                        <select name="payment_method" required>
-                            <option value="cash" <?= $oldPaymentMethod === 'cash' ? 'selected' : '' ?>><?= e(__('payments.cash')) ?></option>
-                            <option value="bank" <?= $oldPaymentMethod === 'bank' ? 'selected' : '' ?>><?= e(__('payments.bank')) ?></option>
-                            <option value="other" <?= $oldPaymentMethod === 'other' ? 'selected' : '' ?>><?= e(__('payments.other')) ?></option>
-                        </select>
-                    </div>
-                </div>
-                <div data-partial-wrap<?= $oldPaymentStatus === 'partial' ? '' : ' hidden' ?> class="field-block">
-                    <label class="field-label"><?= e(__('members.partial_amount')) ?></label>
-                    <input type="number" step="0.01" min="0" name="partial_amount" value="<?= e($oldPartialAmount) ?>">
-                </div>
-                <?php if ($treasuryEnabled): ?>
-                <p class="field-hint muted payment-treasury-note" data-payment-treasury-note>
-                    <?= e(__('members.payment_treasury_note')) ?>
-                </p>
-                <?php endif; ?>
-                <?php endif; ?>
-
-                <div class="field-block">
-                    <label class="field-label"><?= e(__('members.notes')) ?></label>
-                    <textarea name="notes" rows="3"><?= e((string)old('notes', $member['notes'] ?? '')) ?></textarea>
-                </div>
-                <?php if ($tesseraExtraHtml !== ''): ?>
-                    <div class="member-profile-grid" style="margin-top:0.85rem">
-                        <?= $tesseraExtraHtml ?>
-                    </div>
-                <?php endif; ?>
-                <?php if (!$isEdit && $paymentExtraHtml !== ''): ?>
-                    <div class="member-profile-grid" style="margin-top:0.85rem">
-                        <?= $paymentExtraHtml ?>
-                    </div>
-                <?php endif; ?>
-            </div>
         </div>
     </section>
 
@@ -911,6 +1051,8 @@ $paymentExtraHtml = $buildProfileFieldsHtml($paymentExtraFields, \Socly\Services
             <h2 class="section-title"><?= e(__('members.wizard_step3_title')) ?></h2>
             <p class="section-lede"><?= e(__('members.acknowledgements_lede')) ?></p>
         </div>
+        <div class="wizard-panel-body">
+            <div class="wizard-panel-main">
         <?php
         $legal = $legal ?? ['privacy' => '', 'statute' => ''];
         $docMap = [
@@ -927,16 +1069,19 @@ $paymentExtraHtml = $buildProfileFieldsHtml($paymentExtraFields, \Socly\Services
         ];
         ?>
         <?php if ($ackFields): ?>
-            <div class="ack-list">
+            <div class="ack-list member-profile-block">
+                <h3 class="member-profile-block-title"><?= e(__('members.ack_docs_title')) ?></h3>
                 <?php foreach ($ackFields as $field): ?>
                     <?php
                     $fkey = (string) ($field['key'] ?? '');
                     $doc = $docMap[$fkey] ?? null;
-                    if ($doc):
-                        $val = $fieldValue($field);
-                        $checked = $val === '1' || $val === 'on' || $val === 'yes';
-                        $label = localized($field['label_json'] ?? $field['label'] ?? $fkey);
-                        $hasDoc = trim($doc['body']) !== '';
+                    if (!$doc) {
+                        continue;
+                    }
+                    $val = $fieldValue($field);
+                    $checked = $val === '1' || $val === 'on' || $val === 'yes';
+                    $label = localized($field['label_json'] ?? $field['label'] ?? $fkey);
+                    $hasDoc = trim($doc['body']) !== '';
                     ?>
                     <div class="ack-item" data-ack-item>
                         <label class="checkbox-row ack-row">
@@ -952,6 +1097,7 @@ $paymentExtraHtml = $buildProfileFieldsHtml($paymentExtraFields, \Socly\Services
                             <span><?= e($label) ?><?= !empty($field['is_required']) ? ' *' : '' ?></span>
                         </label>
                         <button type="button" class="btn btn-sm btn-ghost" data-doc-open data-doc-key="<?= e($fkey) ?>">
+                            <span class="field-icon" data-icon="doc" aria-hidden="true"></span>
                             <?= e($doc['read']) ?>
                         </button>
                         <dialog class="doc-dialog" data-doc-dialog="<?= e($fkey) ?>">
@@ -977,14 +1123,46 @@ $paymentExtraHtml = $buildProfileFieldsHtml($paymentExtraFields, \Socly\Services
                             </div>
                         </dialog>
                     </div>
-                    <?php else: ?>
-                        <?= $renderTextField($field) ?>
-                    <?php endif; ?>
                 <?php endforeach; ?>
             </div>
         <?php else: ?>
-            <p class="muted"><?= e(__('members.legal_step_empty')) ?></p>
+            <div class="member-profile-block">
+                <p class="muted"><?= e(__('members.legal_step_empty')) ?></p>
+            </div>
         <?php endif; ?>
+
+        <?php if ($optionalConsentFields !== []): ?>
+            <div class="ack-optional member-profile-block">
+                <h3 class="member-profile-block-title"><?= e(__('members.ack_optional_title')) ?></h3>
+                <p class="muted ack-optional-lede"><?= e(__('members.ack_optional_lede')) ?></p>
+                <div class="ack-optional-list">
+                    <?php foreach ($optionalConsentFields as $field): ?>
+                        <?php
+                        $fkey = (string) ($field['key'] ?? '');
+                        $val = $fieldValue($field);
+                        $checked = $val === '1' || $val === 'on' || $val === 'yes';
+                        $label = localized($field['label_json'] ?? $field['label'] ?? $fkey);
+                        ?>
+                        <label class="checkbox-row ack-optional-row">
+                            <input
+                                type="checkbox"
+                                name="fields[<?= e($fkey) ?>]"
+                                value="1"
+                                <?= $checked ? 'checked' : '' ?>
+                            >
+                            <span><?= e($label) ?></span>
+                        </label>
+                    <?php endforeach; ?>
+                </div>
+            </div>
+        <?php endif; ?>
+
+            <p class="ack-trace muted" data-ack-trace>
+                <?= e(__('members.ack_secretariat_trace')) ?>
+            </p>
+            </div>
+            <aside class="wizard-panel-side wizard-panel-side--spacer" aria-hidden="true"></aside>
+        </div>
     </section>
 
     <?php if ($needsEnrollment): ?>
@@ -993,7 +1171,9 @@ $paymentExtraHtml = $buildProfileFieldsHtml($paymentExtraFields, \Socly\Services
             <h2 class="section-title"><?= e(__('members.wizard_enrollment_title')) ?></h2>
             <p class="section-lede"><?= e($isEdit ? __('members.wizard_enrollment_fix_lede') : __('members.wizard_enrollment_lede')) ?></p>
         </div>
-        <input type="hidden" name="enrollment_method" value="<?= e($enrollmentMethod) ?>">
+        <div class="wizard-panel-body">
+            <div class="wizard-panel-main member-profile-block">
+                <input type="hidden" name="enrollment_method" value="<?= e($enrollmentMethod) ?>">
 
         <?php if ($enrollmentMethod === 'print_scan'): ?>
             <p class="muted"><?= e(__('members.enrollment_print_hint')) ?></p>
@@ -1029,6 +1209,9 @@ $paymentExtraHtml = $buildProfileFieldsHtml($paymentExtraFields, \Socly\Services
                 <p class="muted" data-otp-status hidden></p>
             </div>
         <?php endif; ?>
+            </div>
+            <aside class="wizard-panel-side wizard-panel-side--spacer" aria-hidden="true"></aside>
+        </div>
     </section>
     <?php endif; ?>
 
