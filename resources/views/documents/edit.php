@@ -36,10 +36,12 @@ $docId = (int) ($document['id'] ?? 0);
             <a class="btn btn-ghost" href="<?= e(url('/documents/' . $docId . '/file')) ?>" target="_blank" rel="noopener"><?= e(__('documents.open_file')) ?></a>
             <a class="btn btn-ghost" href="<?= e(url('/documents/' . $docId . '/download')) ?>"><?= e(__('documents.download_file')) ?></a>
         <?php endif; ?>
+        <button class="btn" type="submit" form="document-edit-form"><?= e(__('documents.update')) ?></button>
     </div>
 </div>
 
 <form
+    id="document-edit-form"
     class="panel"
     method="post"
     action="<?= e(url('/documents/' . $docId)) ?>"
@@ -69,7 +71,6 @@ $docId = (int) ($document['id'] ?? 0);
             <h2 class="section-title"><?= e((string) ($document['title'] ?? __('documents.edit'))) ?></h2>
             <p class="section-lede"><?= e(__('documents.edit_lede')) ?></p>
         </div>
-        <button class="btn" type="submit"><?= e(__('documents.update')) ?></button>
     </div>
     <?php
     $has_existing_file = $hasExisting || (!empty($values['uploaded_path']));

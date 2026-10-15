@@ -96,6 +96,31 @@ function initConfirmForms(scope = document) {
   });
 }
 
+function initConfirmLinks(scope = document) {
+  scope.querySelectorAll('a[data-confirm]').forEach((link) => {
+    if (!(link instanceof HTMLAnchorElement) || link.dataset.confirmBound === '1') return;
+    link.dataset.confirmBound = '1';
+    link.addEventListener('click', async (event) => {
+      if (link.dataset.confirmed === '1') return;
+      if (event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) {
+        return;
+      }
+      event.preventDefault();
+      const ok = await appConfirm(link.dataset.confirm || '', {
+        danger: link.dataset.confirmDanger === '1',
+      });
+      if (!ok) return;
+      link.dataset.confirmed = '1';
+      if (link.target && link.target !== '_self') {
+        window.open(link.href, link.target, 'noopener');
+        link.dataset.confirmed = '0';
+        return;
+      }
+      window.location.href = link.href;
+    });
+  });
+}
+
 function escapeHtml(value) {
   return String(value)
     .replaceAll('&', '&amp;')
@@ -196,6 +221,7 @@ document.addEventListener('DOMContentLoaded', () => {
   initTreasuryCategory(document);
   initLeaveGuards(document);
   initConfirmForms(document);
+  initConfirmLinks(document);
   initOpenCreatePanels(document);
 });
 
@@ -9833,6 +9859,13 @@ function initOrgPersonForm(form) {
         phoneInput.removeAttribute('readonly');
       }
     }
+    form.classList.toggle('is-member-locked', locked);
+    const copyFields = form.querySelector('[data-org-copy-fields]');
+    copyFields?.classList.toggle('is-locked', locked);
+    const lockedHint = form.querySelector('[data-org-locked-hint]');
+    if (lockedHint instanceof HTMLElement) {
+      lockedHint.hidden = !locked;
+    }
   };
 
   const applyMemberProfile = (profile) => {
@@ -9902,22 +9935,28 @@ function initOrgPersonForm(form) {
     }
   };
 
+  /** Empty value or the sentinel option = person not in the member archive (external). */
+  const externalMemberValue = form.dataset.memberExternal || 'external';
+  const isExternalMember = () => {
+    const value = memberSelect?.value || '';
+    return value === '' || value === externalMemberValue;
+  };
+
   memberSelect?.addEventListener('change', () => {
-    const memberId = memberSelect.value;
-    if (!memberId) {
+    if (isExternalMember()) {
       setMemberFieldsLocked(false);
       return;
     }
-    loadMemberProfile(memberId, true);
+    loadMemberProfile(memberSelect.value, true);
   });
 
   roleSelect?.addEventListener('change', () => {
-    if (memberSelect?.value) {
+    if (memberSelect?.value && !isExternalMember()) {
       loadMemberProfile(memberSelect.value, true);
     }
   });
 
-  if (memberSelect?.value) {
+  if (memberSelect?.value && !isExternalMember()) {
     loadMemberProfile(memberSelect.value, true);
   }
 

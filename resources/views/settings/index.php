@@ -4,7 +4,9 @@
         <p class="page-lede"><?= e(__('settings.lede')) ?></p>
     </div>
     <?php if (can('dashboard.view')): ?>
-        <a class="btn btn-ghost" href="<?= e(url('/dashboard')) ?>"><?= e(__('nav.back_to_dashboard')) ?></a>
+        <div class="actions">
+            <a class="btn btn-ghost" href="<?= e(url('/dashboard')) ?>"><?= e(__('nav.back_to_dashboard')) ?></a>
+        </div>
     <?php endif; ?>
 </div>
 

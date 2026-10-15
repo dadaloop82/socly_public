@@ -7,11 +7,16 @@
  * @var bool $canEdit
  * @var list<array> $customOrgans
  * @var int $votingMembersCount
+ * @var int $exportIncompleteCount
  */
 $canEdit = !empty($canEdit);
 $assocLegalCode = strtoupper(trim((string) ($assocLegalCode ?? '')));
 $assocLegalLabel = trim((string) ($assocLegalLabel ?? ''));
 $hasLogo = assoc_logo_url() !== null;
+$exportIncompleteCount = (int) ($exportIncompleteCount ?? 0);
+$exportConfirm = $exportIncompleteCount > 0
+    ? (string) __('org.export_missing_confirm', ['count' => (string) $exportIncompleteCount])
+    : '';
 $roleLabel = static function (array $group): string {
     $role = $group['role'] ?? [];
     $custom = trim((string) ($role['custom_label'] ?? ''));
@@ -28,47 +33,75 @@ $renderPersonCard = static function (
     array $person,
     string $roleLabelText,
     string $variant = '',
-    bool $editable = false
+    bool $editable = false,
+    bool $monocratic = false
 ) use ($personName): void {
     $name = $personName($person);
     $appointed = format_date($person['appointed_at'] ?? null);
     $endsRaw = trim((string) ($person['mandate_ends_at'] ?? ''));
-    $ends = format_date($endsRaw !== '' ? $endsRaw : null);
+    $endsDate = '';
+    if ($endsRaw !== '' && preg_match('/^\d{4}-\d{2}-\d{2}/', $endsRaw) === 1) {
+        $endsDate = substr($endsRaw, 0, 10);
+    }
+    $ends = format_date($endsDate !== '' ? $endsDate : null);
     $hasMandate = $appointed !== '' || $ends !== '';
-    $mandateExpired = $endsRaw !== '' && preg_match('/^\d{4}-\d{2}-\d{2}/', $endsRaw) === 1
-        && substr($endsRaw, 0, 10) < date('Y-m-d');
+    $today = date('Y-m-d');
+    $mandateExpired = $endsDate !== '' && $endsDate < $today;
+    $mandateExpiring = false;
+    if (!$mandateExpired && $endsDate !== '') {
+        try {
+            $endDt = new DateTimeImmutable($endsDate);
+            $limit = (new DateTimeImmutable($today))->modify('+60 days');
+            $mandateExpiring = $endDt <= $limit;
+        } catch (Throwable) {
+            $mandateExpiring = false;
+        }
+    }
     $id = (int) ($person['id'] ?? 0);
-    $tag = $editable ? 'a' : 'article';
-    $href = $editable ? ' href="' . e(url('/org/people/' . $id . '/edit')) . '"' : '';
+    $editUrl = url('/org/people/' . $id . '/edit');
+    $docsUrl = url('/documents');
     $class = 'org-node' . ($variant !== '' ? ' org-node--' . $variant : '') . ($editable ? ' org-node--clickable' : '');
     if ($mandateExpired) {
         $class .= ' org-node--mandate-expired';
+    } elseif ($mandateExpiring) {
+        $class .= ' org-node--mandate-soon';
     }
+    $actionLabel = $monocratic ? __('org.tap_to_replace') : __('org.tap_to_edit');
     ?>
-    <<?= $tag ?> class="<?= e($class) ?>"<?= $href ?><?= $editable ? ' title="' . e(__('org.edit_person')) . '"' : '' ?>>
-        <p class="org-node-role"><?= e($roleLabelText) ?></p>
-        <h3 class="org-node-name"><?= e($name !== '' ? $name : __('org.vacant')) ?></h3>
+    <article class="<?= e($class) ?>"<?= $editable ? ' title="' . e(__('org.edit_person')) . '"' : '' ?>>
+        <?php if ($editable): ?>
+            <a class="org-node-link" href="<?= e($editUrl) ?>">
+        <?php endif; ?>
+                <p class="org-node-role"><?= e($roleLabelText) ?></p>
+                <h3 class="org-node-name"><?= e($name !== '' ? $name : __('org.vacant')) ?></h3>
+                <?php if ($hasMandate): ?>
+                    <p class="org-node-mandate">
+                        <?= e(__('org.mandate')) ?>:
+                        <?= e($appointed !== '' ? $appointed : '—') ?>
+                        →
+                        <?= e($ends !== '' ? $ends : '—') ?>
+                    </p>
+                <?php endif; ?>
+                <?php
+                $minutesRef = trim((string) ($person['appointment_minutes'] ?? ''));
+                if ($minutesRef !== ''):
+                ?>
+                    <p class="org-node-minutes muted"><?= e($minutesRef) ?></p>
+                <?php endif; ?>
+                <?php if ($editable): ?>
+                    <span class="org-node-action"><?= e($actionLabel) ?></span>
+                <?php endif; ?>
+        <?php if ($editable): ?>
+            </a>
+        <?php endif; ?>
         <?php if ($mandateExpired): ?>
             <span class="org-mandate-badge"><?= e(__('org.mandate_expired')) ?></span>
+        <?php elseif ($mandateExpiring): ?>
+            <a class="org-mandate-badge org-mandate-badge--soon" href="<?= e($docsUrl) ?>" title="<?= e(__('org.mandate_expiring_hint')) ?>">
+                <?= e(__('org.mandate_expiring')) ?>
+            </a>
         <?php endif; ?>
-        <?php if ($hasMandate): ?>
-            <p class="org-node-mandate">
-                <?= e(__('org.mandate')) ?>:
-                <?= e($appointed !== '' ? $appointed : '—') ?>
-                →
-                <?= e($ends !== '' ? $ends : '—') ?>
-            </p>
-        <?php endif; ?>
-        <?php
-        $minutesRef = trim((string) ($person['appointment_minutes'] ?? ''));
-        if ($minutesRef !== ''):
-        ?>
-            <p class="org-node-minutes muted"><?= e($minutesRef) ?></p>
-        <?php endif; ?>
-        <?php if ($editable): ?>
-            <span class="org-node-action"><?= e(__('org.tap_to_edit')) ?></span>
-        <?php endif; ?>
-    </<?= $tag ?>>
+    </article>
     <?php
 };
 $renderVacant = static function (
@@ -90,14 +123,19 @@ $renderVacant = static function (
     </<?= $tag ?>>
     <?php
 };
-$renderAddNode = static function (string $roleLabelText, string $roleKey): void {
+$renderAddNode = static function (string $roleLabelText, string $roleKey, string $addLabel = ''): void {
+    $title = $addLabel !== '' ? $addLabel : __('org.add_person');
     ?>
     <a class="org-node org-node--add org-node--clickable" href="<?= e(url('/org/people/create?role=' . rawurlencode($roleKey))) ?>">
         <p class="org-node-role"><?= e($roleLabelText) ?></p>
-        <h3 class="org-node-name">+ <?= e(__('org.add_person')) ?></h3>
+        <h3 class="org-node-name">+ <?= e($title) ?></h3>
         <span class="org-node-action"><?= e(__('org.tap_to_add')) ?></span>
     </a>
     <?php
+};
+$monocraticRoleKeys = ['president', 'vice_president', 'secretary', 'treasurer'];
+$roleAllowsMultiple = static function (string $roleKey) use ($monocraticRoleKeys): bool {
+    return !in_array($roleKey, $monocraticRoleKeys, true);
 };
 $renderGroupBlock = static function (
     array $group,
@@ -105,12 +143,13 @@ $renderGroupBlock = static function (
     bool $editable,
     bool $isCustom = false,
     bool $wrapTier = true
-) use ($roleLabel, $renderPersonCard, $renderVacant, $renderAddNode): void {
+) use ($roleLabel, $renderPersonCard, $renderVacant, $renderAddNode, $roleAllowsMultiple): void {
     $label = $roleLabel($group);
     $roleKey = (string) (($group['role']['key'] ?? ''));
     $people = $group['people'] ?? [];
     $mod = $variant !== '' ? ' org-group--' . $variant : '';
-    $inner = static function () use ($label, $roleKey, $people, $mod, $variant, $editable, $isCustom, $renderPersonCard, $renderVacant, $renderAddNode): void {
+    $allowMultiple = $roleAllowsMultiple($roleKey);
+    $inner = static function () use ($label, $roleKey, $people, $mod, $variant, $editable, $isCustom, $allowMultiple, $renderPersonCard, $renderVacant, $renderAddNode): void {
         ?>
         <div class="org-group<?= e($mod) ?>">
             <div class="org-group-head">
@@ -128,9 +167,9 @@ $renderGroupBlock = static function (
                     $renderVacant($label, $roleKey, $variant !== '' ? $variant : 'board', $editable);
                 } else {
                     foreach ($people as $person) {
-                        $renderPersonCard($person, $label, $variant !== '' ? $variant : 'board', $editable);
+                        $renderPersonCard($person, $label, $variant !== '' ? $variant : 'board', $editable, !$allowMultiple);
                     }
-                    if ($editable) {
+                    if ($editable && $allowMultiple) {
                         $renderAddNode($label, $roleKey);
                     }
                 }
@@ -154,22 +193,23 @@ $renderRoleSlot = static function (
     string $roleKey,
     string $variant,
     bool $editable
-) use ($byRole, $roleLabel, $renderPersonCard, $renderVacant, $renderAddNode): void {
+) use ($byRole, $roleLabel, $renderPersonCard, $renderVacant, $roleAllowsMultiple): void {
     if (!isset($byRole[$roleKey])) {
         return;
     }
     $group = $byRole[$roleKey];
     $label = $roleLabel($group);
     $people = $group['people'] ?? [];
+    $allowMultiple = $roleAllowsMultiple($roleKey);
+    $monocratic = !$allowMultiple;
     if ($people === []) {
         $renderVacant($label, $roleKey, $variant, $editable);
         return;
     }
-    foreach ($people as $person) {
-        $renderPersonCard($person, $label, $variant, $editable);
-    }
-    if ($editable) {
-        $renderAddNode($label, $roleKey);
+    // Monocratic: show the first assignee only (edit/replace via the card).
+    $list = $allowMultiple ? $people : array_slice($people, 0, 1);
+    foreach ($list as $person) {
+        $renderPersonCard($person, $label, $variant, $editable, $monocratic);
     }
 };
 
@@ -184,6 +224,15 @@ $votingMembersCount = (int) ($votingMembersCount ?? 0);
         <h1 class="page-title"><?= e(__('org.title')) ?></h1>
         <p class="page-lede"><?= e(__('org.lede')) ?></p>
     </div>
+    <div class="actions">
+        <?php if ($canEdit): ?>
+            <a class="btn" href="<?= e(url('/org/people/create')) ?>"><?= e(__('org.add_person')) ?></a>
+            <a class="btn btn-ghost" href="<?= e(url('/org/history')) ?>"><?= e(__('org.history_title')) ?></a>
+        <?php endif; ?>
+        <a class="btn btn-ghost" href="<?= e(url('/org/export.chart')) ?>" target="_blank" rel="noopener"><?= e(__('org.export_chart')) ?></a>
+        <a class="btn btn-ghost" href="<?= e(url('/org/export.csv')) ?>"><?= e(__('org.export_csv')) ?></a>
+        <a class="btn btn-ghost" href="<?= e(url('/org/export.pdf')) ?>" target="_blank" rel="noopener"<?= $exportConfirm !== '' ? ' data-confirm="' . e($exportConfirm) . '"' : '' ?>><?= e(__('org.export_pdf')) ?></a>
+    </div>
 </div>
 
 <div class="panel org-chart-panel">
@@ -192,33 +241,15 @@ $votingMembersCount = (int) ($votingMembersCount ?? 0);
             <h2 class="section-title"><?= e(__('org.chart_title')) ?></h2>
             <p class="section-lede"><?= e(__('org.chart_lede')) ?></p>
         </div>
-        <?php if ($canEdit): ?>
-            <div class="actions org-chart-actions">
-                <?= field('checkbox', [
-                    'name' => '',
-                    'id' => 'org-hide-vacant',
-                    'label' => (string) __('org.hide_vacant'),
-                    'wrapper_class' => 'org-hide-vacant-toggle',
-                    'attrs' => ['data-org-hide-vacant' => true],
-                ]) ?>
-                <a class="btn btn-ghost" href="<?= e(url('/org/history')) ?>"><?= e(__('org.history_title')) ?></a>
-                <a class="btn btn-ghost" href="<?= e(url('/org/export.csv')) ?>"><?= e(__('org.export_csv')) ?></a>
-                <a class="btn btn-ghost" href="<?= e(url('/org/export.pdf')) ?>" target="_blank" rel="noopener"><?= e(__('org.export_pdf')) ?></a>
-                <a class="btn" href="<?= e(url('/org/people/create')) ?>"><?= e(__('org.add_person')) ?></a>
-            </div>
-        <?php else: ?>
-            <div class="actions org-chart-actions">
-                <?= field('checkbox', [
-                    'name' => '',
-                    'id' => 'org-hide-vacant',
-                    'label' => (string) __('org.hide_vacant'),
-                    'wrapper_class' => 'org-hide-vacant-toggle',
-                    'attrs' => ['data-org-hide-vacant' => true],
-                ]) ?>
-                <a class="btn btn-ghost" href="<?= e(url('/org/export.csv')) ?>"><?= e(__('org.export_csv')) ?></a>
-                <a class="btn btn-ghost" href="<?= e(url('/org/export.pdf')) ?>" target="_blank" rel="noopener"><?= e(__('org.export_pdf')) ?></a>
-            </div>
-        <?php endif; ?>
+        <div class="actions org-chart-actions">
+            <?= field('checkbox', [
+                'name' => '',
+                'id' => 'org-hide-vacant',
+                'label' => (string) __('org.hide_vacant'),
+                'wrapper_class' => 'org-hide-vacant-toggle',
+                'attrs' => ['data-org-hide-vacant' => true],
+            ]) ?>
+        </div>
     </div>
 
     <div class="org-chart" data-org-chart aria-label="<?= e(__('org.chart_title')) ?>">
@@ -262,7 +293,7 @@ $votingMembersCount = (int) ($votingMembersCount ?? 0);
 
         <div class="org-tier org-tier--group">
             <div class="org-group org-group--directors">
-                <div class="org-group-head">
+                <div class="org-group-head org-group-head--stacked">
                     <h3 class="org-group-title"><?= e(__('org.board_of_directors')) ?></h3>
                     <p class="org-group-lede"><?= e(__('org.board_of_directors_lede')) ?></p>
                 </div>
@@ -275,7 +306,7 @@ $votingMembersCount = (int) ($votingMembersCount ?? 0);
                 </div>
                 <div class="org-board-members">
                     <h4 class="org-board-members-title"><?= e(__('org.board_members_section')) ?></h4>
-                    <div class="org-group-nodes">
+                    <div class="org-group-nodes org-group-nodes--board">
                         <?php
                         $boardLabel = $roleLabel($board);
                         $boardPeople = $board['people'] ?? [];
@@ -283,10 +314,10 @@ $votingMembersCount = (int) ($votingMembersCount ?? 0);
                             $renderVacant($boardLabel, 'board', 'board', $canEdit);
                         } else {
                             foreach ($boardPeople as $person) {
-                                $renderPersonCard($person, $boardLabel, 'board', $canEdit);
+                                $renderPersonCard($person, $boardLabel, 'board', $canEdit, false);
                             }
                             if ($canEdit) {
-                                $renderAddNode($boardLabel, 'board');
+                                $renderAddNode($boardLabel, 'board', (string) __('org.add_board_member'));
                             }
                         }
                         ?>

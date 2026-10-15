@@ -36,9 +36,13 @@ $values = $old !== [] ? $old : [
         <h1 class="page-title"><?= e(__('treasury.edit')) ?></h1>
         <p class="page-lede"><?= e(__('treasury.edit_lede')) ?></p>
     </div>
+    <div class="actions">
+        <a class="btn btn-ghost" href="<?= e(url('/treasury')) ?>"><?= e(__('common.back')) ?></a>
+        <button class="btn" type="submit" form="treasury-edit-form"><?= e(__('treasury.update')) ?></button>
+    </div>
 </div>
 
-<form class="panel" method="post" action="<?= e(url('/treasury/' . $movementId)) ?>" enctype="multipart/form-data"
+<form id="treasury-edit-form" class="panel" method="post" action="<?= e(url('/treasury/' . $movementId)) ?>" enctype="multipart/form-data"
       data-treasury-form data-leave-guard data-confirm-template="<?= e(__('treasury.confirm_summary')) ?>"
       data-base-currency="<?= e($currency->code()) ?>"
       data-msg-doc-loaded="<?= e(__('treasury.document_loaded')) ?>"
@@ -51,10 +55,6 @@ $values = $old !== [] ? $old : [
         <div>
             <h2 class="section-title"><?= e(__('treasury.edit')) ?></h2>
             <p class="section-lede"><?= e(__('treasury.edit_lede')) ?></p>
-        </div>
-        <div class="actions">
-            <a class="btn btn-ghost" href="<?= e(url('/treasury')) ?>"><?= e(__('common.back')) ?></a>
-            <button class="btn" type="submit"><?= e(__('treasury.update')) ?></button>
         </div>
     </div>
     <?php require __DIR__ . '/_form_fields.php'; ?>

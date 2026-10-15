@@ -18,6 +18,9 @@ final class AssociationPeopleService
     public const ROLE_BOARD = 'board';
     public const ROLE_AUDITOR = 'auditor';
 
+    /** Sentinel posted by the member select when the person is not in the member archive. */
+    public const MEMBER_EXTERNAL = 'external';
+
     /** @var list<string> Consiglio direttivo (incompatibile con organi di controllo). */
     public const DIRECTOR_ROLE_KEYS = [
         self::ROLE_PRESIDENT,
@@ -265,23 +268,29 @@ final class AssociationPeopleService
             return ['ok' => false, 'errors' => ['role_key' => __('validation.in')]];
         }
 
-        $memberId = (int) ($input['member_id'] ?? 0);
-        $eligibility = $this->members->orgEligibility($memberId);
-        if (!$eligibility['ok']) {
-            return ['ok' => false, 'errors' => ['member_id' => $eligibility['message'] ?? __('org.member_required')]];
+        // External people (e.g. an auditor who is not a member) post the sentinel value.
+        $isExternal = trim((string) ($input['member_id'] ?? '')) === self::MEMBER_EXTERNAL;
+        $memberId = $isExternal ? 0 : (int) ($input['member_id'] ?? 0);
+
+        if (!$isExternal) {
+            $eligibility = $this->members->orgEligibility($memberId);
+            if (!$eligibility['ok']) {
+                return ['ok' => false, 'errors' => ['member_id' => $eligibility['message'] ?? __('org.member_required')]];
+            }
+
+            $profile = $this->members->orgPersonProfile($memberId);
+            if ($profile === null) {
+                return ['ok' => false, 'errors' => ['member_id' => __('org.member_not_found')]];
+            }
+
+            $roleConflict = $this->memberRoleConflict($memberId, $role, $id);
+            if ($roleConflict !== null) {
+                return $roleConflict;
+            }
+
+            $input = array_merge($profile, $input);
         }
 
-        $profile = $this->members->orgPersonProfile($memberId);
-        if ($profile === null) {
-            return ['ok' => false, 'errors' => ['member_id' => __('org.member_not_found')]];
-        }
-
-        $roleConflict = $this->memberRoleConflict($memberId, $role, $id);
-        if ($roleConflict !== null) {
-            return $roleConflict;
-        }
-
-        $input = array_merge($profile, $input);
         $input['member_id'] = $memberId;
 
         $first = trim((string) ($input['first_name'] ?? ''));

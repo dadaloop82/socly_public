@@ -8621,6 +8621,52 @@ img.org-assoc-logo-img {
 .org-chart-actions {
   align-items: center;
 }
+/* ── Organigramma: form persona (blocchi come “Nuovo socio”) ─────── */
+.org-person-form {
+  display: grid;
+  gap: 1rem;
+}
+.org-person-form .org-field-row {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.85rem;
+  width: 100%;
+  align-items: start;
+}
+.org-person-form .org-field-row--single {
+  grid-template-columns: 1fr;
+}
+.org-person-form .geo-birth-host,
+.org-person-form .geo-address-host {
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  box-sizing: border-box;
+}
+.org-person-form .org-member-hint {
+  margin: 0;
+  font-size: 0.88rem;
+}
+.org-person-form .org-locked-hint {
+  margin: 0 0 0.35rem;
+  font-size: 0.88rem;
+}
+.org-person-form .org-copy-fields.is-locked input,
+.org-person-form .org-copy-fields.is-locked select,
+.org-person-form .org-copy-fields.is-locked textarea {
+  background: #f2f2f2;
+  color: #4a4a4a;
+}
+.org-person-delete {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 0.85rem;
+}
+@media (max-width: 720px) {
+  .org-person-form .org-field-row {
+    grid-template-columns: 1fr;
+  }
+}
 .org-add-organ-form {
   display: flex;
   flex-wrap: wrap;
@@ -8655,6 +8701,12 @@ img.org-assoc-logo-img {
 }
 .org-group-head .org-group-title {
   margin: 0;
+}
+.org-group-head--stacked {
+  flex-direction: column;
+  align-items: center;
+  gap: 0.45rem;
+  margin-bottom: 1rem;
 }
 .org-group-delete {
   margin: 0;
@@ -8712,9 +8764,22 @@ a.org-node:hover {
   border-color: #c62828;
   box-shadow: inset 0 0 0 1px color-mix(in srgb, #c62828 40%, transparent);
 }
+.org-node--mandate-soon {
+  border-color: color-mix(in srgb, var(--brand-accent, #e8a317) 55%, var(--line));
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--brand-accent, #e8a317) 35%, transparent);
+}
+.org-node-link {
+  display: block;
+  color: inherit;
+  text-decoration: none;
+}
+a.org-node-link:hover {
+  text-decoration: none;
+  color: inherit;
+}
 .org-mandate-badge {
   display: inline-block;
-  margin: 0.25rem 0 0.1rem;
+  margin: 0.35rem 0 0.1rem;
   padding: 0.12rem 0.45rem;
   border-radius: 999px;
   font-size: 0.68rem;
@@ -8723,6 +8788,16 @@ a.org-node:hover {
   text-transform: uppercase;
   color: #fff;
   background: #c62828;
+  text-decoration: none;
+}
+.org-mandate-badge--soon {
+  color: #fff;
+  background: color-mix(in srgb, var(--brand-accent, #e8a317) 88%, #8a4b00);
+}
+a.org-mandate-badge--soon:hover {
+  filter: brightness(0.95);
+  text-decoration: none;
+  color: #fff;
 }
 .org-node--vacant,
 .org-node--add {
@@ -8817,11 +8892,13 @@ a.org-node:hover {
   border-color: color-mix(in srgb, var(--brand-primary, #0D6E66) 28%, var(--line));
 }
 .org-group-lede {
-  margin: -0.45rem 0 0.85rem;
+  margin: 0.25rem 0 0;
+  max-width: 36rem;
   text-align: center;
   font-size: 0.82rem;
+  font-style: italic;
   color: var(--muted, #667085);
-  line-height: 1.35;
+  line-height: 1.4;
 }
 .org-board-officers {
   display: grid;
@@ -8856,6 +8933,13 @@ a.org-node:hover {
   text-transform: uppercase;
   font-weight: 800;
   color: var(--muted, #667085);
+}
+.org-group-nodes--board {
+  grid-template-columns: repeat(auto-fill, minmax(13rem, 1fr));
+  justify-content: start;
+}
+.org-group-nodes--board .org-node {
+  max-width: 100%;
 }
 .org-tier--independent {
   display: flex;

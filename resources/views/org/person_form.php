@@ -8,8 +8,13 @@
  * @var bool $isEdit
  * @var list<array> $memberOptions
  */
+use Socly\Services\AssociationPeopleService;
+
 $roleKey = (string) ($values['role_key'] ?? 'board');
-$memberId = (string) ($values['member_id'] ?? '');
+$memberRaw = trim((string) ($values['member_id'] ?? ''));
+$memberId = ($memberRaw === '' || $memberRaw === '0')
+    ? AssociationPeopleService::MEMBER_EXTERNAL
+    : $memberRaw;
 $memberOptions = $memberOptions ?? [];
 $requiresResidence = !empty($roleMeta['requires_residence']);
 $requiresMandate = !empty($roleMeta['requires_mandate']);
@@ -31,7 +36,12 @@ foreach ($roles as $role) {
     ];
 }
 
-$memberSelectOptions = [];
+$memberSelectOptions = [
+    [
+        'value' => AssociationPeopleService::MEMBER_EXTERNAL,
+        'label' => (string) __('org.member_external'),
+    ],
+];
 foreach ($memberOptions as $memberOption) {
     $optId = (int) ($memberOption['id'] ?? 0);
     $optLabel = trim((string) ($memberOption['display_name'] ?? ''));
@@ -49,12 +59,14 @@ foreach ($memberOptions as $memberOption) {
 </div>
 
 <form
-    class="panel"
+    id="org-person-form"
+    class="panel org-person-form"
     method="post"
     action="<?= e($action) ?>"
     data-cities-url="<?= e(url('/api/geo/cities')) ?>"
     data-addresses-url="<?= e(url('/api/geo/addresses')) ?>"
     data-org-person-form
+    data-member-external="<?= e(AssociationPeopleService::MEMBER_EXTERNAL) ?>"
     data-org-member-profile-url="<?= e(url('/api/org/members/__ID__/profile')) ?>"
     data-msg-role-incompatible="<?= e(__('org.role_incompatible_warn')) ?>"
     <?php if ($isEdit && !empty($person['id'])): ?>
@@ -70,109 +82,137 @@ foreach ($memberOptions as $memberOption) {
     <?php endif; ?>
 >
     <?= csrf_field() ?>
-    <div class="panel-header">
-        <div>
-            <h2 class="section-title"><?= e(__('org.person_details')) ?></h2>
-            <p class="section-lede"><?= e(__('org.person_details_lede')) ?></p>
+    <div class="member-profile-block">
+        <h3 class="member-profile-block-title"><?= e(__('org.form_section_role')) ?></h3>
+        <div class="org-field-row">
+            <?= field('select', [
+                'name' => 'role_key',
+                'label' => (string) __('settings.people_role'),
+                'value' => $roleKey,
+                'required' => true,
+                'include_empty' => false,
+                'options' => $roleSelectOptions,
+                'attrs' => ['data-org-role-select' => true],
+            ]) ?>
+            <?= field('select', [
+                'name' => 'member_id',
+                'label' => (string) __('org.field_member'),
+                'value' => $memberId,
+                'required' => true,
+                'include_empty' => false,
+                'options' => $memberSelectOptions,
+                'attrs' => ['data-org-member-select' => true],
+            ]) ?>
         </div>
-        <div class="actions">
-            <a class="btn btn-ghost" href="<?= e(url('/org')) ?>"><?= e(__('common.back')) ?></a>
-            <button class="btn" type="submit"><?= e($isEdit ? __('org.update_person') : __('org.create_person')) ?></button>
+        <p class="muted org-member-hint"><?= e(__('org.member_select_lede')) ?></p>
+    </div>
+
+    <div class="member-profile-block" data-org-copy-fields>
+        <h3 class="member-profile-block-title"><?= e(__('org.form_section_person')) ?></h3>
+        <p class="muted org-locked-hint" data-org-locked-hint hidden><?= e(__('org.person_fields_locked_hint')) ?></p>
+        <div class="org-field-row">
+            <?= field('text', [
+                'name' => 'first_name',
+                'label' => (string) __('setup.field_first_name'),
+                'value' => (string) ($values['first_name'] ?? ''),
+                'required' => true,
+                'maxlength' => 120,
+                'attrs' => ['data-first-name' => true, 'data-org-member-field' => true],
+            ]) ?>
+            <?= field('text', [
+                'name' => 'last_name',
+                'label' => (string) __('setup.field_last_name'),
+                'value' => (string) ($values['last_name'] ?? ''),
+                'required' => true,
+                'maxlength' => 120,
+                'attrs' => ['data-last-name' => true, 'data-org-member-field' => true],
+            ]) ?>
+        </div>
+        <div class="org-field-row">
+            <?= field('gender', [
+                'name' => 'gender',
+                'label' => (string) __('setup.field_gender'),
+                'value' => (string) ($values['gender'] ?? ''),
+                'attrs' => ['data-org-member-field' => true],
+            ]) ?>
+            <?= field('birth_date', [
+                'name' => 'birth_date',
+                'label' => (string) __('setup.field_birth_date'),
+                'value' => (string) ($values['birth_date'] ?? ''),
+                'show_age' => false,
+                'attrs' => ['data-org-member-field' => true],
+            ]) ?>
+        </div>
+        <div class="org-field-row org-field-row--single">
+            <div class="geo-birth-host" data-field="birth_place">
+                <?= field('birth_place', [
+                    'name' => 'birth_place',
+                    'value' => (string) ($values['birth_place'] ?? ''),
+                    'input_class' => 'member-geo-birth',
+                    'flag_name' => 'birth_place_foreign',
+                    'foreign_inline' => true,
+                    'context' => 'member',
+                ]) ?>
+            </div>
+        </div>
+        <div class="org-field-row org-field-row--single">
+            <?= field('fiscal_code', [
+                'name' => 'fiscal_code',
+                'label' => (string) __('setup.field_person_fiscal_code'),
+                'value' => (string) ($values['fiscal_code'] ?? ''),
+                'required' => true,
+                'attrs' => ['data-org-member-field' => true],
+            ]) ?>
+        </div>
+        <div class="geo-address-host" data-field="residence" data-org-residence-fields <?= $requiresResidence ? '' : 'hidden' ?>>
+            <?= field('address', [
+                'show_hint' => true,
+                'required_map' => [
+                    'city' => $requiresResidence,
+                    'postal_code' => $requiresResidence,
+                    'address' => $requiresResidence,
+                    'house_number' => $requiresResidence,
+                ],
+                'names' => [
+                    'city' => 'city',
+                    'postal_code' => 'postal_code',
+                    'address' => 'address',
+                    'house_number' => 'house_number',
+                ],
+                'values' => [
+                    'city' => (string) ($values['city'] ?? ''),
+                    'postal_code' => (string) ($values['postal_code'] ?? ''),
+                    'address' => (string) ($values['address'] ?? ''),
+                    'house_number' => (string) ($values['house_number'] ?? ''),
+                ],
+            ]) ?>
         </div>
     </div>
 
-    <div class="grid-3">
-        <?= field('select', [
-            'name' => 'role_key',
-            'label' => (string) __('settings.people_role'),
-            'value' => $roleKey,
-            'required' => true,
-            'include_empty' => false,
-            'options' => $roleSelectOptions,
-            'attrs' => ['data-org-role-select' => true],
-        ]) ?>
-    </div>
-
-    <div style="margin-bottom:1rem">
-        <?= field('select', [
-            'name' => 'member_id',
-            'label' => (string) __('org.field_member'),
-            'value' => $memberId,
-            'required' => true,
-            'empty_label' => (string) __('org.member_select_placeholder'),
-            'options' => $memberSelectOptions,
-            'attrs' => ['data-org-member-select' => true],
-        ]) ?>
-        <p class="muted"><?= e(__('org.member_select_lede')) ?></p>
-    </div>
-
-    <div class="grid-3">
-        <?= field('text', [
-            'name' => 'first_name',
-            'label' => (string) __('setup.field_first_name'),
-            'value' => (string) ($values['first_name'] ?? ''),
-            'required' => true,
-            'maxlength' => 120,
-            'attrs' => ['data-first-name' => true, 'data-org-member-field' => true],
-        ]) ?>
-        <?= field('text', [
-            'name' => 'last_name',
-            'label' => (string) __('setup.field_last_name'),
-            'value' => (string) ($values['last_name'] ?? ''),
-            'required' => true,
-            'maxlength' => 120,
-            'attrs' => ['data-last-name' => true, 'data-org-member-field' => true],
-        ]) ?>
-        <?= field('fiscal_code', [
-            'name' => 'fiscal_code',
-            'label' => (string) __('setup.field_person_fiscal_code'),
-            'value' => (string) ($values['fiscal_code'] ?? ''),
-            'required' => true,
-            'attrs' => ['data-org-member-field' => true],
-        ]) ?>
-    </div>
-
-    <div class="grid-3">
-        <?= field('gender', [
-            'name' => 'gender',
-            'label' => (string) __('setup.field_gender'),
-            'value' => (string) ($values['gender'] ?? ''),
-            'attrs' => ['data-org-member-field' => true],
-        ]) ?>
-        <?= field('birth_place', [
-            'name' => 'birth_place',
-            'value' => (string) ($values['birth_place'] ?? ''),
-            'flag_name' => 'birth_place_foreign',
-            'wrapper_class' => 'org-geo-birth',
-        ]) ?>
-        <?= field('birth_date', [
-            'name' => 'birth_date',
-            'label' => (string) __('setup.field_birth_date'),
-            'value' => (string) ($values['birth_date'] ?? ''),
-            'show_age' => false,
-            'attrs' => ['data-org-member-field' => true],
-        ]) ?>
-    </div>
-
-    <div class="grid-3">
-        <?= field('email', [
-            'name' => 'email',
-            'label' => (string) __('org.field_email'),
-            'value' => (string) ($values['email'] ?? ''),
-            'maxlength' => 190,
-            'attrs' => ['data-org-member-field' => true],
-        ]) ?>
-        <?= field('phone', [
-            'name' => 'phone',
-            'label' => (string) __('setup.field_phone'),
-            'value' => (string) ($values['phone'] ?? ''),
-            'input_class' => '',
-        ]) ?>
-        <?= field('text', [
-            'name' => 'notes',
-            'label' => (string) __('org.notes'),
-            'value' => (string) ($values['notes'] ?? ''),
-        ]) ?>
+    <div class="member-profile-block">
+        <h3 class="member-profile-block-title"><?= e(__('org.form_section_contacts')) ?></h3>
+        <div class="org-field-row">
+            <?= field('email', [
+                'name' => 'email',
+                'label' => (string) __('org.field_email'),
+                'value' => (string) ($values['email'] ?? ''),
+                'maxlength' => 190,
+                'attrs' => ['data-org-member-field' => true],
+            ]) ?>
+            <?= field('phone', [
+                'name' => 'phone',
+                'label' => (string) __('setup.field_phone'),
+                'value' => (string) ($values['phone'] ?? ''),
+                'input_class' => '',
+            ]) ?>
+        </div>
+        <div class="org-field-row org-field-row--single">
+            <?= field('text', [
+                'name' => 'notes',
+                'label' => (string) __('org.notes'),
+                'value' => (string) ($values['notes'] ?? ''),
+            ]) ?>
+        </div>
     </div>
 
     <?= field('hidden', [
@@ -181,31 +221,9 @@ foreach ($memberOptions as $memberOption) {
         'attrs' => ['data-org-replace-unique' => true],
     ]) ?>
 
-    <div data-org-residence-fields <?= $requiresResidence ? '' : 'hidden' ?>>
-    <?= field('address', [
-        'show_hint' => true,
-        'required_map' => [
-            'city' => $requiresResidence,
-            'postal_code' => $requiresResidence,
-            'address' => $requiresResidence,
-            'house_number' => $requiresResidence,
-        ],
-        'names' => [
-            'city' => 'city',
-            'postal_code' => 'postal_code',
-            'address' => 'address',
-            'house_number' => 'house_number',
-        ],
-        'values' => [
-            'city' => (string) ($values['city'] ?? ''),
-            'postal_code' => (string) ($values['postal_code'] ?? ''),
-            'address' => (string) ($values['address'] ?? ''),
-            'house_number' => (string) ($values['house_number'] ?? ''),
-        ],
-    ]) ?>
-    </div>
-
-    <div class="grid-2" style="margin-top:1rem">
+    <div class="member-profile-block">
+        <h3 class="member-profile-block-title"><?= e(__('org.form_section_mandate')) ?></h3>
+        <div class="org-field-row">
         <?= field('date', [
             'name' => 'appointed_at',
             'label' => (string) __('setup.field_appointed_at'),
@@ -218,16 +236,18 @@ foreach ($memberOptions as $memberOption) {
             'value' => (string) ($values['mandate_ends_at'] ?? ''),
             'required' => $requiresMandate,
         ]) ?>
+        </div>
+        <div class="org-field-row org-field-row--single">
+            <?= field('text', [
+                'name' => 'appointment_minutes',
+                'label' => (string) __('org.appointment_minutes'),
+                'value' => (string) ($values['appointment_minutes'] ?? ''),
+                'maxlength' => 190,
+                'placeholder' => (string) __('org.appointment_minutes_placeholder'),
+            ]) ?>
+        </div>
     </div>
-    <div style="margin-top:1rem">
-        <?= field('text', [
-            'name' => 'appointment_minutes',
-            'label' => (string) __('org.appointment_minutes'),
-            'value' => (string) ($values['appointment_minutes'] ?? ''),
-            'maxlength' => 190,
-            'placeholder' => (string) __('org.appointment_minutes_placeholder'),
-        ]) ?>
-    </div>
+
     <div class="form-actions form-actions-end">
         <a class="btn btn-ghost" href="<?= e(url('/org')) ?>"><?= e(__('common.back')) ?></a>
         <button class="btn" type="submit"><?= e($isEdit ? __('org.update_person') : __('org.create_person')) ?></button>
@@ -235,14 +255,8 @@ foreach ($memberOptions as $memberOption) {
 </form>
 
 <?php if ($isEdit): ?>
-    <form class="panel" method="post" action="<?= e(url('/org/people/' . (int) ($person['id'] ?? 0) . '/delete')) ?>" data-confirm="<?= e(__('org.delete_confirm')) ?>" data-confirm-danger="1">
+    <form class="org-person-delete" method="post" action="<?= e(url('/org/people/' . (int) ($person['id'] ?? 0) . '/delete')) ?>" data-confirm="<?= e(__('org.delete_confirm')) ?>" data-confirm-danger="1">
         <?= csrf_field() ?>
-        <div class="panel-header">
-            <div>
-                <h2 class="section-title"><?= e(__('org.delete_person')) ?></h2>
-                <p class="section-lede"><?= e(__('org.delete_person_lede')) ?></p>
-            </div>
-            <button class="btn btn-ghost" type="submit"><?= e(__('org.delete_person')) ?></button>
-        </div>
+        <button class="btn btn-danger btn-sm" type="submit"><?= e(__('org.delete_person')) ?></button>
     </form>
 <?php endif; ?>

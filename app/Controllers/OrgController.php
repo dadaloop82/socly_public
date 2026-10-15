@@ -9,6 +9,7 @@ use Socly\Core\View;
 use Socly\Services\AssociationPeopleService;
 use Socly\Services\DeadlineService;
 use Socly\Services\MemberService;
+use Socly\Services\SettingsService;
 
 final class OrgController extends BaseController
 {
@@ -16,7 +17,8 @@ final class OrgController extends BaseController
         View $view,
         private readonly AssociationPeopleService $people,
         private readonly DeadlineService $deadlines,
-        private readonly MemberService $members
+        private readonly MemberService $members,
+        private readonly SettingsService $settings
     ) {
         parent::__construct($view);
     }
@@ -25,34 +27,35 @@ final class OrgController extends BaseController
     {
         require_component('org_roles');
         $byRole = [];
+        $officers = [];
         foreach ($this->people->roles() as $role) {
             $key = (string) ($role['key'] ?? '');
             if ($key === '') {
                 continue;
             }
+            $people = $this->people->listByRole($key);
             $byRole[$key] = [
                 'role' => $role,
-                'people' => $this->people->listByRole($key),
+                'people' => $people,
             ];
-        }
-        $branding = app()->branding();
-        $legalCode = strtoupper(trim((string) ($branding['legal_name'] ?? '')));
-        $legalLabel = '';
-        if ($legalCode !== '') {
-            $forms = \Socly\Setup\AssociationLegalForms::all();
-            if (isset($forms[$legalCode])) {
-                $legalLabel = __($forms[$legalCode]);
+            $label = $this->people->roleLabel($role);
+            foreach ($people as $person) {
+                $officers[] = ['role' => $label, 'person' => $person];
             }
         }
+        $incompleteOfficers = $this->incompleteOfficers($officers);
+        $branding = app()->branding();
+        $legal = $this->assocLegalMeta();
         $this->render('org/index', [
             'title' => __('org.title'),
             'byRole' => $byRole,
             'customOrgans' => $this->people->customOrgans(),
             'assocName' => assoc_capitalize_name((string) ($branding['name'] ?? 'SOCLY')),
-            'assocLegalCode' => $legalCode,
-            'assocLegalLabel' => $legalLabel,
+            'assocLegalCode' => $legal['code'],
+            'assocLegalLabel' => $legal['label'],
             'canEdit' => $this->canEditOrg(),
             'votingMembersCount' => (int) ($this->members->dashboardStats()['members_active'] ?? 0),
+            'exportIncompleteCount' => count($incompleteOfficers),
         ]);
     }
 
@@ -213,20 +216,66 @@ final class OrgController extends BaseController
     {
         require_component('org_roles');
         $branding = app()->branding();
-        $legalCode = strtoupper(trim((string) ($branding['legal_name'] ?? '')));
-        $legalLabel = '';
-        if ($legalCode !== '') {
-            $forms = \Socly\Setup\AssociationLegalForms::all();
-            if (isset($forms[$legalCode])) {
-                $legalLabel = __($forms[$legalCode]);
+        $legal = $this->assocLegalMeta();
+        $groups = $this->officerGroups();
+        $officers = [];
+        foreach ($groups as $group) {
+            foreach ($group['rows'] as $row) {
+                $officers[] = ['role' => (string) $row['role'], 'person' => $row['person']];
             }
         }
         $this->render('org/export_pdf', [
-            'title' => __('org.export_officers'),
-            'rows' => $this->people->exportActive(),
+            'title' => __('org.export_doc_title'),
+            'groups' => $groups,
+            'incomplete' => $this->incompleteOfficers($officers),
+            'totalOfficers' => count($officers),
             'assocName' => assoc_capitalize_name((string) ($branding['name'] ?? 'SOCLY')),
-            'assocLegalCode' => $legalCode,
-            'assocLegalLabel' => $legalLabel,
+            'assocLegalCode' => $legal['code'],
+            'assocLegalLabel' => $legal['label'],
+            'assocFiscalCode' => trim((string) $this->settings->get('association.fiscal_code', '')),
+            'assocAddress' => trim((string) ($this->settings->get('association.address_full', '')
+                ?: $this->settings->get('association.address', ''))),
+            'brandPrimary' => (string) ($branding['primary'] ?? ''),
+            'brandAccent' => (string) ($branding['accent'] ?? ''),
+            'generatedAt' => date('d/m/Y H:i'),
+        ], null);
+    }
+
+    /**
+     * Printable org-chart diagram (new tab, print → PDF).
+     */
+    public function exportChart(Request $request): void
+    {
+        require_component('org_roles');
+        $branding = app()->branding();
+        $legal = $this->assocLegalMeta();
+        $tiers = $this->chartTiers();
+        $officers = [];
+        foreach ($tiers as $tier) {
+            foreach ($tier as $group) {
+                $label = (string) $group['label'];
+                foreach ($group['people'] as $person) {
+                    $officers[] = ['role' => $label, 'person' => $person];
+                }
+            }
+        }
+        $this->render('org/export_chart', [
+            'title' => __('org.export_chart_title'),
+            'tiers' => $tiers,
+            'boardLabel' => __('org.board_members_section'),
+            'boardLede' => __('org.board_of_directors_lede'),
+            'incomplete' => $this->incompleteOfficers($officers),
+            'totalOfficers' => count($officers),
+            'votingMembersCount' => (int) ($this->members->dashboardStats()['members_active'] ?? 0),
+            'assocName' => assoc_capitalize_name((string) ($branding['name'] ?? 'SOCLY')),
+            'assocLegalCode' => $legal['code'],
+            'assocLegalLabel' => $legal['label'],
+            'assocFiscalCode' => trim((string) $this->settings->get('association.fiscal_code', '')),
+            'assocAddress' => trim((string) ($this->settings->get('association.address_full', '')
+                ?: $this->settings->get('association.address', ''))),
+            'brandPrimary' => (string) ($branding['primary'] ?? ''),
+            'brandAccent' => (string) ($branding['accent'] ?? ''),
+            'generatedAt' => date('d/m/Y H:i'),
         ], null);
     }
 
@@ -337,6 +386,157 @@ final class OrgController extends BaseController
             'isEdit' => $person !== null,
             'memberOptions' => $memberOptions,
         ]);
+    }
+
+    /**
+     * Officers grouped by organ, mirroring the on-screen org chart structure.
+     *
+     * @return list<array{key:string,title:string,lede:string,rows:list<array{role:string,person:array<string,mixed>,missing:list<string>}>}>
+     */
+    private function officerGroups(): array
+    {
+        $buckets = [
+            'directors' => [
+                'key' => 'directors',
+                'title' => __('org.board_of_directors'),
+                'lede' => __('org.board_of_directors_lede'),
+                'rows' => [],
+            ],
+            'control' => [
+                'key' => 'control',
+                'title' => __('org.independent_organs'),
+                'lede' => '',
+                'rows' => [],
+            ],
+            'commissions' => [
+                'key' => 'commissions',
+                'title' => __('org.operational_commissions'),
+                'lede' => '',
+                'rows' => [],
+            ],
+        ];
+        foreach ($this->people->roles() as $role) {
+            $key = (string) ($role['key'] ?? '');
+            if ($key === '') {
+                continue;
+            }
+            $people = $this->people->listByRole($key);
+            if ($people === []) {
+                continue;
+            }
+            if (in_array($key, AssociationPeopleService::DIRECTOR_ROLE_KEYS, true)) {
+                $bucket = 'directors';
+            } elseif (in_array($key, AssociationPeopleService::CONTROL_ROLE_KEYS, true)) {
+                $bucket = 'control';
+            } else {
+                $bucket = 'commissions';
+            }
+            $label = $this->people->roleLabel($role);
+            foreach ($people as $person) {
+                $buckets[$bucket]['rows'][] = [
+                    'role' => $label,
+                    'person' => $person,
+                    'missing' => $this->missingOfficerData($person),
+                ];
+            }
+        }
+        return array_values(array_filter(
+            $buckets,
+            static fn (array $bucket): bool => $bucket['rows'] !== []
+        ));
+    }
+
+    /**
+     * Officers missing the data an official certificate requires.
+     *
+     * @param list<array{role:string,person:array<string,mixed>}> $officers
+     * @return list<array{name:string,role:string,fields:list<string>}>
+     */
+    private function incompleteOfficers(array $officers): array
+    {
+        $incomplete = [];
+        foreach ($officers as $officer) {
+            $missing = $this->missingOfficerData($officer['person']);
+            if ($missing === []) {
+                continue;
+            }
+            $person = $officer['person'];
+            $name = trim((string) ($person['last_name'] ?? '') . ' ' . (string) ($person['first_name'] ?? ''));
+            $incomplete[] = [
+                'name' => $name !== '' ? $name : '—',
+                'role' => (string) $officer['role'],
+                'fields' => $missing,
+            ];
+        }
+        return $incomplete;
+    }
+
+    /**
+     * @param array<string,mixed> $person
+     * @return list<string>
+     */
+    private function missingOfficerData(array $person): array
+    {
+        $missing = [];
+        if (trim((string) ($person['appointed_at'] ?? '')) === '') {
+            $missing[] = __('org.export_col_appointed');
+        }
+        if (trim((string) ($person['appointment_minutes'] ?? '')) === '') {
+            $missing[] = __('org.appointment_minutes');
+        }
+        if (trim((string) ($person['mandate_ends_at'] ?? '')) === '') {
+            $missing[] = __('org.export_col_mandate_end');
+        }
+        return $missing;
+    }
+
+    /** @return array{code:string,label:string} */
+    private function assocLegalMeta(): array
+    {
+        $code = strtoupper(trim((string) (app()->branding()['legal_name'] ?? '')));
+        $label = '';
+        if ($code !== '') {
+            $forms = \Socly\Setup\AssociationLegalForms::all();
+            if (isset($forms[$code])) {
+                $label = __($forms[$code]);
+            }
+        }
+        return ['code' => $code, 'label' => $label];
+    }
+
+    /**
+     * Org-chart tiers for the printable diagram (empty organs are kept for
+     * monocratic roles, hidden for custom commissions).
+     *
+     * @return array{directors:list<array<string,mixed>>,control:list<array<string,mixed>>,commissions:list<array<string,mixed>>}
+     */
+    private function chartTiers(): array
+    {
+        $tiers = ['directors' => [], 'control' => [], 'commissions' => []];
+        foreach ($this->people->roles() as $role) {
+            $key = (string) ($role['key'] ?? '');
+            if ($key === '') {
+                continue;
+            }
+            $people = $this->people->listByRole($key);
+            if (in_array($key, AssociationPeopleService::DIRECTOR_ROLE_KEYS, true)) {
+                $tier = 'directors';
+            } elseif (in_array($key, AssociationPeopleService::CONTROL_ROLE_KEYS, true)) {
+                $tier = 'control';
+            } else {
+                if ($people === []) {
+                    continue;
+                }
+                $tier = 'commissions';
+            }
+            $tiers[$tier][] = [
+                'key' => $key,
+                'label' => $this->people->roleLabel($role),
+                'is_board' => $key === AssociationPeopleService::ROLE_BOARD,
+                'people' => $people,
+            ];
+        }
+        return $tiers;
     }
 
     private function canEditOrg(): bool

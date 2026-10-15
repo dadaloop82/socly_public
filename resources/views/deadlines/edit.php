@@ -24,17 +24,17 @@ $deadlineId = (int) ($deadline['id'] ?? 0);
         <?php if (!empty($deadline['member_id']) && component_enabled('members') && can('members.manage')): ?>
             <a class="btn btn-ghost" href="<?= e(url('/members/' . (int) $deadline['member_id'])) ?>"><?= e(__('deadlines.open_member')) ?></a>
         <?php endif; ?>
+        <button class="btn" type="submit" form="deadline-edit-form"><?= e(__('deadlines.update')) ?></button>
     </div>
 </div>
 
-<form class="panel" method="post" action="<?= e(url('/deadlines/' . $deadlineId)) ?>" data-deadline-form data-leave-guard data-confirm-template="<?= e(__('deadlines.confirm_save')) ?>">
+<form id="deadline-edit-form" class="panel" method="post" action="<?= e(url('/deadlines/' . $deadlineId)) ?>" data-deadline-form data-leave-guard data-confirm-template="<?= e(__('deadlines.confirm_save')) ?>">
     <?= csrf_field() ?>
     <div class="panel-header">
         <div>
             <h2 class="section-title"><?= e((string) ($deadline['title'] ?? __('deadlines.edit'))) ?></h2>
             <p class="section-lede"><?= e(__('deadlines.edit_lede')) ?></p>
         </div>
-        <button class="btn" type="submit"><?= e(__('deadlines.update')) ?></button>
     </div>
     <?php
     $show_status = true;

@@ -442,7 +442,8 @@ $app->bind(OrgController::class, fn (App $a) => new OrgController(
     $a->get(View::class),
     $a->get(AssociationPeopleService::class),
     $a->get(DeadlineService::class),
-    $a->get(MemberService::class)
+    $a->get(MemberService::class),
+    $a->get(SettingsService::class)
 ));
 $app->bind(SetupController::class, fn (App $a) => new SetupController(
     $a->get(View::class),
