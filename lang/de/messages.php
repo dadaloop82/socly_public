@@ -1559,7 +1559,7 @@ return [
         'account_label_invalid' => 'Bitte einen gültigen Namen eingeben (max. 80 Zeichen).',
         'account_exists' => 'Ein Konto mit diesem Namen existiert bereits.',
         'account_unassigned' => 'Ohne Konto (Altdaten)',
-        'account_balance_now' => 'Aktueller Saldo: :amount',
+        'account_option_balance' => ':label: :amount',
         'accounts_overview' => 'Saldi pro Finanzkonto',
         'accounts_overview_lede' => 'Jedes Konto ist eine eigene Einheit bei gemeinsamem Hauptbuch: Karte anklicken zum Filtern.',
         'accounts_filter_hint' => 'Hauptbuch auf dieses Konto filtern',

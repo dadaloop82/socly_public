@@ -9850,13 +9850,12 @@ tr.doc-row-editable:focus-visible {
 .treasury-wallet-meta .is-expense { color: #b42318; }
 .treasury-wallet-meta .is-transfer { color: #5b6472; }
 .treasury-wallet-meta .is-muted { color: var(--muted, #667085); }
-/* Saldo in tempo reale sotto il campo «Conto finanziario» / «Da conto». */
-.treasury-account-balance {
-  margin: 0.2rem 0 0;
+/* Saldo dei conti mostrato nelle option; avviso quando «A conto» = «Da conto». */
+.treasury-transfer-notice {
+  margin: 0.35rem 0 0;
   font-size: 0.8rem;
   font-weight: 600;
-  font-variant-numeric: tabular-nums;
-  color: var(--brand-primary-ink, var(--brand-primary, #0D6E66));
+  color: #b42318;
 }
 /* ── Impostazioni → Conti finanziari ── */
 .treasury-accounts-admin { display: grid; gap: 0.85rem; margin-bottom: 1rem; }

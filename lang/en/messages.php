@@ -1561,7 +1561,7 @@ return [
         'account_label_invalid' => 'Enter a valid name (max 80 characters).',
         'account_exists' => 'An account with this name already exists.',
         'account_unassigned' => 'No account (legacy data)',
-        'account_balance_now' => 'Current balance: :amount',
+        'account_option_balance' => ':label: :amount',
         'accounts_overview' => 'Balances by financial account',
         'accounts_overview_lede' => 'Each account is its own entity on a shared ledger: click a card to filter.',
         'accounts_filter_hint' => 'Filter the ledger by this account',

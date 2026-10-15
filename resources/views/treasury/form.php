@@ -106,7 +106,7 @@ $submitLabel = $isEdit ? __('treasury.update') : __('treasury.submit');
       data-treasury-form data-leave-guard data-confirm-template="<?= e(__('treasury.confirm_summary')) ?>"
       data-base-currency="<?= e($currency->code()) ?>"
       data-account-balances-url="<?= e(url('/treasury/accounts/balances')) ?>"
-      data-msg-account-balance="<?= e(__('treasury.account_balance_now')) ?>"
+      data-msg-account-option="<?= e(__('treasury.account_option_balance')) ?>"
       data-msg-doc-loaded="<?= e(__('treasury.document_loaded')) ?>"
       data-msg-doc-idle="<?= e(__('documents.upload_idle')) ?>"
       data-msg-doc-change="<?= e(__('treasury.document_change')) ?>"

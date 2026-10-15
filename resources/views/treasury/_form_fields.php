@@ -5,6 +5,7 @@
  * @var list<array{label:string,keys:list<string>}>|null $category_groups
  * @var list<array{key:string,label:string}>|null $accounts
  * @var list<array{label:string,keys:list<string>}>|null $payment_method_groups
+ * @var list<array{key:string,label:string,active:bool,balance:float}>|null $account_balances
  * @var list<array> $members
  * @var list<string> $beneficiaries
  * @var array{auto_from_payments?:bool}|null $config
@@ -91,6 +92,22 @@ if ($selectedMethod !== '') {
 }
 $selectedAccount = \Socly\Services\TreasuryService::normalizeAccount((string) ($values['account'] ?? ''));
 $selectedTransferAccount = \Socly\Services\TreasuryService::normalizeAccount((string) ($values['transfer_account'] ?? ''));
+
+// Il saldo di ogni conto viaggia dentro l'etichetta dell'option («Banca: 1.234,56 €»).
+$accountBalanceLabels = [];
+foreach (($account_balances ?? []) as $balanceRow) {
+    $balanceKey = (string) ($balanceRow['key'] ?? '');
+    if ($balanceKey !== '') {
+        $accountBalanceLabels[$balanceKey] = (string) $currency->format((float) ($balanceRow['balance'] ?? 0));
+    }
+}
+$accountLabelWithBalance = static function (string $label, string $accountKey) use ($accountBalanceLabels): string {
+    $amount = $accountBalanceLabels[$accountKey] ?? '';
+    return $amount !== ''
+        ? (string) __('treasury.account_option_balance', ['label' => $label, 'amount' => $amount])
+        : $label;
+};
+
 $accountOptions = [];
 // Only active wallets are selectable; the ones already saved on this movement stay
 // visible (and valid) even when they have been deactivated meanwhile.
@@ -103,14 +120,24 @@ foreach (($accounts ?? []) as $accountOption) {
     if (!$accountActive && $accountKey !== $selectedAccount && $accountKey !== $selectedTransferAccount) {
         continue;
     }
-    $accountLabel = (string) ($accountOption['label'] ?? $accountKey);
-    $accountOptions[$accountKey] = $accountActive
-        ? $accountLabel
-        : $accountLabel . ' (' . (string) __('treasury.account_inactive_suffix') . ')';
+    $plainLabel = (string) ($accountOption['label'] ?? $accountKey);
+    if (!$accountActive) {
+        $plainLabel .= ' (' . (string) __('treasury.account_inactive_suffix') . ')';
+    }
+    $accountOptions[] = [
+        'value' => $accountKey,
+        'label' => $accountLabelWithBalance($plainLabel, $accountKey),
+        'attrs' => ['data-label' => $plainLabel],
+    ];
 }
 if ($accountOptions === []) {
     foreach (\Socly\Services\TreasuryService::BUILTIN_ACCOUNTS as $accountKey) {
-        $accountOptions[$accountKey] = (string) __('treasury.account_' . $accountKey);
+        $plainLabel = (string) __('treasury.account_' . $accountKey);
+        $accountOptions[] = [
+            'value' => $accountKey,
+            'label' => $accountLabelWithBalance($plainLabel, $accountKey),
+            'attrs' => ['data-label' => $plainLabel],
+        ];
     }
 }
 $paymentMethodGroups = [];
@@ -206,7 +233,6 @@ foreach ($members as $member) {
                 'data-label-transfer' => (string) __('treasury.transfer_from'),
             ],
         ]) ?>
-        <p class="treasury-account-balance" data-treasury-account-balance hidden></p>
     </div>
     <div data-treasury-method-wrap>
         <?= field('select', [
@@ -231,6 +257,7 @@ foreach ($members as $member) {
             'options' => $accountOptions,
             'attrs' => ['data-treasury-transfer-account' => true],
         ]) ?>
+        <p class="treasury-transfer-notice" data-treasury-transfer-notice hidden><?= e(__('treasury.transfer_same_account')) ?></p>
     </div>
 </div>
 <?php

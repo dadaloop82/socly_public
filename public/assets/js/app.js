@@ -10828,54 +10828,61 @@ function initTreasuryCategory(root = document) {
       setFieldsLocked(methodWrap, isTransfer || isCash);
     };
 
-    // "A conto" can never be the same wallet as "Da conto".
+    // "A conto" can never be the same wallet as "Da conto": the matching option is
+    // removed from the list and, if it was selected, the choice is cleared with a
+    // short inline notice (the server still validates it).
+    const transferNotice = form.querySelector('[data-treasury-transfer-notice]');
     const syncTransferOptions = () => {
       if (!transferSelect || !accountSelect) return;
       const from = accountSelect.value;
       [...transferSelect.options].forEach((opt) => {
-        opt.disabled = opt.value !== '' && opt.value === from;
+        const same = opt.value !== '' && opt.value === from;
+        opt.hidden = same;
+        opt.disabled = same;
       });
-      if (transferSelect.value === from) {
+      if (transferSelect.value !== '' && transferSelect.value === from) {
         transferSelect.value = '';
-      }
-    };
-
-    // Live balance of the selected wallet (fetched once, then kept in memory).
-    const balanceEl = form.querySelector('[data-treasury-account-balance]');
-    const balancesUrl = form.dataset.accountBalancesUrl || '';
-    const balanceTemplate = form.dataset.msgAccountBalance || '';
-    let balances = null;
-    const renderBalance = () => {
-      if (!balanceEl) return;
-      const key = accountSelect?.value || '';
-      const info = balances && key !== '' ? balances[key] : null;
-      if (!info || !balanceTemplate) {
-        balanceEl.hidden = true;
-        balanceEl.textContent = '';
+        if (transferNotice) transferNotice.hidden = false;
         return;
       }
-      balanceEl.hidden = false;
-      balanceEl.textContent = balanceTemplate.replace(':amount', String(info.formatted || ''));
+      if (transferNotice) transferNotice.hidden = true;
+    };
+    transferSelect?.addEventListener('change', syncTransferOptions);
+
+    // Wallet balances live inside the option labels ("Banca: 1.234,56 €"): the page
+    // renders them server-side and this refresh keeps the numbers up to date.
+    const balancesUrl = form.dataset.accountBalancesUrl || '';
+    const optionTemplate = form.dataset.msgAccountOption || '';
+    const applyBalances = (accounts) => {
+      if (!accounts || !optionTemplate) return;
+      [accountSelect, transferSelect].forEach((select) => {
+        if (!select) return;
+        [...select.options].forEach((opt) => {
+          if (opt.value === '') return;
+          const info = accounts[opt.value];
+          if (!info || !info.formatted) return;
+          const base = opt.dataset.label || info.label || opt.textContent;
+          opt.textContent = optionTemplate.replace(':label', base).replace(':amount', String(info.formatted));
+        });
+      });
     };
     const loadBalances = async () => {
-      if (!balancesUrl || !balanceEl) return;
+      if (!balancesUrl) return;
       try {
         const res = await fetch(balancesUrl, { headers: { 'X-Requested-With': 'XMLHttpRequest' } });
         if (res.ok) {
           const data = await res.json();
           if (data && typeof data === 'object' && data.accounts) {
-            balances = data.accounts;
+            applyBalances(data.accounts);
           }
         }
       } catch (error) {
-        balances = null; // offline: the hint simply stays hidden
+        /* offline: the labels keep the server-rendered balances */
       }
-      renderBalance();
     };
     accountSelect?.addEventListener('change', () => {
       syncAccount();
       syncTransferOptions();
-      renderBalance();
     });
     if (!categorySelect) {
       return;
@@ -10949,7 +10956,6 @@ function initTreasuryCategory(root = document) {
       }
       syncAccount();
       syncTransferOptions();
-      renderBalance();
       const accountLabel = accountWrap?.querySelector('.field-label');
       if (accountLabel && accountSelect) {
         accountLabel.textContent = isTransfer

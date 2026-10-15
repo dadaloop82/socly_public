@@ -1517,7 +1517,7 @@ return [
         'account_label_invalid' => 'Inserisci un nome valido (max 80 caratteri).',
         'account_exists' => 'Esiste già un conto con questo nome.',
         'account_unassigned' => 'Senza conto (dati storici)',
-        'account_balance_now' => 'Saldo attuale: :amount',
+        'account_option_balance' => ':label: :amount',
         'accounts_overview' => 'Saldi per conto finanziario',
         'accounts_overview_lede' => 'Ogni conto è un’entità a sé, con lo stesso libro mastro: clicca una scheda per filtrare.',
         'accounts_filter_hint' => 'Filtra il libro mastro su questo conto',
