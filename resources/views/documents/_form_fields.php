@@ -16,6 +16,20 @@ $hasExistingFile = !empty($has_existing_file);
 $fileName = (string) ($values['uploaded_name'] ?? '');
 $fileReady = $hasExistingFile || trim((string) ($values['uploaded_path'] ?? '')) !== '';
 
+// Progressivo automatico per i verbali (libri sociali): "Verbale n. 01/2026".
+$suggestNumbers = (!empty($suggest_number) && is_array($minutes_progressives ?? null))
+    ? $minutes_progressives
+    : [];
+$numberPattern = (string) __('documents.minutes_number_pattern');
+if (
+    $suggestNumbers !== []
+    && trim((string) ($values['document_number'] ?? '')) === ''
+    && isset($suggestNumbers[$selectedCategory])
+) {
+    $values['document_number'] = sprintf($numberPattern, (int) $suggestNumbers[$selectedCategory], date('Y'));
+}
+$numberMapJson = json_encode($suggestNumbers, JSON_UNESCAPED_UNICODE) ?: '{}';
+
 $documentLanguageOptions = array_map(
     static fn (string $lang): array => [
         'value' => $lang,
@@ -64,35 +78,34 @@ foreach (($sibling_options ?? []) as $sib) {
     ];
 }
 ?>
-<div class="grid-3">
+<div class="grid-4">
     <?= field('text', [
         'name' => 'title',
         'label' => (string) __('documents.title_field'),
         'value' => (string) ($values['title'] ?? ''),
         'required' => true,
         'maxlength' => 190,
+        'wrapper_class' => 'grid-span-2',
     ]) ?>
     <?= field('text', [
         'name' => 'document_number',
         'label' => (string) __('documents.number'),
         'value' => (string) ($values['document_number'] ?? ''),
         'maxlength' => 80,
+        'hint' => $suggestNumbers !== [] ? (string) __('documents.minutes_number_hint') : '',
+        'hint_attrs' => ['style' => 'margin:0.35rem 0 0;font-size:0.8rem'],
+        'attrs' => ['data-doc-number' => true],
     ]) ?>
     <?= field('date', [
         'name' => 'document_date',
         'label' => (string) __('documents.date'),
         'value' => (string) ($values['document_date'] ?? $today),
     ]) ?>
-    <?= field('select', [
-        'name' => 'language',
-        'label' => (string) __('documents.language'),
-        'value' => $selectedLanguage,
-        'empty_label' => (string) __('documents.language_none'),
-        'options' => $documentLanguageOptions,
-    ]) ?>
 </div>
 <div class="grid-3">
-    <div data-doc-category-wrap>
+    <div data-doc-category-wrap
+         data-doc-number-pattern="<?= e($numberPattern) ?>"
+         data-doc-number-map="<?= e($numberMapJson) ?>">
         <?= field('select', [
             'name' => 'category',
             'label' => (string) __('documents.category'),
@@ -143,18 +156,12 @@ foreach (($sibling_options ?? []) as $sib) {
     ]) ?>
 </div>
 <div class="grid-3">
-    <?= field('date', [
-        'name' => 'expires_at',
-        'label' => (string) __('documents.expires_at'),
-        'value' => (string) ($values['expires_at'] ?? ''),
-        'hint' => (string) __('documents.expires_at_hint'),
-        'hint_attrs' => ['style' => 'margin:0.35rem 0 0;font-size:0.85rem'],
-    ]) ?>
     <?= field('select', [
-        'name' => 'member_id',
-        'label' => (string) __('documents.member_link'),
-        'value' => (string) ($values['member_id'] ?? ''),
-        'options' => $documentMemberOptions,
+        'name' => 'language',
+        'label' => (string) __('documents.language'),
+        'value' => $selectedLanguage,
+        'empty_label' => (string) __('documents.language_none'),
+        'options' => $documentLanguageOptions,
     ]) ?>
     <?= field('select', [
         'name' => 'sibling_document_id',
@@ -162,33 +169,52 @@ foreach (($sibling_options ?? []) as $sib) {
         'value' => (string) ($values['sibling_document_id'] ?? ''),
         'options' => $documentSiblingOptions,
     ]) ?>
+    <?= field('select', [
+        'name' => 'member_id',
+        'label' => (string) __('documents.member_link'),
+        'value' => (string) ($values['member_id'] ?? ''),
+        'options' => $documentMemberOptions,
+    ]) ?>
 </div>
-<div class="grid-3">
+<div class="grid-2">
+    <?= field('date', [
+        'name' => 'expires_at',
+        'label' => (string) __('documents.expires_at'),
+        'value' => (string) ($values['expires_at'] ?? ''),
+        'hint' => (string) __('documents.expires_at_hint'),
+        'hint_attrs' => ['style' => 'margin:0.35rem 0 0;font-size:0.85rem'],
+    ]) ?>
     <div class="doc-file-field<?= $fileReady ? ' is-uploaded' : '' ?>" data-doc-file-field>
-        <div class="doc-file-row">
+        <span class="field-label sf-field__label"><?= e(__('documents.file')) ?></span>
+        <div class="doc-dropzone" data-doc-dropzone>
+            <span class="field-icon doc-dropzone-icon" data-icon="upload" aria-hidden="true"></span>
+            <div class="doc-dropzone-text">
+                <span class="doc-dropzone-title"><?= e(__('documents.upload_drop')) ?></span>
+                <span class="doc-dropzone-meta"><?= e(__('documents.upload_max', ['max' => (string) ($upload_max_mb ?? 2)])) ?></span>
+            </div>
             <?= field('file', [
-                'label' => (string) __('documents.file'),
+                'label' => '',
                 'name' => 'document_file',
-                'button_label' => $fileReady ? (string) __('documents.change_file') : (string) __('documents.choose_file'),
+                'button_label' => $fileReady ? (string) __('documents.change_file') : (string) __('documents.upload_pick'),
                 'accept' => '.pdf,image/jpeg,image/png,image/webp,application/pdf',
                 'as_button' => true,
-                'button_class' => 'btn btn-ghost file-btn sf-field__file-btn',
+                'button_class' => 'doc-dropzone-pick file-btn sf-field__file-btn',
                 'attrs' => ['data-doc-file-input' => true],
                 'pick_label_attrs' => ['data-doc-pick-label' => true],
             ]) ?>
-            <div class="doc-file-meta" data-doc-file-meta>
-                <strong class="doc-file-name" data-doc-file-name <?= $fileName === '' ? 'hidden' : '' ?>><?= e($fileName) ?></strong>
-                <span class="doc-file-status muted" data-doc-file-status>
-                    <?= e($fileReady ? __('documents.upload_ok') : __('documents.upload_idle')) ?>
-                </span>
-                <div class="doc-file-progress" data-doc-file-progress hidden>
-                    <div class="doc-file-progress-track" aria-hidden="true">
-                        <div class="doc-file-progress-bar" data-doc-file-progress-bar style="width:0%"></div>
-                    </div>
-                    <span class="doc-file-progress-pct" data-doc-file-progress-pct>0%</span>
+        </div>
+        <div class="doc-file-meta" data-doc-file-meta>
+            <strong class="doc-file-name" data-doc-file-name <?= $fileName === '' ? 'hidden' : '' ?>><?= e($fileName) ?></strong>
+            <span class="doc-file-status muted" data-doc-file-status>
+                <?= e($fileReady ? __('documents.upload_ok') : __('documents.upload_idle')) ?>
+            </span>
+            <div class="doc-file-progress" data-doc-file-progress hidden>
+                <div class="doc-file-progress-track" aria-hidden="true">
+                    <div class="doc-file-progress-bar" data-doc-file-progress-bar style="width:0%"></div>
                 </div>
-                <span class="doc-file-hint muted"><?= e(__('documents.upload_hint', ['max' => (string) ($upload_max_mb ?? 2)])) ?></span>
+                <span class="doc-file-progress-pct" data-doc-file-progress-pct>0%</span>
             </div>
+            <span class="doc-file-hint muted"><?= e(__('documents.upload_hint', ['max' => (string) ($upload_max_mb ?? 2)])) ?></span>
         </div>
     </div>
 </div>

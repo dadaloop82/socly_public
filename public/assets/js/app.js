@@ -11141,6 +11141,69 @@ function initDocumentUpload(root = document) {
   categorySelect?.addEventListener('change', syncCategory);
   syncCategory();
 
+  // Dropzone tratteggiata: trascina il file (stesso input di "Clicca per selezionare").
+  const dropzone = form.querySelector('[data-doc-dropzone]');
+  if (dropzone) {
+    const setDragging = (on) => dropzone.classList.toggle('is-dragging', on);
+    ['dragenter', 'dragover'].forEach((evt) => {
+      dropzone.addEventListener(evt, (event) => {
+        event.preventDefault();
+        setDragging(true);
+      });
+    });
+    ['dragleave', 'dragend'].forEach((evt) => {
+      dropzone.addEventListener(evt, () => setDragging(false));
+    });
+    dropzone.addEventListener('drop', (event) => {
+      event.preventDefault();
+      setDragging(false);
+      const dropped = event.dataTransfer?.files;
+      if (!dropped || dropped.length === 0) return;
+      try {
+        input.files = dropped;
+      } catch (_err) {
+        return;
+      }
+      input.dispatchEvent(new Event('change', { bubbles: true }));
+    });
+    dropzone.addEventListener('click', (event) => {
+      if (event.target.closest('.doc-dropzone-pick')) return;
+      input.click();
+    });
+  }
+
+  // Progressivo automatico dei verbali: "Verbale n. 01/2026".
+  const numberInput = form.querySelector('[data-doc-number]');
+  const numberWrap = form.querySelector('[data-doc-category-wrap]');
+  const numberPattern = numberWrap?.getAttribute('data-doc-number-pattern') || '';
+  let numberMap = {};
+  try {
+    numberMap = JSON.parse(numberWrap?.getAttribute('data-doc-number-map') || '{}') || {};
+  } catch (_err) {
+    numberMap = {};
+  }
+  const buildNumber = (category) => {
+    const seq = Number(numberMap[category] || 0);
+    if (!seq || !numberPattern) return '';
+    return numberPattern
+      .replace('%02d', String(seq).padStart(2, '0'))
+      .replace('%s', String(new Date().getFullYear()));
+  };
+  const isSuggestedNumber = (value) => Object.keys(numberMap).some((key) => value === buildNumber(key));
+  const syncNumber = () => {
+    if (!numberInput || !numberPattern) return;
+    const suggestion = buildNumber(categorySelect?.value || '');
+    if (suggestion === '') return;
+    const current = (numberInput.value || '').trim();
+    if (current === '' || isSuggestedNumber(current)) {
+      numberInput.value = suggestion;
+    }
+  };
+  if (numberInput) {
+    categorySelect?.addEventListener('change', syncNumber);
+    syncNumber();
+  }
+
   const setProgress = (pct, visible) => {
     if (progressWrap) {
       progressWrap.hidden = !visible;

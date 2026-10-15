@@ -1572,7 +1572,7 @@ final class SetupService
 
             $category = $this->mapRuntsDocumentCategory($title);
             $summary = trim(sprintf(
-                "Importato automaticamente dal portale RUNTS.\nMarcatore: %s\nFile originale: %s",
+                "Importato dal RUNTS.\nMarcatore: %s\nFile originale: %s",
                 $marker,
                 $originalName
             ));
@@ -2141,6 +2141,17 @@ final class SetupService
         $upper = mb_strtoupper($title, 'UTF-8');
         if (str_contains($upper, 'STATUTO')) {
             return 'statute';
+        }
+        if (str_contains($upper, 'ATTO COSTITUTIVO') || str_contains($upper, 'COSTITUZIONE')) {
+            return 'constitutive_act';
+        }
+        if (
+            str_contains($upper, 'PROVVEDIMENTO')
+            || str_contains($upper, 'DECRETO')
+            || str_contains($upper, 'ISCRIZIONE')
+            || str_contains($upper, 'RUNTS')
+        ) {
+            return 'runts_cert';
         }
         return 'other';
     }

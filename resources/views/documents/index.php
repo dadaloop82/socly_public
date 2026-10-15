@@ -16,7 +16,9 @@ $query = trim((string) ($search_query ?? ''));
 $filterStatus = (string) ($filters['status'] ?? '');
 $filterCategory = (string) ($filters['category'] ?? '');
 $filterExpiring = !empty($filters['expiring']);
-$hasActiveFilters = $query !== '' || $filterStatus !== '' || $filterCategory !== '' || $filterExpiring;
+// "In scadenza" è una voce dello stesso menu Stato (niente controllo volante).
+$statusParam = $filterExpiring ? 'expiring' : $filterStatus;
+$hasActiveFilters = $query !== '' || $statusParam !== '' || $filterCategory !== '';
 
 $categoryLabels = [];
 foreach ($categories as $category) {
@@ -26,19 +28,16 @@ $today = date('Y-m-d');
 $soon = date('Y-m-d', strtotime('+30 days'));
 
 // Keeps the other filters when one of them changes.
-$filterUrl = static function (array $overrides = []) use ($query, $filterStatus, $filterCategory, $filterExpiring): string {
+$filterUrl = static function (array $overrides = []) use ($query, $statusParam, $filterCategory): string {
     $params = [];
     if ($query !== '') {
         $params['q'] = $query;
     }
-    if ($filterStatus !== '') {
-        $params['status'] = $filterStatus;
+    if ($statusParam !== '') {
+        $params['status'] = $statusParam;
     }
     if ($filterCategory !== '') {
         $params['category'] = $filterCategory;
-    }
-    if ($filterExpiring) {
-        $params['expiring'] = '1';
     }
     foreach ($overrides as $key => $value) {
         if ($value === '' || $value === null || $value === false) {
@@ -57,6 +56,7 @@ $statusFilterOptions = [
     'signed' => (string) __('documents.status_signed'),
     'archived' => (string) __('documents.status_archived'),
     'cancelled' => (string) __('documents.status_cancelled'),
+    'expiring' => (string) __('documents.stats_expiring'),
 ];
 
 // Archivio raggruppato per categoria, nell'ordine delle categorie configurate.
@@ -86,7 +86,7 @@ foreach ($documents as $doc) {
     </div>
     <div class="actions">
         <?php if ($hasActiveFilters): ?>
-            <a class="btn btn-ghost" href="<?= e($filterUrl(['q' => '', 'status' => '', 'category' => '', 'expiring' => false])) ?>"><?= e(__('documents.filter_reset')) ?></a>
+            <a class="btn btn-ghost" href="<?= e($filterUrl(['q' => '', 'status' => '', 'category' => ''])) ?>"><?= e(__('documents.filter_reset')) ?></a>
         <?php endif; ?>
         <?php if ($canManage): ?>
             <a class="btn" href="<?= e(url('/documents/create')) ?>"><?= e(__('documents.add')) ?></a>
@@ -99,15 +99,15 @@ foreach ($documents as $doc) {
         <div class="label"><?= e(__('documents.stats_total')) ?></div>
         <div class="value"><?= (int) ($counts['total'] ?? 0) ?></div>
     </a>
-    <a class="stat<?= $filterStatus === 'draft' ? ' is-active' : '' ?>" href="<?= e($filterUrl(['status' => $filterStatus === 'draft' ? '' : 'draft', 'expiring' => false])) ?>">
+    <a class="stat<?= $statusParam === 'draft' ? ' is-active' : '' ?>" href="<?= e($filterUrl(['status' => $statusParam === 'draft' ? '' : 'draft'])) ?>">
         <div class="label"><?= e(__('documents.status_draft')) ?></div>
         <div class="value"><?= (int) ($counts['draft'] ?? 0) ?></div>
     </a>
-    <a class="stat<?= $filterStatus === 'approved' ? ' is-active' : '' ?>" href="<?= e($filterUrl(['status' => $filterStatus === 'approved' ? '' : 'approved', 'expiring' => false])) ?>">
+    <a class="stat<?= $statusParam === 'approved' ? ' is-active' : '' ?>" href="<?= e($filterUrl(['status' => $statusParam === 'approved' ? '' : 'approved'])) ?>">
         <div class="label"><?= e(__('documents.status_approved')) ?></div>
         <div class="value"><?= (int) ($counts['approved'] ?? 0) ?></div>
     </a>
-    <a class="stat<?= $filterExpiring ? ' is-active' : '' ?>" href="<?= e($filterUrl(['expiring' => $filterExpiring ? false : '1'])) ?>">
+    <a class="stat<?= $filterExpiring ? ' is-active' : '' ?>" href="<?= e($filterUrl(['status' => $filterExpiring ? '' : 'expiring'])) ?>">
         <div class="label"><?= e(__('documents.stats_expiring')) ?></div>
         <div class="value<?= (int) ($counts['expiring'] ?? 0) > 0 ? ' stat-negative' : '' ?>"><?= (int) ($counts['expiring'] ?? 0) ?></div>
     </a>
@@ -141,27 +141,51 @@ foreach ($documents as $doc) {
             'name' => 'status',
             'id' => 'documents-status-filter',
             'label' => (string) __('documents.filter_status'),
-            'value' => $filterStatus,
+            'value' => $statusParam,
             'context' => 'filter',
             'empty_label' => (string) __('documents.filter_all'),
             'options' => $statusFilterOptions,
         ]) ?>
-        <?= field('checkbox', [
-            'name' => 'expiring',
-            'id' => 'documents-expiring-filter',
-            'label' => (string) __('documents.stats_expiring'),
-            'value' => $filterExpiring ? '1' : '',
-            'check_value' => '1',
-            'context' => 'filter',
-            'wrapper_class' => 'documents-filter-expiring',
-        ]) ?>
         <?php if ($hasActiveFilters): ?>
-            <a class="btn btn-ghost btn-sm documents-filter-reset" href="<?= e($filterUrl(['q' => '', 'status' => '', 'category' => '', 'expiring' => false])) ?>"><?= e(__('documents.filter_reset')) ?></a>
+            <a class="btn btn-ghost btn-sm documents-filter-reset" href="<?= e($filterUrl(['q' => '', 'status' => '', 'category' => ''])) ?>"><?= e(__('documents.filter_reset')) ?></a>
         <?php endif; ?>
     </div>
 </form>
 <?php endif; ?>
 
+
+<section class="panel documents-minutes">
+    <div class="panel-header">
+        <div>
+            <h2 class="section-title"><?= e(__('documents.minutes_title')) ?></h2>
+            <p class="section-lede"><?= e(__('documents.minutes_lede', ['year' => (string) date('Y')])) ?></p>
+        </div>
+    </div>
+    <div class="documents-minutes-grid">
+        <?php foreach (($minutes_overview ?? []) as $book): ?>
+            <?php
+            $bookKey = (string) ($book['key'] ?? '');
+            $bookYear = (int) ($book['current_year'] ?? 0);
+            $bookTotal = (int) ($book['total'] ?? 0);
+            $bookYearNumber = (int) ($book['year'] ?? date('Y'));
+            $bookLast = trim((string) ($book['last_date'] ?? ''));
+            ?>
+            <article class="documents-minutes-card<?= $bookYear === 0 ? ' is-missing' : '' ?>">
+                <span class="documents-minutes-label"><?= e((string) ($book['label'] ?? $bookKey)) ?></span>
+                <strong class="documents-minutes-count"><?= $bookYear ?></strong>
+                <span class="documents-minutes-meta"><?= e(__('documents.minutes_total', ['count' => (string) $bookTotal])) ?></span>
+                <?php if ($bookYear === 0): ?>
+                    <span class="documents-minutes-warning"><?= e(__('documents.minutes_missing', ['year' => (string) $bookYearNumber])) ?></span>
+                <?php elseif ($bookLast !== ''): ?>
+                    <span class="documents-minutes-meta muted"><?= e(__('documents.minutes_last', ['date' => format_date($bookLast) ?: $bookLast])) ?></span>
+                <?php endif; ?>
+                <?php if ($canManage): ?>
+                    <a class="btn btn-sm<?= $bookYear === 0 ? '' : ' btn-ghost' ?>" href="<?= e(url('/documents/create?category=' . rawurlencode($bookKey))) ?>"><?= e(__('documents.minutes_add')) ?></a>
+                <?php endif; ?>
+            </article>
+        <?php endforeach; ?>
+    </div>
+</section>
 
 <div class="panel">
     <div class="panel-header">
@@ -251,8 +275,9 @@ foreach ($documents as $doc) {
                                                 <span class="documents-lang"><?= e($langLabel) ?></span>
                                             <?php endif; ?>
                                         </div>
-                                        <?php if ($summary !== ''): ?>
-                                            <div class="muted documents-summary"><?= e($summary) ?></div>
+                                        <?php $displaySummary = document_summary_display((string) ($doc['summary'] ?? '')); ?>
+                                        <?php if ($displaySummary !== ''): ?>
+                                            <div class="muted documents-summary"><?= e($displaySummary) ?></div>
                                         <?php endif; ?>
                                     </td>
 

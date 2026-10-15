@@ -8546,12 +8546,10 @@ button.setup-scrape-logo-frame:focus-visible .setup-scrape-logo-overlay {
 /* ── Verbali e documenti: barra filtri live + archivio per categoria ── */
 @media (min-width: 961px) {
   .documents-filter-row {
-    grid-template-columns: minmax(11rem, 2fr) minmax(9rem, 1fr) minmax(9rem, 1fr) auto auto;
+    grid-template-columns: minmax(11rem, 2fr) minmax(9rem, 1fr) minmax(9rem, 1fr) auto;
   }
 }
-.documents-filter-reset,
-.documents-filter-expiring { align-self: end; }
-.documents-filter-expiring .field-label { font-weight: 600; }
+.documents-filter-reset { align-self: end; }
 .documents-table .documents-row { cursor: pointer; }
 .documents-table .documents-date {
   font-weight: 700;
@@ -9974,6 +9972,164 @@ tr.doc-row-editable:focus-visible {
 .doc-file-field.is-error .doc-file-status {
   color: #b42318;
   font-weight: 700;
+}
+
+/* Archivio documenti: i 4 KPI restano sulla stessa riga (prima il quarto andava a capo). */
+.stats-context-documents {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+@media (max-width: 1100px) {
+  .stats-context-documents {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+@media (max-width: 560px) {
+  .stats-context-documents {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Form documento: riga a 4 colonne (titolo 50%, numero e data 25% ciascuno). */
+.grid-4 {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 1rem;
+}
+.grid-span-2 {
+  grid-column: span 2;
+}
+@media (max-width: 1100px) {
+  .grid-4 {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+@media (max-width: 640px) {
+  .grid-4 {
+    grid-template-columns: 1fr;
+  }
+  .grid-span-2 {
+    grid-column: span 1;
+  }
+}
+
+/* Libri sociali obbligatori (art. 15 CTS): i tre blocchi dei verbali. */
+.documents-minutes .panel-header {
+  margin-bottom: 0.75rem;
+}
+.documents-minutes-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 1rem;
+}
+@media (max-width: 900px) {
+  .documents-minutes-grid {
+    grid-template-columns: 1fr;
+  }
+}
+.documents-minutes-card {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  padding: 1rem 1.1rem;
+  border-radius: 14px;
+  border: 1px solid color-mix(in srgb, var(--brand-primary, #0D6E66) 18%, var(--line, #e4e7ec));
+  background: color-mix(in srgb, var(--brand-primary, #0D6E66) 6%, #ffffff);
+}
+.documents-minutes-card.is-missing {
+  border-color: color-mix(in srgb, #c9842a 34%, var(--line, #e4e7ec));
+  background: color-mix(in srgb, #c9842a 8%, #ffffff);
+}
+.documents-minutes-label {
+  font-size: 0.76rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: color-mix(in srgb, var(--ink, #1a1a1a) 72%, transparent);
+}
+.documents-minutes-count {
+  font-size: 1.9rem;
+  line-height: 1.1;
+  font-weight: 800;
+  color: var(--brand-primary-ink, var(--brand-primary, #0D6E66));
+}
+.documents-minutes-meta {
+  font-size: 0.82rem;
+  line-height: 1.35;
+}
+.documents-minutes-warning {
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: #a16207;
+}
+.documents-minutes-card .btn {
+  margin-top: 0.55rem;
+  align-self: flex-start;
+}
+
+/* Upload documento: riquadro tratteggiato con drag & drop. */
+.doc-file-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  min-width: 0;
+}
+.doc-dropzone {
+  display: flex;
+  align-items: center;
+  gap: 0.85rem;
+  padding: 1rem 1.1rem;
+  border: 2px dashed color-mix(in srgb, var(--brand-primary, #0D6E66) 32%, var(--line, #e4e7ec));
+  border-radius: 14px;
+  background: color-mix(in srgb, var(--brand-primary, #0D6E66) 4%, #ffffff);
+  cursor: pointer;
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+.doc-dropzone.is-dragging {
+  border-color: var(--brand-primary, #0D6E66);
+  background: color-mix(in srgb, var(--brand-primary, #0D6E66) 11%, #ffffff);
+}
+.doc-dropzone-icon {
+  flex: 0 0 auto;
+  width: 1.5rem;
+  height: 1.5rem;
+}
+.doc-dropzone-text {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+  min-width: 0;
+}
+.doc-dropzone-title {
+  font-size: 0.92rem;
+  font-weight: 600;
+  line-height: 1.35;
+}
+.doc-dropzone-meta {
+  font-size: 0.78rem;
+  font-weight: 500;
+  color: color-mix(in srgb, var(--ink, #1a1a1a) 66%, transparent);
+}
+.doc-dropzone-pick {
+  margin-left: 0.35rem;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--brand-primary-ink, var(--brand-primary, #0D6E66));
+  font-size: 0.92rem;
+  font-weight: 700;
+  text-decoration: underline;
+  white-space: nowrap;
+}
+.doc-dropzone .sf-field {
+  display: block;
+  margin: 0;
+}
+.doc-dropzone-pick:hover {
+  color: var(--brand-primary, #0D6E66);
+}
+.doc-file-field.is-uploaded .doc-dropzone {
+  background: color-mix(in srgb, var(--brand-primary, #0D6E66) 8%, #ffffff);
+  border-style: solid;
 }
 
 /* Ledger filters: one row on desktop — search + period/type/category/account/sort + grouping. */

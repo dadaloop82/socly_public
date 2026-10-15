@@ -29,7 +29,7 @@ $languageLabel = $language !== '' ? __('documents.language_' . $language) : '—
     <?php if (trim((string) ($document['summary'] ?? '')) !== ''): ?>
         <div style="margin-top:1rem">
             <span class="muted"><?= e(__('documents.summary')) ?></span>
-            <p><?= nl2br(e((string) $document['summary'])) ?></p>
+            <p><?= nl2br(e(document_summary_display((string) $document['summary']))) ?></p>
         </div>
     <?php endif; ?>
     <?php if (!empty($document['file_path'])): ?>

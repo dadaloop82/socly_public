@@ -1373,6 +1373,54 @@ if (!function_exists('row_icon_action')) {
     }
 }
 
+if (!function_exists('document_summary_display')) {
+    /**
+     * Sintesi leggibile: nasconde i marcatori tecnici dell'import RUNTS
+     * ("Marcatore: …", "File originale: …") che restano nel valore salvato.
+     */
+    function document_summary_display(?string $summary): string
+    {
+        $summary = trim((string) $summary);
+        if ($summary === '') {
+            return '';
+        }
+        $lines = preg_split('/\r\n|\r|\n/', $summary) ?: [];
+        $hasTechnical = false;
+        $hasFile = false;
+        $keep = [];
+        foreach ($lines as $line) {
+            $line = trim($line);
+            if ($line === '') {
+                continue;
+            }
+            if (str_starts_with($line, 'Marcatore:')) {
+                $hasTechnical = true;
+                continue;
+            }
+            if (str_starts_with($line, 'File originale:')) {
+                $hasTechnical = true;
+                $hasFile = true;
+                continue;
+            }
+            $keep[] = $line;
+        }
+        if (!$hasTechnical) {
+            return $summary;
+        }
+        $text = rtrim(trim(implode(' ', $keep)), ". \t");
+        // Vecchie importazioni: normalizza la dicitura prolissa.
+        if (str_starts_with($text, 'Importato automaticamente dal portale RUNTS')) {
+            $text = (string) __('documents.imported_from_runts');
+        }
+        if ($hasFile) {
+            $text = $text !== ''
+                ? $text . ' · ' . __('documents.original_file_attached')
+                : (string) __('documents.original_file_attached');
+        }
+        return $text;
+    }
+}
+
 if (!function_exists('row_actions')) {
     /**
      * Fixed-slot row action group so icons stay vertically aligned across list rows.

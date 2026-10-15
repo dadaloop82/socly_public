@@ -31,6 +31,7 @@ final class DocumentsController extends BaseController
             'title' => __('documents.title'),
             'documents' => $this->documents->all(200, $query, $filters),
             'counts' => $this->documents->counts(),
+            'minutes_overview' => $this->documents->minutesOverview(),
             'filters' => $filters,
             'categories' => $this->documents->categoryOptions(),
             'category_groups' => $this->documents->categoryGroupedOptions(),
@@ -46,14 +47,22 @@ final class DocumentsController extends BaseController
     public function create(Request $request): void
     {
         require_component('documents');
+        // La categoria può arrivare dal link "Carica verbale" del blocco Libri sociali.
+        $categories = $this->documents->categoryOptions();
+        $category = trim((string) $request->input('category', ''));
+        if ($category !== '' && !in_array($category, array_column($categories, 'key'), true)) {
+            $category = '';
+        }
         $this->render('documents/form', [
             'title' => __('documents.add'),
             'isEdit' => false,
             'action' => url('/documents'),
             'document' => null,
-            'default_category' => $this->documents->defaultCategory(),
-            'categories' => $this->documents->categoryOptions(),
+            'default_category' => $category !== '' ? $category : $this->documents->defaultCategory(),
+            'categories' => $categories,
             'category_groups' => $this->documents->categoryGroupedOptions(),
+            'minutes_progressives' => $this->documents->minutesProgressives(),
+            'suggest_number' => true,
             'languages' => DocumentService::LANGUAGES,
             'upload_max_mb' => $this->documents->uploadMaxMb(),
             'existing_file_name' => '',
@@ -94,6 +103,8 @@ final class DocumentsController extends BaseController
             'default_category' => (string) ($doc['category'] ?? 'minutes'),
             'categories' => $categories,
             'category_groups' => $this->documents->categoryGroupedOptions(),
+            'minutes_progressives' => $this->documents->minutesProgressives(),
+            'suggest_number' => false,
             'languages' => DocumentService::LANGUAGES,
             'upload_max_mb' => $this->documents->uploadMaxMb(),
             'existing_file_name' => $filePath !== '' ? basename($filePath) : '',
@@ -201,7 +212,10 @@ final class DocumentsController extends BaseController
     private function listFilters(Request $request): array
     {
         $status = trim((string) $request->input('status', ''));
-        if (!in_array($status, DocumentService::STATUSES, true)) {
+        $expiring = $status === 'expiring';
+        if ($expiring) {
+            $status = '';
+        } elseif (!in_array($status, DocumentService::STATUSES, true)) {
             $status = '';
         }
         $category = trim((string) $request->input('category', ''));
@@ -211,7 +225,7 @@ final class DocumentsController extends BaseController
         return [
             'status' => $status,
             'category' => $category,
-            'expiring' => (string) $request->input('expiring', '') === '1',
+            'expiring' => $expiring,
         ];
     }
 

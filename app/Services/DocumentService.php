@@ -33,12 +33,20 @@ final class DocumentService
 
     /** @var array<string, list<string>> */
     public const CATEGORY_GROUPS = [
-        'organs' => ['minutes', 'board_minutes', 'members_register'],
+        'organs' => ['minutes', 'board_minutes', 'audit_minutes', 'members_register'],
         'legal' => ['statute', 'constitutive_act', 'runts_cert', 'regulation'],
         'finance' => ['balance', 'five_per_thousand', 'receipt', 'f24', 'invoice'],
         'contracts' => ['contract', 'insurance', 'lease', 'dvr', 'safeguarding'],
         'other' => ['other'],
     ];
+
+    /**
+     * Libri sociali obbligatori (art. 15 CTS): i verbali di assemblea, consiglio
+     * direttivo e organo di controllo.
+     *
+     * @var list<string>
+     */
+    public const MINUTES_CATEGORIES = ['minutes', 'board_minutes', 'audit_minutes'];
 
     /** @var list<string> */
     public const VISIBILITIES = ['reserved', 'internal', 'public'];
@@ -101,6 +109,57 @@ final class DocumentService
         }
         $sql .= ' ORDER BY COALESCE(d.document_date, d.created_at) DESC, d.id DESC' . $limitSql;
         return $this->db->fetchAll($sql, $params);
+    }
+
+    /**
+     * Libri sociali dell'anno corrente: quanti verbali ci sono per categoria e
+     * quando è stato caricato l'ultimo (per l'avviso "nessun verbale quest'anno").
+     *
+     * @return list<array{key:string,label:string,total:int,current_year:int,year:int,last_date:?string}>
+     */
+    public function minutesOverview(): array
+    {
+        $year = (int) date('Y');
+        $out = [];
+        foreach (self::MINUTES_CATEGORIES as $key) {
+            $row = $this->db->fetch(
+                'SELECT COUNT(*) AS total,
+                        SUM(CASE WHEN document_date IS NOT NULL AND YEAR(document_date) = :year THEN 1 ELSE 0 END) AS current_year,
+                        MAX(document_date) AS last_date
+                 FROM association_documents
+                 WHERE category = :category',
+                ['year' => $year, 'category' => $key]
+            );
+            $lastDate = trim((string) ($row['last_date'] ?? ''));
+            $out[] = [
+                'key' => $key,
+                'label' => (string) __('documents.category_' . $key),
+                'total' => (int) ($row['total'] ?? 0),
+                'current_year' => (int) ($row['current_year'] ?? 0),
+                'year' => $year,
+                'last_date' => $lastDate !== '' ? $lastDate : null,
+            ];
+        }
+        return $out;
+    }
+
+    /**
+     * Numeri suggeriti per i verbali: progressivo dell'anno corrente per categoria.
+     *
+     * @return array<string,int> categoria => prossimo progressivo
+     */
+    public function minutesProgressives(): array
+    {
+        $out = [];
+        foreach (self::MINUTES_CATEGORIES as $key) {
+            $row = $this->db->fetch(
+                'SELECT COUNT(*) AS c FROM association_documents
+                 WHERE category = :category AND document_date IS NOT NULL AND YEAR(document_date) = :year',
+                ['category' => $key, 'year' => (int) date('Y')]
+            );
+            $out[$key] = (int) ($row['c'] ?? 0) + 1;
+        }
+        return $out;
     }
 
     /** @return array{total:int,draft:int,approved:int,expiring:int} */
