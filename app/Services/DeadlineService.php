@@ -63,7 +63,11 @@ final class DeadlineService
                     (SELECT v.value FROM member_field_values v
                      INNER JOIN member_field_definitions dln ON dln.id = v.field_definition_id AND dln.`key` = 'last_name'
                      WHERE v.member_id = m.id LIMIT 1) AS last_name,
-                    m.member_number
+                    m.member_number,
+                    (SELECT TRIM(CONCAT(COALESCE(sp.first_name, ''), ' ', COALESCE(sp.last_name, '')))
+                     FROM association_people sp
+                     WHERE d.source = CONCAT('system:mandate:', sp.id)
+                     ORDER BY sp.id ASC LIMIT 1) AS source_person_name
              FROM deadline_items d
              LEFT JOIN members m ON m.id = d.member_id";
 
@@ -194,6 +198,7 @@ final class DeadlineService
                 'category' => 'mandate',
                 'due_date' => (string) $person['mandate_ends_at'],
                 'member_id' => $memberId > 0 ? $memberId : null,
+                'assignee_role' => $role !== '' ? mb_substr($role, 0, 40) : null,
                 'notes' => __('deadlines.auto_mandate_note'),
             ]);
         }
@@ -545,7 +550,20 @@ final class DeadlineService
             $recurrence = 'none';
         }
         $assigneeRole = trim((string) ($input['assignee_role'] ?? ($existing['assignee_role'] ?? '')));
-        $notifyDays = trim((string) ($input['notify_days'] ?? ($existing['notify_days'] ?? '')));
+        // Notifications arrive either as checkboxes (notify_days[]) or as a "30,7" string.
+        $notifyRaw = $input['notify_days'] ?? ($existing['notify_days'] ?? '');
+        if (is_array($notifyRaw)) {
+            $days = [];
+            foreach ($notifyRaw as $day) {
+                if (is_scalar($day) && preg_match('/^\d{1,3}$/', trim((string) $day)) === 1) {
+                    $days[] = (int) $day;
+                }
+            }
+            $days = array_values(array_unique($days));
+            rsort($days);
+            $notifyRaw = implode(',', $days);
+        }
+        $notifyDays = trim((string) $notifyRaw);
         if ($notifyDays !== '' && !preg_match('/^[\d,\s]+$/', $notifyDays)) {
             $notifyDays = '';
         }
@@ -730,7 +748,7 @@ final class DeadlineService
     private function upsertSystemDeadline(string $source, array $data): void
     {
         $existing = $this->db->fetch(
-            'SELECT id, title, category, due_date, member_id, notes, status, source
+            'SELECT id, title, category, due_date, member_id, notes, status, source, assignee_role
              FROM deadline_items WHERE source = :source ORDER BY id ASC LIMIT 1',
             ['source' => $source]
         );

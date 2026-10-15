@@ -41,7 +41,6 @@ if ($old !== []) {
     ];
 }
 $itemId = $isEdit ? (int) ($deadline['id'] ?? 0) : 0;
-$linkedMemberId = (int) ($values['member_id'] ?? 0);
 $pageTitle = $isEdit ? __('deadlines.edit') : __('deadlines.add');
 $pageLede = $isEdit ? __('deadlines.edit_lede') : __('deadlines.add_lede');
 $submitLabel = $isEdit ? __('deadlines.update') : __('deadlines.submit');
@@ -51,13 +50,6 @@ $submitLabel = $isEdit ? __('deadlines.update') : __('deadlines.submit');
         <h1 class="page-title"><?= e($pageTitle) ?></h1>
         <p class="page-lede"><?= e($pageLede) ?></p>
     </div>
-    <div class="actions">
-        <a class="btn btn-ghost" href="<?= e(url('/deadlines')) ?>"><?= e(__('common.back')) ?></a>
-        <?php if ($isEdit && $linkedMemberId > 0 && component_enabled('members') && can('members.manage')): ?>
-            <a class="btn btn-ghost" href="<?= e(url('/members/' . $linkedMemberId)) ?>"><?= e(__('deadlines.open_member')) ?></a>
-        <?php endif; ?>
-        <button class="btn" type="submit" form="deadline-form"><?= e($submitLabel) ?></button>
-    </div>
 </div>
 
 <form id="deadline-form" class="panel deadlines-form" method="post" action="<?= e($action) ?>"
@@ -65,6 +57,8 @@ $submitLabel = $isEdit ? __('deadlines.update') : __('deadlines.submit');
     <?= csrf_field() ?>
     <?php
     $show_status = $isEdit;
+    // I template legali servono solo alla creazione: in modifica sovrascriverebbero i dati.
+    $show_templates = !$isEdit;
     require __DIR__ . '/_form_fields.php';
     ?>
     <div class="form-actions form-actions-end">

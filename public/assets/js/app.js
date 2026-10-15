@@ -219,6 +219,7 @@ document.addEventListener('DOMContentLoaded', () => {
   });
   initDeadlineCategory(document);
   initDeadlineFilters(document);
+  initDeadlineTemplates(document);
   initTreasuryCategory(document);
   initLeaveGuards(document);
   initConfirmForms(document);
@@ -9605,6 +9606,48 @@ function initDeadlineFilters(root = document) {
     if (form instanceof HTMLFormElement) {
       initLiveFilterForm(form);
     }
+  });
+}
+
+function initDeadlineTemplates(root = document) {
+  // Scadenze tipiche ETS: un clic precompila il form di creazione.
+  root.querySelectorAll('[data-deadline-templates]').forEach((box) => {
+    const form = box.closest('form');
+    if (!(form instanceof HTMLFormElement)) return;
+    box.querySelectorAll('[data-deadline-template]').forEach((btn) => {
+      if (!(btn instanceof HTMLElement)) return;
+      btn.addEventListener('click', () => {
+        let data = {};
+        try {
+          data = JSON.parse(btn.getAttribute('data-deadline-template') || '{}');
+        } catch (error) {
+          data = {};
+        }
+        const setValue = (name, value) => {
+          const el = form.querySelector('[name="' + name + '"]');
+          if (el instanceof HTMLInputElement || el instanceof HTMLSelectElement || el instanceof HTMLTextAreaElement) {
+            el.value = String(value);
+          }
+        };
+        if (data.title) setValue('title', data.title);
+        if (data.category) setValue('category', data.category);
+        if (data.due_date) setValue('due_date', data.due_date);
+        if (data.recurrence) setValue('recurrence', data.recurrence);
+        if (data.assignee_role) setValue('assignee_role', data.assignee_role);
+        if (data.notes) setValue('notes', data.notes);
+        if (Array.isArray(data.notify)) {
+          form.querySelectorAll('input[name="notify_days[]"]').forEach((cb) => {
+            if (cb instanceof HTMLInputElement) {
+              cb.checked = data.notify.map(String).includes(cb.value);
+            }
+          });
+        }
+        // La categoria potrebbe richiedere il campo "nuova categoria": tienilo allineato.
+        form.querySelector('[data-deadline-category]')?.dispatchEvent(new Event('change', { bubbles: true }));
+        const title = form.querySelector('[name="title"]');
+        if (title instanceof HTMLElement) title.focus();
+      });
+    });
   });
 }
 

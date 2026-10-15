@@ -59,17 +59,15 @@ $statusFilterOptions = [
 // Ogni voce finisce in un solo gruppo: l'elenco si legge dall'alto verso il basso.
 $groupLabels = [
     'overdue' => (string) __('deadlines.overdue'),
-    'today' => (string) __('deadlines.bucket_today'),
-    'soon' => (string) __('deadlines.bucket_soon'),
+    'soon' => (string) __('deadlines.due_soon'),
     'later' => (string) __('deadlines.bucket_later'),
     'done' => (string) __('deadlines.bucket_done'),
     'dismissed' => (string) __('deadlines.bucket_dismissed'),
 ];
 $groupTones = [
     'overdue' => 'overdue',
-    'today' => 'soon',
     'soon' => 'soon',
-    'later' => 'valid',
+    'later' => 'future',
     'done' => 'done',
     'dismissed' => 'done',
 ];
@@ -86,8 +84,6 @@ foreach ($deadline_items as $item) {
         $bucketKey = 'dismissed';
     } elseif ($due !== '' && $due < $today) {
         $bucketKey = 'overdue';
-    } elseif ($due === $today) {
-        $bucketKey = 'today';
     } elseif ($due !== '' && $due <= $soon) {
         $bucketKey = 'soon';
     } else {
@@ -210,7 +206,7 @@ foreach ($deadline_items as $item) {
                                 <?php
                                 $due = (string) ($item['due_date'] ?? '');
                                 $itemStatus = (string) ($item['status'] ?? 'open');
-                                $state = 'valid';
+                                $state = 'future';
                                 if ($itemStatus === 'done' || $itemStatus === 'dismissed') {
                                     $state = 'done';
                                 } elseif ($due !== '' && $due < $today) {
@@ -218,14 +214,26 @@ foreach ($deadline_items as $item) {
                                 } elseif ($due !== '' && $due <= $soon) {
                                     $state = 'soon';
                                 }
-                                $badgeLabel = match ($itemStatus) {
-                                    'done' => (string) __('deadlines.status_done'),
-                                    'dismissed' => (string) __('deadlines.status_dismissed'),
-                                    default => (string) __('deadlines.badge_' . $state),
+                                // Solo gli avvisi temporali meritano un badge: le scadenze
+                                // lontane restano neutre (senza etichetta).
+                                $badgeLabel = match ($state) {
+                                    'overdue' => (string) __('deadlines.badge_overdue'),
+                                    'soon' => (string) __('deadlines.badge_soon'),
+                                    default => '',
                                 };
+                                if ($itemStatus === 'done') {
+                                    $badgeLabel = (string) __('deadlines.status_done');
+                                } elseif ($itemStatus === 'dismissed') {
+                                    $badgeLabel = (string) __('deadlines.status_dismissed');
+                                }
                                 $memberLabel = trim((string) (($item['last_name'] ?? '') . ' ' . ($item['first_name'] ?? '')));
+                                if ($memberLabel === '') {
+                                    // Mandato in organigramma: la persona può non essere (ancora) un socio.
+                                    $memberLabel = trim((string) ($item['source_person_name'] ?? ''));
+                                }
+                                $source = (string) ($item['source'] ?? '');
                                 $itemId = (int) ($item['id'] ?? 0);
-                                $isSystem = str_starts_with((string) ($item['source'] ?? ''), 'system:');
+                                $isSystem = str_starts_with($source, 'system:');
                                 $canEdit = $canManage && !$isSystem;
                                 $canAct = $canEdit && $itemStatus === 'open';
                                 $editUrl = $canEdit ? url('/deadlines/' . $itemId . '/edit') : '';
@@ -233,6 +241,39 @@ foreach ($deadline_items as $item) {
                                 $categoryLabel = $categoryFilterOptions[$categoryKey] ?? $categoryKey;
                                 $recurrence = (string) ($item['recurrence'] ?? 'none');
                                 $assignee = trim((string) ($item['assignee_role'] ?? ''));
+                                // Scadenze automatiche: azione contestuale verso il modulo che le genera.
+                                $sourceAction = [];
+                                if ($isSystem) {
+                                    if (str_starts_with($source, 'system:mandate:')) {
+                                        $sourceAction = [
+                                            'icon' => 'edit',
+                                            'label' => __('deadlines.open_org_chart'),
+                                            'href' => url('/org'),
+                                            'show' => can('org.view'),
+                                        ];
+                                    } elseif (str_starts_with($source, 'system:member_cert:')) {
+                                        $sourceAction = [
+                                            'icon' => 'user',
+                                            'label' => __('deadlines.open_member'),
+                                            'href' => !empty($item['member_id']) ? url('/members/' . (int) $item['member_id']) : '',
+                                            'show' => !empty($item['member_id']) && can('members.view'),
+                                        ];
+                                    } elseif (str_starts_with($source, 'system:membership_period:')) {
+                                        $sourceAction = [
+                                            'icon' => 'toggle',
+                                            'label' => __('deadlines.manage_periods'),
+                                            'href' => url('/settings') . '#periods',
+                                            'show' => can('settings.manage'),
+                                        ];
+                                    } elseif (str_starts_with($source, 'system:document:')) {
+                                        $sourceAction = [
+                                            'icon' => 'file',
+                                            'label' => __('deadlines.open_document'),
+                                            'href' => url('/documents/' . (int) substr($source, strlen('system:document:'))),
+                                            'show' => can('documents.view'),
+                                        ];
+                                    }
+                                }
                                 ?>
                                 <tr
                                     class="deadline-row deadline-row-<?= e($state) ?><?= $canEdit ? ' doc-row-editable' : '' ?>"
@@ -245,7 +286,9 @@ foreach ($deadline_items as $item) {
                                 >
                                     <td data-label="<?= e(__('deadlines.due_date')) ?>">
                                         <span class="deadline-due"><?= e(format_date($due) ?: '—') ?></span>
-                                        <span class="deadline-badge deadline-badge-<?= e($state) ?>"><?= e($badgeLabel) ?></span>
+                                        <?php if ($badgeLabel !== ''): ?>
+                                            <span class="deadline-badge deadline-badge-<?= e($state) ?>"><?= e($badgeLabel) ?></span>
+                                        <?php endif; ?>
                                     </td>
                                     <td data-label="<?= e(__('deadlines.title_field')) ?>">
                                         <div class="deadline-title">
@@ -295,11 +338,13 @@ foreach ($deadline_items as $item) {
                                                 'href' => $editUrl,
                                             ];
                                         }
+                                        // Scadenza automatica: vai al modulo che la genera.
+                                        if ($sourceAction !== []) {
+                                            $actions[] = $sourceAction;
+                                        }
                                         ?>
                                         <?php if ($actions !== []): ?>
                                             <?= row_actions($actions) ?>
-                                        <?php else: ?>
-                                            <span class="muted"><?= e(__('deadlines.system_readonly_short')) ?></span>
                                         <?php endif; ?>
                                     </td>
                                 </tr>

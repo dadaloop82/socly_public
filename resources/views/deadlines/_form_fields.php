@@ -1,5 +1,7 @@
 <?php
 /**
+ * Campi del form scadenza (usati da deadlines/form.php).
+ *
  * @var array<string,mixed> $values
  * @var list<array{key:string,label:string,builtin?:bool}> $categories
  * @var list<array{key:string,label:string,options:list<array{key:string,label:string}>}>|null $category_groups
@@ -50,8 +52,115 @@ foreach ($members as $member) {
 }
 
 $memberLinked = trim((string) ($values['member_id'] ?? '')) !== '';
+
+// Preavvisi: pillole invece di numeri separati da virgola. I valori non standard
+// già salvati restano visibili (e modificabili), così non si perde nulla.
+$notifySelected = [];
+foreach (preg_split('/[^\d]+/', (string) ($values['notify_days'] ?? '')) ?: [] as $chunk) {
+    $chunk = trim((string) $chunk);
+    if ($chunk !== '') {
+        $notifySelected[] = (int) $chunk;
+    }
+}
+$notifySelected = array_values(array_unique($notifySelected));
+$notifyPresets = [30, 7, 0];
+foreach ($notifySelected as $day) {
+    if (!in_array($day, $notifyPresets, true)) {
+        $notifyPresets[] = $day;
+    }
+}
+$notifyLabel = static function (int $day): string {
+    return $day === 0
+        ? (string) __('deadlines.notify_same_day')
+        : (string) __('deadlines.notify_days_generic', ['days' => (string) $day]);
+};
+
+// Prossima ricorrenza annuale di una data fissa (es. 30/04 o 30/06).
+$nextAnnualDate = static function (string $monthDay): string {
+    [$day, $month] = array_pad(explode('/', $monthDay), 2, '1');
+    $year = (int) date('Y');
+    $candidate = sprintf('%04d-%02d-%02d', $year, (int) $month, (int) $day);
+    return $candidate >= date('Y-m-d')
+        ? $candidate
+        : sprintf('%04d-%02d-%02d', $year + 1, (int) $month, (int) $day);
+};
 ?>
-<div class="grid-3">
+<?php if (!empty($show_templates)): ?>
+    <?php
+    // Scadenze tipiche del Terzo Settore: un clic precompila il form.
+    $deadlineTemplates = [
+        [
+            'label' => (string) __('deadlines.template_balance_approval'),
+            'data' => [
+                'title' => (string) __('deadlines.template_balance_approval'),
+                'category' => 'assembly_budget',
+                'due_date' => $nextAnnualDate('30/04'),
+                'recurrence' => 'yearly',
+                'assignee_role' => (string) __('deadlines.role_president'),
+                'notify' => [30, 7],
+                'notes' => (string) __('deadlines.template_balance_approval_note'),
+            ],
+        ],
+        [
+            'label' => (string) __('deadlines.template_runts_deposit'),
+            'data' => [
+                'title' => (string) __('deadlines.template_runts_deposit'),
+                'category' => 'runts_deposit',
+                'due_date' => $nextAnnualDate('30/06'),
+                'recurrence' => 'yearly',
+                'assignee_role' => (string) __('deadlines.role_secretary'),
+                'notify' => [30, 7],
+                'notes' => (string) __('deadlines.template_runts_deposit_note'),
+            ],
+        ],
+        [
+            'label' => (string) __('deadlines.template_volunteer_insurance'),
+            'data' => [
+                'title' => (string) __('deadlines.template_volunteer_insurance'),
+                'category' => 'accident_insurance',
+                'recurrence' => 'yearly',
+                'assignee_role' => (string) __('deadlines.role_treasurer'),
+                'notify' => [30, 7],
+                'notes' => (string) __('deadlines.template_volunteer_insurance_note'),
+            ],
+        ],
+        [
+            'label' => (string) __('deadlines.template_five_per_thousand'),
+            'data' => [
+                'title' => (string) __('deadlines.template_five_per_thousand'),
+                'category' => 'five_per_thousand',
+                'recurrence' => 'none',
+                'assignee_role' => (string) __('deadlines.role_treasurer'),
+                'notify' => [30],
+                'notes' => (string) __('deadlines.template_five_per_thousand_note'),
+            ],
+        ],
+        [
+            'label' => (string) __('deadlines.template_medical_cert'),
+            'data' => [
+                'title' => (string) __('deadlines.template_medical_cert'),
+                'category' => 'medical_cert',
+                'recurrence' => 'yearly',
+                'assignee_role' => (string) __('deadlines.role_secretary'),
+                'notify' => [30, 7],
+                'notes' => (string) __('deadlines.template_medical_cert_note'),
+            ],
+        ],
+    ];
+    ?>
+    <div class="deadlines-templates" data-deadline-templates>
+        <span class="deadlines-templates-title"><?= e(__('deadlines.templates_title')) ?></span>
+        <div class="deadlines-templates-list">
+            <?php foreach ($deadlineTemplates as $template): ?>
+                <button type="button" class="deadlines-template" data-deadline-template="<?= e(json_encode($template['data'], JSON_UNESCAPED_UNICODE)) ?>">
+                    <?= e((string) $template['label']) ?>
+                </button>
+            <?php endforeach; ?>
+        </div>
+        <p class="muted deadlines-templates-hint"><?= e(__('deadlines.templates_hint')) ?></p>
+    </div>
+<?php endif; ?>
+<div class="deadlines-form-row deadlines-form-row--main">
     <?= field('text', [
         'name' => 'title',
         'label' => (string) __('deadlines.title_field'),
@@ -89,7 +198,15 @@ $memberLinked = trim((string) ($values['member_id'] ?? '')) !== '';
         </div>
     </div>
 </div>
-<div class="grid-<?= $showStatus ? '3' : '2' ?>">
+
+<?= field('text', [
+    'name' => 'assignee_role',
+    'label' => (string) __('deadlines.assignee_role'),
+    'value' => (string) ($values['assignee_role'] ?? ''),
+    'maxlength' => 40,
+    'placeholder' => (string) __('deadlines.assignee_role_placeholder'),
+]) ?>
+<div class="deadlines-form-row deadlines-form-row--single">
     <div data-deadline-member-wrap>
         <?= field('checkbox', [
             'name' => '',
@@ -109,6 +226,21 @@ $memberLinked = trim((string) ($values['member_id'] ?? '')) !== '';
             ]) ?>
         </div>
     </div>
+</div>
+<div class="deadlines-form-row deadlines-form-row--<?= $showStatus ? 'pair' : 'single' ?>">
+    <?= field('select', [
+        'name' => 'recurrence',
+        'label' => (string) __('deadlines.recurrence'),
+        'value' => (string) ($values['recurrence'] ?? 'none'),
+        'include_empty' => false,
+        'options' => array_map(
+            static fn (string $rec): array => [
+                'value' => $rec,
+                'label' => (string) __('deadlines.recurrence_' . $rec),
+            ],
+            ['none', 'monthly', 'yearly']
+        ),
+    ]) ?>
     <?php if ($showStatus): ?>
         <?= field('select', [
             'name' => 'status',
@@ -126,40 +258,32 @@ $memberLinked = trim((string) ($values['member_id'] ?? '')) !== '';
     <?php else: ?>
         <?= field('hidden', ['name' => 'status', 'value' => 'open']) ?>
     <?php endif; ?>
-    <?= field('select', [
-        'name' => 'recurrence',
-        'label' => (string) __('deadlines.recurrence'),
-        'value' => (string) ($values['recurrence'] ?? 'none'),
-        'include_empty' => false,
-        'options' => array_map(
-            static fn (string $rec): array => [
-                'value' => $rec,
-                'label' => (string) __('deadlines.recurrence_' . $rec),
-            ],
-            ['none', 'monthly', 'yearly']
-        ),
-    ]) ?>
 </div>
-<div class="grid-2">
-    <?= field('text', [
-        'name' => 'assignee_role',
-        'label' => (string) __('deadlines.assignee_role'),
-        'value' => (string) ($values['assignee_role'] ?? ''),
-        'maxlength' => 40,
-        'placeholder' => (string) __('deadlines.assignee_role_placeholder'),
-    ]) ?>
-    <?= field('text', [
-        'name' => 'notify_days',
-        'label' => (string) __('deadlines.notify_days'),
-        'value' => (string) ($values['notify_days'] ?? '30,7'),
-        'maxlength' => 40,
-        'placeholder' => '30,7',
-        'hint' => (string) __('deadlines.notify_days_hint'),
-        'hint_attrs' => ['style' => 'margin:0.35rem 0 0;font-size:0.85rem'],
-    ]) ?>
+<div class="deadlines-form-row deadlines-form-row--single">
+    <div class="deadlines-notify">
+        <span class="field-label"><?= e(__('deadlines.notify_title')) ?></span>
+        <div class="deadlines-notify-pills">
+            <?php foreach ($notifyPresets as $notifyDay): ?>
+                <label class="deadlines-notify-pill">
+                    <?= field('checkbox', [
+                        'name' => 'notify_days[]',
+                        'value' => in_array($notifyDay, $notifySelected, true) ? (string) $notifyDay : '',
+                        'check_value' => (string) $notifyDay,
+                        'checked' => in_array($notifyDay, $notifySelected, true),
+                        'label' => '',
+                        'bare' => true,
+                    ]) ?>
+                    <span><?= e($notifyLabel($notifyDay)) ?></span>
+                </label>
+            <?php endforeach; ?>
+        </div>
+        <p class="muted deadlines-notify-hint"><?= e(__('deadlines.notify_hint')) ?></p>
+    </div>
 </div>
-<?= field('text', [
+<?= field('textarea', [
     'name' => 'notes',
     'label' => (string) __('deadlines.notes'),
     'value' => (string) ($values['notes'] ?? ''),
+    'rows' => 3,
 ]) ?>
+
