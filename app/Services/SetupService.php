@@ -3292,6 +3292,8 @@ final class SetupService
 
         // Operational modules (before members: FKs / orphan paths).
         $this->safeDelete('DELETE FROM treasury_movements');
+        // Custom wallets go back to the seeded built-ins.
+        $this->safeDelete('DELETE FROM treasury_accounts WHERE is_builtin = 0');
         $this->safeDelete('DELETE FROM deadline_items');
         $this->safeDelete('DELETE FROM association_documents');
 

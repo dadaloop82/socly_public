@@ -5,6 +5,8 @@
 /** @var list<array> $members */
 /** @var list<array{key:string,label:string,builtin:bool}> $categories */
 /** @var list<array{label:string,keys:list<string>}> $category_groups */
+/** @var list<array{key:string,label:string,active:bool}> $accounts */
+/** @var list<array{key:string,label:string,active:bool,income:float,expense:float,transfer_in:float,transfer_out:float,balance:float}> $account_balances */
 /** @var list<array{label:string,keys:list<string>}> $payment_method_groups */
 /** @var string $default_category */
 /** @var string $search_query */
@@ -12,6 +14,47 @@
 /** @var bool $hasAnyMovements */
 /** @var \Socly\Services\CurrencyService $currency */
 $canManage = can('treasury.manage');
+$sort = (string) ($ledger_sort ?? 'date_desc');
+$filterPeriod = (string) ($filters['period'] ?? '');
+$filterDirection = (string) ($filters['direction'] ?? '');
+$filterCategory = (string) ($filters['category'] ?? '');
+$filterAccount = (string) ($filters['account'] ?? '');
+$hasActiveFilters = trim((string) ($search_query ?? '')) !== ''
+    || $filterPeriod !== ''
+    || $filterDirection !== ''
+    || $filterCategory !== ''
+    || $filterAccount !== '';
+$accountFilterOptions = [];
+foreach (($accounts ?? []) as $accountOption) {
+    $accountFilterOptions[(string) ($accountOption['key'] ?? '')] = (string) ($accountOption['label'] ?? '');
+}
+// Keeps the current filters when jumping from a wallet card to the filtered ledger.
+$ledgerParams = [];
+if (trim((string) ($search_query ?? '')) !== '') {
+    $ledgerParams['q'] = (string) $search_query;
+}
+if ($filterDirection !== '') {
+    $ledgerParams['direction'] = $filterDirection;
+}
+if ($filterCategory !== '') {
+    $ledgerParams['category'] = $filterCategory;
+}
+if ($filterPeriod !== '') {
+    $ledgerParams['period'] = $filterPeriod;
+}
+if ($sort !== 'date_desc') {
+    $ledgerParams['sort'] = $sort;
+}
+if (empty($group_by_category)) {
+    $ledgerParams['group'] = '0';
+}
+$accountFilterUrl = static function (string $accountKey) use ($ledgerParams): string {
+    $params = $ledgerParams;
+    if ($accountKey !== '') {
+        $params['account'] = $accountKey;
+    }
+    return url('/treasury') . ($params !== [] ? '?' . http_build_query($params) : '');
+};
 ?>
 <div class="page-header">
     <div class="titles">
@@ -40,16 +83,43 @@ $canManage = can('treasury.manage');
     </div>
 </div>
 
+<?php if (!empty($account_balances)): ?>
+    <section class="panel treasury-wallets" data-treasury-wallets>
+        <header class="treasury-wallets-head">
+            <h2 class="section-title"><?= e(__('treasury.accounts_overview')) ?></h2>
+            <p class="section-lede"><?= e(__('treasury.accounts_overview_lede')) ?></p>
+        </header>
+        <div class="treasury-wallets-grid">
+            <?php foreach ($account_balances as $wallet): ?>
+                <?php
+                $walletKey = (string) ($wallet['key'] ?? '');
+                $walletBalance = (float) ($wallet['balance'] ?? 0);
+                $walletActive = !empty($wallet['active']);
+                $walletSelected = $walletKey !== '' && $filterAccount === $walletKey;
+                ?>
+                <a class="treasury-wallet<?= $walletSelected ? ' is-active' : '' ?><?= $walletActive ? '' : ' is-inactive' ?>"
+                   href="<?= e($accountFilterUrl($walletSelected ? '' : $walletKey)) ?>"
+                   title="<?= e($walletSelected ? __('treasury.filter_reset') : __('treasury.accounts_filter_hint')) ?>">
+                    <span class="treasury-wallet-label"><?= e((string) ($wallet['label'] ?? '')) ?></span>
+                    <strong class="treasury-wallet-balance<?= $walletBalance < 0 ? ' is-negative' : '' ?>"><?= e($currency->format($walletBalance)) ?></strong>
+                    <span class="treasury-wallet-meta">
+                        <span class="is-income">+ <?= e($currency->format((float) ($wallet['income'] ?? 0))) ?></span>
+                        <span class="is-expense">− <?= e($currency->format((float) ($wallet['expense'] ?? 0))) ?></span>
+                        <?php if ((float) ($wallet['transfer_in'] ?? 0) !== 0.0 || (float) ($wallet['transfer_out'] ?? 0) !== 0.0): ?>
+                            <span class="is-transfer">↔ <?= e($currency->format((float) ($wallet['transfer_in'] ?? 0) - (float) ($wallet['transfer_out'] ?? 0))) ?></span>
+                        <?php endif; ?>
+                        <?php if (!$walletActive): ?>
+                            <span class="is-muted"><?= e(__('treasury.account_inactive_suffix')) ?></span>
+                        <?php endif; ?>
+                    </span>
+                </a>
+            <?php endforeach; ?>
+        </div>
+    </section>
+<?php endif; ?>
+
 <?php if (!empty($hasAnyMovements)): ?>
 <?php
-$sort = (string) ($ledger_sort ?? 'date_desc');
-$filterPeriod = (string) ($filters['period'] ?? '');
-$filterDirection = (string) ($filters['direction'] ?? '');
-$filterCategory = (string) ($filters['category'] ?? '');
-$hasActiveFilters = trim((string) ($search_query ?? '')) !== ''
-    || $filterPeriod !== ''
-    || $filterDirection !== ''
-    || $filterCategory !== '';
 $categoryFilterOptions = [];
 foreach ($categories as $categoryOption) {
     $categoryFilterOptions[(string) ($categoryOption['key'] ?? '')] = (string) ($categoryOption['label'] ?? '');
@@ -103,6 +173,15 @@ foreach ($categories as $categoryOption) {
             'context' => 'filter',
             'empty_label' => (string) __('treasury.filter_all'),
             'options' => $categoryFilterOptions,
+        ]) ?>
+        <?= field('select', [
+            'name' => 'account',
+            'id' => 'treasury-account-filter',
+            'label' => (string) __('treasury.filter_account'),
+            'value' => $filterAccount,
+            'context' => 'filter',
+            'empty_label' => (string) __('treasury.filter_all'),
+            'options' => $accountFilterOptions,
         ]) ?>
         <?= field('select', [
             'name' => 'sort',

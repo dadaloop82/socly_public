@@ -1042,6 +1042,95 @@
     </div>
 </details>
 
+<details class="config-accordion" id="treasury-accounts" data-config-accordion>
+    <summary class="config-accordion-summary">
+        <span class="config-accordion-title"><?= e(__('settings.treasury_accounts_title')) ?></span>
+        <span class="config-accordion-lede"><?= e(__('settings.treasury_accounts_lede')) ?></span>
+    </summary>
+    <div class="config-accordion-body">
+        <?php if (empty($enabledComponents['treasury'])): ?>
+            <p class="muted"><?= e(__('settings.treasury_accounts_component_off')) ?></p>
+        <?php else: ?>
+            <p class="muted"><?= e(__('settings.treasury_accounts_hint')) ?></p>
+            <div class="treasury-accounts-admin">
+                <?php foreach (($treasuryAccounts ?? []) as $accountRow): ?>
+                    <?php
+                    $accountId = (int) ($accountRow['id'] ?? 0);
+                    $accountSlug = (string) ($accountRow['key'] ?? '');
+                    $accountLabel = (string) ($accountRow['label'] ?? '');
+                    $accountActive = !empty($accountRow['active']);
+                    $accountBuiltin = !empty($accountRow['builtin']);
+                    $accountMovements = (int) (($treasuryAccountUsage ?? [])[$accountSlug] ?? 0);
+                    ?>
+                    <div class="treasury-accounts-admin-row<?= $accountActive ? '' : ' is-inactive' ?>">
+                        <form method="post" action="<?= e(url('/settings/treasury-accounts')) ?>" class="treasury-accounts-admin-form">
+                            <?= csrf_field() ?>
+                            <?= field('hidden', ['name' => 'id', 'value' => (string) $accountId]) ?>
+                            <?= field('text', [
+                                'name' => 'label',
+                                'label' => (string) __('settings.treasury_account_label'),
+                                'value' => $accountLabel,
+                                'context' => 'setup',
+                                'maxlength' => 80,
+                                'hint' => $accountBuiltin ? (string) __('settings.treasury_account_builtin_hint') : '',
+                            ]) ?>
+                            <div class="treasury-accounts-admin-actions">
+                                <?= field('checkbox', [
+                                    'name' => 'is_active',
+                                    'label' => (string) __('settings.treasury_account_active'),
+                                    'checked' => $accountActive,
+                                    'context' => 'setup',
+                                    'value' => '1',
+                                    'check_value' => '1',
+                                    'label_class' => 'checkbox-row',
+                                ]) ?>
+                                <button class="btn btn-sm" type="submit"><?= e(__('common.save')) ?></button>
+                            </div>
+                            <p class="treasury-accounts-admin-meta muted"><?= e(__('settings.treasury_account_meta', ['slug' => $accountSlug, 'count' => (string) $accountMovements])) ?></p>
+                        </form>
+                        <?php if ($accountMovements === 0): ?>
+                            <form method="post" action="<?= e(url('/settings/treasury-accounts/delete')) ?>" class="treasury-accounts-admin-delete"
+                                  data-confirm="<?= e(__('settings.treasury_account_delete_confirm', ['name' => $accountLabel])) ?>" data-confirm-danger="1">
+                                <?= csrf_field() ?>
+                                <?= field('hidden', ['name' => 'id', 'value' => (string) $accountId]) ?>
+                                <button class="btn btn-ghost btn-sm" type="submit"><?= e(__('settings.treasury_account_delete')) ?></button>
+                            </form>
+                        <?php else: ?>
+                            <p class="treasury-accounts-admin-locked muted"><?= e(__('settings.treasury_account_locked', ['count' => (string) $accountMovements])) ?></p>
+                        <?php endif; ?>
+                    </div>
+                <?php endforeach; ?>
+            </div>
+
+            <form method="post" action="<?= e(url('/settings/treasury-accounts')) ?>" class="treasury-accounts-admin-add">
+                <?= csrf_field() ?>
+                <?= field('hidden', ['name' => 'id', 'value' => '0']) ?>
+                <?= field('text', [
+                    'name' => 'label',
+                    'label' => (string) __('settings.treasury_account_new_label'),
+                    'value' => '',
+                    'context' => 'setup',
+                    'maxlength' => 80,
+                    'required' => true,
+                    'placeholder' => (string) __('settings.treasury_account_new_placeholder'),
+                ]) ?>
+                <div class="treasury-accounts-admin-actions">
+                    <?= field('checkbox', [
+                        'name' => 'is_active',
+                        'label' => (string) __('settings.treasury_account_active'),
+                        'checked' => true,
+                        'context' => 'setup',
+                        'value' => '1',
+                        'check_value' => '1',
+                        'label_class' => 'checkbox-row',
+                    ]) ?>
+                    <button class="btn" type="submit"><?= e(__('settings.treasury_account_add')) ?></button>
+                </div>
+            </form>
+        <?php endif; ?>
+    </div>
+</details>
+
 <?php if (!empty(auth_user()['is_system_admin'])): ?>
 <section class="config-danger-zone" id="danger-zone" data-reset-user-data>
     <h2 class="config-danger-title"><?= e(__('settings.reset_zone_title')) ?></h2>

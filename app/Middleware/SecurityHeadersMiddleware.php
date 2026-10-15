@@ -29,6 +29,8 @@ final class SecurityHeadersMiddleware
             "default-src 'self'",
             "img-src 'self' data: blob: https:",
             "media-src 'self' blob:",
+            // Local previews of a picked file use an object URL (blob:) inside an iframe.
+            "frame-src 'self' blob:",
             "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
             "font-src 'self' https://fonts.gstatic.com data:",
             "script-src 'self'",

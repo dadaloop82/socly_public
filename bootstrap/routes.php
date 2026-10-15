@@ -117,6 +117,7 @@ $router->post('/members/{id}/remind-payment', [MemberController::class, 'remindP
 
 $router->get('/treasury', [TreasuryController::class, 'index'], 'treasury.view', ['mw.locale', 'mw.install', 'mw.auth']);
 $router->get('/treasury/create', [TreasuryController::class, 'create'], 'treasury.manage', ['mw.locale', 'mw.install', 'mw.auth']);
+$router->get('/treasury/accounts/balances', [TreasuryController::class, 'accountBalances'], 'treasury.view', ['mw.locale', 'mw.install', 'mw.auth']);
 $router->post('/treasury', [TreasuryController::class, 'store'], 'treasury.manage', ['mw.locale', 'mw.install', 'mw.auth', 'mw.csrf']);
 $router->get('/treasury/{id}/attachment', [TreasuryController::class, 'attachment'], 'treasury.view', ['mw.locale', 'mw.install', 'mw.auth']);
 $router->get('/treasury/{id}/edit', [TreasuryController::class, 'edit'], 'treasury.manage', ['mw.locale', 'mw.install', 'mw.auth']);
@@ -167,6 +168,8 @@ $router->post('/settings/mail', [SettingsController::class, 'saveMail'], 'settin
 $router->post('/settings/email-templates', [SettingsController::class, 'saveEmailTemplate'], 'settings.manage', ['mw.locale', 'mw.install', 'mw.auth', 'mw.csrf']);
 $router->post('/settings/workflow', [SettingsController::class, 'saveWorkflow'], 'settings.manage', ['mw.locale', 'mw.install', 'mw.auth', 'mw.csrf']);
 $router->post('/settings/components', [SettingsController::class, 'saveComponents'], 'settings.manage', ['mw.locale', 'mw.install', 'mw.auth', 'mw.csrf']);
+$router->post('/settings/treasury-accounts', [SettingsController::class, 'saveTreasuryAccount'], 'settings.manage', ['mw.locale', 'mw.install', 'mw.auth', 'mw.csrf']);
+$router->post('/settings/treasury-accounts/delete', [SettingsController::class, 'deleteTreasuryAccount'], 'settings.manage', ['mw.locale', 'mw.install', 'mw.auth', 'mw.csrf']);
 $router->post('/settings/reset-user-data', [SettingsController::class, 'resetUserData'], 'settings.manage', ['mw.locale', 'mw.install', 'mw.auth', 'mw.csrf']);
 
 $router->get('/users', [UserController::class, 'index'], 'users.manage', ['mw.locale', 'mw.install', 'mw.auth']);

@@ -9718,20 +9718,25 @@ function initTreasuryFileField(form) {
     }
   };
 
-  const setPreview = (url) => {
+  const setPreview = (url, isImage = false) => {
     if (!preview) {
       return;
     }
     if (!url) {
       preview.hidden = true;
       preview.innerHTML = '';
+      preview.classList.remove('is-image');
       return;
     }
     preview.hidden = false;
-    preview.innerHTML = `<iframe src="${url}#toolbar=0" title="PDF" loading="lazy"></iframe>`;
+    preview.classList.toggle('is-image', isImage);
+    // Images render as <img>; PDFs need the browser viewer inside an iframe.
+    preview.innerHTML = isImage
+      ? '<img src="' + url + '" alt="">'
+      : '<iframe src="' + url + '#toolbar=0" title="PDF" loading="lazy"></iframe>';
   };
 
-  const setUploaded = (name, size, previewUrl) => {
+  const setUploaded = (name, size, previewUrl, isImage = false) => {
     field.classList.add('is-uploaded');
     field.classList.remove('is-error');
     if (nameEl) {
@@ -9750,7 +9755,7 @@ function initTreasuryFileField(form) {
     if (detachInput) {
       detachInput.value = '';
     }
-    setPreview(previewUrl);
+    setPreview(previewUrl, isImage);
   };
 
   const setIdle = () => {
@@ -9777,7 +9782,7 @@ function initTreasuryFileField(form) {
     }
     clearObjectUrl();
     objectUrl = URL.createObjectURL(file);
-    setUploaded(file.name, file.size, objectUrl);
+    setUploaded(file.name, file.size, objectUrl, (file.type || '').startsWith('image/'));
   });
 
   detachBtn?.addEventListener('click', () => {
@@ -10811,7 +10816,56 @@ function initTreasuryCategory(root = document) {
       const isCash = accountSelect?.value === 'cash';
       setFieldsLocked(methodWrap, isTransfer || isCash);
     };
-    accountSelect?.addEventListener('change', syncAccount);
+
+    // "A conto" can never be the same wallet as "Da conto".
+    const syncTransferOptions = () => {
+      if (!transferSelect || !accountSelect) return;
+      const from = accountSelect.value;
+      [...transferSelect.options].forEach((opt) => {
+        opt.disabled = opt.value !== '' && opt.value === from;
+      });
+      if (transferSelect.value === from) {
+        transferSelect.value = '';
+      }
+    };
+
+    // Live balance of the selected wallet (fetched once, then kept in memory).
+    const balanceEl = form.querySelector('[data-treasury-account-balance]');
+    const balancesUrl = form.dataset.accountBalancesUrl || '';
+    const balanceTemplate = form.dataset.msgAccountBalance || '';
+    let balances = null;
+    const renderBalance = () => {
+      if (!balanceEl) return;
+      const key = accountSelect?.value || '';
+      const info = balances && key !== '' ? balances[key] : null;
+      if (!info || !balanceTemplate) {
+        balanceEl.hidden = true;
+        balanceEl.textContent = '';
+        return;
+      }
+      balanceEl.hidden = false;
+      balanceEl.textContent = balanceTemplate.replace(':amount', String(info.formatted || ''));
+    };
+    const loadBalances = async () => {
+      if (!balancesUrl || !balanceEl) return;
+      try {
+        const res = await fetch(balancesUrl, { headers: { 'X-Requested-With': 'XMLHttpRequest' } });
+        if (res.ok) {
+          const data = await res.json();
+          if (data && typeof data === 'object' && data.accounts) {
+            balances = data.accounts;
+          }
+        }
+      } catch (error) {
+        balances = null; // offline: the hint simply stays hidden
+      }
+      renderBalance();
+    };
+    accountSelect?.addEventListener('change', () => {
+      syncAccount();
+      syncTransferOptions();
+      renderBalance();
+    });
     if (!categorySelect) {
       return;
     }
@@ -10881,6 +10935,8 @@ function initTreasuryCategory(root = document) {
         transferSelect.required = isTransfer;
       }
       syncAccount();
+      syncTransferOptions();
+      renderBalance();
       const accountLabel = accountWrap?.querySelector('.field-label');
       if (accountLabel && accountSelect) {
         accountLabel.textContent = isTransfer
@@ -10891,6 +10947,7 @@ function initTreasuryCategory(root = document) {
     directionRadios.forEach((radio) => radio.addEventListener('change', syncDirection));
     invoiceToggle?.addEventListener('change', syncDirection);
     syncDirection();
+    loadBalances();
 
     form.addEventListener('submit', async (event) => {
       if (form.dataset.confirmed === '1') {

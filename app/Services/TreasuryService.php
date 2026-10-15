@@ -41,12 +41,13 @@ final class TreasuryService
     public const DIRECTIONS = ['income', 'expense', 'transfer'];
 
     /**
-     * Financial accounts (wallets): WHERE the money sits — cash, bank, postal…
-     * Kept apart from METHODS (HOW the money moved: bank transfer, POS…).
+     * Built-in wallets, seeded by migration 028. Custom wallets live in the
+     * `treasury_accounts` table (label, active flag, order) and are managed in
+     * Settings → Conti finanziari.
      *
      * @var list<string>
      */
-    public const ACCOUNTS = ['cash', 'bank', 'postal', 'paypal', 'prepaid_card', 'other'];
+    public const BUILTIN_ACCOUNTS = ['cash', 'bank', 'postal', 'paypal', 'prepaid_card', 'other'];
 
     public function __construct(
         private readonly Database $db,
@@ -57,6 +58,9 @@ final class TreasuryService
         private readonly CurrencyService $currency
     ) {
     }
+
+    /** @var list<array{id:int,slug:string,label:?string,builtin:bool,active:bool,sort_order:int}>|null */
+    private ?array $accountsCache = null;
 
     public function movementCount(): int
     {
@@ -169,38 +173,66 @@ final class TreasuryService
     }
 
     /**
-     * Financial accounts for the "Conto" select (flat list: wallets only).
+     * Wallets as configured in `treasury_accounts` (built-ins + custom ones).
      *
-     * @return list<array{key:string,label:string}>
+     * @return list<array{id:int,key:string,label:string,builtin:bool,active:bool,sort_order:int}>
      */
-    public function accountOptions(): array
+    public function accountOptions(bool $onlyActive = false): array
     {
         $out = [];
-        foreach (self::ACCOUNTS as $key) {
-            $out[] = ['key' => $key, 'label' => __('treasury.account_' . $key)];
+        foreach ($this->accountRows() as $row) {
+            if ($onlyActive && !$row['active']) {
+                continue;
+            }
+            $out[] = [
+                'id' => $row['id'],
+                'key' => $row['slug'],
+                'label' => $this->accountRowLabel($row),
+                'builtin' => $row['builtin'],
+                'active' => $row['active'],
+                'sort_order' => $row['sort_order'],
+            ];
         }
         return $out;
     }
 
     public function accountLabel(string $key): string
     {
-        $key = strtolower(trim($key));
+        $key = self::normalizeAccount($key);
         if ($key === '') {
             return '';
         }
-        foreach ($this->accountOptions() as $opt) {
-            if ($opt['key'] === $key) {
-                return (string) $opt['label'];
+        foreach ($this->accountRows() as $row) {
+            if ($row['slug'] === $key) {
+                return $this->accountRowLabel($row);
             }
         }
         return $this->humanizeSlug($key);
     }
 
-    /** Empty string when the value is not a known wallet (validation must reject it). */
-    public static function normalizeAccount(string $account): string
+    public function accountExists(string $key): bool
     {
-        $account = strtolower(trim($account));
-        return in_array($account, self::ACCOUNTS, true) ? $account : '';
+        $key = self::normalizeAccount($key);
+        if ($key === '') {
+            return false;
+        }
+        foreach ($this->accountRows() as $row) {
+            if ($row['slug'] === $key) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    public function accountIsActive(string $key): bool
+    {
+        $key = self::normalizeAccount($key);
+        foreach ($this->accountRows() as $row) {
+            if ($row['slug'] === $key) {
+                return $row['active'];
+            }
+        }
+        return false;
     }
 
     /** Wallet behind an incoming member payment, used by the auto-registered income. */
@@ -262,6 +294,13 @@ final class TreasuryService
             $where[] = 'm.movement_date <= :filter_to';
             $params['filter_to'] = $to;
         }
+        $account = self::normalizeAccount((string) ($filters['account'] ?? ''));
+        if ($account !== '') {
+            // A wallet filter also matches the destination of a giroconto.
+            $where[] = '(m.account = :filter_account OR m.transfer_account = :filter_account_to)';
+            $params['filter_account'] = $account;
+            $params['filter_account_to'] = $account;
+        }
         if ($where !== []) {
             $sql .= ' WHERE ' . implode(' AND ', $where);
         }
@@ -289,6 +328,270 @@ final class TreasuryService
             'income' => (float) ($balanceRow['inc'] ?? 0),
             'expense' => (float) ($balanceRow['exp'] ?? 0),
         ];
+    }
+
+    /** @return array{id:int,slug:string,label:?string,builtin:bool,active:bool,sort_order:int}|null */
+    public function accountById(int $id): ?array
+    {
+        foreach ($this->accountRows() as $row) {
+            if ($row['id'] === $id) {
+                return $row;
+            }
+        }
+        return null;
+    }
+
+    /** @return array<string,int> slug => ledger rows referencing the wallet */
+    public function accountUsage(): array
+    {
+        $usage = [];
+        foreach ($this->db->fetchAll(
+            "SELECT account AS slug, COUNT(*) AS c
+             FROM treasury_movements
+             WHERE account IS NOT NULL AND account <> ''
+             GROUP BY account"
+        ) as $row) {
+            $slug = self::normalizeAccount((string) $row['slug']);
+            if ($slug !== '') {
+                $usage[$slug] = ($usage[$slug] ?? 0) + (int) $row['c'];
+            }
+        }
+        foreach ($this->db->fetchAll(
+            "SELECT transfer_account AS slug, COUNT(*) AS c
+             FROM treasury_movements
+             WHERE transfer_account IS NOT NULL AND transfer_account <> ''
+             GROUP BY transfer_account"
+        ) as $row) {
+            $slug = self::normalizeAccount((string) $row['slug']);
+            if ($slug !== '') {
+                $usage[$slug] = ($usage[$slug] ?? 0) + (int) $row['c'];
+            }
+        }
+        return $usage;
+    }
+
+    /**
+     * Net balance per wallet. The ledger stays unique, but every wallet is its own
+     * entity: a giroconto is an outflow from the source wallet and an inflow to the
+     * destination, while income/expense only touch one wallet.
+     *
+     * @param array{from?:string,to?:string} $range
+     * @return list<array{key:string,label:string,active:bool,income:float,expense:float,transfer_in:float,transfer_out:float,balance:float}>
+     */
+    public function accountBalances(array $range = []): array
+    {
+        $where = '';
+        $params = [];
+        $from = trim((string) ($range['from'] ?? ''));
+        if ($from !== '') {
+            $where .= ' AND movement_date >= :range_from';
+            $params['range_from'] = $from;
+        }
+        $to = trim((string) ($range['to'] ?? ''));
+        if ($to !== '') {
+            $where .= ' AND movement_date <= :range_to';
+            $params['range_to'] = $to;
+        }
+
+        $empty = ['income' => 0.0, 'expense' => 0.0, 'transfer_in' => 0.0, 'transfer_out' => 0.0];
+        $totals = [];
+        foreach ($this->db->fetchAll(
+            'SELECT account, direction, COALESCE(SUM(amount), 0) AS total
+             FROM treasury_movements
+             WHERE 1 = 1' . $where . '
+             GROUP BY account, direction',
+            $params
+        ) as $row) {
+            $key = self::normalizeAccount((string) ($row['account'] ?? ''));
+            $totals[$key] ??= $empty;
+            $total = (float) ($row['total'] ?? 0);
+            switch ((string) ($row['direction'] ?? '')) {
+                case 'income':
+                    $totals[$key]['income'] += $total;
+                    break;
+                case 'expense':
+                    $totals[$key]['expense'] += $total;
+                    break;
+                case 'transfer':
+                    $totals[$key]['transfer_out'] += $total;
+                    break;
+            }
+        }
+        foreach ($this->db->fetchAll(
+            "SELECT transfer_account, COALESCE(SUM(amount), 0) AS total
+             FROM treasury_movements
+             WHERE direction = 'transfer' AND transfer_account IS NOT NULL AND transfer_account <> ''" . $where . '
+             GROUP BY transfer_account',
+            $params
+        ) as $row) {
+            $key = self::normalizeAccount((string) ($row['transfer_account'] ?? ''));
+            if ($key === '') {
+                continue;
+            }
+            $totals[$key] ??= $empty;
+            $totals[$key]['transfer_in'] += (float) ($row['total'] ?? 0);
+        }
+
+        $out = [];
+        foreach ($this->accountOptions() as $opt) {
+            $key = (string) $opt['key'];
+            $sums = $totals[$key] ?? $empty;
+            unset($totals[$key]);
+            $out[] = [
+                'key' => $key,
+                'label' => (string) $opt['label'],
+                'active' => (bool) $opt['active'],
+                'income' => $sums['income'],
+                'expense' => $sums['expense'],
+                'transfer_in' => $sums['transfer_in'],
+                'transfer_out' => $sums['transfer_out'],
+                'balance' => $sums['income'] - $sums['expense'] + $sums['transfer_in'] - $sums['transfer_out'],
+            ];
+        }
+        // Legacy rows without a (known) wallet get their own bucket.
+        foreach ($totals as $key => $sums) {
+            $out[] = [
+                'key' => $key,
+                'label' => $key === '' ? (string) __('treasury.account_unassigned') : $this->accountLabel($key),
+                'active' => false,
+                'income' => $sums['income'],
+                'expense' => $sums['expense'],
+                'transfer_in' => $sums['transfer_in'],
+                'transfer_out' => $sums['transfer_out'],
+                'balance' => $sums['income'] - $sums['expense'] + $sums['transfer_in'] - $sums['transfer_out'],
+            ];
+        }
+        return $out;
+    }
+
+    /** @return array{ok:bool,id?:int,errors?:array<string,string>} */
+    public function createAccount(string $label, bool $active = true, string $ip = '', ?int $userId = null): array
+    {
+        $label = trim($label);
+        if ($label === '' || mb_strlen($label) > 80) {
+            return ['ok' => false, 'errors' => ['label' => __('treasury.account_label_invalid')]];
+        }
+        $slug = $this->slugifyAccount($label);
+        if ($slug === '' || in_array($slug, self::BUILTIN_ACCOUNTS, true) || $this->accountExists($slug)) {
+            return ['ok' => false, 'errors' => ['label' => __('treasury.account_exists')]];
+        }
+        $max = (int) ($this->db->fetch('SELECT COALESCE(MAX(sort_order), 100) AS m FROM treasury_accounts')['m'] ?? 100);
+        $id = $this->db->insert('treasury_accounts', [
+            'slug' => $slug,
+            'label' => $label,
+            'is_builtin' => 0,
+            'is_active' => $active ? 1 : 0,
+            'sort_order' => $max + 10,
+        ]);
+        $this->accountsCache = null;
+        $this->audit->log('treasury.account_created', 'treasury', (string) $id, null, ['slug' => $slug, 'label' => $label], $ip, $userId);
+        return ['ok' => true, 'id' => $id];
+    }
+
+    /** @return array{ok:bool,errors?:array<string,string>} */
+    public function updateAccount(int $id, string $label, bool $active, string $ip = '', ?int $userId = null): array
+    {
+        $row = $this->accountById($id);
+        if ($row === null) {
+            return ['ok' => false, 'errors' => ['account' => __('errors.404')]];
+        }
+        $label = trim($label);
+        // Built-ins may fall back to the translated label (empty = reset).
+        if (mb_strlen($label) > 80 || ($label === '' && !$row['builtin'])) {
+            return ['ok' => false, 'errors' => ['label' => __('treasury.account_label_invalid')]];
+        }
+        $this->db->update('treasury_accounts', [
+            'label' => $label !== '' ? $label : null,
+            'is_active' => $active ? 1 : 0,
+        ], 'id = :id', ['id' => $id]);
+        $this->accountsCache = null;
+        $this->audit->log('treasury.account_updated', 'treasury', (string) $id, [
+            'label' => $row['label'],
+            'active' => $row['active'],
+        ], [
+            'label' => $label !== '' ? $label : null,
+            'active' => $active,
+        ], $ip, $userId);
+        return ['ok' => true];
+    }
+
+    /** @return array{ok:bool,errors?:array<string,string>} */
+    public function deleteAccount(int $id, string $ip = '', ?int $userId = null): array
+    {
+        $row = $this->accountById($id);
+        if ($row === null) {
+            return ['ok' => false, 'errors' => ['account' => __('errors.404')]];
+        }
+        $usage = $this->accountUsage()[$row['slug']] ?? 0;
+        if ($usage > 0) {
+            return ['ok' => false, 'errors' => ['account' => __('treasury.account_in_use', ['count' => (string) $usage])]];
+        }
+        $this->db->query('DELETE FROM treasury_accounts WHERE id = :id', ['id' => $id]);
+        $this->accountsCache = null;
+        $this->audit->log('treasury.account_deleted', 'treasury', (string) $id, ['slug' => $row['slug'], 'label' => $row['label']], null, $ip, $userId);
+        return ['ok' => true];
+    }
+
+    /** Slug sanitised to `[a-z0-9_]` (max 40 chars), matching the stored wallet keys. */
+    public static function normalizeAccount(string $account): string
+    {
+        $account = mb_strtolower(trim($account));
+        if ($account === '') {
+            return '';
+        }
+        if (function_exists('iconv')) {
+            $trans = @iconv('UTF-8', 'ASCII//TRANSLIT//IGNORE', $account);
+            if (is_string($trans) && $trans !== '') {
+                $account = $trans;
+            }
+        }
+        $account = preg_replace('/[^a-z0-9]+/', '_', $account) ?? '';
+        return trim(mb_substr(trim($account, '_'), 0, 40), '_');
+    }
+
+    private function slugifyAccount(string $label): string
+    {
+        return self::normalizeAccount($label);
+    }
+
+    /** @return list<array{id:int,slug:string,label:?string,builtin:bool,active:bool,sort_order:int}> */
+    private function accountRows(): array
+    {
+        if ($this->accountsCache !== null) {
+            return $this->accountsCache;
+        }
+        $rows = $this->db->fetchAll(
+            'SELECT id, slug, label, is_builtin, is_active, sort_order
+             FROM treasury_accounts
+             ORDER BY sort_order ASC, label ASC, id ASC'
+        );
+        $out = [];
+        foreach ($rows as $row) {
+            $label = trim((string) ($row['label'] ?? ''));
+            $out[] = [
+                'id' => (int) $row['id'],
+                'slug' => (string) $row['slug'],
+                'label' => $label !== '' ? $label : null,
+                'builtin' => !empty($row['is_builtin']),
+                'active' => !empty($row['is_active']),
+                'sort_order' => (int) $row['sort_order'],
+            ];
+        }
+        $this->accountsCache = $out;
+        return $out;
+    }
+
+    /** @param array{slug:string,label:?string,builtin:bool} $row */
+    private function accountRowLabel(array $row): string
+    {
+        $label = trim((string) ($row['label'] ?? ''));
+        if ($label !== '') {
+            return $label;
+        }
+        if ($row['builtin'] && in_array($row['slug'], self::BUILTIN_ACCOUNTS, true)) {
+            return (string) __('treasury.account_' . $row['slug']);
+        }
+        return $this->humanizeSlug((string) $row['slug']);
     }
 
     /**
@@ -674,8 +977,12 @@ final class TreasuryService
         // "Conto" (wallet: where the money sits) and "metodo" (how it moved) are
         // two different things and therefore two different columns.
         $account = self::normalizeAccount((string) ($input['account'] ?? ''));
-        if ($account === '') {
+        $existingAccount = self::normalizeAccount((string) ($existing['account'] ?? ''));
+        if ($account === '' || !$this->accountExists($account)) {
             return ['ok' => false, 'errors' => ['account' => __('treasury.account_required')]];
+        }
+        if (!$this->accountIsActive($account) && $account !== $existingAccount) {
+            return ['ok' => false, 'errors' => ['account' => __('treasury.account_inactive')]];
         }
         $method = '';
         $transferAccount = null;
@@ -683,8 +990,12 @@ final class TreasuryService
             // A giroconto moves liquidity between two own wallets: no payment method.
             $transferRaw = trim((string) ($input['transfer_account'] ?? ''));
             $transferAccount = self::normalizeAccount($transferRaw);
-            if ($transferRaw === '' || $transferAccount === '') {
+            $existingTransfer = self::normalizeAccount((string) ($existing['transfer_account'] ?? ''));
+            if ($transferRaw === '' || $transferAccount === '' || !$this->accountExists($transferAccount)) {
                 return ['ok' => false, 'errors' => ['transfer_account' => __('treasury.transfer_to_required')]];
+            }
+            if (!$this->accountIsActive($transferAccount) && $transferAccount !== $existingTransfer) {
+                return ['ok' => false, 'errors' => ['transfer_account' => __('treasury.account_inactive')]];
             }
             if ($transferAccount === $account) {
                 return ['ok' => false, 'errors' => ['transfer_account' => __('treasury.transfer_same_account')]];

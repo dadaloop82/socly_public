@@ -40,6 +40,8 @@ $memberInvolved = !empty($values['member_involved']) || trim((string) ($values['
 $hasAttachment = !empty($values['attachment_path']) && empty($values['detach_invoice_pdf']);
 $attachmentName = $hasAttachment ? basename((string) $values['attachment_path']) : '';
 $attachmentPreviewUrl = trim((string) ($values['attachment_preview_url'] ?? ''));
+$attachmentIsImage = $hasAttachment
+    && preg_match('/\.(?:jpe?g|png|webp)$/i', (string) ($values['attachment_path'] ?? '')) === 1;
 $documentEditUrl = trim((string) ($values['document_edit_url'] ?? ''));
 $fileReady = $hasAttachment;
 
@@ -88,16 +90,29 @@ if ($selectedMethod !== '') {
     $selectedMethod = \Socly\Services\TreasuryService::normalizePaymentMethod($selectedMethod);
 }
 $selectedAccount = \Socly\Services\TreasuryService::normalizeAccount((string) ($values['account'] ?? ''));
+$selectedTransferAccount = \Socly\Services\TreasuryService::normalizeAccount((string) ($values['transfer_account'] ?? ''));
 $accountOptions = [];
+// Only active wallets are selectable; the ones already saved on this movement stay
+// visible (and valid) even when they have been deactivated meanwhile.
 foreach (($accounts ?? []) as $accountOption) {
-    $accountOptions[(string) ($accountOption['key'] ?? '')] = (string) ($accountOption['label'] ?? '');
+    $accountKey = (string) ($accountOption['key'] ?? '');
+    if ($accountKey === '') {
+        continue;
+    }
+    $accountActive = !empty($accountOption['active']);
+    if (!$accountActive && $accountKey !== $selectedAccount && $accountKey !== $selectedTransferAccount) {
+        continue;
+    }
+    $accountLabel = (string) ($accountOption['label'] ?? $accountKey);
+    $accountOptions[$accountKey] = $accountActive
+        ? $accountLabel
+        : $accountLabel . ' (' . (string) __('treasury.account_inactive_suffix') . ')';
 }
 if ($accountOptions === []) {
-    foreach (\Socly\Services\TreasuryService::ACCOUNTS as $accountKey) {
+    foreach (\Socly\Services\TreasuryService::BUILTIN_ACCOUNTS as $accountKey) {
         $accountOptions[$accountKey] = (string) __('treasury.account_' . $accountKey);
     }
 }
-$selectedTransferAccount = \Socly\Services\TreasuryService::normalizeAccount((string) ($values['transfer_account'] ?? ''));
 $paymentMethodGroups = [];
 $paymentMethodFlat = [];
 if ($methodGroups !== []) {
@@ -191,6 +206,7 @@ foreach ($members as $member) {
                 'data-label-transfer' => (string) __('treasury.transfer_from'),
             ],
         ]) ?>
+        <p class="treasury-account-balance" data-treasury-account-balance hidden></p>
     </div>
     <div data-treasury-method-wrap>
         <?= field('select', [
@@ -347,9 +363,13 @@ foreach ($members as $member) {
                         <span class="doc-file-status muted" data-treasury-doc-status>
                             <?= e($fileReady ? __('treasury.document_attached') : __('documents.upload_idle')) ?>
                         </span>
-                        <div class="doc-file-preview" data-treasury-doc-preview <?= ($fileReady && $attachmentPreviewUrl !== '') ? '' : 'hidden' ?>>
+                        <div class="doc-file-preview<?= $attachmentIsImage ? ' is-image' : '' ?>" data-treasury-doc-preview <?= ($fileReady && $attachmentPreviewUrl !== '') ? '' : 'hidden' ?>>
                             <?php if ($fileReady && $attachmentPreviewUrl !== ''): ?>
-                                <iframe src="<?= e($attachmentPreviewUrl) ?>#toolbar=0" title="<?= e(__('treasury.upload_document')) ?>" loading="lazy"></iframe>
+                                <?php if ($attachmentIsImage): ?>
+                                    <img src="<?= e($attachmentPreviewUrl) ?>" alt="<?= e(__('treasury.upload_document')) ?>" loading="lazy">
+                                <?php else: ?>
+                                    <iframe src="<?= e($attachmentPreviewUrl) ?>#toolbar=0" title="<?= e(__('treasury.upload_document')) ?>" loading="lazy"></iframe>
+                                <?php endif; ?>
                             <?php endif; ?>
                         </div>
                         <span class="doc-file-hint muted"><?= e(__('documents.upload_hint', ['max' => upload_max_mb()])) ?></span>

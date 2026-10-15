@@ -23,6 +23,7 @@ use Socly\Services\MemberService;
 use Socly\Services\PlatformService;
 use Socly\Services\SettingsService;
 use Socly\Services\SetupService;
+use Socly\Services\TreasuryService;
 use Socly\Services\UserService;
 use Socly\Services\WorkflowService;
 
@@ -46,7 +47,8 @@ final class SettingsController extends BaseController
         private readonly PlatformService $platform,
         private readonly UserService $users,
         private readonly EmailTemplateService $emailTemplates,
-        private readonly WorkflowService $workflow
+        private readonly WorkflowService $workflow,
+        private readonly TreasuryService $treasury
     ) {
         parent::__construct($view);
     }
@@ -123,6 +125,9 @@ final class SettingsController extends BaseController
                 ),
             ],
             'plugin_catalog' => $this->pluginCatalogForSettings(),
+            'treasuryAccounts' => $this->treasury->accountOptions(),
+            'treasuryAccountUsage' => $this->treasury->accountUsage(),
+            'treasuryAccountBalances' => $this->treasury->accountBalances(),
             'panelUsers' => $this->users->panelUsers(),
             'emailTemplates' => $this->emailTemplates->all(),
             'workflowRules' => $this->workflow->all(),
@@ -623,9 +628,10 @@ final class SettingsController extends BaseController
         $this->components->markConfigured();
 
         if ($this->components->isEnabled('treasury')) {
-            $this->components->saveConfig('treasury', [
-                'auto_from_payments' => !empty($data['treasury_auto_from_payments']),
-            ]);
+            // Merge: keep the rest of the treasury config (custom categories…).
+            $existing = $this->components->config('treasury', []);
+            $existing['auto_from_payments'] = !empty($data['treasury_auto_from_payments']);
+            $this->components->saveConfig('treasury', $existing);
         }
         if ($this->components->isEnabled('deadlines')) {
             $existing = $this->components->config('deadlines', ['warn_days' => 30, 'default_category' => 'general']);
@@ -783,6 +789,41 @@ final class SettingsController extends BaseController
     private function settingsWantsJson(Request $request): bool
     {
         return strtolower((string) $request->header('X-Requested-With')) === 'xmlhttprequest';
+    }
+
+    /**
+     * Wallet management (add, rename, activate/deactivate, delete when unused).
+     * Settings never touches the ledger: it only configures the wallets.
+     */
+    public function saveTreasuryAccount(Request $request): void
+    {
+        $data = $request->all();
+        $id = (int) ($data['id'] ?? 0);
+        $label = (string) ($data['label'] ?? '');
+        // The active flag is a plain checkbox: unchecked = deactivated.
+        $active = !empty($data['is_active']);
+
+        if ($id > 0) {
+            $result = $this->treasury->updateAccount($id, $label, $active, $request->ip(), auth_user()['id'] ?? null);
+        } else {
+            $result = $this->treasury->createAccount($label, $active, $request->ip(), auth_user()['id'] ?? null);
+        }
+        if (empty($result['ok'])) {
+            $this->settingsFail($request, $result['errors'] ?? ['account' => __('validation.required')], 'treasury-accounts');
+        }
+        $this->audit->log('settings.saved', 'settings', 'treasury_accounts', null, null, $request->ip());
+        $this->settingsFinish($request, 'treasury-accounts');
+    }
+
+    public function deleteTreasuryAccount(Request $request): void
+    {
+        $id = (int) (((array) $request->all())['id'] ?? 0);
+        $result = $this->treasury->deleteAccount($id, $request->ip(), auth_user()['id'] ?? null);
+        if (empty($result['ok'])) {
+            $this->settingsFail($request, $result['errors'] ?? ['account' => __('errors.404')], 'treasury-accounts');
+        }
+        $this->audit->log('settings.saved', 'settings', 'treasury_accounts', null, null, $request->ip());
+        $this->settingsFinish($request, 'treasury-accounts');
     }
 
     private function settingsFinish(Request $request, string $anchor = ''): never

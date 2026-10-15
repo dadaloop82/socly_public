@@ -55,6 +55,8 @@ final class TreasuryController extends BaseController
             'members' => $this->members->listForSelect(),
             'categories' => $this->treasury->categoryOptions(),
             'category_groups' => $this->treasury->categoryGroups(),
+            'accounts' => $this->treasury->accountOptions(),
+            'account_balances' => $this->treasury->accountBalances(),
             'payment_method_groups' => $this->treasury->paymentMethodGroups(),
             'default_category' => $this->treasury->defaultCategory(),
             'search_query' => $query,
@@ -170,6 +172,25 @@ final class TreasuryController extends BaseController
         redirect('/treasury');
     }
 
+    /**
+     * Live wallet balances for the movement form (the "Da conto" select).
+     */
+    public function accountBalances(Request $request): void
+    {
+        require_component('treasury');
+        $accounts = [];
+        foreach ($this->treasury->accountBalances() as $row) {
+            $accounts[(string) $row['key']] = [
+                'label' => (string) $row['label'],
+                'active' => (bool) $row['active'],
+                'balance' => (float) $row['balance'],
+                'formatted' => $this->currency->format((float) $row['balance']),
+            ];
+        }
+        header('Content-Type: application/json; charset=utf-8');
+        echo json_encode(['ok' => true, 'accounts' => $accounts], JSON_UNESCAPED_UNICODE);
+    }
+
     public function attachment(Request $request, string $id): void
     {
         require_component('treasury');
@@ -189,13 +210,17 @@ final class TreasuryController extends BaseController
     /**
      * Ledger filters from the query string (validated; period presets expand to a date range).
      *
-     * @return array{direction:string,category:string,from:string,to:string,period:string}
+     * @return array{direction:string,category:string,account:string,from:string,to:string,period:string}
      */
     private function ledgerFilters(Request $request): array
     {
         $direction = (string) $request->input('direction', '');
         if (!in_array($direction, TreasuryService::DIRECTIONS, true)) {
             $direction = '';
+        }
+        $account = \Socly\Services\TreasuryService::normalizeAccount((string) $request->input('account', ''));
+        if ($account !== '' && !$this->treasury->accountExists($account)) {
+            $account = '';
         }
         $category = trim((string) $request->input('category', ''));
         if ($category !== '' && !in_array($category, array_column($this->treasury->categoryOptions(), 'key'), true)) {
@@ -217,6 +242,7 @@ final class TreasuryController extends BaseController
         return [
             'direction' => $direction,
             'category' => $category,
+            'account' => $account,
             'from' => $from,
             'to' => $to,
             'period' => $period,
