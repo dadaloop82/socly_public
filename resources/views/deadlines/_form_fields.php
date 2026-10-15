@@ -95,9 +95,9 @@ $memberLinked = trim((string) ($values['member_id'] ?? '')) !== '';
             'name' => '',
             'label' => (string) __('deadlines.member_involved'),
             'checked' => $memberLinked,
-            'label_class' => '',
+            'label_class' => 'checkbox-row',
+            'wrapper_class' => 'deadline-member-toggle',
             'attrs' => ['data-deadline-member-toggle' => true],
-            'wrap_attrs' => ['style' => 'margin-bottom:0.5rem'],
         ]) ?>
         <div data-deadline-member-fields <?= $memberLinked ? '' : 'hidden' ?>>
             <?= field('select', [

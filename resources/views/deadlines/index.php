@@ -1,115 +1,169 @@
 <?php
-/** @var list<array> $deadline_items */
-/** @var array{overdue:int,due_soon:int,open:int} $counts */
-/** @var list<array> $members */
-/** @var list<array{key:string,label:string,builtin:bool}> $categories */
-/** @var string $today */
-/** @var string $soon */
-/** @var string $default_category */
-/** @var string $active_filter */
-$old = old_input();
-$values = $old !== [] ? $old : [
-    'title' => '',
-    'due_date' => '',
-    'category' => (string) ($default_category ?? 'general'),
-    'member_id' => '',
-    'notes' => '',
-    'status' => 'open',
-    'new_category' => '',
-];
+/**
+ * Scadenzario — pagina elenco (stesso stile di Soci e Prima cassa):
+ * intestazione con azione primaria, KPI cliccabili, barra filtri live e
+ * archivio raggruppato per urgenza, con righe cliccabili e azioni rapide.
+ *
+ * @var list<array> $deadline_items
+ * @var array{overdue:int,due_soon:int,open:int} $counts
+ * @var list<array> $members
+ * @var list<array{key:string,label:string,builtin:bool}> $categories
+ * @var string $today
+ * @var string $soon
+ * @var string $default_category
+ * @var string $active_filter
+ * @var string $filter_category
+ * @var string $search_query
+ */
 $canManage = can('deadlines.manage');
-$formOpen = $old !== [];
 $activeFilter = (string) ($active_filter ?? '');
-$filterUrl = static function (string $filter = '') use ($search_query): string {
+$query = trim((string) ($search_query ?? ''));
+$filterCategory = (string) ($filter_category ?? '');
+$hasActiveFilters = $query !== '' || $activeFilter !== '' || $filterCategory !== '';
+
+$categoryFilterOptions = [];
+foreach ($categories as $category) {
+    $categoryFilterOptions[(string) $category['key']] = (string) $category['label'];
+}
+
+// Keeps the other filters when one of them changes (stat cards, reset link…).
+$filterUrl = static function (array $overrides = []) use ($query, $activeFilter, $filterCategory): string {
     $params = [];
-    if (trim((string) ($search_query ?? '')) !== '') {
-        $params['q'] = (string) $search_query;
+    if ($query !== '') {
+        $params['q'] = $query;
     }
-    if ($filter !== '') {
-        $params['filter'] = $filter;
+    if ($activeFilter !== '') {
+        $params['filter'] = $activeFilter;
     }
-    $qs = http_build_query($params);
-    return url('/deadlines' . ($qs !== '' ? '?' . $qs : ''));
+    if ($filterCategory !== '') {
+        $params['category'] = $filterCategory;
+    }
+    foreach ($overrides as $key => $value) {
+        if ($value === '' || $value === null) {
+            unset($params[$key]);
+            continue;
+        }
+        $params[$key] = (string) $value;
+    }
+    return url('/deadlines') . ($params !== [] ? '?' . http_build_query($params) : '');
 };
+
+$statusFilterOptions = [
+    'open' => (string) __('deadlines.tab_open'),
+    'overdue' => (string) __('deadlines.overdue'),
+    'soon' => (string) __('deadlines.due_soon'),
+    'done' => (string) __('deadlines.tab_done'),
+    'all' => (string) __('deadlines.status_all'),
+];
+
+// Ogni voce finisce in un solo gruppo: l'elenco si legge dall'alto verso il basso.
+$groupLabels = [
+    'overdue' => (string) __('deadlines.overdue'),
+    'today' => (string) __('deadlines.bucket_today'),
+    'soon' => (string) __('deadlines.bucket_soon'),
+    'later' => (string) __('deadlines.bucket_later'),
+    'done' => (string) __('deadlines.bucket_done'),
+    'dismissed' => (string) __('deadlines.bucket_dismissed'),
+];
+$groupTones = [
+    'overdue' => 'overdue',
+    'today' => 'soon',
+    'soon' => 'soon',
+    'later' => 'valid',
+    'done' => 'done',
+    'dismissed' => 'done',
+];
+$groups = [];
+foreach (array_keys($groupLabels) as $groupKey) {
+    $groups[$groupKey] = [];
+}
+foreach ($deadline_items as $item) {
+    $itemStatus = (string) ($item['status'] ?? 'open');
+    $due = (string) ($item['due_date'] ?? '');
+    if ($itemStatus === 'done') {
+        $bucketKey = 'done';
+    } elseif ($itemStatus === 'dismissed') {
+        $bucketKey = 'dismissed';
+    } elseif ($due !== '' && $due < $today) {
+        $bucketKey = 'overdue';
+    } elseif ($due === $today) {
+        $bucketKey = 'today';
+    } elseif ($due !== '' && $due <= $soon) {
+        $bucketKey = 'soon';
+    } else {
+        $bucketKey = 'later';
+    }
+    $groups[$bucketKey][] = $item;
+}
 ?>
 <div class="page-header">
     <div class="titles">
         <h1 class="page-title"><?= e(__('deadlines.title')) ?></h1>
         <p class="page-lede"><?= e(__('deadlines.lede')) ?></p>
     </div>
-    <?php if ($canManage): ?>
-        <div class="actions">
-            <button type="button" class="btn" data-open-create-panel="[data-deadline-form-panel]"><?= e(__('deadlines.add')) ?></button>
-        </div>
-    <?php endif; ?>
+    <div class="actions">
+        <?php if ($hasActiveFilters): ?>
+            <a class="btn btn-ghost" href="<?= e($filterUrl(['q' => '', 'filter' => '', 'category' => ''])) ?>"><?= e(__('deadlines.filter_reset')) ?></a>
+        <?php endif; ?>
+        <?php if ($canManage): ?>
+            <a class="btn" href="<?= e(url('/deadlines/create')) ?>"><?= e(__('deadlines.add')) ?></a>
+        <?php endif; ?>
+    </div>
 </div>
 
 <div class="stats stats-context-deadlines">
-    <a class="stat<?= $activeFilter === 'overdue' ? ' is-active' : '' ?>" href="<?= e($filterUrl('overdue')) ?>">
+    <a class="stat<?= $activeFilter === 'overdue' ? ' is-active' : '' ?>" href="<?= e($filterUrl(['filter' => $activeFilter === 'overdue' ? '' : 'overdue'])) ?>">
         <div class="label"><?= e(__('deadlines.overdue')) ?></div>
         <div class="value stat-negative"><?= (int) ($counts['overdue'] ?? 0) ?></div>
     </a>
-    <a class="stat<?= $activeFilter === 'soon' ? ' is-active' : '' ?>" href="<?= e($filterUrl('soon')) ?>">
+    <a class="stat<?= $activeFilter === 'soon' ? ' is-active' : '' ?>" href="<?= e($filterUrl(['filter' => $activeFilter === 'soon' ? '' : 'soon'])) ?>">
         <div class="label"><?= e(__('deadlines.due_soon')) ?></div>
         <div class="value"><?= (int) ($counts['due_soon'] ?? 0) ?></div>
     </a>
-    <a class="stat<?= $activeFilter === 'open' ? ' is-active' : '' ?>" href="<?= e($filterUrl('open')) ?>">
+    <a class="stat<?= $activeFilter === 'open' ? ' is-active' : '' ?>" href="<?= e($filterUrl(['filter' => $activeFilter === 'open' ? '' : 'open'])) ?>">
         <div class="label"><?= e(__('deadlines.open')) ?></div>
         <div class="value"><?= (int) ($counts['open'] ?? 0) ?></div>
     </a>
 </div>
-<?php if ($activeFilter !== ''): ?>
-    <p class="muted" style="margin:-0.35rem 0 1rem">
-        <a href="<?= e($filterUrl('')) ?>"><?= e(__('deadlines.filter_clear')) ?></a>
-    </p>
-<?php endif; ?>
 
-<div class="panel filter-bar" style="margin-bottom:1rem;display:flex;gap:0.5rem;flex-wrap:wrap;align-items:center">
-    <a class="btn btn-sm<?= $activeFilter === '' || $activeFilter === 'open' ? '' : ' btn-ghost' ?>" href="<?= e($filterUrl('')) ?>"><?= e(__('deadlines.tab_open')) ?></a>
-    <a class="btn btn-sm<?= $activeFilter === 'done' ? '' : ' btn-ghost' ?>" href="<?= e($filterUrl('done')) ?>"><?= e(__('deadlines.tab_done')) ?></a>
-</div>
-
-<form class="panel filter-bar members-filter" method="get" action="<?= e(url('/deadlines')) ?>" role="search" style="margin-bottom:1rem">
-    <?php if ($activeFilter !== ''): ?>
-        <?= field('hidden', ['name' => 'filter', 'value' => $activeFilter]) ?>
-    <?php endif; ?>
-    <?= field('search', [
-        'name' => 'q',
-        'id' => 'deadline-q-top',
-        'label' => (string) __('deadlines.search'),
-        'label_class' => 'visually-hidden',
-        'value' => (string) ($search_query ?? ''),
-        'context' => 'filter',
-        'placeholder' => (string) __('deadlines.search_placeholder'),
-        'input_class' => 'members-filter-q',
-        'maxlength' => 120,
-    ]) ?>
-    <button class="btn btn-sm" type="submit"><?= e(__('deadlines.search')) ?></button>
-    <?php if (trim((string) ($search_query ?? '')) !== ''): ?>
-        <a class="btn btn-ghost btn-sm" href="<?= e($filterUrl($activeFilter)) ?>"><?= e(__('deadlines.search_clear')) ?></a>
-    <?php endif; ?>
-</form>
-
-<?php if ($canManage): ?>
-<details class="panel treasury-form-panel" data-deadline-form-panel <?= $formOpen ? 'open' : '' ?>>
-    <summary class="treasury-form-summary">
-        <span class="treasury-form-summary-text">
-            <span class="section-title"><?= e(__('deadlines.add')) ?></span>
-            <span class="section-lede"><?= e(__('deadlines.add_lede')) ?></span>
-        </span>
-        <span class="treasury-form-chevron" aria-hidden="true"></span>
-    </summary>
-    <form class="treasury-form-body" method="post" action="<?= e(url('/deadlines')) ?>" data-deadline-form data-leave-guard data-confirm-template="<?= e(__('deadlines.confirm_save')) ?>">
-        <?= csrf_field() ?>
-        <?php
-        $show_status = false;
-        require __DIR__ . '/_form_fields.php';
-        ?>
-        <div class="form-actions form-actions-end">
-            <button class="btn" type="submit"><?= e(__('deadlines.submit')) ?></button>
+<?php if (!empty($deadline_items) || $hasActiveFilters): ?>
+<form class="panel filter-bar members-filter deadlines-filter" method="get" action="<?= e(url('/deadlines')) ?>" role="search" data-deadlines-filter>
+    <div class="members-filter-row deadlines-filter-row">
+        <div class="members-filter-q">
+            <?= field('search', [
+                'name' => 'q',
+                'id' => 'deadlines-q',
+                'label' => (string) __('deadlines.search'),
+                'value' => $query,
+                'context' => 'filter',
+                'placeholder' => (string) __('deadlines.search_placeholder'),
+                'maxlength' => 120,
+                'attrs' => ['enterkeyhint' => 'search', 'autocomplete' => 'off'],
+            ]) ?>
         </div>
-    </form>
-</details>
+        <?= field('select', [
+            'name' => 'category',
+            'id' => 'deadlines-category-filter',
+            'label' => (string) __('deadlines.filter_category'),
+            'value' => $filterCategory,
+            'context' => 'filter',
+            'empty_label' => (string) __('deadlines.filter_all'),
+            'options' => $categoryFilterOptions,
+        ]) ?>
+        <?= field('select', [
+            'name' => 'filter',
+            'id' => 'deadlines-status-filter',
+            'label' => (string) __('deadlines.filter_status'),
+            'value' => $activeFilter !== '' ? $activeFilter : 'open',
+            'context' => 'filter',
+            'include_empty' => false,
+            'options' => $statusFilterOptions,
+        ]) ?>
+        <?php if ($hasActiveFilters): ?>
+            <a class="btn btn-ghost btn-sm deadlines-filter-reset" href="<?= e($filterUrl(['q' => '', 'filter' => '', 'category' => ''])) ?>"><?= e(__('deadlines.filter_reset')) ?></a>
+        <?php endif; ?>
+    </div>
+</form>
 <?php endif; ?>
 
 <div class="panel">
@@ -121,113 +175,141 @@ $filterUrl = static function (string $filter = '') use ($search_query): string {
     </div>
     <?php if ($deadline_items === []): ?>
         <div class="empty-state">
-            <?php if (trim((string) ($search_query ?? '')) !== '' || $activeFilter !== ''): ?>
+            <?php if ($hasActiveFilters): ?>
                 <strong><?= e(__('deadlines.search_empty_title')) ?></strong>
-                <?= e(__('deadlines.search_empty_text', ['q' => (string) ($search_query !== '' ? $search_query : $activeFilter)])) ?>
+                <?= e(__('deadlines.search_empty_text', ['q' => $query !== '' ? $query : $filterCategory])) ?>
             <?php else: ?>
                 <strong><?= e(__('deadlines.empty_title')) ?></strong>
                 <?= e(__('deadlines.empty_text')) ?>
             <?php endif; ?>
         </div>
     <?php else: ?>
-        <div class="table-wrap embedded">
-            <table>
-                <thead>
-                <tr>
-                    <th><?= e(__('deadlines.title_field')) ?></th>
-                    <th><?= e(__('deadlines.category')) ?></th>
-                    <th><?= e(__('deadlines.due_date')) ?></th>
-                    <th><?= e(__('deadlines.member')) ?></th>
-                    <th><?= e(__('deadlines.actions')) ?></th>
-                </tr>
-                </thead>
-                <tbody>
-                            <?php foreach ($deadline_items as $item): ?>
+        <div class="doc-archive deadlines-archive">
+            <?php foreach ($groups as $groupKey => $groupItems): ?>
+                <?php if ($groupItems === []) { continue; } ?>
+                <section class="doc-archive-group deadline-group deadline-group--<?= e($groupTones[$groupKey]) ?>">
+                    <header class="doc-archive-group-head">
+                        <h3 class="doc-archive-group-title"><?= e($groupLabels[$groupKey]) ?></h3>
+                        <span class="doc-archive-group-count"><?= count($groupItems) ?></span>
+                    </header>
+                    <div class="table-wrap embedded">
+                        <table class="deadlines-table">
+                            <thead>
+                            <tr>
+                                <th><?= e(__('deadlines.due_date')) ?></th>
+                                <th><?= e(__('deadlines.title_field')) ?></th>
+                                <th><?= e(__('deadlines.category')) ?></th>
+                                <th><?= e(__('deadlines.member')) ?></th>
+                                <th><?= e(__('deadlines.assignee_role')) ?></th>
+                                <th><?= e(__('deadlines.actions')) ?></th>
+                            </tr>
+                            </thead>
+                            <tbody>
+
+                            <?php foreach ($groupItems as $item): ?>
                                 <?php
                                 $due = (string) ($item['due_date'] ?? '');
                                 $itemStatus = (string) ($item['status'] ?? 'open');
                                 $state = 'valid';
-                                if ($itemStatus === 'done') {
+                                if ($itemStatus === 'done' || $itemStatus === 'dismissed') {
                                     $state = 'done';
                                 } elseif ($due !== '' && $due < $today) {
                                     $state = 'overdue';
                                 } elseif ($due !== '' && $due <= $soon) {
                                     $state = 'soon';
                                 }
+                                $badgeLabel = match ($itemStatus) {
+                                    'done' => (string) __('deadlines.status_done'),
+                                    'dismissed' => (string) __('deadlines.status_dismissed'),
+                                    default => (string) __('deadlines.badge_' . $state),
+                                };
                                 $memberLabel = trim((string) (($item['last_name'] ?? '') . ' ' . ($item['first_name'] ?? '')));
                                 $itemId = (int) ($item['id'] ?? 0);
                                 $isSystem = str_starts_with((string) ($item['source'] ?? ''), 'system:');
-                                $editable = $canManage && !$isSystem && $itemStatus === 'open';
-                                $editUrl = $editable ? url('/deadlines/' . $itemId . '/edit') : '';
-                                $categoryLabel = '';
-                                foreach ($categories as $category) {
-                                    if ((string) $category['key'] === (string) ($item['category'] ?? 'general')) {
-                                        $categoryLabel = (string) $category['label'];
-                                        break;
-                                    }
-                                }
+                                $canEdit = $canManage && !$isSystem;
+                                $canAct = $canEdit && $itemStatus === 'open';
+                                $editUrl = $canEdit ? url('/deadlines/' . $itemId . '/edit') : '';
+                                $categoryKey = (string) ($item['category'] ?? 'general');
+                                $categoryLabel = $categoryFilterOptions[$categoryKey] ?? $categoryKey;
+                                $recurrence = (string) ($item['recurrence'] ?? 'none');
+                                $assignee = trim((string) ($item['assignee_role'] ?? ''));
                                 ?>
                                 <tr
-                                    class="deadline-row deadline-row-<?= e($state) ?><?= $editable ? ' doc-row-editable' : '' ?>"
-                                    <?php if ($editable): ?>
+                                    class="deadline-row deadline-row-<?= e($state) ?><?= $canEdit ? ' doc-row-editable' : '' ?>"
+                                    <?php if ($canEdit): ?>
                                         data-href="<?= e($editUrl) ?>"
                                         tabindex="0"
                                         role="link"
                                         aria-label="<?= e(__('deadlines.edit') . ': ' . (string) ($item['title'] ?? '')) ?>"
                                     <?php endif; ?>
                                 >
-                                    <td>
-                                        <?php if ($itemStatus === 'done'): ?>
-                                            <span class="deadline-badge deadline-badge-done"><?= e(__('deadlines.status_done')) ?></span>
-                                        <?php else: ?>
-                                            <span class="deadline-badge deadline-badge-<?= e($state) ?>"><?= e(__('deadlines.badge_' . $state)) ?></span>
-                                        <?php endif; ?>
-                                        <strong><?= e((string) ($item['title'] ?? '')) ?></strong>
-                                        <?php if ($isSystem): ?>
-                                            <span class="doc-status doc-status-approved"><?= e(__('deadlines.system_badge')) ?></span>
-                                        <?php endif; ?>
+                                    <td data-label="<?= e(__('deadlines.due_date')) ?>">
+                                        <span class="deadline-due"><?= e(format_date($due) ?: '—') ?></span>
+                                        <span class="deadline-badge deadline-badge-<?= e($state) ?>"><?= e($badgeLabel) ?></span>
+                                    </td>
+                                    <td data-label="<?= e(__('deadlines.title_field')) ?>">
+                                        <div class="deadline-title">
+                                            <strong><?= e((string) ($item['title'] ?? '')) ?></strong>
+                                            <?php if ($isSystem): ?>
+                                                <span class="doc-status doc-status-approved"><?= e(__('deadlines.system_badge')) ?></span>
+                                            <?php endif; ?>
+                                            <?php if ($recurrence !== '' && $recurrence !== 'none'): ?>
+                                                <span class="deadline-recurrence"><?= e(__('deadlines.recurrence_' . $recurrence)) ?></span>
+                                            <?php endif; ?>
+                                        </div>
                                         <?php if (!empty($item['notes'])): ?>
-                                            <div class="muted"><?= e((string) $item['notes']) ?></div>
+                                            <div class="muted deadline-notes"><?= e((string) $item['notes']) ?></div>
                                         <?php endif; ?>
                                     </td>
-                                    <td><span class="doc-category-badge"><?= e($categoryLabel !== '' ? $categoryLabel : (string) ($item['category'] ?? '')) ?></span></td>
-                                    <td><?= e(format_date($due) ?: '—') ?></td>
-                                    <td><?= e($memberLabel !== '' ? $memberLabel : '—') ?></td>
-                                    <td class="doc-row-actions" onclick="event.stopPropagation()">
-                                        <?php if ($editable): ?>
-                                            <?= row_actions([
-                                                [
-                                                    'icon' => 'check',
-                                                    'label' => __('deadlines.mark_done'),
-                                                    'form_action' => url('/deadlines/' . $itemId . '/done'),
-                                                ],
-                                                [
-                                                    'icon' => 'renew',
-                                                    'label' => __('deadlines.renew'),
-                                                    'form_action' => url('/deadlines/' . $itemId . '/renew'),
-                                                ],
-                                                [
-                                                    'icon' => 'user',
-                                                    'label' => __('deadlines.open_member'),
-                                                    'show' => !empty($item['member_id']) && component_enabled('members') && can('members.manage'),
-                                                    'href' => !empty($item['member_id']) ? url('/members/' . (int) $item['member_id']) : '',
-                                                ],
-                                                [
-                                                    'icon' => 'edit',
-                                                    'label' => __('deadlines.edit'),
-                                                    'href' => $editUrl,
-                                                ],
-                                            ]) ?>
-                                        <?php elseif (!$isSystem): ?>
-                                            <span class="muted">—</span>
+                                    <td data-label="<?= e(__('deadlines.category')) ?>">
+                                        <span class="doc-category-badge"><?= e($categoryLabel !== '' ? $categoryLabel : $categoryKey) ?></span>
+                                    </td>
+
+                                    <td data-label="<?= e(__('deadlines.member')) ?>"><?= e($memberLabel !== '' ? $memberLabel : '—') ?></td>
+                                    <td data-label="<?= e(__('deadlines.assignee_role')) ?>"><?= e($assignee !== '' ? $assignee : '—') ?></td>
+                                    <td class="doc-row-actions" data-stop-row-nav>
+                                        <?php
+                                        $actions = [];
+                                        if ($canAct) {
+                                            $actions[] = [
+                                                'icon' => 'check',
+                                                'label' => __('deadlines.mark_done'),
+                                                'form_action' => url('/deadlines/' . $itemId . '/done'),
+                                            ];
+                                            $actions[] = [
+                                                'icon' => 'renew',
+                                                'label' => __('deadlines.renew'),
+                                                'form_action' => url('/deadlines/' . $itemId . '/renew'),
+                                            ];
+                                        }
+                                        if ($canEdit) {
+                                            $actions[] = [
+                                                'icon' => 'user',
+                                                'label' => __('deadlines.open_member'),
+                                                'show' => !empty($item['member_id']) && component_enabled('members') && can('members.manage'),
+                                                'href' => !empty($item['member_id']) ? url('/members/' . (int) $item['member_id']) : '',
+                                            ];
+                                            $actions[] = [
+                                                'icon' => 'edit',
+                                                'label' => __('deadlines.edit'),
+                                                'href' => $editUrl,
+                                            ];
+                                        }
+                                        ?>
+                                        <?php if ($actions !== []): ?>
+                                            <?= row_actions($actions) ?>
                                         <?php else: ?>
                                             <span class="muted"><?= e(__('deadlines.system_readonly_short')) ?></span>
                                         <?php endif; ?>
                                     </td>
                                 </tr>
                             <?php endforeach; ?>
-                </tbody>
-            </table>
+                            </tbody>
+                        </table>
+                    </div>
+                </section>
+            <?php endforeach; ?>
         </div>
     <?php endif; ?>
 </div>
+

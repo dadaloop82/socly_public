@@ -218,6 +218,7 @@ document.addEventListener('DOMContentLoaded', () => {
     initOrgPersonForm(form);
   });
   initDeadlineCategory(document);
+  initDeadlineFilters(document);
   initTreasuryCategory(document);
   initLeaveGuards(document);
   initConfirmForms(document);
@@ -9595,6 +9596,15 @@ function initSidebarUpdate() {
         /* ignore */
       }
     });
+  });
+}
+
+function initDeadlineFilters(root = document) {
+  // Scadenzario filters (search + category + status) apply live, like the members list.
+  root.querySelectorAll('[data-deadlines-filter]').forEach((form) => {
+    if (form instanceof HTMLFormElement) {
+      initLiveFilterForm(form);
+    }
   });
 }
 

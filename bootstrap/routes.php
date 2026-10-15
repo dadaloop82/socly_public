@@ -124,6 +124,7 @@ $router->get('/treasury/{id}/edit', [TreasuryController::class, 'edit'], 'treasu
 $router->post('/treasury/{id}', [TreasuryController::class, 'update'], 'treasury.manage', ['mw.locale', 'mw.install', 'mw.auth', 'mw.csrf']);
 
 $router->get('/deadlines', [DeadlinesController::class, 'index'], 'deadlines.view', ['mw.locale', 'mw.install', 'mw.auth']);
+$router->get('/deadlines/create', [DeadlinesController::class, 'create'], 'deadlines.manage', ['mw.locale', 'mw.install', 'mw.auth']);
 $router->post('/deadlines', [DeadlinesController::class, 'store'], 'deadlines.manage', ['mw.locale', 'mw.install', 'mw.auth', 'mw.csrf']);
 $router->get('/deadlines/{id}/edit', [DeadlinesController::class, 'edit'], 'deadlines.manage', ['mw.locale', 'mw.install', 'mw.auth']);
 $router->post('/deadlines/{id}', [DeadlinesController::class, 'update'], 'deadlines.manage', ['mw.locale', 'mw.install', 'mw.auth', 'mw.csrf']);

@@ -27,15 +27,19 @@ final class DeadlinesController extends BaseController
             $query = mb_substr($query, 0, 120);
         }
         $bucket = trim((string) $request->input('filter', ''));
-        if (!in_array($bucket, ['overdue', 'soon', 'open', 'done', ''], true)) {
+        if (!in_array($bucket, ['overdue', 'soon', 'open', 'done', 'all', ''], true)) {
             $bucket = '';
+        }
+        $category = trim((string) $request->input('category', ''));
+        if ($category !== '' && !in_array($category, array_column($this->deadlines->categoryOptions(), 'key'), true)) {
+            $category = '';
         }
         $today = date('Y-m-d');
         $soon = date('Y-m-d', strtotime('+30 days'));
-        $openOnly = $bucket !== 'done';
+        $openOnly = !in_array($bucket, ['done', 'all'], true);
         $this->render('deadlines/index', [
             'title' => __('deadlines.title'),
-            'deadline_items' => $this->deadlines->upcoming(200, $query, $openOnly, $bucket),
+            'deadline_items' => $this->deadlines->upcoming(200, $query, $openOnly, $bucket, null, $category),
             'counts' => $this->deadlines->counts(),
             'today' => $today,
             'soon' => $soon,
@@ -45,6 +49,22 @@ final class DeadlinesController extends BaseController
             'default_category' => $this->deadlines->defaultCategory(),
             'search_query' => $query,
             'active_filter' => $bucket,
+            'filter_category' => $category,
+        ]);
+    }
+
+    public function create(Request $request): void
+    {
+        require_component('deadlines');
+        $this->render('deadlines/form', [
+            'title' => __('deadlines.add'),
+            'isEdit' => false,
+            'action' => url('/deadlines'),
+            'deadline' => null,
+            'default_category' => $this->deadlines->defaultCategory(),
+            'categories' => $this->deadlines->categoryOptions(),
+            'category_groups' => $this->deadlines->categoryGroupedOptions(),
+            'members' => $this->members->listForSelect(),
         ]);
     }
 
@@ -70,9 +90,12 @@ final class DeadlinesController extends BaseController
                 'builtin' => false,
             ];
         }
-        $this->render('deadlines/edit', [
+        $this->render('deadlines/form', [
             'title' => __('deadlines.edit'),
+            'isEdit' => true,
+            'action' => url('/deadlines/' . (int) $item['id']),
             'deadline' => $item,
+            'default_category' => (string) ($item['category'] ?? 'general'),
             'categories' => $categories,
             'category_groups' => $this->deadlines->categoryGroupedOptions(),
             'members' => $this->members->listForSelect(),
@@ -99,7 +122,7 @@ final class DeadlinesController extends BaseController
         if (empty($result['ok'])) {
             $this->flash('errors', $result['errors'] ?? []);
             $this->rememberOld($request->all());
-            redirect('/deadlines');
+            redirect('/deadlines/create');
         }
         $this->flash('success', __('deadlines.saved'));
         redirect('/deadlines');

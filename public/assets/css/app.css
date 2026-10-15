@@ -8410,6 +8410,89 @@ button.setup-scrape-logo-frame:focus-visible .setup-scrape-logo-overlay {
   gap: 0.35rem;
   align-items: center;
 }
+
+/* ── Scadenzario: barra filtri live + archivio raggruppato per urgenza ── */
+@media (min-width: 961px) {
+  .deadlines-filter-row {
+    grid-template-columns: minmax(11rem, 2fr) minmax(9rem, 1fr) minmax(9rem, 1fr) auto;
+  }
+}
+.deadlines-filter-reset { align-self: end; }
+.deadlines-table .deadline-row-overdue { background: color-mix(in srgb, #b42318 5%, transparent); }
+.deadlines-table .deadline-row-soon { background: color-mix(in srgb, #b7791f 6%, transparent); }
+.deadlines-table .deadline-row-done { background: color-mix(in srgb, #475467 5%, transparent); }
+.deadlines-table .deadline-due {
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.deadlines-table .deadline-badge {
+  margin: 0 0 0 0.35rem;
+  vertical-align: middle;
+}
+.deadlines-table .deadline-title {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.45rem;
+}
+.deadlines-table .deadline-notes { margin-top: 0.2rem; }
+.deadlines-table .deadline-recurrence {
+  padding: 0.1rem 0.45rem;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--ink) 8%, transparent);
+  color: color-mix(in srgb, var(--ink) 68%, transparent);
+  font-size: 0.72rem;
+  font-weight: 700;
+}
+.deadlines-form .deadline-member-toggle { margin-bottom: 0.5rem; }
+/* Mobile: the deadlines table becomes a card list, like the members table. */
+@media (max-width: 640px) {
+  .deadlines-table { min-width: 0 !important; }
+  .deadlines-table thead { display: none; }
+  .deadlines-table tbody { display: grid; gap: 0.75rem; }
+  .deadlines-table tr {
+    display: grid;
+    gap: 0.45rem;
+    padding: 0.85rem 0.95rem;
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    background: color-mix(in srgb, var(--brand-paper) 55%, #fff);
+    box-shadow: var(--shadow-soft);
+  }
+  .deadlines-table td {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    padding: 0;
+    border: 0;
+    font-size: 0.95rem;
+    min-width: 0;
+  }
+  .deadlines-table td::before {
+    content: attr(data-label);
+    color: var(--muted);
+    font-size: 0.78rem;
+    font-weight: 700;
+    flex: 0 0 auto;
+    max-width: 42%;
+  }
+  .deadlines-table td:first-child {
+    display: block;
+    padding-bottom: 0.35rem;
+    margin-bottom: 0.2rem;
+    border-bottom: 1px solid var(--line);
+  }
+  .deadlines-table td:first-child::before { display: none; }
+  .deadlines-table td:last-child {
+    display: block;
+    padding-top: 0.35rem;
+    margin-top: 0.15rem;
+    border-top: 1px solid var(--line);
+  }
+  .deadlines-table td:last-child::before { display: none; }
+}
 .inline-form { display: inline; margin: 0; }
 .settings-plugins-block {
   margin-top: 1.5rem;

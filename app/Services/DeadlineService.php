@@ -52,7 +52,7 @@ final class DeadlineService
     }
 
     /** @return list<array<string,mixed>> */
-    public function upcoming(int $limit = 200, string $query = '', bool $openOnly = true, string $bucket = '', ?string $untilDate = null): array
+    public function upcoming(int $limit = 200, string $query = '', bool $openOnly = true, string $bucket = '', ?string $untilDate = null, string $category = ''): array
     {
         $this->syncSystemDeadlines();
         $limitSql = ' LIMIT ' . max(1, min(500, $limit));
@@ -94,6 +94,11 @@ final class DeadlineService
         if ($untilDate !== null && preg_match('/^\d{4}-\d{2}-\d{2}$/', $untilDate)) {
             $where[] = 'd.due_date <= :until_date';
             $params['until_date'] = $untilDate;
+        }
+        $category = trim($category);
+        if ($category !== '') {
+            $where[] = 'd.category = :filter_category';
+            $params['filter_category'] = $category;
         }
         $sql = $base;
         if ($where !== []) {
