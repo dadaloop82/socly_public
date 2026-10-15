@@ -26,9 +26,12 @@ final class DocumentsController extends BaseController
         if (mb_strlen($query) > 120) {
             $query = mb_substr($query, 0, 120);
         }
+        $filters = $this->listFilters($request);
         $this->render('documents/index', [
             'title' => __('documents.title'),
-            'documents' => $this->documents->all(200, $query),
+            'documents' => $this->documents->all(200, $query, $filters),
+            'counts' => $this->documents->counts(),
+            'filters' => $filters,
             'categories' => $this->documents->categoryOptions(),
             'category_groups' => $this->documents->categoryGroupedOptions(),
             'default_category' => $this->documents->defaultCategory(),
@@ -37,6 +40,26 @@ final class DocumentsController extends BaseController
             'members' => $this->members->listForSelect(),
             'sibling_options' => $this->documents->all(100),
             'search_query' => $query,
+        ]);
+    }
+
+    public function create(Request $request): void
+    {
+        require_component('documents');
+        $this->render('documents/form', [
+            'title' => __('documents.add'),
+            'isEdit' => false,
+            'action' => url('/documents'),
+            'document' => null,
+            'default_category' => $this->documents->defaultCategory(),
+            'categories' => $this->documents->categoryOptions(),
+            'category_groups' => $this->documents->categoryGroupedOptions(),
+            'languages' => DocumentService::LANGUAGES,
+            'upload_max_mb' => $this->documents->uploadMaxMb(),
+            'existing_file_name' => '',
+            'members' => $this->members->listForSelect(),
+            'sibling_options' => $this->documents->all(100),
+            'document_id' => 0,
         ]);
     }
 
@@ -63,9 +86,12 @@ final class DocumentsController extends BaseController
             $this->documents->all(100),
             static fn (array $row): bool => (int) ($row['id'] ?? 0) !== (int) $id
         ));
-        $this->render('documents/edit', [
+        $this->render('documents/form', [
             'title' => __('documents.edit'),
+            'isEdit' => true,
+            'action' => url('/documents/' . (int) $id),
             'document' => $doc,
+            'default_category' => (string) ($doc['category'] ?? 'minutes'),
             'categories' => $categories,
             'category_groups' => $this->documents->categoryGroupedOptions(),
             'languages' => DocumentService::LANGUAGES,
@@ -161,10 +187,32 @@ final class DocumentsController extends BaseController
         if (empty($result['ok'])) {
             $this->flash('errors', $result['errors'] ?? []);
             $this->rememberOld($request->all());
-            redirect('/documents');
+            redirect('/documents/create');
         }
         $this->flash('success', __('documents.saved'));
         redirect('/documents');
+    }
+
+    /**
+     * Archivio filters from the query string (validated).
+     *
+     * @return array{status:string,category:string,expiring:bool}
+     */
+    private function listFilters(Request $request): array
+    {
+        $status = trim((string) $request->input('status', ''));
+        if (!in_array($status, DocumentService::STATUSES, true)) {
+            $status = '';
+        }
+        $category = trim((string) $request->input('category', ''));
+        if ($category !== '' && !in_array($category, array_column($this->documents->categoryOptions(), 'key'), true)) {
+            $category = '';
+        }
+        return [
+            'status' => $status,
+            'category' => $category,
+            'expiring' => (string) $request->input('expiring', '') === '1',
+        ];
     }
 
     public function download(Request $request, string $id): void

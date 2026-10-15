@@ -1,103 +1,167 @@
 <?php
-/** @var list<array> $documents */
-/** @var list<array{key:string,label:string,builtin:bool}> $categories */
-/** @var list<string> $languages */
-/** @var string $default_category */
-$old = old_input();
-$values = $old !== [] ? $old : [
-    'title' => '',
-    'document_number' => '',
-    'document_date' => date('Y-m-d'),
-    'expires_at' => '',
-    'language' => '',
-    'category' => (string) ($default_category ?? 'minutes'),
-    'status' => 'draft',
-    'visibility' => 'internal',
-    'member_id' => '',
-    'sibling_document_id' => '',
-    'summary' => '',
-    'uploaded_path' => '',
-    'uploaded_mime' => '',
-    'uploaded_name' => '',
-    'new_category' => '',
-];
+/**
+ * Verbali e documenti — pagina elenco nello stile di Soci, Prima cassa e Scadenzario:
+ * intestazione con azione primaria, KPI cliccabili, barra filtri live e archivio
+ * raggruppato per categoria con righe cliccabili.
+ *
+ * @var list<array> $documents
+ * @var array{total:int,draft:int,approved:int,expiring:int} $counts
+ * @var array{status:string,category:string,expiring:bool} $filters
+ * @var list<array{key:string,label:string,builtin:bool}> $categories
+ * @var list<string> $languages
+ * @var string $search_query
+ */
 $canManage = can('documents.manage');
-$formOpen = $old !== [];
+$query = trim((string) ($search_query ?? ''));
+$filterStatus = (string) ($filters['status'] ?? '');
+$filterCategory = (string) ($filters['category'] ?? '');
+$filterExpiring = !empty($filters['expiring']);
+$hasActiveFilters = $query !== '' || $filterStatus !== '' || $filterCategory !== '' || $filterExpiring;
+
+$categoryLabels = [];
+foreach ($categories as $category) {
+    $categoryLabels[(string) $category['key']] = (string) $category['label'];
+}
+$today = date('Y-m-d');
+$soon = date('Y-m-d', strtotime('+30 days'));
+
+// Keeps the other filters when one of them changes.
+$filterUrl = static function (array $overrides = []) use ($query, $filterStatus, $filterCategory, $filterExpiring): string {
+    $params = [];
+    if ($query !== '') {
+        $params['q'] = $query;
+    }
+    if ($filterStatus !== '') {
+        $params['status'] = $filterStatus;
+    }
+    if ($filterCategory !== '') {
+        $params['category'] = $filterCategory;
+    }
+    if ($filterExpiring) {
+        $params['expiring'] = '1';
+    }
+    foreach ($overrides as $key => $value) {
+        if ($value === '' || $value === null || $value === false) {
+            unset($params[$key]);
+            continue;
+        }
+        $params[$key] = (string) $value;
+    }
+    return url('/documents') . ($params !== [] ? '?' . http_build_query($params) : '');
+};
+
+$statusFilterOptions = [
+    'draft' => (string) __('documents.status_draft'),
+    'pending_approval' => (string) __('documents.status_pending_approval'),
+    'approved' => (string) __('documents.status_approved'),
+    'signed' => (string) __('documents.status_signed'),
+    'archived' => (string) __('documents.status_archived'),
+    'cancelled' => (string) __('documents.status_cancelled'),
+];
+
+// Archivio raggruppato per categoria, nell'ordine delle categorie configurate.
+$groups = [];
+$groupOrder = [];
+foreach ($categories as $category) {
+    $key = (string) $category['key'];
+    $groupOrder[] = $key;
+    $groups[$key] = [];
+}
+foreach ($documents as $doc) {
+    $key = trim((string) ($doc['category'] ?? ''));
+    if ($key === '') {
+        $key = 'other';
+    }
+    if (!isset($groups[$key])) {
+        $groups[$key] = [];
+        $groupOrder[] = $key;
+    }
+    $groups[$key][] = $doc;
+}
 ?>
 <div class="page-header">
     <div class="titles">
         <h1 class="page-title"><?= e(__('documents.title')) ?></h1>
         <p class="page-lede"><?= e(__('documents.lede')) ?></p>
     </div>
-    <?php if ($canManage): ?>
-        <div class="actions">
-            <button type="button" class="btn" data-open-create-panel="[data-document-form-panel]"><?= e(__('documents.add')) ?></button>
-        </div>
-    <?php endif; ?>
+    <div class="actions">
+        <?php if ($hasActiveFilters): ?>
+            <a class="btn btn-ghost" href="<?= e($filterUrl(['q' => '', 'status' => '', 'category' => '', 'expiring' => false])) ?>"><?= e(__('documents.filter_reset')) ?></a>
+        <?php endif; ?>
+        <?php if ($canManage): ?>
+            <a class="btn" href="<?= e(url('/documents/create')) ?>"><?= e(__('documents.add')) ?></a>
+        <?php endif; ?>
+    </div>
 </div>
 
-<form class="panel filter-bar members-filter" method="get" action="<?= e(url('/documents')) ?>" role="search" style="margin-bottom:1rem">
-    <?= field('search', [
-        'name' => 'q',
-        'id' => 'doc-archive-q-top',
-        'label' => (string) __('documents.search'),
-        'label_class' => 'visually-hidden',
-        'value' => (string) ($search_query ?? ''),
-        'context' => 'filter',
-        'placeholder' => (string) __('documents.search_placeholder'),
-        'input_class' => 'members-filter-q',
-        'maxlength' => 120,
-    ]) ?>
-    <button class="btn btn-sm" type="submit"><?= e(__('documents.search')) ?></button>
-    <?php if (trim((string) ($search_query ?? '')) !== ''): ?>
-        <a class="btn btn-ghost btn-sm" href="<?= e(url('/documents')) ?>"><?= e(__('documents.search_clear')) ?></a>
-    <?php endif; ?>
-</form>
+<div class="stats stats-context-documents">
+    <a class="stat" href="<?= e($filterUrl(['q' => '', 'status' => '', 'category' => '', 'expiring' => false])) ?>">
+        <div class="label"><?= e(__('documents.stats_total')) ?></div>
+        <div class="value"><?= (int) ($counts['total'] ?? 0) ?></div>
+    </a>
+    <a class="stat<?= $filterStatus === 'draft' ? ' is-active' : '' ?>" href="<?= e($filterUrl(['status' => $filterStatus === 'draft' ? '' : 'draft', 'expiring' => false])) ?>">
+        <div class="label"><?= e(__('documents.status_draft')) ?></div>
+        <div class="value"><?= (int) ($counts['draft'] ?? 0) ?></div>
+    </a>
+    <a class="stat<?= $filterStatus === 'approved' ? ' is-active' : '' ?>" href="<?= e($filterUrl(['status' => $filterStatus === 'approved' ? '' : 'approved', 'expiring' => false])) ?>">
+        <div class="label"><?= e(__('documents.status_approved')) ?></div>
+        <div class="value"><?= (int) ($counts['approved'] ?? 0) ?></div>
+    </a>
+    <a class="stat<?= $filterExpiring ? ' is-active' : '' ?>" href="<?= e($filterUrl(['expiring' => $filterExpiring ? false : '1'])) ?>">
+        <div class="label"><?= e(__('documents.stats_expiring')) ?></div>
+        <div class="value<?= (int) ($counts['expiring'] ?? 0) > 0 ? ' stat-negative' : '' ?>"><?= (int) ($counts['expiring'] ?? 0) ?></div>
+    </a>
+</div>
 
-<?php if ($canManage): ?>
-<details class="panel treasury-form-panel" data-document-form-panel <?= $formOpen ? 'open' : '' ?>>
-    <summary class="treasury-form-summary">
-        <span class="treasury-form-summary-text">
-            <span class="section-title"><?= e(__('documents.add')) ?></span>
-            <span class="section-lede"><?= e(__('documents.add_lede')) ?></span>
-        </span>
-        <span class="treasury-form-chevron" aria-hidden="true"></span>
-    </summary>
-    <form
-        class="treasury-form-body"
-        method="post"
-        action="<?= e(url('/documents')) ?>"
-        enctype="multipart/form-data"
-        data-document-form
-        data-leave-guard
-        data-upload-url="<?= e(url('/documents/upload')) ?>"
-        data-msg-idle="<?= e(__('documents.upload_idle')) ?>"
-        data-msg-uploading="<?= e(__('documents.upload_busy')) ?>"
-        data-msg-ok="<?= e(__('documents.upload_ok')) ?>"
-        data-msg-fail="<?= e(__('documents.upload_fail')) ?>"
-        data-msg-change="<?= e(__('documents.change_file')) ?>"
-    >
-        <?= csrf_field() ?>
-        <?= field('hidden', [
-            'name' => 'uploaded_path',
-            'value' => (string) ($values['uploaded_path'] ?? ''),
-            'attrs' => ['data-doc-uploaded-path' => true],
-        ]) ?>
-        <?= field('hidden', [
-            'name' => 'uploaded_mime',
-            'value' => (string) ($values['uploaded_mime'] ?? ''),
-            'attrs' => ['data-doc-uploaded-mime' => true],
-        ]) ?>
-        <?php
-        $has_existing_file = false;
-        require __DIR__ . '/_form_fields.php';
-        ?>
-        <div class="form-actions form-actions-end">
-            <button class="btn" type="submit"><?= e(__('documents.submit')) ?></button>
+<?php if ($documents !== [] || $hasActiveFilters): ?>
+<form class="panel filter-bar members-filter documents-filter" method="get" action="<?= e(url('/documents')) ?>" role="search" data-documents-filter>
+    <div class="members-filter-row documents-filter-row">
+        <div class="members-filter-q">
+            <?= field('search', [
+                'name' => 'q',
+                'id' => 'documents-q',
+                'label' => (string) __('documents.search'),
+                'value' => $query,
+                'context' => 'filter',
+                'placeholder' => (string) __('documents.search_placeholder'),
+                'maxlength' => 120,
+                'attrs' => ['enterkeyhint' => 'search', 'autocomplete' => 'off'],
+            ]) ?>
         </div>
-    </form>
-</details>
+        <?= field('select', [
+            'name' => 'category',
+            'id' => 'documents-category-filter',
+            'label' => (string) __('documents.filter_category'),
+            'value' => $filterCategory,
+            'context' => 'filter',
+            'empty_label' => (string) __('documents.filter_all'),
+            'options' => $categoryLabels,
+        ]) ?>
+        <?= field('select', [
+            'name' => 'status',
+            'id' => 'documents-status-filter',
+            'label' => (string) __('documents.filter_status'),
+            'value' => $filterStatus,
+            'context' => 'filter',
+            'empty_label' => (string) __('documents.filter_all'),
+            'options' => $statusFilterOptions,
+        ]) ?>
+        <?= field('checkbox', [
+            'name' => 'expiring',
+            'id' => 'documents-expiring-filter',
+            'label' => (string) __('documents.stats_expiring'),
+            'value' => $filterExpiring ? '1' : '',
+            'check_value' => '1',
+            'context' => 'filter',
+            'wrapper_class' => 'documents-filter-expiring',
+        ]) ?>
+        <?php if ($hasActiveFilters): ?>
+            <a class="btn btn-ghost btn-sm documents-filter-reset" href="<?= e($filterUrl(['q' => '', 'status' => '', 'category' => '', 'expiring' => false])) ?>"><?= e(__('documents.filter_reset')) ?></a>
+        <?php endif; ?>
+    </div>
+</form>
 <?php endif; ?>
+
 
 <div class="panel">
     <div class="panel-header">
@@ -108,75 +172,109 @@ $formOpen = $old !== [];
     </div>
     <?php if ($documents === []): ?>
         <div class="empty-state">
-            <?php if (trim((string) ($search_query ?? '')) !== ''): ?>
+            <?php if ($hasActiveFilters): ?>
                 <strong><?= e(__('documents.search_empty_title')) ?></strong>
-                <?= e(__('documents.search_empty_text', ['q' => (string) $search_query])) ?>
+                <?= e(__('documents.search_empty_text', ['q' => $query !== '' ? $query : ($filterCategory !== '' ? $filterCategory : $filterStatus)])) ?>
             <?php else: ?>
                 <strong><?= e(__('documents.empty_title')) ?></strong>
                 <?= e(__('documents.empty_text')) ?>
             <?php endif; ?>
         </div>
     <?php else: ?>
-        <div class="table-wrap embedded">
-            <table>
-                <thead>
-                <tr>
-                    <th><?= e(__('documents.title_field')) ?></th>
-                    <th><?= e(__('documents.number')) ?></th>
-                    <th><?= e(__('documents.category')) ?></th>
-                    <th><?= e(__('documents.language')) ?></th>
-                    <th><?= e(__('documents.date')) ?></th>
-                    <th><?= e(__('documents.status')) ?></th>
-                    <th><?= e(__('documents.actions')) ?></th>
-                </tr>
-                </thead>
-                <tbody>
-                            <?php foreach ($documents as $doc): ?>
+        <div class="doc-archive documents-archive">
+            <?php foreach ($groupOrder as $groupKey): ?>
+                <?php $groupItems = $groups[$groupKey] ?? []; ?>
+                <?php if ($groupItems === []) { continue; } ?>
+                <section class="doc-archive-group">
+                    <header class="doc-archive-group-head">
+                        <h3 class="doc-archive-group-title"><?= e($categoryLabels[$groupKey] ?? $groupKey) ?></h3>
+                        <span class="doc-archive-group-count"><?= count($groupItems) ?></span>
+                    </header>
+                    <div class="table-wrap embedded">
+                        <table class="documents-table">
+                            <thead>
+                            <tr>
+                                <th><?= e(__('documents.date')) ?></th>
+                                <th><?= e(__('documents.title_field')) ?></th>
+                                <th><?= e(__('documents.number')) ?></th>
+                                <th><?= e(__('documents.status')) ?></th>
+                                <th><?= e(__('documents.actions')) ?></th>
+                            </tr>
+                            </thead>
+                            <tbody>
+
+                            <?php foreach ($groupItems as $doc): ?>
                                 <?php
-                                $lang = trim((string) ($doc['language'] ?? ''));
-                                $langLabel = $lang !== '' ? __('documents.language_' . $lang) : '—';
-                                if ($lang !== '' && $langLabel === 'documents.language_' . $lang) {
-                                    $langLabel = $lang;
-                                }
                                 $docId = (int) ($doc['id'] ?? 0);
                                 $detailUrl = url('/documents/' . $docId);
-                                $categoryLabel = '';
-                                foreach ($categories as $category) {
-                                    if ((string) $category['key'] === (string) ($doc['category'] ?? 'other')) {
-                                        $categoryLabel = (string) $category['label'];
-                                        break;
+                                $docStatus = (string) ($doc['status'] ?? 'draft');
+                                $docDate = (string) ($doc['document_date'] ?? '');
+                                $docNumber = trim((string) ($doc['document_number'] ?? ''));
+                                $summary = trim((string) ($doc['summary'] ?? ''));
+                                $hasFile = trim((string) ($doc['file_path'] ?? '')) !== '';
+                                $lang = trim((string) ($doc['language'] ?? ''));
+                                $langLabel = '';
+                                if ($lang !== '') {
+                                    $langLabel = (string) __('documents.language_' . $lang);
+                                    if ($langLabel === 'documents.language_' . $lang) {
+                                        $langLabel = $lang;
                                     }
                                 }
+                                $expires = trim((string) ($doc['expires_at'] ?? ''));
+                                $expiresPast = $expires !== '' && $expires < $today;
+                                $expiresSoon = $expires !== '' && !$expiresPast && $expires <= $soon;
                                 ?>
                                 <tr
-                                    class="doc-row-editable"
-                                        data-href="<?= e($detailUrl) ?>"
-                                        tabindex="0"
-                                        role="link"
-                                        aria-label="<?= e(__('documents.view') . ': ' . (string) ($doc['title'] ?? '')) ?>"
+                                    class="documents-row doc-row-editable"
+                                    data-href="<?= e($detailUrl) ?>"
+                                    tabindex="0"
+                                    role="link"
+                                    aria-label="<?= e(__('documents.view') . ': ' . (string) ($doc['title'] ?? '')) ?>"
                                 >
-                                    <td>
-                                        <strong><?= e((string) ($doc['title'] ?? '')) ?></strong>
-                                        <?php if (!empty($doc['summary'])): ?>
-                                            <div class="muted"><?= e((string) $doc['summary']) ?></div>
+                                    <td data-label="<?= e(__('documents.date')) ?>">
+                                        <span class="documents-date"><?= e(format_date($docDate) ?: '—') ?></span>
+                                        <?php if ($expires !== ''): ?>
+                                            <span class="documents-expires<?= $expiresPast ? ' is-late' : ($expiresSoon ? ' is-soon' : '') ?>">
+                                                <?= e($expiresPast
+                                                    ? __('documents.expires_past', ['date' => format_date($expires) ?: $expires])
+                                                    : __('documents.expires_on', ['date' => format_date($expires) ?: $expires])) ?>
+                                            </span>
                                         <?php endif; ?>
                                     </td>
-                                    <td><?= e((string) ($doc['document_number'] ?? '') ?: '—') ?></td>
-                                    <td><span class="doc-category-badge"><?= e($categoryLabel !== '' ? $categoryLabel : (string) ($doc['category'] ?? '')) ?></span></td>
-                                    <td><?= e($langLabel) ?></td>
-                                    <td><?= e(format_date($doc['document_date'] ?? null) ?: '—') ?></td>
-                                    <td><span class="doc-status doc-status-<?= e((string) ($doc['status'] ?? 'draft')) ?>"><?= e(__('documents.status_' . (string) ($doc['status'] ?? 'draft'))) ?></span></td>
-                                    <td class="doc-row-actions" onclick="event.stopPropagation()">
+                                    <td data-label="<?= e(__('documents.title_field')) ?>">
+                                        <div class="documents-title">
+                                            <strong><?= e((string) ($doc['title'] ?? '')) ?></strong>
+                                            <?php if ($hasFile): ?>
+                                                <span class="documents-file-badge"><?= e(__('documents.file')) ?></span>
+                                            <?php endif; ?>
+                                            <?php if ($langLabel !== ''): ?>
+                                                <span class="documents-lang"><?= e($langLabel) ?></span>
+                                            <?php endif; ?>
+                                        </div>
+                                        <?php if ($summary !== ''): ?>
+                                            <div class="muted documents-summary"><?= e($summary) ?></div>
+                                        <?php endif; ?>
+                                    </td>
+
+                                    <td data-label="<?= e(__('documents.number')) ?>"><?= e($docNumber !== '' ? $docNumber : '—') ?></td>
+                                    <td data-label="<?= e(__('documents.status')) ?>">
+                                        <span class="doc-status doc-status-<?= e($docStatus) ?>"><?= e(__('documents.status_' . $docStatus)) ?></span>
+                                    </td>
+                                    <td class="doc-row-actions" data-stop-row-nav>
                                         <?= row_actions([
                                             [
-                                                'icon' => !empty($doc['file_path']) ? 'file' : 'view',
-                                                'label' => !empty($doc['file_path']) ? __('documents.open_file') : __('documents.view'),
-                                                'href' => !empty($doc['file_path'])
-                                                    ? url('/documents/' . $docId . '/file')
-                                                    : $detailUrl,
-                                                'target' => !empty($doc['file_path']) ? '_blank' : null,
-                                                'rel' => !empty($doc['file_path']) ? 'noopener' : null,
-                                                'primary' => !empty($doc['file_path']),
+                                                'icon' => $hasFile ? 'file' : 'view',
+                                                'label' => $hasFile ? __('documents.open_file') : __('documents.view'),
+                                                'href' => $hasFile ? url('/documents/' . $docId . '/file') : $detailUrl,
+                                                'target' => $hasFile ? '_blank' : null,
+                                                'rel' => $hasFile ? 'noopener' : null,
+                                                'primary' => $hasFile,
+                                            ],
+                                            [
+                                                'icon' => 'external',
+                                                'label' => __('documents.download_file'),
+                                                'show' => $hasFile,
+                                                'href' => $hasFile ? url('/documents/' . $docId . '/download') : '',
                                             ],
                                             [
                                                 'icon' => 'edit',
@@ -188,8 +286,12 @@ $formOpen = $old !== [];
                                     </td>
                                 </tr>
                             <?php endforeach; ?>
-                </tbody>
-            </table>
+                            </tbody>
+                        </table>
+                    </div>
+                </section>
+            <?php endforeach; ?>
         </div>
     <?php endif; ?>
 </div>
+

@@ -132,6 +132,7 @@ $router->post('/deadlines/{id}/done', [DeadlinesController::class, 'done'], 'dea
 $router->post('/deadlines/{id}/renew', [DeadlinesController::class, 'renew'], 'deadlines.manage', ['mw.locale', 'mw.install', 'mw.auth', 'mw.csrf']);
 
 $router->get('/documents', [DocumentsController::class, 'index'], 'documents.view', ['mw.locale', 'mw.install', 'mw.auth']);
+$router->get('/documents/create', [DocumentsController::class, 'create'], 'documents.manage', ['mw.locale', 'mw.install', 'mw.auth']);
 $router->post('/documents', [DocumentsController::class, 'store'], 'documents.manage', ['mw.locale', 'mw.install', 'mw.auth', 'mw.csrf']);
 $router->post('/documents/upload', [DocumentsController::class, 'upload'], 'documents.manage', ['mw.locale', 'mw.install', 'mw.auth', 'mw.csrf']);
 $router->get('/documents/{id}', [DocumentsController::class, 'show'], 'documents.view', ['mw.locale', 'mw.install', 'mw.auth']);

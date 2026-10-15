@@ -64,7 +64,10 @@ final class DocumentService
     }
 
     /** @return list<array<string,mixed>> */
-    public function all(int $limit = 200, string $query = ''): array
+    /**
+     * @param array{status?:string,category?:string,expiring?:bool} $filters
+     */
+    public function all(int $limit = 200, string $query = '', array $filters = []): array
     {
         $query = trim($query);
         $limitSql = ' LIMIT ' . max(1, min(500, $limit));
@@ -72,18 +75,54 @@ final class DocumentService
              FROM association_documents d
              LEFT JOIN users u ON u.id = d.created_by';
 
-        if ($query === '') {
-            return $this->db->fetchAll(
-                $base . ' ORDER BY COALESCE(d.document_date, d.created_at) DESC, d.id DESC' . $limitSql
-            );
-        }
-
+        $where = [];
         $params = [];
-        $where = $this->buildSearchWhere($query, $params);
-        return $this->db->fetchAll(
-            $base . ' WHERE ' . $where . ' ORDER BY COALESCE(d.document_date, d.created_at) DESC, d.id DESC' . $limitSql,
-            $params
+        if ($query !== '') {
+            $where[] = $this->buildSearchWhere($query, $params);
+        }
+        $status = trim((string) ($filters['status'] ?? ''));
+        if (in_array($status, self::STATUSES, true)) {
+            $where[] = 'd.status = :filter_status';
+            $params['filter_status'] = $status;
+        }
+        $category = trim((string) ($filters['category'] ?? ''));
+        if ($category !== '') {
+            $where[] = 'd.category = :filter_category';
+            $params['filter_category'] = $category;
+        }
+        if (!empty($filters['expiring'])) {
+            $where[] = 'd.expires_at IS NOT NULL AND d.expires_at >= :expires_from AND d.expires_at <= :expires_to';
+            $params['expires_from'] = date('Y-m-d');
+            $params['expires_to'] = date('Y-m-d', strtotime('+30 days'));
+        }
+        $sql = $base;
+        if ($where !== []) {
+            $sql .= ' WHERE ' . implode(' AND ', $where);
+        }
+        $sql .= ' ORDER BY COALESCE(d.document_date, d.created_at) DESC, d.id DESC' . $limitSql;
+        return $this->db->fetchAll($sql, $params);
+    }
+
+    /** @return array{total:int,draft:int,approved:int,expiring:int} */
+    public function counts(): array
+    {
+        $row = $this->db->fetch(
+            'SELECT COUNT(*) AS total,
+                    SUM(CASE WHEN status = \'draft\' THEN 1 ELSE 0 END) AS draft,
+                    SUM(CASE WHEN status IN (\'approved\', \'signed\') THEN 1 ELSE 0 END) AS approved,
+                    SUM(CASE WHEN expires_at IS NOT NULL AND expires_at >= :expires_from AND expires_at <= :expires_to THEN 1 ELSE 0 END) AS expiring
+             FROM association_documents',
+            [
+                'expires_from' => date('Y-m-d'),
+                'expires_to' => date('Y-m-d', strtotime('+30 days')),
+            ]
         );
+        return [
+            'total' => (int) ($row['total'] ?? 0),
+            'draft' => (int) ($row['draft'] ?? 0),
+            'approved' => (int) ($row['approved'] ?? 0),
+            'expiring' => (int) ($row['expiring'] ?? 0),
+        ];
     }
 
     public function countAll(): int

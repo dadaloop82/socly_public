@@ -211,6 +211,7 @@ document.addEventListener('DOMContentLoaded', () => {
   initBirthDateFields(document);
   initGeoSubmitValidation(document);
   initDocumentUpload(document);
+  initDocumentFilters(document);
   initDocumentRowLinks(document);
   document.querySelectorAll('[data-org-person-form]').forEach((form) => {
     initPlaceSuggest(form);
@@ -9603,6 +9604,15 @@ function initSidebarUpdate() {
 function initDeadlineFilters(root = document) {
   // Scadenzario filters (search + category + status) apply live, like the members list.
   root.querySelectorAll('[data-deadlines-filter]').forEach((form) => {
+    if (form instanceof HTMLFormElement) {
+      initLiveFilterForm(form);
+    }
+  });
+}
+
+function initDocumentFilters(root = document) {
+  // Archivio documenti: ricerca, categoria, stato e "in scadenza" filtrano dal vivo.
+  root.querySelectorAll('[data-documents-filter]').forEach((form) => {
     if (form instanceof HTMLFormElement) {
       initLiveFilterForm(form);
     }

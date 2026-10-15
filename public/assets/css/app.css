@@ -8494,6 +8494,99 @@ button.setup-scrape-logo-frame:focus-visible .setup-scrape-logo-overlay {
   color: var(--brand-primary-ink, var(--brand-primary, #0D6E66));
 }
 .deadlines-notify-hint { margin: 0; font-size: 0.8rem; }
+
+/* ── Verbali e documenti: barra filtri live + archivio per categoria ── */
+@media (min-width: 961px) {
+  .documents-filter-row {
+    grid-template-columns: minmax(11rem, 2fr) minmax(9rem, 1fr) minmax(9rem, 1fr) auto auto;
+  }
+}
+.documents-filter-reset,
+.documents-filter-expiring { align-self: end; }
+.documents-filter-expiring .field-label { font-weight: 600; }
+.documents-table .documents-row { cursor: pointer; }
+.documents-table .documents-date {
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.documents-table .documents-title {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.45rem;
+}
+.documents-table .documents-summary { margin-top: 0.2rem; }
+.documents-table .documents-file-badge,
+.documents-table .documents-lang {
+  padding: 0.1rem 0.45rem;
+  border-radius: 999px;
+  font-size: 0.72rem;
+  font-weight: 700;
+}
+.documents-table .documents-file-badge {
+  background: color-mix(in srgb, var(--brand-primary, #0D6E66) 10%, #fff);
+  color: var(--brand-primary-ink, var(--brand-primary, #0D6E66));
+}
+.documents-table .documents-lang {
+  background: color-mix(in srgb, var(--ink) 8%, transparent);
+  color: color-mix(in srgb, var(--ink) 68%, transparent);
+}
+.documents-table .documents-expires {
+  display: block;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--muted, #667085);
+}
+.documents-table .documents-expires.is-soon { color: #9a6700; }
+.documents-table .documents-expires.is-late { color: #b42318; }
+/* Mobile: la tabella diventa un elenco di schede, come socio/scadenzario. */
+@media (max-width: 640px) {
+  .documents-table { min-width: 0 !important; }
+  .documents-table thead { display: none; }
+  .documents-table tbody { display: grid; gap: 0.75rem; }
+  .documents-table tr {
+    display: grid;
+    gap: 0.45rem;
+    padding: 0.85rem 0.95rem;
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    background: color-mix(in srgb, var(--brand-paper) 55%, #fff);
+    box-shadow: var(--shadow-soft);
+  }
+  .documents-table td {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    padding: 0;
+    border: 0;
+    font-size: 0.95rem;
+    min-width: 0;
+  }
+  .documents-table td::before {
+    content: attr(data-label);
+    color: var(--muted);
+    font-size: 0.78rem;
+    font-weight: 700;
+    flex: 0 0 auto;
+    max-width: 42%;
+  }
+  .documents-table td:first-child {
+    display: block;
+    padding-bottom: 0.35rem;
+    margin-bottom: 0.2rem;
+    border-bottom: 1px solid var(--line);
+  }
+  .documents-table td:first-child::before { display: none; }
+  .documents-table td:last-child {
+    display: block;
+    padding-top: 0.35rem;
+    margin-top: 0.15rem;
+    border-top: 1px solid var(--line);
+  }
+  .documents-table td:last-child::before { display: none; }
+}
 /* Mobile: the deadlines table becomes a card list, like the members table. */
 @media (max-width: 640px) {
   .deadlines-table { min-width: 0 !important; }
