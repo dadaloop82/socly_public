@@ -31,6 +31,23 @@ final class TreasuryService
         'offset_compensation', 'other',
     ];
 
+    /**
+     * Stored directions. `transfer` is a giroconto between the association's own
+     * accounts: it moves liquidity without changing the cash book balance, so it
+     * stays out of the income/expense aggregates.
+     *
+     * @var list<string>
+     */
+    public const DIRECTIONS = ['income', 'expense', 'transfer'];
+
+    /**
+     * Financial accounts (wallets): WHERE the money sits — cash, bank, postal…
+     * Kept apart from METHODS (HOW the money moved: bank transfer, POS…).
+     *
+     * @var list<string>
+     */
+    public const ACCOUNTS = ['cash', 'bank', 'postal', 'paypal', 'prepaid_card', 'other'];
+
     public function __construct(
         private readonly Database $db,
         private readonly AuditService $audit,
@@ -87,7 +104,6 @@ final class TreasuryService
                 'bank_transfer', 'pos_card', 'satispay', 'paypal', 'online_gateway', 'sepa_direct_debit',
             ]],
             ['label_key' => 'treasury.method_group_traditional', 'keys' => ['cash', 'postal_slip', 'check']],
-            ['label_key' => 'treasury.method_group_internal', 'keys' => ['internal_transfer', 'offset_compensation']],
             ['label_key' => 'treasury.method_group_other', 'keys' => ['other']],
         ];
         $out = [];
@@ -152,8 +168,60 @@ final class TreasuryService
         return in_array($method, self::METHODS, true) ? $method : 'other';
     }
 
+    /**
+     * Financial accounts for the "Conto" select (flat list: wallets only).
+     *
+     * @return list<array{key:string,label:string}>
+     */
+    public function accountOptions(): array
+    {
+        $out = [];
+        foreach (self::ACCOUNTS as $key) {
+            $out[] = ['key' => $key, 'label' => __('treasury.account_' . $key)];
+        }
+        return $out;
+    }
+
+    public function accountLabel(string $key): string
+    {
+        $key = strtolower(trim($key));
+        if ($key === '') {
+            return '';
+        }
+        foreach ($this->accountOptions() as $opt) {
+            if ($opt['key'] === $key) {
+                return (string) $opt['label'];
+            }
+        }
+        return $this->humanizeSlug($key);
+    }
+
+    /** Empty string when the value is not a known wallet (validation must reject it). */
+    public static function normalizeAccount(string $account): string
+    {
+        $account = strtolower(trim($account));
+        return in_array($account, self::ACCOUNTS, true) ? $account : '';
+    }
+
+    /** Wallet behind an incoming member payment, used by the auto-registered income. */
+    public static function accountForPaymentMethod(string $method): string
+    {
+        return match (self::normalizePaymentMethod($method)) {
+            'cash' => 'cash',
+            'postal_slip' => 'postal',
+            'paypal' => 'paypal',
+            'other', 'internal_transfer', 'offset_compensation' => 'other',
+            default => 'bank',
+        };
+    }
+
     /** @return array{movements:list<array<string,mixed>>,balance:float,income:float,expense:float} */
-    public function ledger(int $limit = 200, string $query = '', string $sort = 'date_desc'): array
+    /**
+     * Ledger rows + global balance (the KPI boxes always reflect the whole cash book).
+     *
+     * @param array{direction?:string,category?:string,from?:string,to?:string} $filters
+     */
+    public function ledger(int $limit = 200, string $query = '', string $sort = 'date_desc', array $filters = []): array
     {
         $params = [];
         $sql = "SELECT m.*,
@@ -169,10 +237,35 @@ final class TreasuryService
              LEFT JOIN members mem ON mem.id = m.member_id
              LEFT JOIN users u ON u.id = m.created_by";
 
+        $where = [];
         $query = trim($query);
         if ($query !== '') {
-            $sql .= ' WHERE ' . $this->buildSearchWhere($query, $params);
+            $where[] = $this->buildSearchWhere($query, $params);
         }
+        $direction = (string) ($filters['direction'] ?? '');
+        if (in_array($direction, self::DIRECTIONS, true)) {
+            $where[] = 'm.direction = :filter_direction';
+            $params['filter_direction'] = $direction;
+        }
+        $category = trim((string) ($filters['category'] ?? ''));
+        if ($category !== '') {
+            $where[] = 'm.category = :filter_category';
+            $params['filter_category'] = $category;
+        }
+        $from = trim((string) ($filters['from'] ?? ''));
+        if ($from !== '') {
+            $where[] = 'm.movement_date >= :filter_from';
+            $params['filter_from'] = $from;
+        }
+        $to = trim((string) ($filters['to'] ?? ''));
+        if ($to !== '') {
+            $where[] = 'm.movement_date <= :filter_to';
+            $params['filter_to'] = $to;
+        }
+        if ($where !== []) {
+            $sql .= ' WHERE ' . implode(' AND ', $where);
+        }
+
         $order = match ($sort) {
             'date_asc' => 'm.movement_date ASC, m.id ASC',
             'created_desc' => 'm.created_at DESC, m.id DESC',
@@ -262,9 +355,13 @@ final class TreasuryService
     /**
      * @return list<array{key:string,label:string,items:list<array<string,mixed>>}>
      */
-    public function groupedByCategory(int $limit = 200, string $query = '', string $sort = 'date_desc'): array
+    /**
+     * @param array{direction?:string,category?:string,from?:string,to?:string} $filters
+     * @return list<array{key:string,label:string,items:list<array>}>
+     */
+    public function groupedByCategory(int $limit = 200, string $query = '', string $sort = 'date_desc', array $filters = []): array
     {
-        $ledger = $this->ledger($limit, $query, $sort);
+        $ledger = $this->ledger($limit, $query, $sort, $filters);
         $items = $ledger['movements'];
         $labels = $this->categoryMap();
         $buckets = [];
@@ -399,7 +496,7 @@ final class TreasuryService
         $row = $this->find($id);
         $relative = trim((string) ($row['attachment_path'] ?? ''));
         if ($relative === '' || str_contains($relative, '..') || str_contains($relative, '\\')
-            || preg_match('#^documents/[a-zA-Z0-9._-]+\.pdf$#', $relative) !== 1) {
+            || preg_match('#^documents/[a-zA-Z0-9._-]+\.(?:pdf|jpe?g|png|webp)$#i', $relative) !== 1) {
             return null;
         }
         $path = storage_path($relative);
@@ -522,6 +619,7 @@ final class TreasuryService
             'amount' => $amount,
             'description' => mb_substr($description, 0, 500),
             'payment_method' => $method,
+            'account' => self::accountForPaymentMethod($method),
             'member_id' => $memberId,
             'payment_id' => $paymentId,
         ]);
@@ -535,9 +633,10 @@ final class TreasuryService
     private function parseInput(array $input, ?array $existing): array
     {
         $direction = (string) ($input['direction'] ?? '');
-        if (!in_array($direction, ['income', 'expense'], true)) {
+        if (!in_array($direction, self::DIRECTIONS, true)) {
             return ['ok' => false, 'errors' => ['direction' => __('validation.in')]];
         }
+        $isTransfer = $direction === 'transfer';
         $amountRaw = (float) str_replace(',', '.', (string) ($input['amount'] ?? '0'));
         if ($amountRaw <= 0) {
             return ['ok' => false, 'errors' => ['amount' => __('validation.required')]];
@@ -563,27 +662,57 @@ final class TreasuryService
         if (!$this->validator->validate(['movement_date' => $date], ['movement_date' => 'date'])) {
             return ['ok' => false, 'errors' => ['movement_date' => __('validation.date')]];
         }
-        $categoryResult = $this->resolveCategory($input, $existing);
+        if ($isTransfer) {
+            // A giroconto has no category of its own: it always moves liquidity internally.
+            $categoryResult = ['ok' => true, 'key' => 'internal_transfer'];
+        } else {
+            $categoryResult = $this->resolveCategory($input, $existing);
+        }
         if (empty($categoryResult['ok'])) {
             return ['ok' => false, 'errors' => ['category' => (string) ($categoryResult['error'] ?? __('validation.required'))]];
         }
-        $method = self::normalizePaymentMethod(trim((string) ($input['payment_method'] ?? 'cash')));
+        // "Conto" (wallet: where the money sits) and "metodo" (how it moved) are
+        // two different things and therefore two different columns.
+        $account = self::normalizeAccount((string) ($input['account'] ?? ''));
+        if ($account === '') {
+            return ['ok' => false, 'errors' => ['account' => __('treasury.account_required')]];
+        }
+        $method = '';
+        $transferAccount = null;
+        if ($isTransfer) {
+            // A giroconto moves liquidity between two own wallets: no payment method.
+            $transferRaw = trim((string) ($input['transfer_account'] ?? ''));
+            $transferAccount = self::normalizeAccount($transferRaw);
+            if ($transferRaw === '' || $transferAccount === '') {
+                return ['ok' => false, 'errors' => ['transfer_account' => __('treasury.transfer_to_required')]];
+            }
+            if ($transferAccount === $account) {
+                return ['ok' => false, 'errors' => ['transfer_account' => __('treasury.transfer_same_account')]];
+            }
+        } else {
+            $methodRaw = trim((string) ($input['payment_method'] ?? ''));
+            if ($account === 'cash') {
+                $method = 'cash'; // cash wallet ⇒ cash payment, the method is implied
+            } elseif ($methodRaw !== '') {
+                $method = self::normalizePaymentMethod($methodRaw);
+            }
+        }
         $memberInvolved = !empty($input['member_involved']);
         $memberId = $memberInvolved ? trim((string) ($input['member_id'] ?? '')) : '';
         $memberId = $memberId !== '' ? (int) $memberId : null;
         $isInvoice = $direction === 'expense' && !empty($input['invoice_payment']);
-        $invoiceNumber = $isInvoice ? mb_substr(trim((string) ($input['invoice_number'] ?? '')), 0, 120) : null;
+        $invoiceNumber = mb_substr(trim((string) ($input['invoice_number'] ?? '')), 0, 120);
         $invoiceTitle = $isInvoice ? mb_substr(trim((string) ($input['invoice_title'] ?? '')), 0, 190) : null;
         $invoiceDate = null;
         $invoiceDueDate = null;
-        if ($isInvoice) {
-            $invoiceDateRaw = trim((string) ($input['invoice_date'] ?? ''));
-            if ($invoiceDateRaw !== '') {
-                if (!$this->validator->validate(['invoice_date' => $invoiceDateRaw], ['invoice_date' => 'date'])) {
-                    return ['ok' => false, 'errors' => ['invoice_date' => __('validation.date')]];
-                }
-                $invoiceDate = $invoiceDateRaw;
+        $invoiceDateRaw = trim((string) ($input['invoice_date'] ?? ''));
+        if ($invoiceDateRaw !== '') {
+            if (!$this->validator->validate(['invoice_date' => $invoiceDateRaw], ['invoice_date' => 'date'])) {
+                return ['ok' => false, 'errors' => ['invoice_date' => __('validation.date')]];
             }
+            $invoiceDate = $invoiceDateRaw;
+        }
+        if ($isInvoice) {
             $invoiceDueRaw = trim((string) ($input['invoice_due_date'] ?? ''));
             if ($invoiceDueRaw !== '') {
                 if (!$this->validator->validate(['invoice_due_date' => $invoiceDueRaw], ['invoice_due_date' => 'date'])) {
@@ -592,9 +721,7 @@ final class TreasuryService
                 $invoiceDueDate = $invoiceDueRaw;
             }
         }
-        $beneficiary = $isInvoice
-            ? mb_substr(trim((string) ($input['beneficiary'] ?? '')), 0, 190)
-            : '';
+        $beneficiary = mb_substr(trim((string) ($input['beneficiary'] ?? '')), 0, 190);
 
         return [
             'ok' => true,
@@ -607,6 +734,8 @@ final class TreasuryService
                 'amount_currency' => $amountCurrency,
                 'description' => trim((string) ($input['description'] ?? '')),
                 'payment_method' => $method,
+                'account' => $account,
+                'transfer_account' => $transferAccount,
                 'member_id' => $memberId,
                 'invoice_payment' => $isInvoice ? 1 : 0,
                 'invoice_number' => $invoiceNumber !== '' ? $invoiceNumber : null,
@@ -648,8 +777,11 @@ final class TreasuryService
         }
 
         if ($hasUpload) {
-            if (strtolower((string) ($file['type'] ?? '')) !== 'application/pdf'
-                && !str_ends_with(strtolower((string) ($file['name'] ?? '')), '.pdf')) {
+            $uploadMime = strtolower((string) ($file['type'] ?? ''));
+            $uploadExt = strtolower(pathinfo((string) ($file['name'] ?? ''), PATHINFO_EXTENSION));
+            $allowedMimes = ['application/pdf', 'image/jpeg', 'image/png', 'image/webp'];
+            $allowedExts = ['pdf', 'jpg', 'jpeg', 'png', 'webp'];
+            if (!in_array($uploadMime, $allowedMimes, true) && !in_array($uploadExt, $allowedExts, true)) {
                 return ['ok' => false, 'error' => __('treasury.invoice_pdf_invalid')];
             }
             $uploaded = $this->documents->upload($file);
@@ -657,7 +789,7 @@ final class TreasuryService
                 return ['ok' => false, 'error' => (string) ($uploaded['error'] ?? __('documents.upload_fail'))];
             }
             $path = (string) $uploaded['path'];
-            $mime = (string) ($uploaded['mime'] ?? 'application/pdf');
+            $mime = (string) ($uploaded['mime'] ?? ($uploadMime !== '' ? $uploadMime : 'application/pdf'));
         } else {
             $path = trim((string) ($existing['attachment_path'] ?? ''));
             $mime = 'application/pdf';
@@ -712,6 +844,7 @@ final class TreasuryService
         $params['like_desc'] = $like;
         $params['like_category'] = $like;
         $params['like_method'] = $like;
+        $params['like_account'] = $like;
         $params['like_invoice_title'] = $like;
         $params['like_beneficiary'] = $like;
         $params['like_invoice_number'] = $like;
@@ -719,6 +852,7 @@ final class TreasuryService
             'm.description LIKE :like_desc',
             'm.category LIKE :like_category',
             'm.payment_method LIKE :like_method',
+            'm.account LIKE :like_account',
             'm.invoice_title LIKE :like_invoice_title',
             'm.beneficiary LIKE :like_beneficiary',
             'm.invoice_number LIKE :like_invoice_number',
@@ -743,13 +877,56 @@ final class TreasuryService
             $parts[] = 'm.category IN (' . implode(', ', $in) . ')';
         }
 
-        foreach (['income' => 'treasury.direction_income', 'expense' => 'treasury.direction_expense'] as $dir => $labelKey) {
+        foreach (['income' => 'treasury.direction_income', 'expense' => 'treasury.direction_expense', 'transfer' => 'treasury.direction_transfer'] as $dir => $labelKey) {
             $label = mb_strtolower(__($labelKey));
             if (str_contains($label, $needle) || str_contains($needle, $dir)) {
                 $param = 'dir_' . $dir;
                 $params[$param] = $dir;
                 $parts[] = 'm.direction = :' . $param;
             }
+        }
+
+        // Wallets are searchable by label too ("banca", "cassa contanti", …).
+        $accKeys = [];
+        foreach ($this->accountOptions() as $opt) {
+            $label = mb_strtolower((string) $opt['label']);
+            $key = mb_strtolower((string) $opt['key']);
+            if (str_contains($label, $needle) || str_contains($key, $needle) || str_contains($needle, $key)) {
+                $accKeys[] = (string) $opt['key'];
+            }
+        }
+        if ($accKeys !== []) {
+            $in = [];
+            $inTransfer = [];
+            foreach (array_values(array_unique($accKeys)) as $i => $key) {
+                $param = 'acc_' . $i;
+                $params[$param] = $key;
+                $in[] = ':' . $param;
+                $paramTransfer = 'acc_to_' . $i;
+                $params[$paramTransfer] = $key;
+                $inTransfer[] = ':' . $paramTransfer;
+            }
+            $parts[] = '(m.account IN (' . implode(', ', $in) . ') OR m.transfer_account IN (' . implode(', ', $inTransfer) . '))';
+        }
+
+        // Payment methods are searchable by label too ("bonifico", "POS", …).
+        $methodKeys = [];
+        foreach ($this->paymentMethodGroups() as $group) {
+            foreach ($group['keys'] as $methodKey) {
+                $label = mb_strtolower((string) __('treasury.method_' . $methodKey));
+                if (str_contains($label, $needle)) {
+                    $methodKeys[] = (string) $methodKey;
+                }
+            }
+        }
+        if ($methodKeys !== []) {
+            $in = [];
+            foreach (array_values(array_unique($methodKeys)) as $i => $key) {
+                $param = 'pm_' . $i;
+                $params[$param] = $key;
+                $in[] = ':' . $param;
+            }
+            $parts[] = 'm.payment_method IN (' . implode(', ', $in) . ')';
         }
 
         return '(' . implode(' OR ', $parts) . ')';

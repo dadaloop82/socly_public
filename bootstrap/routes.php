@@ -116,6 +116,7 @@ $router->post('/members/{id}/payments', [MemberController::class, 'storePayment'
 $router->post('/members/{id}/remind-payment', [MemberController::class, 'remindPayment'], 'members.manage', ['mw.locale', 'mw.install', 'mw.auth', 'mw.csrf']);
 
 $router->get('/treasury', [TreasuryController::class, 'index'], 'treasury.view', ['mw.locale', 'mw.install', 'mw.auth']);
+$router->get('/treasury/create', [TreasuryController::class, 'create'], 'treasury.manage', ['mw.locale', 'mw.install', 'mw.auth']);
 $router->post('/treasury', [TreasuryController::class, 'store'], 'treasury.manage', ['mw.locale', 'mw.install', 'mw.auth', 'mw.csrf']);
 $router->get('/treasury/{id}/attachment', [TreasuryController::class, 'attachment'], 'treasury.view', ['mw.locale', 'mw.install', 'mw.auth']);
 $router->get('/treasury/{id}/edit', [TreasuryController::class, 'edit'], 'treasury.manage', ['mw.locale', 'mw.install', 'mw.auth']);

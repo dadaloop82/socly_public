@@ -378,11 +378,11 @@ $votingMembersCount = (int) ($votingMembersCount ?? 0);
             <div class="org-tier org-tier--add-organ">
                 <form class="org-add-organ-form org-add-organ-footer" method="post" action="<?= e(url('/org/organs')) ?>">
                     <?= csrf_field() ?>
-                    <label class="visually-hidden" for="org-organ-label"><?= e(__('org.add_organ')) ?></label>
                     <?= field('text', [
                         'name' => 'label',
                         'id' => 'org-organ-label',
-                        'label' => '',
+                        'label' => (string) __('org.add_organ'),
+                        'label_class' => 'visually-hidden',
                         'required' => true,
                         'maxlength' => 80,
                         'placeholder' => (string) __('org.add_organ_placeholder'),

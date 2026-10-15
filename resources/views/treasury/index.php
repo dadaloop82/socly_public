@@ -5,35 +5,13 @@
 /** @var list<array> $members */
 /** @var list<array{key:string,label:string,builtin:bool}> $categories */
 /** @var list<array{label:string,keys:list<string>}> $category_groups */
-/** @var list<array{key:string,directions:string,default:string}> $movement_kinds */
 /** @var list<array{label:string,keys:list<string>}> $payment_method_groups */
 /** @var string $default_category */
 /** @var string $search_query */
 /** @var list<string> $beneficiaries */
 /** @var bool $hasAnyMovements */
 /** @var \Socly\Services\CurrencyService $currency */
-$old = old_input();
-$values = $old !== [] ? $old : [
-    'direction' => 'income',
-    'movement_kind' => 'operating',
-    'amount' => '',
-    'amount_currency' => '',
-    'member_involved' => '',
-    'movement_date' => date('Y-m-d'),
-    'category' => (string) ($default_category ?? 'membership_fee'),
-    'payment_method' => 'cash',
-    'member_id' => '',
-    'description' => '',
-    'new_category' => '',
-    'invoice_payment' => '',
-    'invoice_number' => '',
-    'invoice_date' => '',
-    'invoice_due_date' => '',
-    'invoice_title' => '',
-    'beneficiary' => '',
-];
 $canManage = can('treasury.manage');
-$formOpen = $old !== [];
 ?>
 <div class="page-header">
     <div class="titles">
@@ -42,7 +20,7 @@ $formOpen = $old !== [];
     </div>
     <?php if ($canManage): ?>
         <div class="actions">
-            <button type="button" class="btn" data-open-create-panel="[data-treasury-form-panel]"><?= e(__('treasury.add_movement')) ?></button>
+            <a class="btn" href="<?= e(url('/treasury/create')) ?>"><?= e(__('treasury.add_movement')) ?></a>
         </div>
     <?php endif; ?>
 </div>
@@ -63,47 +41,68 @@ $formOpen = $old !== [];
 </div>
 
 <?php if (!empty($hasAnyMovements)): ?>
-<form class="panel filter-bar treasury-filter" method="get" action="<?= e(url('/treasury')) ?>" role="search">
-    <div class="panel-header treasury-filter-head">
-        <div>
-            <h2 class="section-title"><?= e(__('treasury.search')) ?></h2>
-            <p class="section-lede"><?= e(__('treasury.ledger_options')) ?></p>
-        </div>
-        <button class="btn btn-sm treasury-filter-submit-desktop" type="submit"><?= e(__('treasury.search')) ?></button>
-    </div>
-    <?php $sort = (string) ($ledger_sort ?? 'date_desc'); ?>
-    <div class="treasury-filter-q">
-        <label class="treasury-filter-q-label" for="treasury-q"><?= e(__('treasury.search')) ?></label>
-        <div class="treasury-filter-q-row">
+<?php
+$sort = (string) ($ledger_sort ?? 'date_desc');
+$filterPeriod = (string) ($filters['period'] ?? '');
+$filterDirection = (string) ($filters['direction'] ?? '');
+$filterCategory = (string) ($filters['category'] ?? '');
+$hasActiveFilters = trim((string) ($search_query ?? '')) !== ''
+    || $filterPeriod !== ''
+    || $filterDirection !== ''
+    || $filterCategory !== '';
+$categoryFilterOptions = [];
+foreach ($categories as $categoryOption) {
+    $categoryFilterOptions[(string) ($categoryOption['key'] ?? '')] = (string) ($categoryOption['label'] ?? '');
+}
+?>
+<form class="panel filter-bar members-filter treasury-filter" method="get" action="<?= e(url('/treasury')) ?>" role="search" data-treasury-filter>
+    <div class="members-filter-row treasury-filter-row">
+        <div class="members-filter-q">
             <?= field('search', [
                 'name' => 'q',
                 'id' => 'treasury-q',
-                'label' => '',
+                'label' => (string) __('treasury.search'),
                 'value' => (string) ($search_query ?? ''),
                 'context' => 'filter',
                 'placeholder' => (string) __('treasury.search_placeholder'),
                 'maxlength' => 120,
-                'attrs' => ['enterkeyhint' => 'search'],
+                'attrs' => ['enterkeyhint' => 'search', 'autocomplete' => 'off'],
             ]) ?>
-            <button class="btn btn-sm treasury-filter-submit-mobile" type="submit"><?= e(__('treasury.search')) ?></button>
-            <?php if (trim((string) ($search_query ?? '')) !== ''): ?>
-                <a class="btn btn-ghost btn-sm" href="<?= e(url('/treasury')) ?>"><?= e(__('treasury.search_clear')) ?></a>
-            <?php endif; ?>
         </div>
-    </div>
-    <div class="grid-2" style="margin-top:0.85rem;gap:0.85rem">
         <?= field('select', [
-            'name' => 'group',
-            'id' => 'treasury-group',
-            'label' => (string) __('treasury.group_by_category'),
-            'value' => !empty($group_by_category) ? '1' : '0',
+            'name' => 'period',
+            'id' => 'treasury-period',
+            'label' => (string) __('treasury.filter_period'),
+            'value' => $filterPeriod,
             'context' => 'filter',
-            'include_empty' => false,
+            'empty_label' => (string) __('treasury.period_all'),
             'options' => [
-                '1' => (string) __('treasury.group_by_category'),
-                '0' => (string) __('treasury.group_by_category_off'),
+                'month' => (string) __('treasury.period_month'),
+                'year' => (string) __('treasury.period_year'),
+                'days30' => (string) __('treasury.period_days30'),
             ],
-            'attrs' => ['data-treasury-filter-auto' => true],
+        ]) ?>
+        <?= field('select', [
+            'name' => 'direction',
+            'id' => 'treasury-direction',
+            'label' => (string) __('treasury.filter_direction'),
+            'value' => $filterDirection,
+            'context' => 'filter',
+            'empty_label' => (string) __('treasury.direction_all'),
+            'options' => [
+                'income' => (string) __('treasury.income'),
+                'expense' => (string) __('treasury.expense'),
+                'transfer' => (string) __('treasury.direction_transfer'),
+            ],
+        ]) ?>
+        <?= field('select', [
+            'name' => 'category',
+            'id' => 'treasury-category-filter',
+            'label' => (string) __('treasury.filter_category'),
+            'value' => $filterCategory,
+            'context' => 'filter',
+            'empty_label' => (string) __('treasury.filter_all'),
+            'options' => $categoryFilterOptions,
         ]) ?>
         <?= field('select', [
             'name' => 'sort',
@@ -118,36 +117,21 @@ $formOpen = $old !== [];
                 'created_desc' => (string) __('treasury.sort_created_desc'),
                 'invoice_desc' => (string) __('treasury.sort_invoice_desc'),
             ],
-            'attrs' => ['data-treasury-filter-auto' => true],
         ]) ?>
+        <?= field('checkbox', [
+            'name' => 'group',
+            'id' => 'treasury-group',
+            'label' => (string) __('treasury.group_toggle'),
+            'value' => !empty($group_by_category) ? '1' : '',
+            'check_value' => '1',
+            'context' => 'filter',
+            'wrapper_class' => 'treasury-filter-group',
+        ]) ?>
+        <?php if ($hasActiveFilters): ?>
+            <a class="btn btn-ghost btn-sm treasury-filter-reset" href="<?= e(url('/treasury')) ?>"><?= e(__('treasury.filter_reset')) ?></a>
+        <?php endif; ?>
     </div>
 </form>
-<?php endif; ?>
-
-<?php if ($canManage): ?>
-<details class="panel treasury-form-panel" data-treasury-form-panel <?= $formOpen ? 'open' : '' ?>>
-    <summary class="treasury-form-summary">
-        <span class="treasury-form-summary-text">
-            <span class="section-title"><?= e(__('treasury.add_movement')) ?></span>
-            <span class="section-lede"><?= e(__('treasury.add_lede')) ?></span>
-        </span>
-        <span class="treasury-form-chevron" aria-hidden="true"></span>
-    </summary>
-    <form class="treasury-form-body" method="post" action="<?= e(url('/treasury')) ?>" enctype="multipart/form-data" data-treasury-form data-leave-guard
-          data-confirm-template="<?= e(__('treasury.confirm_summary')) ?>"
-          data-base-currency="<?= e($currency->code()) ?>"
-          data-msg-doc-loaded="<?= e(__('treasury.document_loaded')) ?>"
-          data-msg-doc-idle="<?= e(__('documents.upload_idle')) ?>"
-          data-msg-doc-change="<?= e(__('treasury.document_change')) ?>"
-          data-max-upload-bytes="<?= (int) upload_limit_bytes() ?>"
-          data-msg-upload-too-large="<?= e(__('documents.upload_too_large', ['max' => upload_max_mb()])) ?>">
-        <?= csrf_field() ?>
-        <?php require __DIR__ . '/_form_fields.php'; ?>
-        <div class="form-actions form-actions-end">
-            <button class="btn" type="submit"><?= e(__('treasury.submit')) ?></button>
-        </div>
-    </form>
-</details>
 <?php endif; ?>
 
 <div class="panel">
@@ -183,7 +167,6 @@ $formOpen = $old !== [];
                                 <th><?= e(__('treasury.description')) ?></th>
                                 <th><?= e(__('treasury.method')) ?></th>
                                 <th><?= e(__('treasury.details')) ?></th>
-                                <th><?= e(__('treasury.created')) ?></th>
                                 <th><?= e(__('treasury.income')) ?></th>
                                 <th><?= e(__('treasury.expense')) ?></th>
                                 <th><?= e(__('treasury.actions')) ?></th>
@@ -193,6 +176,7 @@ $formOpen = $old !== [];
                             <?php foreach ($group['items'] as $row): ?>
                                 <?php
                                 $isIncome = ($row['direction'] ?? '') === 'income';
+                                $isTransfer = ($row['direction'] ?? '') === 'transfer';
                                 $amount = (float) ($row['amount'] ?? 0);
                                 $memberLabel = trim((string) (($row['last_name'] ?? '') . ' ' . ($row['first_name'] ?? '')));
                                 $desc = trim((string) ($row['description'] ?? ''));
@@ -200,19 +184,42 @@ $formOpen = $old !== [];
                                 if ($desc === '' && $invoiceTitle !== '') {
                                     $desc = $invoiceTitle;
                                 }
+                                if ($desc === '' && $isTransfer) {
+                                    $desc = (string) __('treasury.kind_internal_transfer');
+                                }
                                 if ($desc === '' && $memberLabel !== '') {
                                     $desc = $memberLabel;
                                 }
                                 $rowId = (int) ($row['id'] ?? 0);
                                 $editUrl = $canManage ? url('/treasury/' . $rowId . '/edit') : '';
-                                $methodKey = \Socly\Services\TreasuryService::normalizePaymentMethod((string) ($row['payment_method'] ?? 'cash'));
-                                $methodLabel = __('treasury.method_' . $methodKey);
-                                if ($methodLabel === 'treasury.method_' . $methodKey) {
+                                $accountKey = \Socly\Services\TreasuryService::normalizeAccount((string) ($row['account'] ?? ''));
+                                $accountLabel = $accountKey !== '' ? (string) __('treasury.account_' . $accountKey) : '';
+                                if ($accountKey !== '' && $accountLabel === 'treasury.account_' . $accountKey) {
+                                    $accountLabel = $accountKey;
+                                }
+                                $methodRaw = trim((string) ($row['payment_method'] ?? ''));
+                                $methodKey = $methodRaw !== '' ? \Socly\Services\TreasuryService::normalizePaymentMethod($methodRaw) : '';
+                                $methodLabel = $methodKey !== '' ? (string) __('treasury.method_' . $methodKey) : '';
+                                if ($methodKey !== '' && $methodLabel === 'treasury.method_' . $methodKey) {
                                     $methodLabel = $methodKey;
+                                }
+                                // Wallet first, method second: cash (and giroconti) need no method.
+                                $methodCell = $accountLabel !== '' ? $accountLabel : $methodLabel;
+                                if ($accountLabel !== '' && $methodLabel !== '' && $methodKey !== 'cash') {
+                                    $methodCell .= ' · ' . $methodLabel;
+                                }
+                                $transferLabel = '';
+                                $transferRaw = trim((string) ($row['transfer_account'] ?? ''));
+                                if ($isTransfer && $transferRaw !== '') {
+                                    $transferKey = \Socly\Services\TreasuryService::normalizeAccount($transferRaw);
+                                    $transferLabel = $transferKey !== '' ? (string) __('treasury.account_' . $transferKey) : $transferRaw;
+                                    if ($transferKey !== '' && $transferLabel === 'treasury.account_' . $transferKey) {
+                                        $transferLabel = $transferKey;
+                                    }
                                 }
                                 ?>
                                 <tr
-                                    class="treasury-row treasury-row-<?= $isIncome ? 'income' : 'expense' ?><?= $canManage ? ' doc-row-editable' : '' ?>"
+                                    class="treasury-row treasury-row-<?= $isTransfer ? 'transfer' : ($isIncome ? 'income' : 'expense') ?><?= $canManage ? ' doc-row-editable' : '' ?>"
                                     <?php if ($canManage): ?>
                                         data-href="<?= e($editUrl) ?>"
                                         tabindex="0"
@@ -223,7 +230,13 @@ $formOpen = $old !== [];
                                     <td><?= e(format_date($row['movement_date'] ?? null) ?: '—') ?></td>
                                     <td><?= e(!empty($row['invoice_date']) ? (format_date($row['invoice_date']) ?: (string) $row['invoice_date']) : '—') ?></td>
                                     <td><?= e($desc !== '' ? $desc : '—') ?></td>
-                                    <td><?= e($methodLabel) ?></td>
+                                    <td>
+                                        <?php if ($isTransfer && $transferLabel !== ''): ?>
+                                            <?= e($methodCell) ?> → <?= e($transferLabel) ?>
+                                        <?php else: ?>
+                                            <?= e($methodCell) ?>
+                                        <?php endif; ?>
+                                    </td>
                                     <td>
                                         <?php if ($memberLabel !== ''): ?><div><?= e($memberLabel) ?></div><?php endif; ?>
                                         <?php if (!empty($row['beneficiary'])): ?><div><?= e(__('treasury.supplier')) ?>: <?= e((string) $row['beneficiary']) ?></div><?php endif; ?>
@@ -234,13 +247,9 @@ $formOpen = $old !== [];
                                         <?php if (!empty($row['attachment_path'])): ?><div><a href="<?= e(url('/treasury/' . $rowId . '/attachment')) ?>" target="_blank" rel="noopener"><?= e(__('treasury.upload_document')) ?></a></div><?php endif; ?>
                                         <?php if (empty($row['member_id']) && empty($row['beneficiary']) && empty($row['invoice_number']) && empty($row['invoice_title']) && empty($row['attachment_path'])): ?><?= e(__('treasury.none')) ?><?php endif; ?>
                                     </td>
-                                    <td>
-                                        <div><?= e(format_datetime($row['created_at'] ?? null) ?: '—') ?></div>
-                                        <div class="muted"><?= e((string) ($row['creator_name'] ?? __('treasury.none'))) ?></div>
-                                    </td>
-                                    <td class="amount-income"><?= $isIncome ? e($currency->format($amount)) : '—' ?></td>
-                                    <td class="amount-expense"><?= !$isIncome ? e($currency->format($amount)) : '—' ?></td>
-                                    <td class="doc-row-actions" onclick="event.stopPropagation()">
+                                    <td class="<?= $isTransfer ? 'amount-transfer' : 'amount-income' ?>"><?= $isIncome || $isTransfer ? ($isTransfer ? '↔ ' : '') . e($currency->format($amount)) : '—' ?></td>
+                                    <td class="amount-expense"><?= $isIncome || $isTransfer ? '—' : e($currency->format($amount)) ?></td>
+                                    <td class="doc-row-actions" data-stop-row-nav>
                                         <?= row_actions([
                                             [
                                                 'icon' => 'file',

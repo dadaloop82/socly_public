@@ -232,15 +232,48 @@ function initOpenCreatePanels(root = document) {
     btn.addEventListener('click', () => {
       const sel = btn.getAttribute('data-open-create-panel') || '';
       const panel = sel ? document.querySelector(sel) : null;
+      if (panel instanceof HTMLDialogElement) {
+        openPanelDialog(panel);
+        return;
+      }
       if (!(panel instanceof HTMLDetailsElement)) return;
       panel.open = true;
       panel.scrollIntoView({ behavior: 'smooth', block: 'start' });
-      const first = panel.querySelector('input:not([type="hidden"]), select, textarea');
-      if (first instanceof HTMLElement) {
-        window.setTimeout(() => first.focus(), 250);
-      }
+      focusFirstField(panel);
     });
   });
+
+  // Form dialogs that must open on load (e.g. after a validation error).
+  root.querySelectorAll('dialog[data-auto-open-panel="1"]').forEach((dialog) => {
+    if (dialog instanceof HTMLDialogElement) openPanelDialog(dialog);
+  });
+}
+
+/** Opens a form dialog, wiring its close buttons / backdrop once. */
+function openPanelDialog(dialog) {
+  if (dialog.dataset.panelBound !== '1') {
+    dialog.dataset.panelBound = '1';
+    dialog.querySelectorAll('[data-close-panel]').forEach((btn) => {
+      btn.addEventListener('click', () => dialog.close());
+    });
+    dialog.addEventListener('click', (event) => {
+      // Clicks on the backdrop target the dialog element itself.
+      if (event.target === dialog) dialog.close();
+    });
+  }
+  if (typeof dialog.showModal === 'function') {
+    dialog.showModal();
+  } else {
+    dialog.setAttribute('open', 'open');
+  }
+  focusFirstField(dialog);
+}
+
+function focusFirstField(panel) {
+  const first = panel.querySelector('input:not([type="hidden"]), select, textarea');
+  if (first instanceof HTMLElement) {
+    window.setTimeout(() => first.focus(), 250);
+  }
 }
 
 /** Compact members search placeholder + live filter submit. */
@@ -257,22 +290,34 @@ function initMembersFilterMobile() {
     window.matchMedia('(max-width: 640px)').addEventListener('change', sync);
   }
   if (!(form instanceof HTMLFormElement)) return;
+  initLiveFilterForm(form);
+}
 
-  const submitLive = debounce(() => {
+/**
+ * Live filter form: selects/checkboxes apply on change, text inputs after a
+ * short debounce (320 ms). Shared by the members list and the treasury ledger.
+ */
+function initLiveFilterForm(form) {
+  if (!(form instanceof HTMLFormElement) || form.dataset.liveFilterBound === '1') return;
+  form.dataset.liveFilterBound = '1';
+
+  const submitNow = () => {
     if (typeof form.requestSubmit === 'function') form.requestSubmit();
     else form.submit();
+  };
+  const submitLive = debounce(() => {
+    submitNow();
   }, 320);
 
-  form.querySelectorAll('select').forEach((el) => {
+  form.querySelectorAll('select, input[type="checkbox"], input[type="radio"]').forEach((el) => {
     el.addEventListener('change', () => {
       submitLive.cancel?.();
-      if (typeof form.requestSubmit === 'function') form.requestSubmit();
-      else form.submit();
+      submitNow();
     });
   });
-  if (input instanceof HTMLInputElement) {
-    input.addEventListener('input', submitLive);
-  }
+  form.querySelectorAll('input[type="search"], input[type="text"]').forEach((el) => {
+    el.addEventListener('input', submitLive);
+  });
 }
 
 /**
@@ -2434,27 +2479,6 @@ function initMembersList() {
 
   const selectedIds = () =>
     checkboxes.filter((cb) => cb.checked).map((cb) => cb.value);
-
-  root.querySelectorAll('tr.clickable-row[data-href]').forEach((row) => {
-    const go = () => {
-      const href = row.getAttribute('data-href') || '';
-      if (href) window.location.href = href;
-    };
-    row.addEventListener('click', (e) => {
-      if (!(e instanceof MouseEvent) || e.button !== 0) return;
-      if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
-      if (e.target instanceof Element && e.target.closest('a, button, input, label, select, textarea, form, [data-stop-row-nav]')) {
-        return;
-      }
-      go();
-    });
-    row.addEventListener('keydown', (e) => {
-      if (e.key !== 'Enter' && e.key !== ' ') return;
-      if (e.target !== row) return;
-      e.preventDefault();
-      go();
-    });
-  });
 
   const syncBulkBar = () => {
     const ids = selectedIds();
@@ -9766,20 +9790,23 @@ function initTreasuryFileField(form) {
 }
 
 function formatTreasuryConfirmMessage(form, template) {
-  const directionHidden = form.querySelector('[data-treasury-direction]');
-  const signSelect = form.querySelector('[data-treasury-sign]');
-  const kindSelect = form.querySelector('[data-treasury-kind]');
+  const directionInput = form.querySelector('[data-treasury-direction]:checked')
+    || form.querySelector('[data-treasury-direction]');
   const categorySelect = form.querySelector('[data-treasury-category]');
   const newCategoryInput = form.querySelector('[data-treasury-new-category-input]');
   const amountRaw = String(form.querySelector('[name="amount"]')?.value || '').trim();
   const dateRaw = String(form.querySelector('[name="movement_date"]')?.value || '').trim();
 
-  const directionValue = directionHidden?.value || signSelect?.value || 'income';
-  const directionLabel = signSelect?.selectedOptions?.[0]?.textContent?.trim()
-    || (directionValue === 'expense' ? 'Uscita' : 'Entrata');
-  const kindLabel = kindSelect?.selectedOptions?.[0]?.textContent?.trim() || '';
+  const directionValue = directionInput?.value || 'income';
+  const directionLabel = directionInput?.closest('.tessera-choice-card')?.querySelector('.tessera-choice-card-title')?.textContent?.trim()
+    || (directionValue === 'expense' ? 'Uscita' : (directionValue === 'transfer' ? 'Giroconto' : 'Entrata'));
   let categoryLabel = '—';
-  if (categorySelect?.value === '__new__') {
+  if (directionValue === 'transfer') {
+    // A giroconto is described by its two wallets, not by a category.
+    const fromLabel = form.querySelector('[data-treasury-account]')?.selectedOptions?.[0]?.textContent?.trim() || '';
+    const toLabel = form.querySelector('[data-treasury-transfer-account]')?.selectedOptions?.[0]?.textContent?.trim() || '';
+    categoryLabel = fromLabel !== '' && toLabel !== '' ? `${fromLabel} → ${toLabel}` : (toLabel || fromLabel || '—');
+  } else if (categorySelect?.value === '__new__') {
     categoryLabel = String(newCategoryInput?.value || '').trim() || '—';
   } else {
     categoryLabel = categorySelect?.selectedOptions?.[0]?.textContent?.trim() || '—';
@@ -9813,7 +9840,7 @@ function formatTreasuryConfirmMessage(form, template) {
 
   return tpl
     .replace(':type', directionLabel)
-    .replace(':kind', kindLabel)
+    .replace(':kind', '')
     .replace(':amount', amountDisplay)
     .replace(':date', dateLabel)
     .replace(':category', categoryLabel);
@@ -10736,105 +10763,70 @@ function initAuthUpdateCheck() {
 }
 
 function initTreasuryCategory(root = document) {
-  root.querySelectorAll('[data-treasury-filter-auto]').forEach((el) => {
-    if (!(el instanceof HTMLSelectElement) || el.dataset.boundAuto === '1') return;
-    el.dataset.boundAuto = '1';
-    el.addEventListener('change', () => {
-      const form = el.form;
-      if (!form) return;
-      if (typeof form.requestSubmit === 'function') {
-        form.requestSubmit();
-      } else {
-        form.submit();
-      }
-    });
-  });
+  // Ledger filters (search + period/type/category/sort + grouping) apply live.
+  const filterForm = root.querySelector('[data-treasury-filter]');
+  if (filterForm instanceof HTMLFormElement) {
+    initLiveFilterForm(filterForm);
+  }
 
   root.querySelectorAll('[data-treasury-form]').forEach((form) => {
     const categorySelect = form.querySelector('[data-treasury-category]');
+    const docsRow = form.querySelector('[data-treasury-docs-row]');
     const newCategoryWrap = form.querySelector('[data-treasury-new-category]');
     const newCategoryInput = form.querySelector('[data-treasury-new-category-input]');
-    const directionHidden = form.querySelector('[data-treasury-direction]');
-    const kindSelect = form.querySelector('[data-treasury-kind]');
-    const signSelect = form.querySelector('[data-treasury-sign]');
-    const signWrap = form.querySelector('[data-treasury-sign-wrap]');
+    const directionRadios = [...form.querySelectorAll('[data-treasury-direction]')];
+    const accountWrap = form.querySelector('[data-treasury-account-wrap]');
+    const accountSelect = form.querySelector('[data-treasury-account]');
+    const methodWrap = form.querySelector('[data-treasury-method-wrap]');
+    const methodSelect = form.querySelector('[data-treasury-method]');
+    const transferWrap = form.querySelector('[data-treasury-transfer-fields]');
+    const transferSelect = form.querySelector('[data-treasury-transfer-account]');
+    const beneficiaryWrap = form.querySelector('[data-treasury-beneficiary-wrap]');
     const invoiceToggle = form.querySelector('[data-treasury-invoice-toggle]');
     const memberToggle = form.querySelector('[data-treasury-member-toggle]');
     const memberFields = form.querySelector('[data-treasury-member-fields]');
     const memberSelect = form.querySelector('[data-treasury-member-select]');
-    const amountCurrency = form.querySelector('[data-treasury-amount-currency]');
-    const currencyHint = form.querySelector('[data-treasury-currency-hint]');
-    const baseCurrency = String(form.dataset.baseCurrency || 'EUR').toUpperCase();
+
+    // Shared show/hide: a hidden block must never submit its (stale) values.
+    const setFieldsLocked = (container, locked) => {
+      if (!container) return;
+      container.hidden = locked;
+      container.querySelectorAll('input, select, textarea').forEach((input) => {
+        input.disabled = locked;
+      });
+    };
+
+    const currentDirection = () => directionRadios.find((radio) => radio.checked)?.value || 'income';
+    // The cards' look follows the real radio state, so the highlighted card can
+    // never drift away from the value that is actually submitted.
+    const paintDirectionCards = () => {
+      directionRadios.forEach((radio) => {
+        radio.closest('.tessera-choice-card')?.classList.toggle('is-selected', radio.checked);
+      });
+    };
+    // The wallet decides whether a payment method still makes sense: a cash desk
+    // implies "contanti", while a giroconto has no method at all.
+    const syncAccount = () => {
+      const isTransfer = currentDirection() === 'transfer';
+      const isCash = accountSelect?.value === 'cash';
+      setFieldsLocked(methodWrap, isTransfer || isCash);
+    };
+    accountSelect?.addEventListener('change', syncAccount);
     if (!categorySelect) {
       return;
     }
 
-    const syncKindSign = () => {
-      if (!kindSelect || !directionHidden) {
-        return;
-      }
-      const option = kindSelect.selectedOptions?.[0];
-      const directions = option?.dataset?.directions || 'both';
-      const defaultDir = option?.dataset?.defaultDirection || 'income';
-      if (signSelect) {
-        if (directions === 'income') {
-          signSelect.value = 'income';
-          signSelect.disabled = true;
-          if (signWrap) signWrap.hidden = true;
-        } else if (directions === 'expense') {
-          signSelect.value = 'expense';
-          signSelect.disabled = true;
-          if (signWrap) signWrap.hidden = true;
-        } else {
-          signSelect.disabled = false;
-          if (signWrap) signWrap.hidden = false;
-          if (!signSelect.value || (signSelect.value !== 'income' && signSelect.value !== 'expense')) {
-            signSelect.value = defaultDir;
-          }
-        }
-      }
-      directionHidden.value = signSelect?.value || defaultDir;
-    };
-    kindSelect?.addEventListener('change', syncKindSign);
-    signSelect?.addEventListener('change', () => {
-      if (directionHidden && signSelect) {
-        directionHidden.value = signSelect.value;
-      }
-      syncDirection();
-    });
-    syncKindSign();
-
+    // "Cerca tra i soci" and the free-text counterparty are mutually exclusive.
     const syncMember = () => {
       const involved = !!memberToggle?.checked;
-      if (memberFields) {
-        memberFields.hidden = !involved;
-      }
-      if (memberSelect) {
-        memberSelect.disabled = !involved;
-        if (!involved) {
-          memberSelect.value = '';
-        }
+      setFieldsLocked(memberFields, !involved);
+      setFieldsLocked(beneficiaryWrap, involved);
+      if (memberSelect && !involved) {
+        memberSelect.value = '';
       }
     };
     memberToggle?.addEventListener('change', syncMember);
     syncMember();
-
-    const syncCurrencyHint = () => {
-      if (!currencyHint || !amountCurrency) {
-        return;
-      }
-      const selected = String(amountCurrency.value || baseCurrency).toUpperCase();
-      if (selected !== baseCurrency) {
-        currencyHint.hidden = false;
-        const tpl = currencyHint.dataset.template || '';
-        currencyHint.textContent = tpl.replace(':currency', selected).replace(':base', baseCurrency);
-      } else {
-        currencyHint.hidden = true;
-        currencyHint.textContent = '';
-      }
-    };
-    amountCurrency?.addEventListener('change', syncCurrencyHint);
-    syncCurrencyHint();
 
     initTreasuryFileField(form);
 
@@ -10865,23 +10857,38 @@ function initTreasuryCategory(root = document) {
     sync();
 
     const syncDirection = () => {
-      const dir = directionHidden?.value || signSelect?.value || 'income';
-      const isExpense = dir === 'expense';
-      form.querySelectorAll('[data-treasury-expense-fields]').forEach((field) => {
-        field.hidden = !isExpense;
-        field.querySelectorAll('input, select, textarea').forEach((input) => {
-          input.disabled = !isExpense;
-        });
+      paintDirectionCards();
+      const direction = currentDirection();
+      const isExpense = direction === 'expense';
+      const isTransfer = direction === 'transfer';
+      form.querySelectorAll('[data-treasury-expense-fields]').forEach((block) => {
+        setFieldsLocked(block, !isExpense);
       });
       const isInvoice = isExpense && !!invoiceToggle?.checked;
-      form.querySelectorAll('[data-treasury-invoice-fields]').forEach((field) => {
-        field.hidden = !isInvoice;
-        field.querySelectorAll('input, select, textarea').forEach((input) => {
-          input.disabled = !isInvoice;
-        });
+      form.querySelectorAll('[data-treasury-invoice-fields]').forEach((block) => {
+        setFieldsLocked(block, !isInvoice);
       });
+      // Giroconto: only liquidity between two own wallets — no category, no
+      // document row, no payment method; the account select becomes
+      // "Da conto" and a second "A conto" wallet shows up.
+      setFieldsLocked(docsRow, isTransfer);
+      if (isTransfer && categorySelect.value !== 'internal_transfer') {
+        categorySelect.value = 'internal_transfer';
+        sync();
+      }
+      setFieldsLocked(transferWrap, !isTransfer);
+      if (transferSelect) {
+        transferSelect.required = isTransfer;
+      }
+      syncAccount();
+      const accountLabel = accountWrap?.querySelector('.field-label');
+      if (accountLabel && accountSelect) {
+        accountLabel.textContent = isTransfer
+          ? (accountSelect.dataset.labelTransfer || accountLabel.textContent)
+          : (accountSelect.dataset.labelDefault || accountLabel.textContent);
+      }
     };
-    directionHidden?.addEventListener('change', syncDirection);
+    directionRadios.forEach((radio) => radio.addEventListener('change', syncDirection));
     invoiceToggle?.addEventListener('change', syncDirection);
     syncDirection();
 
@@ -10921,24 +10928,28 @@ function bodyMaxUploadBytes() {
 }
 
 function initDocumentRowLinks(root = document) {
-  root.querySelectorAll('tr.doc-row-editable[data-href]').forEach((row) => {
-    const href = row.getAttribute('data-href');
-    if (!href) {
-      return;
-    }
+  root.querySelectorAll('tr.doc-row-editable[data-href], tr.clickable-row[data-href]').forEach((row) => {
+    if (row.dataset.rowLinkBound === '1') return;
+    row.dataset.rowLinkBound = '1';
+    const go = () => {
+      const href = row.getAttribute('data-href') || '';
+      if (href) window.location.href = href;
+    };
     row.addEventListener('click', (event) => {
+      if (!(event instanceof MouseEvent) || event.button !== 0) return;
+      if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
       const target = event.target;
-      if (target instanceof Element && target.closest('a, button, input, label, select, textarea')) {
+      if (target instanceof Element
+        && target.closest('a, button, input, label, select, textarea, form, [data-stop-row-nav]')) {
         return;
       }
-      window.location.href = href;
+      go();
     });
     row.addEventListener('keydown', (event) => {
-      if (event.key !== 'Enter' && event.key !== ' ') {
-        return;
-      }
+      if (event.key !== 'Enter' && event.key !== ' ') return;
+      if (event.target !== row) return;
       event.preventDefault();
-      window.location.href = href;
+      go();
     });
   });
 }

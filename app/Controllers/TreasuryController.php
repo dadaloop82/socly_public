@@ -35,13 +35,14 @@ final class TreasuryController extends BaseController
         if (!in_array($sort, ['date_desc', 'date_asc', 'created_desc', 'invoice_desc'], true)) {
             $sort = 'date_desc';
         }
-        $ledger = $this->treasury->ledger(200, $query, $sort);
+        $filters = $this->ledgerFilters($request);
+        $ledger = $this->treasury->ledger(200, $query, $sort, $filters);
         $config = $this->components->config('treasury', ['auto_from_payments' => true]);
         $this->render('treasury/index', [
             'title' => __('treasury.title'),
             'ledger' => $ledger,
             'movement_groups' => $groupByCategory
-                ? $this->treasury->groupedByCategory(200, $query, $sort)
+                ? $this->treasury->groupedByCategory(200, $query, $sort, $filters)
                 : [[
                     'key' => 'all',
                     'label' => __('treasury.group_by_category_off'),
@@ -49,17 +50,37 @@ final class TreasuryController extends BaseController
                 ]],
             'group_by_category' => $groupByCategory,
             'ledger_sort' => $sort,
+            'filters' => $filters,
             'config' => $config,
             'members' => $this->members->listForSelect(),
             'categories' => $this->treasury->categoryOptions(),
             'category_groups' => $this->treasury->categoryGroups(),
-            'movement_kinds' => TreasuryService::movementKindMeta(),
             'payment_method_groups' => $this->treasury->paymentMethodGroups(),
             'default_category' => $this->treasury->defaultCategory(),
             'search_query' => $query,
             'beneficiaries' => $this->treasury->beneficiaries(),
             'currency' => $this->currency,
             'hasAnyMovements' => $this->treasury->movementCount() > 0,
+        ]);
+    }
+
+    public function create(Request $request): void
+    {
+        require_component('treasury');
+        $this->render('treasury/form', [
+            'title' => __('treasury.add_movement'),
+            'isEdit' => false,
+            'action' => url('/treasury'),
+            'movement' => null,
+            'default_category' => $this->treasury->defaultCategory(),
+            'categories' => $this->treasury->categoryOptions(),
+            'category_groups' => $this->treasury->categoryGroups(),
+            'accounts' => $this->treasury->accountOptions(),
+            'payment_method_groups' => $this->treasury->paymentMethodGroups(),
+            'members' => $this->members->listForSelect(),
+            'config' => $this->components->config('treasury', ['auto_from_payments' => true]),
+            'beneficiaries' => $this->treasury->beneficiaries(),
+            'currency' => $this->currency,
         ]);
     }
 
@@ -81,12 +102,15 @@ final class TreasuryController extends BaseController
                 'builtin' => false,
             ];
         }
-        $this->render('treasury/edit', [
+        $this->render('treasury/form', [
             'title' => __('treasury.edit'),
+            'isEdit' => true,
+            'action' => url('/treasury/' . (int) $movement['id']),
             'movement' => $movement,
+            'default_category' => (string) ($movement['category'] ?? 'membership_fee'),
             'categories' => $categories,
             'category_groups' => $this->treasury->categoryGroups(),
-            'movement_kinds' => TreasuryService::movementKindMeta(),
+            'accounts' => $this->treasury->accountOptions(),
             'payment_method_groups' => $this->treasury->paymentMethodGroups(),
             'members' => $this->members->listForSelect(),
             'config' => $this->components->config('treasury', ['auto_from_payments' => true]),
@@ -129,7 +153,7 @@ final class TreasuryController extends BaseController
                 'invoice_pdf' => __('documents.upload_too_large', ['max' => upload_max_mb()]),
             ]);
             $this->rememberOld($request->all());
-            redirect('/treasury');
+            redirect('/treasury/create');
         }
         $result = $this->treasury->create(
             $request->all(),
@@ -140,7 +164,7 @@ final class TreasuryController extends BaseController
         if (empty($result['ok'])) {
             $this->flash('errors', $result['errors'] ?? ['treasury' => __('validation.required')]);
             $this->rememberOld($request->all());
-            redirect('/treasury');
+            redirect('/treasury/create');
         }
         $this->flash('success', __('treasury.saved'));
         redirect('/treasury');
@@ -155,8 +179,53 @@ final class TreasuryController extends BaseController
             echo 'Not found';
             return;
         }
-        header('Content-Type: application/pdf');
+        $detected = mime_content_type($path);
+        $mime = is_string($detected) && $detected !== '' ? $detected : 'application/octet-stream';
+        header('Content-Type: ' . $mime);
         header('Content-Disposition: inline; filename="' . basename($path) . '"');
         readfile($path);
+    }
+
+    /**
+     * Ledger filters from the query string (validated; period presets expand to a date range).
+     *
+     * @return array{direction:string,category:string,from:string,to:string,period:string}
+     */
+    private function ledgerFilters(Request $request): array
+    {
+        $direction = (string) $request->input('direction', '');
+        if (!in_array($direction, TreasuryService::DIRECTIONS, true)) {
+            $direction = '';
+        }
+        $category = trim((string) $request->input('category', ''));
+        if ($category !== '' && !in_array($category, array_column($this->treasury->categoryOptions(), 'key'), true)) {
+            $category = '';
+        }
+        $period = (string) $request->input('period', '');
+        if (!in_array($period, ['month', 'year', 'days30'], true)) {
+            $period = '';
+        }
+        $from = $this->isoDate((string) $request->input('from', ''));
+        $to = $this->isoDate((string) $request->input('to', ''));
+        if ($from === '' && $to === '' && $period !== '') {
+            [$from, $to] = match ($period) {
+                'month' => [date('Y-m-01'), date('Y-m-t')],
+                'year' => [date('Y-01-01'), date('Y-12-31')],
+                default => [date('Y-m-d', strtotime('-30 days')), date('Y-m-d')],
+            };
+        }
+        return [
+            'direction' => $direction,
+            'category' => $category,
+            'from' => $from,
+            'to' => $to,
+            'period' => $period,
+        ];
+    }
+
+    private function isoDate(string $value): string
+    {
+        $value = trim($value);
+        return preg_match('/^\d{4}-\d{2}-\d{2}$/', $value) === 1 ? $value : '';
     }
 }

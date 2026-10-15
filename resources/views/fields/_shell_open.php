@@ -14,6 +14,9 @@ $modifier = trim((string) ($modifier ?? ''));
 $wrapperClass = Fields::wrapperClass($context, (string) ($wrapper_class ?? ''), $modifier);
 $id = (string) ($id ?? '');
 $label = (string) ($label ?? '');
+$labelClass = trim((string) ($label_class ?? ''));
+$labelAttrs = is_array($label_attrs ?? null) ? $label_attrs : [];
+$labelExtra = (string) ($label_extra ?? '');
 $required = !empty($required);
 $icon = (string) ($icon ?? '');
 $dataField = (string) ($data_field ?? '');
@@ -34,11 +37,12 @@ if (!empty($wrap_attrs) && is_array($wrap_attrs)) {
 }
 ?>
 <div<?= Fields::attrs($wrapAttrs) ?>>
-<?php if ($label !== ''): ?>
-    <label class="field-label sf-field__label"<?= $id !== '' ? ' for="' . e($id) . '"' : '' ?>>
+<?php if ($label !== '' || $labelExtra !== ''): ?>
+    <label class="field-label sf-field__label<?= $labelClass !== '' ? ' ' . e($labelClass) : '' ?>"<?= $id !== '' ? ' for="' . e($id) . '"' : '' ?><?= Fields::attrs($labelAttrs) ?>>
         <?php if ($icon !== ''): ?>
             <span class="field-icon" data-icon="<?= e($icon) ?>" aria-hidden="true"></span>
         <?php endif; ?>
         <?= e($label) ?><?= $required ? ' *' : '' ?>
+        <?= $labelExtra ?>
     </label>
 <?php endif; ?>

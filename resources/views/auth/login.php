@@ -69,11 +69,11 @@ if ($setupUrl === '') {
             'value' => $currentLocale,
             'attrs' => ['data-login-lang' => true],
         ]) ?>
-        <label for="email" data-i18n="auth.email"><?= e(__('auth.email')) ?></label>
         <?= field('email', [
             'name' => 'email',
             'id' => 'email',
-            'label' => '',
+            'label' => (string) __('auth.email'),
+            'label_attrs' => ['data-i18n' => 'auth.email'],
             'value' => (string) old('email'),
             'required' => true,
             'placeholder' => (string) __('auth.email_placeholder'),
@@ -85,16 +85,16 @@ if ($setupUrl === '') {
             ],
         ]) ?>
 
-        <label for="password" data-i18n="auth.password"><?= e(__('auth.password')) ?></label>
         <?= field('password', [
             'name' => 'password',
             'id' => 'password',
-            'label' => '',
+            'label' => (string) __('auth.password'),
+            'label_attrs' => ['data-i18n' => 'auth.password'],
             'required' => true,
             'placeholder' => (string) __('auth.password_placeholder'),
             'autocomplete' => 'current-password',
             'wrapper_class' => 'password-field--bare',
-            'input_attrs' => 'data-i18n-placeholder="auth.password_placeholder"',
+            'attrs' => ['data-i18n-placeholder' => 'auth.password_placeholder'],
         ]) ?>
 
         <?= field('checkbox', [

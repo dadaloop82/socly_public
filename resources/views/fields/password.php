@@ -15,6 +15,8 @@ $props = [
     'wrapper_class' => trim('sf-field password-field ' . $wrapper_class . ($context === 'setup' ? ' setup-field' : '')),
     'input_attrs' => (string) ($input_attrs ?? ''),
     'hint_attrs' => (string) ($hint_attrs ?? ''),
+    'attrs' => is_array($attrs ?? null) ? $attrs : [],
+    'label_attrs' => is_array($label_attrs ?? null) ? $label_attrs : [],
 ];
 if ($hint !== '' && ($props['hint_attrs'] ?? '') === '') {
     // password_input supports optional hint via hint_attrs on a <p>; keep simple echo after.

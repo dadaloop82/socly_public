@@ -3,7 +3,7 @@
  * @var array<string,mixed> $values
  * @var list<array{key:string,label:string,builtin?:bool}> $categories
  * @var list<array{label:string,keys:list<string>}>|null $category_groups
- * @var list<array{key:string,directions:string,default:string}>|null $movement_kinds
+ * @var list<array{key:string,label:string}>|null $accounts
  * @var list<array{label:string,keys:list<string>}>|null $payment_method_groups
  * @var list<array> $members
  * @var list<string> $beneficiaries
@@ -14,8 +14,7 @@ $selectedCategory = (string) ($values['category'] ?? 'membership_fee');
 $showNewCategory = $selectedCategory === '__new__';
 $today = date('Y-m-d');
 $selectedDirection = (string) ($values['direction'] ?? 'income');
-$selectedKind = (string) ($values['movement_kind'] ?? 'operating');
-$movementKinds = $movement_kinds ?? \Socly\Services\TreasuryService::movementKindMeta();
+$isTransfer = $selectedDirection === 'transfer';
 $categoryGroups = $category_groups ?? [];
 $methodGroups = $payment_method_groups ?? [];
 $categoryMap = [];
@@ -32,12 +31,7 @@ $customCategories = array_values(array_filter(
     $categories,
     static fn (array $cat): bool => empty($cat['builtin']) || !isset($groupedCategoryKeys[(string) $cat['key']])
 ));
-$kindMetaJson = json_encode($movementKinds, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP);
 $baseCurrency = $currency->code();
-$selectedAmountCurrency = strtoupper(trim((string) ($values['amount_currency'] ?? $baseCurrency)));
-if (!in_array($selectedAmountCurrency, $currency->supportedCodes(), true)) {
-    $selectedAmountCurrency = $baseCurrency;
-}
 $displayAmount = (string) ($values['amount'] ?? '');
 if (isset($values['amount_entered']) && $values['amount_entered'] !== '' && $values['amount_entered'] !== null) {
     $displayAmount = (string) $values['amount_entered'];
@@ -48,27 +42,6 @@ $attachmentName = $hasAttachment ? basename((string) $values['attachment_path'])
 $attachmentPreviewUrl = trim((string) ($values['attachment_preview_url'] ?? ''));
 $documentEditUrl = trim((string) ($values['document_edit_url'] ?? ''));
 $fileReady = $hasAttachment;
-
-$movementKindOptions = [];
-foreach ($movementKinds as $kind) {
-    $key = (string) ($kind['key'] ?? 'operating');
-    $movementKindOptions[] = [
-        'value' => $key,
-        'label' => (string) __('treasury.kind_' . $key),
-        'attrs' => [
-            'data-directions' => (string) ($kind['directions'] ?? 'both'),
-            'data-default-direction' => (string) ($kind['default'] ?? 'income'),
-        ],
-    ];
-}
-
-$amountCurrencyOptions = [];
-foreach ($currency->supportedCodes() as $code) {
-    $amountCurrencyOptions[] = [
-        'value' => $code,
-        'label' => (string) __('currency.' . strtolower($code)) . ' (' . $code . ')',
-    ];
-}
 
 $treasuryCategoryGroups = [];
 $treasuryCategoryFlat = [];
@@ -110,9 +83,21 @@ if ($categoryGroups !== []) {
     $treasuryCategoryFlat[] = ['value' => '__new__', 'label' => (string) __('treasury.category_new')];
 }
 
-$selectedMethod = \Socly\Services\TreasuryService::normalizePaymentMethod(
-    (string) ($values['payment_method'] ?? 'cash')
-);
+$selectedMethod = trim((string) ($values['payment_method'] ?? ''));
+if ($selectedMethod !== '') {
+    $selectedMethod = \Socly\Services\TreasuryService::normalizePaymentMethod($selectedMethod);
+}
+$selectedAccount = \Socly\Services\TreasuryService::normalizeAccount((string) ($values['account'] ?? ''));
+$accountOptions = [];
+foreach (($accounts ?? []) as $accountOption) {
+    $accountOptions[(string) ($accountOption['key'] ?? '')] = (string) ($accountOption['label'] ?? '');
+}
+if ($accountOptions === []) {
+    foreach (\Socly\Services\TreasuryService::ACCOUNTS as $accountKey) {
+        $accountOptions[$accountKey] = (string) __('treasury.account_' . $accountKey);
+    }
+}
+$selectedTransferAccount = \Socly\Services\TreasuryService::normalizeAccount((string) ($values['transfer_account'] ?? ''));
 $paymentMethodGroups = [];
 $paymentMethodFlat = [];
 if ($methodGroups !== []) {
@@ -141,56 +126,49 @@ foreach ($members as $member) {
     ];
 }
 ?>
-<div class="treasury-type-row grid-3" data-treasury-kind-meta='<?= e((string) $kindMetaJson) ?>'>
-    <?= field('select', [
-        'name' => 'movement_kind',
-        'label' => (string) __('treasury.movement_kind'),
-        'value' => $selectedKind,
-        'include_empty' => false,
-        'options' => $movementKindOptions,
-        'attrs' => ['data-treasury-kind' => true],
-    ]) ?>
-    <div data-treasury-sign-wrap>
-        <?= field('select', [
-            'name' => '',
-            'label' => (string) __('treasury.direction_sign'),
-            'value' => $selectedDirection,
-            'include_empty' => false,
-            'options' => [
-                ['value' => 'income', 'label' => (string) __('treasury.direction_sign_income')],
-                ['value' => 'expense', 'label' => (string) __('treasury.direction_sign_expense')],
-            ],
-            'attrs' => ['data-treasury-sign' => true],
+<?= field('radio_cards', [
+    'name' => 'direction',
+    'label' => (string) __('treasury.direction_sign'),
+    'value' => $selectedDirection,
+    'required' => true,
+    'wrapper_class' => 'treasury-direction-field',
+    'cards_class' => 'treasury-direction-cards',
+    'options' => [
+        [
+            'value' => 'income',
+            'label' => (string) __('treasury.direction_sign_income'),
+            'card_class' => 'is-income',
+            'icon' => '<svg viewBox="0 0 24 24" width="24" height="24" aria-hidden="true"><path fill="currentColor" d="M12 3.5 5.5 11h4v9.5h5V11h4z"/></svg>',
+        ],
+        [
+            'value' => 'expense',
+            'label' => (string) __('treasury.direction_sign_expense'),
+            'card_class' => 'is-expense',
+            'icon' => '<svg viewBox="0 0 24 24" width="24" height="24" aria-hidden="true"><path fill="currentColor" d="M12 20.5 18.5 13h-4V3.5h-5V13h-4z"/></svg>',
+        ],
+        [
+            'value' => 'transfer',
+            'label' => (string) __('treasury.direction_sign_transfer'),
+            'card_class' => 'is-transfer',
+            'icon' => '<svg viewBox="0 0 24 24" width="24" height="24" aria-hidden="true"><path fill="currentColor" d="M3 6h12V3l5 4-5 4V8H3V6zM21 15H9v-3l-5 4 5 4v-3h12v-2z"/></svg>',
+        ],
+    ],
+    'attrs' => ['data-treasury-direction' => true],
+]) ?>
+<?= field('hidden', [
+    'name' => 'amount_currency',
+    'value' => $baseCurrency,
+]) ?>
+<div class="treasury-form-row treasury-form-row--economy">
+    <div class="treasury-amount-field">
+        <?= field('text', [
+            'name' => 'amount',
+            'label' => (string) __('treasury.amount'),
+            'value' => $displayAmount,
+            'required' => true,
+            'placeholder' => '0,00',
+            'attrs' => ['data-treasury-amount' => true, 'inputmode' => 'decimal'],
         ]) ?>
-    </div>
-    <?= field('hidden', [
-        'name' => 'direction',
-        'value' => $selectedDirection,
-        'required' => true,
-        'attrs' => ['data-treasury-direction' => true],
-    ]) ?>
-</div>
-<div class="grid-3">
-    <?= field('text', [
-        'name' => 'amount',
-        'label' => (string) __('treasury.amount'),
-        'value' => $displayAmount,
-        'required' => true,
-        'placeholder' => '0,00',
-        'inputmode' => 'decimal',
-        'attrs' => ['data-treasury-amount' => true],
-    ]) ?>
-    <div>
-        <?= field('select', [
-            'name' => 'amount_currency',
-            'label' => (string) __('treasury.amount_currency'),
-            'value' => $selectedAmountCurrency,
-            'include_empty' => false,
-            'options' => $amountCurrencyOptions,
-            'attrs' => ['data-treasury-amount-currency' => true],
-        ]) ?>
-        <p class="muted treasury-currency-hint" data-treasury-currency-hint hidden
-           data-template="<?= e(__('treasury.currency_convert_hint', ['base' => $baseCurrency])) ?>"></p>
     </div>
     <?= field('date', [
         'name' => 'movement_date',
@@ -198,9 +176,77 @@ foreach ($members as $member) {
         'value' => (string) ($values['movement_date'] ?? $today),
         'required' => true,
     ]) ?>
+    <div data-treasury-account-wrap>
+        <?= field('select', [
+            'name' => 'account',
+            'label' => (string) ($isTransfer ? __('treasury.transfer_from') : __('treasury.account')),
+            'value' => $selectedAccount,
+            'required' => true,
+            'include_empty' => true,
+            'empty_label' => (string) __('treasury.account_select'),
+            'options' => $accountOptions,
+            'attrs' => [
+                'data-treasury-account' => true,
+                'data-label-default' => (string) __('treasury.account'),
+                'data-label-transfer' => (string) __('treasury.transfer_from'),
+            ],
+        ]) ?>
+    </div>
+    <div data-treasury-method-wrap>
+        <?= field('select', [
+            'name' => 'payment_method',
+            'label' => (string) __('treasury.payment_method_label'),
+            'value' => $selectedMethod,
+            'include_empty' => true,
+            'empty_label' => (string) __('treasury.method_unspecified'),
+            'groups' => $paymentMethodGroups !== [] ? $paymentMethodGroups : null,
+            'options' => $paymentMethodGroups === [] ? $paymentMethodFlat : [],
+            'attrs' => ['data-treasury-method' => true],
+        ]) ?>
+    </div>
+    <div data-treasury-transfer-fields <?= $isTransfer ? '' : 'hidden' ?>>
+        <?= field('select', [
+            'name' => 'transfer_account',
+            'label' => (string) __('treasury.transfer_to'),
+            'value' => $selectedTransferAccount,
+            'required' => $isTransfer,
+            'include_empty' => true,
+            'empty_label' => (string) __('treasury.account_select'),
+            'options' => $accountOptions,
+            'attrs' => ['data-treasury-transfer-account' => true],
+        ]) ?>
+    </div>
 </div>
-<div class="grid-3">
-    <div data-treasury-category-wrap>
+<div data-treasury-expense-fields>
+    <div class="treasury-form-row treasury-form-row--single">
+        <div class="treasury-invoice-block">
+            <?= field('checkbox', [
+                'name' => 'invoice_payment',
+                'label' => (string) __('treasury.invoice_payment'),
+                'hint' => (string) __('treasury.invoice_payment_hint'),
+                'checked' => !empty($values['invoice_payment']),
+                'label_class' => 'checkbox-row-lg',
+                'attrs' => ['data-treasury-invoice-toggle' => true],
+            ]) ?>
+            <div class="treasury-invoice-fields" data-treasury-invoice-fields>
+                <?= field('text', [
+                    'name' => 'invoice_title',
+                    'label' => (string) __('treasury.invoice_title'),
+                    'value' => (string) ($values['invoice_title'] ?? ''),
+                    'maxlength' => 190,
+                    'placeholder' => (string) __('treasury.invoice_title_placeholder'),
+                ]) ?>
+                <?= field('date', [
+                    'name' => 'invoice_due_date',
+                    'label' => (string) __('treasury.invoice_due_date'),
+                    'value' => (string) ($values['invoice_due_date'] ?? ''),
+                ]) ?>
+            </div>
+        </div>
+    </div>
+</div>
+<div class="treasury-form-row treasury-form-row--docs" data-treasury-docs-row <?= $isTransfer ? 'hidden' : '' ?>>
+    <div data-treasury-category-wrap <?= $isTransfer ? 'hidden' : '' ?>>
         <?= field('select', [
             'name' => 'category',
             'label' => (string) __('treasury.category'),
@@ -222,78 +268,42 @@ foreach ($members as $member) {
             ]) ?>
         </div>
     </div>
-    <?= field('select', [
-        'name' => 'payment_method',
-        'label' => (string) __('treasury.method'),
-        'value' => $selectedMethod,
-        'include_empty' => false,
-        'groups' => $paymentMethodGroups !== [] ? $paymentMethodGroups : null,
-        'options' => $paymentMethodGroups === [] ? $paymentMethodFlat : [],
-        'attrs' => ['data-treasury-method' => true],
-    ]) ?>
     <?= field('text', [
+        'name' => 'invoice_number',
+        'label' => (string) __('treasury.doc_number'),
+        'value' => (string) ($values['invoice_number'] ?? ''),
+        'maxlength' => 120,
+        'placeholder' => (string) __('treasury.doc_number_placeholder'),
+    ]) ?>
+    <?= field('date', [
+        'name' => 'invoice_date',
+        'label' => (string) __('treasury.doc_date'),
+        'value' => (string) ($values['invoice_date'] ?? ''),
+    ]) ?>
+</div>
+<div class="treasury-form-row treasury-form-row--single">
+    <?= field('textarea', [
         'name' => 'description',
         'label' => (string) __('treasury.description'),
         'value' => (string) ($values['description'] ?? ''),
         'maxlength' => 500,
+        'rows' => 2,
     ]) ?>
 </div>
-<?= field('checkbox', [
-    'name' => 'member_involved',
-    'label' => (string) __('treasury.member_involved'),
-    'checked' => $memberInvolved,
-    'label_class' => 'checkbox-row-lg',
-    'attrs' => ['data-treasury-member-toggle' => true],
-]) ?>
-<div data-treasury-member-fields <?= $memberInvolved ? '' : 'hidden' ?>>
-    <?= field('select', [
-        'name' => 'member_id',
-        'label' => (string) __('treasury.member'),
-        'value' => (string) ($values['member_id'] ?? ''),
-        'empty_label' => (string) __('treasury.member_select'),
-        'options' => $treasuryMemberOptions,
-        'attrs' => ['data-treasury-member-select' => true],
-    ]) ?>
-</div>
-<div data-treasury-expense-fields>
-    <div class="treasury-invoice-block">
+<div class="treasury-form-row treasury-form-row--single">
+    <div class="treasury-soggetto-fields">
         <?= field('checkbox', [
-            'name' => 'invoice_payment',
-            'label' => (string) __('treasury.invoice_payment'),
-            'checked' => !empty($values['invoice_payment']),
+            'name' => 'member_involved',
+            'label' => (string) __('treasury.member_involved'),
+            'hint' => (string) __('treasury.member_involved_hint'),
+            'checked' => $memberInvolved,
             'label_class' => 'checkbox-row-lg',
-            'attrs' => ['data-treasury-invoice-toggle' => true],
+            'attrs' => ['data-treasury-member-toggle' => true],
         ]) ?>
-        <div class="treasury-invoice-fields" data-treasury-invoice-fields>
-            <p class="section-lede" style="margin:0 0 0.65rem"><?= e(__('treasury.invoice_block_lede')) ?></p>
-            <?= field('text', [
-                'name' => 'invoice_title',
-                'label' => (string) __('treasury.invoice_title'),
-                'value' => (string) ($values['invoice_title'] ?? ''),
-                'maxlength' => 190,
-                'placeholder' => (string) __('treasury.invoice_title_placeholder'),
-            ]) ?>
-            <div class="grid-3">
-                <?= field('text', [
-                    'name' => 'invoice_number',
-                    'label' => (string) __('treasury.invoice_number'),
-                    'value' => (string) ($values['invoice_number'] ?? ''),
-                    'maxlength' => 120,
-                ]) ?>
-                <?= field('date', [
-                    'name' => 'invoice_date',
-                    'label' => (string) __('treasury.invoice_date'),
-                    'value' => (string) ($values['invoice_date'] ?? ''),
-                ]) ?>
-                <?= field('date', [
-                    'name' => 'invoice_due_date',
-                    'label' => (string) __('treasury.invoice_due_date'),
-                    'value' => (string) ($values['invoice_due_date'] ?? ''),
-                ]) ?>
-            </div>
+        <div data-treasury-beneficiary-wrap <?= $memberInvolved ? 'hidden' : '' ?>>
             <?= field('text', [
                 'name' => 'beneficiary',
-                'label' => (string) __('treasury.supplier'),
+                'label' => (string) __('treasury.counterparty'),
                 'value' => (string) ($values['beneficiary'] ?? ''),
                 'maxlength' => 190,
                 'placeholder' => (string) __('treasury.supplier_placeholder'),
@@ -304,13 +314,29 @@ foreach ($members as $member) {
                     <option value="<?= e($beneficiary) ?>">
                 <?php endforeach; ?>
             </datalist>
+        </div>
+        <div data-treasury-member-fields <?= $memberInvolved ? '' : 'hidden' ?>>
+            <?= field('select', [
+                'name' => 'member_id',
+                'label' => (string) __('treasury.member'),
+                'value' => (string) ($values['member_id'] ?? ''),
+                'empty_label' => (string) __('treasury.member_select'),
+                'options' => $treasuryMemberOptions,
+                'attrs' => ['data-treasury-member-select' => true],
+            ]) ?>
+        </div>
+    </div>
+</div>
+<div class="treasury-form-row treasury-form-row--single">
+    <div class="treasury-attach-fields">
+        <p class="section-lede treasury-attach-lede"><?= e(__('treasury.attachment_lede')) ?></p>
             <div class="doc-file-field<?= $fileReady ? ' is-uploaded' : '' ?>" data-treasury-doc-field>
                 <div class="doc-file-row">
                     <?= field('file', [
                         'label' => (string) __('treasury.upload_document'),
                         'name' => 'invoice_pdf',
                         'button_label' => $fileReady ? (string) __('treasury.document_change') : (string) __('treasury.document_choose'),
-                        'accept' => 'application/pdf,.pdf',
+                        'accept' => 'application/pdf,image/jpeg,image/png,image/webp',
                         'as_button' => true,
                         'button_class' => 'btn btn-ghost file-btn sf-field__file-btn',
                         'attrs' => ['data-treasury-doc-input' => true],
@@ -341,7 +367,6 @@ foreach ($members as $member) {
                     <?php endif; ?>
                 </div>
             </div>
-        </div>
     </div>
 </div>
 <?php if (!empty($config['auto_from_payments'])): ?>

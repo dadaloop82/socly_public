@@ -82,6 +82,10 @@ final class Fields
         $props['name'] = (string) ($props['name'] ?? '');
         $props['id'] = (string) ($props['id'] ?? self::defaultId((string) $props['name']));
         $props['label'] = array_key_exists('label', $props) ? (string) $props['label'] : '';
+        $props['label_class'] = trim((string) ($props['label_class'] ?? ''));
+        $props['label_attrs'] = is_array($props['label_attrs'] ?? null) ? $props['label_attrs'] : [];
+        $props['label_extra'] = (string) ($props['label_extra'] ?? '');
+        $props['wrap_attrs'] = is_array($props['wrap_attrs'] ?? null) ? $props['wrap_attrs'] : [];
         $props['value'] = $props['value'] ?? '';
         if (is_bool($props['value']) || is_int($props['value']) || is_float($props['value'])) {
             $props['value'] = (string) (int) $props['value'];

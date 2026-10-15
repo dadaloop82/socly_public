@@ -738,10 +738,6 @@ $paymentExtraHtml = $buildProfileFieldsHtml($paymentExtraFields, \Socly\Services
 
                 <div class="member-profile-block" data-guardian-field hidden>
                     <div class="field-block" data-guardian-required-label="<?= e(__('members.guardian_required_badge')) ?>">
-                        <div class="guardian-label-row">
-                            <label class="field-label" for="field-guardian-select"><?= e(__('members.guardian_label')) ?></label>
-                            <span class="guardian-required-badge" data-guardian-badge><?= e(__('members.guardian_required_badge')) ?></span>
-                        </div>
                         <?= field('search', [
                             'name' => '',
                             'id' => 'field-guardian-search',
@@ -756,7 +752,8 @@ $paymentExtraHtml = $buildProfileFieldsHtml($paymentExtraFields, \Socly\Services
                         <?= field('select', [
                             'name' => 'guardian_member_id',
                             'id' => 'field-guardian-select',
-                            'label' => '',
+                            'label' => (string) __('members.guardian_label'),
+                            'label_extra' => '<span class="guardian-required-badge" data-guardian-badge>' . e(__('members.guardian_required_badge')) . '</span>',
                             'value' => $oldGuardianId,
                             'empty_label' => __('members.guardian_none'),
                             'options' => array_map(static fn (array $c): array => [

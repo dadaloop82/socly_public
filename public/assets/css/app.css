@@ -4957,15 +4957,6 @@ input.is-geo-forced,
   background-position: center bottom;
   background-size: cover;
 }
-.guardian-label-row {
-  display: flex;
-  align-items: center;
-  gap: 0.55rem;
-  flex-wrap: wrap;
-}
-.guardian-label-row .field-label {
-  margin: 0;
-}
 .guardian-required-badge {
   display: inline-flex;
   align-items: center;
@@ -8357,6 +8348,9 @@ button.setup-scrape-logo-frame:focus-visible .setup-scrape-logo-overlay {
 .stat-negative { color: #b42318; }
 .treasury-ledger .treasury-row-income { background: color-mix(in srgb, #0f7a48 6%, transparent); }
 .treasury-ledger .treasury-row-expense { background: color-mix(in srgb, #b42318 5%, transparent); }
+/* Giroconto: liquidity moved between own accounts — neutral, balance-safe row. */
+.treasury-ledger .treasury-row-transfer { background: color-mix(in srgb, #5b6472 7%, transparent); }
+.treasury-ledger .amount-transfer { color: #4a5568; font-weight: 700; }
 .treasury-ledger .amount-income { color: #0f7a48; font-weight: 700; }
 .treasury-ledger .amount-expense { color: #b42318; font-weight: 700; }
 .treasury-ledger .amount-balance { font-variant-numeric: tabular-nums; }
@@ -9650,9 +9644,15 @@ tr.doc-row-editable:focus-visible {
   font-size: 0.82rem;
   line-height: 1.3;
 }
+.doc-file-field .doc-file-status,
+.doc-file-field .doc-file-hint {
+  /* Pezza giustificativa: testo secondario ma leggibile (prima era grigio su grigio). */
+  color: color-mix(in srgb, var(--ink, #1a1a1a) 74%, transparent);
+}
 .doc-file-hint {
   font-size: 0.78rem;
   line-height: 1.3;
+  font-weight: 500;
 }
 .doc-file-progress {
   display: flex;
@@ -9704,32 +9704,196 @@ tr.doc-row-editable:focus-visible {
   font-weight: 700;
 }
 
-.treasury-filter-submit-mobile { display: none; }
-.treasury-filter-q-label { display: block; }
-.treasury-filter-q-row {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 0.45rem;
-}
-.treasury-filter-q-row input { flex: 1; min-width: min(100%, 14rem); }
-@media (min-width: 52rem) {
-  .treasury-filter .treasury-filter-head {
-    align-items: center;
-  }
-  .treasury-filter-q-label { display: none; }
-  .treasury-filter-submit-mobile { display: none; }
-  .treasury-filter {
-    padding-bottom: 1rem;
+/* Ledger filters: one row on desktop — search + period/type/category/sort + grouping. */
+@media (min-width: 961px) {
+  .treasury-filter-row {
+    grid-template-columns: minmax(11rem, 2fr) repeat(4, minmax(7rem, 1fr)) auto auto;
   }
 }
-@media (max-width: 51.99rem) {
-  .treasury-filter-submit-desktop { display: none; }
-  .treasury-filter-submit-mobile { display: inline-flex; }
+.treasury-filter-group,
+.treasury-filter-reset {
+  align-self: end;
+}
+.treasury-filter-group .field-label {
+  font-weight: 600;
 }
 
 .treasury-form-panel {
   margin-bottom: 1rem;
+}
+/* Prima cassa: form movimento su pagina dedicata (stesso layout del modale). */
+/* ── Entrata / Uscita: pulsanti grandi con stato attivo inequivocabile ── */
+.treasury-direction-field {
+  margin-bottom: 1.1rem;
+}
+.treasury-direction-cards {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.75rem;
+}
+@media (max-width: 560px) {
+  .treasury-direction-cards {
+    grid-template-columns: 1fr;
+  }
+}
+.treasury-direction-cards .tessera-choice-card {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.65rem;
+  min-height: 4.75rem;
+  padding: 0.95rem 1rem;
+  border-width: 2px;
+  border-color: color-mix(in srgb, var(--ink) 16%, transparent);
+  border-radius: 16px;
+}
+.treasury-direction-cards .tessera-choice-card-icon {
+  width: 2.6rem;
+  height: 2.6rem;
+  border-radius: 13px;
+  background: color-mix(in srgb, var(--ink) 7%, #fff);
+  color: color-mix(in srgb, var(--ink) 60%, transparent);
+}
+.treasury-direction-cards .tessera-choice-card-title {
+  font-size: 1.08rem;
+  font-weight: 800;
+  letter-spacing: 0.01em;
+  color: color-mix(in srgb, var(--ink) 72%, transparent);
+}
+.treasury-direction-cards .is-income.is-selected,
+.treasury-direction-cards .is-income:has(> input:checked) {
+  background: #0f7a48;
+  border-color: #0b5c36;
+  box-shadow: 0 10px 22px color-mix(in srgb, #0f7a48 34%, transparent);
+}
+.treasury-direction-cards .is-expense.is-selected,
+.treasury-direction-cards .is-expense:has(> input:checked) {
+  background: #b42318;
+  border-color: #8f1c13;
+  box-shadow: 0 10px 22px color-mix(in srgb, #b42318 32%, transparent);
+}
+.treasury-direction-cards .is-transfer.is-selected,
+.treasury-direction-cards .is-transfer:has(> input:checked) {
+  background: #5b6472;
+  border-color: #474e59;
+  box-shadow: 0 10px 22px color-mix(in srgb, #5b6472 30%, transparent);
+}
+.treasury-direction-cards .is-income.is-selected .tessera-choice-card-title,
+.treasury-direction-cards .is-income:has(> input:checked) .tessera-choice-card-title,
+.treasury-direction-cards .is-expense.is-selected .tessera-choice-card-title,
+.treasury-direction-cards .is-expense:has(> input:checked) .tessera-choice-card-title,
+.treasury-direction-cards .is-transfer.is-selected .tessera-choice-card-title,
+.treasury-direction-cards .is-transfer:has(> input:checked) .tessera-choice-card-title {
+  color: #fff;
+}
+.treasury-direction-cards .is-income.is-selected .tessera-choice-card-icon,
+.treasury-direction-cards .is-income:has(> input:checked) .tessera-choice-card-icon,
+.treasury-direction-cards .is-expense.is-selected .tessera-choice-card-icon,
+.treasury-direction-cards .is-expense:has(> input:checked) .tessera-choice-card-icon,
+.treasury-direction-cards .is-transfer.is-selected .tessera-choice-card-icon,
+.treasury-direction-cards .is-transfer:has(> input:checked) .tessera-choice-card-icon {
+  background: rgba(255, 255, 255, 0.24);
+  color: #fff;
+}
+.treasury-direction-cards .tessera-choice-card.is-selected::after,
+.treasury-direction-cards .tessera-choice-card:has(> input:checked)::after {
+  content: '✓';
+  position: absolute;
+  top: 0.5rem;
+  right: 0.8rem;
+  font-size: 1.05rem;
+  font-weight: 800;
+  color: #fff;
+  line-height: 1;
+}
+.treasury-direction-cards .tessera-choice-card:not(.is-selected):not(:has(> input:checked)):hover {
+  background: color-mix(in srgb, var(--ink) 4%, #fff);
+  border-color: color-mix(in srgb, var(--ink) 30%, transparent);
+}
+/* Rete di sicurezza: se una classe "is-selected" rimane indietro, il pulsante
+   non si colora — lo stato reale è sempre quello del radio selezionato. */
+.treasury-direction-cards .tessera-choice-card.is-selected:not(:has(> input:checked)) {
+  background: #fff;
+  border-color: color-mix(in srgb, var(--ink) 16%, transparent);
+  box-shadow: none;
+}
+.treasury-direction-cards .tessera-choice-card.is-selected:not(:has(> input:checked)) .tessera-choice-card-title {
+  color: color-mix(in srgb, var(--ink) 72%, transparent);
+}
+.treasury-direction-cards .tessera-choice-card.is-selected:not(:has(> input:checked)) .tessera-choice-card-icon {
+  background: color-mix(in srgb, var(--ink) 7%, #fff);
+  color: color-mix(in srgb, var(--ink) 60%, transparent);
+}
+.treasury-direction-cards .tessera-choice-card.is-selected:not(:has(> input:checked))::after {
+  content: none;
+}
+.treasury-form-row {
+  display: grid;
+  gap: 0.85rem;
+  margin-top: 0.9rem;
+}
+/* Rows are grids, so `hidden` needs an explicit rule to beat `display: grid`. */
+.treasury-form-row[hidden] {
+  display: none;
+}
+/* Importo · Data · Conto («Da conto») · Metodo («A conto») */
+.treasury-form-row--economy {
+  grid-template-columns: minmax(0, 1.05fr) minmax(0, 1fr) minmax(0, 1.15fr) minmax(0, 1fr);
+}
+/* Cassa contanti: il metodo è implicito, la riga resta a tre colonne. */
+@media (min-width: 961px) {
+  .treasury-form-row--economy:has([data-treasury-method-wrap][hidden]):not(:has([data-treasury-transfer-fields]:not([hidden]))) {
+    grid-template-columns: minmax(0, 1.05fr) minmax(0, 1fr) minmax(0, 1.25fr);
+  }
+}
+/* Categoria (50%) · N. documento (30%) · Data documento (20%) */
+.treasury-form-row--docs {
+  grid-template-columns: 5fr 3fr 2fr;
+  align-items: start;
+}
+.treasury-form-row--single {
+  grid-template-columns: 1fr;
+}
+.treasury-soggetto-fields,
+.treasury-attach-fields {
+  display: grid;
+  gap: 0.7rem;
+  align-content: start;
+}
+/* Fixed € inside the amount control (associations work in EUR). */
+.treasury-amount-field {
+  position: relative;
+}
+.treasury-amount-field input {
+  padding-right: 2.1rem;
+}
+.treasury-amount-field::after {
+  content: '€';
+  position: absolute;
+  right: 0.8rem;
+  bottom: 0.72rem;
+  font-weight: 700;
+  color: color-mix(in srgb, var(--ink) 55%, transparent);
+  pointer-events: none;
+}
+.treasury-attach-lede {
+  margin: 0;
+}
+.treasury-invoice-fields {
+  display: grid;
+  gap: 0.75rem;
+  margin-top: 0.35rem;
+}
+@media (min-width: 961px) {
+  .treasury-invoice-fields {
+    grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr);
+    align-items: start;
+  }
+}
+@media (max-width: 960px) {
+  .treasury-form-row--economy,
+  .treasury-form-row--docs {
+    grid-template-columns: 1fr;
+  }
 }
 .treasury-invoice-block {
   display: grid;

@@ -37,11 +37,11 @@ $formOpen = $old !== [];
 </div>
 
 <form class="panel filter-bar members-filter" method="get" action="<?= e(url('/documents')) ?>" role="search" style="margin-bottom:1rem">
-    <label class="visually-hidden" for="doc-archive-q-top"><?= e(__('documents.search')) ?></label>
     <?= field('search', [
         'name' => 'q',
         'id' => 'doc-archive-q-top',
-        'label' => '',
+        'label' => (string) __('documents.search'),
+        'label_class' => 'visually-hidden',
         'value' => (string) ($search_query ?? ''),
         'context' => 'filter',
         'placeholder' => (string) __('documents.search_placeholder'),

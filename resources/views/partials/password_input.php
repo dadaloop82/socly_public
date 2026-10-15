@@ -25,12 +25,14 @@ $minlength = isset($minlength) && (int) $minlength > 0 ? (int) $minlength : null
 $wrapperClass = trim('password-field ' . (string) ($wrapper_class ?? 'setup-field'));
 $inputAttrs = trim((string) ($input_attrs ?? ''));
 $hintAttrs = trim((string) ($hint_attrs ?? ''));
+$labelAttrs = is_array($label_attrs ?? null) ? $label_attrs : [];
+$fieldAttrs = Socly\Support\Fields::attrs(is_array($attrs ?? null) ? $attrs : []);
 $tag = $label !== '' ? 'label' : 'div';
 $star = $required ? ' *' : '';
 ?>
 <<?= $tag ?> class="<?= e($wrapperClass) ?>" data-password-field>
     <?php if ($label !== ''): ?>
-        <span><?= e($label) ?><?= e($star) ?></span>
+        <span<?= Socly\Support\Fields::attrs($labelAttrs) ?>><?= e($label) ?><?= e($star) ?></span>
     <?php endif; ?>
     <span class="password-input-wrap">
         <input
@@ -42,7 +44,7 @@ $star = $required ? ' *' : '';
             <?= $placeholder !== '' ? 'placeholder="' . e($placeholder) . '"' : '' ?>
             <?= $required ? 'required' : '' ?>
             <?= $minlength !== null ? 'minlength="' . (int) $minlength . '"' : '' ?>
-            <?= $inputAttrs !== '' ? $inputAttrs : '' ?>
+            <?= $inputAttrs !== '' ? $inputAttrs : '' ?><?= $fieldAttrs ?>
         >
         <button
             type="button"

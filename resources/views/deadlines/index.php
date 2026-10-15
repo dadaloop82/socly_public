@@ -73,11 +73,11 @@ $filterUrl = static function (string $filter = '') use ($search_query): string {
     <?php if ($activeFilter !== ''): ?>
         <?= field('hidden', ['name' => 'filter', 'value' => $activeFilter]) ?>
     <?php endif; ?>
-    <label class="visually-hidden" for="deadline-q-top"><?= e(__('deadlines.search')) ?></label>
     <?= field('search', [
         'name' => 'q',
         'id' => 'deadline-q-top',
-        'label' => '',
+        'label' => (string) __('deadlines.search'),
+        'label_class' => 'visually-hidden',
         'value' => (string) ($search_query ?? ''),
         'context' => 'filter',
         'placeholder' => (string) __('deadlines.search_placeholder'),

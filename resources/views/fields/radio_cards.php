@@ -15,6 +15,7 @@ foreach ($rawOptions as $k => $opt) {
             'label' => (string) ($opt['label'] ?? ''),
             'icon' => (string) ($opt['icon'] ?? ''),
             'description' => (string) ($opt['description'] ?? ''),
+            'card_class' => trim((string) ($opt['card_class'] ?? '')),
         ];
     } else {
         $normalized[] = [
@@ -22,6 +23,7 @@ foreach ($rawOptions as $k => $opt) {
             'label' => (string) $opt,
             'icon' => '',
             'description' => '',
+            'card_class' => '',
         ];
     }
 }
@@ -46,7 +48,7 @@ echo view_partial('fields/_shell_open', array_merge(get_defined_vars(), [
             'disabled' => $disabled,
         ], $attrs);
         ?>
-        <label class="tessera-choice-card<?= $selected ? ' is-selected' : '' ?>">
+        <label class="tessera-choice-card<?= $selected ? ' is-selected' : '' ?><?= $opt['card_class'] !== '' ? ' ' . e($opt['card_class']) : '' ?>">
             <input<?= Fields::attrs($rAttrs) ?>>
             <?php if ($opt['icon'] !== ''): ?>
                 <span class="tessera-choice-card-icon"><?= $opt['icon'] ?></span>
