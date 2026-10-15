@@ -199,12 +199,14 @@ if ($user && app()->isInstalled() && !$temporaryInstance && can('settings.manage
                 && component_enabled('deadlines')
                 && can('deadlines.view')
             ) {
-                $sidebarDeadlines = app(\Socly\Services\DeadlineService::class)->upcoming(
+                $deadlineService = app(\Socly\Services\DeadlineService::class);
+                $sidebarDeadlines = $deadlineService->upcoming(
                     12,
                     '',
                     true,
                     '',
-                    date('Y-m-d', strtotime('+7 days'))
+                    // Finestra = preavviso più ampio configurato, così i promemoria a 30 giorni si vedono.
+                    date('Y-m-d', strtotime('+' . $deadlineService->maxNotifyDays() . ' days'))
                 );
             }
         } catch (\Throwable) {
@@ -236,6 +238,7 @@ if ($user && app()->isInstalled() && !$temporaryInstance && can('settings.manage
                         }
                         $itemId = (int) ($item['id'] ?? 0);
                         $isSystem = str_starts_with((string) ($item['source'] ?? ''), 'system:');
+                        $notifyThreshold = \Socly\Services\DeadlineService::notifyAlert($item, $sidebarToday);
                         $href = can('deadlines.manage') && !$isSystem
                             ? url('/deadlines/' . $itemId . '/edit')
                             : url('/deadlines');
@@ -246,6 +249,13 @@ if ($user && app()->isInstalled() && !$temporaryInstance && can('settings.manage
                                 <span class="sidebar-deadline-meta">
                                     <span class="sidebar-deadline-badge"><?= e(__('deadlines.badge_' . $state)) ?></span>
                                     <time datetime="<?= e($due) ?>"><?= e(format_date($due) ?: '—') ?></time>
+                                    <?php if ($notifyThreshold !== null): ?>
+                                        <span class="sidebar-deadline-notify" title="<?= e(__('deadlines.notify_title')) ?>">
+                                            <?= e($notifyThreshold === 0
+                                                ? __('deadlines.notify_badge_today')
+                                                : __('deadlines.notify_badge', ['days' => (string) $notifyThreshold])) ?>
+                                        </span>
+                                    <?php endif; ?>
                                 </span>
                             </a>
                         </li>

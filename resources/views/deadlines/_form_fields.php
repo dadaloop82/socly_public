@@ -74,6 +74,11 @@ $notifyLabel = static function (int $day): string {
         ? (string) __('deadlines.notify_same_day')
         : (string) __('deadlines.notify_days_generic', ['days' => (string) $day]);
 };
+$notifyUnit = static function (int $day): string {
+    return $day === 0
+        ? (string) __('deadlines.notify_unit_same_day')
+        : (string) __('deadlines.notify_unit_days');
+};
 
 // Prossima ricorrenza annuale di una data fissa (es. 30/04 o 30/06).
 $nextAnnualDate = static function (string $monthDay): string {
@@ -264,16 +269,20 @@ $nextAnnualDate = static function (string $monthDay): string {
         <span class="field-label"><?= e(__('deadlines.notify_title')) ?></span>
         <div class="deadlines-notify-pills">
             <?php foreach ($notifyPresets as $notifyDay): ?>
-                <label class="deadlines-notify-pill">
+                <?php $notifyChecked = in_array($notifyDay, $notifySelected, true); ?>
+                <label class="deadlines-notify-pill<?= $notifyChecked ? ' is-on' : '' ?>">
                     <?= field('checkbox', [
                         'name' => 'notify_days[]',
-                        'value' => in_array($notifyDay, $notifySelected, true) ? (string) $notifyDay : '',
+                        'id' => 'notify-days-' . $notifyDay,
+                        'value' => $notifyChecked ? (string) $notifyDay : '',
                         'check_value' => (string) $notifyDay,
-                        'checked' => in_array($notifyDay, $notifySelected, true),
+                        'checked' => $notifyChecked,
                         'label' => '',
                         'bare' => true,
+                        'attrs' => ['aria-label' => $notifyLabel($notifyDay)],
                     ]) ?>
-                    <span><?= e($notifyLabel($notifyDay)) ?></span>
+                    <span class="deadlines-notify-days"><?= (int) $notifyDay ?></span>
+                    <span class="deadlines-notify-unit"><?= e($notifyUnit($notifyDay)) ?></span>
                 </label>
             <?php endforeach; ?>
         </div>

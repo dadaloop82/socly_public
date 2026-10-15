@@ -419,7 +419,8 @@ $app->bind(SettingsController::class, fn (App $a) => new SettingsController(
     $a->get(PlatformService::class),
     $a->get(UserService::class),
     $a->get(EmailTemplateService::class),
-    $a->get(WorkflowService::class)
+    $a->get(WorkflowService::class),
+    $a->get(TreasuryService::class)
 ));
 $app->bind(TreasuryController::class, fn (App $a) => new TreasuryController(
     $a->get(View::class),

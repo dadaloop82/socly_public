@@ -269,6 +269,67 @@ final class DeadlineService
         return str_starts_with((string) ($item['source'] ?? ''), 'system:');
     }
 
+    /**
+     * Reminder threshold already crossed for an item (e.g. 30, 7 or 0 days before),
+     * or null when the item has no notifications configured or is already late.
+     *
+     * @param array<string,mixed> $item
+     */
+    public static function notifyAlert(array $item, ?string $today = null): ?int
+    {
+        $due = trim((string) ($item['due_date'] ?? ''));
+        if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $due)) {
+            return null;
+        }
+        $thresholds = [];
+        foreach (preg_split('/[^\d]+/', (string) ($item['notify_days'] ?? '')) ?: [] as $chunk) {
+            $chunk = trim((string) $chunk);
+            if ($chunk !== '') {
+                $thresholds[] = (int) $chunk;
+            }
+        }
+        if ($thresholds === []) {
+            return null;
+        }
+        $thresholds = array_values(array_unique($thresholds));
+        // Dal più stretto al più ampio: l'avviso attivo è il primo che "contiene" oggi
+        // (es. con 5 giorni residui e [30, 7, 0] l'avviso attivo è quello a 7 giorni).
+        sort($thresholds);
+        $today = $today !== null && $today !== '' ? $today : date('Y-m-d');
+        $daysLeft = (int) floor((strtotime($due) - strtotime($today)) / 86400);
+        if ($daysLeft < 0) {
+            return null; // già scaduta: l'avviso è lo stato "Scaduta", non un promemoria
+        }
+        foreach ($thresholds as $threshold) {
+            if ($daysLeft <= $threshold) {
+                return $threshold;
+            }
+        }
+        return null;
+    }
+
+    /** Finestra di avviso più ampia configurata (per il blocco scadenze della barra laterale). */
+    public function maxNotifyDays(int $fallback = 7, int $max = 180): int
+    {
+        $rows = $this->db->fetchAll(
+            "SELECT notify_days FROM deadline_items
+             WHERE status = 'open' AND notify_days IS NOT NULL AND notify_days <> ''"
+        );
+        $maxDays = 0;
+        foreach ($rows as $row) {
+            foreach (preg_split('/[^\d]+/', (string) $row['notify_days']) ?: [] as $chunk) {
+                $chunk = trim((string) $chunk);
+                if ($chunk !== '') {
+                    $maxDays = max($maxDays, (int) $chunk);
+                }
+            }
+        }
+        if ($maxDays <= 0) {
+            return $fallback;
+        }
+        return min($max, max($fallback, $maxDays));
+    }
+
     /** @return array{overdue:int,due_soon:int,open:int} */
     public function counts(): array
     {

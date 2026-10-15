@@ -8474,26 +8474,74 @@ button.setup-scrape-logo-frame:focus-visible .setup-scrape-logo-overlay {
 }
 .deadlines-template:hover { background: color-mix(in srgb, var(--brand-primary, #0D6E66) 12%, #fff); }
 .deadlines-templates-hint { margin: 0; font-size: 0.8rem; }
-/* Preavvisi a pillole (niente numeri separati da virgola) */
+/* Preavvisi: pillole larghe su una riga, con il numero in evidenza */
 .deadlines-notify { display: grid; gap: 0.4rem; }
-.deadlines-notify-pills { display: flex; flex-wrap: wrap; gap: 0.45rem; }
+.deadlines-notify-pills {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.6rem;
+}
 .deadlines-notify-pill {
-  display: inline-flex;
+  display: flex;
   align-items: center;
-  gap: 0.4rem;
-  padding: 0.35rem 0.7rem;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 0.6rem 0.85rem;
   border: 1px solid color-mix(in srgb, var(--ink) 14%, transparent);
-  border-radius: 999px;
-  font-size: 0.85rem;
+  border-radius: 14px;
   font-weight: 600;
   cursor: pointer;
+  transition: border-color 0.15s ease, background 0.15s ease;
 }
+.deadlines-notify-pill input {
+  width: 1.05rem;
+  height: 1.05rem;
+  accent-color: var(--brand-primary, #0D6E66);
+  flex-shrink: 0;
+}
+.deadlines-notify-days {
+  font-size: 1.35rem;
+  font-weight: 800;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+  color: color-mix(in srgb, var(--ink) 78%, transparent);
+}
+.deadlines-notify-unit {
+  font-size: 0.82rem;
+  color: color-mix(in srgb, var(--ink) 62%, transparent);
+}
+.deadlines-notify-pill.is-on,
 .deadlines-notify-pill:has(input:checked) {
   border-color: color-mix(in srgb, var(--brand-primary, #0D6E66) 55%, transparent);
   background: color-mix(in srgb, var(--brand-primary, #0D6E66) 10%, #fff);
+}
+.deadlines-notify-pill.is-on .deadlines-notify-days,
+.deadlines-notify-pill:has(input:checked) .deadlines-notify-days {
   color: var(--brand-primary-ink, var(--brand-primary, #0D6E66));
 }
+.deadlines-notify-pill.is-on .deadlines-notify-unit,
+.deadlines-notify-pill:has(input:checked) .deadlines-notify-unit {
+  color: color-mix(in srgb, var(--brand-primary-ink, #0D6E66) 80%, transparent);
+}
+@media (max-width: 560px) {
+  .deadlines-notify-pills { grid-template-columns: 1fr; }
+}
 .deadlines-notify-hint { margin: 0; font-size: 0.8rem; }
+/* Avviso attivo (promemoria dentro la finestra scelta) */
+.deadline-notify,
+.sidebar-deadline-notify {
+  padding: 0.1rem 0.45rem;
+  border-radius: 999px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  background: #fff4db;
+  color: #9a6700;
+  white-space: nowrap;
+}
+.sidebar-deadline-notify {
+  background: color-mix(in srgb, var(--brand-accent, #B84A1B) 22%, transparent);
+  color: color-mix(in srgb, var(--brand-paper) 92%, var(--brand-accent));
+}
 
 /* ── Verbali e documenti: barra filtri live + archivio per categoria ── */
 @media (min-width: 961px) {

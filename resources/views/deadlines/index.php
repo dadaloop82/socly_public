@@ -241,6 +241,7 @@ foreach ($deadline_items as $item) {
                                 $categoryLabel = $categoryFilterOptions[$categoryKey] ?? $categoryKey;
                                 $recurrence = (string) ($item['recurrence'] ?? 'none');
                                 $assignee = trim((string) ($item['assignee_role'] ?? ''));
+                                $notifyAlert = \Socly\Services\DeadlineService::notifyAlert($item, $today);
                                 // Scadenze automatiche: azione contestuale verso il modulo che le genera.
                                 $sourceAction = [];
                                 if ($isSystem) {
@@ -298,6 +299,13 @@ foreach ($deadline_items as $item) {
                                             <?php endif; ?>
                                             <?php if ($recurrence !== '' && $recurrence !== 'none'): ?>
                                                 <span class="deadline-recurrence"><?= e(__('deadlines.recurrence_' . $recurrence)) ?></span>
+                                            <?php endif; ?>
+                                            <?php if ($notifyAlert !== null): ?>
+                                                <span class="deadline-notify" title="<?= e(__('deadlines.notify_title')) ?>">
+                                                    <?= e($notifyAlert === 0
+                                                        ? __('deadlines.notify_badge_today')
+                                                        : __('deadlines.notify_badge', ['days' => (string) $notifyAlert])) ?>
+                                                </span>
                                             <?php endif; ?>
                                         </div>
                                         <?php if (!empty($item['notes'])): ?>
