@@ -1679,7 +1679,7 @@ return [
         'method_other' => 'Other method',
         'none' => 'None',
         'invoice_payment' => 'Invoice payment',
-        'invoice_payment_hint' => 'Only to link an invoice: number and document date go in the «Category» row.',
+        'invoice_payment_hint' => 'Tick to record the full invoice details (number, date, subject, due date).',
         'invoice_title' => 'Invoice name / subject',
         'invoice_title_placeholder' => 'e.g. Office rent March',
         'invoice_number' => 'Invoice number',

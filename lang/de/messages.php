@@ -1677,7 +1677,7 @@ return [
         'method_other' => 'Andere Zahlungsart',
         'none' => 'Keine',
         'invoice_payment' => 'Rechnungszahlung',
-        'invoice_payment_hint' => 'Nur zum Verknüpfen einer Rechnung: Nummer und Belegdatum stehen in der Zeile «Kategorie».',
+        'invoice_payment_hint' => 'Ankreuzen, um alle Rechnungsangaben zu erfassen (Nummer, Datum, Betreff, Fälligkeit).',
         'invoice_title' => 'Rechnungsname / Betreff',
         'invoice_title_placeholder' => 'z. B. Miete Büro März',
         'invoice_number' => 'Rechnungsnummer',

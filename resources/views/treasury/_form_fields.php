@@ -233,7 +233,12 @@ foreach ($members as $member) {
         ]) ?>
     </div>
 </div>
-<div data-treasury-expense-fields>
+<?php
+// Uscita + "Pagamento fattura": the invoice data live inside the block (complete and
+// self-contained). Without the flag the paper invoice details stay in the doc row.
+$invoiceActive = $selectedDirection === 'expense' && !empty($values['invoice_payment']);
+?>
+<div data-treasury-expense-fields <?= $selectedDirection === 'expense' ? '' : 'hidden' ?>>
     <div class="treasury-form-row treasury-form-row--single">
         <div class="treasury-invoice-block">
             <?= field('checkbox', [
@@ -244,7 +249,19 @@ foreach ($members as $member) {
                 'label_class' => 'checkbox-row-lg',
                 'attrs' => ['data-treasury-invoice-toggle' => true],
             ]) ?>
-            <div class="treasury-invoice-fields" data-treasury-invoice-fields>
+            <div class="treasury-invoice-fields" data-treasury-invoice-fields <?= $invoiceActive ? '' : 'hidden' ?>>
+                <?= field('text', [
+                    'name' => 'invoice_number',
+                    'label' => (string) __('treasury.invoice_number'),
+                    'value' => (string) ($values['invoice_number'] ?? ''),
+                    'maxlength' => 120,
+                    'placeholder' => (string) __('treasury.doc_number_placeholder'),
+                ]) ?>
+                <?= field('date', [
+                    'name' => 'invoice_date',
+                    'label' => (string) __('treasury.invoice_date'),
+                    'value' => (string) ($values['invoice_date'] ?? ''),
+                ]) ?>
                 <?= field('text', [
                     'name' => 'invoice_title',
                     'label' => (string) __('treasury.invoice_title'),
@@ -284,18 +301,22 @@ foreach ($members as $member) {
             ]) ?>
         </div>
     </div>
-    <?= field('text', [
-        'name' => 'invoice_number',
-        'label' => (string) __('treasury.doc_number'),
-        'value' => (string) ($values['invoice_number'] ?? ''),
-        'maxlength' => 120,
-        'placeholder' => (string) __('treasury.doc_number_placeholder'),
-    ]) ?>
-    <?= field('date', [
-        'name' => 'invoice_date',
-        'label' => (string) __('treasury.doc_date'),
-        'value' => (string) ($values['invoice_date'] ?? ''),
-    ]) ?>
+    <div class="treasury-doc-fields" data-treasury-doc-fields <?= $invoiceActive ? 'hidden' : '' ?>>
+        <?= field('text', [
+            'name' => 'invoice_number',
+            'label' => (string) __('treasury.doc_number'),
+            'value' => (string) ($values['invoice_number'] ?? ''),
+            'maxlength' => 120,
+            'placeholder' => (string) __('treasury.doc_number_placeholder'),
+            'disabled' => $invoiceActive,
+        ]) ?>
+        <?= field('date', [
+            'name' => 'invoice_date',
+            'label' => (string) __('treasury.doc_date'),
+            'value' => (string) ($values['invoice_date'] ?? ''),
+            'disabled' => $invoiceActive,
+        ]) ?>
+    </div>
 </div>
 <div class="treasury-form-row treasury-form-row--single">
     <?= field('textarea', [

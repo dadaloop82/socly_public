@@ -1635,7 +1635,7 @@ return [
         'method_other' => 'Altro metodo',
         'none' => 'Nessuno',
         'invoice_payment' => 'Pagamento fattura',
-        'invoice_payment_hint' => 'Solo per collegare una fattura: numero e data documento si compilano nella riga «Categoria».',
+        'invoice_payment_hint' => 'Spunta per registrare tutti gli estremi della fattura (numero, data, oggetto, scadenza).',
         'invoice_title' => 'Nome / oggetto fattura',
         'invoice_title_placeholder' => 'Es. Affitto sede marzo',
         'invoice_number' => 'Numero fattura',

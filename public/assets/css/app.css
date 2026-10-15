@@ -9937,6 +9937,20 @@ tr.doc-row-editable:focus-visible {
   grid-template-columns: 5fr 3fr 2fr;
   align-items: start;
 }
+/* The two document fields keep their 30/20 share inside their own wrapper. */
+.treasury-doc-fields {
+  display: grid;
+  grid-column: 2 / -1;
+  grid-template-columns: 3fr 2fr;
+  gap: 0.85rem;
+  align-items: start;
+}
+/* "Pagamento fattura" active: invoice data live in their block, so Categoria owns the row. */
+@media (min-width: 961px) {
+  .treasury-form-row--docs:has([data-treasury-doc-fields][hidden]) {
+    grid-template-columns: 1fr;
+  }
+}
 .treasury-form-row--single {
   grid-template-columns: 1fr;
 }
@@ -9978,8 +9992,12 @@ tr.doc-row-editable:focus-visible {
 }
 @media (max-width: 960px) {
   .treasury-form-row--economy,
-  .treasury-form-row--docs {
+  .treasury-form-row--docs,
+  .treasury-doc-fields {
     grid-template-columns: 1fr;
+  }
+  .treasury-doc-fields {
+    grid-column: auto;
   }
 }
 .treasury-invoice-block {
