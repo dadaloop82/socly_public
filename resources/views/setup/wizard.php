@@ -28,7 +28,16 @@ $errorStep = flash('setup_error_step');
             </form>
         </section>
     <?php elseif ($mode === 'thanks'): ?>
-        <?php $errors = null; ?>
+        <?php
+        // Only the ToS consent error may survive on the thank-you interstitial.
+        $termsError = '';
+        if (is_array($errors) && !empty($errors['accept_terms'])) {
+            $termsError = is_array($errors['accept_terms'])
+                ? implode(', ', $errors['accept_terms'])
+                : (string) $errors['accept_terms'];
+        }
+        $errors = null;
+        ?>
         <section class="setup-card setup-thanks" data-setup-panel>
             <div class="setup-card-bar setup-card-bar-end" data-setup-line>
                 <button type="button" class="btn btn-ghost btn-sm setup-exit" data-setup-exit><?= e(__('setup.exit')) ?></button>
@@ -48,6 +57,22 @@ $errorStep = flash('setup_error_step');
             <p class="setup-copy setup-thanks-copy" data-setup-line>
                 <?= e(__('setup.thanks_text')) ?>
             </p>
+            <div class="setup-terms-consent setup-thanks-consent" data-setup-line>
+                <p class="setup-terms-title" data-i18n="setup.thanks_disclaimer_title"><?= e(__('setup.thanks_disclaimer_title')) ?></p>
+                <p class="setup-terms-consent-lede" data-i18n="setup.thanks_disclaimer_text"><?= e(__('setup.thanks_disclaimer_text')) ?></p>
+                <?= field('checkbox', [
+                    'name' => 'accept_terms',
+                    'label' => (string) __('terms.accept'),
+                    'checked' => false,
+                    'required' => true,
+                    'context' => 'setup',
+                    'label_class' => 'checkbox-row setup-check',
+                ]) ?>
+                <button type="button" class="setup-terms-link" data-terms-open data-i18n="terms.read_all"><?= e(__('terms.read_all')) ?></button>
+                <?php if ($termsError !== ''): ?>
+                    <p class="setup-terms-consent-error" data-setup-line><?= e($termsError) ?></p>
+                <?php endif; ?>
+            </div>
             <form method="post" action="<?= e(url('/setup/thanks')) ?>">
                 <?= csrf_field() ?>
                 <div class="setup-actions" data-setup-line>
@@ -1878,6 +1903,17 @@ $errorStep = flash('setup_error_step');
                             'attrs' => ['data-platform-opt' => true],
                         ]) ?>
                         <p class="setup-hint muted setup-platform-showcase-note"><?= e(__('setup.platform_showcase_hint')) ?></p>
+                        <div class="setup-terms-consent">
+                            <?= field('checkbox', [
+                                'name' => 'accept_terms',
+                                'label' => (string) __('terms.accept'),
+                                'checked' => !empty($value['terms_accepted']),
+                                'required' => true,
+                                'context' => 'setup',
+                                'label_class' => 'checkbox-row setup-check',
+                            ]) ?>
+                            <button type="button" class="setup-terms-link" data-terms-open data-i18n="terms.read_all"><?= e(__('terms.read_all')) ?></button>
+                        </div>
                         <div class="setup-platform-confirm" data-platform-confirm <?= $anyPlatform ? '' : 'hidden' ?>>
                             <p class="setup-hint setup-platform-confirm-lede"><?= e(__('setup.platform_confirm_hint')) ?></p>
                             <div class="setup-equal-row">
@@ -2150,4 +2186,6 @@ $errorStep = flash('setup_error_step');
             </div>
         </div>
     </dialog>
+
+    <?= view_partial('partials/terms_dialog') ?>
 </div>

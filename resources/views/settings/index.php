@@ -10,12 +10,52 @@
     <?php endif; ?>
 </div>
 
-<div class="config-accordions" data-config-accordions
-     data-autosave-busy="<?= e(__('settings.autosave_busy')) ?>"
-     data-autosave-ok="<?= e(__('settings.autosaved')) ?>"
-     data-autosave-fail="<?= e(__('settings.autosave_failed')) ?>"
-     data-autosave-ago="<?= e(__('settings.autosave_ago')) ?>">
-<details class="config-accordion" id="general" data-config-accordion>
+<div class="config-layout" data-settings-nav data-default-group="assoc">
+    <nav class="config-nav" role="tablist" aria-label="<?= e(__('settings.nav_aria')) ?>">
+        <button type="button" class="config-nav-item" role="tab" data-settings-nav-item="assoc" aria-selected="true" aria-controls="settings-group-assoc">
+            <span class="config-nav-icon" aria-hidden="true">
+                <svg width="20" height="20" viewBox="0 0 24 24" focusable="false"><path fill="currentColor" d="M3 21V8l9-5 9 5v13h-7v-6h-4v6H3z"/></svg>
+            </span>
+            <span class="config-nav-text">
+                <span class="config-nav-title"><?= e(__('settings.nav_assoc')) ?></span>
+                <span class="config-nav-lede"><?= e(__('settings.nav_assoc_lede')) ?></span>
+            </span>
+        </button>
+        <button type="button" class="config-nav-item" role="tab" data-settings-nav-item="members" aria-selected="false" aria-controls="settings-group-members" tabindex="-1">
+            <span class="config-nav-icon" aria-hidden="true">
+                <svg width="20" height="20" viewBox="0 0 24 24" focusable="false"><path fill="currentColor" d="M16 11a3 3 0 1 0 0-6 3 3 0 0 0 0 6zm-8 0a3 3 0 1 0 0-6 3 3 0 0 0 0 6zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5C15 14.17 10.33 13 8 13zm8 0c-.29 0-.62.02-.97.05A4.4 4.4 0 0 1 17 16.5V19h6v-2.5c0-2.33-4.67-3.5-7-3.5z"/></svg>
+            </span>
+            <span class="config-nav-text">
+                <span class="config-nav-title"><?= e(__('settings.nav_members')) ?></span>
+                <span class="config-nav-lede"><?= e(__('settings.nav_members_lede')) ?></span>
+            </span>
+        </button>
+        <button type="button" class="config-nav-item" role="tab" data-settings-nav-item="comms" aria-selected="false" aria-controls="settings-group-comms" tabindex="-1">
+            <span class="config-nav-icon" aria-hidden="true">
+                <svg width="20" height="20" viewBox="0 0 24 24" focusable="false"><path fill="currentColor" d="M20 4H4a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2zm0 4-8 5-8-5V6l8 5 8-5v2z"/></svg>
+            </span>
+            <span class="config-nav-text">
+                <span class="config-nav-title"><?= e(__('settings.nav_comms')) ?></span>
+                <span class="config-nav-lede"><?= e(__('settings.nav_comms_lede')) ?></span>
+            </span>
+        </button>
+        <button type="button" class="config-nav-item" role="tab" data-settings-nav-item="cassa" aria-selected="false" aria-controls="settings-group-cassa" tabindex="-1">
+            <span class="config-nav-icon" aria-hidden="true">
+                <svg width="20" height="20" viewBox="0 0 24 24" focusable="false"><path fill="currentColor" d="M18 8h-1V6a5 5 0 0 0-10 0v2H6a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V10a2 2 0 0 0-2-2zm-6 9a2 2 0 1 1 0-4 2 2 0 0 1 0 4zm3-9H9V6a3 3 0 0 1 6 0v2z"/></svg>
+            </span>
+            <span class="config-nav-text">
+                <span class="config-nav-title"><?= e(__('settings.nav_cassa')) ?></span>
+                <span class="config-nav-lede"><?= e(__('settings.nav_cassa_lede')) ?></span>
+            </span>
+        </button>
+    </nav>
+
+    <div class="config-accordions" data-config-accordions
+         data-autosave-busy="<?= e(__('settings.autosave_busy')) ?>"
+         data-autosave-ok="<?= e(__('settings.autosaved')) ?>"
+         data-autosave-fail="<?= e(__('settings.autosave_failed')) ?>"
+         data-autosave-ago="<?= e(__('settings.autosave_ago')) ?>">
+<details class="config-accordion" id="general" data-config-accordion data-settings-group="assoc">
     <summary class="config-accordion-summary">
         <span class="config-accordion-title"><?= e(__('settings.general')) ?></span>
         <span class="config-accordion-lede"><?= e(__('settings.general_lede')) ?></span>
@@ -418,7 +458,7 @@
     </div>
 </details>
 
-<details class="config-accordion" id="legal" data-config-accordion>
+<details class="config-accordion" id="legal" data-config-accordion data-settings-group="cassa">
     <summary class="config-accordion-summary">
         <span class="config-accordion-title"><?= e(__('settings.legal')) ?></span>
         <span class="config-accordion-lede"><?= e(__('settings.legal_lede')) ?></span>
@@ -480,7 +520,7 @@
     </div>
 </details>
 
-<details class="config-accordion" id="types" data-config-accordion>
+<details class="config-accordion" id="types" data-config-accordion data-settings-group="members">
     <summary class="config-accordion-summary">
         <span class="config-accordion-title"><?= e(__('settings.types')) ?></span>
         <span class="config-accordion-lede"><?= e(__('settings.types_lede')) ?></span>
@@ -495,7 +535,7 @@
     </div>
 </details>
 
-<details class="config-accordion" id="periods" data-config-accordion>
+<details class="config-accordion" id="periods" data-config-accordion data-settings-group="members">
     <summary class="config-accordion-summary">
         <span class="config-accordion-title"><?= e(__('settings.periods')) ?></span>
         <span class="config-accordion-lede"><?= e(__('settings.periods_lede')) ?></span>
@@ -510,7 +550,7 @@
     </div>
 </details>
 
-<details class="config-accordion" id="fields" data-config-accordion>
+<details class="config-accordion" id="fields" data-config-accordion data-settings-group="members">
     <summary class="config-accordion-summary">
         <span class="config-accordion-title"><?= e(__('settings.fields')) ?></span>
         <span class="config-accordion-lede"><?= e(__('settings.fields_lede')) ?></span>
@@ -560,7 +600,7 @@
     </div>
 </details>
 
-<details class="config-accordion" id="mail" data-config-accordion>
+<details class="config-accordion" id="mail" data-config-accordion data-settings-group="comms">
     <summary class="config-accordion-summary">
         <span class="config-accordion-title"><?= e(__('settings.mail')) ?></span>
         <span class="config-accordion-lede"><?= e(__('settings.mail_lede')) ?></span>
@@ -739,7 +779,7 @@
     </div>
 </details>
 
-<details class="config-accordion" id="email-templates" data-config-accordion>
+<details class="config-accordion" id="email-templates" data-config-accordion data-settings-group="comms">
     <summary class="config-accordion-summary">
         <span class="config-accordion-title"><?= e(__('settings.email_templates_title')) ?></span>
         <span class="config-accordion-lede"><?= e(__('settings.email_templates_lede')) ?></span>
@@ -755,7 +795,7 @@
     </div>
 </details>
 
-<details class="config-accordion" id="workflow" data-config-accordion>
+<details class="config-accordion" id="workflow" data-config-accordion data-settings-group="comms">
     <summary class="config-accordion-summary">
         <span class="config-accordion-title"><?= e(__('settings.workflow_title')) ?></span>
         <span class="config-accordion-lede"><?= e(__('settings.workflow_lede')) ?></span>
@@ -769,7 +809,7 @@
     </div>
 </details>
 
-<details class="config-accordion" id="enrollment" data-config-accordion>
+<details class="config-accordion" id="enrollment" data-config-accordion data-settings-group="members">
     <summary class="config-accordion-summary">
         <span class="config-accordion-title"><?= e(__('settings.enrollment')) ?></span>
         <span class="config-accordion-lede"><?= e(__('settings.enrollment_lede')) ?></span>
@@ -790,7 +830,7 @@
     </div>
 </details>
 
-<details class="config-accordion" id="platform" data-config-accordion>
+<details class="config-accordion" id="platform" data-config-accordion data-settings-group="assoc">
     <summary class="config-accordion-summary">
         <span class="config-accordion-title"><?= e(__('settings.platform')) ?></span>
         <span class="config-accordion-lede"><?= e(__('settings.platform_lede')) ?></span>
@@ -824,6 +864,21 @@
                 'attrs' => ['data-platform-opt' => true],
             ]) ?>
             <p class="setup-hint muted"><?= e(__('setup.platform_showcase_hint')) ?></p>
+            <?php
+                $termsAcceptedAt = (string) ($settings['legal.terms_accepted_at'] ?? '');
+                $termsAcceptedLabel = $termsAcceptedAt !== ''
+                    ? __('terms.accepted_at', ['date' => format_datetime($termsAcceptedAt)])
+                    : __('terms.not_accepted');
+            ?>
+            <div class="settings-terms-status">
+                <p class="settings-terms-title"><?= e(__('settings.terms_status_title')) ?></p>
+                <p class="settings-terms-note muted">
+                    <span><?= e($termsAcceptedLabel) ?></span>
+                    <span class="settings-terms-sep" aria-hidden="true">·</span>
+                    <button type="button" class="setup-terms-link" data-terms-open="terms-dialog"><?= e(__('terms.read_all')) ?></button>
+                </p>
+                <p class="settings-terms-lede muted"><?= e(__('settings.terms_status_lede')) ?></p>
+            </div>
             <?php
                 $anyPlatformSettings = (($settings['platform.news_opt_in'] ?? '1') !== '0')
                     || (($settings['platform.usage_stats_opt_in'] ?? '1') !== '0')
@@ -860,7 +915,7 @@
 </details>
 
 <?php if (can('users.manage')): ?>
-<details class="config-accordion" id="users" data-config-accordion>
+<details class="config-accordion" id="users" data-config-accordion data-settings-group="cassa">
     <summary class="config-accordion-summary">
         <span class="config-accordion-title"><?= e(__('settings.users_manage_title')) ?></span>
         <span class="config-accordion-lede"><?= e(__('users.lede')) ?></span>
@@ -874,7 +929,7 @@
 </details>
 <?php endif; ?>
 
-<details class="config-accordion" id="components" data-config-accordion>
+<details class="config-accordion" id="components" data-config-accordion data-settings-group="assoc">
     <summary class="config-accordion-summary">
         <span class="config-accordion-title"><?= e(__('settings.components_title')) ?></span>
         <span class="config-accordion-lede"><?= e(__('settings.components_lede')) ?></span>
@@ -1042,7 +1097,7 @@
     </div>
 </details>
 
-<details class="config-accordion" id="treasury-accounts" data-config-accordion>
+<details class="config-accordion" id="treasury-accounts" data-config-accordion data-settings-group="cassa">
     <summary class="config-accordion-summary">
         <span class="config-accordion-title"><?= e(__('settings.treasury_accounts_title')) ?></span>
         <span class="config-accordion-lede"><?= e(__('settings.treasury_accounts_lede')) ?></span>
@@ -1163,5 +1218,7 @@
     </div>
 </dialog>
 <?php endif; ?>
+    </div><!-- .config-accordions -->
+</div><!-- .config-layout -->
 
-</div>
+<?= view_partial('partials/terms_dialog', ['dialogId' => 'terms-dialog']) ?>

@@ -330,6 +330,13 @@ final class SetupController extends BaseController
 
     public function thanks(Request $request): void
     {
+        // The Terms of Service must be accepted to leave the thank-you interstitial.
+        if (empty($request->input('accept_terms'))) {
+            $_SESSION['setup_show_thanks'] = true;
+            $this->flash('errors', ['accept_terms' => __('terms.required')]);
+            redirect('/setup');
+        }
+        $this->setup->acceptTerms('setup.thanks');
         unset($_SESSION['setup_show_thanks']);
         $remaining = $this->setup->missingSteps();
         if ($remaining === []) {

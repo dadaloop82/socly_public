@@ -155,15 +155,7 @@ $year = date('Y');
             </div>
         </div>
     </dialog>
-    <dialog class="setup-exit-dialog auth-terms-dialog" data-auth-terms-dialog>
-        <div class="setup-exit-shell auth-terms-shell">
-            <h2 class="setup-exit-title" data-i18n="auth.terms_title"><?= e(__('auth.terms_title')) ?></h2>
-            <p class="setup-exit-text auth-terms-body" data-i18n-html="auth.license_note"><?= with_auth_asterisk(e(__('auth.license_note'))) ?></p>
-            <div class="setup-exit-actions">
-                <button type="button" class="btn" data-auth-terms-close data-i18n="common.close"><?= e(__('common.close')) ?></button>
-            </div>
-        </div>
-    </dialog>
+    <?= view_partial('partials/terms_dialog') ?>
     <footer class="auth-footer">
         <div class="auth-footer-brand">
             <?= socly_word_html('socly-word-footer') ?>
@@ -175,7 +167,7 @@ $year = date('Y');
             <span class="auth-footer-meta">· © <?= e($year) ?></span>
             <span class="auth-footer-version">· v<?= e(app_version()) ?></span>
             <span class="auth-footer-sep" aria-hidden="true">·</span>
-            <button type="button" class="auth-footer-terms" data-auth-terms-open data-i18n="auth.terms_link"><?= e(__('auth.terms_link')) ?></button>
+            <button type="button" class="auth-footer-terms" data-terms-open data-i18n="auth.terms_link"><?= e(__('auth.terms_link')) ?></button>
         </div>
         <nav class="auth-footer-actions">
             <?= view_partial('partials/report_problem') ?>

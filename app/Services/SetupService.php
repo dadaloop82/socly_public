@@ -15,6 +15,9 @@ use Socly\Core\Database;
 
 final class SetupService
 {
+    /** Version of the Terms of Service recorded on acceptance. */
+    public const TERMS_VERSION = '1.0';
+
     public function __construct(
         private readonly SettingsService $settings,
         private readonly AssociationPeopleService $people,
@@ -526,6 +529,7 @@ final class SetupService
                 'news_opt_in' => $neverConfigured || ((string) $this->settings->get('platform.news_opt_in', '1')) !== '0',
                 'usage_stats_opt_in' => $neverConfigured || ((string) $this->settings->get('platform.usage_stats_opt_in', '1')) !== '0',
                 'showcase_consent' => $neverConfigured || ((string) $this->settings->get('platform.showcase_consent', '1')) !== '0',
+                'terms_accepted' => $this->rawStored('legal.terms_accepted_at', '') !== null,
                 'confirm_first_name' => '',
                 'confirm_last_name' => '',
                 'president_first_placeholder' => trim((string) ($president['first_name'] ?? '')),
@@ -798,6 +802,9 @@ final class SetupService
         }
 
         if ($type === 'platform_consents') {
+            if (empty($input['accept_terms'])) {
+                return ['ok' => false, 'errors' => ['accept_terms' => __('terms.required')]];
+            }
             $news = !empty($input['news_opt_in']);
             $stats = !empty($input['usage_stats_opt_in']);
             $showcase = !empty($input['showcase_consent']);
@@ -811,6 +818,7 @@ final class SetupService
             $this->settings->set('platform.usage_stats_opt_in', $stats ? '1' : '0');
             $this->settings->set('platform.showcase_consent', $showcase ? '1' : '0');
             $this->settings->set('platform.consents_configured', '1');
+            $this->acceptTerms('setup.platform_consents');
             if ($news || $stats || $showcase) {
                 $this->settings->set('platform.consents_confirmed_at', date('c'));
                 $this->settings->set('platform.consents_confirmed_name', trim(
@@ -3192,6 +3200,27 @@ final class SetupService
     {
         $raw = $this->readValue('gdpr.enabled', 'GDPR_ENABLED', '0');
         return (string) $raw === '1';
+    }
+
+    /**
+     * Record the acceptance of the Terms of Service (onboarding + settings).
+     *
+     * Stored without encryption: it is an evidence record, not a secret.
+     */
+    public function acceptTerms(string $source = 'setup'): void
+    {
+        $acceptedAt = date('c');
+        $this->settings->set('legal.terms_accepted_at', $acceptedAt);
+        $this->settings->set('legal.terms_accepted_version', self::TERMS_VERSION);
+        try {
+            app(AuditService::class)->log('terms.accepted', 'settings', 'terms', null, [
+                'version' => self::TERMS_VERSION,
+                'source' => $source,
+                'accepted_at' => $acceptedAt,
+            ]);
+        } catch (\Throwable) {
+            // non-blocking: the acceptance is already persisted in settings
+        }
     }
 
     /**

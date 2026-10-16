@@ -176,6 +176,7 @@ document.addEventListener('DOMContentLoaded', () => {
   initOrgHideVacant();
   initSidebarDeadlines();
   initConfigAccordions();
+  initSettingsNav();
   initPersonNameCase(document);
   initMemberForm();
   initMemberWizard();
@@ -207,7 +208,7 @@ document.addEventListener('DOMContentLoaded', () => {
   initDemoLoginNotice();
   initAuthNewsWidget();
   initAuthUpdateCheck();
-  initAuthTermsDialog();
+  initTermsDialogs();
   initBirthDateFields(document);
   initGeoSubmitValidation(document);
   initDocumentUpload(document);
@@ -10656,25 +10657,52 @@ function initGeoSubmitValidation(root = document) {
   });
 }
 
-function initAuthTermsDialog() {
-  const openBtn = document.querySelector('[data-auth-terms-open]');
-  const dialog = document.querySelector('[data-auth-terms-dialog]');
-  if (!(openBtn instanceof HTMLElement) || !(dialog instanceof HTMLDialogElement)) return;
-  const closeBtn = dialog.querySelector('[data-auth-terms-close]');
+function initTermsDialogs() {
+  const dialogs = Array.from(document.querySelectorAll('[data-terms-dialog]'))
+    .filter((el) => el instanceof HTMLDialogElement);
+  if (dialogs.length === 0) return;
 
-  const open = () => {
-    if (typeof dialog.showModal === 'function') dialog.showModal();
+  const dialogFor = (trigger) => {
+    const target = String(trigger.getAttribute('data-terms-open') || '').trim();
+    if (target) {
+      const byId = document.getElementById(target);
+      if (byId instanceof HTMLDialogElement) return byId;
+    }
+    return dialogs[0];
   };
-  const close = () => {
+
+  const close = (dialog) => {
     if (typeof dialog.close === 'function') dialog.close();
   };
 
-  openBtn.addEventListener('click', open);
-  if (closeBtn instanceof HTMLElement) {
-    closeBtn.addEventListener('click', close);
-  }
-  dialog.addEventListener('click', (event) => {
-    if (event.target === dialog) close();
+  document.addEventListener('click', (event) => {
+    const node = event.target instanceof Element ? event.target : null;
+    if (!node) return;
+
+    const trigger = node.closest('[data-terms-open]');
+    if (trigger) {
+      event.preventDefault();
+      const dialog = dialogFor(trigger);
+      if (dialog && !dialog.open && typeof dialog.showModal === 'function') {
+        dialog.showModal();
+      }
+      return;
+    }
+
+    const closer = node.closest('[data-terms-close]');
+    if (closer) {
+      const dialog = closer.closest('[data-terms-dialog]');
+      if (dialog instanceof HTMLDialogElement) {
+        event.preventDefault();
+        close(dialog);
+      }
+    }
+  });
+
+  dialogs.forEach((dialog) => {
+    dialog.addEventListener('click', (event) => {
+      if (event.target === dialog) close(dialog);
+    });
   });
 }
 
@@ -11345,6 +11373,11 @@ function initConfigAccordions() {
     return;
   }
 
+  // Grouped macro-area navigation (settings) owns switching and hash logic.
+  if (document.querySelector('[data-settings-nav]')) {
+    return;
+  }
+
   const panels = Array.from(root.querySelectorAll('[data-config-accordion]'));
   if (panels.length === 0) {
     return;
@@ -11391,6 +11424,88 @@ function initConfigAccordions() {
       }
     });
   });
+}
+
+function initSettingsNav() {
+  const nav = document.querySelector('[data-settings-nav]');
+  const root = document.querySelector('[data-config-accordions]');
+  if (!nav || !root) return;
+
+  const items = Array.from(nav.querySelectorAll('[data-settings-nav-item]'));
+  const panels = Array.from(root.querySelectorAll('[data-config-accordion]'));
+  if (items.length === 0 || panels.length === 0) return;
+
+  const groupOf = (panel) => String(panel.getAttribute('data-settings-group') || '');
+  const groupIds = items
+    .map((item) => String(item.getAttribute('data-settings-nav-item') || ''))
+    .filter((group) => group !== '');
+  const defaultGroup = groupIds[0] || '';
+  const panelsOf = (group) => panels.filter((panel) => groupOf(panel) === group);
+
+  const setActiveGroup = (group) => {
+    items.forEach((item) => {
+      const isActive = String(item.getAttribute('data-settings-nav-item') || '') === group;
+      item.setAttribute('aria-selected', isActive ? 'true' : 'false');
+      item.setAttribute('tabindex', isActive ? '0' : '-1');
+    });
+    panels.forEach((panel) => {
+      panel.hidden = groupOf(panel) !== group;
+    });
+  };
+
+  // Sections of the active macro-area are shown open: no accordion hunting.
+  const showGroup = (group, focus, scroll = true) => {
+    const target = group !== '' && panelsOf(group).length > 0 ? group : defaultGroup;
+    setActiveGroup(target);
+    panelsOf(target).forEach((panel) => {
+      panel.open = focus ? panel === focus : true;
+    });
+    if (!scroll) return;
+    const anchor = focus || root;
+    anchor.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  };
+
+  const panelForHash = () => {
+    let hash = (location.hash || '').replace(/^#/, '');
+    if (!hash) return null;
+    if (hash === 'plugins') hash = 'components';
+    return panels.find((panel) => panel.id === hash) || null;
+  };
+
+  const syncFromHash = (initial = false) => {
+    const target = panelForHash();
+    if (!target) {
+      showGroup(defaultGroup, null, !initial);
+      return;
+    }
+    if (location.hash !== `#${target.id}`) {
+      history.replaceState(null, '', `#${target.id}`);
+    }
+    showGroup(groupOf(target), target, true);
+  };
+
+  items.forEach((item) => {
+    item.addEventListener('click', () => {
+      const group = String(item.getAttribute('data-settings-nav-item') || '');
+      const first = panelsOf(group)[0];
+      if (first) {
+        history.replaceState(null, '', `#${first.id}`);
+      }
+      showGroup(group, null, true);
+    });
+  });
+
+  panels.forEach((panel) => {
+    panel.addEventListener('toggle', () => {
+      if (!panel.open || !panel.id) return;
+      if (location.hash !== `#${panel.id}`) {
+        history.replaceState(null, '', `#${panel.id}`);
+      }
+    });
+  });
+
+  syncFromHash(true);
+  window.addEventListener('hashchange', () => syncFromHash(false));
 }
 
 function initDashboardTabs() {

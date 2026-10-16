@@ -97,6 +97,7 @@ final class SettingsController extends BaseController
                 'gdpr.require_comms_consent' => $this->settings->get('gdpr.require_comms_consent', '0'),
                 'legal.privacy' => $this->legalTexts('legal.privacy'),
                 'legal.statute' => $this->legalTexts('legal.statute'),
+                'legal.terms_accepted_at' => (string) $this->settings->get('legal.terms_accepted_at', ''),
                 'membership.enrollment_validation' => $this->settings->get('membership.enrollment_validation', 'none'),
                 'platform.news_opt_in' => $this->settings->get('platform.news_opt_in', '1'),
                 'platform.usage_stats_opt_in' => $this->settings->get('platform.usage_stats_opt_in', '1'),
