@@ -57,24 +57,24 @@ $errorStep = flash('setup_error_step');
             <p class="setup-copy setup-thanks-copy" data-setup-line>
                 <?= e(__('setup.thanks_text')) ?>
             </p>
-            <div class="setup-terms-consent setup-thanks-consent" data-setup-line>
-                <p class="setup-terms-title" data-i18n="setup.thanks_disclaimer_title"><?= e(__('setup.thanks_disclaimer_title')) ?></p>
-                <p class="setup-terms-consent-lede" data-i18n="setup.thanks_disclaimer_text"><?= e(__('setup.thanks_disclaimer_text')) ?></p>
-                <?= field('checkbox', [
-                    'name' => 'accept_terms',
-                    'label' => (string) __('terms.accept'),
-                    'checked' => false,
-                    'required' => true,
-                    'context' => 'setup',
-                    'label_class' => 'checkbox-row setup-check',
-                ]) ?>
-                <button type="button" class="setup-terms-link" data-terms-open data-i18n="terms.read_all"><?= e(__('terms.read_all')) ?></button>
-                <?php if ($termsError !== ''): ?>
-                    <p class="setup-terms-consent-error" data-setup-line><?= e($termsError) ?></p>
-                <?php endif; ?>
-            </div>
             <form method="post" action="<?= e(url('/setup/thanks')) ?>">
                 <?= csrf_field() ?>
+                <div class="setup-terms-consent setup-thanks-consent" data-setup-line>
+                    <p class="setup-terms-title" data-i18n="setup.thanks_disclaimer_title"><?= e(__('setup.thanks_disclaimer_title')) ?></p>
+                    <p class="setup-terms-consent-lede" data-i18n="setup.thanks_disclaimer_text"><?= e(__('setup.thanks_disclaimer_text')) ?></p>
+                    <?= field('checkbox', [
+                        'name' => 'accept_terms',
+                        'label' => (string) __('terms.accept'),
+                        'checked' => false,
+                        'required' => true,
+                        'context' => 'setup',
+                        'label_class' => 'checkbox-row setup-check',
+                    ]) ?>
+                    <button type="button" class="setup-terms-link" data-terms-open data-i18n="terms.read_all"><?= e(__('terms.read_all')) ?></button>
+                    <?php if ($termsError !== ''): ?>
+                        <p class="setup-terms-consent-error" data-setup-line><?= e($termsError) ?></p>
+                    <?php endif; ?>
+                </div>
                 <div class="setup-actions" data-setup-line>
                     <?php if (!empty($backHref)): ?>
                         <a class="btn btn-ghost setup-back" href="<?= e((string) $backHref) ?>"><?= e(__('common.back')) ?></a>
@@ -801,6 +801,7 @@ $errorStep = flash('setup_error_step');
                          data-msg-cf-calc="<?= e(__('members.cf_generate')) ?>"
                          data-msg-cf-calc-title="<?= e(__('setup.cf_calc_title')) ?>"
                          data-msg-cf-calc-apply="<?= e(__('setup.cf_calc_apply')) ?>">
+                        <p class="setup-hint muted setup-people-intro"><?= e(__('setup.people_one_by_one')) ?></p>
                         <?php if ($isBoardStep && is_array($boardPresident) && trim((string) ($boardPresident['first_name'] ?? '')) !== ''): ?>
                             <div class="setup-people-president" data-setup-board-president>
                                 <div class="setup-people-president-avatar" aria-hidden="true">
@@ -841,6 +842,15 @@ $errorStep = flash('setup_error_step');
                             <p class="setup-subhead"><?= e(__('setup.board_other_members')) ?></p>
                         <?php endif; ?>
 
+                        <div class="setup-people-pager" data-people-pager hidden>
+                            <button type="button" class="btn btn-ghost btn-sm setup-people-nav" data-people-prev aria-label="<?= e(__('setup.people_prev')) ?>">‹</button>
+                            <span class="setup-people-counter" data-people-counter
+                                  data-template="<?= e(__('setup.people_counter')) ?>"
+                                  data-label-prev="<?= e(__('setup.people_prev')) ?>"
+                                  data-label-next="<?= e(__('setup.people_next')) ?>"></span>
+                            <button type="button" class="btn btn-ghost btn-sm setup-people-nav" data-people-next aria-label="<?= e(__('setup.people_next')) ?>">›</button>
+                        </div>
+                        <button type="button" class="btn btn-ghost" data-people-add data-i18n="setup.add_person"><?= e(__('setup.add_person')) ?></button>
                         <div class="setup-people-rows" data-people-rows>
                             <?php foreach ($peopleRows as $i => $person): ?>
                                 <?php if (!is_array($person)) continue; ?>
@@ -913,7 +923,6 @@ $errorStep = flash('setup_error_step');
                                 </div>
                             <?php endforeach; ?>
                         </div>
-                        <button type="button" class="btn btn-ghost" data-people-add data-i18n="setup.add_person"><?= e(__('setup.add_person')) ?></button>
                         <template data-people-template>
                             <div class="setup-people-row" data-people-row>
                                 <?php if ($showOrganType): ?>
@@ -1852,10 +1861,65 @@ $errorStep = flash('setup_error_step');
                             <p class="setup-field-error"><?= e(is_array($errors['components']) ? implode(', ', $errors['components']) : (string) $errors['components']) ?></p>
                         <?php endif; ?>
                     </div>
+                <?php elseif ($stepType === 'treasury_accounts'): ?>
+                    <?php
+                    $accountRows = is_array($value['accounts'] ?? null) ? $value['accounts'] : [];
+                    $currencyDisplay = (string) ($value['currency_display'] ?? '€');
+                    ?>
+                    <div class="setup-accounts" data-setup-line>
+                        <p class="setup-hint muted"><?= e(__('setup.accounts_hint')) ?></p>
+                        <?php if ($accountRows === []): ?>
+                            <p class="setup-hint setup-hint-warn"><?= e(__('setup.accounts_unavailable')) ?></p>
+                        <?php endif; ?>
+                        <div class="setup-accounts-list">
+                            <?php foreach ($accountRows as $accountRow): ?>
+                                <?php
+                                if (!is_array($accountRow)) {
+                                    continue;
+                                }
+                                $accKey = (string) ($accountRow['key'] ?? '');
+                                if ($accKey === '') {
+                                    continue;
+                                }
+                                $accLabel = (string) ($accountRow['label'] ?? $accKey);
+                                ?>
+                                <div class="setup-account-row">
+                                    <div class="setup-account-active">
+                                        <?= field('checkbox', [
+                                            'name' => 'accounts[' . $accKey . '][active]',
+                                            'label' => $accLabel,
+                                            'value' => '1',
+                                            'check_value' => '1',
+                                            'checked' => !empty($accountRow['active']),
+                                            'context' => 'setup',
+                                            'label_class' => 'checkbox-row setup-check',
+                                        ]) ?>
+                                    </div>
+                                    <label class="setup-field setup-field-account-opening">
+                                        <span><?= e(__('setup.accounts_opening')) ?></span>
+                                        <div class="setup-price-with-currency">
+                                            <?= field('number', [
+                                                'name' => 'accounts[' . $accKey . '][opening_balance]',
+                                                'label' => '',
+                                                'value' => '',
+                                                'context' => 'inline',
+                                                'wrapper_class' => 'sf-field--price-inline',
+                                                'step' => '0.01',
+                                                'min' => 0,
+                                                'placeholder' => '0.00',
+                                            ]) ?>
+                                            <span class="setup-price-currency" aria-hidden="true"><?= e($currencyDisplay) ?></span>
+                                        </div>
+                                    </label>
+                                </div>
+                            <?php endforeach; ?>
+                        </div>
+                    </div>
                 <?php elseif ($stepType === 'platform_consents'): ?>
                     <?php
                         $mailReady = !empty($value['mail_ready']);
                         $anyPlatform = !empty($value['news_opt_in']) || !empty($value['usage_stats_opt_in']) || !empty($value['showcase_consent']);
+                        $adminEmail = trim((string) ($value['admin_email'] ?? ''));
                     ?>
                     <?php
                         $presFirst = trim((string) ($value['president_first_placeholder'] ?? ''));
@@ -1867,6 +1931,13 @@ $errorStep = flash('setup_error_step');
                             ? __('setup.platform_confirm_ph_last', ['name' => $presLast])
                             : __('setup.platform_confirm_last');
                     ?>
+                    <?php if ($adminEmail !== ''): ?>
+                        <div class="setup-admin-summary" data-setup-line>
+                            <p class="setup-subhead"><?= e(__('setup.admin_login_title')) ?></p>
+                            <p><?= e(__('setup.admin_login_hint', ['email' => $adminEmail])) ?></p>
+                            <p class="muted"><?= e(__('setup.admin_users_hint')) ?></p>
+                        </div>
+                    <?php endif; ?>
                     <div
                         class="setup-platform-consents"
                         data-setup-line
@@ -2036,7 +2107,11 @@ $errorStep = flash('setup_error_step');
 
                 </div><!-- .setup-form-scroll -->
 
-                <?php if (in_array($stepType, ['president', 'people_list', 'textarea', 'smtp_config'], true)): ?>
+                <div class="setup-scroll-cue" data-setup-scroll-cue aria-hidden="true">
+                    <span class="setup-scroll-cue-arrow">↓</span>
+                </div>
+
+                <?php if (in_array($stepType, ['president', 'people_list', 'textarea', 'smtp_config', 'treasury_accounts'], true)): ?>
                     <?php
                     $isAuditorsDefer = $stepType === 'people_list' && (string) ($step['role'] ?? '') === 'auditor';
                     $deferLabelKey = $isAuditorsDefer ? 'setup.defer_step_skip' : 'setup.defer_step';

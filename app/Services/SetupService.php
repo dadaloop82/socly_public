@@ -202,6 +202,11 @@ final class SetupService
             return $this->rawStored('platform.consents_configured', '') !== null;
         }
 
+        if ($type === 'treasury_accounts') {
+            return $this->isStepDeferred($step)
+                || $this->rawStored('treasury.accounts_configured', '') !== null;
+        }
+
         if ($type === 'smtp_config') {
             if ($this->isStepDeferred($step)) {
                 return true;
@@ -514,6 +519,26 @@ final class SetupService
             return ['components' => $items];
         }
 
+        if ($type === 'treasury_accounts') {
+            $accounts = [];
+            $currency = '€';
+            try {
+                $treasury = app(\Socly\Services\TreasuryService::class);
+                $accounts = $treasury->accountOptions();
+                $currency = app(\Socly\Services\CurrencyService::class)->display();
+            } catch (\Throwable $e) {
+                // A missing legacy table / component must not break the whole wizard.
+                try {
+                    app('logger')->warning('setup.accounts_unavailable', ['error' => $e::class]);
+                } catch (\Throwable) {
+                }
+            }
+            return [
+                'accounts' => $accounts,
+                'currency_display' => $currency,
+            ];
+        }
+
         if ($type === 'admin_account') {
             return [
                 'name' => '',
@@ -525,6 +550,8 @@ final class SetupService
         if ($type === 'platform_consents') {
             $neverConfigured = $this->rawStored('platform.consents_configured', '') === null;
             $president = $this->people->getPresident();
+            $adminId = (int) $this->settings->get('app.admin_user_id', 0);
+            $adminUser = $adminId > 0 ? $this->users->find($adminId) : null;
             return [
                 'news_opt_in' => $neverConfigured || ((string) $this->settings->get('platform.news_opt_in', '1')) !== '0',
                 'usage_stats_opt_in' => $neverConfigured || ((string) $this->settings->get('platform.usage_stats_opt_in', '1')) !== '0',
@@ -535,6 +562,7 @@ final class SetupService
                 'president_first_placeholder' => trim((string) ($president['first_name'] ?? '')),
                 'president_last_placeholder' => trim((string) ($president['last_name'] ?? '')),
                 'mail_ready' => $this->mail->isReady(),
+                'admin_email' => trim((string) ($adminUser['email'] ?? '')),
             ];
         }
 
@@ -795,6 +823,10 @@ final class SetupService
 
         if ($type === 'component_select') {
             return $this->saveComponentSelect($input);
+        }
+
+        if ($type === 'treasury_accounts') {
+            return $this->saveTreasuryAccountsStep($input);
         }
 
         if ($type === 'admin_account') {
@@ -3126,6 +3158,108 @@ final class SetupService
         return ['ok' => true];
     }
 
+    /**
+     * Treasury accounts: activate the wallets and record any opening balance as
+     * the first income movement ("Saldo iniziale") — only on the first run, so
+     * re-entering the step never duplicates money.
+     *
+     * @param array<string, mixed> $input
+     * @return array{ok:bool,errors?:array<string,string>}
+     */
+    private function saveTreasuryAccountsStep(array $input): array
+    {
+        try {
+            $treasury = app(\Socly\Services\TreasuryService::class);
+            $accounts = $treasury->accountOptions();
+        } catch (\Throwable $e) {
+            try {
+                app('logger')->warning('setup.accounts_unavailable', ['error' => $e::class]);
+            } catch (\Throwable) {
+            }
+            return ['ok' => false, 'errors' => ['accounts' => __('setup.accounts_unavailable')]];
+        }
+        $rows = is_array($input['accounts'] ?? null) ? (array) $input['accounts'] : [];
+        $firstRun = $this->rawStored('treasury.accounts_configured', '') === null;
+        $ip = (string) ($_SERVER['REMOTE_ADDR'] ?? '0.0.0.0');
+        $errors = [];
+        $activeCount = 0;
+        $createdMovementIds = [];
+
+        try {
+            foreach ($accounts as $account) {
+                if (!is_array($account)) {
+                    continue;
+                }
+                $slug = (string) ($account['key'] ?? '');
+                if ($slug === '') {
+                    continue;
+                }
+                $row = is_array($rows[$slug] ?? null) ? (array) $rows[$slug] : [];
+                $rawValue = $row['opening_balance'] ?? '';
+                $raw = is_scalar($rawValue) ? trim((string) $rawValue) : '';
+                $opening = $raw === '' ? 0.0 : (float) str_replace(',', '.', $raw);
+                if (!is_finite($opening) || $opening < 0) {
+                    $errors['accounts'] = __('setup.accounts_opening_invalid');
+                    continue;
+                }
+                $active = !empty($row['active']) || $opening > 0.0;
+                if ($active) {
+                    $activeCount++;
+                }
+                $label = (string) ($account['label'] ?? $slug);
+                $id = (int) ($account['id'] ?? 0);
+                if ($id > 0) {
+                    // Built-ins keep their translated label (empty = fallback to i18n).
+                    $saveLabel = !empty($account['builtin']) ? '' : $label;
+                    $treasury->updateAccount($id, $saveLabel, $active, $ip);
+                }
+                if (!$firstRun || $opening <= 0.0 || !$active) {
+                    continue;
+                }
+                $result = $treasury->create([
+                    'direction' => 'income',
+                    'amount' => $opening,
+                    'movement_date' => date('Y-m-d'),
+                    'account' => $slug,
+                    'payment_method' => $slug === 'cash' ? 'cash' : 'bank_transfer',
+                    'category' => 'other',
+                    'description' => __('setup.accounts_opening_movement', ['account' => $label]),
+                    'member_involved' => 0,
+                ], null, $ip, null);
+                if (empty($result['ok'])) {
+                    $errors['accounts'] = __('setup.accounts_opening_failed', ['account' => $label]);
+                    break;
+                }
+                $createdMovementIds[] = (int) ($result['id'] ?? 0);
+            }
+        } catch (\Throwable $e) {
+            try {
+                app('logger')->warning('setup.accounts_save_failed', ['error' => $e::class]);
+            } catch (\Throwable) {
+            }
+            $errors['accounts'] = __('setup.accounts_unavailable');
+        }
+
+        if ($errors === [] && $activeCount === 0) {
+            $errors['accounts'] = __('setup.accounts_at_least_one');
+        }
+        if ($errors !== []) {
+            // Never leave half-written opening movements behind.
+            foreach ($createdMovementIds as $movementId) {
+                if ($movementId < 1) {
+                    continue;
+                }
+                try {
+                    $this->db->query('DELETE FROM treasury_movements WHERE id = :id', ['id' => $movementId]);
+                } catch (\Throwable) {
+                }
+            }
+            return ['ok' => false, 'errors' => $errors];
+        }
+        $this->settings->set('treasury.accounts_configured', '1');
+        return ['ok' => true];
+    }
+
     private function saveAdminAccount(array $input): array
     {
         if ($this->users->hasAssociationAdmin()) {
@@ -3334,6 +3468,12 @@ final class SetupService
         $this->safeDelete('DELETE FROM treasury_movements');
         // Custom wallets go back to the seeded built-ins.
         $this->safeDelete('DELETE FROM treasury_accounts WHERE is_builtin = 0');
+        // Built-ins return to their default active state after a full reset.
+        try {
+            $this->db->query('UPDATE treasury_accounts SET is_active = 1, label = NULL WHERE is_builtin = 1');
+        } catch (\Throwable) {
+            // table missing in very old schema — ignore
+        }
         $this->safeDelete('DELETE FROM deadline_items');
         $this->safeDelete('DELETE FROM association_documents');
 

@@ -328,22 +328,7 @@ $invoiceActive = $selectedDirection === 'expense' && !empty($values['invoice_pay
             ]) ?>
         </div>
     </div>
-    <div class="treasury-doc-fields" data-treasury-doc-fields <?= $invoiceActive ? 'hidden' : '' ?>>
-        <?= field('text', [
-            'name' => 'invoice_number',
-            'label' => (string) __('treasury.doc_number'),
-            'value' => (string) ($values['invoice_number'] ?? ''),
-            'maxlength' => 120,
-            'placeholder' => (string) __('treasury.doc_number_placeholder'),
-            'disabled' => $invoiceActive,
-        ]) ?>
-        <?= field('date', [
-            'name' => 'invoice_date',
-            'label' => (string) __('treasury.doc_date'),
-            'value' => (string) ($values['invoice_date'] ?? ''),
-            'disabled' => $invoiceActive,
-        ]) ?>
-    </div>
+    <?php // Invoice number/date live only inside the invoice block (no duplicates). ?>
 </div>
 <div class="treasury-form-row treasury-form-row--single">
     <?= field('textarea', [
@@ -364,14 +349,18 @@ $invoiceActive = $selectedDirection === 'expense' && !empty($values['invoice_pay
             'label_class' => 'checkbox-row-lg',
             'attrs' => ['data-treasury-member-toggle' => true],
         ]) ?>
-        <div data-treasury-beneficiary-wrap <?= $memberInvolved ? 'hidden' : '' ?>>
+        <div data-treasury-beneficiary-wrap <?= $memberInvolved ? 'hidden' : '' ?>
+             data-msg-suggest="<?= e(__('treasury.counterparty_suggest')) ?>">
             <?= field('text', [
                 'name' => 'beneficiary',
                 'label' => (string) __('treasury.counterparty'),
                 'value' => (string) ($values['beneficiary'] ?? ''),
                 'maxlength' => 190,
                 'placeholder' => (string) __('treasury.supplier_placeholder'),
-                'attrs' => ['list' => 'treasury-beneficiaries'],
+                'attrs' => [
+                    'list' => 'treasury-beneficiaries',
+                    'data-treasury-beneficiary-input' => true,
+                ],
             ]) ?>
             <datalist id="treasury-beneficiaries">
                 <?php foreach ($beneficiaries as $beneficiary): ?>

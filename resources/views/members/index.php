@@ -13,7 +13,7 @@ $canPayments = can('payments.manage');
     </div>
     <div class="actions">
         <?php if ($canManage): ?>
-            <a class="btn" href="<?= e(url('/members/create')) ?>"><?= e(__('members.create')) ?></a>
+            <a class="btn<?= empty($hasAnyMembers) ? ' is-first-cta' : '' ?>" href="<?= e(url('/members/create')) ?>"><?= e(__('members.create')) ?></a>
         <?php endif; ?>
         <a class="btn btn-ghost" href="<?= e(url('/members/export?' . http_build_query(array_filter($filters)))) ?>"><?= e(__('members.export')) ?></a>
         <a class="btn btn-ghost" href="<?= e(url('/members/export/registry?' . http_build_query(array_filter($filters)))) ?>" target="_blank" rel="noopener"><?= e(__('members.registry_export')) ?></a>

@@ -750,16 +750,25 @@ final class TreasuryService
     public function beneficiaries(): array
     {
         $rows = $this->db->fetchAll(
-            "SELECT DISTINCT beneficiary
+            "SELECT beneficiary
              FROM treasury_movements
              WHERE beneficiary IS NOT NULL AND beneficiary <> ''
              ORDER BY beneficiary
-             LIMIT 200"
+             LIMIT 400"
         );
-        return array_values(array_map(
-            static fn (array $row): string => (string) $row['beneficiary'],
-            $rows
-        ));
+        $seen = [];
+        foreach ($rows as $row) {
+            $value = trim((string) preg_replace('/\s+/u', ' ', (string) ($row['beneficiary'] ?? '')));
+            if ($value === '') {
+                continue;
+            }
+            $key = mb_strtolower($value);
+            if (!isset($seen[$key])) {
+                $seen[$key] = $value;
+            }
+        }
+        ksort($seen, SORT_NATURAL | SORT_FLAG_CASE);
+        return array_values($seen);
     }
 
     public function defaultCategory(): string
@@ -1032,7 +1041,22 @@ final class TreasuryService
                 $invoiceDueDate = $invoiceDueRaw;
             }
         }
-        $beneficiary = mb_substr(trim((string) ($input['beneficiary'] ?? '')), 0, 190);
+        $beneficiary = trim((string) preg_replace('/\s+/u', ' ', (string) ($input['beneficiary'] ?? '')));
+        if ($beneficiary !== '') {
+            $beneficiary = mb_substr($beneficiary, 0, 190);
+            // Reuse the canonical spelling already stored (ignoring case/spacing)
+            // so “Comune di Bolzano” and “comune di bolzano” never become duplicates.
+            $existingName = $this->db->fetch(
+                "SELECT beneficiary FROM treasury_movements
+                 WHERE beneficiary IS NOT NULL AND beneficiary <> ''
+                   AND LOWER(TRIM(beneficiary)) = LOWER(:name)
+                 ORDER BY id ASC LIMIT 1",
+                ['name' => $beneficiary]
+            );
+            if (is_array($existingName) && trim((string) ($existingName['beneficiary'] ?? '')) !== '') {
+                $beneficiary = (string) $existingName['beneficiary'];
+            }
+        }
 
         return [
             'ok' => true,

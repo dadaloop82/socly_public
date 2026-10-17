@@ -102,7 +102,7 @@ foreach ($deadline_items as $item) {
             <a class="btn btn-ghost" href="<?= e($filterUrl(['q' => '', 'filter' => '', 'category' => ''])) ?>"><?= e(__('deadlines.filter_reset')) ?></a>
         <?php endif; ?>
         <?php if ($canManage): ?>
-            <a class="btn" href="<?= e(url('/deadlines/create')) ?>"><?= e(__('deadlines.add')) ?></a>
+            <a class="btn<?= ($deadline_items === [] && !$hasActiveFilters) ? ' is-first-cta' : '' ?>" href="<?= e(url('/deadlines/create')) ?>"><?= e(__('deadlines.add')) ?></a>
         <?php endif; ?>
     </div>
 </div>

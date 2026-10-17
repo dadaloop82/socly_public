@@ -5870,6 +5870,12 @@ function ensureSetupValidityWrap(el) {
   if (el.type === 'radio' || el.type === 'checkbox' || el.type === 'hidden' || el.type === 'file') {
     return null;
   }
+  // Native date/time controls own their segmented UI: reparenting them makes the
+  // caret jump and can scroll the card while the visitor is still typing the year.
+  if (el.type === 'date' || el.type === 'time' || el.type === 'datetime-local'
+    || el.type === 'month' || el.type === 'week') {
+    return null;
+  }
   // Phone dial + national row must stay a flat flex; wrapping steals focus and shifts layout.
   if (el.closest('[data-phone-field]')) {
     return el.closest('.setup-input-validity');
@@ -7890,14 +7896,80 @@ function initPeopleList(list) {
       const last = row.querySelector('input[name*="[last_name]"]')?.value?.trim() || '';
       const cfInput = row.querySelector('input[data-people-cf], input[name*="[fiscal_code]"]');
       const nameFilled = !!(first || last);
+      const visible = !row.hidden;
       const star = row.querySelector('[data-people-cf-star]');
       if (star instanceof HTMLElement) {
         star.hidden = !nameFilled;
       }
-      setCfValidity(cfInput, nameFilled);
+      // Hidden pager rows must not block the CTA with "not focusable" errors.
+      setCfValidity(cfInput, nameFilled && visible);
     });
     form?.dispatchEvent(new Event('setup:cta-refresh', { bubbles: true }));
   };
+
+  // One person at a time: the pager keeps long boards readable on small screens.
+  const pager = list.querySelector('[data-people-pager]');
+  const pagerPrev = list.querySelector('[data-people-prev]');
+  const pagerNext = list.querySelector('[data-people-next]');
+  const pagerCounter = list.querySelector('[data-people-counter]');
+  let activePerson = 0;
+
+  const personRows = () => [...rows.querySelectorAll('[data-people-row]')];
+
+  const showPerson = (index) => {
+    const items = personRows();
+    if (!items.length) {
+      return;
+    }
+    activePerson = Math.min(Math.max(index, 0), items.length - 1);
+    items.forEach((row, i) => {
+      row.hidden = i !== activePerson;
+    });
+    if (pager instanceof HTMLElement) {
+      pager.hidden = items.length < 2;
+    }
+    if (pagerCounter instanceof HTMLElement) {
+      const tpl = pagerCounter.dataset.template || 'Persona :current di :total';
+      pagerCounter.textContent = tpl
+        .replaceAll(':current', String(activePerson + 1))
+        .replaceAll(':total', String(items.length));
+    }
+    if (pagerPrev instanceof HTMLButtonElement) pagerPrev.disabled = activePerson === 0;
+    if (pagerNext instanceof HTMLButtonElement) pagerNext.disabled = activePerson === items.length - 1;
+    syncPeopleCfRequired();
+  };
+
+  const currentPersonRow = () => personRows()[activePerson] || null;
+
+  const personRowHasData = (row) => ['[data-people-first]', '[data-people-last]', '[data-people-cf]']
+    .some((sel) => (row.querySelector(sel)?.value?.trim() || '') !== '');
+
+  const canLeaveCurrentPerson = () => {
+    const row = currentPersonRow();
+    if (!(row instanceof HTMLElement) || !personRowHasData(row)) {
+      return true;
+    }
+    const invalid = [...row.querySelectorAll('input, select')].find((el) => !el.checkValidity());
+    if (invalid instanceof HTMLElement) {
+      invalid.reportValidity();
+      return false;
+    }
+    return true;
+  };
+
+  const revealPersonRow = (row) => {
+    const index = personRows().indexOf(row);
+    if (index >= 0) {
+      showPerson(index);
+    }
+  };
+
+  pagerPrev?.addEventListener('click', () => {
+    if (canLeaveCurrentPerson()) showPerson(activePerson - 1);
+  });
+  pagerNext?.addEventListener('click', () => {
+    if (canLeaveCurrentPerson()) showPerson(activePerson + 1);
+  });
 
   rows.addEventListener('input', (event) => {
     const target = event.target;
@@ -7907,7 +7979,7 @@ function initPeopleList(list) {
     syncPeopleCfRequired();
   });
   rows.addEventListener('change', syncPeopleCfRequired);
-  syncPeopleCfRequired();
+  showPerson(0);
 
   const reindex = () => {
     [...rows.querySelectorAll('[data-people-row]')].forEach((row, i) => {
@@ -8013,7 +8085,7 @@ function initPeopleList(list) {
     const scope = list.closest('form') || list || document;
     initPlaceSuggest(scope);
     initPersonNameCase(scope);
-    syncPeopleCfRequired();
+    showPerson(personRows().length - 1);
   });
 
   const importBox = list.closest('.setup-people')?.querySelector('[data-setup-runts-board-import]')
@@ -8066,7 +8138,7 @@ function initPeopleList(list) {
     });
     reindex();
     initPersonNameCase(list.closest('form') || list || document);
-    syncPeopleCfRequired();
+    showPerson(0);
     if (importBox instanceof HTMLElement) importBox.hidden = true;
   });
 
@@ -8084,12 +8156,12 @@ function initPeopleList(list) {
     if (rows.children.length <= 1) {
       row.querySelectorAll('input').forEach((input) => { input.value = ''; });
       row.querySelectorAll('select').forEach((select) => { select.value = ''; });
-      syncPeopleCfRequired();
+      showPerson(0);
       return;
     }
     row.remove();
     reindex();
-    syncPeopleCfRequired();
+    showPerson(Math.min(activePerson, personRows().length - 1));
   });
 
   dialogCancel?.addEventListener('click', (event) => {
@@ -8201,6 +8273,7 @@ function initPeopleList(list) {
         if ((first || last) && !cf) {
           blocked = true;
           if (cfInput instanceof HTMLInputElement) {
+            revealPersonRow(row);
             cfInput.setCustomValidity(msgCfRequired);
             cfInput.reportValidity();
           }
@@ -8209,6 +8282,7 @@ function initPeopleList(list) {
         if (cf && !isValidItalianFiscalCode(cf)) {
           blocked = true;
           if (cfInput instanceof HTMLInputElement) {
+            revealPersonRow(row);
             cfInput.setCustomValidity(msgCfInvalid);
             cfInput.reportValidity();
           }
@@ -10367,7 +10441,6 @@ function initBirthDateFields(root = document) {
       return true;
     };
     input.addEventListener('change', validate);
-    input.addEventListener('input', validate);
     input.addEventListener('blur', () => {
       if (!validate() && typeof input.reportValidity === 'function') {
         input.reportValidity();
@@ -10883,6 +10956,55 @@ function initTreasuryCategory(root = document) {
     const memberToggle = form.querySelector('[data-treasury-member-toggle]');
     const memberFields = form.querySelector('[data-treasury-member-fields]');
     const memberSelect = form.querySelector('[data-treasury-member-select]');
+    const beneficiaryInput = form.querySelector('[data-treasury-beneficiary-input]');
+    const beneficiaryList = document.getElementById('treasury-beneficiaries');
+    const msgBeneficiarySuggest = beneficiaryWrap?.dataset?.msgSuggest || 'Did you mean “:name”?';
+
+    // Free-text counterparty: normalise spacing/case and offer the existing
+    // spelling when a near-duplicate is typed (server stores the canonical one).
+    const normalizeName = (value) => String(value || '')
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .toLowerCase()
+      .replace(/\s+/g, ' ')
+      .trim();
+    const distance = (a, b) => {
+      const prev = Array.from({ length: b.length + 1 }, (_, i) => i);
+      for (let i = 1; i <= a.length; i += 1) {
+        let last = prev[0];
+        prev[0] = i;
+        for (let j = 1; j <= b.length; j += 1) {
+          const tmp = prev[j];
+          prev[j] = Math.min(prev[j] + 1, prev[j - 1] + 1, last + (a[i - 1] === b[j - 1] ? 0 : 1));
+          last = tmp;
+        }
+      }
+      return prev[b.length];
+    };
+    beneficiaryInput?.addEventListener('change', () => {
+      if (!(beneficiaryInput instanceof HTMLInputElement) || !(beneficiaryList instanceof HTMLDataListElement)) return;
+      const value = normalizeName(beneficiaryInput.value);
+      if (!value) return;
+      const options = [...beneficiaryList.options]
+        .map((option) => ({ value: option.value, key: normalizeName(option.value) }))
+        .filter((option) => option.key !== '');
+      if (options.some((option) => option.key === value)) return;
+      let best = null;
+      let bestScore = 0;
+      options.forEach((option) => {
+        const score = 1 - distance(value, option.key) / Math.max(value.length, option.key.length);
+        if (score > bestScore) {
+          bestScore = score;
+          best = option.value;
+        }
+      });
+      if (best && bestScore >= 0.82) {
+        const message = msgBeneficiarySuggest.replace(':name', best);
+        if (window.confirm(message)) {
+          beneficiaryInput.value = best;
+        }
+      }
+    });
 
     // Shared show/hide: a hidden block must never submit its (stale) values.
     const setFieldsLocked = (container, locked) => {
@@ -11014,6 +11136,22 @@ function initTreasuryCategory(root = document) {
       const direction = currentDirection();
       const isExpense = direction === 'expense';
       const isTransfer = direction === 'transfer';
+      // Income cannot be settled with expense-only methods (SEPA direct debit,
+      // internal transfer, offset/refund): hide them from the select.
+      const incomeExcluded = new Set(['sepa_direct_debit', 'internal_transfer', 'offset_compensation']);
+      if (methodSelect instanceof HTMLSelectElement) {
+        [...methodSelect.options].forEach((option) => {
+          const hide = !isExpense && !isTransfer && incomeExcluded.has(option.value);
+          option.hidden = hide;
+          option.disabled = hide;
+        });
+        if (methodSelect.selectedOptions[0]?.hidden) {
+          methodSelect.value = '';
+        }
+        [...methodSelect.querySelectorAll('optgroup')].forEach((group) => {
+          group.hidden = [...group.querySelectorAll('option')].every((option) => option.hidden);
+        });
+      }
       form.querySelectorAll('[data-treasury-expense-fields]').forEach((block) => {
         setFieldsLocked(block, !isExpense);
       });

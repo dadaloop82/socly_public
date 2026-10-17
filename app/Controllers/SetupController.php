@@ -1010,6 +1010,29 @@ final class SetupController extends BaseController
         $_SESSION['_setup_logo_candidates'] = $candidates;
         $result['logo_candidates'] = $candidates;
 
+        // Se nessun logo è stato applicato automaticamente ma sono stati trovati
+        // candidati, usa il primo (quello con il punteggio più alto): l’utente
+        // potrà comunque sostituirlo dallo step dedicato al logo.
+        if (empty($result['logo_url']) && $candidates !== []) {
+            try {
+                $this->setup->applyScrapedHints(['logo_url' => $candidates[0]]);
+                $autoLogo = app(\Socly\Services\BrandingService::class)->logoUrl();
+                if (is_string($autoLogo) && trim($autoLogo) !== '') {
+                    $result['logo_url'] = $autoLogo;
+                    $result['logo_candidates'] = [];
+                    $candidates = [];
+                    $_SESSION['_setup_logo_candidates'] = [];
+                    if (!in_array('logo', $applied, true)) {
+                        $applied[] = 'logo';
+                    }
+                    $result['applied'] = $applied;
+                    $result['applied_count'] = count($applied);
+                }
+            } catch (\Throwable) {
+                // Download fallito: restano i candidati per la scelta manuale.
+            }
+        }
+
         $emit([
             'type' => 'done',
             'ok' => true,

@@ -63,7 +63,7 @@ $accountFilterUrl = static function (string $accountKey) use ($ledgerParams): st
     </div>
     <?php if ($canManage): ?>
         <div class="actions">
-            <a class="btn" href="<?= e(url('/treasury/create')) ?>"><?= e(__('treasury.add_movement')) ?></a>
+            <a class="btn<?= empty($hasAnyMovements) ? ' is-first-cta' : '' ?>" href="<?= e(url('/treasury/create')) ?>"><?= e(__('treasury.add_movement')) ?></a>
         </div>
     <?php endif; ?>
 </div>
@@ -197,6 +197,7 @@ foreach ($categories as $categoryOption) {
                 'invoice_desc' => (string) __('treasury.sort_invoice_desc'),
             ],
         ]) ?>
+        <?= field('hidden', ['name' => 'group', 'value' => '0']) ?>
         <?= field('checkbox', [
             'name' => 'group',
             'id' => 'treasury-group',

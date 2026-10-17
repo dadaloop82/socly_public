@@ -362,6 +362,15 @@ final class SetupCatalogue
                 'description_key' => 'setup.step_fields_desc',
             ],
             [
+                'key' => 'treasury.accounts',
+                'settings_key' => 'treasury.accounts_configured',
+                'storage' => 'settings',
+                'type' => 'treasury_accounts',
+                'required' => false,
+                'title_key' => 'setup.step_accounts_title',
+                'description_key' => 'setup.step_accounts_desc',
+            ],
+            [
                 'key' => 'mail.smtp',
                 'settings_key' => 'mail.configured',
                 'storage' => 'settings',

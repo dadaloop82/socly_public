@@ -89,7 +89,7 @@ foreach ($documents as $doc) {
             <a class="btn btn-ghost" href="<?= e($filterUrl(['q' => '', 'status' => '', 'category' => ''])) ?>"><?= e(__('documents.filter_reset')) ?></a>
         <?php endif; ?>
         <?php if ($canManage): ?>
-            <a class="btn" href="<?= e(url('/documents/create')) ?>"><?= e(__('documents.add')) ?></a>
+            <a class="btn<?= ($documents === [] && !$hasActiveFilters) ? ' is-first-cta' : '' ?>" href="<?= e(url('/documents/create')) ?>"><?= e(__('documents.add')) ?></a>
         <?php endif; ?>
     </div>
 </div>
