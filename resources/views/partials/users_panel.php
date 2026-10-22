@@ -13,6 +13,7 @@ $panelUsers = is_array($panelUsers ?? null) ? $panelUsers : [];
             <thead>
                 <tr>
                     <th><?= e(__('users.email')) ?></th>
+                    <th><?= e(__('users.role')) ?></th>
                     <th><?= e(__('users.locale')) ?></th>
                     <th><?= e(__('users.active')) ?></th>
                     <th></th>
@@ -22,6 +23,7 @@ $panelUsers = is_array($panelUsers ?? null) ? $panelUsers : [];
                 <?php foreach ($panelUsers as $u): ?>
                     <tr>
                         <td><?= e((string) ($u['email'] ?? '')) ?></td>
+                        <td><?= e(\Socly\Services\UserService::roleLabel($u['role'] ?? null) ?: __('users.role_custom')) ?></td>
                         <td><?= e(strtoupper((string) ($u['locale'] ?? 'it'))) ?></td>
                         <td><?= !empty($u['is_active']) ? e(__('common.yes')) : e(__('common.no')) ?></td>
                         <td class="doc-row-actions">
@@ -103,6 +105,7 @@ $panelUsers = is_array($panelUsers ?? null) ? $panelUsers : [];
         <?php if (!empty($mailReady)): ?>
             <p class="setup-hint muted"><?= e(__('users.welcome_email_hint')) ?></p>
         <?php endif; ?>
+        <?= view_partial('partials/user_role_picker', ['selected' => old('role', '')]) ?>
         <?= view_partial('partials/user_permissions_editor', ['selected' => old('permissions', [])]) ?>
         <div class="actions form-actions form-actions-end">
             <button class="btn" type="submit"><?= e(__('users.create_submit')) ?></button>

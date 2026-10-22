@@ -38,7 +38,12 @@ final class UserController extends BaseController
         $data = $request->all();
         $this->rememberOld($data);
         $plainPassword = (string) ($data['password'] ?? '');
-        $result = $this->users->create($data, $data['permissions'] ?? [], $request->ip());
+        $permissions = is_array($data['permissions'] ?? null) ? $data['permissions'] : [];
+        if ($permissions === []) {
+            // No checkboxes posted (or JS off): the role template is the source of truth.
+            $permissions = UserService::rolePermissions((string) ($data['role'] ?? '')) ?? [];
+        }
+        $result = $this->users->create($data, $permissions, $request->ip());
         if (!$result['ok']) {
             $this->flash('errors', $result['errors']);
             $this->redirectUsers('settings');
@@ -90,7 +95,11 @@ final class UserController extends BaseController
         $data = $request->all();
         $returnTo = (string) ($data['return'] ?? '');
         $this->rememberOld($data);
-        $result = $this->users->update((int) $id, $data, $data['permissions'] ?? [], $request->ip());
+        $permissions = is_array($data['permissions'] ?? null) ? $data['permissions'] : [];
+        if ($permissions === []) {
+            $permissions = UserService::rolePermissions((string) ($data['role'] ?? '')) ?? [];
+        }
+        $result = $this->users->update((int) $id, $data, $permissions, $request->ip());
         if (!$result['ok']) {
             $this->flash('errors', $result['errors']);
             redirect('/users/' . $id . '/edit' . ($returnTo === 'settings' ? '?return=settings' : ''));

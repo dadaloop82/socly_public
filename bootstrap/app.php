@@ -5,6 +5,7 @@ declare(strict_types=1);
 use Dotenv\Dotenv;
 use Socly\Controllers\AuthController;
 use Socly\Controllers\BrandingController;
+use Socly\Controllers\BudgetController;
 use Socly\Controllers\DashboardController;
 use Socly\Controllers\DeadlinesController;
 use Socly\Controllers\DocumentsController;
@@ -49,6 +50,7 @@ use Socly\Services\AssociationWebsiteScrapeService;
 use Socly\Services\AuditService;
 use Socly\Services\AuthService;
 use Socly\Services\BrandingService;
+use Socly\Services\BudgetService;
 use Socly\Services\ComponentService;
 use Socly\Services\CurrencyService;
 use Socly\Services\DeadlineService;
@@ -315,6 +317,11 @@ $app->bind(TreasuryService::class, fn (App $a) => new TreasuryService(
     $a->get(DocumentService::class),
     $a->get(CurrencyService::class)
 ));
+$app->bind(BudgetService::class, fn (App $a) => new BudgetService(
+    $a->get(Database::class),
+    $a->get(AuditService::class),
+    $a->get(TreasuryService::class)
+));
 $app->bind(DeadlineService::class, fn (App $a) => new DeadlineService(
     $a->get(Database::class),
     $a->get(AuditService::class),
@@ -427,7 +434,15 @@ $app->bind(TreasuryController::class, fn (App $a) => new TreasuryController(
     $a->get(TreasuryService::class),
     $a->get(MemberService::class),
     $a->get(ComponentService::class),
-    $a->get(CurrencyService::class)
+    $a->get(CurrencyService::class),
+    $a->get(BudgetService::class)
+));
+$app->bind(BudgetController::class, fn (App $a) => new BudgetController(
+    $a->get(View::class),
+    $a->get(BudgetService::class),
+    $a->get(TreasuryService::class),
+    $a->get(CurrencyService::class),
+    $a->get(SettingsService::class)
 ));
 $app->bind(DeadlinesController::class, fn (App $a) => new DeadlinesController(
     $a->get(View::class),

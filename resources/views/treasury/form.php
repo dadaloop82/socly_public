@@ -11,6 +11,7 @@
  * @var list<array> $members
  * @var array{auto_from_payments?:bool} $config
  * @var list<string> $beneficiaries
+ * @var list<array{label:string,options:list<array{value:string,label:string,direction:string,category:string}>}>|null $budget_items
  * @var \Socly\Services\CurrencyService $currency
  */
 $movementId = $isEdit ? (int) ($movement['id'] ?? 0) : 0;
@@ -25,6 +26,7 @@ if ($old !== []) {
         'amount_currency' => (string) ($movement['amount_currency'] ?? ''),
         'movement_date' => (string) ($movement['movement_date'] ?? date('Y-m-d')),
         'category' => (string) ($movement['category'] ?? 'membership_fee'),
+        'budget_item_id' => (string) ($movement['budget_item_id'] ?? ''),
         'payment_method' => (string) ($movement['payment_method'] ?? ''),
         'account' => (string) ($movement['account'] ?? ''),
         'transfer_account' => (string) ($movement['transfer_account'] ?? ''),
@@ -48,6 +50,7 @@ if ($old !== []) {
         'amount_currency' => '',
         'movement_date' => date('Y-m-d'),
         'category' => (string) ($default_category ?? 'membership_fee'),
+        'budget_item_id' => '',
         'payment_method' => '',
         'account' => '',
         'transfer_account' => '',

@@ -193,6 +193,7 @@ document.addEventListener('DOMContentLoaded', () => {
   initDashboardTabs();
   initDashboardCharts();
   initTreasuryCharts();
+  initTreasuryBudgetImpute(document);
   initAuthLoginI18nLive();
   syncBrandReadableColors();
   initSessionHeartbeat();
@@ -202,6 +203,8 @@ document.addEventListener('DOMContentLoaded', () => {
   initPasswordToggles(document);
   initPasswordGenerators(document);
   initPermissionTemplates(document);
+  initBudgetGrid(document);
+  initBudgetCreateForm(document);
   initEmailTemplateEditor(document);
   initFieldsSortable(document);
   initComponentCards(document);
@@ -647,6 +650,43 @@ function initPermissionTemplates(scope = document) {
         });
       });
     });
+    const form = editor.closest('form');
+    const roleSelect = form ? form.querySelector('[data-user-role]') : null;
+    const roleDescription = form ? form.querySelector('[data-user-role-description]') : null;
+    const syncRoleDescription = () => {
+      if (!roleSelect || !roleDescription) return;
+      const opt = roleSelect.options[roleSelect.selectedIndex];
+      const description = (opt && opt.dataset.roleDescription) || '';
+      roleDescription.textContent = description;
+      roleDescription.hidden = description === '';
+    };
+    const applyRolePermissions = () => {
+      if (!roleSelect) return;
+      const opt = roleSelect.options[roleSelect.selectedIndex];
+      const role = roleSelect.value || '';
+      let keys = [];
+      try {
+        keys = JSON.parse((opt && opt.dataset.rolePermissions) || '[]');
+      } catch {
+        keys = [];
+      }
+      if (!Array.isArray(keys)) keys = [];
+      // "Personalizzato" leaves the current selection untouched.
+      if (keys.length === 0 && role === '') return;
+      const keySet = new Set(keys.map(String));
+      editor.querySelectorAll('[data-permission-key]').forEach((input) => {
+        if (input instanceof HTMLInputElement && input.type === 'checkbox' && !input.disabled) {
+          input.checked = keySet.has(input.value);
+        }
+      });
+    };
+    if (roleSelect) {
+      syncRoleDescription();
+      roleSelect.addEventListener('change', () => {
+        syncRoleDescription();
+        applyRolePermissions();
+      });
+    }
   });
 }
 
@@ -12578,4 +12618,171 @@ function initFieldsSortable(scope = document) {
       tbody.insertBefore(dragRow, before ? target : target.nextSibling);
     });
   });
+}
+
+/* ── Bilancio: selezionando un CSV si attiva il modello "Importa" ────────── */
+function initBudgetCreateForm(scope = document) {
+  const form = scope.querySelector('[data-budget-create]');
+  if (!form || form.dataset.budgetCreateBound === '1') return;
+  form.dataset.budgetCreateBound = '1';
+  const input = form.querySelector('[data-budget-csv-input]');
+  if (!input) return;
+  input.addEventListener('change', () => {
+    if (!input.files || input.files.length === 0) return;
+    const radio = form.querySelector('input[name="template"][value="csv_import"]');
+    if (radio instanceof HTMLInputElement) radio.checked = true;
+  });
+}
+
+/* ── Prima cassa: propone il centro di costo in base alla categoria scelta ── */
+function initTreasuryBudgetImpute(scope = document) {
+  const form = scope.querySelector('[data-treasury-form]');
+  if (!form || form.dataset.budgetImputeBound === '1') return;
+  form.dataset.budgetImputeBound = '1';
+  const select = form.querySelector('[data-treasury-budget-item]');
+  const category = form.querySelector('[data-treasury-category]');
+  if (!select || !category) return;
+  category.addEventListener('change', () => {
+    if (select.value) return; // never override a manual choice
+    const match = Array.from(select.options).find(
+      (option) => option.dataset.category && option.dataset.category === category.value
+    );
+    if (match) select.value = match.value;
+  });
+}
+
+/* ── Bilancio: griglia blocco/sezione con totali live ───────────────────── */
+function initBudgetGrid(scope = document) {
+  const form = scope.querySelector('[data-budget-grid]');
+  if (!form || form.dataset.budgetGridBound === '1') return;
+  form.dataset.budgetGridBound = '1';
+
+  const grid = form.querySelector('.budget-grid');
+  const sectionTemplate = form.querySelector('[data-budget-section-template]');
+  const addSectionButton = form.querySelector('[data-budget-add-section]');
+  if (!grid) return;
+
+  const symbol = form.dataset.currencySymbol || '';
+  const locale = (document.documentElement.lang || 'it').slice(0, 2);
+  const localeMap = { it: 'it-IT', de: 'de-DE', en: 'en-GB' };
+  const numberFormatter = new Intl.NumberFormat(localeMap[locale] || 'it-IT', {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  });
+  let sectionCounter = 0;
+
+  const parseAmount = (raw) => {
+    let value = String(raw || '').replace(/[^\d.,-]/g, '').trim();
+    if (value === '') return 0;
+    if (value.includes(',')) {
+      value = value.replace(/\./g, '').replace(',', '.');
+    }
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : 0;
+  };
+  const format = (value) => `${numberFormatter.format(value)} ${symbol}`.trim();
+
+  const recalc = () => {
+    let grandExpense = 0;
+    let grandIncome = 0;
+    grid.querySelectorAll('[data-budget-section]').forEach((section) => {
+      let sectionExpense = 0;
+      let sectionIncome = 0;
+      section.querySelectorAll('[data-budget-row]').forEach((row) => {
+        const amountInput = row.querySelector('[data-budget-amount]');
+        const directionSelect = row.querySelector('[data-budget-direction]');
+        const amount = parseAmount(amountInput ? amountInput.value : '');
+        if (directionSelect && directionSelect.value === 'income') {
+          sectionIncome += amount;
+        } else {
+          sectionExpense += amount;
+        }
+      });
+      grandExpense += sectionExpense;
+      grandIncome += sectionIncome;
+      const expenseTarget = section.querySelector('[data-budget-section-total="expense"]');
+      const incomeTarget = section.querySelector('[data-budget-section-total="income"]');
+      if (expenseTarget) expenseTarget.textContent = format(sectionExpense);
+      if (incomeTarget) incomeTarget.textContent = format(sectionIncome);
+    });
+    const grandExpenseTarget = form.querySelector('[data-budget-grand="expense"]');
+    const grandIncomeTarget = form.querySelector('[data-budget-grand="income"]');
+    const grandNeedTarget = form.querySelector('[data-budget-grand="need"]');
+    if (grandExpenseTarget) grandExpenseTarget.textContent = format(grandExpense);
+    if (grandIncomeTarget) grandIncomeTarget.textContent = format(grandIncome);
+    if (grandNeedTarget) grandNeedTarget.textContent = format(grandExpense - grandIncome);
+  };
+
+  const nextKey = () => {
+    sectionCounter += 1;
+    return `n${Date.now().toString(36)}${sectionCounter}`;
+  };
+
+  const addRow = (section) => {
+    if (!section) return;
+    const template = section.querySelector('[data-budget-row-template]');
+    const tbody = section.querySelector('[data-budget-rows]');
+    if (!template || !tbody) return;
+    const key = section.dataset.sectionKey || '';
+    tbody.insertAdjacentHTML('beforeend', template.innerHTML.replaceAll('__KEY__', key));
+    const lastRow = tbody.lastElementChild;
+    const labelInput = lastRow ? lastRow.querySelector('input[name="item_label[]"]') : null;
+    if (labelInput) labelInput.focus();
+  };
+
+  form.addEventListener('click', (event) => {
+    const target = event.target;
+    if (!(target instanceof Element)) return;
+    const addRowButton = target.closest('[data-budget-add-row]');
+    if (addRowButton) {
+      event.preventDefault();
+      addRow(addRowButton.closest('[data-budget-section]'));
+      recalc();
+      return;
+    }
+    const removeRowButton = target.closest('[data-budget-row-remove]');
+    if (removeRowButton) {
+      event.preventDefault();
+      const row = removeRowButton.closest('[data-budget-row]');
+      if (row) row.remove();
+      recalc();
+      return;
+    }
+    const removeSectionButton = target.closest('[data-budget-section-remove]');
+    if (removeSectionButton) {
+      event.preventDefault();
+      const section = removeSectionButton.closest('[data-budget-section]');
+      if (!section) return;
+      const message = form.dataset.msgRemoveSection || '';
+      if (message && !window.confirm(message)) return;
+      section.remove();
+      recalc();
+    }
+  });
+
+  if (addSectionButton && sectionTemplate) {
+    addSectionButton.addEventListener('click', () => {
+      const key = nextKey();
+      grid.insertAdjacentHTML('beforeend', sectionTemplate.innerHTML.replaceAll('__KEY__', key));
+      const newSection = grid.lastElementChild;
+      addRow(newSection);
+      recalc();
+      if (newSection) newSection.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    });
+  }
+
+  form.addEventListener('input', (event) => {
+    const target = event.target;
+    if (target instanceof HTMLInputElement && target.matches('[data-budget-amount]')) {
+      recalc();
+    }
+  });
+  form.addEventListener('change', (event) => {
+    const target = event.target;
+    if (target instanceof HTMLSelectElement && target.matches('[data-budget-direction]')) {
+      recalc();
+    }
+  });
+
+  recalc();
 }

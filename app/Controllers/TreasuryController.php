@@ -6,6 +6,7 @@ namespace Socly\Controllers;
 
 use Socly\Core\Http\Request;
 use Socly\Core\View;
+use Socly\Services\BudgetService;
 use Socly\Services\ComponentService;
 use Socly\Services\CurrencyService;
 use Socly\Services\MemberService;
@@ -18,7 +19,8 @@ final class TreasuryController extends BaseController
         private readonly TreasuryService $treasury,
         private readonly MemberService $members,
         private readonly ComponentService $components,
-        private readonly CurrencyService $currency
+        private readonly CurrencyService $currency,
+        private readonly BudgetService $budgets
     ) {
         parent::__construct($view);
     }
@@ -84,6 +86,7 @@ final class TreasuryController extends BaseController
             'config' => $this->components->config('treasury', ['auto_from_payments' => true]),
             'beneficiaries' => $this->treasury->beneficiaries(),
             'currency' => $this->currency,
+            'budget_items' => $this->budgets->itemOptions((int) date('Y')),
         ]);
     }
 
@@ -120,6 +123,7 @@ final class TreasuryController extends BaseController
             'config' => $this->components->config('treasury', ['auto_from_payments' => true]),
             'beneficiaries' => $this->treasury->beneficiaries(),
             'currency' => $this->currency,
+            'budget_items' => $this->budgets->itemOptions((int) substr((string) ($movement['movement_date'] ?? date('Y-m-d')), 0, 4)),
         ]);
     }
 

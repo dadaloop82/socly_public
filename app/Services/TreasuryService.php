@@ -264,7 +264,11 @@ final class TreasuryService
                      INNER JOIN member_field_definitions d ON d.id = v.field_definition_id AND d.`key` = 'last_name'
                      WHERE v.member_id = mem.id LIMIT 1) AS last_name,
                     mem.member_number,
-                    u.name AS creator_name
+                    u.name AS creator_name,
+                    (SELECT CONCAT(b.fiscal_year, ' · ', i.label)
+                     FROM budget_items i
+                     INNER JOIN budgets b ON b.id = i.budget_id
+                     WHERE i.id = m.budget_item_id) AS budget_item_label
              FROM treasury_movements m
              LEFT JOIN members mem ON mem.id = m.member_id
              LEFT JOIN users u ON u.id = m.created_by";
@@ -794,7 +798,11 @@ final class TreasuryService
                      INNER JOIN member_field_definitions d ON d.id = v.field_definition_id AND d.`key` = 'last_name'
                      WHERE v.member_id = mem.id LIMIT 1) AS last_name,
                     mem.member_number,
-                    u.name AS creator_name
+                    u.name AS creator_name,
+                    (SELECT CONCAT(b.fiscal_year, ' · ', i.label)
+                     FROM budget_items i
+                     INNER JOIN budgets b ON b.id = i.budget_id
+                     WHERE i.id = m.budget_item_id) AS budget_item_label
              FROM treasury_movements m
              LEFT JOIN members mem ON mem.id = m.member_id
              LEFT JOIN users u ON u.id = m.created_by
@@ -1058,12 +1066,23 @@ final class TreasuryService
             }
         }
 
+        $budgetItemId = 0;
+        $budgetItemRaw = trim((string) ($input['budget_item_id'] ?? ''));
+        if (!$isTransfer && $budgetItemRaw !== '' && $budgetItemRaw !== '0') {
+            $budgetItemId = (int) $budgetItemRaw;
+            $exists = $this->db->fetch('SELECT id FROM budget_items WHERE id = :id', ['id' => $budgetItemId]);
+            if ($exists === null) {
+                return ['ok' => false, 'errors' => ['budget_item_id' => __('validation.in')]];
+            }
+        }
+
         return [
             'ok' => true,
             'data' => [
                 'movement_date' => $date,
                 'direction' => $direction,
                 'category' => (string) $categoryResult['key'],
+                'budget_item_id' => $budgetItemId > 0 ? $budgetItemId : null,
                 'amount' => $amount,
                 'amount_entered' => $amountEntered,
                 'amount_currency' => $amountCurrency,

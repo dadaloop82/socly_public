@@ -12,8 +12,9 @@
         <table>
             <thead>
             <tr>
-                <th>Name</th>
-                <th>Email</th>
+                <th><?= e(__('users.name')) ?></th>
+                <th><?= e(__('users.email')) ?></th>
+                <th><?= e(__('users.role')) ?></th>
                 <th><?= e(__('users.locale')) ?></th>
                 <th><?= e(__('users.active')) ?></th>
                 <th></th>
@@ -24,6 +25,7 @@
                 <tr>
                     <td><?= e($u['name']) ?><?= !empty($u['is_system_admin']) ? ' ★ ' . e(__('users.system_admin')) : '' ?></td>
                     <td><?= e($u['email']) ?></td>
+                    <td><?= e(\Socly\Services\UserService::roleLabel($u['role'] ?? null) ?: __('users.role_custom')) ?></td>
                     <td><?= e(strtoupper($u['locale'])) ?></td>
                     <td><?= $u['is_active'] ? __('common.yes') : __('common.no') ?></td>
                     <td class="doc-row-actions">

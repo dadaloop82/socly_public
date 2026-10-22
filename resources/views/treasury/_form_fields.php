@@ -8,6 +8,7 @@
  * @var list<array{key:string,label:string,active:bool,balance:float}>|null $account_balances
  * @var list<array> $members
  * @var list<string> $beneficiaries
+ * @var list<array{label:string,options:list<array{value:string,label:string,direction:string,category:string}>}>|null $budget_items
  * @var array{auto_from_payments?:bool}|null $config
  * @var \Socly\Services\CurrencyService $currency
  */
@@ -327,6 +328,38 @@ $invoiceActive = $selectedDirection === 'expense' && !empty($values['invoice_pay
                 'attrs' => ['data-treasury-new-category-input' => true],
             ]) ?>
         </div>
+        <?php
+        $budgetItemGroups = [];
+        foreach (($budget_items ?? []) as $budgetGroup) {
+            $budgetOptions = [];
+            foreach (($budgetGroup['options'] ?? []) as $budgetOption) {
+                $budgetOptions[] = [
+                    'value' => (string) ($budgetOption['value'] ?? ''),
+                    'label' => (string) ($budgetOption['label'] ?? ''),
+                    'attrs' => [
+                        'data-category' => (string) ($budgetOption['category'] ?? ''),
+                        'data-direction' => (string) ($budgetOption['direction'] ?? ''),
+                    ],
+                ];
+            }
+            if ($budgetOptions !== []) {
+                $budgetItemGroups[] = ['label' => (string) ($budgetGroup['label'] ?? ''), 'options' => $budgetOptions];
+            }
+        }
+        ?>
+        <?php if ($budgetItemGroups !== []): ?>
+            <div class="budget-impute-field" data-treasury-budget-field>
+                <?= field('select', [
+                    'name' => 'budget_item_id',
+                    'label' => (string) __('treasury.budget_item'),
+                    'value' => (string) ($values['budget_item_id'] ?? ''),
+                    'empty_label' => (string) __('treasury.budget_item_none'),
+                    'groups' => $budgetItemGroups,
+                    'hint' => (string) __('treasury.budget_item_hint'),
+                    'attrs' => ['data-treasury-budget-item' => true],
+                ]) ?>
+            </div>
+        <?php endif; ?>
     </div>
     <?php // Invoice number/date live only inside the invoice block (no duplicates). ?>
 </div>

@@ -6,7 +6,9 @@ namespace Socly\Setup;
 
 /**
  * Italian legal-form abbreviations (max 6 chars) for associations / entities.
- * Labels are bilingual (IT / DE) so Südtirol associations can recognise both forms.
+ *
+ * The official code is always the Italian one (APS, ODV, …): German long forms
+ * are only kept for RUNTS matching, never shown as the selectable label.
  */
 final class AssociationLegalForms
 {
@@ -114,23 +116,18 @@ final class AssociationLegalForms
     }
 
     /**
-     * Select option label: "APS" or "APS / VBO" when a DE alias exists.
+     * Select option label: the official Italian code (e.g. "APS").
      */
     public static function displayCode(string $code): string
     {
-        $code = strtoupper(trim($code));
-        $alias = self::bilingualCatalog()[$code]['alias'] ?? '';
-        if ($alias !== '' && strtoupper($alias) !== $code) {
-            return $code . ' / ' . strtoupper($alias);
-        }
-        return $code;
+        return strtoupper(trim($code));
     }
 
     /**
-     * Bilingual meaning shown under the denomination, e.g.
-     * "Associazione di Promozione Sociale · Verein zur sozialen Förderung".
+     * Italian long form shown under the denomination, e.g.
+     * "Associazione di Promozione Sociale".
      */
-    public static function bilingualMeaning(string $code): string
+    public static function meaning(string $code): string
     {
         $code = strtoupper(trim($code));
         $row = self::bilingualCatalog()[$code] ?? null;
@@ -138,12 +135,7 @@ final class AssociationLegalForms
             $key = self::all()[$code] ?? '';
             return $key !== '' ? (string) __($key) : $code;
         }
-        $it = trim($row['it']);
-        $de = trim($row['de']);
-        if ($it === '' || $de === '' || strcasecmp($it, $de) === 0) {
-            return $it !== '' ? $it : $de;
-        }
-        return $it . ' · ' . $de;
+        return trim((string) $row['it']);
     }
 
     /**

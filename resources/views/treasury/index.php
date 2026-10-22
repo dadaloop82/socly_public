@@ -68,28 +68,24 @@ $accountFilterUrl = static function (string $accountKey) use ($ledgerParams): st
     <?php endif; ?>
 </div>
 
-<div class="stats stats-context-treasury">
-    <div class="stat">
-        <div class="label"><?= e(__('treasury.balance')) ?></div>
-        <div class="value"><?= e($currency->format((float) $ledger['balance'])) ?></div>
+<section class="panel treasury-overview">
+    <div class="treasury-overview-head">
+        <div class="treasury-overview-balance">
+            <span class="treasury-overview-label"><?= e(__('treasury.balance')) ?></span>
+            <strong class="treasury-overview-value<?= (float) $ledger['balance'] < 0 ? ' is-negative' : '' ?>"><?= e($currency->format((float) $ledger['balance'])) ?></strong>
+        </div>
+        <div class="treasury-overview-flows">
+            <span class="is-income"><span aria-hidden="true">↓</span> <?= e($currency->format((float) $ledger['income'])) ?></span>
+            <span class="is-expense"><span aria-hidden="true">↑</span> <?= e($currency->format((float) $ledger['expense'])) ?></span>
+        </div>
+        <div class="treasury-overview-actions">
+            <?php if ($canManage): ?>
+                <a class="btn btn-ghost btn-sm" href="<?= e(url('/budgets')) ?>"><?= e(__('budget.title')) ?></a>
+            <?php endif; ?>
+        </div>
     </div>
-    <div class="stat">
-        <div class="label"><?= e(__('treasury.income_total')) ?></div>
-        <div class="value stat-positive"><?= e($currency->format((float) $ledger['income'])) ?></div>
-    </div>
-    <div class="stat">
-        <div class="label"><?= e(__('treasury.expense_total')) ?></div>
-        <div class="value stat-negative"><?= e($currency->format((float) $ledger['expense'])) ?></div>
-    </div>
-</div>
-
-<?php if (!empty($account_balances)): ?>
-    <section class="panel treasury-wallets" data-treasury-wallets>
-        <header class="treasury-wallets-head">
-            <h2 class="section-title"><?= e(__('treasury.accounts_overview')) ?></h2>
-            <p class="section-lede"><?= e(__('treasury.accounts_overview_lede')) ?></p>
-        </header>
-        <div class="treasury-wallets-grid">
+    <?php if (!empty($account_balances)): ?>
+        <div class="treasury-wallets-grid is-compact" data-treasury-wallets>
             <?php foreach ($account_balances as $wallet): ?>
                 <?php
                 $walletKey = (string) ($wallet['key'] ?? '');
@@ -100,7 +96,12 @@ $accountFilterUrl = static function (string $accountKey) use ($ledgerParams): st
                 <a class="treasury-wallet<?= $walletSelected ? ' is-active' : '' ?><?= $walletActive ? '' : ' is-inactive' ?>"
                    href="<?= e($accountFilterUrl($walletSelected ? '' : $walletKey)) ?>"
                    title="<?= e($walletSelected ? __('treasury.filter_reset') : __('treasury.accounts_filter_hint')) ?>">
-                    <span class="treasury-wallet-label"><?= e((string) ($wallet['label'] ?? '')) ?></span>
+                    <span class="treasury-wallet-label">
+                        <?= e((string) ($wallet['label'] ?? '')) ?>
+                        <?php if (!$walletActive): ?>
+                            <span class="treasury-wallet-flag"><?= e(__('treasury.account_inactive_suffix')) ?></span>
+                        <?php endif; ?>
+                    </span>
                     <strong class="treasury-wallet-balance<?= $walletBalance < 0 ? ' is-negative' : '' ?>"><?= e($currency->format($walletBalance)) ?></strong>
                     <span class="treasury-wallet-meta">
                         <span class="is-income">+ <?= e($currency->format((float) ($wallet['income'] ?? 0))) ?></span>
@@ -108,15 +109,12 @@ $accountFilterUrl = static function (string $accountKey) use ($ledgerParams): st
                         <?php if ((float) ($wallet['transfer_in'] ?? 0) !== 0.0 || (float) ($wallet['transfer_out'] ?? 0) !== 0.0): ?>
                             <span class="is-transfer">↔ <?= e($currency->format((float) ($wallet['transfer_in'] ?? 0) - (float) ($wallet['transfer_out'] ?? 0))) ?></span>
                         <?php endif; ?>
-                        <?php if (!$walletActive): ?>
-                            <span class="is-muted"><?= e(__('treasury.account_inactive_suffix')) ?></span>
-                        <?php endif; ?>
                     </span>
                 </a>
             <?php endforeach; ?>
         </div>
-    </section>
-<?php endif; ?>
+    <?php endif; ?>
+</section>
 
 <?php if (!empty($hasAnyMovements)): ?>
 <?php
@@ -243,7 +241,6 @@ foreach ($categories as $categoryOption) {
                             <thead>
                             <tr>
                                 <th><?= e(__('treasury.operation_date')) ?></th>
-                                <th><?= e(__('treasury.invoice_date')) ?></th>
                                 <th><?= e(__('treasury.description')) ?></th>
                                 <th><?= e(__('treasury.method')) ?></th>
                                 <th><?= e(__('treasury.details')) ?></th>
@@ -308,7 +305,6 @@ foreach ($categories as $categoryOption) {
                                     <?php endif; ?>
                                 >
                                     <td><?= e(format_date($row['movement_date'] ?? null) ?: '—') ?></td>
-                                    <td><?= e(!empty($row['invoice_date']) ? (format_date($row['invoice_date']) ?: (string) $row['invoice_date']) : '—') ?></td>
                                     <td><?= e($desc !== '' ? $desc : '—') ?></td>
                                     <td>
                                         <?php if ($isTransfer && $transferLabel !== ''): ?>
@@ -322,10 +318,12 @@ foreach ($categories as $categoryOption) {
                                         <?php if (!empty($row['beneficiary'])): ?><div><?= e(__('treasury.supplier')) ?>: <?= e((string) $row['beneficiary']) ?></div><?php endif; ?>
                                         <?php if ($invoiceTitle !== '' && $invoiceTitle !== $desc): ?><div><?= e(__('treasury.invoice_title')) ?>: <?= e($invoiceTitle) ?></div><?php endif; ?>
                                         <?php if (!empty($row['invoice_number'])): ?><div><?= e(__('treasury.invoice_number')) ?>: <?= e((string) $row['invoice_number']) ?></div><?php endif; ?>
+                                        <?php if (!empty($row['invoice_date'])): ?><div><?= e(__('treasury.invoice_date')) ?>: <?= e(format_date($row['invoice_date']) ?: (string) $row['invoice_date']) ?></div><?php endif; ?>
+                                        <?php if (!empty($row['budget_item_label'])): ?><div><?= e(__('treasury.budget_item')) ?>: <?= e((string) $row['budget_item_label']) ?></div><?php endif; ?>
                                         <?php if (!empty($row['invoice_due_date'])): ?><div><?= e(__('treasury.invoice_due_date')) ?>: <?= e(format_date($row['invoice_due_date']) ?: (string) $row['invoice_due_date']) ?></div><?php endif; ?>
                                         <?php if (!empty($row['amount_entered']) && !empty($row['amount_currency'])): ?><div><?= e(__('treasury.amount_original')) ?>: <?= e(number_format((float) $row['amount_entered'], 2, ',', '.')) ?> <?= e((string) $row['amount_currency']) ?></div><?php endif; ?>
                                         <?php if (!empty($row['attachment_path'])): ?><div><a href="<?= e(url('/treasury/' . $rowId . '/attachment')) ?>" target="_blank" rel="noopener"><?= e(__('treasury.upload_document')) ?></a></div><?php endif; ?>
-                                        <?php if (empty($row['member_id']) && empty($row['beneficiary']) && empty($row['invoice_number']) && empty($row['invoice_title']) && empty($row['attachment_path'])): ?><?= e(__('treasury.none')) ?><?php endif; ?>
+                                        <?php if (empty($row['member_id']) && empty($row['beneficiary']) && empty($row['invoice_number']) && empty($row['invoice_title']) && empty($row['budget_item_label']) && empty($row['invoice_date']) && empty($row['attachment_path'])): ?><?= e(__('treasury.none')) ?><?php endif; ?>
                                     </td>
                                     <td class="<?= $isTransfer ? 'amount-transfer' : 'amount-income' ?>"><?= $isIncome || $isTransfer ? ($isTransfer ? '↔ ' : '') . e($currency->format($amount)) : '—' ?></td>
                                     <td class="amount-expense"><?= $isIncome || $isTransfer ? '—' : e($currency->format($amount)) ?></td>

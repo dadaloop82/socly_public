@@ -10,6 +10,7 @@
 | password | `password_hash` |
 | name | display name |
 | locale | `it` / `de` / `en` |
+| role | operator role label (`president`, `treasurer`, `secretary`, `board`, `volunteer`) — NULL = custom permissions |
 | is_system_admin | immutable admin flag; cannot delete |
 | is_active | soft disable |
 | created_at, updated_at | |
@@ -45,6 +46,17 @@ EAV: `member_id`, `field_definition_id`, `value`.
 
 ### audit_logs
 `user_id`, `action`, `entity_type`, `entity_id`, `before_json`, `after_json`, `ip`, `created_at`.
+
+### treasury_movements
+Cash book rows: `movement_date`, `direction` (`income` / `expense` / `transfer`), `category`, `budget_item_id` (nullable cost centre), `amount`, `description`, `payment_method`, `account`, `transfer_account`, invoice fields, `attachment_path`, `member_id`, `payment_id`, `created_by`.
+
+### budgets / budget_sections / budget_items
+Yearly forecast budget, one per fiscal year (`budgets.fiscal_year` unique; `status` `draft` / `approved`).
+
+- `budget_sections` — collapsible groups (`title`, `sort_order`), cascade-deleted with the budget.
+- `budget_items` — one line: `direction` (`income` / `expense`), `label`, `amount`, optional `category` (matches the treasury categories), `notes`, `sort_order`.
+
+The actuals (consuntivo) are **derived**: `SUM(treasury_movements.amount)` grouped by `budget_item_id`. No duplicated actuals table; movements without imputation are reported separately as “non imputati”.
 
 ### plugins
 `id` (plugin slug), `is_enabled`, `enabled_at`, `meta_json`.

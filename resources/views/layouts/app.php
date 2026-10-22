@@ -183,6 +183,9 @@ if ($user && app()->isInstalled() && !$temporaryInstance && can('settings.manage
             <?php foreach ($componentMenu as $item): ?>
                 <?php if (!empty($item['permission']) && !can($item['permission'])) continue; ?>
                 <a href="<?= e(url($item['path'])) ?>" class="<?= e($navActive($item['path'])) ?>"><?= e(__($item['label'])) ?></a>
+                <?php if (($item['key'] ?? '') === 'treasury' && can('treasury.view')): ?>
+                    <a href="<?= e(url('/budgets')) ?>" class="<?= e($navActive('/budgets')) ?>"><?= e(__('nav.budgets')) ?></a>
+                <?php endif; ?>
             <?php endforeach; ?>
             <?php foreach ($pluginMenu as $item): ?>
                 <?php if (!empty($item['permission']) && !can($item['permission'])) continue; ?>
@@ -327,34 +330,31 @@ if ($user && app()->isInstalled() && !$temporaryInstance && can('settings.manage
                     </div>
                 </details>
             <?php endif; ?>
-            <?php if (!empty($demoPreview)): ?>
-                <div class="user-name"><?= e(__('auth.demo_preview_user')) ?></div>
-            <?php else: ?>
-                <div class="user-name"><?= e($user['name'] ?? '') ?></div>
-                <div class="user-meta"><?= e($user['email'] ?? '') ?></div>
-            <?php endif; ?>
-            <div class="sidebar-footer-version">v<?= e(app_version()) ?></div>
-            <?php if ($configActive && can('dashboard.view')): ?>
-                <a
-                    class="sidebar-settings-link sidebar-back-link"
-                    href="<?= e(url('/dashboard')) ?>"
-                >
-                    <span class="sidebar-back-icon" aria-hidden="true"></span>
-                    <?= e(__('nav.back_to_dashboard')) ?>
-                </a>
-            <?php elseif ($isAdminConfig): ?>
-                <a
-                    class="sidebar-settings-link"
-                    href="<?= e(url('/settings')) ?>"
-                >
-                    <span class="sidebar-settings-icon" aria-hidden="true"></span>
-                    <?= e(__('nav.settings')) ?>
-                </a>
-            <?php endif; ?>
-            <form method="post" action="<?= e(url('/logout')) ?>">
-                <?= csrf_field() ?>
-                <button class="btn btn-ghost btn-sm btn-logout" type="submit"><?= e(!empty($demoPreview) ? __('auth.demo_exit') : __('nav.logout')) ?></button>
-            </form>
+            <div class="sidebar-footer-actions">
+                <?php if ($configActive && can('dashboard.view')): ?>
+                    <a
+                        class="sidebar-icon-link"
+                        href="<?= e(url('/dashboard')) ?>"
+                        title="<?= e(__('nav.back_to_dashboard')) ?>"
+                        aria-label="<?= e(__('nav.back_to_dashboard')) ?>"
+                    >
+                        <span class="sidebar-back-icon" aria-hidden="true"></span>
+                    </a>
+                <?php elseif ($isAdminConfig): ?>
+                    <a
+                        class="sidebar-icon-link"
+                        href="<?= e(url('/settings')) ?>"
+                        title="<?= e(__('nav.settings')) ?>"
+                        aria-label="<?= e(__('nav.settings')) ?>"
+                    >
+                        <span class="sidebar-settings-icon" aria-hidden="true"></span>
+                    </a>
+                <?php endif; ?>
+                <form method="post" action="<?= e(url('/logout')) ?>" class="sidebar-logout-form">
+                    <?= csrf_field() ?>
+                    <button class="btn btn-ghost btn-sm btn-logout" type="submit"><?= e(!empty($demoPreview) ? __('auth.demo_exit') : __('nav.logout')) ?></button>
+                </form>
+            </div>
         </div>
     </aside>
 
@@ -422,6 +422,18 @@ if ($user && app()->isInstalled() && !$temporaryInstance && can('settings.manage
                 <?= socly_word_html('socly-word-footer') ?>
                 <?php if ($hasAssoc): ?>
                     <span class="footer-for">· <?= e(__('auth.for')) ?> <?= assoc_lockup_html(['class' => 'assoc-lockup-footer']) ?></span>
+                <?php endif; ?>
+                <?php if (!empty($demoPreview)): ?>
+                    <span class="footer-operator">· <?= e(__('auth.demo_preview_user')) ?></span>
+                <?php elseif ($user && (trim((string) ($user['name'] ?? '')) !== '' || trim((string) ($user['email'] ?? '')) !== '')): ?>
+                    <span class="footer-operator">
+                        <?php if (trim((string) ($user['name'] ?? '')) !== ''): ?>
+                            · <?= e((string) $user['name']) ?>
+                        <?php endif; ?>
+                        <?php if (trim((string) ($user['email'] ?? '')) !== ''): ?>
+                            · <?= e((string) $user['email']) ?>
+                        <?php endif; ?>
+                    </span>
                 <?php endif; ?>
                 <span class="footer-meta">· © <?= e(date('Y')) ?> · v<?= e(app_version()) ?></span>
             </div>

@@ -436,7 +436,7 @@ $errorStep = flash('setup_error_step');
                                     $selectOptions[] = [
                                         'value' => $optVal,
                                         'label' => $isCurrency ? $optVal : \Socly\Setup\AssociationLegalForms::displayCode($optVal),
-                                        'attrs' => $isCurrency ? [] : ['data-meaning' => \Socly\Setup\AssociationLegalForms::bilingualMeaning($optVal)],
+                                        'attrs' => $isCurrency ? [] : ['data-meaning' => \Socly\Setup\AssociationLegalForms::meaning($optVal)],
                                     ];
                                 }
                                 ?>

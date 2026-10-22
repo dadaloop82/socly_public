@@ -97,6 +97,9 @@
         <p class="setup-hint muted"><?= e(__('users.system_admin')) ?></p>
     <?php endif; ?>
     <?php if (!$isEdit || empty($user['is_system_admin'])): ?>
+        <?= view_partial('partials/user_role_picker', [
+            'selected' => old('role', $user['role'] ?? ''),
+        ]) ?>
         <?= view_partial('partials/user_permissions_editor', [
             'selected' => old('permissions', $selected) ?: [],
             'disabled' => false,

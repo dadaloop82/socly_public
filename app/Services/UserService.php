@@ -46,7 +46,7 @@ final class UserService
     /** @return list<array<string,mixed>> */
     public function all(bool $includeSystemAdmins = false): array
     {
-        $sql = 'SELECT id, email, name, locale, is_system_admin, is_active, created_at FROM users';
+        $sql = 'SELECT id, email, name, locale, role, is_system_admin, is_active, created_at FROM users';
         if (!$includeSystemAdmins) {
             $sql .= ' WHERE is_system_admin = 0';
         }
@@ -57,7 +57,7 @@ final class UserService
     public function find(int $id): ?array
     {
         $user = $this->db->fetch(
-            'SELECT id, email, name, locale, is_system_admin, is_active, created_at FROM users WHERE id = :id',
+            'SELECT id, email, name, locale, role, is_system_admin, is_active, created_at FROM users WHERE id = :id',
             ['id' => $id]
         );
         if (!$user) {
@@ -120,8 +120,9 @@ final class UserService
         $id = $this->db->insert('users', [
             'name' => $name,
             'email' => $data['email'],
-            'password' => password_hash($data['password'], PASSWORD_DEFAULT),
+            'password' => password_hash((string) $data['password'], PASSWORD_DEFAULT),
             'locale' => $data['locale'],
+            'role' => self::normalizeRole((string) ($data['role'] ?? '')),
             'is_system_admin' => 0,
             'is_active' => !empty($data['is_active']) ? 1 : 0,
         ]);
@@ -158,6 +159,7 @@ final class UserService
                 : self::deriveDisplayNameFromEmail((string) $data['email']),
             'email' => $data['email'],
             'locale' => $data['locale'],
+            'role' => self::normalizeRole((string) ($data['role'] ?? '')),
             'is_active' => !empty($before['is_system_admin']) ? 1 : (!empty($data['is_active']) ? 1 : 0),
         ];
         if (!empty($data['password'])) {
@@ -202,6 +204,52 @@ final class UserService
                 ]);
             }
         }
+    }
+
+    /**
+     * Stable role keys for operator accounts (see roleTemplates()).
+     *
+     * @return list<string>
+     */
+    public static function roleKeys(): array
+    {
+        return array_map(static fn (array $tpl): string => (string) $tpl['key'], self::roleTemplates());
+    }
+
+    /** Empty / unknown role ⇒ NULL (custom permission set without a label). */
+    public static function normalizeRole(string $role): ?string
+    {
+        $role = strtolower(trim($role));
+        return in_array($role, self::roleKeys(), true) ? $role : null;
+    }
+
+    public static function roleLabel(?string $role): string
+    {
+        $role = self::normalizeRole((string) $role);
+        if ($role === null) {
+            return '';
+        }
+        foreach (self::roleTemplates() as $tpl) {
+            if ((string) $tpl['key'] === $role) {
+                return (string) __((string) $tpl['label_key']);
+            }
+        }
+        return '';
+    }
+
+    /** @return list<string>|null */
+    public static function rolePermissions(string $role): ?array
+    {
+        $role = self::normalizeRole($role);
+        if ($role === null) {
+            return null;
+        }
+        foreach (self::roleTemplates() as $tpl) {
+            if ((string) $tpl['key'] === $role) {
+                return array_values(array_map('strval', $tpl['permissions']));
+            }
+        }
+        return null;
     }
 
     /** @return list<array{key:string,label_key:string,description_key:string,permissions:list<string>}> */
