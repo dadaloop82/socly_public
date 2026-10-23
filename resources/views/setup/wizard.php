@@ -393,10 +393,8 @@ $showNameDe = !empty($showNameDe);
                                     </div>
                                     <div class="setup-runts-panel" data-setup-runts-panel <?= !empty($runtsExhausted) ? 'hidden' : '' ?>>
                                     <div class="setup-runts-callout" data-setup-runts-callout>
-                                        <span class="setup-runts-callout-icon setup-runts-callout-icon-promo" aria-hidden="true">⚡</span>
                                         <span class="setup-runts-callout-icon setup-runts-callout-icon-ok" aria-hidden="true">✓</span>
-                                        <p class="setup-runts-callout-text setup-runts-callout-promo" data-i18n="setup.runts_callout"><?= e(__('setup.runts_callout')) ?></p>
-                                        <p class="setup-runts-callout-text setup-runts-callout-ok" data-i18n="setup.runts_callout_found" hidden><?= e(__('setup.runts_callout_found')) ?></p>
+                                        <p class="setup-runts-callout-text setup-runts-callout-ok" data-i18n="setup.runts_callout_found"><?= e(__('setup.runts_callout_found')) ?></p>
                                     </div>
                                     <?= field('text', [
                                         'id' => 'setup-runts-number',
