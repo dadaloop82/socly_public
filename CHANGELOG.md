@@ -19,6 +19,9 @@ and this project follows a simple `1.0.x` versioning scheme driven by release sy
   revocable; demo instances excluded)
 - Socly admin “Installazioni” registry with filters and full contact cards, plus a platform dashboard
   with charts (versions, languages, member ranges, components, provinces, activity)
+- One-click installers for Linux (`bin/install/linux.sh`), macOS (`bin/install/macos.sh`) and Windows
+  (`bin/install/windows.ps1`): environment checks, PHP/Composer/MariaDB/OCR setup, database creation,
+  `.env`, migrations and local server
 
 ### Fixed
 

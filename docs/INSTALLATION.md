@@ -26,6 +26,26 @@ Serve `exec()` abilitato in PHP e il binario CLI `php` (il worker OCR parte in b
 Se `exec()` è disabilitato Socly usa un OCR inline ridotto e segnala nell'interfaccia quando il testo
 letto è parziale.
 
+## Installazione one-click (Linux, macOS, Windows)
+
+Gli script in `bin/install/` verificano l'ambiente, installano PHP 8.2+ con le estensioni richieste,
+MariaDB/MySQL, Composer e (opzionale) gli strumenti OCR, creano database e `.env`, applicano le
+migrazioni e avviano il server locale:
+
+```bash
+sudo bash bin/install/linux.sh                                      # Linux
+bash bin/install/macos.sh                                           # macOS (Homebrew)
+powershell -ExecutionPolicy Bypass -File bin\install\windows.ps1    # Windows (admin)
+```
+
+Opzioni utili: `--check` (solo verifica), `--no-ocr`, `--no-serve`, `--port=8080`,
+`--db-root-pass=...`. Su Windows i parametri sono `-Check`, `-NoOcr`, `-NoServe`, `-Port`, `-DbRootPass`.
+Dettagli in [`bin/install/README.md`](../bin/install/README.md).
+
+Al termine apri `http://127.0.0.1:8080/install` e completa il wizard (associazione, account Admin,
+periodo/quota, campi, consensi). Il server PHP integrato serve per installazione e valutazione: per la
+produzione usa Apache/Nginx + HTTPS come descritto sotto.
+
 ## 1. Scarica il codice
 
 ```bash
@@ -176,6 +196,26 @@ sudo apt install poppler-utils tesseract-ocr tesseract-ocr-ita
 `exec()` must be enabled in PHP and the `php` CLI binary must be available (the OCR worker starts in
 the background via `nohup`). When `exec()` is disabled, Socly falls back to a short inline OCR and
 warns in the UI when the extracted text is partial.
+
+## One-click installation (Linux, macOS, Windows)
+
+The scripts in `bin/install/` verify the environment, install PHP 8.2+ with the required extensions,
+MariaDB/MySQL, Composer and optional OCR tools, create the database and `.env`, apply migrations and
+start the local server:
+
+```bash
+sudo bash bin/install/linux.sh                                      # Linux
+bash bin/install/macos.sh                                           # macOS (Homebrew)
+powershell -ExecutionPolicy Bypass -File bin\install\windows.ps1    # Windows (admin)
+```
+
+Useful flags: `--check` (verify only), `--no-ocr`, `--no-serve`, `--port=8080`,
+`--db-root-pass=...`. On Windows the parameters are `-Check`, `-NoOcr`, `-NoServe`, `-Port`,
+`-DbRootPass`. Details in [`bin/install/README.md`](../bin/install/README.md).
+
+Then open `http://127.0.0.1:8080/install` and complete the wizard (association, Admin account,
+period/type, fields, consents). The built-in PHP server is for installation and evaluation: for
+production use Apache/Nginx + HTTPS as described below.
 
 ## 1. Get the code
 

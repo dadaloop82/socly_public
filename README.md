@@ -45,7 +45,14 @@ cp .env.example .env
 ```
 
 La guida completa (Apache, Nginx, permessi, database, OCR, aggiornamenti e troubleshooting) è in
-[docs/INSTALLATION.md](docs/INSTALLATION.md).
+[docs/INSTALLATION.md](docs/INSTALLATION.md). In alternativa, gli script one-click in `bin/install/`
+installano ambiente, database e applicazione e avviano il wizard:
+
+```bash
+sudo bash bin/install/linux.sh   # Linux
+bash bin/install/macos.sh        # macOS
+powershell -ExecutionPolicy Bypass -File bin\install\windows.ps1   # Windows
+```
 
 Durante il wizard configuri database, branding dell'associazione e account **SuperAdmin** della
 piattaforma. Dopo l'installazione il primo avvio crea l'account **Admin** dell'associazione usato
@@ -116,7 +123,14 @@ cp .env.example .env
 ```
 
 Full guide (Apache, Nginx, permissions, database, OCR, updates and troubleshooting) in
-[docs/INSTALLATION.md](docs/INSTALLATION.md).
+[docs/INSTALLATION.md](docs/INSTALLATION.md). Alternatively, the one-click scripts in `bin/install/`
+install the environment, database and application and start the wizard:
+
+```bash
+sudo bash bin/install/linux.sh   # Linux
+bash bin/install/macos.sh        # macOS
+powershell -ExecutionPolicy Bypass -File bin\install\windows.ps1   # Windows
+```
 
 During the wizard you configure the database, association branding, and the platform **SuperAdmin**
 account. After install, first-run setup creates the association **Admin** used day to day.

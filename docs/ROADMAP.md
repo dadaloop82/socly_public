@@ -16,6 +16,7 @@
 - [x] Audit log
 - [x] RUNTS lookup: association data, documents and statute/privacy prefill (native PDF text + OCR)
 - [x] Platform installation registry (consented contact cards) and telemetry dashboard with charts
+- [x] One-click installers for Linux, macOS and Windows (environment + database + app + local server)
 
 ## Planned plugins (sold separately)
 
