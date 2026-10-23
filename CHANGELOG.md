@@ -12,6 +12,9 @@ and this project follows a simple `1.0.x` versioning scheme driven by release sy
 - Public source-available distribution of the Socly base edition
 - Installation wizard, membership core, plugins API, and multi-language UI
 - Setup wizard warning when statute/privacy OCR could not read every page
+- Installation guide (`docs/INSTALLATION.md`) covering Apache/Nginx, permissions, database, optional
+  OCR tools, updates and troubleshooting
+- Bilingual README (Italian and English accordions) and bilingual installation guide
 
 ### Fixed
 
