@@ -1192,6 +1192,9 @@ a.sidebar-brand-home:hover {
 .setup-scrape-btn.is-attention {
   animation: setup-runts-attention 2.6s ease-in-out infinite;
 }
+.setup-scrape-retry.is-attention {
+  animation: setup-runts-attention 2.6s ease-in-out infinite;
+}
 @keyframes setup-runts-attention {
   0%, 100% {
     box-shadow: 0 0 0 0 color-mix(in srgb, var(--brand-primary) 0%, transparent);
@@ -1205,7 +1208,8 @@ a.sidebar-brand-home:hover {
   }
 }
 @media (prefers-reduced-motion: reduce) {
-  .setup-scrape-btn.is-attention {
+  .setup-scrape-btn.is-attention,
+  .setup-scrape-retry.is-attention {
     animation: none;
     box-shadow: 0 0 0 3px color-mix(in srgb, var(--brand-primary) 18%, transparent);
   }

@@ -6659,6 +6659,7 @@ function initSetupWebsiteScrape(root) {
     btn.hidden = true;
     btn.setAttribute('aria-hidden', 'true');
     btn.disabled = true;
+    btn.classList.remove('is-attention');
   };
 
   const showScrapeButton = () => {
@@ -6667,6 +6668,19 @@ function initSetupWebsiteScrape(root) {
   };
 
   const hasValidWebsite = () => isWebsiteScrapeAllowed(input.value);
+
+  const syncScrapeAttention = () => {
+    const scraping = box.classList.contains('is-scraping');
+    const attempted = box.dataset.scrapeAttempted === '1';
+    const failed = box.dataset.scrapeFailed === '1';
+    const valid = hasValidWebsite();
+    const mainHot = !btn.hidden && !btn.disabled && valid && !scraping && !attempted && !failed;
+    btn.classList.toggle('is-attention', mainHot);
+    if (retryBtn) {
+      const retryHot = !retryBtn.hidden && !scraping && failed;
+      retryBtn.classList.toggle('is-attention', retryHot);
+    }
+  };
 
   const setScrapeNavLocked = (locked) => {
     root.classList.toggle('is-scrape-busy', locked);
@@ -6689,6 +6703,7 @@ function initSetupWebsiteScrape(root) {
     if (!locked) {
       form?.dispatchEvent(new CustomEvent('setup:cta-refresh'));
     }
+    syncScrapeAttention();
   };
 
   const blockNavWhileScraping = (event) => {
@@ -6982,10 +6997,17 @@ function initSetupWebsiteScrape(root) {
     box.hidden = !showShell;
     if (showShell) box.removeAttribute('aria-hidden');
     else box.setAttribute('aria-hidden', 'true');
+    syncScrapeAttention();
   };
   input.addEventListener('input', () => {
     if (box.dataset.scrapeFailed === '1') {
       clearScrapeRetry();
+      box.dataset.scrapeAttempted = '0';
+      if (live) live.hidden = true;
+      setPhase('');
+      setElapsed('');
+    } else if (box.dataset.scrapeAttempted === '1') {
+      // A different URL is being typed: allow the scrape button again (and pulse it).
       box.dataset.scrapeAttempted = '0';
       if (live) live.hidden = true;
       setPhase('');
@@ -7023,12 +7045,14 @@ function initSetupWebsiteScrape(root) {
     if (retryBtn) retryBtn.hidden = false;
     if (elapsedEl) elapsedEl.hidden = true;
     hideScrapeButton();
+    syncScrapeAttention();
   };
 
   const clearScrapeRetry = () => {
     delete box.dataset.scrapeFailed;
     if (retryBtn) retryBtn.hidden = true;
     if (elapsedEl) elapsedEl.hidden = false;
+    syncScrapeAttention();
   };
 
   const upsertRow = (list, key, label, value) => {
