@@ -5763,11 +5763,6 @@ function initSetupRuntsLookup(root) {
     if (autofillLocked) legalSelect.blur();
   });
   nameInput?.addEventListener('input', syncLabel);
-  // Coming back to this step with a RUNTS number already present: keep the
-  // auto-filled fields locked (clear the number to edit them manually).
-  if (digits() !== '' && box.dataset.runtsExhausted !== '1') {
-    setFieldsLocked(true);
-  }
   sync();
   syncQuotaUi();
 
