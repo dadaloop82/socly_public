@@ -1188,6 +1188,50 @@ a.sidebar-brand-home:hover {
   max-width: none;
   justify-content: center;
 }
+/* Smooth, delicate pulse: reminds the user to fetch RUNTS data after typing the number. */
+.setup-scrape-btn.is-attention {
+  animation: setup-runts-attention 2.6s ease-in-out infinite;
+}
+@keyframes setup-runts-attention {
+  0%, 100% {
+    box-shadow: 0 0 0 0 color-mix(in srgb, var(--brand-primary) 0%, transparent);
+    transform: translateY(0);
+  }
+  50% {
+    box-shadow:
+      0 0 0 7px color-mix(in srgb, var(--brand-primary) 13%, transparent),
+      0 10px 22px color-mix(in srgb, var(--brand-primary) 16%, transparent);
+    transform: translateY(-1px);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .setup-scrape-btn.is-attention {
+    animation: none;
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--brand-primary) 18%, transparent);
+  }
+}
+.setup-name-pair .setup-runts-lock-hint {
+  grid-column: 1 / -1;
+  margin: 0;
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: var(--brand-primary-deep);
+}
+.setup-name-pair .sf-field.is-runts-locked .sf-field__control {
+  background: color-mix(in srgb, var(--brand-primary) 5%, #fff);
+  border-color: color-mix(in srgb, var(--brand-primary) 28%, var(--line));
+  color: color-mix(in srgb, var(--ink) 72%, var(--muted));
+  cursor: not-allowed;
+}
+.setup-name-pair .sf-field.is-runts-locked select.sf-field__control {
+  pointer-events: none;
+}
+.setup-name-pair .sf-field.is-runts-locked .sf-field__label {
+  color: var(--brand-primary-deep);
+}
+.setup-name-pair .sf-field.is-runts-locked .sf-field__control:disabled {
+  opacity: 0.9;
+}
 .geo-foreign-bar {
   display: flex;
   flex-wrap: wrap;

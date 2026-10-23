@@ -476,6 +476,9 @@ $errorStep = flash('setup_error_step');
                             <?php endif; ?>
                         <?php endforeach; ?>
                         <p class="setup-hint setup-full-name-preview muted" data-setup-full-name-preview hidden></p>
+                        <p class="setup-hint setup-runts-lock-hint" data-setup-runts-lock-hint hidden>
+                            <?= e(__('setup.runts_autofill_locked')) ?>
+                        </p>
                     </div>
                 <?php elseif ($stepType === 'field_group'): ?>
                     <div

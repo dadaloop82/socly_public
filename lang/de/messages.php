@@ -979,6 +979,7 @@ return [
         'runts_button' => 'Versuchen Sie, Daten aus dem RUNTS-Archiv abzurufen',
         'runts_button_fallback' => 'Versuchen Sie, Daten aus dem RUNTS-Archiv abzurufen',
         'runts_hint' => 'Mit RUNTS werden Daten automatisch ausgefüllt.',
+        'runts_autofill_locked' => 'Name und Rechtsform werden automatisch aus dem RUNTS ausgefüllt: klicke auf die Schaltfläche oben. Lösche die Nummer, um sie manuell zu bearbeiten.',
         'runts_limit_wait' => 'Sie können es in :seconds Sekunden erneut versuchen.',
         'runts_limit_exhausted' => 'Sie haben die 3 RUNTS-Abrufe für heute aufgebraucht.',
         'runts_unavailable' => 'Der RUNTS kann heute nicht mehr abgefragt werden. Fahren Sie mit der manuellen Eingabe fort.',

@@ -983,6 +983,7 @@ return [
         'runts_button' => 'Prova a recuperare i dati dall’archivio RUNTS',
         'runts_button_fallback' => 'Prova a recuperare i dati dall’archivio RUNTS',
         'runts_hint' => 'Con il RUNTS i dati si compilano in automatico.',
+        'runts_autofill_locked' => 'Denominazione e forma giuridica si compilano automaticamente dal RUNTS: clicca il pulsante qui sopra. Cancella il numero per modificarle manualmente.',
         'runts_limit_wait' => 'Ci puoi riprovare tra :seconds secondi.',
         'runts_limit_exhausted' => 'Hai esaurito i 3 tentativi di recupero RUNTS per oggi.',
         'runts_unavailable' => 'Non è più possibile interrogare il RUNTS per oggi. Continua con la compilazione manuale dei campi.',

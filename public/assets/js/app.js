@@ -5035,6 +5035,7 @@ function initSetupRuntsLookup(root) {
   const pair = root.querySelector('[data-setup-name-pair]') || input.closest('[data-setup-name-pair]');
   const nameInput = pair?.querySelector('[data-setup-assoc-name]');
   const legalSelect = pair?.querySelector('[data-setup-legal-name]');
+  const lockHint = root.querySelector('[data-setup-runts-lock-hint]');
   const currencySelect = pair?.querySelector('select[name="currency"]');
   const form = root.querySelector('[data-setup-form]');
   const backLink = form?.querySelector('.setup-back');
@@ -5043,6 +5044,7 @@ function initSetupRuntsLookup(root) {
 
   const digits = () => String(input.value || '').replace(/\D+/g, '');
   let lookingUp = false;
+  let autofillLocked = false;
   let baseReady = false;
   let streamFollowUp = false;
   let cooldownTimer = 0;
@@ -5110,11 +5112,49 @@ function initSetupRuntsLookup(root) {
     }
   };
 
+  const syncAttention = () => {
+    const hot = !btn.hidden && !btn.disabled
+      && digits() !== ''
+      && !lookingUp
+      && !box.classList.contains('is-found')
+      && box.dataset.runtsExhausted !== '1'
+      && box.dataset.runtsCooldowning !== '1';
+    btn.classList.toggle('is-attention', hot);
+  };
+
+  const setFieldsLocked = (locked) => {
+    autofillLocked = !!locked;
+    if (nameInput) {
+      // readOnly (not disabled) keeps the value submitted and validated.
+      nameInput.readOnly = autofillLocked || lookingUp;
+      nameInput.disabled = lookingUp;
+    }
+    if (legalSelect) {
+      // A select cannot be readOnly: keep it enabled for form validation but
+      // non-interactive while locked.
+      legalSelect.disabled = lookingUp;
+      if (autofillLocked) {
+        legalSelect.setAttribute('aria-disabled', 'true');
+        legalSelect.setAttribute('tabindex', '-1');
+      } else {
+        legalSelect.removeAttribute('aria-disabled');
+        legalSelect.removeAttribute('tabindex');
+      }
+    }
+    [nameInput, legalSelect].filter(Boolean).forEach((field) => {
+      const wrap = field.closest('.sf-field');
+      if (wrap) wrap.classList.toggle('is-runts-locked', autofillLocked);
+    });
+    if (lockHint) lockHint.hidden = !autofillLocked;
+    box.classList.toggle('is-autofill-locked', autofillLocked);
+  };
+
   const hideBtn = () => {
     btn.hidden = true;
     btn.disabled = true;
     btn.setAttribute('aria-hidden', 'true');
     syncQuotaUi();
+    syncAttention();
   };
   const showBtn = () => {
     if (box.dataset.runtsExhausted === '1' || box.classList.contains('is-found')) {
@@ -5125,6 +5165,7 @@ function initSetupRuntsLookup(root) {
     btn.removeAttribute('aria-hidden');
     btn.disabled = lookingUp || digits() === '' || box.dataset.runtsCooldowning === '1';
     syncQuotaUi();
+    syncAttention();
   };
 
   const markExhausted = () => {
@@ -5175,6 +5216,7 @@ function initSetupRuntsLookup(root) {
     }
     box.dataset.runtsCooldowning = '1';
     btn.disabled = true;
+    syncAttention();
     cooldownTimer = window.setTimeout(() => {
       cooldownTimer = 0;
       box.dataset.runtsCooldowning = '0';
@@ -5572,7 +5614,7 @@ function initSetupRuntsLookup(root) {
     if (exitBtn) exitBtn.disabled = lookingUp;
     input.readOnly = lookingUp;
     if (nameInput) {
-      nameInput.readOnly = lookingUp;
+      nameInput.readOnly = lookingUp || autofillLocked;
       nameInput.disabled = lookingUp;
     }
     if (legalSelect) legalSelect.disabled = lookingUp;
@@ -5581,6 +5623,7 @@ function initSetupRuntsLookup(root) {
       btn.disabled = true;
       btn.setAttribute('aria-busy', 'true');
       if (live) live.hidden = false;
+      syncAttention();
     } else {
       btn.removeAttribute('aria-busy');
       sync();
@@ -5590,6 +5633,7 @@ function initSetupRuntsLookup(root) {
 
   const markBaseReady = (payload) => {
     applyFields(payload.fields || {});
+    setFieldsLocked(true);
     box.classList.add('is-found');
     hideBtn();
     baseReady = true;
@@ -5654,6 +5698,13 @@ function initSetupRuntsLookup(root) {
     event.stopPropagation();
   }, true);
 
+  form?.addEventListener('submit', (event) => {
+    if (event.defaultPrevented) return;
+    // Disabled fields are not submitted: unlock right before the browser
+    // serializes the form so the auto-filled name/legal form are sent.
+    setFieldsLocked(false);
+  }, true);
+
   const applyFields = (fields) => {
     if (fields.runts && input) {
       input.value = fields.runts;
@@ -5690,10 +5741,33 @@ function initSetupRuntsLookup(root) {
       streamFollowUp = false;
       stopOcrPoll();
     }
+    // With a RUNTS number the name/legal form are auto-filled: lock them until
+    // the number is cleared or the lookup fails. Never lock when the lookup
+    // cannot run (quota exhausted / cooldown).
+    setFieldsLocked(
+      digits() !== ''
+      && box.dataset.runtsExhausted !== '1'
+      && box.dataset.runtsCooldowning !== '1'
+    );
     sync();
   });
   input.addEventListener('change', sync);
+  // Keep the legal form non-interactive while RUNTS autofill is locked.
+  legalSelect?.addEventListener('mousedown', (event) => {
+    if (autofillLocked) event.preventDefault();
+  }, true);
+  legalSelect?.addEventListener('keydown', (event) => {
+    if (autofillLocked) event.preventDefault();
+  }, true);
+  legalSelect?.addEventListener('focus', () => {
+    if (autofillLocked) legalSelect.blur();
+  });
   nameInput?.addEventListener('input', syncLabel);
+  // Coming back to this step with a RUNTS number already present: keep the
+  // auto-filled fields locked (clear the number to edit them manually).
+  if (digits() !== '' && box.dataset.runtsExhausted !== '1') {
+    setFieldsLocked(true);
+  }
   sync();
   syncQuotaUi();
 
@@ -5703,12 +5777,14 @@ function initSetupRuntsLookup(root) {
     if (!number) {
       if (live) live.hidden = false;
       showStatus(box.dataset.msgNeed || '', 'error');
+      setFieldsLocked(false);
       return;
     }
     if (box.dataset.runtsExhausted === '1' || box.dataset.runtsCooldowning === '1') return;
     stopOcrPoll();
     baseReady = false;
     streamFollowUp = false;
+    setFieldsLocked(true);
     setLookupBusy(true);
     hideBtn();
     setProgress(4);
@@ -5865,6 +5941,10 @@ function initSetupRuntsLookup(root) {
       } else if (!limitHandled && attemptConsumed && !box.classList.contains('is-found')) {
         // Short pause between the 3 attempts — keep the error visible, then re-enable.
         armCooldown(COOLDOWN_SECONDS);
+      }
+      if (!box.classList.contains('is-found')) {
+        // Lookup failed/timed out: let the user type the fields manually.
+        setFieldsLocked(false);
       }
       setLookupBusy(false);
     }
