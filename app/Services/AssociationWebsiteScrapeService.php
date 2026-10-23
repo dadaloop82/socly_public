@@ -952,6 +952,11 @@ final class AssociationWebsiteScrapeService
     /** @return list<string> Best-first: mailto + same host preferred over footer partner emails. */
     private function extractEmails(string $raw, string $baseUrl = ''): array
     {
+        // Decode URL-encoded mailto links and "info [at] domain [dot] it" obfuscation.
+        $raw = rawurldecode($raw);
+        $raw = preg_replace('/\s*[\[\(\{]\s*at\s*[\]\)\}]\s*/iu', '@', $raw) ?? $raw;
+        $raw = preg_replace('/\s*[\[\(\{]\s*dot\s*[\]\)\}]\s*/iu', '.', $raw) ?? $raw;
+
         $siteHost = strtolower((string) (parse_url($baseUrl, PHP_URL_HOST) ?: ''));
         $siteHost = preg_replace('/^www\./', '', $siteHost) ?? $siteHost;
 
@@ -990,11 +995,33 @@ final class AssociationWebsiteScrapeService
 
     private function isDiscardEmail(string $email): bool
     {
-        return str_contains($email, 'example.')
+        $email = strtolower(trim($email));
+        if ($email === '') {
+            return true;
+        }
+        if (str_contains($email, 'example.')
             || str_contains($email, 'sentry.')
             || str_contains($email, 'wixpress')
             || str_contains($email, 'schema.org')
-            || str_contains($email, 'w3.org');
+            || str_contains($email, 'w3.org')
+        ) {
+            return true;
+        }
+        // Template placeholders: never real association contacts.
+        $at = strrpos($email, '@');
+        $domain = $at !== false ? substr($email, $at + 1) : '';
+        $placeholders = [
+            'website.com', 'website.it', 'domain.com', 'domain.it', 'sito.it', 'tuosito.it',
+            'test.com', 'test.it', 'sample.com', 'sample.it', 'prova.it', 'azienda.it', 'ditta.it',
+            'nome.it',
+        ];
+        foreach ($placeholders as $placeholder) {
+            if ($domain === $placeholder || str_ends_with($domain, '.' . $placeholder)) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /**
@@ -1038,25 +1065,75 @@ final class AssociationWebsiteScrapeService
 
     private function extractPhone(string $raw): ?string
     {
-        if (preg_match_all('/(?:tel:|telefono|phone|cell\.?|mobile)[^\d+]{0,12}(\+?39[\s.\-]*)?(0\d{5,10}|3\d{8,9})/iu', $raw, $m)) {
-            return $this->formatPhone(($m[2][0] ?? ''));
+        // Never read numbers from scripts/styles/comments: tracking IDs, counters
+        // and CSS sizes look like phone numbers.
+        $clean = preg_replace('/<script\b[^>]*>.*?<\/script>|<style\b[^>]*>.*?<\/style>|<!--.*?-->/is', ' ', $raw) ?? $raw;
+        $clean = html_entity_decode($clean, ENT_QUOTES | ENT_HTML5, 'UTF-8');
+        $clean = rawurldecode($clean);
+
+        $candidates = [];
+        // 1) tel: links (also URL-encoded, e.g. tel:+39%20347...)
+        if (preg_match_all('/tel\s*:\s*([+0-9][0-9\s().\/\-]{5,})/iu', $clean, $m)) {
+            foreach ($m[1] as $value) {
+                $candidates[] = $value;
+            }
         }
-        if (preg_match_all('/(?<!\d)(\+39[\s.\-]*)?(0\d{1,3}[\s.\-]?\d{5,8}|3\d{2}[\s.\-]?\d{6,7})(?!\d)/', $raw, $m)) {
-            return $this->formatPhone(preg_replace('/\D+/', '', $m[0][0] ?? '') ?? '');
+        // 2) Structured data
+        if (preg_match_all('/"telephone"\s*:\s*"([^"]+)"/iu', $clean, $m)) {
+            foreach ($m[1] as $value) {
+                $candidates[] = $value;
+            }
         }
+        // 3) Labeled numbers ("Tel.", "Telefono:", "Cell.", "WhatsApp"…)
+        if (preg_match_all(
+            '/(?:tel\.?|telefono|phone|telefon|cell(?:ulare)?|mobile|whatsapp)\s*[:.\-]?\s*(\+?39[\s.\-\/]*|0039[\s.\-\/]*)?((?:0\d{1,4}|3\d{2}|800|848|199)[\s.\-\/]?\d{3,8})/iu',
+            $clean,
+            $m
+        )) {
+            foreach ($m[2] as $i => $digits) {
+                $candidates[] = ((string) ($m[1][$i] ?? '')) . $digits;
+            }
+        }
+        // 4) Fallback: plausible standalone numbers outside words/IDs.
+        if (preg_match_all(
+            '/(?<![\w\/])(?:\+39[\s.\-]*|0039[\s.\-]*)?((?:0\d{1,4}[\s.\-\/]?\d{4,8})|(?:3\d{2}[\s.\-\/]?\d{6,7})|(?:(?:800|848|199)[\s.\-\/]?\d{6}))(?![\w\/])/u',
+            $clean,
+            $m
+        )) {
+            foreach ($m[1] as $value) {
+                $candidates[] = $value;
+            }
+        }
+
+        foreach ($candidates as $candidate) {
+            $formatted = $this->formatPhone($candidate);
+            if ($formatted !== null) {
+                return $formatted;
+            }
+        }
+
         return null;
     }
 
     private function formatPhone(string $digits): ?string
     {
         $digits = preg_replace('/\D+/', '', $digits) ?? '';
-        if (str_starts_with($digits, '39') && strlen($digits) > 10) {
+        if (str_starts_with($digits, '0039')) {
+            $digits = substr($digits, 4);
+        } elseif (str_starts_with($digits, '39') && strlen($digits) > 10
+            && preg_match('/^39(0\d{6,10}|3\d{8,9}|800\d{6}|848\d{6}|199\d{6})$/', $digits)
+        ) {
             $digits = substr($digits, 2);
         }
-        if (preg_match('/^(3\d{8,9}|0\d{5,10})$/', $digits)) {
-            return $digits;
+        // 11-digit numbers are VAT codes, not phones: keep landlines to 7-10 digits.
+        if (preg_match('/^(3\d{8,9}|0\d{6,9}|800\d{6}|848\d{6}|199\d{6})$/', $digits) !== 1) {
+            return null;
         }
-        return null;
+        if (preg_match('/^(\d)\1+$/', $digits) === 1) {
+            return null;
+        }
+
+        return $digits;
     }
 
     private function extractVat(string $text): ?string
