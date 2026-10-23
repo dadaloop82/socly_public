@@ -6046,17 +6046,29 @@ html:has(.setup-body) {
 }
 .setup-scroll-cue-arrow {
   display: inline-block;
-  font-size: 1.05rem;
+  font-size: 1.2rem;
   font-weight: 800;
   line-height: 1;
-  animation: setup-scroll-nudge 1.1s ease-in-out infinite;
+  animation: setup-scroll-blink 1.7s ease-in-out infinite;
 }
-@keyframes setup-scroll-nudge {
-  0%, 100% { transform: translateY(-0.12rem); opacity: 0.55; }
-  50% { transform: translateY(0.18rem); opacity: 1; }
+@keyframes setup-scroll-blink {
+  0%, 100% {
+    opacity: 0.3;
+    transform: translateY(-0.14rem);
+    text-shadow: 0 0 0 transparent;
+  }
+  50% {
+    opacity: 1;
+    transform: translateY(0.18rem);
+    text-shadow: 0 0 10px color-mix(in srgb, var(--brand-primary) 45%, transparent);
+  }
 }
 @media (prefers-reduced-motion: reduce) {
-  .setup-scroll-cue-arrow { animation: none; }
+  .setup-scroll-cue-arrow {
+    animation: none;
+    opacity: 0.9;
+    text-shadow: none;
+  }
 }
 @keyframes setup-ambient-drift {
   from { transform: translate3d(0, 0, 0) scale(1); opacity: 0.85; }
