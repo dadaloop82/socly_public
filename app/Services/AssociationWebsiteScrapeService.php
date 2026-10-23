@@ -954,6 +954,22 @@ final class AssociationWebsiteScrapeService
     {
         // Decode URL-encoded mailto links and "info [at] domain [dot] it" obfuscation.
         $raw = rawurldecode($raw);
+        // Joomla/JS email cloaking: concatenate string literals inside scripts.
+        if (preg_match_all('/<script\b[^>]*>(.*?)<\/script>/is', $raw, $scripts)) {
+            foreach ($scripts[1] as $script) {
+                $joined = '';
+                if (preg_match_all('/[\'"]([^\'"]*)[\'"]/', $script, $parts)) {
+                    $joined = implode('', $parts[1]);
+                }
+                $joined = html_entity_decode($joined, ENT_QUOTES | ENT_HTML5, 'UTF-8');
+                if (preg_match_all('/[A-Z0-9._%+\-]+@[A-Z0-9.\-]+\.[A-Z]{2,}/i', $joined, $m)) {
+                    foreach ($m[0] as $email) {
+                        $raw .= ' ' . strtolower($email);
+                    }
+                }
+            }
+        }
+        $raw = preg_replace("/'\\s*\\+\\s*'/", '', $raw) ?? $raw; // Joomla email cloaking
         $raw = preg_replace('/\s*[\[\(\{]\s*at\s*[\]\)\}]\s*/iu', '@', $raw) ?? $raw;
         $raw = preg_replace('/\s*[\[\(\{]\s*dot\s*[\]\)\}]\s*/iu', '.', $raw) ?? $raw;
 
