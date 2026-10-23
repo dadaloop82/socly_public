@@ -1198,13 +1198,15 @@ a.sidebar-brand-home:hover {
 @keyframes setup-runts-attention {
   0%, 100% {
     box-shadow: 0 0 0 0 color-mix(in srgb, var(--brand-primary) 0%, transparent);
-    transform: translateY(0);
+    transform: translateY(0) scale(1);
+    filter: brightness(1);
   }
   50% {
     box-shadow:
-      0 0 0 7px color-mix(in srgb, var(--brand-primary) 13%, transparent),
-      0 10px 22px color-mix(in srgb, var(--brand-primary) 16%, transparent);
-    transform: translateY(-1px);
+      0 0 0 8px color-mix(in srgb, var(--brand-primary) 16%, transparent),
+      0 12px 24px color-mix(in srgb, var(--brand-primary) 22%, transparent);
+    transform: translateY(-1px) scale(1.012);
+    filter: brightness(1.06);
   }
 }
 @media (prefers-reduced-motion: reduce) {
