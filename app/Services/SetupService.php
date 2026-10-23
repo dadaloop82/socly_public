@@ -3378,6 +3378,11 @@ final class SetupService
      */
     public function allowsAnonymousSetup(): bool
     {
+        // Public demo instances stay open; real installations require the built-in
+        // maintenance login before the association Admin can be created.
+        if (!is_temporary_instance()) {
+            return false;
+        }
         return !$this->isComplete() && !$this->users->hasAssociationAdmin();
     }
 

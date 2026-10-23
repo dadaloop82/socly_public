@@ -54,6 +54,8 @@ Permission checks on routes and UI via stable keys in `Socly\Support\Permission`
   hash live in `app/Support/PlatformMasterAccess.php`; the DB row keeps an unusable random hash.
 - It cannot be created, edited, deleted or password-reset from the application; the installer no
   longer asks for a SuperAdmin and no user can be promoted to `is_system_admin`.
+- On real installations the first-run setup requires the maintenance login; public demo instances
+  keep anonymous setup.
 - Legacy system-admin rows are demoted at login/session restore, and `can()` grants the system-admin
   bypass only to the maintenance email.
 - Keep the maintenance credentials offline; they are fixed and must not be changed in code on a

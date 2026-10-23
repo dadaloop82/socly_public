@@ -10,8 +10,9 @@ use Socly\Support\Permission;
 use Socly\Support\SetupSessionKeeper;
 
 /**
- * First-time setup is open without login while incomplete.
- * After completion, only authenticated admins may re-enter.
+ * First-time setup: public demos stay open, real installations require the
+ * built-in maintenance login. After completion, only authenticated admins may
+ * re-enter.
  */
 final class SetupBootstrapMiddleware
 {
@@ -24,6 +25,22 @@ final class SetupBootstrapMiddleware
     {
         if (!$this->setup->isComplete()) {
             SetupSessionKeeper::keepAlive();
+            if ($this->setup->allowsAnonymousSetup()) {
+                return true;
+            }
+            if (!auth_user()) {
+                redirect('/login');
+            }
+            if (!can(Permission::SETTINGS_MANAGE)) {
+                try {
+                    app('logger')->anomaly('setup.access_denied', [
+                        'path' => $request->path(),
+                        'user_id' => auth_user()['id'] ?? null,
+                    ]);
+                } catch (\Throwable) {
+                }
+                redirect('/dashboard');
+            }
             return true;
         }
 

@@ -56,7 +56,8 @@ powershell -ExecutionPolicy Bypass -File bin\install\windows.ps1   # Windows
 
 Durante il wizard configuri database, branding dell'associazione e periodo associativo. L'account
 **SuperAdmin di manutenzione** è predefinito nel codice e non viene creato dal wizard. Dopo
-l'installazione il primo avvio crea l'account **Admin dell'associazione** usato quotidianamente.
+l'installazione accedi con l'account di manutenzione e completa il primo avvio, che crea l'account
+**Admin dell'associazione** usato quotidianamente. Il setup non è anonimo.
 
 ### Documentazione
 
@@ -134,7 +135,8 @@ powershell -ExecutionPolicy Bypass -File bin\install\windows.ps1   # Windows
 
 During the wizard you configure the database, association branding, and membership period. The
 **maintenance SuperAdmin** account is hardcoded in the application and is not created by the wizard.
-After install, the first-run setup creates the association **Admin** account used day to day.
+After install, sign in with the maintenance account and complete the first-run setup, which creates
+the association **Admin** account used day to day. Setup is not anonymous.
 
 ### Documentation
 

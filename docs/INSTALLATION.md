@@ -135,9 +135,10 @@ Apri `https://socly.example.org/install` e completa i cinque passaggi:
 
 L'**account di manutenzione** (l'unico SuperAdmin) è predefinito nel codice: non viene creato dal
 wizard, non è modificabile né eliminabile dall'interfaccia e non può essere creato da altri utenti.
-Dopo l'installazione il **wizard di primo avvio** su `/setup` crea l'account **Admin
-dell'associazione** e guida la configurazione: dati dell'associazione, recupero dal RUNTS o dal sito
-web, logo e colori, statuto e informativa privacy, tesoreria e scadenze.
+Dopo l'installazione accedi con l'account di manutenzione e completa il **wizard di primo avvio** su
+`/setup`: crea l'account **Admin dell'associazione** e guida la configurazione (dati dell'associazione,
+recupero dal RUNTS o dal sito web, logo e colori, statuto e informativa privacy, tesoreria e scadenze).
+Il setup non è anonimo: senza login di manutenzione nessuno può creare l'Admin dell'associazione.
 
 ## 6. Verifica
 
@@ -309,9 +310,11 @@ Open `https://socly.example.org/install` and complete the five steps:
 
 The **maintenance account** (the only SuperAdmin) is hardcoded in the application: it is not created
 by the wizard, cannot be edited or deleted from the UI, and no other user can be promoted to
-SuperAdmin. After installation the **first-run wizard** at `/setup` creates the association **Admin**
-account and guides the configuration: association data, RUNTS or website lookup, logo and colours,
-statute and privacy notice, treasury and deadlines.
+SuperAdmin. After installation sign in with the maintenance account and complete the **first-run
+wizard** at `/setup`: it creates the association **Admin** account and guides the configuration
+(association data, RUNTS or website lookup, logo and colours, statute and privacy notice, treasury and
+deadlines). Setup is not anonymous: without the maintenance login nobody can create the association
+Admin.
 
 ## 6. Verify
 
