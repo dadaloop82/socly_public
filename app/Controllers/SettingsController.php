@@ -101,6 +101,7 @@ final class SettingsController extends BaseController
                 'membership.enrollment_validation' => $this->settings->get('membership.enrollment_validation', 'none'),
                 'platform.news_opt_in' => $this->settings->get('platform.news_opt_in', '1'),
                 'platform.usage_stats_opt_in' => $this->settings->get('platform.usage_stats_opt_in', '1'),
+                'platform.contacts_opt_in' => $this->settings->get('platform.contacts_opt_in', '1'),
                 'platform.showcase_consent' => $this->settings->get('platform.showcase_consent', '1'),
             ],
             'roles' => $this->people->roles(),
@@ -114,6 +115,7 @@ final class SettingsController extends BaseController
             'mailReady' => $this->mail->isReady(),
             'presidentFirstPlaceholder' => trim((string) (($this->people->getPresident() ?? [])['first_name'] ?? '')),
             'presidentLastPlaceholder' => trim((string) (($this->people->getPresident() ?? [])['last_name'] ?? '')),
+            'showNameDe' => $this->setup->showGermanNameField(),
             'components' => ComponentRegistry::all(),
             'enabledComponents' => array_fill_keys($this->components->enabledKeys(), true),
             'componentConfigs' => [
@@ -380,6 +382,12 @@ final class SettingsController extends BaseController
         ]);
         $this->audit->log('settings.saved', 'settings', 'general', $before, $data, $request->ip());
         $this->plugins->fire('settings.saved', array_keys($data));
+        try {
+            // Association details changed: sync on the next heartbeat without blocking the save.
+            $this->settings->set('platform.installation_needs_sync', '1');
+            $this->platform->maybeSyncInstallation();
+        } catch (\Throwable) {
+        }
         $this->settingsFinish($request, 'general');
     }
 
@@ -538,10 +546,11 @@ final class SettingsController extends BaseController
     public function savePlatform(Request $request): void
     {
         $data = $request->all();
-        $news = !empty($data['news_opt_in']);
-        $stats = !empty($data['usage_stats_opt_in']);
-        $showcase = !empty($data['showcase_consent']);
-        if ($news || $stats || $showcase) {
+        $isDemo = $this->platform->isTemporaryInstance();
+        $news = !$isDemo && !empty($data['news_opt_in']);
+        $stats = !$isDemo && !empty($data['usage_stats_opt_in']);
+        $contacts = !$isDemo && !empty($data['contact_sync_opt_in']);
+        if ($news || $stats || $contacts) {
             $confirmError = app(\Socly\Services\SetupService::class)->validatePresidentNameConfirmation($data);
             if ($confirmError !== null) {
                 $this->settingsFail($request, $confirmError, 'platform');
@@ -553,19 +562,24 @@ final class SettingsController extends BaseController
         }
         $this->settings->set('platform.news_opt_in', $news ? '1' : '0');
         $this->settings->set('platform.usage_stats_opt_in', $stats ? '1' : '0');
-        $this->settings->set('platform.showcase_consent', $showcase ? '1' : '0');
+        if (!$isDemo) {
+            $this->settings->set('platform.contacts_opt_in', $contacts ? '1' : '0');
+        }
         $this->settings->set('platform.consents_configured', '1');
         try {
             if ($stats) {
                 $this->platform->maybeSendTelemetry();
             }
-            $this->platform->syncShowcase();
+            if (!$isDemo) {
+                // Push the updated card immediately (or revoke it if consent was turned off).
+                $this->platform->maybeSyncInstallation(true);
+            }
         } catch (\Throwable) {
         }
         $this->audit->log('settings.saved', 'settings', 'platform', null, [
             'news' => $news,
             'stats' => $stats,
-            'showcase' => $showcase,
+            'contacts' => $contacts,
         ], $request->ip());
         $this->settingsFinish($request, 'platform');
     }

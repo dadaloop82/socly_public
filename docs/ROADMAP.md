@@ -15,6 +15,7 @@
 - [x] i18n IT / DE / EN
 - [x] Audit log
 - [x] RUNTS lookup: association data, documents and statute/privacy prefill (native PDF text + OCR)
+- [x] Platform installation registry (consented contact cards) and telemetry dashboard with charts
 
 ## Planned plugins (sold separately)
 

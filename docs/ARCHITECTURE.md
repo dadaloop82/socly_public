@@ -50,6 +50,25 @@ Rules and limits:
   documents: synthetic notes (“text truncated…”) must never be written inside them.
 - When OCR is unavailable, the wizard degrades gracefully and asks the administrator to paste the text.
 
+## Platform telemetry & installation registry
+
+`Socly\Services\PlatformService` talks to the Socly platform API (`SOCLY_SITE_URL`, default
+`/api/platform.php`):
+
+- **Anonymous telemetry** (`maybeSendTelemetry`): version, locale, member range and exact counts,
+  enabled components/plugins, PHP and database version. No names, emails or personal data. Sent at
+  login at most every 6 hours.
+- **Installation registry** (`maybeSyncInstallation`): association identity and contacts, seat,
+  admin/president, installed version, usage counts and enabled modules. Requires
+  `platform.contacts_opt_in` (default on, revocable) and is **never sent by demo instances**
+  (`app.temporary_instance`). Sent when consents are saved, when association settings change, on
+  update check/install, at least daily, and immediately when the installed version changes.
+- Receiver: `_webSite/api/platform.php` → `platform_instances` / `platform_installations` (SQLite).
+  Admin pages: “Piattaforma” (KPIs + charts + telemetry table) and “Installazioni” (contact cards
+  with filters and detail).
+
+Demos are excluded from both payloads, so platform numbers only describe real installations.
+
 ## Plugins
 
 See [PLUGIN_API.md](PLUGIN_API.md). Plugins are discovered by scanning `plugins/*.php`. Only rows marked enabled in `plugins` are booted. Disabling a plugin unloads hooks; data remains.

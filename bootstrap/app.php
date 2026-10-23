@@ -474,7 +474,8 @@ $app->bind(SetupController::class, fn (App $a) => new SetupController(
 $app->bind(UpdateController::class, fn (App $a) => new UpdateController(
     $a->get(View::class),
     $a->get(UpdateService::class),
-    $a->get(SetupService::class)
+    $a->get(SetupService::class),
+    $a->get(PlatformService::class)
 ));
 $app->bind(UserController::class, fn (App $a) => new UserController(
     $a->get(View::class),

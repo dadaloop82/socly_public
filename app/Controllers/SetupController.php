@@ -172,6 +172,7 @@ final class SetupController extends BaseController
             'runtsAttemptsUsed' => $runtsQuota['used'],
             'runtsExhausted' => $runtsQuota['exhausted'],
             'runtsCooldownSeconds' => self::RUNTS_COOLDOWN_SECONDS,
+            'showNameDe' => $this->setup->showGermanNameField(),
         ], 'layouts/setup');
     }
 
@@ -567,7 +568,7 @@ final class SetupController extends BaseController
                 if (in_array($field, ['_token', 'step_index', 'step_key', 'setup_exit', 'logo_file'], true)) {
                     continue;
                 }
-                if (in_array($field, ['news_opt_in', 'usage_stats_opt_in', 'showcase_consent'], true)) {
+                if (in_array($field, ['news_opt_in', 'usage_stats_opt_in', 'contact_sync_opt_in', 'showcase_consent'], true)) {
                     $base[$field] = !empty($fieldValue);
                     continue;
                 }

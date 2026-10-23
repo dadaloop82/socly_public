@@ -72,6 +72,14 @@ The actuals (consuntivo) are **derived**: `SUM(treasury_movements.amount)` group
 ### plugins
 `id` (plugin slug), `is_enabled`, `enabled_at`, `meta_json`.
 
+### Platform settings
+
+`platform.instance_token` (random, hashed by the receiver), `platform.news_opt_in`,
+`platform.usage_stats_opt_in`, `platform.contacts_opt_in`, `platform.consents_configured/confirmed_at/name`,
+`platform.telemetry_last_at`, `platform.installation_last_at`, `platform.installation_version`,
+`platform.installation_sent`, `platform.installation_last_try`, `platform.installation_needs_sync`.
+Demos set `app.temporary_instance = 1` and never send platform data.
+
 ## Economic status (derived)
 
 - **paid** — `balance_due <= 0`

@@ -6,6 +6,7 @@ namespace Socly\Controllers;
 
 use Socly\Core\Http\Request;
 use Socly\Core\View;
+use Socly\Services\PlatformService;
 use Socly\Services\SetupService;
 use Socly\Services\UpdateService;
 use Socly\Support\Permission;
@@ -15,7 +16,8 @@ final class UpdateController extends BaseController
     public function __construct(
         View $view,
         private readonly UpdateService $updates,
-        private readonly SetupService $setup
+        private readonly SetupService $setup,
+        private readonly PlatformService $platform
     ) {
         parent::__construct($view);
     }
@@ -29,6 +31,11 @@ final class UpdateController extends BaseController
         }
         $result = $this->updates->apply($request->ip());
         if ($result['ok']) {
+            try {
+                // New version: refresh the installation card immediately.
+                $this->platform->maybeSyncInstallation(true);
+            } catch (\Throwable) {
+            }
             $this->flash('success', $result['message']);
             if (!$this->setup->isComplete()) {
                 unset($_SESSION['setup_greeted']);
@@ -45,6 +52,12 @@ final class UpdateController extends BaseController
         $force = (string) $request->input('force', '') === '1';
         try {
             $info = $this->updates->check($force);
+            try {
+                // Keep the registry in sync even when the update is only checked (next heartbeat).
+                app(\Socly\Services\SettingsService::class)->set('platform.installation_needs_sync', '1');
+                $this->platform->maybeSyncInstallation();
+            } catch (\Throwable) {
+            }
             $this->json([
                 'ok' => true,
                 'available' => !empty($info['available']),

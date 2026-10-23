@@ -5730,7 +5730,24 @@ function initSetupRuntsLookup(root) {
         legalSelect.dispatchEvent(new Event('change', { bubbles: true }));
       }
     }
+    // The German denomination is only relevant for South Tyrol associations.
+    revealNameDe(fields);
     syncLabel();
+  };
+
+  // Show the optional German name only when RUNTS reports a South Tyrol seat.
+  const revealNameDe = (fields) => {
+    const wrap = root.querySelector('[data-setup-name-de-wrap]');
+    if (!wrap) return;
+    const province = String(fields?.province || '').trim().toUpperCase();
+    const hay = [fields?.city, fields?.address, fields?.section, fields?.province]
+      .map((v) => String(v || '').toLowerCase())
+      .join(' ');
+    const southTyrol = province === 'BZ'
+      || /bolzano|bozen|südtirol|sudtirol|alto adige/.test(hay);
+    if (southTyrol) {
+      wrap.hidden = false;
+    }
   };
 
   const sync = () => {
@@ -5750,14 +5767,10 @@ function initSetupRuntsLookup(root) {
       streamFollowUp = false;
       stopOcrPoll();
     }
-    // With a RUNTS number the name/legal form are auto-filled: lock them until
-    // the number is cleared or the lookup fails. Never lock when the lookup
-    // cannot run (quota exhausted / cooldown).
-    setFieldsLocked(
-      digits() !== ''
-      && box.dataset.runtsExhausted !== '1'
-      && box.dataset.runtsCooldowning !== '1'
-    );
+    // Never lock name/legal form just because a number was typed: the user must still
+    // be able to fill required fields if the lookup is not run or returns nothing.
+    // They are locked again only after a successful lookup (markBaseReady).
+    setFieldsLocked(false);
     sync();
   });
   input.addEventListener('change', sync);

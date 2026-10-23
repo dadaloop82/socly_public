@@ -15,6 +15,10 @@ and this project follows a simple `1.0.x` versioning scheme driven by release sy
 - Installation guide (`docs/INSTALLATION.md`) covering Apache/Nginx, permissions, database, optional
   OCR tools, updates and troubleshooting
 - Bilingual README (Italian and English accordions) and bilingual installation guide
+- Setup/settings consent to send association and installation details to Socly (default on,
+  revocable; demo instances excluded)
+- Socly admin “Installazioni” registry with filters and full contact cards, plus a platform dashboard
+  with charts (versions, languages, member ranges, components, provinces, activity)
 
 ### Fixed
 
@@ -25,12 +29,19 @@ and this project follows a simple `1.0.x` versioning scheme driven by release sy
 - Long scanned PDFs are read with no page cap in the background worker and with a larger time budget
 - “Fetch RUNTS data”, “Fetch website data” and “Retry” buttons pulse smoothly when they are ready to
   be pressed; the “more content below” ↓ cue blinks smoothly (both honour reduced motion)
+- Typing a RUNTS number no longer locks the name/legal fields before the lookup (required-field error)
+- German denomination field is shown only for South Tyrol associations (or when already filled)
+- Anonymous telemetry counters pointed at non-existent table/column names and always reported zero
 
 ### Changed
 
 - Legal texts are stored with a generous 400 000-character cap per locale and partial OCR is surfaced
   as a warning instead of silently shortening the document
 - Texts cut by the previous OCR build are refreshed automatically on the next RUNTS lookup
+- Anonymous telemetry now includes exact member/user counts, plugins and PHP/database versions
+- Installation cards are refreshed on consent save, settings changes, update checks/installs, daily
+  and immediately when the installed version changes
+- Public showcase consent was removed from the wizard and the admin panel (existing data is retained)
 
 ## [1.0.0] - 2026-08-15
 

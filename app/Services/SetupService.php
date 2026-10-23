@@ -555,7 +555,9 @@ final class SetupService
             return [
                 'news_opt_in' => $neverConfigured || ((string) $this->settings->get('platform.news_opt_in', '1')) !== '0',
                 'usage_stats_opt_in' => $neverConfigured || ((string) $this->settings->get('platform.usage_stats_opt_in', '1')) !== '0',
+                'contact_sync_opt_in' => $neverConfigured || ((string) $this->settings->get('platform.contacts_opt_in', '1')) !== '0',
                 'showcase_consent' => $neverConfigured || ((string) $this->settings->get('platform.showcase_consent', '1')) !== '0',
+                'is_temporary_instance' => $this->settings->get('app.temporary_instance', '0') === '1',
                 'terms_accepted' => $this->rawStored('legal.terms_accepted_at', '') !== null,
                 'confirm_first_name' => '',
                 'confirm_last_name' => '',
@@ -837,10 +839,12 @@ final class SetupService
             if (empty($input['accept_terms'])) {
                 return ['ok' => false, 'errors' => ['accept_terms' => __('terms.required')]];
             }
-            $news = !empty($input['news_opt_in']);
-            $stats = !empty($input['usage_stats_opt_in']);
-            $showcase = !empty($input['showcase_consent']);
-            if ($news || $stats || $showcase) {
+            $isDemo = (string) $this->settings->get('app.temporary_instance', '0') === '1';
+            $news = !$isDemo && !empty($input['news_opt_in']);
+            $stats = !$isDemo && !empty($input['usage_stats_opt_in']);
+            // Demos never get the contact-sharing option and never send association data.
+            $contacts = !$isDemo && !empty($input['contact_sync_opt_in']);
+            if ($news || $stats || $contacts) {
                 $confirmError = $this->validatePresidentNameConfirmation($input);
                 if ($confirmError !== null) {
                     return ['ok' => false, 'errors' => $confirmError];
@@ -848,10 +852,12 @@ final class SetupService
             }
             $this->settings->set('platform.news_opt_in', $news ? '1' : '0');
             $this->settings->set('platform.usage_stats_opt_in', $stats ? '1' : '0');
-            $this->settings->set('platform.showcase_consent', $showcase ? '1' : '0');
+            if (!$isDemo) {
+                $this->settings->set('platform.contacts_opt_in', $contacts ? '1' : '0');
+            }
             $this->settings->set('platform.consents_configured', '1');
             $this->acceptTerms('setup.platform_consents');
-            if ($news || $stats || $showcase) {
+            if (($news || $stats || $contacts) && !$isDemo) {
                 $this->settings->set('platform.consents_confirmed_at', date('c'));
                 $this->settings->set('platform.consents_confirmed_name', trim(
                     (string) ($input['confirm_first_name'] ?? '') . ' ' . (string) ($input['confirm_last_name'] ?? '')
@@ -862,7 +868,11 @@ final class SetupService
                 if ($stats) {
                     $platform->maybeSendTelemetry();
                 }
-                $platform->syncShowcase();
+                if (!$isDemo) {
+                    // Force the first installation card as soon as consents are saved
+                    // (or revoke it immediately when the user opted out).
+                    $platform->maybeSyncInstallation(true);
+                }
             } catch (\Throwable) {
                 // non-blocking
             }
@@ -3392,6 +3402,37 @@ final class SetupService
         return (string) $raw === '1';
     }
 
+    /**
+     * German denomination only matters for bilingual associations in South Tyrol.
+     * Detect it from the stored seat data (RUNTS/address) instead of always asking.
+     */
+    public function isSouthTyrolAssociation(): bool
+    {
+        $province = strtoupper(trim((string) $this->settings->get('association.province', '')));
+        if ($province === 'BZ' || str_contains($province, 'BOLZANO') || str_contains($province, 'BOZEN')) {
+            return true;
+        }
+        $needles = ['bolzano', 'bozen', 'südtirol', 'sudtirol', 'alto adige', 'alto-adige'];
+        foreach (['association.city', 'association.address', 'association.address_full'] as $key) {
+            $value = mb_strtolower(trim((string) $this->settings->get($key, '')), 'UTF-8');
+            if ($value === '') {
+                continue;
+            }
+            foreach ($needles as $needle) {
+                if (str_contains($value, $needle)) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    /** Show the optional German denomination field only when it is meaningful. */
+    public function showGermanNameField(): bool
+    {
+        return $this->isSouthTyrolAssociation()
+            || trim((string) $this->settings->get('association.name_de', '')) !== '';
+    }
     /**
      * Record the acceptance of the Terms of Service (onboarding + settings).
      *

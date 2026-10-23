@@ -47,6 +47,7 @@ This document captures mistakes and costly fixes from the previous membership co
 | Cache without invalidation; user input in cache keys | If caching is added: invalidate on write; never key by raw user search |
 | Ad-hoc maintenance PHP mutating prod | Prefer migrations; reversible, documented jobs only |
 | Thin RISKS.md ignoring real incidents | Keep `docs/RISKS.md` and this file updated when we find issues |
+| Telemetry counters on guessed table/column names wrapped in `catch` → silent zeros | Check names against migrations; never hide “empty stats” behind a catch-all |
 | JS `console.log` and duplicate asset files in prod | No debug console in shipped assets; no `-old` / `-backup` copies |
 
 ## Plugin boundary

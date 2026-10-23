@@ -1124,6 +1124,10 @@ a.sidebar-brand-home:hover {
 .setup-name-pair .setup-field-name-de {
   grid-column: 1 / -1;
 }
+/* The German denomination is rendered hidden unless the seat is in South Tyrol. */
+.setup-name-pair .setup-field-name-de[hidden] {
+  display: none !important;
+}
 .setup-bilingual-hint,
 .setup-field-name-de .setup-field-hint {
   margin: 0.35rem 0 0;
@@ -1189,31 +1193,48 @@ a.sidebar-brand-home:hover {
   justify-content: center;
 }
 /* Smooth “breathing” pulse: nudges the user to press the fetch button.
-   Shared by the RUNTS lookup, the website scrape and the retry action. */
+   Uses an opacity-animated ring so it also works under prefers-reduced-motion
+   and does not depend on color-mix() support in keyframes. */
 .setup-scrape-btn.is-attention,
 .setup-scrape-retry.is-attention {
+  position: relative;
   animation: setup-cta-attention 2.4s cubic-bezier(0.45, 0, 0.55, 1) infinite;
-  will-change: box-shadow, transform, filter;
+  will-change: transform, filter;
+}
+.setup-scrape-btn.is-attention::after,
+.setup-scrape-retry.is-attention::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  box-shadow: 0 0 0 6px var(--brand-primary);
+  opacity: 0;
+  pointer-events: none;
+  animation: setup-cta-ring 2.4s ease-in-out infinite;
 }
 @keyframes setup-cta-attention {
   0%, 100% {
-    box-shadow: 0 8px 20px color-mix(in srgb, var(--brand-primary) 20%, transparent);
     transform: translateY(0) scale(1);
     filter: brightness(1);
   }
   50% {
-    box-shadow:
-      0 0 0 8px color-mix(in srgb, var(--brand-primary) 17%, transparent),
-      0 16px 32px color-mix(in srgb, var(--brand-primary) 30%, transparent);
-    transform: translateY(-1px) scale(1.014);
-    filter: brightness(1.14);
+    transform: translateY(-1px) scale(1.015);
+    filter: brightness(1.16);
   }
+}
+@keyframes setup-cta-ring {
+  0%, 100% { opacity: 0; }
+  50% { opacity: 0.3; }
 }
 @media (prefers-reduced-motion: reduce) {
   .setup-scrape-btn.is-attention,
   .setup-scrape-retry.is-attention {
     animation: none;
-    box-shadow: 0 0 0 3px color-mix(in srgb, var(--brand-primary) 20%, transparent);
+  }
+  /* Keep the visual hint without movement: the ring still “breathes”. */
+  .setup-scrape-btn.is-attention::after,
+  .setup-scrape-retry.is-attention::after {
+    animation: setup-cta-ring 2.6s ease-in-out infinite;
   }
 }
 .setup-name-pair .setup-runts-lock-hint {
@@ -6067,10 +6088,13 @@ html:has(.setup-body) {
   }
 }
 @media (prefers-reduced-motion: reduce) {
+  /* No movement, but the arrow still blinks so it is noticed. */
   .setup-scroll-cue-arrow {
-    animation: none;
-    opacity: 0.9;
-    text-shadow: none;
+    animation: setup-scroll-blink-soft 2.2s ease-in-out infinite;
+  }
+  @keyframes setup-scroll-blink-soft {
+    0%, 100% { opacity: 0.35; }
+    50% { opacity: 1; }
   }
 }
 @keyframes setup-ambient-drift {

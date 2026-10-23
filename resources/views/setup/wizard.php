@@ -2,6 +2,7 @@
 /** @var string $mode */
 $errors = flash('errors');
 $errorStep = flash('setup_error_step');
+$showNameDe = !empty($showNameDe);
 ?>
 <div class="setup-stage" data-setup-wizard data-mode="<?= e($mode) ?>" data-has-progress="<?= !empty($hasProgress) ? '1' : '0' ?>" data-setup-incremental="<?= !empty($isIncremental) ? '1' : '0' ?>" data-i18n-endpoint="<?= e(url('/i18n/messages')) ?>">
     <div class="setup-ambient" aria-hidden="true"></div>
@@ -469,6 +470,13 @@ $errorStep = flash('setup_error_step');
                                         'data-setup-assoc-name' => $fieldKey === 'name' ? true : false,
                                         'data-setup-assoc-name-de' => $fieldKey === 'name_de' ? true : false,
                                     ]),
+                                    // German denomination: only for South Tyrol associations.
+                                    'wrap_attrs' => $fieldKey === 'name_de'
+                                        ? array_filter([
+                                            'data-setup-name-de-wrap' => true,
+                                            'hidden' => !$showNameDe,
+                                        ])
+                                        : [],
                                     'hint' => $fieldKey === 'name_de' ? (string) __('setup.field_assoc_name_de_hint') : '',
                                 ]) ?>
                                 <?php if ($fieldKey === 'name'): ?>
@@ -1922,7 +1930,10 @@ $errorStep = flash('setup_error_step');
                 <?php elseif ($stepType === 'platform_consents'): ?>
                     <?php
                         $mailReady = !empty($value['mail_ready']);
-                        $anyPlatform = !empty($value['news_opt_in']) || !empty($value['usage_stats_opt_in']) || !empty($value['showcase_consent']);
+                        $isTemporary = !empty($value['is_temporary_instance']);
+                        $anyPlatform = !empty($value['news_opt_in'])
+                            || !empty($value['usage_stats_opt_in'])
+                            || (!$isTemporary && !empty($value['contact_sync_opt_in']));
                         $adminEmail = trim((string) ($value['admin_email'] ?? ''));
                     ?>
                     <?php
@@ -1969,15 +1980,18 @@ $errorStep = flash('setup_error_step');
                             'label_class' => 'checkbox-row setup-check',
                             'attrs' => ['data-platform-opt' => true],
                         ]) ?>
-                        <?= field('checkbox', [
-                            'name' => 'showcase_consent',
-                            'label' => (string) __('setup.platform_showcase'),
-                            'checked' => !empty($value['showcase_consent']),
-                            'context' => 'setup',
-                            'label_class' => 'checkbox-row setup-check',
-                            'attrs' => ['data-platform-opt' => true],
-                        ]) ?>
-                        <p class="setup-hint muted setup-platform-showcase-note"><?= e(__('setup.platform_showcase_hint')) ?></p>
+                        <p class="setup-hint muted setup-platform-stats-note"><?= e(__('setup.platform_stats_hint')) ?></p>
+                        <?php if (!$isTemporary): ?>
+                            <?= field('checkbox', [
+                                'name' => 'contact_sync_opt_in',
+                                'label' => (string) __('setup.platform_contacts'),
+                                'checked' => !empty($value['contact_sync_opt_in']),
+                                'context' => 'setup',
+                                'label_class' => 'checkbox-row setup-check',
+                                'attrs' => ['data-platform-opt' => true],
+                            ]) ?>
+                            <p class="setup-hint muted setup-platform-contacts-note"><?= e(__('setup.platform_contacts_hint')) ?></p>
+                        <?php endif; ?>
                         <div class="setup-terms-consent">
                             <?= field('checkbox', [
                                 'name' => 'accept_terms',

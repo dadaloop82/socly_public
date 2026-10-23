@@ -47,6 +47,16 @@ Permission checks on routes and UI via stable keys in `Socly\Support\Permission`
 - Empty optional fields normalized to `null`.
 - Fiscal code validated with Italian check digit (no invented birthplace defaults).
 
+## Outbound platform data
+
+- Anonymous telemetry (usage statistics) contains no personal data: version, locale, member range,
+  enabled components/plugins, PHP/database versions.
+- Association/installation contact data is sent to the vendor only with explicit consent
+  (`platform.contacts_opt_in`, default on, revocable in Settings). It includes association identity,
+  contacts, seat, admin/president, installed version and usage counts.
+- Demo/temporary instances never send telemetry or contact data.
+- The receiver stores a SHA-256 hash of the instance token, not the token itself.
+
 ## Plugins
 
 Treat plugin code as trusted. Disable unused plugins; disabling does not delete data.

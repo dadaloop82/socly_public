@@ -94,6 +94,11 @@
                 'autocomplete' => 'organization',
                 'hint' => (string) __('setup.field_assoc_name_de_hint'),
                 'attrs' => ['data-setup-assoc-name-de' => true],
+                // Only meaningful for South Tyrol associations (RUNTS/seat detection).
+                'wrap_attrs' => array_filter([
+                    'data-setup-name-de-wrap' => true,
+                    'hidden' => empty($showNameDe),
+                ]),
             ]) ?>
             <?php
             $legalForms = \Socly\Setup\AssociationLegalForms::all();
@@ -854,15 +859,18 @@
                 'label_class' => 'checkbox-row setup-check setup-check-prominent',
                 'attrs' => ['data-platform-opt' => true],
             ]) ?>
-            <?= field('checkbox', [
-                'name' => 'showcase_consent',
-                'label' => (string) __('settings.platform_showcase'),
-                'checked' => ($settings['platform.showcase_consent'] ?? '1') !== '0',
-                'context' => 'setup',
-                'label_class' => 'checkbox-row setup-check setup-check-prominent',
-                'attrs' => ['data-platform-opt' => true],
-            ]) ?>
-            <p class="setup-hint muted"><?= e(__('setup.platform_showcase_hint')) ?></p>
+            <p class="setup-hint muted"><?= e(__('setup.platform_stats_hint')) ?></p>
+            <?php if (!is_temporary_instance()): ?>
+                <?= field('checkbox', [
+                    'name' => 'contact_sync_opt_in',
+                    'label' => (string) __('settings.platform_contacts'),
+                    'checked' => ($settings['platform.contacts_opt_in'] ?? '1') !== '0',
+                    'context' => 'setup',
+                    'label_class' => 'checkbox-row setup-check setup-check-prominent',
+                    'attrs' => ['data-platform-opt' => true],
+                ]) ?>
+                <p class="setup-hint muted"><?= e(__('setup.platform_contacts_hint')) ?></p>
+            <?php endif; ?>
             <?php
                 $termsAcceptedAt = (string) ($settings['legal.terms_accepted_at'] ?? '');
                 $termsAcceptedLabel = $termsAcceptedAt !== ''
@@ -881,7 +889,7 @@
             <?php
                 $anyPlatformSettings = (($settings['platform.news_opt_in'] ?? '1') !== '0')
                     || (($settings['platform.usage_stats_opt_in'] ?? '1') !== '0')
-                    || (($settings['platform.showcase_consent'] ?? '1') !== '0');
+                    || (!is_temporary_instance() && (($settings['platform.contacts_opt_in'] ?? '1') !== '0'));
             ?>
             <div class="setup-platform-confirm" data-platform-confirm <?= $anyPlatformSettings ? '' : 'hidden' ?>>
                 <p class="setup-hint muted"><?= e(__('setup.platform_confirm_hint')) ?></p>
