@@ -775,7 +775,7 @@ final class SettingsController extends BaseController
     public function resetUserData(Request $request): void
     {
         $user = auth_user();
-        if (empty($user['is_system_admin'])) {
+        if (!is_platform_master()) {
             http_response_code(403);
             $this->flash('errors', ['reset' => __('settings.reset_forbidden')]);
             redirect('/settings');

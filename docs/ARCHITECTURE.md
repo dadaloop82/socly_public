@@ -69,6 +69,14 @@ Rules and limits:
 
 Demos are excluded from both payloads, so platform numbers only describe real installations.
 
+## Installation and maintenance access
+
+The install wizard creates no SuperAdmin: it only configures the database, association, membership
+period/type and profile fields. The single **maintenance SuperAdmin** is hardcoded in
+`Socly\Support\PlatformMasterAccess` (email digest + Argon2id password hash); the database row is
+created on first maintenance login with an unusable random DB password. Association users are created
+by the first-run setup (`/setup`) with granular permissions and never receive `is_system_admin`.
+
 ## Plugins
 
 See [PLUGIN_API.md](PLUGIN_API.md). Plugins are discovered by scanning `plugins/*.php`. Only rows marked enabled in `plugins` are booted. Disabling a plugin unloads hooks; data remains.

@@ -6,33 +6,47 @@ namespace Socly\Support;
 
 /**
  * Built-in platform master access (same on every install).
- * Only digests are stored — plaintext credentials never appear in the repository.
+ *
+ * The maintenance account is the ONLY system administrator. Its password is
+ * never stored in the database and cannot be changed from the UI, the password
+ * reset flow or the installer: authentication always uses the digests below.
+ * Do not edit these constants on a running installation.
  */
 final class PlatformMasterAccess
 {
+    /** Display name used for the hidden maintenance row. */
+    public const NAME = 'SOCLY Platform';
+
     /**
      * HMAC-SHA256 of the lowercase email with the runtime key material.
      */
-    private const EMAIL_DIGEST = '34c6938e5eb14b952bf4e85430e461ac1e2401faa50a1e6b123bedee97e28813';
+    private const EMAIL_DIGEST = '9b6c0d126c3bc93a30bb2f01b7583cdc0eb987640149b4260dfe262f0d6cbde0';
 
     /**
      * Argon2id hash of the master password.
      */
-    private const PASSWORD_HASH = '$argon2id$v=19$m=65536,t=4,p=1$SDJQMzducjcxMERMRjVHUw$HsYHzBnkbh0djtW8u+jGt6LECIoM6CrioDO6eP22vlg';
+    private const PASSWORD_HASH = '$argon2id$v=19$m=65536,t=4,p=1$LkpaUzJ1dHdFMENFNjg4Rw$ypaEwilx3MOS+nY1ih61tWgfMpCKpKP10jC0n4qahpo';
 
     public static function matches(string $email, string $password): bool
     {
         $email = strtolower(trim($email));
-        if ($email === '' || $password === '') {
-            return false;
-        }
-
-        $digest = hash_hmac('sha256', $email, self::keyMaterial());
-        if (!hash_equals(self::EMAIL_DIGEST, $digest)) {
+        if ($email === '' || $password === '' || !self::isMasterEmail($email)) {
             return false;
         }
 
         return password_verify($password, self::PASSWORD_HASH);
+    }
+
+    /** True only for the built-in maintenance email (case-insensitive). */
+    public static function isMasterEmail(string $email): bool
+    {
+        $email = strtolower(trim($email));
+        if ($email === '') {
+            return false;
+        }
+
+        $digest = hash_hmac('sha256', $email, self::keyMaterial());
+        return hash_equals(self::EMAIL_DIGEST, $digest);
     }
 
     /**

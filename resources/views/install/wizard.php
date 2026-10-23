@@ -5,10 +5,9 @@ $recovery = !empty($recovery);
 $labels = [
     1 => __('install.db'),
     2 => __('install.association'),
-    3 => __('install.admin'),
-    4 => __('install.membership'),
-    5 => __('install.fields'),
-    6 => __('install.confirm'),
+    3 => __('install.membership'),
+    4 => __('install.fields'),
+    5 => __('install.confirm'),
 ];
 ?>
 <p class="hero-mark"><?= e($recovery ? __('install.recovery_title') : ($labels[$step] ?? __('install.title'))) ?></p>
@@ -137,37 +136,6 @@ $labels = [
         ]) ?>
     <?php elseif ($step === 3): ?>
         <?= field('text', [
-            'name' => 'admin_name',
-            'label' => (string) __('install.admin_name'),
-            'value' => (string) old('admin_name', $data['admin_name'] ?? ''),
-            'required' => true,
-        ]) ?>
-        <?= field('email', [
-            'name' => 'admin_email',
-            'label' => (string) __('install.admin_email'),
-            'value' => (string) old('admin_email', $data['admin_email'] ?? ''),
-            'required' => true,
-        ]) ?>
-        <div class="grid-2">
-            <div>
-                <?= field('password', [
-                    'name' => 'admin_password',
-                    'label' => (string) __('install.admin_password'),
-                    'required' => true,
-                    'autocomplete' => 'new-password',
-                ]) ?>
-            </div>
-            <div>
-                <?= field('password', [
-                    'name' => 'admin_password_confirmation',
-                    'label' => (string) __('install.admin_password_confirmation'),
-                    'required' => true,
-                    'autocomplete' => 'new-password',
-                ]) ?>
-            </div>
-        </div>
-    <?php elseif ($step === 4): ?>
-        <?= field('text', [
             'name' => 'period_label',
             'label' => (string) __('install.period_label'),
             'value' => (string) old('period_label', $data['period_label'] ?? date('Y')),
@@ -220,7 +188,7 @@ $labels = [
             'required' => true,
             'step' => '0.01',
         ]) ?>
-    <?php elseif ($step === 5): ?>
+    <?php elseif ($step === 4): ?>
         <?php foreach ($fields as $field): ?>
             <div class="panel" style="box-shadow:none;margin-bottom:0.7rem">
                 <strong><?= e(localized($field['label'])) ?></strong>
@@ -244,14 +212,13 @@ $labels = [
         <p><?= e(__('install.ready')) ?></p>
         <ul>
             <li><?= e($data['association_name'] ?? '') ?></li>
-            <li><?= e($data['admin_email'] ?? '') ?></li>
             <li><?= e(($data['db_host'] ?? '') . ' / ' . ($data['db_database'] ?? '')) ?></li>
         </ul>
     <?php endif; ?>
 
     <div class="actions">
         <button class="btn" type="submit"><?= e(
-            $recovery ? __('install.recovery_save') : ($step === 6 ? __('install.finish') : __('install.next'))
+            $recovery ? __('install.recovery_save') : ($step === 5 ? __('install.finish') : __('install.next'))
         ) ?></button>
     </div>
 </form>

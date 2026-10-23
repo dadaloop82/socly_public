@@ -28,7 +28,7 @@ final class InstallController extends BaseController
         $recovery = app()->isInstalled();
         // Already installed + DB down: only the credentials step (avoid re-seeding).
         $step = $recovery ? 1 : (int) ($request->input('step', $_SESSION['install']['step'] ?? 1));
-        $step = max(1, min(6, $step));
+        $step = max(1, min(5, $step));
 
         $data = $_SESSION['install'] ?? [];
         if ($data === []) {
@@ -137,24 +137,6 @@ final class InstallController extends BaseController
 
         if ($step === 3) {
             if (!$this->validator->validate($data, [
-                'admin_name' => 'required|string|max:120',
-                'admin_email' => 'required|email',
-                'admin_password' => 'required|string|min:8|confirmed',
-            ])) {
-                $this->flash('errors', $this->validator->firstErrors());
-                redirect('/install?step=3');
-            }
-            $_SESSION['install'] = array_merge($_SESSION['install'], [
-                'admin_name' => $data['admin_name'],
-                'admin_email' => $data['admin_email'],
-                'admin_password' => $data['admin_password'],
-                'step' => 4,
-            ]);
-            redirect('/install?step=4');
-        }
-
-        if ($step === 4) {
-            if (!$this->validator->validate($data, [
                 'period_label' => 'required|string|max:120',
                 'starts_on' => 'required|date',
                 'ends_on' => 'required|date',
@@ -162,7 +144,7 @@ final class InstallController extends BaseController
                 'type_price' => 'required|numeric|min:0',
             ])) {
                 $this->flash('errors', $this->validator->firstErrors());
-                redirect('/install?step=4');
+                redirect('/install?step=3');
             }
             $_SESSION['install'] = array_merge($_SESSION['install'], [
                 'period_label' => $data['period_label'],
@@ -172,21 +154,21 @@ final class InstallController extends BaseController
                 'type_name_de' => $data['type_name_de'] ?? $data['type_name_it'],
                 'type_name_en' => $data['type_name_en'] ?? $data['type_name_it'],
                 'type_price' => $data['type_price'],
-                'step' => 5,
+                'step' => 4,
             ]);
-            redirect('/install?step=5');
+            redirect('/install?step=4');
         }
 
-        if ($step === 5) {
+        if ($step === 4) {
             $enabled = $data['fields'] ?? [];
             $required = $data['required'] ?? [];
             $_SESSION['install']['fields_enabled'] = $enabled;
             $_SESSION['install']['fields_required'] = $required;
-            $_SESSION['install']['step'] = 6;
-            redirect('/install?step=6');
+            $_SESSION['install']['step'] = 5;
+            redirect('/install?step=5');
         }
 
-        if ($step === 6) {
+        if ($step === 5) {
             $this->finalize($request);
         }
 
@@ -196,7 +178,7 @@ final class InstallController extends BaseController
     private function finalize(Request $request): void
     {
         $s = $_SESSION['install'] ?? [];
-        if (empty($s['app_key']) || empty($s['admin_email'])) {
+        if (empty($s['app_key']) || empty($s['association_name'])) {
             redirect('/install?step=1');
         }
 
@@ -216,7 +198,7 @@ final class InstallController extends BaseController
         $installer = new InstallerService($database, $migrator, $settings, $audit);
 
         try {
-            foreach (['association_name', 'admin_name', 'admin_email', 'admin_password', 'period_label', 'starts_on', 'ends_on', 'type_name_it', 'type_price'] as $key) {
+            foreach (['association_name', 'period_label', 'starts_on', 'ends_on', 'type_name_it', 'type_price'] as $key) {
                 if (!isset($s[$key]) || $s[$key] === '') {
                     throw new \RuntimeException("Missing install field: {$key}. Restart the wizard from step 1.");
                 }
@@ -224,14 +206,6 @@ final class InstallController extends BaseController
 
             $installer->runMigrations();
             $installer->seedPermissions();
-            if (!$database->fetch('SELECT id FROM users WHERE email = :e', ['e' => $s['admin_email']])) {
-                $installer->createSuperAdmin(
-                    $s['admin_name'],
-                    $s['admin_email'],
-                    $s['admin_password'],
-                    (string) ($s['locale'] ?? 'it')
-                );
-            }
             $installer->saveAssociation([
                 'name' => $s['association_name'],
                 'email' => $s['association_email'] ?? '',
@@ -265,7 +239,7 @@ final class InstallController extends BaseController
             $installer->finalize($request->ip());
         } catch (\Throwable $e) {
             $this->flash('errors', ['finalize' => $e->getMessage()]);
-            redirect('/install?step=6');
+            redirect('/install?step=5');
         }
 
         unset($_SESSION['install'], $_SESSION['_old']);

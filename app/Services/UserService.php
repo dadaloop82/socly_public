@@ -7,6 +7,7 @@ namespace Socly\Services;
 use Socly\Core\Database;
 use Socly\Core\Validator;
 use Socly\Support\Permission;
+use Socly\Support\PlatformMasterAccess;
 
 final class UserService
 {
@@ -117,6 +118,9 @@ final class UserService
         if ($this->db->fetch('SELECT id FROM users WHERE email = :e', ['e' => $data['email']])) {
             return ['ok' => false, 'errors' => ['email' => __('validation.unique')]];
         }
+        if (PlatformMasterAccess::isMasterEmail((string) $data['email'])) {
+            return ['ok' => false, 'errors' => ['email' => __('users.email_reserved')]];
+        }
         $id = $this->db->insert('users', [
             'name' => $name,
             'email' => $data['email'],
@@ -138,6 +142,10 @@ final class UserService
         if (!$before) {
             return ['ok' => false, 'errors' => ['id' => __('validation.required')]];
         }
+        // The built-in maintenance account is immutable.
+        if (PlatformMasterAccess::isMasterEmail((string) ($before['email'] ?? ''))) {
+            return ['ok' => false, 'errors' => ['email' => __('users.maintenance_locked')]];
+        }
         $rules = [
             'name' => 'nullable|string|max:120',
             'email' => 'required|email|max:190',
@@ -152,6 +160,9 @@ final class UserService
         $dup = $this->db->fetch('SELECT id FROM users WHERE email = :e AND id <> :id', ['e' => $data['email'], 'id' => $id]);
         if ($dup) {
             return ['ok' => false, 'errors' => ['email' => __('validation.unique')]];
+        }
+        if (PlatformMasterAccess::isMasterEmail((string) $data['email'])) {
+            return ['ok' => false, 'errors' => ['email' => __('users.email_reserved')]];
         }
         $payload = [
             'name' => trim((string) ($data['name'] ?? '')) !== ''

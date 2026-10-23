@@ -3554,7 +3554,7 @@ final class SetupService
     /**
      * Full wipe of association data so first-run setup can be repeated.
      * Deletes every operational row and stored files (logo, photos, documents, enrollment).
-     * Keeps only the platform SuperAdmin account(s), permissions catalogue and migrations.
+     * Keeps only the built-in maintenance SuperAdmin, permissions catalogue and migrations.
      */
     public function resetAssociationConfiguration(): void
     {

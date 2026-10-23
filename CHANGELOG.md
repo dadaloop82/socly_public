@@ -22,6 +22,10 @@ and this project follows a simple `1.0.x` versioning scheme driven by release sy
 - One-click installers for Linux (`bin/install/linux.sh`), macOS (`bin/install/macos.sh`) and Windows
   (`bin/install/windows.ps1`): environment checks, PHP/Composer/MariaDB/OCR setup, database creation,
   `.env`, migrations and local server
+- Single built-in maintenance SuperAdmin (hardcoded credentials); the installer no longer asks for or
+  creates a SuperAdmin, and users cannot be promoted to system administrator
+- RUNTS-first onboarding step with a “fill in the fields manually” link; the fetch button stays
+  visible (disabled) and pulses clearly once a code is entered
 
 ### Fixed
 

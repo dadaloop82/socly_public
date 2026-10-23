@@ -1587,6 +1587,7 @@ function initSetupWizard() {
   initSetupBrandingPalettes(root);
   initLogoFilePickers(root);
   initSetupNamePairPreview(root);
+  initSetupManualFields(root);
   initPlatformConsents(root);
   // SMTP before CTA gate: pre-checked "skip mail" must clear required fields first.
   initSetupSmtp(root);
@@ -5756,8 +5757,8 @@ function initSetupRuntsLookup(root) {
       hideBtn();
       return;
     }
-    if (digits() === '') hideBtn();
-    else showBtn();
+    // Keep the fetch button visible (disabled) on the RUNTS-only step.
+    showBtn();
   };
 
   input.addEventListener('input', () => {
@@ -5962,10 +5963,48 @@ function initSetupRuntsLookup(root) {
       if (!box.classList.contains('is-found')) {
         // Lookup failed/timed out: let the user type the fields manually.
         setFieldsLocked(false);
+        root.dispatchEvent(new CustomEvent('setup:runts-failed'));
       }
       setLookupBusy(false);
     }
   });
+}
+
+function initSetupManualFields(root) {
+  const pair = root.querySelector('[data-setup-name-pair]');
+  const wrap = pair?.querySelector('[data-setup-manual-fields]');
+  const toggle = pair?.querySelector('[data-setup-manual-toggle]');
+  if (!wrap) return;
+  const form = root.querySelector('[data-setup-form]');
+  const fields = [...wrap.querySelectorAll('input, select, textarea')];
+  const syncRequired = (visible) => {
+    fields.forEach((el) => {
+      el.required = visible && el.dataset.setupRequired === '1';
+    });
+  };
+  const refreshCta = () => form?.dispatchEvent(new CustomEvent('setup:cta-refresh'));
+  const show = (focus) => {
+    wrap.hidden = false;
+    if (toggle) toggle.hidden = true;
+    syncRequired(true);
+    refreshCta();
+    if (focus) {
+      const name = wrap.querySelector('[data-setup-assoc-name]');
+      if (name instanceof HTMLElement) name.focus();
+    }
+  };
+
+  if (wrap.hidden) {
+    syncRequired(false);
+    if (toggle) toggle.hidden = false;
+  } else {
+    syncRequired(true);
+    if (toggle) toggle.hidden = true;
+  }
+
+  toggle?.addEventListener('click', () => show(true));
+  // A failed RUNTS lookup must expose the manual fields immediately.
+  root.addEventListener('setup:runts-failed', () => show(false));
 }
 
 function initSetupCtaGate(root) {
@@ -5989,6 +6028,15 @@ function initSetupCtaGate(root) {
       ok = typeof form.checkValidity === 'function' ? form.checkValidity() : true;
     } catch {
       ok = true;
+    }
+    // RUNTS-first step: manual fields hidden → require a fetched name + legal form.
+    const manual = form.querySelector('[data-setup-manual-fields]');
+    if (ok && manual instanceof HTMLElement && manual.hidden) {
+      const name = form.querySelector('[data-setup-assoc-name]');
+      const legal = form.querySelector('[data-setup-legal-name]');
+      if (!name || !legal || String(name.value || '').trim() === '' || String(legal.value || '') === '') {
+        ok = false;
+      }
     }
     cta.disabled = !ok;
   };

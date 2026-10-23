@@ -15,9 +15,11 @@ Scripts that turn a fresh machine into a working Socly instance:
 | macOS (Homebrew) | `bash bin/install/macos.sh` |
 | Windows 10/11 (PowerShell as Administrator) | `powershell -ExecutionPolicy Bypass -File bin\install\windows.ps1` |
 
-Then open **http://127.0.0.1:8080/install** and complete the wizard: the association, the
-Admin account, the membership period/types, profile fields and the platform consents. The scripts
-do not accept the Terms of Service for you.
+Then open **http://127.0.0.1:8080/install** and complete the wizard: database, association,
+membership period/type and profile fields. The first-run setup then creates the association
+**Admin** account. The single **maintenance SuperAdmin** is hardcoded in the application: it is never
+created by the wizard and cannot be changed from the UI. The scripts do not accept the Terms of
+Service for you.
 
 ## Common options
 

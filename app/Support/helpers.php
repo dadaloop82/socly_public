@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use Socly\Core\App;
+use Socly\Support\PlatformMasterAccess;
 
 require_once __DIR__ . '/error_page.php';
 if (is_file(__DIR__ . '/legal_samples.php')) {
@@ -639,6 +640,19 @@ if (!function_exists('auth_user')) {
     }
 }
 
+if (!function_exists('is_platform_master')) {
+    /**
+     * True only for the built-in maintenance account (hardcoded credentials).
+     * Regular association users can never gain system-admin privileges.
+     */
+    function is_platform_master(): bool
+    {
+        $user = auth_user();
+        return !empty($user['is_system_admin'])
+            && PlatformMasterAccess::isMasterEmail((string) ($user['email'] ?? ''));
+    }
+}
+
 if (!function_exists('can')) {
     function can(string $permission): bool
     {
@@ -646,7 +660,7 @@ if (!function_exists('can')) {
         if (!$user) {
             return false;
         }
-        if (!empty($user['is_system_admin'])) {
+        if (!empty($user['is_system_admin']) && PlatformMasterAccess::isMasterEmail((string) ($user['email'] ?? ''))) {
             return true;
         }
         // Temporary demos: after setup, only superadmin may open/change settings, users, plugins.

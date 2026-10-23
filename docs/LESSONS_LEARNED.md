@@ -26,6 +26,7 @@ This document captures mistakes and costly fixes from the previous membership co
 | Gender / QR enums inconsistent across layers | One enum end-to-end (DB + validator + UI) |
 | Renumbering member PKs breaking FKs | Stable surrogate IDs; never renumber; use `member_number` as business id |
 | Permission keys renamed repeatedly | Stable catalogue in `Socly\Support\Permission` |
+| User-facing SuperAdmin creation | Single built-in maintenance account; `is_system_admin` is never settable from the UI |
 | Uniqueness on email with empty string vs NULL confusion | Normalize empty optional fields to `null` before store/unique checks |
 
 ## Document extraction (OCR)

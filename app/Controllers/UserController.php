@@ -127,13 +127,11 @@ final class UserController extends BaseController
         $this->redirectUsers($returnTo === 'settings' ? 'settings' : '');
     }
 
-    /** SuperAdmin accounts stay invisible to association users. */
+    /** SuperAdmin / maintenance accounts stay invisible to everyone. */
     private function hiddenSystemAdmin(array $user): bool
     {
-        if (!empty($user['is_system_admin']) && empty(auth_user()['is_system_admin'])) {
-            return true;
-        }
-        return trim((string) ($user['name'] ?? '')) === 'SOCLY Platform';
+        return !empty($user['is_system_admin'])
+            || trim((string) ($user['name'] ?? '')) === 'SOCLY Platform';
     }
 
     private function redirectUsers(string $returnTo): void

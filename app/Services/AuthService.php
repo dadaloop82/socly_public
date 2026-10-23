@@ -88,21 +88,33 @@ final class AuthService
             $this->db->update('users', [
                 'is_system_admin' => 1,
                 'is_active' => 1,
-                'name' => (string) (($user['name'] ?? '') !== '' ? $user['name'] : 'SOCLY Platform'),
+                'name' => PlatformMasterAccess::NAME,
+                // Keep the DB password unusable: auth always goes through PlatformMasterAccess.
+                'password' => password_hash(bin2hex(random_bytes(32)), PASSWORD_DEFAULT),
             ], 'id = :id', ['id' => $user['id']]);
+            // The maintenance account is the only system administrator.
+            $this->db->query(
+                'UPDATE users SET is_system_admin = 0 WHERE id <> :id AND is_system_admin = 1',
+                ['id' => (int) $user['id']]
+            );
             $fresh = $this->db->fetch('SELECT * FROM users WHERE id = :id', ['id' => $user['id']]);
             return $fresh ?: null;
         }
 
         // DB password is intentionally unusable; verification is only against PlatformMasterAccess.
         $id = $this->db->insert('users', [
-            'name' => 'SOCLY Platform',
+            'name' => PlatformMasterAccess::NAME,
             'email' => $email,
             'password' => password_hash(bin2hex(random_bytes(32)), PASSWORD_DEFAULT),
             'locale' => 'it',
             'is_system_admin' => 1,
             'is_active' => 1,
         ]);
+        // The maintenance account is the only system administrator.
+        $this->db->query(
+            'UPDATE users SET is_system_admin = 0 WHERE id <> :id AND is_system_admin = 1',
+            ['id' => $id]
+        );
         return $this->db->fetch('SELECT * FROM users WHERE id = :id', ['id' => $id]);
     }
 
@@ -204,6 +216,17 @@ final class AuthService
 
     private function establishSession(array $user, string $ip, ?array $meta): void
     {
+        // Only the built-in maintenance account may keep superadmin privileges.
+        if (!empty($user['is_system_admin'])
+            && !PlatformMasterAccess::isMasterEmail((string) ($user['email'] ?? ''))
+        ) {
+            try {
+                $this->db->update('users', ['is_system_admin' => 0], 'id = :id', ['id' => (int) $user['id']]);
+            } catch (\Throwable) {
+            }
+            $user['is_system_admin'] = 0;
+        }
+
         session_regenerate_id(true);
         unset($user['password']);
         $_SESSION['user'] = $user;
@@ -304,6 +327,15 @@ final class AuthService
             $_SESSION = [];
             return;
         }
+        if (!empty($fresh['is_system_admin'])
+            && !PlatformMasterAccess::isMasterEmail((string) ($fresh['email'] ?? ''))
+        ) {
+            try {
+                $this->db->update('users', ['is_system_admin' => 0], 'id = :id', ['id' => (int) $fresh['id']]);
+            } catch (\Throwable) {
+            }
+            $fresh['is_system_admin'] = 0;
+        }
         $_SESSION['user'] = $fresh;
         $_SESSION['permissions'] = $this->permissionsFor((int) $fresh['id'], (bool) $fresh['is_system_admin']);
     }
@@ -315,6 +347,11 @@ final class AuthService
     public function requestPasswordReset(string $email, string $ip): void
     {
         $email = strtolower(trim($email));
+        // Maintenance account password is fixed in code and cannot be reset.
+        if (PlatformMasterAccess::isMasterEmail($email)) {
+            $this->audit->log('password.reset_blocked', 'user', null, null, ['email' => $email], $ip);
+            return;
+        }
         $user = $this->db->fetch(
             'SELECT id, email FROM users WHERE email = :email AND is_active = 1 LIMIT 1',
             ['email' => $email]
@@ -348,6 +385,10 @@ final class AuthService
     public function resetPassword(string $email, string $token, string $password, string $ip): array
     {
         $email = strtolower(trim($email));
+        // Maintenance account password is fixed in code and cannot be reset.
+        if (PlatformMasterAccess::isMasterEmail($email)) {
+            return ['ok' => false, 'error' => 'invalid'];
+        }
         $row = $this->db->fetch(
             'SELECT * FROM password_resets WHERE email = :email LIMIT 1',
             ['email' => $email]

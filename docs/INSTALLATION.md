@@ -42,9 +42,10 @@ Opzioni utili: `--check` (solo verifica), `--no-ocr`, `--no-serve`, `--port=8080
 `--db-root-pass=...`. Su Windows i parametri sono `-Check`, `-NoOcr`, `-NoServe`, `-Port`, `-DbRootPass`.
 Dettagli in [`bin/install/README.md`](../bin/install/README.md).
 
-Al termine apri `http://127.0.0.1:8080/install` e completa il wizard (associazione, account Admin,
-periodo/quota, campi, consensi). Il server PHP integrato serve per installazione e valutazione: per la
-produzione usa Apache/Nginx + HTTPS come descritto sotto.
+Al termine apri `http://127.0.0.1:8080/install` e completa il wizard (associazione, periodo/quota,
+campi). Il wizard di primo avvio crea poi l'account **Admin dell'associazione**; l'account SuperAdmin
+di manutenzione è predefinito nel codice e non viene creato dal wizard. Il server PHP integrato serve
+per installazione e valutazione: per la produzione usa Apache/Nginx + HTTPS come descritto sotto.
 
 ## 1. Scarica il codice
 
@@ -124,17 +125,19 @@ server {
 
 ## 5. Installazione guidata
 
-Apri `https://socly.example.org/install` e completa i sei passaggi:
+Apri `https://socly.example.org/install` e completa i cinque passaggi:
 
 1. **Database e URL** — credenziali MySQL e indirizzo pubblico dell'applicazione.
 2. **Associazione** — nome, contatti, colori del brand, lingua predefinita, GDPR.
-3. **Account Admin** — il SuperAdmin della piattaforma (email + password).
-4. **Periodo associativo e tipo di quota** — etichetta, date, nome e prezzo del tipo di socio.
-5. **Campi profilo** — campi predefiniti da abilitare e quelli obbligatori.
-6. **Riepilogo** — conferma: vengono create le tabelle, i permessi e il file `storage/installed.lock`.
+3. **Periodo associativo e tipo di quota** — etichetta, date, nome e prezzo del tipo di socio.
+4. **Campi profilo** — campi predefiniti da abilitare e quelli obbligatori.
+5. **Riepilogo** — conferma: vengono create le tabelle, i permessi e il file `storage/installed.lock`.
 
-Fatto questo accedi e completa il **wizard di primo avvio** su `/setup`: dati dell'associazione,
-recupero dal RUNTS o dal sito web, logo e colori, statuto e informativa privacy, tesoreria e scadenze.
+L'**account di manutenzione** (l'unico SuperAdmin) è predefinito nel codice: non viene creato dal
+wizard, non è modificabile né eliminabile dall'interfaccia e non può essere creato da altri utenti.
+Dopo l'installazione il **wizard di primo avvio** su `/setup` crea l'account **Admin
+dell'associazione** e guida la configurazione: dati dell'associazione, recupero dal RUNTS o dal sito
+web, logo e colori, statuto e informativa privacy, tesoreria e scadenze.
 
 ## 6. Verifica
 
@@ -213,9 +216,10 @@ Useful flags: `--check` (verify only), `--no-ocr`, `--no-serve`, `--port=8080`,
 `--db-root-pass=...`. On Windows the parameters are `-Check`, `-NoOcr`, `-NoServe`, `-Port`,
 `-DbRootPass`. Details in [`bin/install/README.md`](../bin/install/README.md).
 
-Then open `http://127.0.0.1:8080/install` and complete the wizard (association, Admin account,
-period/type, fields, consents). The built-in PHP server is for installation and evaluation: for
-production use Apache/Nginx + HTTPS as described below.
+Then open `http://127.0.0.1:8080/install` and complete the wizard (association, period/type, fields).
+The first-run setup then creates the association **Admin** account; the maintenance SuperAdmin is
+hardcoded in the application and is not created by the wizard. The built-in PHP server is for
+installation and evaluation: for production use Apache/Nginx + HTTPS as described below.
 
 ## 1. Get the code
 
@@ -295,17 +299,19 @@ server {
 
 ## 5. Guided installation
 
-Open `https://socly.example.org/install` and complete the six steps:
+Open `https://socly.example.org/install` and complete the five steps:
 
 1. **Database and URL** — MySQL credentials and the public application URL.
 2. **Association** — name, contacts, brand colours, default locale, GDPR.
-3. **Admin account** — the platform SuperAdmin (email + password).
-4. **Membership period and type** — label, dates, name and price of the member type.
-5. **Profile fields** — default fields to enable and the required ones.
-6. **Summary** — confirm: tables, permissions and `storage/installed.lock` are created.
+3. **Membership period and type** — label, dates, name and price of the member type.
+4. **Profile fields** — default fields to enable and the required ones.
+5. **Summary** — confirm: tables, permissions and `storage/installed.lock` are created.
 
-Then log in and complete the **first-run wizard** at `/setup`: association data, RUNTS or website
-lookup, logo and colours, statute and privacy notice, treasury and deadlines.
+The **maintenance account** (the only SuperAdmin) is hardcoded in the application: it is not created
+by the wizard, cannot be edited or deleted from the UI, and no other user can be promoted to
+SuperAdmin. After installation the **first-run wizard** at `/setup` creates the association **Admin**
+account and guides the configuration: association data, RUNTS or website lookup, logo and colours,
+statute and privacy notice, treasury and deadlines.
 
 ## 6. Verify
 

@@ -1199,7 +1199,7 @@
     </div>
 </details>
 
-<?php if (!empty(auth_user()['is_system_admin'])): ?>
+<?php if (is_platform_master()): ?>
 <section class="config-danger-zone" id="danger-zone" data-reset-user-data>
     <h2 class="config-danger-title"><?= e(__('settings.reset_zone_title')) ?></h2>
     <p class="config-danger-text"><?= e(__('settings.reset_zone_lede')) ?></p>

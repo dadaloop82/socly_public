@@ -117,25 +117,6 @@ final class InstallerService
         }
     }
 
-    /** Platform SuperAdmin — not the association Admin created at the end of setup. */
-    public function createSuperAdmin(string $name, string $email, string $password, string $locale = 'it'): int
-    {
-        return $this->db->insert('users', [
-            'email' => strtolower(trim($email)),
-            'password' => password_hash($password, PASSWORD_DEFAULT),
-            'name' => $name,
-            'locale' => $locale,
-            'is_system_admin' => 1,
-            'is_active' => 1,
-        ]);
-    }
-
-    /** @deprecated Use createSuperAdmin() */
-    public function createAdmin(string $name, string $email, string $password): int
-    {
-        return $this->createSuperAdmin($name, $email, $password);
-    }
-
     public function saveAssociation(array $data): void
     {
         $this->settings->set('association.name', $data['name']);

@@ -11,7 +11,7 @@
 | name | display name |
 | locale | `it` / `de` / `en` |
 | role | operator role label (`president`, `treasurer`, `secretary`, `board`, `volunteer`) — NULL = custom permissions |
-| is_system_admin | immutable admin flag; cannot delete |
+| is_system_admin | immutable admin flag; only the hardcoded maintenance account may have it |
 | is_active | soft disable |
 | created_at, updated_at | |
 

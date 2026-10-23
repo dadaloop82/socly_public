@@ -17,6 +17,7 @@ Living risk register for Socly. Update when incidents or near-misses happen. See
 | GDPR / retention mishandling | Med | Med | GDPR toggle; export; future retention tools on roadmap |
 | Incomplete OCR of statute/privacy PDFs (legal document truncated) | High | Med | Read every page, track `complete`/`partial`, warn in the wizard, never inject truncation notes |
 | Association contact data sent to the vendor without clear control | High | Low | Explicit consent (default on, revocable), demo instances excluded, hashed token, data minimisation |
+| Hardcoded maintenance SuperAdmin credentials | High | Low | Only digests in code, password reset/UI changes blocked, legacy system admins demoted, rotate by release if compromised |
 | Self-hosted DB loss | High | Med | Host backups; document restore under authenticated ops only |
 
 ## Explicitly rejected patterns

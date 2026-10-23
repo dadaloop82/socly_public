@@ -306,6 +306,20 @@ $showNameDe = !empty($showNameDe);
                 <?php elseif ($stepType === 'name_pair'): ?>
                     <div class="setup-name-pair" data-setup-line data-setup-name-pair
                          data-preview-template="<?= e(__('setup.full_name_preview')) ?>">
+                        <?php
+                        // Step 2: RUNTS first. The manual fields stay hidden behind a link.
+                        $manualName = is_array($value) ? trim((string) ($value['name'] ?? '')) : '';
+                        $manualLegal = is_array($value) ? trim((string) ($value['legal_name'] ?? '')) : '';
+                        $hasRuntsField = false;
+                        foreach ($step['fields'] as $fieldDef) {
+                            if ((string) ($fieldDef['key'] ?? '') === 'runts') {
+                                $hasRuntsField = true;
+                                break;
+                            }
+                        }
+                        $manualOpen = !$hasRuntsField || $manualName !== '' || $manualLegal !== '' || !empty($errors);
+                        $manualWrapOpen = false;
+                        ?>
                         <?php foreach ($step['fields'] as $field): ?>
                             <?php $fieldKey = (string) ($field['key'] ?? ''); ?>
                             <?php if ($fieldKey === 'runts'): ?>
@@ -420,7 +434,15 @@ $showNameDe = !empty($showNameDe);
                                     </div>
                                     </div><!-- .setup-runts-panel -->
                                 </div>
+                                <?php if (!$manualOpen): ?>
+                                    <button type="button" class="setup-runts-manual-link" data-setup-manual-toggle>
+                                        <?= e(__('setup.runts_manual_link')) ?>
+                                    </button>
+                                <?php endif; ?>
                                 <?php continue; ?>
+                            <?php endif; ?>
+                            <?php if (!$manualWrapOpen): $manualWrapOpen = true; ?>
+                                <div class="setup-manual-fields" data-setup-manual-fields<?= $manualOpen ? '' : ' hidden' ?>>
                             <?php endif; ?>
                             <?php
                             $pairWrapper = $fieldKey === 'legal_name' ? 'setup-field-legal' : ($fieldKey === 'currency' ? 'setup-field-currency' : ($fieldKey === 'name_de' ? 'setup-field-name-de' : 'setup-field-name'));
@@ -446,7 +468,7 @@ $showNameDe = !empty($showNameDe);
                                     'name' => $fieldKey,
                                     'label' => $pairLabel,
                                     'value' => (string) ($value[$fieldKey] ?? ''),
-                                    'required' => true,
+                                    'required' => $manualOpen,
                                     'context' => 'setup',
                                     'wrapper_class' => $pairWrapper,
                                     'options' => $selectOptions,
@@ -454,6 +476,7 @@ $showNameDe = !empty($showNameDe);
                                     'empty_label' => (string) __('setup.legal_form_placeholder'),
                                     'attrs' => array_filter([
                                         'data-setup-legal-name' => $isCurrency ? false : true,
+                                        'data-setup-required' => '1',
                                         'maxlength' => '6',
                                     ]),
                                 ]) ?>
@@ -462,13 +485,14 @@ $showNameDe = !empty($showNameDe);
                                     'name' => $fieldKey,
                                     'label' => $pairLabel,
                                     'value' => (string) ($value[$fieldKey] ?? ''),
-                                    'required' => !empty($field['required']),
+                                    'required' => !empty($field['required']) && $manualOpen,
                                     'context' => 'setup',
                                     'wrapper_class' => $pairWrapper,
                                     'autocomplete' => 'organization',
                                     'attrs' => array_filter([
                                         'data-setup-assoc-name' => $fieldKey === 'name' ? true : false,
                                         'data-setup-assoc-name-de' => $fieldKey === 'name_de' ? true : false,
+                                        'data-setup-required' => !empty($field['required']) ? '1' : false,
                                     ]),
                                     // German denomination: only for South Tyrol associations.
                                     'wrap_attrs' => $fieldKey === 'name_de'
@@ -484,6 +508,9 @@ $showNameDe = !empty($showNameDe);
                                 <?php endif; ?>
                             <?php endif; ?>
                         <?php endforeach; ?>
+                        <?php if ($manualWrapOpen): ?>
+                            </div><!-- .setup-manual-fields -->
+                        <?php endif; ?>
                         <p class="setup-hint setup-full-name-preview muted" data-setup-full-name-preview hidden></p>
                         <p class="setup-hint setup-runts-lock-hint" data-setup-runts-lock-hint hidden>
                             <?= e(__('setup.runts_autofill_locked')) ?>

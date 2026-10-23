@@ -47,6 +47,18 @@ Permission checks on routes and UI via stable keys in `Socly\Support\Permission`
 - Empty optional fields normalized to `null`.
 - Fiscal code validated with Italian check digit (no invented birthplace defaults).
 
+## Maintenance SuperAdmin
+
+- Exactly one system administrator exists: the built-in **maintenance account**.
+- The password is never stored in the database or UI: the email digest and the Argon2id password
+  hash live in `app/Support/PlatformMasterAccess.php`; the DB row keeps an unusable random hash.
+- It cannot be created, edited, deleted or password-reset from the application; the installer no
+  longer asks for a SuperAdmin and no user can be promoted to `is_system_admin`.
+- Legacy system-admin rows are demoted at login/session restore, and `can()` grants the system-admin
+  bypass only to the maintenance email.
+- Keep the maintenance credentials offline; they are fixed and must not be changed in code on a
+  running installation.
+
 ## Outbound platform data
 
 - Anonymous telemetry (usage statistics) contains no personal data: version, locale, member range,
