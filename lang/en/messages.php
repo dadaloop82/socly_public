@@ -981,7 +981,7 @@ return [
         'runts_button' => 'Try to fetch data from the RUNTS archive',
         'runts_button_fallback' => 'Try to fetch data from the RUNTS archive',
         'runts_hint' => 'With RUNTS, fields fill in automatically.',
-        'runts_autofill_locked' => 'Name and legal form are filled automatically from RUNTS: click the button above. Clear the number to edit them manually.',
+        'runts_autofill_locked' => 'Name and legal form are filled automatically from RUNTS. Clear the number to edit them manually.',
         'runts_limit_wait' => 'You can try again in :seconds seconds.',
         'runts_limit_exhausted' => 'You have used all 3 RUNTS lookup attempts for today.',
         'runts_unavailable' => 'RUNTS lookups are no longer available today. Continue by filling in the fields manually.',
