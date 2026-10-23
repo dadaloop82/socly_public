@@ -1086,17 +1086,17 @@ final class AssociationWebsiteScrapeService
         }
         // 3) Labeled numbers ("Tel.", "Telefono:", "Cell.", "WhatsApp"…)
         if (preg_match_all(
-            '/(?:tel\.?|telefono|phone|telefon|cell(?:ulare)?|mobile|whatsapp)\s*[:.\-]?\s*(\+?39[\s.\-\/]*|0039[\s.\-\/]*)?((?:0\d{1,4}|3\d{2}|800|848|199)[\s.\-\/]?\d{3,8})/iu',
+            '/(?:tel\.?|telefono|phone|telefon|cell(?:ulare)?|mobile|whatsapp)\s*[:.\-]?\s*(?:\+?39[\s.\-\/]*|0039[\s.\-\/]*)?([0-9][0-9\s.\-\/]{4,16}[0-9])/iu',
             $clean,
             $m
         )) {
-            foreach ($m[2] as $i => $digits) {
-                $candidates[] = ((string) ($m[1][$i] ?? '')) . $digits;
+            foreach ($m[1] as $digits) {
+                $candidates[] = $digits;
             }
         }
         // 4) Fallback: plausible standalone numbers outside words/IDs.
         if (preg_match_all(
-            '/(?<![\w\/])(?:\+39[\s.\-]*|0039[\s.\-]*)?((?:0\d{1,4}[\s.\-\/]?\d{4,8})|(?:3\d{2}[\s.\-\/]?\d{6,7})|(?:(?:800|848|199)[\s.\-\/]?\d{6}))(?![\w\/])/u',
+            '/(?<![\w\/])(?:\+39[\s.\-]*|0039[\s.\-]*)?([038][0-9\s.\-\/]{5,16}[0-9])(?![\w\/])/u',
             $clean,
             $m
         )) {
