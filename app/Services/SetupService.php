@@ -1656,7 +1656,8 @@ final class SetupService
      *   methods:array<string,string>,
      *   pending_ocr:bool,
      *   status:string,
-     *   attempted:list<string>
+     *   attempted:list<string>,
+     *   partial:list<string>
      * }
      */
     public function prefillLegalTextsFromDocuments(array $documents, bool $allowOcr = false, array $ocrOptions = []): array
@@ -1666,9 +1667,11 @@ final class SetupService
         $prefilled = [];
         $methods = [];
         $attempted = [];
+        $partial = [];
         $needsOcr = false;
-        $maxPages = max(1, (int) ($ocrOptions['max_pages'] ?? 20));
-        $maxSeconds = max(5, (int) ($ocrOptions['max_seconds'] ?? 360));
+        // 0 pages = read the whole PDF (background worker has no time limit).
+        $maxPages = max(0, (int) ($ocrOptions['max_pages'] ?? 0));
+        $maxSeconds = max(5, (int) ($ocrOptions['max_seconds'] ?? 900));
         $dpi = max(72, min(200, (int) ($ocrOptions['dpi'] ?? 150)));
 
         foreach ($documents as $doc) {
@@ -1683,7 +1686,7 @@ final class SetupService
                 continue;
             }
             $settingsKey = $kind === 'privacy' ? 'legal.privacy' : 'legal.statute';
-            if (!$this->legalTextIsEmpty($settingsKey)) {
+            if (!$this->legalTextIsEmpty($settingsKey) && !$this->legalTextNeedsFreshOcr($settingsKey, $kind)) {
                 continue;
             }
 
@@ -1720,6 +1723,14 @@ final class SetupService
             }
 
             $text = trim((string) $extracted['text']);
+            // OCR may stop before the last page on very long PDFs: keep the text but flag it
+            // so the setup UI can ask the user to review the missing tail.
+            if (
+                !empty($extracted['truncated'])
+                || (($extracted['method'] ?? '') === 'ocr' && ($extracted['complete'] ?? true) === false)
+            ) {
+                $partial[] = $kind;
+            }
             // Store Italian only: triplicating OCR text in de/en blew past memory on the privacy step.
             // Warning banner is shown in the UI — never embed notices inside the editable text.
             $payload = ['it' => $text, 'de' => '', 'en' => ''];
@@ -1731,18 +1742,19 @@ final class SetupService
 
         $prefilled = array_values(array_unique($prefilled));
         $attempted = array_values(array_unique($attempted));
+        $partial = array_values(array_unique($partial));
         $missingAfterNative = array_values(array_diff($attempted, $prefilled));
         $pending = $needsOcr && $missingAfterNative !== [];
 
         if ($allowOcr) {
             // Background OCR finished: always settle pending, success or not.
             $status = $prefilled !== [] ? 'ok' : ($attempted !== [] ? 'failed' : 'none');
-            $this->storeLegalOcrState($status, $prefilled, $methods, false);
+            $this->storeLegalOcrState($status, $prefilled, $methods, false, $partial);
         } elseif ($pending) {
-            $this->storeLegalOcrState('pending', $prefilled, $methods, true);
+            $this->storeLegalOcrState('pending', $prefilled, $methods, true, $partial);
         } elseif ($prefilled !== []) {
             $usedOcr = in_array('ocr', array_values($methods), true);
-            $this->storeLegalOcrState($usedOcr ? 'ok' : 'prefilled', $prefilled, $methods, false);
+            $this->storeLegalOcrState($usedOcr ? 'ok' : 'prefilled', $prefilled, $methods, false, $partial);
         } elseif ($attempted !== []) {
             // Scanned PDFs: only "unavailable" when OCR tools are truly missing.
             $status = $extractor->ocrAvailable() ? 'failed' : 'unavailable';
@@ -1759,6 +1771,7 @@ final class SetupService
             'pending_ocr' => $pending,
             'status' => $status,
             'attempted' => $attempted,
+            'partial' => $partial,
         ];
     }
 
@@ -1766,28 +1779,30 @@ final class SetupService
      * Short OCR pass for Apache/mod_php (max_execution_time ≈ 30s).
      *
      * @param list<array<string,mixed>> $documents
-     * @return array{prefilled:list<string>,methods:array<string,string>,pending_ocr:bool,status:string,attempted:list<string>}
+     * @return array{prefilled:list<string>,methods:array<string,string>,pending_ocr:bool,status:string,attempted:list<string>,partial:list<string>}
      */
     public function prefillLegalTextsFromDocumentsFastOcr(array $documents): array
     {
         return $this->prefillLegalTextsFromDocuments($documents, true, [
-            'max_pages' => 4,
-            'max_seconds' => 22,
-            'dpi' => 110,
+            'max_pages' => 12,
+            'max_seconds' => 45,
+            'dpi' => 120,
         ]);
     }
 
     /**
      * @param list<string> $prefilled
      * @param array<string,string> $methods
+     * @param list<string> $partial
      */
-    public function storeLegalOcrState(string $status, array $prefilled = [], array $methods = [], bool $pending = false): void
+    public function storeLegalOcrState(string $status, array $prefilled = [], array $methods = [], bool $pending = false, array $partial = []): void
     {
         $this->settings->set('legal.runts_ocr_pending', $pending ? '1' : '0');
         $this->settings->set('legal.runts_ocr_status', $status);
         $this->settings->set('legal.runts_ocr_result', [
             'prefilled' => array_values($prefilled),
             'methods' => $methods,
+            'partial' => array_values($partial),
             'updated_at' => date('c'),
         ]);
     }
@@ -1800,7 +1815,8 @@ final class SetupService
      *   pending:bool,
      *   status:string,
      *   prefilled:list<string>,
-     *   methods:array<string,string>
+     *   methods:array<string,string>,
+     *   partial:list<string>
      * }
      */
     public function legalPrefillStatus(): array
@@ -1809,15 +1825,8 @@ final class SetupService
         $status = (string) $this->settings->get('legal.runts_ocr_status', $pending ? 'pending' : 'none');
         $raw = $this->settings->get('legal.runts_ocr_result', []);
         $result = is_array($raw) ? $raw : [];
-        $prefilled = [];
-        if (is_array($result['prefilled'] ?? null)) {
-            foreach ($result['prefilled'] as $item) {
-                $item = (string) $item;
-                if (in_array($item, ['statute', 'privacy'], true)) {
-                    $prefilled[] = $item;
-                }
-            }
-        }
+        $prefilled = $this->legalKinds($result['prefilled'] ?? []);
+        $partial = $this->legalKinds($result['partial'] ?? []);
         $methods = is_array($result['methods'] ?? null) ? $result['methods'] : [];
 
         // Fallback: if pending flag stuck but lock is gone and last job log exists.
@@ -1827,10 +1836,11 @@ final class SetupService
                 $decoded = json_decode((string) file_get_contents($log), true);
                 if (is_array($decoded['result'] ?? null)) {
                     $jobResult = $decoded['result'];
-                    $prefilled = array_values(array_unique(array_map('strval', $jobResult['prefilled'] ?? [])));
+                    $prefilled = $this->legalKinds($jobResult['prefilled'] ?? []);
+                    $partial = $this->legalKinds($jobResult['partial'] ?? []);
                     $methods = is_array($jobResult['methods'] ?? null) ? $jobResult['methods'] : [];
                     $status = $prefilled !== [] ? 'ok' : 'failed';
-                    $this->storeLegalOcrState($status, $prefilled, $methods, false);
+                    $this->storeLegalOcrState($status, $prefilled, $methods, false, $partial);
                     $pending = false;
                 }
             }
@@ -1842,15 +1852,35 @@ final class SetupService
             'status' => $status,
             'prefilled' => $prefilled,
             'methods' => $methods,
+            'partial' => $partial,
         ];
+    }
+
+    /**
+     * @param mixed $raw
+     * @return list<string>
+     */
+    private function legalKinds(mixed $raw): array
+    {
+        if (!is_array($raw)) {
+            return [];
+        }
+        $out = [];
+        foreach ($raw as $item) {
+            $item = (string) $item;
+            if (in_array($item, ['statute', 'privacy'], true)) {
+                $out[] = $item;
+            }
+        }
+        return array_values(array_unique($out));
     }
 
     /**
      * If statute/privacy were already filled earlier (e.g. previous OCR), surface them in the UI.
      *
      * @param list<array<string,mixed>> $documents
-     * @param array{prefilled?:list<string>,methods?:array<string,string>,pending_ocr?:bool,status?:string,attempted?:list<string>} $legalPrefill
-     * @return array{prefilled:list<string>,methods:array<string,string>,pending_ocr:bool,status:string,attempted:list<string>}
+     * @param array{prefilled?:list<string>,methods?:array<string,string>,pending_ocr?:bool,status?:string,attempted?:list<string>,partial?:list<string>} $legalPrefill
+     * @return array{prefilled:list<string>,methods:array<string,string>,pending_ocr:bool,status:string,attempted:list<string>,partial:list<string>}
      */
     public function enrichLegalPrefillWithExisting(array $documents, array $legalPrefill): array
     {
@@ -1885,6 +1915,7 @@ final class SetupService
             'pending_ocr' => !empty($legalPrefill['pending_ocr']),
             'status' => $status,
             'attempted' => $attempted,
+            'partial' => $this->legalKinds($legalPrefill['partial'] ?? []),
         ];
     }
 
@@ -1917,7 +1948,7 @@ final class SetupService
                 continue;
             }
             $settingsKey = $kind === 'privacy' ? 'legal.privacy' : 'legal.statute';
-            if (!$this->legalTextIsEmpty($settingsKey)) {
+            if (!$this->legalTextIsEmpty($settingsKey) && !$this->legalTextNeedsFreshOcr($settingsKey, $kind)) {
                 continue;
             }
             $path = (string) ($doc['absolute'] ?? '');
@@ -2053,18 +2084,43 @@ final class SetupService
     {
         $raw = $this->settings->get($settingsKey, '');
         $text = localized(is_string($raw) ? $raw : (is_array($raw) ? $raw : ''));
-        return trim($text) === '';
+        $text = trim($text);
+        if ($text === '') {
+            return true;
+        }
+        // Texts cut by the old 40k/80k caps carry a synthetic note: treat them as incomplete
+        // so a new RUNTS lookup can replace them with the full document.
+        return preg_match('/testo troncato (?:automaticamente|per visualizzazione)/iu', $text) === 1;
+    }
+
+    /**
+     * Legacy OCR builds (before the pdftoppm page-naming fix) only read page 1 and stored
+     * a very short text. Allow the next RUNTS lookup to replace it with the full document.
+     */
+    private function legalTextNeedsFreshOcr(string $settingsKey, string $kind): bool
+    {
+        if ((string) $this->settings->get($settingsKey . '_from_runts', '0') !== '1') {
+            return false;
+        }
+        $raw = $this->settings->get('legal.runts_ocr_result', []);
+        $methods = is_array($raw) && is_array($raw['methods'] ?? null) ? $raw['methods'] : [];
+        if ((string) ($methods[$kind] ?? '') !== 'ocr') {
+            return false;
+        }
+        $stored = $this->settings->get($settingsKey, '');
+        $text = localized(is_string($stored) ? $stored : (is_array($stored) ? $stored : ''));
+        return mb_strlen(trim($text), 'UTF-8') < 4000;
     }
 
     /** Keep setup textareas renderable even if a previous OCR dumped megabytes. */
     private function clipLegalEditorText(string $text): string
     {
-        $max = 80_000;
+        // Same cap as PdfTextExtractor: never inject a notice inside the editable legal text.
+        $max = 400_000;
         if ($text === '' || mb_strlen($text, 'UTF-8') <= $max) {
             return $text;
         }
-        return rtrim(mb_substr($text, 0, $max, 'UTF-8'))
-            . "\n\n[… testo troncato per visualizzazione — usa il PDF originale se serve il resto]";
+        return rtrim(mb_substr($text, 0, $max, 'UTF-8'));
     }
 
     /** Remove legacy inline RUNTS draft notices from editable legal text. */

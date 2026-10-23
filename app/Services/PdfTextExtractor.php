@@ -11,6 +11,15 @@ final class PdfTextExtractor
 {
     private const MIN_USEFUL_CHARS = 180;
 
+    /** Absolute safety cap (settings are LONGTEXT): keeps setup pages light. */
+    private const MAX_TEXT_CHARS = 400_000;
+
+    /** Hard page ceiling used only when pdfinfo cannot report the page count. */
+    private const OCR_MAX_PAGES = 500;
+
+    /** Set when normalizeText() had to cut the extracted text. */
+    private bool $textTruncated = false;
+
     /**
      * @param array{
      *   ocr?:bool,
@@ -20,30 +29,39 @@ final class PdfTextExtractor
      *   lang?:string,
      *   on_progress?:callable(int,int):void
      * } $options
-     * @return array{ok:bool,text:string,method:string,pages:int,error?:string}
+     * @return array{ok:bool,text:string,method:string,pages:int,error?:string,processed_pages?:int,complete?:bool,truncated?:bool}
      */
     public function extract(string $pdfPath, array $options = []): array
     {
+        $this->textTruncated = false;
         if (!is_file($pdfPath) || !is_readable($pdfPath)) {
             return ['ok' => false, 'text' => '', 'method' => '', 'pages' => 0, 'error' => 'missing'];
         }
 
         $native = $this->extractNative($pdfPath);
         if ($this->isUseful($native['text'])) {
+            $text = $this->normalizeText($native['text']);
             return [
                 'ok' => true,
-                'text' => $this->normalizeText($native['text']),
+                'text' => $text,
                 'method' => 'pdftotext',
                 'pages' => $native['pages'],
+                'processed_pages' => $native['pages'],
+                'complete' => true,
+                'truncated' => $this->textTruncated,
             ];
         }
 
         if (empty($options['ocr'])) {
+            $text = $this->normalizeText($native['text']);
             return [
                 'ok' => false,
-                'text' => $this->normalizeText($native['text']),
+                'text' => $text,
                 'method' => 'pdftotext',
                 'pages' => $native['pages'],
+                'processed_pages' => $native['pages'],
+                'complete' => false,
+                'truncated' => $this->textTruncated,
                 'error' => 'no_text_layer',
             ];
         }
@@ -183,7 +201,7 @@ final class PdfTextExtractor
 
     /**
      * @param array<string, mixed> $options
-     * @return array{ok:bool,text:string,method:string,pages:int,error?:string}
+     * @return array{ok:bool,text:string,method:string,pages:int,error?:string,processed_pages?:int,complete?:bool,truncated?:bool}
      */
     private function extractViaOcr(string $pdfPath, array $options): array
     {
@@ -191,16 +209,18 @@ final class PdfTextExtractor
             return ['ok' => false, 'text' => '', 'method' => '', 'pages' => 0, 'error' => 'ocr_unavailable'];
         }
 
-        $pages = $this->pageCount($pdfPath);
-        if ($pages < 1) {
-            $pages = 1;
-        }
-        $maxPages = max(1, (int) ($options['max_pages'] ?? 20));
-        $maxSeconds = max(5, (int) ($options['max_seconds'] ?? 300));
+        $knownPages = $this->pageCount($pdfPath);
+        // 0 means “unknown” (pdfinfo missing): keep scanning until a page render fails.
+        $maxPages = max(0, (int) ($options['max_pages'] ?? 0));
+        $maxSeconds = max(5, (int) ($options['max_seconds'] ?? 900));
         $dpi = max(72, min(200, (int) ($options['dpi'] ?? 150)));
         $lang = trim((string) ($options['lang'] ?? 'ita'));
         if ($lang === '') {
             $lang = 'ita';
+        }
+        $limit = $maxPages > 0 ? $maxPages : self::OCR_MAX_PAGES;
+        if ($knownPages > 0 && $knownPages < $limit) {
+            $limit = $knownPages;
         }
         /** @var callable(int,int):void|null $onProgress */
         $onProgress = isset($options['on_progress']) && is_callable($options['on_progress'])
@@ -211,15 +231,17 @@ final class PdfTextExtractor
         $tesseract = $this->bin('tesseract');
         $tmpDir = sys_get_temp_dir() . '/socly-pdf-ocr-' . bin2hex(random_bytes(6));
         if (!@mkdir($tmpDir, 0700, true) && !is_dir($tmpDir)) {
-            return ['ok' => false, 'text' => '', 'method' => '', 'pages' => $pages, 'error' => 'tmpdir'];
+            return ['ok' => false, 'text' => '', 'method' => '', 'pages' => $knownPages, 'error' => 'tmpdir'];
         }
 
         $chunks = [];
+        $processed = 0;
+        $timedOut = false;
         $started = microtime(true);
-        $limit = min($pages, $maxPages);
         try {
             for ($page = 1; $page <= $limit; $page++) {
                 if ((microtime(true) - $started) >= $maxSeconds) {
+                    $timedOut = true;
                     break;
                 }
                 if ($onProgress) {
@@ -237,15 +259,34 @@ final class PdfTextExtractor
                     escapeshellarg($prefix)
                 );
                 exec($render, $ignored, $code);
-                $png = $prefix . '-1.png';
-                if (!is_file($png)) {
-                    // some poppler builds use -01
-                    $alt = $prefix . '-01.png';
-                    $png = is_file($alt) ? $alt : '';
+                // pdftoppm names the file after the real page number (-f/-l): p3-3.png, p10-10.png…
+                // Older poppler builds sometimes restart at 1, so accept any rendered file.
+                $rendered = glob($prefix . '-*.png') ?: [];
+                $png = '';
+                foreach ($rendered as $candidate) {
+                    if (is_file($candidate)) {
+                        $png = $candidate;
+                        break;
+                    }
+                }
+                if ($png === '') {
+                    // Legacy naming fallbacks.
+                    $legacy = [$prefix . '-1.png', $prefix . '-01.png'];
+                    foreach ($legacy as $candidate) {
+                        if (is_file($candidate)) {
+                            $png = $candidate;
+                            break;
+                        }
+                    }
                 }
                 if ($png === '' || !is_file($png)) {
+                    // Unknown page count: the first failed render is the real end of the PDF.
+                    if ($knownPages === 0) {
+                        break;
+                    }
                     continue;
                 }
+                $processed++;
 
                 $ocrCmd = sprintf(
                     '%s %s stdout -l %s --psm 6 2>/dev/null',
@@ -265,6 +306,9 @@ final class PdfTextExtractor
             $this->wipeDir($tmpDir);
         }
 
+        $pages = $knownPages > 0 ? $knownPages : $processed;
+        // Complete only when every page reported by pdfinfo has been processed.
+        $complete = !$timedOut && ($knownPages > 0 ? $processed >= $knownPages : true);
         $text = $this->normalizeText(implode("\n\n", $chunks));
         if (!$this->isUseful($text)) {
             return [
@@ -272,6 +316,9 @@ final class PdfTextExtractor
                 'text' => $text,
                 'method' => 'ocr',
                 'pages' => $pages,
+                'processed_pages' => $processed,
+                'complete' => $complete,
+                'truncated' => $this->textTruncated,
                 'error' => 'ocr_empty',
             ];
         }
@@ -281,6 +328,9 @@ final class PdfTextExtractor
             'text' => $text,
             'method' => 'ocr',
             'pages' => $pages,
+            'processed_pages' => $processed,
+            'complete' => $complete,
+            'truncated' => $this->textTruncated || !$complete,
         ];
     }
 
@@ -319,10 +369,10 @@ final class PdfTextExtractor
         // Drop isolated form-feed noise from empty OCR pages.
         $text = str_replace("\f", "\n", $text);
         $text = trim($text);
-        // Cap size: demos/setup must keep settings + HTML render under memory limits.
-        $maxChars = 80_000;
-        if (mb_strlen($text, 'UTF-8') > $maxChars) {
-            $text = rtrim(mb_substr($text, 0, $maxChars, 'UTF-8')) . "\n\n[… testo troncato automaticamente — completa o sostituisci dal PDF originale]";
+        // Safety cap only: never inject notices inside the text (it becomes the legal document).
+        if (mb_strlen($text, 'UTF-8') > self::MAX_TEXT_CHARS) {
+            $this->textTruncated = true;
+            $text = rtrim(mb_substr($text, 0, self::MAX_TEXT_CHARS, 'UTF-8'));
         }
         return $text;
     }

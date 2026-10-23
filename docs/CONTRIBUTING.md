@@ -13,6 +13,8 @@ Socly is proprietary software. External contributions are accepted only under a 
 7. Mutating operations should write to the audit log.
 8. Use `Socly\Support\Permission` constants — do not invent ad-hoc permission strings.
 9. Never log passwords, fiscal codes, or full request/session dumps.
+10. Changes to document/OCR extraction must be verified on a multi-page scanned PDF (page coverage,
+    `complete` flag) — see [LESSONS_LEARNED.md](LESSONS_LEARNED.md#document-extraction-ocr).
 
 ## Local run
 

@@ -366,6 +366,7 @@ $errorStep = flash('setup_error_step');
                                      data-msg-legal-privacy="<?= e(__('setup.runts_legal_privacy')) ?>"
                                      data-msg-legal-ocr-pending="<?= e(__('setup.runts_legal_ocr_pending')) ?>"
                                      data-msg-legal-ocr-ok="<?= e(__('setup.runts_legal_ocr_ok')) ?>"
+                                     data-msg-legal-ocr-partial="<?= e(__('setup.runts_legal_ocr_partial')) ?>"
                                      data-msg-legal-ocr-fail="<?= e(__('setup.runts_legal_ocr_fail')) ?>"
                                      data-msg-legal-ocr-unavailable="<?= e(__('setup.runts_legal_ocr_unavailable')) ?>"
                                      data-legal-status-url="<?= e(url('/setup/runts-legal-prefill-status')) ?>"

@@ -740,15 +740,17 @@ final class SetupController extends BaseController
                 return;
             }
 
-            @set_time_limit(120);
+            @set_time_limit(180);
             $extractor = new \Socly\Services\PdfTextExtractor();
-            $result = $extractor->extract($tmp, ['ocr' => true, 'max_pages' => 40, 'max_seconds' => 90]);
+            // 0 pages = read the whole PDF: statute/privacy must not be cut at an arbitrary page.
+            $result = $extractor->extract($tmp, ['ocr' => true, 'max_pages' => 0, 'max_seconds' => 160]);
             $text = trim((string) ($result['text'] ?? ''));
-            if ($text === '' || mb_strlen($text, 'UTF-8') < 40) {
+            $ocrPartial = ($result['method'] ?? '') === 'ocr' && ($result['complete'] ?? true) === false;
+            if ($text === '' || mb_strlen($text, 'UTF-8') < 40 || $ocrPartial) {
                 http_response_code(422);
                 $errKey = (($result['error'] ?? '') === 'ocr_unavailable')
                     ? 'setup.runts_legal_ocr_unavailable'
-                    : 'setup.legal_pdf_fail';
+                    : ($ocrPartial ? 'setup.legal_pdf_partial' : 'setup.legal_pdf_fail');
                 echo json_encode([
                     'ok' => false,
                     'error' => (string) __($errKey),
@@ -1310,6 +1312,7 @@ final class SetupController extends BaseController
                 'methods' => $legalPrefill['methods'] ?? [],
                 'status' => (string) ($legalPrefill['status'] ?? 'none'),
                 'attempted' => $legalPrefill['attempted'] ?? [],
+                'partial' => $legalPrefill['partial'] ?? [],
                 'ocr_debug' => is_array($legalPrefill['ocr_debug'] ?? null) ? $legalPrefill['ocr_debug'] : null,
             ],
             'elapsed_ms' => $result['elapsed_ms'] ?? null,

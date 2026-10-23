@@ -15,6 +15,7 @@ Living risk register for Socly. Update when incidents or near-misses happen. See
 | Misconfigured document root exposing `.env` / storage | High | Med | `public/` only; `.htaccess` deny for sensitive patterns |
 | Encrypted settings unreadable after key loss | High | Low | Backup `.env` `APP_KEY` with disaster recovery procedure |
 | GDPR / retention mishandling | Med | Med | GDPR toggle; export; future retention tools on roadmap |
+| Incomplete OCR of statute/privacy PDFs (legal document truncated) | High | Med | Read every page, track `complete`/`partial`, warn in the wizard, never inject truncation notes |
 | Self-hosted DB loss | High | Med | Host backups; document restore under authenticated ops only |
 
 ## Explicitly rejected patterns

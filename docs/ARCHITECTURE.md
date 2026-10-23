@@ -29,6 +29,27 @@ Socly is a lightweight custom MVC application on PHP 8.2+ with Composer PSR-4 au
 - Sensitive values are encrypted at rest with `APP_KEY` (see [SECURITY.md](SECURITY.md)).
 - Branding (name, colors, logo path) is stored as settings and exposed as CSS variables in the layout.
 
+## Document text extraction (RUNTS)
+
+The setup wizard can prefill the association statute and privacy notice from the PDFs downloaded
+from the RUNTS register (`Socly\Services\PdfTextExtractor`):
+
+1. `pdftotext` runs first. If the PDF has a text layer, the complete text is used and no OCR is needed.
+2. Scanned PDFs are rendered with `pdftoppm` **one page at a time** and OCR'd with `tesseract`
+   (`--psm 6`, Italian language pack).
+
+Rules and limits:
+
+- `max_pages = 0` means “all pages”. The background worker (`bin/runts-legal-prefill.php`) uses no
+  page cap and a 30-minute budget; the manual PDF upload in the wizard also reads the whole file.
+- `pdftoppm -f N -l N` names the output after the **real page number** (`p3-3.png`, not `p3-1.png`):
+  resolve rendered files with a glob, never assume the `-1` suffix.
+- The extractor returns `processed_pages`, `complete` and `truncated`. `SetupService` turns them into
+  a `partial` flag so the wizard can warn when a legal text was only partially read.
+- `legal.statute` / `legal.privacy` are stored as JSON per locale and are treated as official
+  documents: synthetic notes (“text truncated…”) must never be written inside them.
+- When OCR is unavailable, the wizard degrades gracefully and asks the administrator to paste the text.
+
 ## Plugins
 
 See [PLUGIN_API.md](PLUGIN_API.md). Plugins are discovered by scanning `plugins/*.php`. Only rows marked enabled in `plugins` are booted. Disabling a plugin unloads hooks; data remains.

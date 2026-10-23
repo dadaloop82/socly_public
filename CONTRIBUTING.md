@@ -17,6 +17,8 @@ Socly’s public repository is a **source-available** distribution of the base p
 5. Mutating operations should write to the audit log.
 6. Use `Socly\Support\Permission` constants — do not invent ad-hoc permission strings.
 7. Never log passwords, fiscal codes, or full request/session dumps.
+8. Document/OCR extraction changes must be tested on a multi-page scanned PDF (page coverage and
+   `complete` flag), not only on the first page.
 
 See [PLUGIN_API.md](docs/PLUGIN_API.md) for drop-in plugins.
 

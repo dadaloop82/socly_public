@@ -1188,32 +1188,32 @@ a.sidebar-brand-home:hover {
   max-width: none;
   justify-content: center;
 }
-/* Smooth, delicate pulse: reminds the user to fetch RUNTS data after typing the number. */
-.setup-scrape-btn.is-attention {
-  animation: setup-runts-attention 2.6s ease-in-out infinite;
-}
+/* Smooth “breathing” pulse: nudges the user to press the fetch button.
+   Shared by the RUNTS lookup, the website scrape and the retry action. */
+.setup-scrape-btn.is-attention,
 .setup-scrape-retry.is-attention {
-  animation: setup-runts-attention 2.6s ease-in-out infinite;
+  animation: setup-cta-attention 2.4s cubic-bezier(0.45, 0, 0.55, 1) infinite;
+  will-change: box-shadow, transform, filter;
 }
-@keyframes setup-runts-attention {
+@keyframes setup-cta-attention {
   0%, 100% {
-    box-shadow: 0 0 0 0 color-mix(in srgb, var(--brand-primary) 0%, transparent);
+    box-shadow: 0 8px 20px color-mix(in srgb, var(--brand-primary) 20%, transparent);
     transform: translateY(0) scale(1);
     filter: brightness(1);
   }
   50% {
     box-shadow:
-      0 0 0 8px color-mix(in srgb, var(--brand-primary) 16%, transparent),
-      0 12px 24px color-mix(in srgb, var(--brand-primary) 22%, transparent);
-    transform: translateY(-1px) scale(1.012);
-    filter: brightness(1.06);
+      0 0 0 8px color-mix(in srgb, var(--brand-primary) 17%, transparent),
+      0 16px 32px color-mix(in srgb, var(--brand-primary) 30%, transparent);
+    transform: translateY(-1px) scale(1.014);
+    filter: brightness(1.14);
   }
 }
 @media (prefers-reduced-motion: reduce) {
   .setup-scrape-btn.is-attention,
   .setup-scrape-retry.is-attention {
     animation: none;
-    box-shadow: 0 0 0 3px color-mix(in srgb, var(--brand-primary) 18%, transparent);
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--brand-primary) 20%, transparent);
   }
 }
 .setup-name-pair .setup-runts-lock-hint {
@@ -1228,8 +1228,6 @@ a.sidebar-brand-home:hover {
   border-color: color-mix(in srgb, var(--brand-primary) 28%, var(--line));
   color: color-mix(in srgb, var(--ink) 72%, var(--muted));
   cursor: not-allowed;
-}
-.setup-name-pair .sf-field.is-runts-locked select.sf-field__control {
   pointer-events: none;
 }
 .setup-name-pair .sf-field.is-runts-locked .sf-field__label {
@@ -1540,6 +1538,11 @@ a.sidebar-brand-home:hover {
   color: color-mix(in srgb, var(--ink) 75%, #8b2e2e);
   background: color-mix(in srgb, #f3d0d0 45%, #fff);
   border-color: color-mix(in srgb, #c97070 40%, var(--line));
+}
+.setup-runts-note.is-warn {
+  font-weight: 700;
+  border-color: color-mix(in srgb, #c99a2e 50%, var(--line));
+  background: color-mix(in srgb, #f6e7b2 70%, #fff);
 }
 .setup-runts-warn {
   margin: 0 0 0.45rem;
@@ -6046,20 +6049,20 @@ html:has(.setup-body) {
 }
 .setup-scroll-cue-arrow {
   display: inline-block;
-  font-size: 1.2rem;
+  font-size: 1.15rem;
   font-weight: 800;
   line-height: 1;
-  animation: setup-scroll-blink 1.7s ease-in-out infinite;
+  animation: setup-scroll-blink 1.9s ease-in-out infinite;
 }
 @keyframes setup-scroll-blink {
   0%, 100% {
-    opacity: 0.3;
-    transform: translateY(-0.14rem);
+    opacity: 0.28;
+    transform: translateY(-0.12rem);
     text-shadow: 0 0 0 transparent;
   }
   50% {
     opacity: 1;
-    transform: translateY(0.18rem);
+    transform: translateY(0.16rem);
     text-shadow: 0 0 10px color-mix(in srgb, var(--brand-primary) 45%, transparent);
   }
 }

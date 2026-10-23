@@ -12,6 +12,7 @@ The **base edition is free** to download and run on your own server. Professiona
 - Installation wizard and control panel
 - Drop-in plugins (`plugins/*.php`)
 - Association branding, documents, treasury, deadlines (modular components)
+- RUNTS lookup: association data, documents, and statute/privacy prefill (PDF text + OCR)
 
 ## Requirements
 

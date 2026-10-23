@@ -57,7 +57,13 @@ try {
     /** @var \Socly\Services\SetupService $setup */
     $setup = $app->get(\Socly\Services\SetupService::class);
     $docs = is_array($job['documents'] ?? null) ? $job['documents'] : [];
-    $result = $setup->prefillLegalTextsFromDocuments($docs, true);
+    // Read every page of the PDFs: legal texts must be complete, not cut at ~20 pages.
+    $result = $setup->prefillLegalTextsFromDocuments($docs, true, [
+        'max_pages' => 0,
+        'max_seconds' => 1800,
+        'dpi' => 150,
+        'lang' => 'ita',
+    ]);
     $log = storage_path('cache/runts_ocr_last.json');
     @file_put_contents($log, (string) json_encode([
         'finished_at' => date('c'),

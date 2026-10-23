@@ -60,3 +60,20 @@ Rules:
 3. Keep city + street in the **same** geo scope so street autocomplete always has a city sibling.
 4. Wire geo API URLs on `body` or the form (`data-cities-url`, `data-addresses-url`, `data-cap-url`, `data-provinces-url`).
 5. Borders use `--line` (derived from `--brand-primary-ink`) so light association palettes stay readable.
+
+## Motion & attention cues
+
+Motion is functional: it explains the next action, never decorates for its own sake.
+
+| Cue | Class / hook | Behaviour |
+|-----|--------------|-----------|
+| “Fetch data from RUNTS” / “Fetch data from the website” / “Retry” | `.setup-scrape-btn.is-attention`, `.setup-scrape-retry.is-attention` | 2.4 s breathing ring + 1.4 % scale + `brightness(1 → 1.14)` |
+| “More content below” scroll cue | `.setup-scroll-cue-arrow` (shown via `.setup-form-scroll.is-scrollable:not(.is-at-bottom)`) | 1.9 s opacity blink (0.28 → 1) with a soft brand halo |
+
+Rules:
+
+1. Add `.is-attention` from JS only while the action is actually available (visible and enabled);
+   remove it while busy, after success, or while a cooldown is running.
+2. Keep cycles slow (~2 s) and amplitudes small: a gentle pulse, never a hard flash.
+3. Always honour `prefers-reduced-motion: reduce` with a static ring / plain opacity.
+4. Never animate content that carries data or status only (numbers, tables, alerts).

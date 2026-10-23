@@ -153,11 +153,14 @@ final class SettingsService
 
     /**
      * Cap multilingual legal blobs so setup pages never load multi‑MB OCR dumps into memory.
+     *
+     * The limits are intentionally generous: statute/privacy texts must stay complete.
+     * Never append synthetic notes here — this value is the legal document itself.
      */
     private function shrinkLegalSettingValue(string $raw): string
     {
-        $maxJsonBytes = 100_000;
-        $maxLangChars = 40_000;
+        $maxJsonBytes = 1_200_000;
+        $maxLangChars = 400_000;
         if (strlen($raw) <= $maxJsonBytes) {
             return $raw;
         }
@@ -172,8 +175,7 @@ final class SettingsService
                 $text = is_string($converted) ? $converted : '';
             }
             if (mb_strlen($text, 'UTF-8') > $maxLangChars) {
-                $text = rtrim(mb_substr($text, 0, $maxLangChars, 'UTF-8'))
-                    . "\n\n[… testo troncato automaticamente]";
+                $text = rtrim(mb_substr($text, 0, $maxLangChars, 'UTF-8'));
             }
             $encoded = json_encode(['it' => $text, 'de' => '', 'en' => ''], JSON_UNESCAPED_UNICODE | JSON_INVALID_UTF8_SUBSTITUTE);
             return is_string($encoded) ? $encoded : '{"it":"","de":"","en":""}';
@@ -185,8 +187,7 @@ final class SettingsService
                 $text = is_string($converted) ? $converted : '';
             }
             if (mb_strlen($text, 'UTF-8') > $maxLangChars) {
-                $text = rtrim(mb_substr($text, 0, $maxLangChars, 'UTF-8'))
-                    . "\n\n[… testo troncato automaticamente]";
+                $text = rtrim(mb_substr($text, 0, $maxLangChars, 'UTF-8'));
             }
             $decoded[$lang] = $text;
         }

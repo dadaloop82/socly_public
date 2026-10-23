@@ -22,9 +22,20 @@ Named permission keys (e.g. `members.view`, `members.manage`, `payments.manage`,
 | Column | Notes |
 |--------|-------|
 | `key` | PK string |
-| `value` | plaintext or ciphertext |
+| `value` | `LONGTEXT` — plaintext or ciphertext; JSON for multilingual values |
 | `is_encrypted` | bool |
 | `plugin_id` | nullable; scopes plugin settings |
+
+#### Legal texts
+
+`legal.statute` and `legal.privacy` store `{"it":"…","de":"","en":""}` and are rendered as official
+documents (they feed the enrollment form, member area and generated PDFs). Therefore:
+
+- never truncate them with synthetic “… text truncated …” markers inside the value;
+- keep the read cap generous (`400 000` characters per locale) and surface truncation/partial OCR as
+  an explicit warning in the UI instead;
+- the RUNTS prefill writes Italian only and sets `legal.<key>_from_runts = 1`; saving the step manually
+  resets that flag.
 
 ### member_types
 Name (JSON i18n or plain), `price`, `is_active`, `sort_order`.

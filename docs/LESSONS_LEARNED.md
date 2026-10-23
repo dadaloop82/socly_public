@@ -28,6 +28,16 @@ This document captures mistakes and costly fixes from the previous membership co
 | Permission keys renamed repeatedly | Stable catalogue in `Socly\Support\Permission` |
 | Uniqueness on email with empty string vs NULL confusion | Normalize empty optional fields to `null` before store/unique checks |
 
+## Document extraction (OCR)
+
+| Anti-pattern | Socly practice |
+|--------------|----------------|
+| Assuming `pdftoppm` writes `<prefix>-1.png` for every page | With `-f/-l` poppler names files after the real page number (`p3-3.png`); resolve with `glob($prefix . '-*.png')` |
+| Silent page/time caps on legal-document OCR | The background worker reads every page (no cap, 30-minute budget); caps exist only as documented guards |
+| Injecting “text truncated…” notes into extracted text | Return `text` + `complete` + `truncated` separately; show a UI warning and never mutate the official document |
+| Copying OCR output into every locale | Store Italian only (`{it, de:"", en:""}`) and translate later |
+| Byte caps that silently rewrite settings | Legal texts are `LONGTEXT`: keep caps generous and never persist shortened copies with markers |
+
 ## Architecture & ops
 
 | Anti-pattern (legacy) | Socly practice |
@@ -54,3 +64,5 @@ This document captures mistakes and costly fixes from the previous membership co
 5. No magic user IDs / Referer auth / unauthenticated restore?
 6. i18n keys in IT/DE/EN?
 7. Audit log for sensitive mutations?
+8. OCR output that feeds official documents verified on a **multi-page** scanned PDF (page coverage,
+   `complete` flag), not only on the first page?

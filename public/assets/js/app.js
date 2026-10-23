@@ -5293,6 +5293,7 @@ function initSetupRuntsLookup(root) {
 
   const legalPrefillBlock = (legalPrefill) => {
     const prefilled = Array.isArray(legalPrefill?.prefilled) ? legalPrefill.prefilled : [];
+    const partial = Array.isArray(legalPrefill?.partial) ? legalPrefill.partial : [];
     const status = String(legalPrefill?.status || '').trim();
     const pending = !!legalPrefill?.pending_ocr || status === 'pending';
     const labels = {
@@ -5317,6 +5318,13 @@ function initSetupRuntsLookup(root) {
         <p class="setup-runts-docs-heading">${heading}</p>
         <div class="setup-runts-chips">${chips}</div>
       </div>`);
+    }
+
+    // OCR stopped before the last page (long PDF / time limit): tell the user to review it.
+    if (partial.length > 0) {
+      const names = partial.map((key) => labels[key] || String(key)).join(', ');
+      const tpl = box.dataset.msgLegalOcrPartial || '';
+      parts.push(`<p class="setup-runts-note is-warn" data-setup-runts-legal-partial>${escapeHtml(tpl.replaceAll(':items', names))}</p>`);
     }
 
     if (pending) {
@@ -5478,7 +5486,7 @@ function initSetupRuntsLookup(root) {
     const result = status?.querySelector('.setup-runts-result');
     if (!(result instanceof HTMLElement)) return;
     const next = legalPrefillBlock(legalPrefill);
-    result.querySelectorAll('[data-setup-runts-legal], [data-setup-runts-legal-pending]').forEach((el) => el.remove());
+    result.querySelectorAll('[data-setup-runts-legal], [data-setup-runts-legal-pending], [data-setup-runts-legal-partial]').forEach((el) => el.remove());
     if (!next) return;
     const wrap = document.createElement('div');
     wrap.innerHTML = next;
@@ -5512,6 +5520,7 @@ function initSetupRuntsLookup(root) {
           pending_ocr: false,
           prefilled: data.prefilled || [],
           methods: data.methods || {},
+          partial: Array.isArray(data.partial) ? data.partial : [],
         });
       } catch {
         /* keep polling */
