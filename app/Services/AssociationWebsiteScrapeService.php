@@ -1106,6 +1106,9 @@ final class AssociationWebsiteScrapeService
         }
 
         foreach ($candidates as $candidate) {
+            if ($this->isDateLike($candidate)) {
+                continue;
+            }
             $formatted = $this->formatPhone($candidate);
             if ($formatted !== null) {
                 return $formatted;
@@ -1115,18 +1118,42 @@ final class AssociationWebsiteScrapeService
         return null;
     }
 
+    private function isDateLike(string $raw): bool
+    {
+        $raw = trim($raw);
+        if (preg_match('/(?<!\d)(\d{1,2})[\/.\-](\d{1,2})[\/.\-](\d{2,4})(?!\d)/u', $raw, $m)) {
+            $day = (int) $m[1];
+            $month = (int) $m[2];
+            $year = (int) $m[3];
+            if ($day >= 1 && $day <= 31 && $month >= 1 && $month <= 12 && $year >= 1900 && $year <= 2100) {
+                return true;
+            }
+        }
+        $digits = preg_replace('/\D+/', '', $raw) ?? '';
+        if (strlen($digits) === 8) {
+            $day = (int) substr($digits, 0, 2);
+            $month = (int) substr($digits, 2, 2);
+            $year = (int) substr($digits, 4, 4);
+            if ($day >= 1 && $day <= 31 && $month >= 1 && $month <= 12 && $year >= 1900 && $year <= 2100) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
     private function formatPhone(string $digits): ?string
     {
         $digits = preg_replace('/\D+/', '', $digits) ?? '';
         if (str_starts_with($digits, '0039')) {
             $digits = substr($digits, 4);
         } elseif (str_starts_with($digits, '39') && strlen($digits) > 10
-            && preg_match('/^39(0\d{6,10}|3\d{8,9}|800\d{6}|848\d{6}|199\d{6})$/', $digits)
+            && preg_match('/^39(0[1-9]\d{5,8}|3\d{9}|800\d{6}|848\d{6}|199\d{6})$/', $digits)
         ) {
             $digits = substr($digits, 2);
         }
-        // 11-digit numbers are VAT codes, not phones: keep landlines to 7-10 digits.
-        if (preg_match('/^(3\d{8,9}|0\d{6,9}|800\d{6}|848\d{6}|199\d{6})$/', $digits) !== 1) {
+        // 11-digit numbers are VAT codes, not phones. No Italian area code starts with 00.
+        if (preg_match('/^(3\d{9}|0[1-9]\d{5,8}|800\d{6}|848\d{6}|199\d{6})$/', $digits) !== 1) {
             return null;
         }
         if (preg_match('/^(\d)\1+$/', $digits) === 1) {
