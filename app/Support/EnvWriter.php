@@ -37,10 +37,10 @@ final class EnvWriter
             [$key, $value] = explode('=', $line, 2);
             $key = trim($key);
             $value = trim($value);
-            if (
-                (str_starts_with($value, '"') && str_ends_with($value, '"'))
-                || (str_starts_with($value, "'") && str_ends_with($value, "'"))
-            ) {
+            if (str_starts_with($value, '"') && str_ends_with($value, '"')) {
+                $value = substr($value, 1, -1);
+                $value = str_replace(['\\$', '\\"', '\\\\'], ['$', '"', '\\'], $value);
+            } elseif (str_starts_with($value, "'") && str_ends_with($value, "'")) {
                 $value = substr($value, 1, -1);
             }
             $out[$key] = $value;
@@ -94,8 +94,8 @@ final class EnvWriter
         ];
         foreach ($pairs as $key => $value) {
             $escaped = $value;
-            if ($escaped !== '' && preg_match('/[\s#"\']/', $escaped)) {
-                $escaped = '"' . str_replace(['\\', '"'], ['\\\\', '\\"'], $escaped) . '"';
+            if ($escaped !== '' && preg_match('/[\s#"\'\\\\$]/', $escaped)) {
+                $escaped = '"' . str_replace(['\\', '"', '$'], ['\\\\', '\\"', '\\$'], $escaped) . '"';
             }
             $lines[] = $key . '=' . $escaped;
         }

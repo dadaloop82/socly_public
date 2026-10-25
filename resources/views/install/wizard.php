@@ -65,7 +65,7 @@ $labels = [
                 <?= field('text', [
                     'name' => 'db_username',
                     'label' => (string) __('install.db_username'),
-                    'value' => (string) old('db_username', $data['db_username'] ?? 'root'),
+                    'value' => (string) old('db_username', $data['db_username'] ?? 'socly'),
                     'required' => true,
                 ]) ?>
             </div>

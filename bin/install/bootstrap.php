@@ -200,6 +200,40 @@ $ok('Connessione database');
 // ---------------------------------------------------------------------------
 // .env + storage + migrations + permissions
 // ---------------------------------------------------------------------------
+/**
+ * chmod(0600) is a no-op on Windows: use icacls to restrict the file to the
+ * current account, SYSTEM and the local Administrators group.
+ */
+$hardenSecretFile = static function (string $path): void {
+    if (PHP_OS_FAMILY === 'Windows') {
+        if (!function_exists('exec')) {
+            fwrite(STDERR, "⚠ ACL non applicate a .env: exec() disabilitato.\n");
+            return;
+        }
+        $user = trim((string) getenv('USERNAME'));
+        $domain = trim((string) getenv('USERDOMAIN'));
+        if ($user === '') {
+            fwrite(STDERR, "⚠ ACL non applicate a .env: utente Windows non rilevato.\n");
+            return;
+        }
+        $identity = $domain !== '' ? $domain . '\\' . $user : $user;
+        $command = 'icacls ' . escapeshellarg($path)
+            . ' /inheritance:r /grant:r ' . escapeshellarg($identity . ':(R,W)')
+            . ' ' . escapeshellarg('*S-1-5-18:(F)')
+            . ' ' . escapeshellarg('*S-1-5-32-544:(F)') . ' 2>&1';
+        $output = [];
+        $code = 0;
+        exec($command, $output, $code);
+        if ($code !== 0) {
+            fwrite(STDERR, "⚠ ACL non applicate a .env (icacls exit {$code}).\n");
+        }
+        return;
+    }
+    if (!chmod($path, 0600)) {
+        fwrite(STDERR, "⚠ Impossibile impostare chmod 0600 su {$path}.\n");
+    }
+};
+
 InstallerService::writeEnv([
     'app_url' => $url,
     'app_key' => $appKey,
@@ -210,7 +244,7 @@ InstallerService::writeEnv([
     'db_password' => $dbPass,
     'app_locale' => $locale,
 ]);
-@chmod($envPath, 0600);
+$hardenSecretFile($envPath);
 $ok('.env aggiornato');
 
 foreach (['logs', 'cache', 'sessions', 'uploads', 'documents', 'runts'] as $dir) {
@@ -246,5 +280,6 @@ echo "\nSocly è pronto per l'installazione guidata.\n";
 echo "  URL:       {$url}/install\n";
 echo "  Database:  {$dbName} su {$dbHost}:{$dbPort}\n";
 echo "  Lingua:    {$locale}\n";
-echo "Completa il wizard nel browser per creare associazione e account Admin.\n";
+echo "Completa il wizard nel browser (associazione, tesseramento, campi), poi accedi con l'account\n";
+echo "di manutenzione e completa il setup in /setup per creare l'Admin dell'associazione.\n";
 

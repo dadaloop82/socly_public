@@ -28,9 +28,9 @@ letto è parziale.
 
 ## Installazione one-click (Linux, macOS, Windows)
 
-Gli script in `bin/install/` verificano l'ambiente, installano PHP 8.2+ con le estensioni richieste,
-MariaDB/MySQL, Composer e (opzionale) gli strumenti OCR, creano database e `.env`, applicano le
-migrazioni e avviano il server locale:
+Gli script in `bin/install/` verificano l'ambiente, installano PHP 8.4/8.3 (preferiti) o 8.2 con le
+estensioni richieste, MariaDB/MySQL, Composer e (opzionale) gli strumenti OCR, creano database e
+`.env`, applicano le migrazioni e avviano il server locale:
 
 ```bash
 sudo bash bin/install/linux.sh                                      # Linux
@@ -38,14 +38,17 @@ bash bin/install/macos.sh                                           # macOS (Hom
 powershell -ExecutionPolicy Bypass -File bin\install\windows.ps1    # Windows (admin)
 ```
 
-Opzioni utili: `--check` (solo verifica), `--no-ocr`, `--no-serve`, `--port=8080`,
-`--db-root-pass=...`. Su Windows i parametri sono `-Check`, `-NoOcr`, `-NoServe`, `-Port`, `-DbRootPass`.
+Opzioni utili: `--check` (solo verifica), `--plan` (mostra le azioni senza modifiche), `--no-ocr`,
+`--no-serve`, `--port=8080`, `--db-root-pass=...`. Su Windows i parametri sono `-Check` (con `-Json`
+e `-ReportPath` per un report machine-readable), `-Plan`, `-Ocr`, `-NoOcr`, `-NoServe`, `-Port`,
+`-DbRootPass`, `-Uninstall`, `-PurgeDatabase`, `-PurgeMariaDb`.
 Dettagli in [`bin/install/README.md`](../bin/install/README.md).
 
 Al termine apri `http://127.0.0.1:8080/install` e completa il wizard (associazione, periodo/quota,
-campi). Il wizard di primo avvio crea poi l'account **Admin dell'associazione**; l'account SuperAdmin
-di manutenzione è predefinito nel codice e non viene creato dal wizard. Il server PHP integrato serve
-per installazione e valutazione: per la produzione usa Apache/Nginx + HTTPS come descritto sotto.
+campi). Poi accedi con `admin@socly.it` (password di manutenzione definita nel codice, mai stampata
+dagli script) e completa il setup in `/setup`: il wizard di primo avvio crea l'account **Admin
+dell'associazione**. Il server PHP integrato serve per installazione e valutazione: per la produzione
+usa Apache/Nginx + HTTPS come descritto sotto.
 
 ## 1. Scarica il codice
 
@@ -133,8 +136,9 @@ Apri `https://socly.example.org/install` e completa i cinque passaggi:
 4. **Campi profilo** — campi predefiniti da abilitare e quelli obbligatori.
 5. **Riepilogo** — conferma: vengono create le tabelle, i permessi e il file `storage/installed.lock`.
 
-L'**account di manutenzione** (l'unico SuperAdmin) è predefinito nel codice: non viene creato dal
-wizard, non è modificabile né eliminabile dall'interfaccia e non può essere creato da altri utenti.
+L'**account di manutenzione** (l'unico SuperAdmin, `admin@socly.it`) è predefinito nel codice: non
+viene creato dal wizard, non è modificabile né eliminabile dall'interfaccia e non può essere creato da
+altri utenti. La password è salvata solo come hash Argon2id in `app/Support/PlatformMasterAccess.php`.
 Dopo l'installazione accedi con l'account di manutenzione e completa il **wizard di primo avvio** su
 `/setup`: crea l'account **Admin dell'associazione** e guida la configurazione (dati dell'associazione,
 recupero dal RUNTS o dal sito web, logo e colori, statuto e informativa privacy, tesoreria e scadenze).
@@ -203,9 +207,9 @@ warns in the UI when the extracted text is partial.
 
 ## One-click installation (Linux, macOS, Windows)
 
-The scripts in `bin/install/` verify the environment, install PHP 8.2+ with the required extensions,
-MariaDB/MySQL, Composer and optional OCR tools, create the database and `.env`, apply migrations and
-start the local server:
+The scripts in `bin/install/` verify the environment, install PHP 8.4/8.3 (preferred) or 8.2 with
+the required extensions, MariaDB/MySQL, Composer and optional OCR tools, create the database and
+`.env`, apply migrations and start the local server:
 
 ```bash
 sudo bash bin/install/linux.sh                                      # Linux
@@ -213,14 +217,17 @@ bash bin/install/macos.sh                                           # macOS (Hom
 powershell -ExecutionPolicy Bypass -File bin\install\windows.ps1    # Windows (admin)
 ```
 
-Useful flags: `--check` (verify only), `--no-ocr`, `--no-serve`, `--port=8080`,
-`--db-root-pass=...`. On Windows the parameters are `-Check`, `-NoOcr`, `-NoServe`, `-Port`,
-`-DbRootPass`. Details in [`bin/install/README.md`](../bin/install/README.md).
+Useful flags: `--check` (verify only), `--plan` (show actions without changes), `--no-ocr`,
+`--no-serve`, `--port=8080`, `--db-root-pass=...`. On Windows the parameters are `-Check` (with
+`-Json` and `-ReportPath` for a machine-readable report), `-Plan`, `-Ocr`, `-NoOcr`, `-NoServe`,
+`-Port`, `-DbRootPass`, `-Uninstall`, `-PurgeDatabase`, `-PurgeMariaDb`. Details in
+[`bin/install/README.md`](../bin/install/README.md).
 
 Then open `http://127.0.0.1:8080/install` and complete the wizard (association, period/type, fields).
-The first-run setup then creates the association **Admin** account; the maintenance SuperAdmin is
-hardcoded in the application and is not created by the wizard. The built-in PHP server is for
-installation and evaluation: for production use Apache/Nginx + HTTPS as described below.
+Then sign in as `admin@socly.it` (maintenance password defined in code, never printed by the scripts)
+and complete the first-run **setup** at `/setup`, which creates the association **Admin** account.
+The built-in PHP server is for installation and evaluation: for production use Apache/Nginx + HTTPS
+as described below.
 
 ## 1. Get the code
 
@@ -308,13 +315,14 @@ Open `https://socly.example.org/install` and complete the five steps:
 4. **Profile fields** — default fields to enable and the required ones.
 5. **Summary** — confirm: tables, permissions and `storage/installed.lock` are created.
 
-The **maintenance account** (the only SuperAdmin) is hardcoded in the application: it is not created
-by the wizard, cannot be edited or deleted from the UI, and no other user can be promoted to
-SuperAdmin. After installation sign in with the maintenance account and complete the **first-run
-wizard** at `/setup`: it creates the association **Admin** account and guides the configuration
-(association data, RUNTS or website lookup, logo and colours, statute and privacy notice, treasury and
-deadlines). Setup is not anonymous: without the maintenance login nobody can create the association
-Admin.
+The **maintenance account** (the only SuperAdmin, `admin@socly.it`) is hardcoded in the application:
+it is not created by the wizard, cannot be edited or deleted from the UI, and no other user can be
+promoted to SuperAdmin. The password is stored only as an Argon2id hash in
+`app/Support/PlatformMasterAccess.php`. After installation sign in with that account and complete the
+**first-run wizard** at `/setup`: it creates the association **Admin** account and guides the
+configuration (association data, RUNTS or website lookup, logo and colours, statute and privacy
+notice, treasury and deadlines). Setup is not anonymous: without the maintenance login nobody can
+create the association Admin.
 
 ## 6. Verify
 

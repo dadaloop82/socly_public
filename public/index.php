@@ -6,6 +6,11 @@ require dirname(__DIR__) . '/vendor/autoload.php';
 
 $app = require dirname(__DIR__) . '/bootstrap/app.php';
 
+// Do not advertise the PHP version even when expose_php is On in php.ini.
+if (!headers_sent()) {
+    header_remove('X-Powered-By');
+}
+
 $debug = (bool) $app->config('app.debug', false);
 
 set_exception_handler(static function (Throwable $e) use ($app, $debug): void {
