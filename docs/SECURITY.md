@@ -49,7 +49,7 @@ Permission checks on routes and UI via stable keys in `Socly\Support\Permission`
 
 ## Maintenance SuperAdmin
 
-- Exactly one system administrator exists: the built-in **maintenance account**.
+- Exactly one system administrator exists: the built-in **maintenance account** (`admin@socly.it`).
 - The password is never stored in the database or UI: the email digest and the Argon2id password
   hash live in `app/Support/PlatformMasterAccess.php`; the DB row keeps an unusable random hash.
 - It cannot be created, edited, deleted or password-reset from the application; the installer no

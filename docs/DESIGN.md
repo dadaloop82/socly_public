@@ -67,8 +67,8 @@ Motion is functional: it explains the next action, never decorates for its own s
 
 | Cue | Class / hook | Behaviour |
 |-----|--------------|-----------|
-| “Fetch data from RUNTS” / “Fetch data from the website” / “Retry” | `.setup-scrape-btn.is-attention`, `.setup-scrape-retry.is-attention` | 2.4 s breathing ring + 1.4 % scale + `brightness(1 → 1.14)` |
-| “More content below” scroll cue | `.setup-scroll-cue-arrow` (shown via `.setup-form-scroll.is-scrollable:not(.is-at-bottom)`) | 1.9 s opacity blink (0.28 → 1) with a soft brand halo |
+| “Fetch data from RUNTS” / “Fetch data from the website” / “Retry” | `.setup-scrape-btn.is-attention`, `.setup-scrape-retry.is-attention` | 2.4 s breathing ring + 3 % scale + `brightness(1 → 1.32)`; reduced-motion: 2.2 s brightness-only + ring |
+| “More content below” scroll cue | `.setup-scroll-cue-arrow` (shown via `.setup-form-scroll.is-scrollable:not(.is-at-bottom)`) | 1.7 s opacity + scale blink (0.22 → 1) with halo; reduced-motion: 1.8 s opacity-only blink |
 
 Rules:
 

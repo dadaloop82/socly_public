@@ -37,11 +37,15 @@ and this project follows a simple `1.0.x` versioning scheme driven by release sy
 - “Fetch RUNTS data”, “Fetch website data” and “Retry” buttons pulse smoothly when they are ready to
   be pressed; the “more content below” ↓ cue blinks smoothly (both honour reduced motion)
 - Typing a RUNTS number no longer locks the name/legal fields before the lookup (required-field error)
+- President-name confirmation is case-insensitive and ignores apostrophes, hyphens and spacing;
+  the two confirmation inputs are no longer auto-capitalised
 - German denomination field is shown only for South Tyrol associations (or when already filled)
 - Anonymous telemetry counters pointed at non-existent table/column names and always reported zero
 
 ### Changed
 
+- Fresh installations start with only **Cassa contanti** and **Banca** active; postal, PayPal,
+  prepaid card and “other” remain available but disabled until enabled during setup or in settings.
 - Legal texts are stored with a generous 400 000-character cap per locale and partial OCR is surfaced
   as a warning instead of silently shortening the document
 - Texts cut by the previous OCR build are refreshed automatically on the next RUNTS lookup

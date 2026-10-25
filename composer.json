@@ -2,7 +2,7 @@
     "name": "socly/socly",
     "description": "Socly \u2014 self-hosted membership management for associations (base edition)",
     "type": "project",
-    "license": "proprietary",
+    "license": "LicenseRef-Socly-Source-Available",
     "require": {
         "php": "^8.2",
         "ext-pdo": "*",

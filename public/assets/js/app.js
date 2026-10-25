@@ -1118,7 +1118,9 @@ function initPlatformConsents(scope) {
     } catch {
       /* ignore */
     }
-    return s.toLowerCase();
+    // Case-insensitive and tolerant to apostrophes, hyphens and spacing:
+    // "D'Angelo", "D’Angelo" and "D Angelo" compare equal.
+    return s.toLowerCase().replace(/[^\p{L}\p{N}]+/gu, '');
   };
 
   roots.forEach((root) => {
@@ -2674,8 +2676,6 @@ function initPersonNameCase(root = document) {
     '[data-people-last]',
     '[data-cf-dialog-first]',
     '[data-cf-dialog-last]',
-    'input[name="confirm_first_name"]',
-    'input[name="confirm_last_name"]',
   ].join(', ');
 
   const apply = (input) => {
@@ -6473,12 +6473,39 @@ function initSetupFormScrollHint(root) {
     const atBottom = !scrollable || scroller.scrollTop >= max - 24;
     scroller.classList.toggle('is-at-bottom', atBottom);
   };
+  let syncFrame = 0;
+  const scheduleSync = () => {
+    if (syncFrame) return;
+    syncFrame = requestAnimationFrame(() => {
+      syncFrame = 0;
+      sync();
+    });
+  };
   scroller.addEventListener('scroll', sync, { passive: true });
-  window.addEventListener('resize', sync);
+  window.addEventListener('resize', scheduleSync);
+  scroller.addEventListener('transitionend', scheduleSync, { passive: true });
+  const setupFormEl = root.querySelector('[data-setup-form]');
+  setupFormEl?.addEventListener('setup:cta-refresh', scheduleSync);
+  root.addEventListener('setup:runts-failed', scheduleSync);
+  root.addEventListener('setup:fit-assoc-names', scheduleSync);
   // Re-measure after accordion open/close and late layout.
   root.querySelectorAll('details.setup-section').forEach((el) => {
-    el.addEventListener('toggle', () => requestAnimationFrame(sync));
+    el.addEventListener('toggle', scheduleSync);
   });
+  if (typeof ResizeObserver === 'function') {
+    const resizeObserver = new ResizeObserver(scheduleSync);
+    resizeObserver.observe(scroller);
+    [...scroller.children].forEach((child) => resizeObserver.observe(child));
+  }
+  if (typeof MutationObserver === 'function') {
+    const mutationObserver = new MutationObserver(scheduleSync);
+    mutationObserver.observe(scroller, {
+      childList: true,
+      subtree: true,
+      attributes: true,
+      attributeFilter: ['hidden', 'open'],
+    });
+  }
   requestAnimationFrame(sync);
   setTimeout(sync, 320);
 }

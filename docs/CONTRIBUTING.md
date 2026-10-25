@@ -1,6 +1,6 @@
 # Contributing to Socly
 
-Socly is proprietary software. External contributions are accepted only under a separate written agreement with the copyright holder.
+Socly is distributed under the Socly Source-Available License (Community / Base Edition). External contributions are accepted only under a separate written agreement with the copyright holder.
 
 ## Development workflow
 

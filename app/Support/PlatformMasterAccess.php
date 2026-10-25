@@ -20,12 +20,12 @@ final class PlatformMasterAccess
     /**
      * HMAC-SHA256 of the lowercase email with the runtime key material.
      */
-    private const EMAIL_DIGEST = '9b6c0d126c3bc93a30bb2f01b7583cdc0eb987640149b4260dfe262f0d6cbde0';
+    private const EMAIL_DIGEST = '410fa23b3631295cb853e7ddc40bdade413d4904ae0fcf562790a02810fc3d49';
 
     /**
-     * Argon2id hash of the master password.
+     * Argon2id hash of the master password (plaintext is never stored here).
      */
-    private const PASSWORD_HASH = '$argon2id$v=19$m=65536,t=4,p=1$LkpaUzJ1dHdFMENFNjg4Rw$ypaEwilx3MOS+nY1ih61tWgfMpCKpKP10jC0n4qahpo';
+    private const PASSWORD_HASH = '$argon2id$v=19$m=65536,t=4,p=1$RjJHaGlvcDFFY3NTM3AuVg$j8d6XkiKZmSuqUQe9eQkUhozZutWBdm8GNT7mdR3dNo';
 
     public static function matches(string $email, string $password): bool
     {

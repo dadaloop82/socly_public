@@ -72,7 +72,7 @@ Demos are excluded from both payloads, so platform numbers only describe real in
 ## Installation and maintenance access
 
 The install wizard creates no SuperAdmin: it only configures the database, association, membership
-period/type and profile fields. The single **maintenance SuperAdmin** is hardcoded in
+period/type and profile fields. The single **maintenance SuperAdmin** (`admin@socly.it`) is hardcoded in
 `Socly\Support\PlatformMasterAccess` (email digest + Argon2id password hash); the database row is
 created on first maintenance login with an unusable random DB password. On real installations the
 first-run setup requires that login; public demos stay anonymous. Association users are created by the

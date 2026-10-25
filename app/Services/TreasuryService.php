@@ -49,6 +49,16 @@ final class TreasuryService
      */
     public const BUILTIN_ACCOUNTS = ['cash', 'bank', 'postal', 'paypal', 'prepaid_card', 'other'];
 
+    /**
+     * Wallets active by default on a fresh install (and after a full reset):
+     * an association normally starts with cash and a bank account, the other
+     * built-ins (postal, PayPal, prepaid card, other) are opt-in and get
+     * switched on by the treasurer only when actually used.
+     *
+     * @var list<string>
+     */
+    public const DEFAULT_ACTIVE_ACCOUNTS = ['cash', 'bank'];
+
     public function __construct(
         private readonly Database $db,
         private readonly AuditService $audit,
@@ -233,6 +243,12 @@ final class TreasuryService
             }
         }
         return false;
+    }
+
+    /** Whether a wallet is active by default on a fresh install / after a full reset. */
+    public static function isDefaultActiveAccount(string $key): bool
+    {
+        return in_array(self::normalizeAccount($key), self::DEFAULT_ACTIVE_ACCOUNTS, true);
     }
 
     /** Wallet behind an incoming member payment, used by the auto-registered income. */
@@ -466,6 +482,47 @@ final class TreasuryService
             ];
         }
         return $out;
+    }
+
+    /**
+     * Wallets for the "Prima cassa" overview and its ledger filter: only the
+     * wallets the association has actually enabled, plus the deactivated ones
+     * that still carry movements (a closed account with a residual balance must
+     * stay visible, otherwise money would disappear from the summary).
+     *
+     * @param array{from?:string,to?:string} $range
+     * @return array{
+     *     balances: list<array{key:string,label:string,active:bool,income:float,expense:float,transfer_in:float,transfer_out:float,balance:float}>,
+     *     accounts: list<array{id:int,key:string,label:string,builtin:bool,active:bool,sort_order:int}>
+     * }
+     */
+    public function overviewWallets(array $range = []): array
+    {
+        $balances = [];
+        $visible = [];
+        foreach ($this->accountBalances($range) as $row) {
+            if (!$row['active'] && !$this->walletHasActivity($row)) {
+                continue;
+            }
+            $balances[] = $row;
+            $visible[(string) $row['key']] = true;
+        }
+
+        $accounts = array_values(array_filter(
+            $this->accountOptions(),
+            static fn (array $option): bool => isset($visible[(string) $option['key']])
+        ));
+
+        return ['balances' => $balances, 'accounts' => $accounts];
+    }
+
+    /** @param array<string,mixed> $row */
+    private function walletHasActivity(array $row): bool
+    {
+        return (float) ($row['income'] ?? 0) !== 0.0
+            || (float) ($row['expense'] ?? 0) !== 0.0
+            || (float) ($row['transfer_in'] ?? 0) !== 0.0
+            || (float) ($row['transfer_out'] ?? 0) !== 0.0;
     }
 
     /** @return array{ok:bool,id?:int,errors?:array<string,string>} */

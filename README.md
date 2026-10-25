@@ -55,9 +55,10 @@ powershell -ExecutionPolicy Bypass -File bin\install\windows.ps1   # Windows
 ```
 
 Durante il wizard configuri database, branding dell'associazione e periodo associativo. L'account
-**SuperAdmin di manutenzione** è predefinito nel codice e non viene creato dal wizard. Dopo
-l'installazione accedi con l'account di manutenzione e completa il primo avvio, che crea l'account
-**Admin dell'associazione** usato quotidianamente. Il setup non è anonimo.
+**SuperAdmin di manutenzione** (`admin@socly.it`) è predefinito nel codice e non viene creato dal
+wizard; la password è salvata solo come hash. Dopo l'installazione accedi con l'account di manutenzione
+e completa il primo avvio, che crea l'account **Admin dell'associazione** usato quotidianamente. Il
+setup non è anonimo.
 
 ### Documentazione
 

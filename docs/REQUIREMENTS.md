@@ -20,7 +20,7 @@
 - PHP 8.2+, MariaDB/MySQL.
 - CSRF protection on state-changing requests.
 - Encrypted sensitive settings at rest.
-- Proprietary license; no third-party branding in core.
+- Source-available license (Socly Source-Available License, Community / Base Edition); free for self-hosted use; no third-party branding in core.
 - Plugin drop-in: one file in `plugins/` is sufficient to register a feature.
 
 ## Explicitly out of scope (core)

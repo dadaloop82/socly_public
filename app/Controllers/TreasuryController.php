@@ -40,6 +40,8 @@ final class TreasuryController extends BaseController
         $filters = $this->ledgerFilters($request);
         $ledger = $this->treasury->ledger(200, $query, $sort, $filters);
         $config = $this->components->config('treasury', ['auto_from_payments' => true]);
+        // Only the enabled wallets (+ deactivated ones with movements) are listed.
+        $wallets = $this->treasury->overviewWallets();
         $this->render('treasury/index', [
             'title' => __('treasury.title'),
             'ledger' => $ledger,
@@ -57,8 +59,8 @@ final class TreasuryController extends BaseController
             'members' => $this->members->listForSelect(),
             'categories' => $this->treasury->categoryOptions(),
             'category_groups' => $this->treasury->categoryGroups(),
-            'accounts' => $this->treasury->accountOptions(),
-            'account_balances' => $this->treasury->accountBalances(),
+            'accounts' => $wallets['accounts'],
+            'account_balances' => $wallets['balances'],
             'payment_method_groups' => $this->treasury->paymentMethodGroups(),
             'default_category' => $this->treasury->defaultCategory(),
             'search_query' => $query,

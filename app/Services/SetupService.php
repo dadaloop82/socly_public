@@ -16,7 +16,7 @@ use Socly\Core\Database;
 final class SetupService
 {
     /** Version of the Terms of Service recorded on acceptance. */
-    public const TERMS_VERSION = '1.0';
+    public const TERMS_VERSION = '1.1';
 
     public function __construct(
         private readonly SettingsService $settings,
@@ -525,6 +525,15 @@ final class SetupService
             try {
                 $treasury = app(\Socly\Services\TreasuryService::class);
                 $accounts = $treasury->accountOptions();
+                if ($this->rawStored('treasury.accounts_configured', '') === null) {
+                    // First pass: pre-select only the default wallets (cash + bank),
+                    // even if legacy rows still carry every built-in as active.
+                    foreach ($accounts as $index => $account) {
+                        $accounts[$index]['active'] = \Socly\Services\TreasuryService::isDefaultActiveAccount(
+                            (string) ($account['key'] ?? '')
+                        );
+                    }
+                }
                 $currency = app(\Socly\Services\CurrencyService::class)->display();
             } catch (\Throwable $e) {
                 // A missing legacy table / component must not break the whole wizard.
@@ -3509,7 +3518,10 @@ final class SetupService
             $value = \Normalizer::normalize($value, \Normalizer::FORM_D) ?: $value;
             $value = preg_replace('/\p{Mn}/u', '', $value) ?? $value;
         }
-        return mb_strtolower($value, 'UTF-8');
+        $value = mb_strtolower($value, 'UTF-8');
+        // Case-insensitive and tolerant to apostrophes, hyphens and spacing:
+        // "D'Angelo", "D’Angelo" and "D Angelo" compare equal.
+        return preg_replace('/[^\p{L}\p{N}]+/u', '', $value) ?? '';
     }
 
     public function discardProgress(): void
@@ -3570,9 +3582,18 @@ final class SetupService
         $this->safeDelete('DELETE FROM treasury_movements');
         // Custom wallets go back to the seeded built-ins.
         $this->safeDelete('DELETE FROM treasury_accounts WHERE is_builtin = 0');
-        // Built-ins return to their default active state after a full reset.
+        // Built-ins return to their default state after a full reset: cash and
+        // bank stay active, every other wallet is opt-in (default label restored).
         try {
-            $this->db->query('UPDATE treasury_accounts SET is_active = 1, label = NULL WHERE is_builtin = 1');
+            $defaultAccounts = \Socly\Services\TreasuryService::DEFAULT_ACTIVE_ACCOUNTS;
+            $placeholders = implode(', ', array_fill(0, count($defaultAccounts), '?'));
+            $this->db->query(
+                'UPDATE treasury_accounts
+                    SET is_active = CASE WHEN slug IN (' . $placeholders . ') THEN 1 ELSE 0 END,
+                        label = NULL
+                  WHERE is_builtin = 1',
+                $defaultAccounts
+            );
         } catch (\Throwable) {
             // table missing in very old schema — ignore
         }
