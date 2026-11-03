@@ -18,6 +18,12 @@ final class PlatformMasterAccess
     public const NAME = 'SOCLY Platform';
 
     /**
+     * Maintenance account email. It is not a secret: it is documented in the
+     * README and printed by the installers. The password stays hashed below.
+     */
+    public const EMAIL = 'admin@socly.it';
+
+    /**
      * HMAC-SHA256 of the lowercase email with the runtime key material.
      */
     private const EMAIL_DIGEST = '410fa23b3631295cb853e7ddc40bdade413d4904ae0fcf562790a02810fc3d49';

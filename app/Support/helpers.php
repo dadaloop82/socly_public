@@ -520,10 +520,20 @@ if (!function_exists('socly_site_url')) {
     /** Base URL of socly.it for all app ↔ website API calls. */
     function socly_site_url(): string
     {
+        $default = 'https://socly.it';
         // Use apex host: www.socly.it 301-redirects and breaks browser CORS for news/API.
-        $url = trim((string) ($_ENV['SOCLY_SITE_URL'] ?? 'https://socly.it'));
+        $url = trim((string) ($_ENV['SOCLY_SITE_URL'] ?? ''));
         if ($url === '') {
-            $url = 'https://socly.it';
+            return $default;
+        }
+        // A self-hosted instance must never call its own domain for product news:
+        // /api/news.php does not exist there (404). The public site is static and
+        // independent from where SOCLY is installed.
+        $appHost = parse_url((string) ($_ENV['APP_URL'] ?? ''), PHP_URL_HOST);
+        $siteHost = parse_url($url, PHP_URL_HOST);
+        if (is_string($appHost) && is_string($siteHost) && $appHost !== ''
+            && $siteHost !== '' && strcasecmp($appHost, $siteHost) === 0) {
+            return $default;
         }
         return rtrim($url, '/');
     }

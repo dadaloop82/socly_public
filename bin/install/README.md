@@ -16,13 +16,14 @@ Scripts that turn a fresh machine into a working Socly instance:
 | Windows 10/11 (PowerShell as Administrator) | `powershell -ExecutionPolicy Bypass -File bin\install\windows.ps1` |
 
 Then open **http://127.0.0.1:8080/install**: the installers already created the database and wrote
-`.env`, so this page only confirms the connection (nothing to type) and sends you to `/login`. Sign
-in with the maintenance account (`admin@socly.it`, password defined in
-`app/Support/PlatformMasterAccess.php`) and the **full guided setup** starts automatically at
-`/setup` (language, association, logo/colors, officers, statute/privacy, member types and periods,
-profile fields, treasury accounts, mail, enrollment, components, Admin account and consents); it also
-creates the association **Admin** account. `/install` is only needed again to restore the database
-credentials when the instance cannot connect anymore.
+`.env`, so this page only confirms the connection (nothing to type) and drops you **straight into the
+guided setup** with the maintenance session already active — no login form. The 22 steps cover
+language, association and seat, logo/colors, officers, statute/privacy, member types and periods,
+profile fields, treasury accounts, mail, enrollment, components, Admin account and consents; the last
+one creates the association **Admin**. While that Admin does not exist yet, `/setup` stays reachable
+without signing in (for the first 60 minutes after installation); afterwards sign in with the
+maintenance account (`admin@socly.it`, password defined in `app/Support/PlatformMasterAccess.php`).
+`/install` is only needed again to restore the database credentials when the instance cannot connect.
 Without the one-click script the same page asks for the database credentials, creates the database
 and runs the migrations.
 The single **maintenance SuperAdmin** is hardcoded in the application: it is never created by the

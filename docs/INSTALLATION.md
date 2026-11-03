@@ -61,12 +61,16 @@ usa Apache/Nginx + HTTPS come descritto sotto.
 
 `/install` si occupa **solo dell'infrastruttura**: credenziali del database, creazione del DB se
 manca, migrazioni e `storage/installed.lock`. Se lo script one-click ha già scritto `.env` e creato il
-database, la pagina non chiede nulla: chiude l'installazione e porta subito al login. Dopo l'accesso
-con l'account di manutenzione (`admin@socly.it`) parte **la configurazione guidata completa**
-in `/setup` (lingua, dati e sede dell'associazione, logo e colori, organi sociali, statuto e privacy,
+database, la pagina non chiede nulla: chiude l'installazione e apre **direttamente la configurazione
+guidata** (`/setup`) con la sessione di manutenzione già attiva, senza passare dal login. Il wizard
+raccoglie lingua, dati e sede dell'associazione, logo e colori, organi sociali, statuto e privacy,
 tipi di socio e periodi, campi anagrafica, tesoreria, posta, iscrizioni, componenti, account Admin e
-consensi). `/install` torna utile solo per ripristinare le credenziali del database se l'istanza non
-riesce più a connettersi.
+consensi.
+Finché non esiste l'account **Admin dell'associazione** il wizard resta raggiungibile anche senza
+login (`/login` mostra il pulsante «Procedi alla configurazione») per i primi **60 minuti**
+dall'installazione; dopo, o appena l'Admin esiste, serve l'account di manutenzione `admin@socly.it`.
+`/install` torna utile solo per ripristinare le credenziali del database se l'istanza non riesce più a
+connettersi.
 
 ## 1. Scarica il codice
 
@@ -259,12 +263,15 @@ as described below.
 
 `/install` only handles the **infrastructure**: database credentials, creating the DB when missing,
 migrations and `storage/installed.lock`. When the one-click installers already wrote `.env` and
-created the database, the page asks nothing: it locks the installation and goes straight to the
-login. Signing in with the maintenance account (`admin@socly.it`) opens the **full guided setup** at
-`/setup` (language, association data and seat, logo and colors, officers, statute and privacy,
-member types and periods, profile fields, treasury accounts, mail, enrollment, components, Admin
-account and consents). `/install` is only needed again to restore the database credentials when the
-instance cannot connect anymore.
+created the database, the page asks nothing: it locks the installation and opens the **guided setup**
+(`/setup`) directly, with the maintenance session already active (no login form). The wizard collects
+language, association data and seat, logo and colors, officers, statute and privacy, member types and
+periods, profile fields, treasury accounts, mail, enrollment, components, Admin account and consents.
+Until the association **Admin** exists the wizard also stays reachable without signing in (`/login`
+shows a “Continue configuration” button) for the first **60 minutes** after installation; after that,
+or as soon as the Admin exists, the maintenance account `admin@socly.it` is required.
+`/install` is only needed again to restore the database credentials when the instance cannot connect
+anymore.
 
 ## 1. Get the code
 

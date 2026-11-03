@@ -18,6 +18,12 @@ final class SetupService
     /** Version of the Terms of Service recorded on acceptance. */
     public const TERMS_VERSION = '1.1';
 
+    /**
+     * Minutes a freshly installed instance keeps the guided setup reachable
+     * without the maintenance login (until the association Admin exists).
+     */
+    public const SETUP_OPEN_MINUTES = 60;
+
     public function __construct(
         private readonly SettingsService $settings,
         private readonly AssociationPeopleService $people,
@@ -3388,11 +3394,24 @@ final class SetupService
     public function allowsAnonymousSetup(): bool
     {
         // Public demo instances stay open; real installations require the built-in
-        // maintenance login before the association Admin can be created.
-        if (!is_temporary_instance()) {
+        // maintenance login once the association Admin exists.
+        if ($this->isComplete() || $this->users->hasAssociationAdmin()) {
             return false;
         }
-        return !$this->isComplete() && !$this->users->hasAssociationAdmin();
+        if (is_temporary_instance()) {
+            return true;
+        }
+        // A freshly installed instance stays open for a short window so the
+        // operator walks straight into the wizard (also after losing the browser
+        // session) instead of meeting a login form before any data exists.
+        // After that window the maintenance login is required again.
+        $lock = storage_path('installed.lock');
+        if (!is_file($lock)) {
+            return false;
+        }
+        $age = time() - (int) @filemtime($lock);
+
+        return $age >= 0 && $age < (int) (self::SETUP_OPEN_MINUTES * 60);
     }
 
     /**

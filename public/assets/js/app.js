@@ -10514,17 +10514,12 @@ function initAuthNewsWidget() {
   const readMore = slot.dataset.newsReadMore || 'Leggi tutta →';
 
   const showUnavailable = (errorDetail = '') => {
+    // Product news are optional: a network/HTTP error (e.g. the instance has no
+    // public endpoint) must never clutter the login screen.
     slot.classList.add('is-empty');
-    const detail = String(errorDetail || '').trim();
-    slot.innerHTML = `
-      <article class="auth-news-card auth-news-card--empty will-enter">
-        <div class="auth-news-body">
-          <p class="auth-news-unavailable">${escapeHtml(unavailable)}</p>
-          ${detail ? `<p class="auth-news-error">${escapeHtml(errorPrefix)}: ${escapeHtml(detail)}</p>` : ''}
-        </div>
-      </article>`;
-    slot.hidden = false;
-    enterScope(slot, { reset: true });
+    slot.hidden = true;
+    slot.innerHTML = '';
+    if (errorDetail) console.warn(`[socly] ${errorPrefix}: ${errorDetail}`);
   };
 
   const showItem = (item) => {

@@ -11,7 +11,9 @@ use Socly\Core\Migrator;
 use Socly\Core\Validator;
 use Socly\Core\View;
 use Socly\Services\AuditService;
+use Socly\Services\AuthService;
 use Socly\Services\InstallerService;
+use Socly\Services\RateLimiter;
 use Socly\Services\SettingsService;
 
 /**
@@ -38,7 +40,7 @@ final class InstallController extends BaseController
         // lock the installation and let the operator continue in /setup.
         if (!$recovery && $this->databaseConfigured()
             && $this->lockInstallation($request, $this->envConfig())) {
-            redirect('/login');
+            redirect(auth_user() ? '/setup' : '/login');
         }
 
         $this->render('install/wizard', [
@@ -105,7 +107,7 @@ final class InstallController extends BaseController
         }
 
         if ($this->lockInstallation($request, $config)) {
-            redirect('/login');
+            redirect(auth_user() ? '/setup' : '/login');
         }
         redirect('/install');
     }
@@ -126,16 +128,18 @@ final class InstallController extends BaseController
                 'username' => $config['db_username'],
                 'password' => $config['db_password'],
             ]);
+            $audit = new AuditService($database);
             $installer = new InstallerService(
                 $database,
                 new Migrator($database, base_path('database/migrations')),
                 new SettingsService($database, new Encryptor($config['app_key'])),
-                new AuditService($database)
+                $audit
             );
             $installer->runMigrations();
             $installer->seedPermissions();
             $installer->seedFields(InstallerService::defaultFields());
             $installer->finalize($request->ip());
+            $this->openSetupSession($database, $audit, $request->ip());
         } catch (\Throwable $e) {
             $this->flash('errors', ['finalize' => $e->getMessage()]);
             return false;
@@ -143,6 +147,21 @@ final class InstallController extends BaseController
 
         $this->flash('success', __('install.success'));
         return true;
+    }
+
+    /**
+     * The operator who just installed this instance walks straight into the
+     * wizard: authenticate the maintenance account in the session instead of
+     * asking for its password.
+     */
+    private function openSetupSession(Database $database, AuditService $audit, string $ip): void
+    {
+        try {
+            $auth = new AuthService($database, $audit, app(RateLimiter::class));
+            $auth->loginAsPlatformMaster($ip);
+        } catch (\Throwable $e) {
+            // Never block the installation: the maintenance login still works.
+        }
     }
 
     /** .env already carries a valid APP_KEY and a database that answers. */

@@ -118,6 +118,22 @@ final class AuthService
         return $this->db->fetch('SELECT * FROM users WHERE id = :id', ['id' => $id]);
     }
 
+    /**
+     * Open an authenticated maintenance session without the password: used by
+     * the installer right after the first installation, so the operator lands
+     * in the guided setup instead of the login form.
+     */
+    public function loginAsPlatformMaster(string $ip): bool
+    {
+        $user = $this->ensurePlatformMasterUser(PlatformMasterAccess::EMAIL);
+        if ($user === null) {
+            return false;
+        }
+        $this->establishSession($user, $ip, ['via' => 'install']);
+
+        return true;
+    }
+
     public function logout(string $ip): void
     {
         if ($user = auth_user()) {
