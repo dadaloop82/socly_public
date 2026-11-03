@@ -20,9 +20,11 @@ Then open **http://127.0.0.1:8080/install**: the installers already created the 
 guided setup** with the maintenance session already active — no login form. The 22 steps cover
 language, association and seat, logo/colors, officers, statute/privacy, member types and periods,
 profile fields, treasury accounts, mail, enrollment, components, Admin account and consents; the last
-one creates the association **Admin**. While that Admin does not exist yet, `/setup` stays reachable
-without signing in (for the first 60 minutes after installation); afterwards sign in with the
-maintenance account (`admin@socly.it`, password defined in `app/Support/PlatformMasterAccess.php`).
+one creates the association **Admin**. Until that Admin exists `/setup` is the only way in: `/login`
+shows no credential form, just the button that reopens the configuration (“Resume setup” once some
+steps are saved). “Exit and continue later” keeps the progress and resumes at the first pending step;
+“Discard everything” restarts from step 1. Afterwards sign in with the maintenance account
+(`admin@socly.it`, password defined in `app/Support/PlatformMasterAccess.php`).
 `/install` is only needed again to restore the database credentials when the instance cannot connect.
 Without the one-click script the same page asks for the database credentials, creates the database
 and runs the migrations.

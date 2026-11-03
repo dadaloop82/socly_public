@@ -1,11 +1,13 @@
 <?php
 /** @var bool $needsSetup */
+/** @var bool $setupHasProgress */
 /** @var string $setupRequiredTitle */
 /** @var string $setupRequiredI18nKey */
 /** @var string $setupRequiredTextKey */
 /** @var string $setupUrl */
 $currentLocale = (string) app('translator')->getLocale();
 $needsSetup = !empty($needsSetup);
+$setupHasProgress = !empty($setupHasProgress);
 $setupRequiredTitle = trim((string) ($setupRequiredTitle ?? ''));
 $setupRequiredI18nKey = trim((string) ($setupRequiredI18nKey ?? 'auth.setup_required_title_first'));
 $setupRequiredTextKey = trim((string) ($setupRequiredTextKey ?? 'auth.setup_required_text'));
@@ -51,7 +53,7 @@ if ($setupUrl === '') {
 <?php if ($needsSetup): ?>
     <h1 class="h1" data-i18n="<?= e($setupRequiredI18nKey) ?>"><?= e($setupRequiredTitle !== '' ? $setupRequiredTitle : __('auth.setup_required_title_first')) ?></h1>
     <p class="lede auth-setup-lede" data-i18n="<?= e($setupRequiredTextKey) ?>"><?= e(__($setupRequiredTextKey)) ?></p>
-    <a class="btn btn-block" href="<?= e($setupUrl) ?>" data-i18n="auth.setup_configure_button" data-setup-lang-link><?= e(__('auth.setup_configure_button')) ?></a>
+    <a class="btn btn-block" href="<?= e($setupUrl) ?>" data-i18n="<?= $setupHasProgress ? 'auth.setup_resume_button' : 'auth.setup_configure_button' ?>" data-setup-lang-link><?= e($setupHasProgress ? __('auth.setup_resume_button') : __('auth.setup_configure_button')) ?></a>
     <?php
       $extraCta = code_path('resources/views/auth/extra_setup_cta.php');
       if (is_file($extraCta) && !str_contains($setupUrl, '/install')) {

@@ -66,9 +66,12 @@ guidata** (`/setup`) con la sessione di manutenzione già attiva, senza passare 
 raccoglie lingua, dati e sede dell'associazione, logo e colori, organi sociali, statuto e privacy,
 tipi di socio e periodi, campi anagrafica, tesoreria, posta, iscrizioni, componenti, account Admin e
 consensi.
-Finché non esiste l'account **Admin dell'associazione** il wizard resta raggiungibile anche senza
-login (`/login` mostra il pulsante «Procedi alla configurazione») per i primi **60 minuti**
-dall'installazione; dopo, o appena l'Admin esiste, serve l'account di manutenzione `admin@socly.it`.
+Finché non esiste l'account **Admin dell'associazione** il wizard è l'unica porta d'ingresso: `/login`
+non mostra il modulo credenziali ma solo il pulsante che riapre la configurazione (con il testo
+«Riprendi la configurazione» se hai già salvato dei passi). «Esci e riprendi dopo» salva e sospende:
+al rientro si riparte dal primo passo ancora mancante. «Scarta tutto» cancella quanto fatto e riapre
+il wizard dal passo 1. Appena creato l'Admin (ultimo passo del wizard) o completati tutti i passi,
+serve l'account di manutenzione `admin@socly.it`.
 `/install` torna utile solo per ripristinare le credenziali del database se l'istanza non riesce più a
 connettersi.
 
@@ -267,9 +270,11 @@ created the database, the page asks nothing: it locks the installation and opens
 (`/setup`) directly, with the maintenance session already active (no login form). The wizard collects
 language, association data and seat, logo and colors, officers, statute and privacy, member types and
 periods, profile fields, treasury accounts, mail, enrollment, components, Admin account and consents.
-Until the association **Admin** exists the wizard also stays reachable without signing in (`/login`
-shows a “Continue configuration” button) for the first **60 minutes** after installation; after that,
-or as soon as the Admin exists, the maintenance account `admin@socly.it` is required.
+Until the association **Admin** exists the wizard is the only way in: `/login` shows no credential
+form, just the button that reopens the configuration (“Resume setup” once some steps are saved).
+“Exit and continue later” saves and suspends — coming back resumes at the first pending step —
+while “Discard everything” wipes the progress and reopens the wizard at step 1. As soon as the Admin
+exists (last wizard step) or every step is done, the maintenance account `admin@socly.it` is required.
 `/install` is only needed again to restore the database credentials when the instance cannot connect
 anymore.
 

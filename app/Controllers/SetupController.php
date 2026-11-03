@@ -382,12 +382,16 @@ final class SetupController extends BaseController
             $_SESSION['_old']
         );
         $_SESSION['setup_dismissed'] = true;
-        redirect('/login');
+        // Discarding means starting over: reopen the wizard at the first step
+        // instead of dropping the operator on the login form.
+        redirect('/setup?intro=1');
     }
 
     public function exitSetup(Request $request): void
     {
-        // Keep drafts so returning to Configura can restore temporary inputs.
+        // "Continue later": the collected data stays in the settings, so coming
+        // back resumes at the first pending step. The session is closed because
+        // the wizard gate would otherwise pull the operator straight back in.
         unset($_SESSION['setup_greeted'], $_SESSION['setup_show_thanks']);
         $_SESSION['setup_dismissed'] = true;
         if (auth_user()) {
@@ -397,11 +401,20 @@ final class SetupController extends BaseController
             }
             $_SESSION['setup_dismissed'] = true;
         }
+        // Not "configuration complete": the login page shows the resume CTA until
+        // every step (Admin account included) has been filled in.
+        $this->flash('success', __('setup.exit_saved'));
         redirect('/login');
     }
 
     public function save(Request $request): void
     {
+        // "Exit and continue later" must work from every step, including the first
+        // one (which has no step_key yet and would otherwise be redirected back).
+        if ((string) $request->input('setup_exit', '0') === '1') {
+            $this->exitSetup($request);
+        }
+
         $stepKey = trim((string) $request->input('step_key', ''));
         $missing = $this->setup->missingSteps();
         $stepIndex = max(0, (int) $request->input('step_index', 0));
@@ -476,11 +489,8 @@ final class SetupController extends BaseController
     private function afterStepSaved(Request $request, array $step, int $stepIndex): void
     {
         if ((string) $request->input('setup_exit', '0') === '1') {
-            unset($_SESSION['setup_greeted'], $_SESSION['setup_show_thanks'], $_SESSION['setup_locale_chosen']);
-            if (auth_user()) {
-                $this->auth->logout($request->ip());
-            }
-            redirect('/login');
+            // Step saved, then "continue later": same suspension as the exit button.
+            $this->exitSetup($request);
         }
 
         if (($step['key'] ?? '') === 'app.locale') {

@@ -58,6 +58,7 @@ final class AuthController extends BaseController
             'title' => __('auth.welcome_title'),
             'needsSetup' => $needsSetup,
             'setupUrl' => $dbDown ? url('/install') : url('/setup'),
+            'setupHasProgress' => $needsSetup && !$dbDown && $this->setupHasProgress(),
             'setupRequiredTitle' => $needsSetup
                 ? ($dbDown ? __('auth.setup_required_title') : __('auth.setup_required_title_first'))
                 : '',
@@ -71,6 +72,16 @@ final class AuthController extends BaseController
             'newsApiUrl' => socly_news_api_url(),
             'demoLoginNotice' => $dbDown ? null : $this->demoLoginNotice(),
         ], 'layouts/guest');
+    }
+
+    /** True when the operator already saved at least one setup step. */
+    private function setupHasProgress(): bool
+    {
+        try {
+            return $this->setup->hasProgress();
+        } catch (\Throwable $e) {
+            return false;
+        }
     }
 
     private function databaseUnreachable(): bool
