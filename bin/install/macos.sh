@@ -22,6 +22,8 @@ CHECK_ONLY=0
 PLAN_ONLY=0
 PORT_EXPLICIT=0
 APP_URL_EXPLICIT=0
+RESET_DB_PASS=0
+FORCE_ENV=0
 if [[ -n "${SOCLY_PORT:-}" ]]; then PORT_EXPLICIT=1; fi
 if [[ -n "$APP_URL" ]]; then APP_URL_EXPLICIT=1; fi
 
@@ -39,6 +41,8 @@ Options:
   --db-user=USER         Database user (default socly)
   --db-pass=PASS         Database password (default: generated)
   --db-root-pass=PASS    MariaDB root password (if needed)
+  --reset-db-pass        Rotate the password of an already existing DB user
+  --force                Overwrite an .env pointing to another database
   --url=URL              Public application URL (default http://BIND:PORT)
   --locale=it|de|en      Default locale (default it)
   --no-ocr               Skip poppler/tesseract installation
@@ -58,6 +62,32 @@ die() { printf '✖ %s\n' "$*" >&2; exit 1; }
 ok() { printf '✔ %s\n' "$*"; }
 warn() { printf '⚠ %s\n' "$*" >&2; }
 have() { command -v "$1" >/dev/null 2>&1; }
+
+# Composer refuses to run as root interactively: never let a diagnostic hang.
+composer_version() {
+    COMPOSER_ALLOW_SUPERUSER=1 composer --version --no-interaction 2>/dev/null </dev/null | head -1
+}
+
+# The wizard rewrites APP_URL/DB_* in .env by design: doing that inside a
+# directory that already hosts another instance would silently repoint it.
+guard_existing_env() {
+    [[ "$FORCE_ENV" -eq 1 ]] && return 0
+    local env_db env_user
+    env_db="$(env_value DB_DATABASE || true)"
+    [[ -n "$env_db" ]] || return 0
+    env_user="$(env_value DB_USERNAME || true)"
+    if [[ "$env_db" == "$DB_NAME" && ( -z "$env_user" || "$env_user" == "$DB_USER" ) ]]; then
+        return 0
+    fi
+    cat >&2 <<MSG
+✖ ${ROOT}/.env punta già al database '${env_db}' (utente '${env_user:-?}').
+  Sovrascriverlo romperebbe l'istanza esistente. Scegli:
+    --db-name=${env_db} --db-user=${env_user:-$DB_USER}   riusa l'istanza presente
+    installa in una cartella nuova
+    --force                                              sovrascrive comunque
+MSG
+    exit 2
+}
 
 env_value() {
     local key="$1" file="${2:-$ROOT/.env}" line value
@@ -103,6 +133,13 @@ resolve_local_port() {
     if [[ "$BIND" == "0.0.0.0" || "$BIND" == "::" ]]; then
         CONNECT_HOST="127.0.0.1"
     fi
+    case "$BIND" in
+        127.*|::1|localhost) ;;
+        *)
+            warn "--bind=${BIND} espone il wizard /install (nessuna autenticazione) sulla rete locale."
+            echo "  Preferisci 127.0.0.1 + tunnel SSH, oppure --no-serve e servi l'app con un vhost." >&2
+            ;;
+    esac
     LOCAL_PORT="$PORT"
     for _ in $(seq 1 25); do
         port_in_use "$LOCAL_PORT" || break
@@ -138,6 +175,8 @@ while (($#)); do
         --url) APP_URL="$2"; shift 2 ;;
         --locale=*) LOCALE="${1#*=}"; shift ;;
         --locale) LOCALE="$2"; shift 2 ;;
+        --reset-db-pass) RESET_DB_PASS=1; shift ;;
+        --force) FORCE_ENV=1; shift ;;
         --no-ocr) WITH_OCR=0; shift ;;
         --no-browser) OPEN_BROWSER=0; shift ;;
         --no-serve) DO_SERVE=0; shift ;;
@@ -178,7 +217,7 @@ check_environment() {
     have php && echo "  PHP:       $(php -r 'echo PHP_VERSION;')" || echo "  PHP:       assente (verrà installato)"
     php_extensions_ok && echo "  Estensioni: pdo_mysql, mbstring, openssl, json, fileinfo OK" \
         || echo "  Estensioni: MANCANTI (verranno installate)"
-    have composer && echo "  Composer:  $(composer --version 2>/dev/null | head -1)" || echo "  Composer:  assente (verrà installato)"
+    have composer && echo "  Composer:  $(composer_version)" || echo "  Composer:  assente (verrà installato)"
     have mysql && echo "  MariaDB:   client presente" || echo "  MariaDB:   assente (verrà installato)"
     if port_in_use "$PORT"; then
         echo "  Porta app: ${PORT} OCCUPATA (lo script cercherà la successiva libera)"
@@ -340,6 +379,9 @@ case "$DB_PASS" in
     *[[:cntrl:]]*) die "La password database non può contenere caratteri di controllo." ;;
 esac
 
+# Fail before touching the database if this folder already hosts another instance.
+guard_existing_env
+
 # A root account reachable over TCP without a password is dangerous when
 # the server listens on a public interface. Loopback-only setups (common
 # with Homebrew) get a warning instead of a hard failure.
@@ -357,24 +399,74 @@ if [[ -z "$DB_ROOT_PASS" ]] \
     warn "root MariaDB accetta TCP senza password su loopback: imposta una password root se il servizio può essere raggiunto dalla rete."
 fi
 
+# Does the account already exist on this server? 0 = yes, 1 = no, 2 = unknown.
+db_user_exists() {
+    local user_sql="$1" host="$2" out
+    out="$(mysql_root_any -N -B -e "SELECT COUNT(*) FROM mysql.user WHERE user = '${user_sql}' AND host = '${host}';" 2>/dev/null)" || return 2
+    [[ "$out" =~ ^[0-9]+$ ]] || return 2
+    [[ "$out" -gt 0 ]] && return 0
+    return 1
+}
+
+# Can the application account already log in with the password we would use?
+db_user_auth_ok() {
+    local user="$1" pass="$2"
+    MYSQL_PWD="$pass" mysql -u "$user" -e 'SELECT 1' >/dev/null 2>&1 && return 0
+    MYSQL_PWD="$pass" mysql -u "$user" -h 127.0.0.1 -P "$DB_PORT" --protocol=TCP -e 'SELECT 1' >/dev/null 2>&1
+}
+
+# Never rotate the password of an account this run did not create: another Socly
+# instance (or another application) may be using it. Rotation is opt-in
+# (--reset-db-pass) and an unknown state is always treated as "leave it alone".
 build_database_sql() {
-    local pass_literal="$1"
-    cat <<SQL
-CREATE DATABASE IF NOT EXISTS \`${DB_NAME}\` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
-CREATE USER IF NOT EXISTS '${DB_USER_SQL}'@'localhost' IDENTIFIED BY '${pass_literal}';
-CREATE USER IF NOT EXISTS '${DB_USER_SQL}'@'127.0.0.1' IDENTIFIED BY '${pass_literal}';
-ALTER USER '${DB_USER_SQL}'@'localhost' IDENTIFIED BY '${pass_literal}';
-ALTER USER '${DB_USER_SQL}'@'127.0.0.1' IDENTIFIED BY '${pass_literal}';
-GRANT ALL PRIVILEGES ON \`${DB_NAME}\`.* TO '${DB_USER_SQL}'@'localhost';
-GRANT ALL PRIVILEGES ON \`${DB_NAME}\`.* TO '${DB_USER_SQL}'@'127.0.0.1';
-FLUSH PRIVILEGES;
-SQL
+    local pass_literal="$1" reset="$2" account="$3" host
+    printf 'CREATE DATABASE IF NOT EXISTS `%s` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;\n' "$DB_NAME"
+    for host in localhost 127.0.0.1; do
+        if db_user_exists "$account" "$host"; then
+            if [[ "$reset" == "1" ]]; then
+                printf "ALTER USER '%s'@'%s' IDENTIFIED BY '%s';\n" "$account" "$host" "$pass_literal"
+            fi
+        else
+            # 2 (unknown state) also lands here: CREATE IF NOT EXISTS never
+            # changes the password of an account that already exists.
+            printf "CREATE USER IF NOT EXISTS '%s'@'%s' IDENTIFIED BY '%s';\n" "$account" "$host" "$pass_literal"
+        fi
+        printf 'GRANT ALL PRIVILEGES ON `%s`.* TO %s;\n' "$DB_NAME" "'${account}'@'${host}'"
+    done
+    printf 'FLUSH PRIVILEGES;\n'
 }
 
 DB_PASS_SQL="$(sql_escape "$DB_PASS")"
 DB_USER_SQL="$(sql_escape "$DB_USER")"
-SQL_EXEC="$(build_database_sql "$DB_PASS_SQL")"
-SQL_REDACTED="$(build_database_sql '***')"
+
+# Refuse to take over an account that already exists with a different password.
+for _host in localhost 127.0.0.1; do
+    if db_user_exists "$DB_USER_SQL" "$_host"; then
+        _state=0
+    else
+        _state=$?
+    fi
+    if [[ "$_state" -eq 2 ]]; then
+        warn "Stato dell'utente '${DB_USER}'@'${_host}' non determinabile: la password esistente non viene toccata."
+        continue
+    fi
+    [[ "$_state" -eq 0 ]] || continue
+    if [[ "$RESET_DB_PASS" -eq 0 ]] && ! db_user_auth_ok "$DB_USER" "$DB_PASS"; then
+        cat >&2 <<MSG
+✖ L'utente MySQL '${DB_USER}'@'${_host}' esiste già con un'altra password.
+  Non la sovrascrivo per non interrompere un'istanza che la sta usando. Scegli:
+    --db-user=<altro nome>            usa un account nuovo
+    --db-pass=<password attuale>      riusa l'account esistente
+    --reset-db-pass                   ruota la password (rompe le altre istanze che la usano)
+  Per vedere gli account già presenti:
+    mysql -e "select user,host from mysql.user where user like '${DB_USER}%'"
+MSG
+        exit 3
+    fi
+done
+
+SQL_EXEC="$(build_database_sql "$DB_PASS_SQL" "$RESET_DB_PASS" "$DB_USER_SQL")"
+SQL_REDACTED="$(build_database_sql '***' "$RESET_DB_PASS" "$DB_USER_SQL")"
 
 if ! mysql_root_any -e "$SQL_EXEC"; then
     cat >&2 <<SQL
@@ -444,8 +536,18 @@ if [[ "$READY" -ne 1 ]]; then
     die "Il server locale non risponde su ${LOCAL_URL} (marcatore X-Socly-Installer assente)."
 fi
 
+# A GUI session is required: over SSH or on a headless Mac `open` fails or hangs.
 if [[ "$OPEN_BROWSER" -eq 1 ]]; then
-    open "$LOCAL_URL" >/dev/null 2>&1 || true
+    if [[ -n "${SSH_CONNECTION:-}${SSH_TTY:-}" ]]; then
+        echo "  Browser:  sessione SSH: apri ${LOCAL_URL} dal browser del Mac." >&2
+    elif have open; then
+        # `timeout` is not part of macOS by default.
+        if have timeout; then
+            timeout 10 open "$LOCAL_URL" >/dev/null 2>&1 || true
+        else
+            open "$LOCAL_URL" >/dev/null 2>&1 || true
+        fi
+    fi
 fi
 
 cat <<TXT

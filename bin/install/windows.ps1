@@ -24,6 +24,13 @@
   Remove the PHP runtime/shim and local server created by this script.
   Add -PurgeDatabase to also drop the Socly database/user.
   Add -PurgeMariaDb to also uninstall MariaDB when this script installed it.
+.PARAMETER ResetDbPass
+  Rotate the password of an already existing database user. Without it an
+  existing '<DbUser>'@'localhost' account with a different password stops the
+  installation instead of being silently overwritten.
+.PARAMETER Force
+  Overwrite an existing .env that points to another database (another Socly
+  instance installed in the same folder).
 .PARAMETER WaitOnExit
   Internal: keep this window open at the end. The script adds it only when it
   re-launches itself elevated, so the final URLs and log paths stay readable.
@@ -51,6 +58,8 @@ param(
     [switch]$Uninstall,
     [switch]$PurgeDatabase,
     [switch]$PurgeMariaDb,
+    [switch]$ResetDbPass,
+    [switch]$Force,
     [switch]$WaitOnExit
 )
 
@@ -287,7 +296,7 @@ function Get-CheckReport {
 
     $composerVersion = ''
     if (Has-Command composer) {
-        try { $composerVersion = (& composer --version 2>$null | Select-Object -First 1) } catch { $composerVersion = '' }
+        try { $composerVersion = (& composer --version --no-interaction 2>$null | Select-Object -First 1) } catch { $composerVersion = '' }
     }
 
     $mysqlPath = ''
@@ -804,6 +813,81 @@ function Test-RootAccess([string]$MysqlExe) {
     Fail 'Accesso root a MariaDB non riuscito. Rilancia con -DbRootPass "...".'
 }
 
+# Runs a scalar query against MariaDB as root and returns its first line, or
+# $null when the query fails.
+function Invoke-MysqlScalar {
+    param(
+        [Parameter(Mandatory = $true)][string]$MysqlExe,
+        [Parameter(Mandatory = $true)][string[]]$Arguments,
+        [Parameter(Mandatory = $true)][string]$Sql
+    )
+    $previous = $env:MYSQL_PWD
+    try {
+        if ($script:RootPassword -ne '') { $env:MYSQL_PWD = $script:RootPassword }
+        else { Remove-Item Env:MYSQL_PWD -ErrorAction SilentlyContinue }
+        $out = & $MysqlExe @Arguments '-N' '-B' '-e' $Sql 2>$null
+        if ($LASTEXITCODE -ne 0) { return $null }
+        $line = $out | Select-Object -First 1
+        if ($null -eq $line) { return '' }
+        return ([string]$line).Trim()
+    } catch {
+        return $null
+    } finally {
+        if ($null -eq $previous) { Remove-Item Env:MYSQL_PWD -ErrorAction SilentlyContinue }
+        else { $env:MYSQL_PWD = $previous }
+    }
+}
+
+# 'exists' | 'absent' | 'unknown' — an unknown state is never altered.
+function Get-DbAccountState {
+    param(
+        [Parameter(Mandatory = $true)][string]$MysqlExe,
+        [Parameter(Mandatory = $true)][string[]]$Arguments,
+        [Parameter(Mandatory = $true)][string]$UserSql,
+        [Parameter(Mandatory = $true)][string]$AccountHost
+    )
+    $count = Invoke-MysqlScalar -MysqlExe $MysqlExe -Arguments $Arguments `
+        -Sql "SELECT COUNT(*) FROM mysql.user WHERE user = '$UserSql' AND host = '$AccountHost';"
+    if ($null -eq $count -or $count -notmatch '^\d+$') { return 'unknown' }
+    if ([int]$count -gt 0) { return 'exists' }
+    return 'absent'
+}
+
+function Test-DbUserAuth {
+    param(
+        [Parameter(Mandatory = $true)][string]$MysqlExe,
+        [Parameter(Mandatory = $true)][string]$DbAddress,
+        [Parameter(Mandatory = $true)][string]$User,
+        [Parameter(Mandatory = $true)][string]$Pass
+    )
+    $previous = $env:MYSQL_PWD
+    try {
+        $env:MYSQL_PWD = $Pass
+        $authArgs = @('-u', $User, '-h', $DbAddress, '-P', "$DbPort", '--protocol=TCP', '--connect-timeout=5', '-e', 'SELECT 1;')
+        $null = & $MysqlExe @authArgs 2>$null
+        return ($LASTEXITCODE -eq 0)
+    } catch {
+        return $false
+    } finally {
+        if ($null -eq $previous) { Remove-Item Env:MYSQL_PWD -ErrorAction SilentlyContinue }
+        else { $env:MYSQL_PWD = $previous }
+    }
+}
+
+# The wizard rewrites APP_URL/DB_* in .env by design: doing that inside a folder
+# that already hosts another instance would silently repoint it.
+function Assert-ExistingEnv {
+    $envFile = Join-Path $Root '.env'
+    if (-not (Test-Path $envFile)) { return }
+    if ($Force) { return }
+    $envDb = Get-EnvValue $envFile 'DB_DATABASE'
+    if ([string]::IsNullOrWhiteSpace($envDb)) { return }
+    $envUser = Get-EnvValue $envFile 'DB_USERNAME'
+    if ($envDb -eq $DbName -and ([string]::IsNullOrWhiteSpace($envUser) -or $envUser -eq $DbUser)) { return }
+    Fail ("$envFile punta gia' al database '$envDb' (utente '$envUser'): sovrascriverlo romperebbe l'istanza esistente. " +
+        "Rilancia con -DbName $envDb -DbUser $envUser, installa in una cartella nuova oppure aggiungi -Force.")
+}
+
 function Create-Database([string]$MysqlExe) {
     if ($DbName -notmatch '^[A-Za-z0-9_]+$') { Fail 'Nome database non valido: usa lettere, numeri e _' }
     if ($DbUser -notmatch '^[A-Za-z0-9_]+$') { Fail 'Nome utente database non valido: usa lettere, numeri e _' }
@@ -815,16 +899,37 @@ function Create-Database([string]$MysqlExe) {
 
     $user = Escape-SqlString $DbUser
     $pass = Escape-SqlString $script:DbPass
-    $sql = 'CREATE DATABASE IF NOT EXISTS `' + $DbName + '` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci; ' +
-        "CREATE USER IF NOT EXISTS '$user'@'localhost' IDENTIFIED BY '$pass'; " +
-        "CREATE USER IF NOT EXISTS '$user'@'127.0.0.1' IDENTIFIED BY '$pass'; " +
-        "ALTER USER '$user'@'localhost' IDENTIFIED BY '$pass'; " +
-        "ALTER USER '$user'@'127.0.0.1' IDENTIFIED BY '$pass'; " +
-        'GRANT ALL PRIVILEGES ON `' + $DbName + '`.* TO ' + "'$user'@'localhost'; " +
-        'GRANT ALL PRIVILEGES ON `' + $DbName + '`.* TO ' + "'$user'@'127.0.0.1'; FLUSH PRIVILEGES;"
-
     $args = @('-u', 'root', '-h', $DbHost, '-P', "$DbPort", '--protocol=TCP', '--connect-timeout=5')
     $script:RootPassword = $script:DbRootPass
+
+    # Never rotate the password of an account this run did not create: another
+    # Socly instance (or another application) may be using it.
+    $parts = New-Object System.Collections.Generic.List[string]
+    $parts.Add('CREATE DATABASE IF NOT EXISTS `' + $DbName + '` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;')
+    foreach ($accountHost in @('localhost', '127.0.0.1')) {
+        $state = Get-DbAccountState -MysqlExe $MysqlExe -Arguments $args -UserSql $user -AccountHost $accountHost
+        if ($state -eq 'unknown') {
+            Write-Warn "Stato dell'utente $DbUser@$accountHost non determinabile: la password esistente non viene toccata."
+        }
+        if ($state -eq 'exists' -and -not $ResetDbPass) {
+            if (-not (Test-DbUserAuth -MysqlExe $MysqlExe -DbAddress $DbHost -User $DbUser -Pass $script:DbPass)) {
+                Fail ("L'utente MySQL '$DbUser'@'$accountHost' esiste gia' con un'altra password. Non la sovrascrivo " +
+                    "per non interrompere un'istanza che la sta usando: usa -DbUser <altro nome>, " +
+                    "-DbPass <password attuale> oppure -ResetDbPass per ruotarla.")
+            }
+        }
+        if ($state -eq 'exists') {
+            if ($ResetDbPass) { $parts.Add("ALTER USER '$user'@'$accountHost' IDENTIFIED BY '$pass';") }
+        } else {
+            # 'unknown' lands here too: CREATE IF NOT EXISTS never changes the
+            # password of an account that already exists.
+            $parts.Add("CREATE USER IF NOT EXISTS '$user'@'$accountHost' IDENTIFIED BY '$pass';")
+        }
+        $parts.Add('GRANT ALL PRIVILEGES ON `' + $DbName + '`.* TO ' + "'$user'@'$accountHost';")
+    }
+    $parts.Add('FLUSH PRIVILEGES;')
+    $sql = $parts -join ' '
+
     $code = Invoke-Mysql -MysqlExe $MysqlExe -Arguments $args -Sql $sql
     if ($code -ne 0) {
         $redacted = $sql.Replace($pass, '***').Replace($script:DbPass, '***')
@@ -1098,6 +1203,7 @@ try {
     }
     $script:DbPass = $DbPass
     $script:DbRootPass = $DbRootPass
+    Assert-ExistingEnv
 
     $PhpExe = Ensure-Php
     Save-Manifest

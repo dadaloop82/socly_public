@@ -39,10 +39,19 @@ powershell -ExecutionPolicy Bypass -File bin\install\windows.ps1    # Windows (a
 ```
 
 Opzioni utili: `--check` (solo verifica), `--plan` (mostra le azioni senza modifiche), `--no-ocr`,
-`--no-serve`, `--port=8080`, `--db-root-pass=...`. Su Windows i parametri sono `-Check` (con `-Json`
-e `-ReportPath` per un report machine-readable), `-Plan`, `-Ocr`, `-NoOcr`, `-NoServe`, `-Port`,
-`-DbRootPass`, `-Uninstall`, `-PurgeDatabase`, `-PurgeMariaDb`.
+`--no-serve`, `--port=8080`, `--db-root-pass=...`, `--user=<utente di sistema>` (proprietario di
+`.env`/`storage/`; usalo quando installi come root su un host servito da `www-data`),
+`--reset-db-pass` (ruota la password di un utente DB già esistente: senza questo flag un account
+omonimo con password diversa blocca l'installazione invece di essere sovrascritto), `--force`
+(sovrascrive un `.env` che punta a un altro database). Su Windows i parametri sono `-Check` (con
+`-Json` e `-ReportPath` per un report machine-readable), `-Plan`, `-Ocr`, `-NoOcr`, `-NoServe`,
+`-Port`, `-DbRootPass`, `-ResetDbPass`, `-Force`, `-Uninstall`, `-PurgeDatabase`, `-PurgeMariaDb`.
 Dettagli in [`bin/install/README.md`](../bin/install/README.md).
+
+Gli script **non toccano un'istanza esistente**: installano PHP e il server MariaDB solo se mancano
+(su un host già servito da Plesk/cPanel o con un PHP completo non viene aggiunto un secondo stack),
+non riscrivono un `.env` che punta a un altro database e non cambiano la password di un utente MySQL
+preesistente. Su un server condiviso installa in una cartella nuova con DB e utente dedicati.
 
 Al termine apri `http://127.0.0.1:8080/install` e completa il wizard (associazione, periodo/quota,
 campi). Poi accedi con `admin@socly.it` (password di manutenzione definita nel codice, mai stampata
@@ -218,10 +227,20 @@ powershell -ExecutionPolicy Bypass -File bin\install\windows.ps1    # Windows (a
 ```
 
 Useful flags: `--check` (verify only), `--plan` (show actions without changes), `--no-ocr`,
-`--no-serve`, `--port=8080`, `--db-root-pass=...`. On Windows the parameters are `-Check` (with
-`-Json` and `-ReportPath` for a machine-readable report), `-Plan`, `-Ocr`, `-NoOcr`, `-NoServe`,
-`-Port`, `-DbRootPass`, `-Uninstall`, `-PurgeDatabase`, `-PurgeMariaDb`. Details in
-[`bin/install/README.md`](../bin/install/README.md).
+`--no-serve`, `--port=8080`, `--db-root-pass=...`, `--user=<system user>` (owner of
+`.env`/`storage/`; use it when installing as root on a host served by `www-data`),
+`--reset-db-pass` (rotate the password of an already existing DB user: without it an account with
+the same name but a different password stops the installation instead of being overwritten),
+`--force` (overwrite an `.env` that points to another database). On Windows the parameters are
+`-Check` (with `-Json` and `-ReportPath` for a machine-readable report), `-Plan`, `-Ocr`, `-NoOcr`,
+`-NoServe`, `-Port`, `-DbRootPass`, `-ResetDbPass`, `-Force`, `-Uninstall`, `-PurgeDatabase`,
+`-PurgeMariaDb`. Details in [`bin/install/README.md`](../bin/install/README.md).
+
+The scripts **never touch an existing installation**: PHP and the MariaDB server are installed only
+when missing (a host already managed by Plesk/cPanel or with a complete PHP stack does not get a
+second one), an `.env` pointing to another database is not rewritten and the password of a
+pre-existing MySQL user is never changed. On a shared server install into a new folder with a
+dedicated database and user.
 
 Then open `http://127.0.0.1:8080/install` and complete the wizard (association, period/type, fields).
 Then sign in as `admin@socly.it` (maintenance password defined in code, never printed by the scripts)

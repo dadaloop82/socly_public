@@ -32,6 +32,9 @@ Terms of Service for you.
 --db-user=socly        database user
 --db-pass=...          database password (default: generated)
 --db-root-pass=...     MariaDB/MySQL root password, when required
+--reset-db-pass        rotate the password of an already existing DB user
+--user=USER            system user owning .env/storage and running the server
+--force                overwrite an .env that points to another database
 --url=https://...      public application URL written to .env
 --locale=it|de|en      default locale
 --no-ocr               skip poppler/tesseract installation
@@ -43,7 +46,7 @@ Terms of Service for you.
 
 On Windows the PowerShell parameters are `-Port`, `-Bind`, `-DbName`, `-DbUser`, `-DbPass`,
 `-DbRootPass`, `-Url`, `-Locale`, `-Ocr`, `-NoOcr`, `-NoBrowser`, `-NoServe`, `-Check`, `-Json`,
-`-ReportPath`, `-Plan`, `-Uninstall`, `-PurgeDatabase`, `-PurgeMariaDb`.
+`-ReportPath`, `-Plan`, `-ResetDbPass`, `-Force`, `-Uninstall`, `-PurgeDatabase`, `-PurgeMariaDb`.
 
 `-Check -Json` prints a machine-readable report (OS, admin rights, free disk, ports, network,
 PHP/Composer/MariaDB, project files, firewall/Defender). `-Plan` only prints the actions.
@@ -54,9 +57,10 @@ PHP/Composer/MariaDB, project files, firewall/Defender). `-Plan` only prints the
 ## What gets installed
 
 - **PHP 8.4/8.3** (preferred) or **8.2** with `pdo_mysql`, `mbstring`, `openssl`, `json`, `fileinfo`,
-  `curl`, `gd`, `intl`, `zip`
+  `curl`, `gd`, `intl`, `zip` — installed only when PHP is missing or its extensions are incomplete
 - **Composer** (system package or a local `composer.phar` on Windows, verified against its SHA-256)
-- **MariaDB/MySQL** server and client. On Windows the installer sets a generated root password,
+- **MariaDB/MySQL** server and client — the client only when missing, the server only when no local
+  instance is reachable. On Windows the installer sets a generated root password,
   stores it in `storage/cache/db-root.pass` with restricted ACLs, binds MariaDB to `127.0.0.1`
   and rejects existing empty-root TCP access. It does **not** add PHP to the Machine `PATH`.
 - **OCR (optional)**: `poppler-utils`, `tesseract`, Italian language data on Linux/macOS;
@@ -83,6 +87,20 @@ PHP/Composer/MariaDB, project files, firewall/Defender). `-Plan` only prints the
   Poppler still has to be installed manually; without it the RUNTS PDF prefill is partial.
 - The scripts are idempotent: re-running them keeps the existing database, `.env`, `APP_KEY` and
   generated passwords. Reuse `-DbRootPass`/`--db-root-pass` for a root account you manage yourself.
+- They are also **non-destructive on shared hosts**: PHP and the MariaDB server are installed only
+  when missing (a host already serving another stack, e.g. Plesk/cPanel, does not get a second
+  `php8.x` or a second MariaDB), an existing `.env` pointing to a different database stops the run
+  (`--force`/`-Force` to override) and the password of a pre-existing MySQL user is never rotated
+  unless `--reset-db-pass`/`-ResetDbPass` is passed explicitly. Install a test instance in a new
+  folder with `--db-name`/`--db-user` of its own.
+- On Linux the system user that owns `.env` and `storage/` is chosen with `--user` (or the
+  `SOCLY_APP_USER` environment variable; default: the user that invoked `sudo`, or the current owner
+  of `storage/`). Running as root leaves root-owned files that a `www-data`/`php-fpm` deployment
+  cannot read: the script warns about it.
+- `--check` never blocks on an interactive prompt (Composer is always called with
+  `--no-interaction`). On a remote/headless machine the browser is not opened: use
+  `ssh -L 8080:127.0.0.1:8080 user@host`. `--bind=0.0.0.0` exposes the pre-authentication wizard to
+  the network and prints a warning.
 - A port requested explicitly (`--port`/`-Port`) that is already busy stops the installation. The
   default port is shifted to the next free one and `APP_URL` is written with the port actually used.
 - Never commit `.env`, `storage/` or the generated passwords.

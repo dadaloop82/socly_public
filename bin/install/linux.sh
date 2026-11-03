@@ -23,6 +23,10 @@ CHECK_ONLY=0
 PLAN_ONLY=0
 PORT_EXPLICIT=0
 APP_URL_EXPLICIT=0
+RESET_DB_PASS=0
+FORCE_ENV=0
+APP_USER_OVERRIDE="${SOCLY_APP_USER:-}"
+APT_UPDATED=0
 # The option loop below consumes "$@": keep a copy for the sudo re-exec.
 ORIG_ARGS=("$@")
 if [[ -n "${SOCLY_PORT:-}" ]]; then PORT_EXPLICIT=1; fi
@@ -42,6 +46,11 @@ Options:
   --db-user=USER         Database user (default socly)
   --db-pass=PASS         Database password (default: generated)
   --db-root-pass=PASS    MariaDB/MySQL root password (if needed)
+  --reset-db-pass        Rotate the password of an already existing DB user
+  --user=USER            System user that owns .env/storage and runs the server
+                         (default: the user that invoked sudo, else the owner
+                         of storage/, else the current user)
+  --force                Overwrite an .env pointing to another database
   --url=URL              Public application URL (default http://BIND:PORT)
   --locale=it|de|en      Default locale (default it)
   --no-ocr               Skip poppler/tesseract installation
@@ -102,6 +111,41 @@ port_in_use() {
     return 1
 }
 
+is_local_db() {
+    case "$DB_HOST" in
+        localhost|127.0.0.1|::1) return 0 ;;
+    esac
+    return 1
+}
+
+# Composer >= 2.5 asks for an interactive confirmation when it runs as root:
+# always call it non-interactively, otherwise diagnostics such as --check look
+# frozen when the script runs on a TTY.
+composer_version() {
+    COMPOSER_ALLOW_SUPERUSER=1 composer --version --no-interaction 2>/dev/null </dev/null | head -1
+}
+
+# The wizard rewrites APP_URL/DB_* in .env by design: doing that inside a
+# directory that already hosts another instance would silently repoint it.
+guard_existing_env() {
+    [[ "$FORCE_ENV" -eq 1 ]] && return 0
+    local env_db env_user
+    env_db="$(env_value DB_DATABASE || true)"
+    [[ -n "$env_db" ]] || return 0
+    env_user="$(env_value DB_USERNAME || true)"
+    if [[ "$env_db" == "$DB_NAME" && ( -z "$env_user" || "$env_user" == "$DB_USER" ) ]]; then
+        return 0
+    fi
+    cat >&2 <<MSG
+✖ ${ROOT}/.env punta già al database '${env_db}' (utente '${env_user:-?}').
+  Sovrascriverlo romperebbe l'istanza esistente. Scegli:
+    --db-name=${env_db} --db-user=${env_user:-$DB_USER}   riusa l'istanza presente
+    installa in una cartella nuova (es. /opt/socly o un altro vhost)
+    --force                                              sovrascrive comunque
+MSG
+    exit 2
+}
+
 # Resolve the port before .env is written, so APP_URL never points at a port
 # that the built-in server does not use. An explicitly requested port that is
 # busy stops the installation instead of silently serving somewhere else.
@@ -110,6 +154,14 @@ resolve_local_port() {
     if [[ "$BIND" == "0.0.0.0" || "$BIND" == "::" ]]; then
         CONNECT_HOST="127.0.0.1"
     fi
+    case "$BIND" in
+        127.*|::1|localhost) ;;
+        *)
+            warn "--bind=${BIND} espone il wizard /install (nessuna autenticazione) su tutte le interfacce."
+            echo "  Preferisci 127.0.0.1 + tunnel SSH (ssh -L ${PORT}:127.0.0.1:${PORT} utente@server)," >&2
+            echo "  oppure --no-serve e servi l'app con un vhost Apache/Nginx." >&2
+            ;;
+    esac
     LOCAL_PORT="$PORT"
     for _ in $(seq 1 25); do
         port_in_use "$LOCAL_PORT" || break
@@ -145,6 +197,10 @@ while (($#)); do
         --url) APP_URL="$2"; shift 2 ;;
         --locale=*) LOCALE="${1#*=}"; shift ;;
         --locale) LOCALE="$2"; shift 2 ;;
+        --user=*) APP_USER_OVERRIDE="${1#*=}"; shift ;;
+        --user) APP_USER_OVERRIDE="$2"; shift 2 ;;
+        --reset-db-pass) RESET_DB_PASS=1; shift ;;
+        --force) FORCE_ENV=1; shift ;;
         --no-ocr) WITH_OCR=0; shift ;;
         --no-browser) OPEN_BROWSER=0; shift ;;
         --no-serve) DO_SERVE=0; shift ;;
@@ -171,6 +227,26 @@ php_extensions_ok() {
     php -r '$r=["pdo_mysql","mbstring","openssl","json","fileinfo"]; foreach($r as $e){ if(!extension_loaded($e)) exit(1); }' >/dev/null 2>&1
 }
 
+php_extra_extensions_ok() {
+    have php || return 1
+    php -r '$r=["curl","zip","gd","intl","xml"]; foreach($r as $e){ if(!extension_loaded($e)) exit(1); }' >/dev/null 2>&1
+}
+
+# The unix user that will own .env/storage and run the local server. Running as
+# root is a trap: the app then cannot be served by www-data/php-fpm, so an
+# existing storage/ owner wins over "root".
+app_user_candidate() {
+    local user="${APP_USER_OVERRIDE:-${SUDO_USER:-$(id -un)}}" owner
+    if [[ "$user" == "root" ]]; then
+        owner="$(stat -c '%U' "$ROOT/storage" 2>/dev/null || true)"
+        if [[ -n "$owner" && "$owner" != "root" && "$owner" != "UNKNOWN" ]]; then
+            printf '%s' "$owner"
+            return 0
+        fi
+    fi
+    printf '%s' "$user"
+}
+
 check_environment() {
     echo "Socly — verifica ambiente Linux"
     if [[ -f /etc/os-release ]]; then
@@ -183,15 +259,21 @@ check_environment() {
     else
         echo "  Admin:     no (lo script si eleva con sudo)"
     fi
+    echo "  Utente app: $(app_user_candidate) (proprietario di .env e storage/)"
     if have php; then
-        echo "  PHP:       $(php -r 'echo PHP_VERSION;')"
+        echo "  PHP:       $(php -r 'echo PHP_VERSION;') ($(command -v php))"
         php_extensions_ok && echo "  Estensioni: pdo_mysql, mbstring, openssl, json, fileinfo OK" \
             || echo "  Estensioni: MANCANTI (verranno installate)"
+        php_extra_extensions_ok || echo "  Extra:     mancano curl/zip/gd/intl/xml (OCR e PDF)"
         echo "  php.ini:   display_errors=$(php -r 'echo ini_get("display_errors") ?: "0";') log_errors=$(php -r 'echo ini_get("log_errors") ?: "0";')"
     else
         echo "  PHP:       assente (verrà installato)"
     fi
-    have composer && echo "  Composer:  $(composer --version 2>/dev/null | head -1)" || echo "  Composer:  assente (verrà installato)"
+    if have composer; then
+        echo "  Composer:  $(composer_version)"
+    else
+        echo "  Composer:  assente (verrà installato)"
+    fi
     if have mysql || have mariadb; then
         echo "  MariaDB:   client presente"
     else
@@ -238,6 +320,10 @@ show_plan() {
         echo "  Porta app: $PORT (bind $BIND) occupata -> userà $plan_port"
     fi
     echo "  Database:  $DB_NAME su $DB_HOST:$DB_PORT (utente $DB_USER)"
+    if [[ "$RESET_DB_PASS" -eq 1 ]]; then
+        echo "             password dell'utente esistente RUOTATA (--reset-db-pass)"
+    fi
+    echo "  Utente app: $(app_user_candidate) (proprietario di .env e storage/)"
     if php_version_ok && php_extensions_ok; then
         echo "  PHP:       riuso $(php -r 'echo PHP_VERSION;')"
     else
@@ -247,7 +333,10 @@ show_plan() {
     if have mysql || have mariadb; then
         echo "  MariaDB:   riuso client esistente"
     else
-        echo "  MariaDB:   installazione pacchetto server + client"
+        echo "  MariaDB:   installazione del client"
+    fi
+    if is_local_db && ! have mysqld && ! have mariadbd; then
+        echo "  MariaDB:   installazione del server (nessuna istanza installata)"
     fi
     echo "  .env:      creato/aggiornato, chmod 600"
     echo "  Migrazioni: php bin/install/bootstrap.php"
@@ -274,7 +363,24 @@ if [[ "${EUID}" -ne 0 ]]; then
     fi
     exec sudo -E bash "$0"
 fi
-APP_USER="${SUDO_USER:-$(id -un)}"
+# .env (chmod 600) and storage/ must belong to the user that will serve the app:
+# root-owned files silently break a www-data/php-fpm deployment.
+resolve_app_user() {
+    local raw="${APP_USER_OVERRIDE:-${SUDO_USER:-$(id -un)}}"
+    APP_USER="$(app_user_candidate)"
+    if [[ "$raw" == "root" && "$APP_USER" != "root" ]]; then
+        warn "Esecuzione come root ma storage/ appartiene a ${APP_USER}: uso --user=${APP_USER}"
+        echo "  per non rompere l'istanza esistente (forzalo con --user=root se è voluto)." >&2
+    fi
+    id -u "$APP_USER" >/dev/null 2>&1 \
+        || die "Utente '${APP_USER}' inesistente: correggi --user=<utente> e rilancia."
+    if [[ "$APP_USER" == "root" ]]; then
+        warn "Esecuzione come root: .env (chmod 600), storage/ e il server locale saranno di root."
+        echo "  Se l'app sarà servita da www-data/php-fpm rilancia con --user=www-data" >&2
+        echo "  (oppure SUDO_USER=www-data bash bin/install/linux.sh ...)." >&2
+    fi
+}
+resolve_app_user
 export DEBIAN_FRONTEND=noninteractive
 if [[ "$DO_SERVE" -eq 1 ]]; then
     resolve_local_port
@@ -304,69 +410,148 @@ install_composer_official() {
     ok 'Composer installato e verificato'
 }
 
+mysql_client_ok() {
+    have mysql || have mariadb
+}
+
+# The local DB server is reachable or at least installed: a shared/corporate
+# host (Plesk, cPanel, a pre-existing MariaDB) must never get a second one.
+mysql_server_ok() {
+    db_ping "$DB_HOST" "$DB_PORT" && return 0
+    have mysqld || have mariadbd || return 1
+    return 0
+}
+
+apt_prepare() {
+    if [[ "$APT_UPDATED" -eq 0 ]]; then
+        apt-get update || warn "apt-get update ha segnalato errori: proseguo con gli indici esistenti."
+        APT_UPDATED=1
+    fi
+}
+
+# Install only when the argument list is not empty, refreshing the indexes once.
+apt_install() {
+    [[ $# -gt 0 ]] || return 0
+    apt_prepare
+    apt-get install -y "$@"
+}
+
+# PHP is installed only when it is missing or incomplete: on a host that already
+# provides a full PHP stack (Plesk, cPanel, distro packages) adding php8.x-*
+# would create a second, unused stack.
+install_php_apt() {
+    local v ver pkg installable=()
+    if php_version_ok && php_extensions_ok; then
+        ver="$(php -r 'echo PHP_MAJOR_VERSION.".".PHP_MINOR_VERSION;')"
+        for pkg in curl zip gd intl xml; do
+            php -r "exit(extension_loaded('${pkg}') ? 0 : 1);" >/dev/null 2>&1 && continue
+            # Only a package that really exists for this PHP version is safe to add.
+            apt-cache show "php${ver}-${pkg}" >/dev/null 2>&1 && installable+=("php${ver}-${pkg}")
+        done
+        if [[ ${#installable[@]} -eq 0 ]]; then
+            ok "PHP $(php -r 'echo PHP_VERSION;') con le estensioni richieste: nessun pacchetto PHP aggiunto"
+            return 0
+        fi
+        apt_install "${installable[@]}" || warn "Estensioni PHP opzionali non installate: ${installable[*]}"
+        return 0
+    fi
+
+    local installed=0
+    for v in 8.4 8.3 8.2; do
+        apt-cache show "php${v}-cli" >/dev/null 2>&1 || continue
+        if apt_install "php${v}-cli" "php${v}-mysql" "php${v}-mbstring" "php${v}-xml" \
+            "php${v}-curl" "php${v}-zip" "php${v}-gd" "php${v}-intl"; then
+            installed=1
+            break
+        fi
+    done
+    if [[ "$installed" -eq 0 ]]; then
+        warn "PHP 8.2+ non disponibile nei repository: provo il repository ondrej/php"
+        apt_install software-properties-common gnupg
+        add-apt-repository -y ppa:ondrej/php || true
+        APT_UPDATED=0
+        apt_prepare
+        for v in 8.4 8.3 8.2; do
+            apt-cache show "php${v}-cli" >/dev/null 2>&1 || continue
+            if apt_install "php${v}-cli" "php${v}-mysql" "php${v}-mbstring" "php${v}-xml" \
+                "php${v}-curl" "php${v}-zip" "php${v}-gd" "php${v}-intl"; then
+                installed=1
+                break
+            fi
+        done
+    fi
+    [[ "$installed" -eq 1 ]] || die "PHP 8.2+ non installabile automaticamente: installalo e riprova."
+}
+
 install_packages() {
     if have apt-get; then
         ok "Pacchetti Debian/Ubuntu"
-        apt-get update
-        apt-get install -y ca-certificates curl unzip mariadb-server mariadb-client
-        if ! php_version_ok; then
-            local installed=0 v
-            for v in 8.4 8.3 8.2; do
-                if apt-cache show "php${v}-cli" >/dev/null 2>&1; then
-                    if apt-get install -y "php${v}-cli" "php${v}-mysql" "php${v}-mbstring" "php${v}-xml" \
-                        "php${v}-curl" "php${v}-zip" "php${v}-gd" "php${v}-intl"; then
-                        installed=1
-                        break
-                    fi
-                fi
-            done
-            if [[ "$installed" -eq 0 ]]; then
-                warn "PHP 8.2+ non disponibile nei repository: provo il repository ondrej/php"
-                apt-get install -y software-properties-common gnupg
-                add-apt-repository -y ppa:ondrej/php || true
-                apt-get update
-                for v in 8.4 8.3 8.2; do
-                    if apt-cache show "php${v}-cli" >/dev/null 2>&1; then
-                        if apt-get install -y "php${v}-cli" "php${v}-mysql" "php${v}-mbstring" "php${v}-xml" \
-                            "php${v}-curl" "php${v}-zip" "php${v}-gd" "php${v}-intl"; then
-                            installed=1
-                            break
-                        fi
-                    fi
-                done
-            fi
-            [[ "$installed" -eq 1 ]] || die "PHP 8.2+ non installabile automaticamente: installalo e riprova."
-        else
-            local ver
-            ver="$(php -r 'echo PHP_MAJOR_VERSION.".".PHP_MINOR_VERSION;')"
-            apt-get install -y "php${ver}-mysql" "php${ver}-mbstring" "php${ver}-xml" "php${ver}-curl" "php${ver}-zip" "php${ver}-gd" "php${ver}-intl" \
-                || apt-get install -y php-mysql php-mbstring php-xml php-curl php-zip php-gd php-intl
+        local base=()
+        have curl || base+=(curl)
+        have unzip || base+=(unzip)
+        [[ -f /etc/ssl/certs/ca-certificates.crt ]] || base+=(ca-certificates)
+        apt_install "${base[@]}"
+        if ! mysql_client_ok; then
+            apt_install mariadb-client || apt_install default-mysql-client \
+                || warn "Client MySQL/MariaDB non installato: installalo e riprova."
         fi
-        have composer || apt-get install -y composer || install_composer_official
-        if [[ "$WITH_OCR" -eq 1 ]]; then
-            apt-get install -y poppler-utils tesseract-ocr tesseract-ocr-ita \
+        if is_local_db && ! mysql_server_ok; then
+            apt_install mariadb-server \
+                || die "MariaDB non installabile e nessun server raggiungibile su ${DB_HOST}:${DB_PORT}."
+        fi
+        install_php_apt
+        have composer || apt_install composer || install_composer_official
+        if [[ "$WITH_OCR" -eq 1 ]] && { ! have pdftoppm || ! have tesseract; }; then
+            apt_install poppler-utils tesseract-ocr tesseract-ocr-ita \
                 || warn "OCR non installato (opzionale): puoi aggiungerlo dopo"
         fi
     elif have dnf; then
         ok "Pacchetti Fedora/RHEL"
-        dnf install -y curl unzip mariadb-server mariadb \
-            php-cli php-mysqlnd php-mbstring php-openssl php-curl php-zip php-gd php-intl
-        if [[ "$WITH_OCR" -eq 1 ]]; then
+        have curl || dnf install -y curl
+        have unzip || dnf install -y unzip
+        mysql_client_ok || dnf install -y mariadb
+        if is_local_db && ! mysql_server_ok; then
+            dnf install -y mariadb-server
+        fi
+        if ! php_version_ok || ! php_extensions_ok; then
+            dnf install -y php-cli php-mysqlnd php-mbstring php-openssl php-curl php-zip php-gd php-intl
+        fi
+        have composer || dnf install -y composer || install_composer_official
+        if [[ "$WITH_OCR" -eq 1 ]] && { ! have pdftoppm || ! have tesseract; }; then
             dnf install -y poppler-utils tesseract tesseract-langpack-ita \
                 || warn "OCR non installato (opzionale): puoi aggiungerlo dopo"
         fi
     elif have pacman; then
         ok "Pacchetti Arch"
-        pacman -Sy --noconfirm --needed php php-gd composer mariadb curl unzip
-        if [[ "$WITH_OCR" -eq 1 ]]; then
+        if ! php_version_ok || ! php_extensions_ok; then
+            pacman -Sy --noconfirm --needed php php-gd
+        fi
+        have composer || pacman -S --noconfirm --needed composer
+        if ! mysql_client_ok; then
+            pacman -S --noconfirm --needed mariadb-clients
+        fi
+        if is_local_db && ! mysql_server_ok; then
+            pacman -S --noconfirm --needed mariadb
+        fi
+        have curl || pacman -S --noconfirm --needed curl
+        have unzip || pacman -S --noconfirm --needed unzip
+        if [[ "$WITH_OCR" -eq 1 ]] && { ! have pdftoppm || ! have tesseract; }; then
             pacman -S --noconfirm --needed poppler tesseract tesseract-data-ita \
                 || warn "OCR non installato (opzionale): puoi aggiungerlo dopo"
         fi
     elif have zypper; then
         ok "Pacchetti openSUSE"
-        zypper --non-interactive install php8 php8-mysql php8-mbstring php8-openssl \
-            php8-curl php8-zip php8-gd php8-intl mariadb mariadb-client curl unzip
-        if [[ "$WITH_OCR" -eq 1 ]]; then
+        if ! php_version_ok || ! php_extensions_ok; then
+            zypper --non-interactive install php8 php8-mysql php8-mbstring php8-openssl \
+                php8-curl php8-zip php8-gd php8-intl
+        fi
+        mysql_client_ok || zypper --non-interactive install mariadb-client
+        if is_local_db && ! mysql_server_ok; then
+            zypper --non-interactive install mariadb
+        fi
+        have curl || zypper --non-interactive install curl
+        have unzip || zypper --non-interactive install unzip
+        if [[ "$WITH_OCR" -eq 1 ]] && { ! have pdftoppm || ! have tesseract; }; then
             zypper --non-interactive install poppler-tools tesseract-ocr tesseract-ocr-ita \
                 || warn "OCR non installato (opzionale): puoi aggiungerlo dopo"
         fi
@@ -375,19 +560,27 @@ install_packages() {
         apk update >/dev/null 2>&1 || true
         # Alpine ships PHP per version and not every branch has the newest one.
         # json/session/fileinfo are not separate packages on Alpine.
-        local apk_php=''
-        for v in 84 83 82; do
-            if apk info -e "php${v}" >/dev/null 2>&1; then apk_php="$v"; break; fi
-        done
-        [[ -n "$apk_php" ]] || die "Nessun pacchetto PHP 8.2+ nei repository Alpine: aggiorna la distro e riprova."
-        apk add --no-cache "php${apk_php}" \
-            "php${apk_php}-pdo_mysql" "php${apk_php}-mbstring" "php${apk_php}-openssl" \
-            "php${apk_php}-curl" "php${apk_php}-zip" "php${apk_php}-gd" "php${apk_php}-intl" \
-            "php${apk_php}-phar" "php${apk_php}-tokenizer" "php${apk_php}-xml" \
-            "php${apk_php}-session" "php${apk_php}-fileinfo" \
-            composer mariadb mariadb-client curl unzip
-        ln -sf "/usr/bin/php${apk_php}" /usr/local/bin/php
-        if [[ "$WITH_OCR" -eq 1 ]]; then
+        if ! php_version_ok || ! php_extensions_ok; then
+            local apk_php=''
+            for v in 84 83 82; do
+                if apk info -e "php${v}" >/dev/null 2>&1; then apk_php="$v"; break; fi
+            done
+            [[ -n "$apk_php" ]] || die "Nessun pacchetto PHP 8.2+ nei repository Alpine: aggiorna la distro e riprova."
+            apk add --no-cache "php${apk_php}" \
+                "php${apk_php}-pdo_mysql" "php${apk_php}-mbstring" "php${apk_php}-openssl" \
+                "php${apk_php}-curl" "php${apk_php}-zip" "php${apk_php}-gd" "php${apk_php}-intl" \
+                "php${apk_php}-phar" "php${apk_php}-tokenizer" "php${apk_php}-xml" \
+                "php${apk_php}-session" "php${apk_php}-fileinfo"
+            ln -sf "/usr/bin/php${apk_php}" /usr/local/bin/php
+        fi
+        have composer || apk add --no-cache composer
+        mysql_client_ok || apk add --no-cache mariadb-client
+        if is_local_db && ! mysql_server_ok; then
+            apk add --no-cache mariadb
+        fi
+        have curl || apk add --no-cache curl
+        have unzip || apk add --no-cache unzip
+        if [[ "$WITH_OCR" -eq 1 ]] && { ! have pdftoppm || ! have tesseract; }; then
             apk add --no-cache poppler-utils tesseract-ocr tesseract-ocr-data-ita \
                 || warn "OCR non installato (opzionale): puoi aggiungerlo dopo"
         fi
@@ -447,18 +640,41 @@ mysql_root_any() {
     mysql_root_tcp "$@"
 }
 
+# Does the account already exist on this server? 0 = yes, 1 = no, 2 = unknown.
+db_user_exists() {
+    local user_sql="$1" host="$2" out
+    out="$(mysql_root_any -N -B -e "SELECT COUNT(*) FROM mysql.user WHERE user = '${user_sql}' AND host = '${host}';" 2>/dev/null)" || return 2
+    [[ "$out" =~ ^[0-9]+$ ]] || return 2
+    [[ "$out" -gt 0 ]] && return 0
+    return 1
+}
+
+# Can the application account already log in with the password we would use?
+db_user_auth_ok() {
+    local user="$1" pass="$2"
+    MYSQL_PWD="$pass" mysql -u "$user" -e 'SELECT 1' >/dev/null 2>&1 && return 0
+    MYSQL_PWD="$pass" mysql -u "$user" -h 127.0.0.1 -P "$DB_PORT" --protocol=TCP -e 'SELECT 1' >/dev/null 2>&1
+}
+
+# Never rotate the password of an account this run did not create: another Socly
+# instance (or another application) may be using it. Rotation is opt-in
+# (--reset-db-pass) and an unknown state is always treated as "leave it alone".
 build_database_sql() {
-    local pass_literal="$1"
-    cat <<SQL
-CREATE DATABASE IF NOT EXISTS \`${DB_NAME}\` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
-CREATE USER IF NOT EXISTS '${user_sql}'@'localhost' IDENTIFIED BY '${pass_literal}';
-CREATE USER IF NOT EXISTS '${user_sql}'@'127.0.0.1' IDENTIFIED BY '${pass_literal}';
-ALTER USER '${user_sql}'@'localhost' IDENTIFIED BY '${pass_literal}';
-ALTER USER '${user_sql}'@'127.0.0.1' IDENTIFIED BY '${pass_literal}';
-GRANT ALL PRIVILEGES ON \`${DB_NAME}\`.* TO '${user_sql}'@'localhost';
-GRANT ALL PRIVILEGES ON \`${DB_NAME}\`.* TO '${user_sql}'@'127.0.0.1';
-FLUSH PRIVILEGES;
-SQL
+    local pass_literal="$1" reset="$2" account="$3" host
+    printf 'CREATE DATABASE IF NOT EXISTS `%s` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;\n' "$DB_NAME"
+    for host in localhost 127.0.0.1; do
+        if db_user_exists "$account" "$host"; then
+            if [[ "$reset" == "1" ]]; then
+                printf "ALTER USER '%s'@'%s' IDENTIFIED BY '%s';\n" "$account" "$host" "$pass_literal"
+            fi
+        else
+            # 2 (unknown state) also lands here: CREATE IF NOT EXISTS never
+            # changes the password of an account that already exists.
+            printf "CREATE USER IF NOT EXISTS '%s'@'%s' IDENTIFIED BY '%s';\n" "$account" "$host" "$pass_literal"
+        fi
+        printf 'GRANT ALL PRIVILEGES ON `%s`.* TO %s;\n' "$DB_NAME" "'${account}'@'${host}'"
+    done
+    printf 'FLUSH PRIVILEGES;\n'
 }
 
 create_database() {
@@ -501,11 +717,41 @@ create_database() {
         warn "root MariaDB accetta TCP senza password su loopback: imposta una password root se il servizio può essere raggiunto dalla rete."
     fi
 
-    local db_pass_sql user_sql sql_exec sql_redacted
+    local db_pass_sql user_sql sql_exec sql_redacted host state
     db_pass_sql="$(sql_escape "$DB_PASS")"
     user_sql="$(sql_escape "$DB_USER")"
-    sql_exec="$(build_database_sql "$db_pass_sql")"
-    sql_redacted="$(build_database_sql '***')"
+
+    # Refuse to take over an account that already exists with a different
+    # password: it may belong to another Socly instance on the same server.
+    for host in localhost 127.0.0.1; do
+        if db_user_exists "$user_sql" "$host"; then
+            state=0
+        else
+            state=$?
+        fi
+        if [[ "$state" -eq 2 ]]; then
+            warn "Stato dell'utente '${DB_USER}'@'${host}' non determinabile: la password esistente non viene toccata."
+            continue
+        fi
+        if [[ "$state" -ne 0 || "$RESET_DB_PASS" -eq 1 ]]; then
+            continue
+        fi
+        if ! db_user_auth_ok "$DB_USER" "$DB_PASS"; then
+            cat >&2 <<MSG
+✖ L'utente MySQL '${DB_USER}'@'${host}' esiste già con un'altra password.
+  Non la sovrascrivo per non interrompere un'istanza che la sta usando. Scegli:
+    --db-user=<altro nome>            usa un account nuovo (consigliato su server condivisi)
+    --db-pass=<password attuale>      riusa l'account esistente
+    --reset-db-pass                   ruota la password (rompe le altre istanze che la usano)
+  Per vedere gli account già presenti:
+    mysql -e "select user,host from mysql.user where user like '${DB_USER}%'"
+MSG
+            exit 3
+        fi
+    done
+
+    sql_exec="$(build_database_sql "$db_pass_sql" "$RESET_DB_PASS" "$user_sql")"
+    sql_redacted="$(build_database_sql '***' "$RESET_DB_PASS" "$user_sql")"
 
     if ! mysql_root_any -e "$sql_exec"; then
         cat >&2 <<SQL
@@ -521,14 +767,23 @@ SQL
     ok "Database ${DB_NAME} e utente ${DB_USER} pronti"
 }
 
+AS_APP_WARNED=0
 as_app() {
     if [[ "$APP_USER" == "root" ]]; then
         "$@"
-    else
-        # -H: give the child the target user's HOME, otherwise Composer tries
-        # to write its cache into /root.
-        sudo -H -u "$APP_USER" "$@"
+        return
     fi
+    if ! have sudo; then
+        if [[ "$AS_APP_WARNED" -eq 0 ]]; then
+            warn "sudo non disponibile: eseguo come root e riassegno .env e storage/ a ${APP_USER} alla fine."
+            AS_APP_WARNED=1
+        fi
+        "$@"
+        return
+    fi
+    # -H: give the child the target user's HOME, otherwise Composer tries
+    # to write its cache into /root.
+    sudo -H -u "$APP_USER" "$@"
 }
 
 echo "Socly — installazione one-click (Linux)"
@@ -538,6 +793,8 @@ php_version_ok || die "PHP 8.2+ non disponibile dopo l'installazione."
 php_extensions_ok || die "Estensioni PHP mancanti (pdo_mysql, mbstring, openssl, json, fileinfo)."
 have composer || install_composer_official
 have composer || die "Composer non disponibile."
+# Fail before touching the database if this folder already hosts another instance.
+guard_existing_env
 
 if [[ "$DB_HOST" == "localhost" || "$DB_HOST" == "127.0.0.1" || "$DB_HOST" == "::1" ]]; then
     start_db || die "MariaDB/MySQL non risponde. Avvialo e riprova."
@@ -567,8 +824,20 @@ as_app env SOCLY_DB_PASS="$DB_PASS" php bin/install/bootstrap.php \
     --db-host="$DB_HOST" --db-port="$DB_PORT" --db-name="$DB_NAME" --db-user="$DB_USER" \
     --url="$APP_URL" --locale="$LOCALE"
 
+STORAGE_PREEXISTING=0
+STORAGE_OWNER=''
+if [[ -d storage ]]; then
+    STORAGE_PREEXISTING=1
+    STORAGE_OWNER="$(stat -c '%U' storage 2>/dev/null || true)"
+fi
 mkdir -p storage/logs storage/cache storage/sessions storage/uploads storage/documents storage/runts
-chown -R "$APP_USER":"$APP_USER" storage 2>/dev/null || true
+# Only take ownership of a fresh tree, of files we already own or of a root-owned
+# leftover: a storage/ belonging to another user means another instance lives here.
+if [[ "$STORAGE_PREEXISTING" -eq 1 && -n "$STORAGE_OWNER" && "$STORAGE_OWNER" != "$APP_USER" && "$STORAGE_OWNER" != "root" ]]; then
+    warn "storage/ appartiene a ${STORAGE_OWNER}: non lo riassegno a ${APP_USER} (usa --user=${STORAGE_OWNER})."
+else
+    chown -R "$APP_USER":"$APP_USER" storage 2>/dev/null || true
+fi
 chmod -R u+rwX,g+rwX storage 2>/dev/null || true
 chmod +x bin/install/*.sh 2>/dev/null || true
 
@@ -591,7 +860,7 @@ if [[ "$APP_USER" == "root" ]]; then
     php -S "${BIND}:${LOCAL_PORT}" -t public public/router.php > storage/logs/install-server.log 2>&1 &
 else
     # shellcheck disable=SC2024 # log file ownership handled above
-    sudo -H -u "$APP_USER" php -S "${BIND}:${LOCAL_PORT}" -t public public/router.php > storage/logs/install-server.log 2>&1 &
+    as_app php -S "${BIND}:${LOCAL_PORT}" -t public public/router.php > storage/logs/install-server.log 2>&1 &
 fi
 SERVER_PID=$!
 cleanup() {
@@ -617,13 +886,44 @@ if [[ "$READY" -ne 1 ]]; then
     die "Il server locale non risponde su ${LOCAL_URL} (marcatore X-Socly-Installer assente)."
 fi
 
-if [[ "$OPEN_BROWSER" -eq 1 ]]; then
-    if have xdg-open; then
-        xdg-open "$LOCAL_URL" >/dev/null 2>&1 &
-    elif have sensible-browser; then
-        sensible-browser "$LOCAL_URL" >/dev/null 2>&1 &
+open_wizard_browser() {
+    local url="$1" opener=''
+    [[ "$OPEN_BROWSER" -eq 1 ]] || return 0
+    if [[ -n "${SSH_CONNECTION:-}${SSH_TTY:-}" ]]; then
+        echo "  Browser:  sessione SSH: apri il wizard dal tuo PC (tunnel qui sotto)." >&2
+        return 0
     fi
-fi
+    if [[ -z "${DISPLAY:-}" && -z "${WAYLAND_DISPLAY:-}" ]]; then
+        echo "  Browser:  nessun ambiente grafico: apri ${url} manualmente." >&2
+        return 0
+    fi
+    if have xdg-open; then
+        opener='xdg-open'
+    elif have sensible-browser; then
+        opener='sensible-browser'
+    fi
+    if [[ -z "$opener" ]]; then
+        echo "  Browser:  apri ${url} manualmente." >&2
+        return 0
+    fi
+    # A headless/misconfigured opener must never hang the installer.
+    if have timeout; then
+        timeout 10 "$opener" "$url" >/dev/null 2>&1 &
+    else
+        "$opener" "$url" >/dev/null 2>&1 &
+    fi
+    echo "  Browser:  apro ${url} (se non compare, aprilo a mano)." >&2
+}
+open_wizard_browser "$LOCAL_URL"
+
+case "$BIND" in
+    127.*|::1|localhost)
+        TUNNEL_HINT="  Tunnel:   ssh -L ${LOCAL_PORT}:127.0.0.1:${LOCAL_PORT} <utente>@<server>   (da un altro PC)"
+        ;;
+    *)
+        TUNNEL_HINT="  Nota:     il wizard è raggiungibile dalla rete su ${BIND}:${LOCAL_PORT} (usa un firewall)"
+        ;;
+esac
 
 cat <<TXT
 
@@ -633,9 +933,11 @@ cat <<TXT
   Setup:    http://${CONNECT_HOST}:${LOCAL_PORT}/setup (dopo il wizard e il login)
   Log:      ${ROOT}/storage/logs/install-server.log
   Stop:     Ctrl+C
+${TUNNEL_HINT}
 
 Completa il wizard (associazione, periodo, quote, campi); poi accedi con admin@socly.it e completa /setup.
 La password di manutenzione non viene stampata né salvata dallo script.
+Il server locale vive in questa sessione: se chiudi SSH si ferma (--no-serve per un vhost).
 Per la produzione (Apache/Nginx, HTTPS) vedi docs/INSTALLATION.md.
 TXT
 
