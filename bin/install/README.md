@@ -15,7 +15,9 @@ Scripts that turn a fresh machine into a working Socly instance:
 | macOS (Homebrew) | `bash bin/install/macos.sh` |
 | Windows 10/11 (PowerShell as Administrator) | `powershell -ExecutionPolicy Bypass -File bin\install\windows.ps1` |
 
-Then open **http://127.0.0.1:8080/install** and complete the wizard: database, association,
+Then open **http://127.0.0.1:8080/install** and complete the wizard: it starts at the **association**
+step (the installers already created the database and wrote `.env`, so the credentials step is
+skipped and reachable from the “Database already configured” banner) and covers association,
 membership period/type and profile fields. The final step sends you to `/login`: sign in with the
 maintenance account (`admin@socly.it`, password defined in `app/Support/PlatformMasterAccess.php`)
 and complete the first-run **setup** at `/setup`, which creates the association **Admin** account.

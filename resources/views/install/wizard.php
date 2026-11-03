@@ -2,6 +2,7 @@
 $step = (int)($step ?? 1);
 $data = $data ?? [];
 $recovery = !empty($recovery);
+$dbReady = !empty($dbReady);
 $labels = [
     1 => __('install.db'),
     2 => __('install.association'),
@@ -19,6 +20,16 @@ $labels = [
         <?php foreach ($labels as $n => $label): ?>
             <span class="step-pill <?= $n === $step ? 'active' : '' ?>"><?= e((string)$n . '. ' . $label) ?></span>
         <?php endforeach; ?>
+    </div>
+<?php endif; ?>
+
+<?php if ($dbReady && $step > 1): ?>
+    <div class="alert alert-success">
+        <?= e(__('install.db_ready', [
+            'database' => (string) ($data['db_database'] ?? ''),
+            'host' => (string) ($data['db_host'] ?? ''),
+        ])) ?>
+        <a href="<?= e(url('/install?step=1')) ?>"><?= e(__('install.db_change')) ?></a>
     </div>
 <?php endif; ?>
 

@@ -27,7 +27,19 @@ final class InstallController extends BaseController
     {
         $recovery = app()->isInstalled();
         // Already installed + DB down: only the credentials step (avoid re-seeding).
-        $step = $recovery ? 1 : (int) ($request->input('step', $_SESSION['install']['step'] ?? 1));
+        if ($recovery) {
+            $step = 1;
+        } else {
+            $requested = $request->input('step', $_SESSION['install']['step'] ?? null);
+            if ($requested === null) {
+                // The one-click installers already created the database and wrote
+                // .env: do not ask for the credentials again, start from the
+                // association step (step 1 stays reachable with ?step=1).
+                $step = $this->databaseConfigured() ? 2 : 1;
+            } else {
+                $step = (int) $requested;
+            }
+        }
         $step = max(1, min(5, $step));
 
         $data = $_SESSION['install'] ?? [];
@@ -42,13 +54,81 @@ final class InstallController extends BaseController
             ];
         }
 
+        $dbReady = !$recovery && $this->databaseConfigured();
+        if ($dbReady) {
+            $data = $this->seedSessionFromEnv($data);
+        }
+
         $this->render('install/wizard', [
             'step' => $step,
             'data' => $data,
+            'dbReady' => $dbReady,
             'fields' => InstallerService::defaultFields(),
             'title' => $recovery ? __('install.recovery_title') : __('install.title'),
             'recovery' => $recovery,
         ], 'layouts/install');
+    }
+
+    /**
+     * .env already carries the APP_KEY and a DB configuration that answers:
+     * the wizard can skip the credentials step instead of asking them again.
+     */
+    private function databaseConfigured(): bool
+    {
+        foreach (['APP_KEY', 'DB_DATABASE', 'DB_USERNAME'] as $key) {
+            if (trim((string) ($_ENV[$key] ?? '')) === '') {
+                return false;
+            }
+        }
+        try {
+            // A key that does not decode to 32 bytes would abort finalize().
+            new Encryptor((string) $_ENV['APP_KEY']);
+            return app()->get(Database::class)->isReachable();
+        } catch (\Throwable $e) {
+            return false;
+        }
+    }
+
+    /** A corrupted/legacy APP_KEY would blow up finalize(): replace it. */
+    private function usableAppKey(string $candidate): string
+    {
+        if ($candidate !== '') {
+            try {
+                new Encryptor($candidate);
+                return $candidate;
+            } catch (\Throwable $e) {
+                // Fall through and generate a valid key.
+            }
+        }
+        return Encryptor::generateKey();
+    }
+
+    /**
+     * The wizard writes what it collects in the session; when the DB step is
+     * skipped those values must come from .env, otherwise finalize() aborts.
+     *
+     * @param array<string,mixed> $data
+     * @return array<string,mixed>
+     */
+    private function seedSessionFromEnv(array $data): array
+    {
+        $fromEnv = [
+            'app_url' => (string) ($_ENV['APP_URL'] ?? ''),
+            'db_host' => (string) ($_ENV['DB_HOST'] ?? '127.0.0.1'),
+            'db_port' => (string) ($_ENV['DB_PORT'] ?? '3306'),
+            'db_database' => (string) ($_ENV['DB_DATABASE'] ?? ''),
+            'db_username' => (string) ($_ENV['DB_USERNAME'] ?? ''),
+            'db_password' => (string) ($_ENV['DB_PASSWORD'] ?? ''),
+            'app_key' => (string) ($_ENV['APP_KEY'] ?? ''),
+        ];
+        foreach ($fromEnv as $key => $value) {
+            if (!isset($data[$key]) || $data[$key] === '') {
+                $data[$key] = $value;
+            }
+        }
+        $_SESSION['install'] = $data;
+
+        return $data;
     }
 
     public function save(Request $request): void
@@ -88,7 +168,7 @@ final class InstallController extends BaseController
                 redirect('/install?step=1');
             }
             $existingKey = trim((string) ($_ENV['APP_KEY'] ?? ''));
-            $appKey = $existingKey !== '' ? $existingKey : Encryptor::generateKey();
+            $appKey = $this->usableAppKey($existingKey);
             $_SESSION['install'] = array_merge($_SESSION['install'], [
                 'db_host' => $data['db_host'],
                 'db_port' => $data['db_port'],

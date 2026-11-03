@@ -59,6 +59,12 @@ dagli script) e completa il setup in `/setup`: il wizard di primo avvio crea l'a
 dell'associazione**. Il server PHP integrato serve per installazione e valutazione: per la produzione
 usa Apache/Nginx + HTTPS come descritto sotto.
 
+Lo script prepara già database e `.env`: il wizard web ha **5 passi** e parte direttamente da
+**Associazione**, mostrando in alto «Database già configurato: …» con il link per rivedere le
+credenziali (passo 1). Se `.env` è assente o il database non risponde, il wizard riparte dal passo
+Database; se l'istanza è già installata e il DB è irraggiungibile, mostra solo il passo di
+ripristino delle credenziali.
+
 ## 1. Scarica il codice
 
 ```bash
@@ -247,6 +253,12 @@ Then sign in as `admin@socly.it` (maintenance password defined in code, never pr
 and complete the first-run **setup** at `/setup`, which creates the association **Admin** account.
 The built-in PHP server is for installation and evaluation: for production use Apache/Nginx + HTTPS
 as described below.
+
+The script already prepared the database and `.env`: the web wizard has **5 steps** and starts at
+**Association**, showing a “Database already configured: …” banner with a link to review the
+credentials (step 1). If `.env` is missing or the database does not answer, the wizard starts from
+the Database step; when the instance is already installed and the DB is unreachable it shows only
+the credentials recovery step.
 
 ## 1. Get the code
 
