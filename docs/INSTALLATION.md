@@ -59,11 +59,14 @@ dagli script) e completa il setup in `/setup`: il wizard di primo avvio crea l'a
 dell'associazione**. Il server PHP integrato serve per installazione e valutazione: per la produzione
 usa Apache/Nginx + HTTPS come descritto sotto.
 
-Lo script prepara già database e `.env`: il wizard web ha **5 passi** e parte direttamente da
-**Associazione**, mostrando in alto «Database già configurato: …» con il link per rivedere le
-credenziali (passo 1). Se `.env` è assente o il database non risponde, il wizard riparte dal passo
-Database; se l'istanza è già installata e il DB è irraggiungibile, mostra solo il passo di
-ripristino delle credenziali.
+`/install` si occupa **solo dell'infrastruttura**: credenziali del database, creazione del DB se
+manca, migrazioni e `storage/installed.lock`. Se lo script one-click ha già scritto `.env` e creato il
+database, la pagina non chiede nulla: chiude l'installazione e porta subito al login. Dopo l'accesso
+con l'account di manutenzione (`admin@socly.it`) parte **la configurazione guidata completa**
+in `/setup` (lingua, dati e sede dell'associazione, logo e colori, organi sociali, statuto e privacy,
+tipi di socio e periodi, campi anagrafica, tesoreria, posta, iscrizioni, componenti, account Admin e
+consensi). `/install` torna utile solo per ripristinare le credenziali del database se l'istanza non
+riesce più a connettersi.
 
 ## 1. Scarica il codice
 
@@ -254,11 +257,14 @@ and complete the first-run **setup** at `/setup`, which creates the association 
 The built-in PHP server is for installation and evaluation: for production use Apache/Nginx + HTTPS
 as described below.
 
-The script already prepared the database and `.env`: the web wizard has **5 steps** and starts at
-**Association**, showing a “Database already configured: …” banner with a link to review the
-credentials (step 1). If `.env` is missing or the database does not answer, the wizard starts from
-the Database step; when the instance is already installed and the DB is unreachable it shows only
-the credentials recovery step.
+`/install` only handles the **infrastructure**: database credentials, creating the DB when missing,
+migrations and `storage/installed.lock`. When the one-click installers already wrote `.env` and
+created the database, the page asks nothing: it locks the installation and goes straight to the
+login. Signing in with the maintenance account (`admin@socly.it`) opens the **full guided setup** at
+`/setup` (language, association data and seat, logo and colors, officers, statute and privacy,
+member types and periods, profile fields, treasury accounts, mail, enrollment, components, Admin
+account and consents). `/install` is only needed again to restore the database credentials when the
+instance cannot connect anymore.
 
 ## 1. Get the code
 

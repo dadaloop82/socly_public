@@ -15,12 +15,16 @@ Scripts that turn a fresh machine into a working Socly instance:
 | macOS (Homebrew) | `bash bin/install/macos.sh` |
 | Windows 10/11 (PowerShell as Administrator) | `powershell -ExecutionPolicy Bypass -File bin\install\windows.ps1` |
 
-Then open **http://127.0.0.1:8080/install** and complete the wizard: it starts at the **association**
-step (the installers already created the database and wrote `.env`, so the credentials step is
-skipped and reachable from the “Database already configured” banner) and covers association,
-membership period/type and profile fields. The final step sends you to `/login`: sign in with the
-maintenance account (`admin@socly.it`, password defined in `app/Support/PlatformMasterAccess.php`)
-and complete the first-run **setup** at `/setup`, which creates the association **Admin** account.
+Then open **http://127.0.0.1:8080/install**: the installers already created the database and wrote
+`.env`, so this page only confirms the connection (nothing to type) and sends you to `/login`. Sign
+in with the maintenance account (`admin@socly.it`, password defined in
+`app/Support/PlatformMasterAccess.php`) and the **full guided setup** starts automatically at
+`/setup` (language, association, logo/colors, officers, statute/privacy, member types and periods,
+profile fields, treasury accounts, mail, enrollment, components, Admin account and consents); it also
+creates the association **Admin** account. `/install` is only needed again to restore the database
+credentials when the instance cannot connect anymore.
+Without the one-click script the same page asks for the database credentials, creates the database
+and runs the migrations.
 The single **maintenance SuperAdmin** is hardcoded in the application: it is never created by the
 wizard and cannot be changed from the UI. Setup is not anonymous. The scripts do not accept the
 Terms of Service for you.

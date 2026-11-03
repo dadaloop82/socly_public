@@ -14,6 +14,13 @@ use Socly\Services\AuditService;
 use Socly\Services\InstallerService;
 use Socly\Services\SettingsService;
 
+/**
+ * Infrastructure installer: database credentials, migrations and the
+ * installed.lock only. Everything the association needs (name, seat, logo,
+ * membership types/periods, profile fields, mail, admin account, …) is
+ * collected by the guided setup at /setup, which the maintenance login opens
+ * automatically right after this step.
+ */
 final class InstallController extends BaseController
 {
     public function __construct(
@@ -26,70 +33,134 @@ final class InstallController extends BaseController
     public function index(Request $request): void
     {
         $recovery = app()->isInstalled();
-        // Already installed + DB down: only the credentials step (avoid re-seeding).
-        if ($recovery) {
-            $step = 1;
-        } else {
-            $requested = $request->input('step', $_SESSION['install']['step'] ?? null);
-            if ($requested === null) {
-                // The one-click installers already created the database and wrote
-                // .env: do not ask for the credentials again, start from the
-                // association step (step 1 stays reachable with ?step=1).
-                $step = $this->databaseConfigured() ? 2 : 1;
-            } else {
-                $step = (int) $requested;
-            }
-        }
-        $step = max(1, min(5, $step));
 
-        $data = $_SESSION['install'] ?? [];
-        if ($data === []) {
-            $data = [
-                'app_url' => (string) ($_ENV['APP_URL'] ?? ('http://' . ($_SERVER['HTTP_HOST'] ?? 'localhost'))),
-                'db_host' => (string) ($_ENV['DB_HOST'] ?? '127.0.0.1'),
-                'db_port' => (string) ($_ENV['DB_PORT'] ?? '3306'),
-                'db_database' => (string) ($_ENV['DB_DATABASE'] ?? 'socly'),
-                'db_username' => (string) ($_ENV['DB_USERNAME'] ?? 'socly'),
-                'db_password' => (string) ($_ENV['DB_PASSWORD'] ?? ''),
-            ];
-        }
-
-        $dbReady = !$recovery && $this->databaseConfigured();
-        if ($dbReady) {
-            $data = $this->seedSessionFromEnv($data);
+        // A one-click installer already created the database and wrote .env:
+        // lock the installation and let the operator continue in /setup.
+        if (!$recovery && $this->databaseConfigured()
+            && $this->lockInstallation($request, $this->envConfig())) {
+            redirect('/login');
         }
 
         $this->render('install/wizard', [
-            'step' => $step,
-            'data' => $data,
-            'dbReady' => $dbReady,
-            'fields' => InstallerService::defaultFields(),
-            'title' => $recovery ? __('install.recovery_title') : __('install.title'),
+            'data' => $this->envConfig(),
             'recovery' => $recovery,
+            'title' => $recovery ? __('install.recovery_title') : __('install.title'),
         ], 'layouts/install');
     }
 
+    public function save(Request $request): void
+    {
+        $data = $request->all();
+        $this->rememberOld($data);
+
+        if (!$this->validator->validate($data, [
+            'app_url' => 'required|string',
+            'db_host' => 'required|string',
+            'db_port' => 'required|integer',
+            'db_database' => 'required|string',
+            'db_username' => 'required|string',
+        ])) {
+            $this->flash('errors', $this->validator->firstErrors());
+            redirect('/install');
+        }
+
+        // An empty field keeps the password already stored in .env.
+        $password = trim((string) ($data['db_password'] ?? ''));
+        if ($password === '') {
+            $password = (string) ($_ENV['DB_PASSWORD'] ?? '');
+        }
+
+        try {
+            $pdo = new \PDO(
+                sprintf('mysql:host=%s;port=%s;charset=utf8mb4', $data['db_host'], $data['db_port']),
+                (string) $data['db_username'],
+                $password,
+                [\PDO::ATTR_ERRMODE => \PDO::ERRMODE_EXCEPTION]
+            );
+            $pdo->exec(
+                'CREATE DATABASE IF NOT EXISTS `' . str_replace('`', '``', (string) $data['db_database'])
+                . '` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci'
+            );
+        } catch (\Throwable $e) {
+            $this->flash('errors', ['db' => __('install.db_error') . ': ' . $e->getMessage()]);
+            redirect('/install');
+        }
+
+        $config = [
+            'app_url' => rtrim((string) $data['app_url'], '/'),
+            'app_key' => $this->usableAppKey(trim((string) ($_ENV['APP_KEY'] ?? ''))),
+            'db_host' => (string) $data['db_host'],
+            'db_port' => (string) $data['db_port'],
+            'db_database' => (string) $data['db_database'],
+            'db_username' => (string) $data['db_username'],
+            'db_password' => $password,
+        ];
+        InstallerService::writeEnv($config);
+        unset($_SESSION['install'], $_SESSION['_old']);
+
+        // Recovery of an installed instance: only the credentials had to change.
+        if (app()->isInstalled()) {
+            $this->flash('success', __('install.recovery_success'));
+            redirect('/login');
+        }
+
+        if ($this->lockInstallation($request, $config)) {
+            redirect('/login');
+        }
+        redirect('/install');
+    }
+
     /**
-     * .env already carries the APP_KEY and a DB configuration that answers:
-     * the wizard can skip the credentials step instead of asking them again.
+     * Migrations, permissions, default profile fields and installed.lock. No
+     * association data is asked here: /setup collects it afterwards.
+     *
+     * @param array<string,string> $config
      */
+    private function lockInstallation(Request $request, array $config): bool
+    {
+        try {
+            $database = new Database([
+                'host' => $config['db_host'],
+                'port' => $config['db_port'],
+                'database' => $config['db_database'],
+                'username' => $config['db_username'],
+                'password' => $config['db_password'],
+            ]);
+            $installer = new InstallerService(
+                $database,
+                new Migrator($database, base_path('database/migrations')),
+                new SettingsService($database, new Encryptor($config['app_key'])),
+                new AuditService($database)
+            );
+            $installer->runMigrations();
+            $installer->seedPermissions();
+            $installer->seedFields(InstallerService::defaultFields());
+            $installer->finalize($request->ip());
+        } catch (\Throwable $e) {
+            $this->flash('errors', ['finalize' => $e->getMessage()]);
+            return false;
+        }
+
+        $this->flash('success', __('install.success'));
+        return true;
+    }
+
+    /** .env already carries a valid APP_KEY and a database that answers. */
     private function databaseConfigured(): bool
     {
-        foreach (['APP_KEY', 'DB_DATABASE', 'DB_USERNAME'] as $key) {
-            if (trim((string) ($_ENV[$key] ?? '')) === '') {
-                return false;
-            }
+        $config = $this->envConfig();
+        if ($config['app_key'] === '' || $config['db_database'] === '' || $config['db_username'] === '') {
+            return false;
         }
         try {
-            // A key that does not decode to 32 bytes would abort finalize().
-            new Encryptor((string) $_ENV['APP_KEY']);
+            new Encryptor($config['app_key']);
             return app()->get(Database::class)->isReachable();
         } catch (\Throwable $e) {
             return false;
         }
     }
 
-    /** A corrupted/legacy APP_KEY would blow up finalize(): replace it. */
+    /** A corrupted/legacy APP_KEY would abort the first migration: replace it. */
     private function usableAppKey(string $candidate): string
     {
         if ($candidate !== '') {
@@ -100,20 +171,15 @@ final class InstallController extends BaseController
                 // Fall through and generate a valid key.
             }
         }
+
         return Encryptor::generateKey();
     }
 
-    /**
-     * The wizard writes what it collects in the session; when the DB step is
-     * skipped those values must come from .env, otherwise finalize() aborts.
-     *
-     * @param array<string,mixed> $data
-     * @return array<string,mixed>
-     */
-    private function seedSessionFromEnv(array $data): array
+    /** @return array<string,string> */
+    private function envConfig(): array
     {
-        $fromEnv = [
-            'app_url' => (string) ($_ENV['APP_URL'] ?? ''),
+        return [
+            'app_url' => (string) ($_ENV['APP_URL'] ?? ('http://' . ($_SERVER['HTTP_HOST'] ?? 'localhost'))),
             'db_host' => (string) ($_ENV['DB_HOST'] ?? '127.0.0.1'),
             'db_port' => (string) ($_ENV['DB_PORT'] ?? '3306'),
             'db_database' => (string) ($_ENV['DB_DATABASE'] ?? ''),
@@ -121,209 +187,5 @@ final class InstallController extends BaseController
             'db_password' => (string) ($_ENV['DB_PASSWORD'] ?? ''),
             'app_key' => (string) ($_ENV['APP_KEY'] ?? ''),
         ];
-        foreach ($fromEnv as $key => $value) {
-            if (!isset($data[$key]) || $data[$key] === '') {
-                $data[$key] = $value;
-            }
-        }
-        $_SESSION['install'] = $data;
-
-        return $data;
-    }
-
-    public function save(Request $request): void
-    {
-        $step = (int) $request->input('step', 1);
-        // Already installed: only credentials may be rewritten (DB recovery).
-        if (app()->isInstalled() && $step !== 1) {
-            redirect('/install');
-        }
-        $_SESSION['install'] ??= [];
-        $data = $request->all();
-        $this->rememberOld($data);
-
-        if ($step === 1) {
-            if (!$this->validator->validate($data, [
-                'db_host' => 'required|string',
-                'db_port' => 'required|integer',
-                'db_database' => 'required|string',
-                'db_username' => 'required|string',
-                'app_url' => 'required|string',
-            ])) {
-                $this->flash('errors', $this->validator->firstErrors());
-                redirect('/install?step=1');
-            }
-            try {
-                $dsn = sprintf(
-                    'mysql:host=%s;port=%s;charset=utf8mb4',
-                    $data['db_host'],
-                    $data['db_port']
-                );
-                $pdo = new \PDO($dsn, $data['db_username'], (string) $data['db_password'], [
-                    \PDO::ATTR_ERRMODE => \PDO::ERRMODE_EXCEPTION,
-                ]);
-                $pdo->exec('CREATE DATABASE IF NOT EXISTS `' . str_replace('`', '``', $data['db_database']) . '` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci');
-            } catch (\Throwable $e) {
-                $this->flash('errors', ['db' => __('install.db_error') . ': ' . $e->getMessage()]);
-                redirect('/install?step=1');
-            }
-            $existingKey = trim((string) ($_ENV['APP_KEY'] ?? ''));
-            $appKey = $this->usableAppKey($existingKey);
-            $_SESSION['install'] = array_merge($_SESSION['install'], [
-                'db_host' => $data['db_host'],
-                'db_port' => $data['db_port'],
-                'db_database' => $data['db_database'],
-                'db_username' => $data['db_username'],
-                'db_password' => $data['db_password'] ?? '',
-                'app_url' => rtrim($data['app_url'], '/'),
-                'app_key' => $appKey,
-                'step' => 2,
-            ]);
-            InstallerService::writeEnv($_SESSION['install']);
-
-            // Recovery: lock exists, credentials fixed → back to the app (keep APP_KEY).
-            if (app()->isInstalled()) {
-                unset($_SESSION['install'], $_SESSION['_old']);
-                $this->flash('success', __('install.recovery_success'));
-                redirect('/login');
-            }
-
-            redirect('/install?step=2');
-        }
-
-        if ($step === 2) {
-            if (!$this->validator->validate($data, [
-                'association_name' => 'required|string|max:120',
-                'primary' => 'required|color',
-                'accent' => 'required|color',
-                'locale' => 'required|in:it,de,en',
-            ])) {
-                $this->flash('errors', $this->validator->firstErrors());
-                redirect('/install?step=2');
-            }
-            $_SESSION['install'] = array_merge($_SESSION['install'], [
-                'association_name' => $data['association_name'],
-                'association_email' => $data['association_email'] ?? '',
-                'association_phone' => $data['association_phone'] ?? '',
-                'association_address' => $data['association_address'] ?? '',
-                'primary' => $data['primary'],
-                'accent' => $data['accent'],
-                'locale' => $data['locale'],
-                'gdpr_enabled' => !empty($data['gdpr_enabled']),
-                'step' => 3,
-            ]);
-            redirect('/install?step=3');
-        }
-
-        if ($step === 3) {
-            if (!$this->validator->validate($data, [
-                'period_label' => 'required|string|max:120',
-                'starts_on' => 'required|date',
-                'ends_on' => 'required|date',
-                'type_name_it' => 'required|string|max:120',
-                'type_price' => 'required|numeric|min:0',
-            ])) {
-                $this->flash('errors', $this->validator->firstErrors());
-                redirect('/install?step=3');
-            }
-            $_SESSION['install'] = array_merge($_SESSION['install'], [
-                'period_label' => $data['period_label'],
-                'starts_on' => $data['starts_on'],
-                'ends_on' => $data['ends_on'],
-                'type_name_it' => $data['type_name_it'],
-                'type_name_de' => $data['type_name_de'] ?? $data['type_name_it'],
-                'type_name_en' => $data['type_name_en'] ?? $data['type_name_it'],
-                'type_price' => $data['type_price'],
-                'step' => 4,
-            ]);
-            redirect('/install?step=4');
-        }
-
-        if ($step === 4) {
-            $enabled = $data['fields'] ?? [];
-            $required = $data['required'] ?? [];
-            $_SESSION['install']['fields_enabled'] = $enabled;
-            $_SESSION['install']['fields_required'] = $required;
-            $_SESSION['install']['step'] = 5;
-            redirect('/install?step=5');
-        }
-
-        if ($step === 5) {
-            $this->finalize($request);
-        }
-
-        redirect('/install');
-    }
-
-    private function finalize(Request $request): void
-    {
-        $s = $_SESSION['install'] ?? [];
-        if (empty($s['app_key']) || empty($s['association_name'])) {
-            redirect('/install?step=1');
-        }
-
-        // Reload env into a fresh Database connection
-        $dbConfig = [
-            'host' => $s['db_host'],
-            'port' => $s['db_port'],
-            'database' => $s['db_database'],
-            'username' => $s['db_username'],
-            'password' => $s['db_password'],
-        ];
-        $database = new Database($dbConfig);
-        $migrator = new Migrator($database, base_path('database/migrations'));
-        $encryptor = new Encryptor($s['app_key']);
-        $settings = new SettingsService($database, $encryptor);
-        $audit = new AuditService($database);
-        $installer = new InstallerService($database, $migrator, $settings, $audit);
-
-        try {
-            foreach (['association_name', 'period_label', 'starts_on', 'ends_on', 'type_name_it', 'type_price'] as $key) {
-                if (!isset($s[$key]) || $s[$key] === '') {
-                    throw new \RuntimeException("Missing install field: {$key}. Restart the wizard from step 1.");
-                }
-            }
-
-            $installer->runMigrations();
-            $installer->seedPermissions();
-            $installer->saveAssociation([
-                'name' => $s['association_name'],
-                'email' => $s['association_email'] ?? '',
-                'phone' => $s['association_phone'] ?? '',
-                'address' => $s['association_address'] ?? '',
-                'primary' => $s['primary'] ?? '#0D6E66',
-                'accent' => $s['accent'] ?? '#B84A1B',
-                'locale' => $s['locale'] ?? 'it',
-                'gdpr_enabled' => !empty($s['gdpr_enabled']),
-            ]);
-            if (!(int) ($database->fetch('SELECT COUNT(*) c FROM membership_periods')['c'] ?? 0)) {
-                $installer->createPeriod((string) $s['period_label'], (string) $s['starts_on'], (string) $s['ends_on']);
-            }
-            if (!(int) ($database->fetch('SELECT COUNT(*) c FROM member_types')['c'] ?? 0)) {
-                $installer->createMemberType([
-                    'it' => $s['type_name_it'],
-                    'de' => $s['type_name_de'] ?? $s['type_name_it'],
-                    'en' => $s['type_name_en'] ?? $s['type_name_it'],
-                ], (float) $s['type_price']);
-            }
-
-            $fields = InstallerService::defaultFields();
-            $enabled = $s['fields_enabled'] ?? array_column($fields, 'key');
-            $required = $s['fields_required'] ?? ['first_name', 'last_name'];
-            foreach ($fields as &$field) {
-                $field['is_enabled'] = in_array($field['key'], $enabled, true);
-                $field['is_required'] = in_array($field['key'], $required, true);
-            }
-            unset($field);
-            $installer->seedFields($fields);
-            $installer->finalize($request->ip());
-        } catch (\Throwable $e) {
-            $this->flash('errors', ['finalize' => $e->getMessage()]);
-            redirect('/install?step=5');
-        }
-
-        unset($_SESSION['install'], $_SESSION['_old']);
-        $this->flash('success', __('install.success'));
-        redirect('/login');
     }
 }
