@@ -16,7 +16,7 @@ use Socly\Core\Database;
 final class SetupService
 {
     /** Version of the Terms of Service recorded on acceptance. */
-    public const TERMS_VERSION = '1.1';
+    public const TERMS_VERSION = '1.2';
 
     public function __construct(
         private readonly SettingsService $settings,

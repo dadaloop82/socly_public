@@ -10,15 +10,37 @@
  */
 
 $termsSections = ['s1', 's2', 's3', 's4', 's5', 's6'];
+// Extra paragraphs and bullet lists per section. Everything stays a plain
+// string key so the live language switcher keeps working through `data-i18n`.
+$termsExtraParagraphs = [
+    's2' => ['s2_text_2'],
+    's5' => ['s5_text_2'],
+    's6' => ['s6_text_2'],
+];
+$termsLists = [
+    's3' => ['s3_item_a', 's3_item_b'],
+    's4' => ['s4_item_1', 's4_item_2', 's4_item_3', 's4_item_4'],
+];
 ?>
 <article class="terms-doc" data-terms-doc>
     <p class="terms-doc-meta" data-i18n="terms.subtitle"><?= e(__('terms.subtitle')) ?></p>
     <p class="terms-doc-version" data-i18n="terms.version"><?= e(__('terms.version')) ?></p>
     <p class="terms-doc-intro" data-i18n="terms.intro"><?= e(__('terms.intro')) ?></p>
+    <p class="terms-doc-intro" data-i18n="terms.intro_2"><?= e(__('terms.intro_2')) ?></p>
     <?php foreach ($termsSections as $termsSection): ?>
         <section class="terms-doc-section<?= $termsSection === 's3' ? ' terms-doc-section-strong' : '' ?>">
             <h3 class="terms-doc-heading" data-i18n="terms.<?= e($termsSection) ?>_title"><?= e(__('terms.' . $termsSection . '_title')) ?></h3>
             <p class="terms-doc-text" data-i18n="terms.<?= e($termsSection) ?>_text"><?= e(__('terms.' . $termsSection . '_text')) ?></p>
+            <?php foreach ($termsExtraParagraphs[$termsSection] ?? [] as $termsParagraph): ?>
+                <p class="terms-doc-text" data-i18n="terms.<?= e($termsParagraph) ?>"><?= e(__('terms.' . $termsParagraph)) ?></p>
+            <?php endforeach; ?>
+            <?php if (isset($termsLists[$termsSection])): ?>
+                <ul class="terms-doc-list">
+                    <?php foreach ($termsLists[$termsSection] as $termsItem): ?>
+                        <li data-i18n="terms.<?= e($termsItem) ?>"><?= e(__('terms.' . $termsItem)) ?></li>
+                    <?php endforeach; ?>
+                </ul>
+            <?php endif; ?>
         </section>
     <?php endforeach; ?>
 </article>

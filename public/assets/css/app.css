@@ -3328,6 +3328,13 @@ tr.clickable-row:focus-visible {
 .terms-doc-text {
   margin: 0;
 }
+.terms-doc-list {
+  margin: 0;
+  padding-left: 1.15rem;
+  display: grid;
+  gap: 0.3rem;
+  list-style: disc;
+}
 .terms-doc-section-strong {
   padding: 0.7rem 0.85rem;
   border-left: 3px solid var(--brand-accent);
