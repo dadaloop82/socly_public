@@ -12,6 +12,18 @@
 
 <div class="config-layout" data-settings-nav data-default-group="assoc">
     <nav class="config-nav" role="tablist" aria-label="<?= e(__('settings.nav_aria')) ?>">
+        <div class="config-search">
+            <input
+                type="search"
+                class="config-search-input"
+                data-settings-search
+                placeholder="<?= e(__('settings.search_placeholder')) ?>"
+                aria-label="<?= e(__('settings.search_placeholder')) ?>"
+                autocomplete="off"
+                spellcheck="false"
+            >
+            <p class="config-search-empty muted" data-settings-search-empty hidden><?= e(__('settings.search_empty')) ?></p>
+        </div>
         <button type="button" class="config-nav-item" role="tab" data-settings-nav-item="assoc" aria-selected="true" aria-controls="settings-group-assoc">
             <span class="config-nav-icon" aria-hidden="true">
                 <svg width="20" height="20" viewBox="0 0 24 24" focusable="false"><path fill="currentColor" d="M3 21V8l9-5 9 5v13h-7v-6h-4v6H3z"/></svg>
@@ -54,7 +66,10 @@
          data-autosave-busy="<?= e(__('settings.autosave_busy')) ?>"
          data-autosave-ok="<?= e(__('settings.autosaved')) ?>"
          data-autosave-fail="<?= e(__('settings.autosave_failed')) ?>"
-         data-autosave-ago="<?= e(__('settings.autosave_ago')) ?>">
+         data-autosave-ago="<?= e(__('settings.autosave_ago')) ?>"
+         data-save-label="<?= e(__('settings.save_now')) ?>"
+         data-autosave-badge="<?= e(__('settings.autosave_badge')) ?>"
+         data-autosave-hint="<?= e(__('settings.autosave_hint')) ?>">
 <details class="config-accordion" id="general" data-config-accordion data-settings-group="assoc">
     <summary class="config-accordion-summary">
         <span class="config-accordion-title"><?= e(__('settings.general')) ?></span>

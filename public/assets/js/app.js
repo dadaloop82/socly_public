@@ -186,6 +186,7 @@ document.addEventListener('DOMContentLoaded', () => {
   initSetupWizard();
   initSettingsAssociationForms();
   initSettingsAutosave();
+  initSettingsSearch();
   initLegalDocEditors(document);
   initSetupGdprOptions(document);
   initLogoFilePickers(document);
@@ -4241,6 +4242,9 @@ function initSettingsAutosave(scope = document) {
   const okMsg = root?.dataset.autosaveOk || 'Saved';
   const failMsg = root?.dataset.autosaveFail || 'Could not save';
   const agoTemplate = root?.dataset.autosaveAgo || 'Saved :time ago';
+  const saveLabel = root?.dataset.saveLabel || 'Save';
+  const badgeLabel = root?.dataset.autosaveBadge || 'Autosave';
+  const hintLabel = root?.dataset.autosaveHint || '';
 
   const formatAgo = (seconds) => {
     if (seconds < 60) {
@@ -4320,6 +4324,124 @@ function initSettingsAutosave(scope = document) {
 
     form.addEventListener('input', scheduleSave, true);
     form.addEventListener('change', scheduleSave, true);
+
+    // Explicit save row: autosave already runs 800ms after a change, but the
+    // button makes it obvious (and lets the user save immediately).
+    if (form.querySelector('[data-settings-save-row]') === null) {
+      const row = document.createElement('div');
+      row.className = 'settings-save-row';
+      row.setAttribute('data-settings-save-row', '');
+      const badge = document.createElement('span');
+      badge.className = 'settings-save-badge';
+      badge.textContent = badgeLabel;
+      const hint = document.createElement('span');
+      hint.className = 'settings-save-hint muted';
+      hint.textContent = hintLabel;
+      const saveBtn = document.createElement('button');
+      saveBtn.type = 'button';
+      saveBtn.className = 'btn btn-sm settings-save-btn';
+      saveBtn.textContent = saveLabel;
+      saveBtn.addEventListener('click', () => {
+        saveNow();
+      });
+      row.append(badge, hint, saveBtn);
+      form.append(row);
+    }
+  });
+}
+
+/**
+ * Settings search: filters the accordion sections by their visible text, shows
+ * the first group with a match and dims the nav entries left without results.
+ * Works together with initSettingsNav() (which owns group switching).
+ */
+function initSettingsSearch(scope = document) {
+  const nav = scope.querySelector('[data-settings-nav]');
+  const input = nav?.querySelector('[data-settings-search]');
+  const emptyNote = nav?.querySelector('[data-settings-search-empty]');
+  const root = nav?.querySelector('[data-config-accordions]');
+  if (!(nav instanceof HTMLElement) || !(input instanceof HTMLInputElement) || !(root instanceof HTMLElement)) {
+    return;
+  }
+  if (input.dataset.settingsSearchBound === '1') return;
+  input.dataset.settingsSearchBound = '1';
+
+  const panels = Array.from(root.querySelectorAll('[data-config-accordion]'));
+  const navItems = Array.from(nav.querySelectorAll('[data-settings-nav-item]'));
+  const groupOf = (panel) => String(panel.getAttribute('data-settings-group') || '');
+  const activeGroup = () => {
+    const active = navItems.find((item) => item.getAttribute('aria-selected') === 'true');
+    return active ? String(active.getAttribute('data-settings-nav-item') || '') : '';
+  };
+  const setGroup = (group) => {
+    navItems.forEach((item) => {
+      const on = String(item.getAttribute('data-settings-nav-item') || '') === group;
+      item.setAttribute('aria-selected', on ? 'true' : 'false');
+      item.setAttribute('tabindex', on ? '0' : '-1');
+    });
+  };
+  const normalize = (value) => String(value || '')
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '');
+
+  const clear = () => {
+    const group = activeGroup();
+    panels.forEach((panel) => {
+      panel.hidden = group !== '' && groupOf(panel) !== group;
+    });
+    navItems.forEach((item) => item.classList.remove('is-dim'));
+    if (emptyNote instanceof HTMLElement) emptyNote.hidden = true;
+  };
+
+  const apply = () => {
+    const query = normalize(input.value).trim();
+    if (query === '') {
+      clear();
+      return;
+    }
+    const terms = query.split(/\s+/).filter(Boolean);
+    const hits = panels.filter((panel) => {
+      const haystack = normalize(panel.textContent || '');
+      return terms.every((term) => haystack.includes(term));
+    });
+    const hitGroups = new Set(hits.map(groupOf));
+    navItems.forEach((item) => {
+      const key = String(item.getAttribute('data-settings-nav-item') || '');
+      item.classList.toggle('is-dim', !hitGroups.has(key));
+    });
+    if (hits.length === 0) {
+      panels.forEach((panel) => { panel.hidden = true; });
+      if (emptyNote instanceof HTMLElement) emptyNote.hidden = false;
+      return;
+    }
+    if (emptyNote instanceof HTMLElement) emptyNote.hidden = true;
+    const current = activeGroup();
+    const targetGroup = current !== '' && hitGroups.has(current) ? current : groupOf(hits[0]);
+    setGroup(targetGroup);
+    panels.forEach((panel) => {
+      const match = hits.includes(panel) && groupOf(panel) === targetGroup;
+      panel.hidden = !match;
+      if (match && panel instanceof HTMLDetailsElement) panel.open = true;
+    });
+  };
+
+  let timer = null;
+  input.addEventListener('input', () => {
+    window.clearTimeout(timer);
+    timer = window.setTimeout(apply, 120);
+  });
+  input.addEventListener('keydown', (event) => {
+    if (event.key === 'Escape' && input.value !== '') {
+      input.value = '';
+      apply();
+    }
+  });
+  // A nav click switches group in initSettingsNav(): re-apply the filter after it.
+  navItems.forEach((item) => {
+    item.addEventListener('click', () => {
+      window.setTimeout(apply, 0);
+    });
   });
 }
 

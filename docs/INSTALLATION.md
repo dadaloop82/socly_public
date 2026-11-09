@@ -397,6 +397,24 @@ version is published. Manual update:
 4. Run `composer install --no-dev` if dependencies changed.
 5. Open the site: pending migrations run on the first request.
 
+### One-click / automatic update (git checkouts)
+
+Where the app is a **git checkout** of the private repository with SSH access, the update can be
+applied without touching files by hand (`UPDATE_ENABLED=true` in `.env`):
+
+- inside the app: sidebar card “Aggiornamento disponibile” → **Aggiorna** (admin only);
+- from the command line: `php bin/update.php` (only checks) or `php bin/update.php --apply`
+  (git fetch + fast-forward + migrations, same engine as the button);
+- scheduled (nightly, fully automatic):
+
+  ```cron
+  15 4 * * * php /path/to/socly/bin/update.php --apply >> /path/to/socly/storage/logs/update.log 2>&1
+  ```
+
+Both paths refuse to run on temporary demo instances, when `UPDATE_ENABLED` is false and when the
+working tree has local modifications (`updates.dirty`). The login page always shows the installed
+version and, through “Verifica aggiornamenti”, the published/remote version with the release notes.
+
 ## Troubleshooting
 
 | Symptom | Cause / fix |
