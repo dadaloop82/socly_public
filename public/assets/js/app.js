@@ -3145,9 +3145,57 @@ function initLeaveGuards(scope = document) {
         return;
       }
       if (await appConfirm(copy.text)) {
-        allowLeave = true;
-        form.requestSubmit();
+        submitAndLeave();
       }
+    };
+
+    // "Salva" must behave like the form's own default submit: pick the first
+    // non-destructive submit button so its name/value (action, send_test, …)
+    // reaches the server, and never trigger a delete-style button by accident.
+    const pickSubmitter = () => {
+      const buttons = Array.from(form.querySelectorAll('button[type="submit"], input[type="submit"]'))
+        .filter((el) => !el.disabled);
+      if (buttons.length === 0) return null;
+      const haystack = (el) => [
+        el.getAttribute('name') || '',
+        el.getAttribute('value') || '',
+        el.getAttribute('data-tpl-submit') || '',
+        el.getAttribute('class') || '',
+      ].join(' ').toLowerCase();
+      const isDanger = (el) => /delete|remove|destroy|elimina|cancella|danger/.test(haystack(el));
+      const saveish = buttons.find((el) => /^(save|salva|store)$/.test(
+        (el.getAttribute('data-tpl-submit') || el.getAttribute('value') || '').toLowerCase()
+      ));
+      return saveish || buttons.find((el) => !isDanger(el)) || null;
+    };
+
+    // Close the guard before submitting: while a modal <dialog> is open the
+    // form is inert, so a blocked submission (invalid required fields, or a
+    // page handler cancelling it) would show no bubble and no focus — the
+    // "Salva" click would look like it does nothing.
+    const submitAndLeave = () => {
+      allowLeave = true;
+      if (dialog.open) dialog.close();
+      const submitter = pickSubmitter();
+      if (submitter) {
+        // Faithful "press the form's own save button": it runs the button's
+        // click handlers (e.g. data-tpl-submit fills the hidden action field)
+        // and sends its name/value with the request.
+        submitter.click();
+      } else if (typeof form.requestSubmit === 'function') {
+        form.requestSubmit();
+      } else {
+        form.submit();
+      }
+      // Still on the page => the browser blocked the submit or a handler
+      // cancelled it: surface the native messages and re-arm the guard.
+      window.setTimeout(() => {
+        if (!form.isConnected) return;
+        allowLeave = false;
+        if (typeof form.reportValidity === 'function' && !form.checkValidity()) {
+          form.reportValidity();
+        }
+      }, 180);
     };
 
     form.addEventListener('submit', () => { allowLeave = true; });
@@ -3166,10 +3214,7 @@ function initLeaveGuards(scope = document) {
       event.preventDefault();
       askLeave(href);
     });
-    dialog.querySelector('[data-leave-save]')?.addEventListener('click', () => {
-      allowLeave = true;
-      form.requestSubmit();
-    });
+    dialog.querySelector('[data-leave-save]')?.addEventListener('click', submitAndLeave);
     dialog.querySelector('[data-leave-discard]')?.addEventListener('click', () => {
       allowLeave = true;
       dialog.close();

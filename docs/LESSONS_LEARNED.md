@@ -41,6 +41,13 @@ This document captures mistakes and costly fixes from the previous membership co
 | Probing absolute paths (`/usr/bin/pdftotext`, `/usr/bin/php8.4`) with a bare `is_file()` | Plesk sets `open_basedir`: the probe raises a warning, our error handler throws and OCR/worker discovery dies with a misleading message. Probe with `@`, add `PHP_BINDIR`, then fall back to `command -v` (exec is not bound by `open_basedir`) and trust its absolute answer |
 | One `try/catch` around download **and** OCR in the setup import | Keep them separate: `runts_docs_fail` only when attachments could not be downloaded; OCR failures get their own key (`runts_docs_ocr_fail`) and a logged `setup.runts_docs_ocr_failed` |
 
+## Frontend (UI/JS)
+
+| Anti-pattern | Socly practice |
+|--------------|----------------|
+| Calling `form.requestSubmit()` while a modal `<dialog>` is open | The rest of the page is inert, so constraint validation shows no bubble and cannot focus the field: the click looks like it does nothing. Close the dialog first, then submit and fall back to `reportValidity()` if the submit was blocked |
+| Submitting a form programmatically without its save button | `requestSubmit()` without a submitter drops the button's name/value (`action=save`, `data-tpl-submit`) and skips its click handlers: pick the first non-destructive submit button and `.click()` it |
+
 ## Architecture & ops
 
 | Anti-pattern (legacy) | Socly practice |
