@@ -7659,8 +7659,25 @@ button.setup-scrape-logo-frame:focus-visible .setup-scrape-logo-overlay {
 .setup-account-active { padding-bottom: 0.55rem; }
 .setup-account-active .setup-field { margin: 0; }
 .setup-field-account-opening > span { font-size: 0.9rem; }
+.setup-accounts-new {
+  display: grid;
+  gap: 0.55rem;
+  margin-top: 0.35rem;
+  padding: 0.75rem 0.85rem 0.85rem;
+  border: 1px dashed color-mix(in srgb, var(--brand-primary) 30%, var(--line));
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--brand-paper) 45%, white);
+}
+.setup-accounts-new .setup-subhead { margin: 0; }
+.setup-account-row-new {
+  grid-template-columns: minmax(0, 1fr) minmax(8.5rem, 10.5rem) auto;
+  align-items: end;
+}
+.setup-accounts-new > .btn { justify-self: start; }
+.setup-account-row-remove { white-space: nowrap; }
 @media (max-width: 600px) {
   .setup-account-row { grid-template-columns: 1fr; }
+  .setup-account-row-new { grid-template-columns: 1fr; }
   .setup-account-toggle,
   .setup-account-active { padding-bottom: 0; }
 }

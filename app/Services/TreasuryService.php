@@ -525,7 +525,7 @@ final class TreasuryService
             || (float) ($row['transfer_out'] ?? 0) !== 0.0;
     }
 
-    /** @return array{ok:bool,id?:int,errors?:array<string,string>} */
+    /** @return array{ok:bool,id?:int,slug?:string,errors?:array<string,string>} */
     public function createAccount(string $label, bool $active = true, string $ip = '', ?int $userId = null): array
     {
         $label = trim($label);
@@ -546,7 +546,7 @@ final class TreasuryService
         ]);
         $this->accountsCache = null;
         $this->audit->log('treasury.account_created', 'treasury', (string) $id, null, ['slug' => $slug, 'label' => $label], $ip, $userId);
-        return ['ok' => true, 'id' => $id];
+        return ['ok' => true, 'id' => $id, 'slug' => $slug];
     }
 
     /** @return array{ok:bool,errors?:array<string,string>} */

@@ -1600,6 +1600,7 @@ function initSetupWizard() {
   initSetupTaxIds(root);
   initSetupContacts(root);
   initSetupPresidentSections(root);
+  initSetupAccounts(root);
   initSetupFormScrollHint(root);
   initLegalDocEditors(root);
   initSetupLegalPdf(root);
@@ -6568,6 +6569,47 @@ function initSetupFormScrollHint(root) {
  * President step accordion: open closed sections that still need required values
  * when Continua is pressed, so “false bottom” never hides validation.
  */
+/**
+ * “Conti di cassa” step: add/remove extra wallets before saving the step.
+ *
+ * Each new row is a clone of the server-rendered <template> whose __INDEX__
+ * placeholder becomes a unique index, so the POST arrives as
+ * accounts_new[0][label], accounts_new[1][label], …
+ */
+function initSetupAccounts(root = document) {
+  root.querySelectorAll('[data-setup-accounts-new]').forEach((wrap) => {
+    if (!(wrap instanceof HTMLElement) || wrap.dataset.accountsNewBound === '1') return;
+    wrap.dataset.accountsNewBound = '1';
+    const template = wrap.querySelector('[data-accounts-new-template]');
+    const list = wrap.querySelector('[data-accounts-new-list]');
+    const addBtn = wrap.querySelector('[data-accounts-new-add]');
+    if (!(template instanceof HTMLTemplateElement) || !(list instanceof HTMLElement) || !(addBtn instanceof HTMLElement)) {
+      return;
+    }
+    let nextIndex = Number(wrap.dataset.nextIndex || 0) || 0;
+    const refresh = () => wrap.dispatchEvent(new Event('setup:cta-refresh', { bubbles: true }));
+    addBtn.addEventListener('click', () => {
+      const html = String(template.innerHTML || '').replaceAll('__INDEX__', String(nextIndex++));
+      const holder = document.createElement('div');
+      holder.innerHTML = html.trim();
+      const row = holder.firstElementChild;
+      if (!(row instanceof HTMLElement)) return;
+      list.appendChild(row);
+      const input = row.querySelector('input[type="text"]');
+      if (input instanceof HTMLInputElement) input.focus();
+      refresh();
+    });
+    list.addEventListener('click', (event) => {
+      const target = event.target instanceof Element ? event.target : null;
+      const btn = target ? target.closest('[data-accounts-new-remove]') : null;
+      if (!btn) return;
+      const row = btn.closest('.setup-account-row');
+      if (row) row.remove();
+      refresh();
+    });
+  });
+}
+
 function initSetupPresidentSections(root) {
   const host = root.querySelector('[data-setup-president-sections]');
   const form = root.querySelector('[data-setup-form]');

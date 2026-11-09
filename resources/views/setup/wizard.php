@@ -1902,6 +1902,57 @@ $showNameDe = !empty($showNameDe);
                     <?php
                     $accountRows = is_array($value['accounts'] ?? null) ? $value['accounts'] : [];
                     $currencyDisplay = (string) ($value['currency_display'] ?? '€');
+                    $builtinAccounts = [];
+                    $customAccounts = [];
+                    foreach ($accountRows as $accountRow) {
+                        if (!is_array($accountRow) || (string) ($accountRow['key'] ?? '') === '') {
+                            continue;
+                        }
+                        if (!empty($accountRow['builtin'])) {
+                            $builtinAccounts[] = $accountRow;
+                        } else {
+                            $customAccounts[] = $accountRow;
+                        }
+                    }
+                    /** Existing wallet: activation checkbox + opening balance. */
+                    $renderAccountRow = static function (array $accountRow) use ($currencyDisplay): void {
+                        $accKey = (string) ($accountRow['key'] ?? '');
+                        if ($accKey === '') {
+                            return;
+                        }
+                        $accLabel = (string) ($accountRow['label'] ?? $accKey);
+                        ?>
+                        <div class="setup-account-row">
+                            <div class="setup-account-active">
+                                <?= field('checkbox', [
+                                    'name' => 'accounts[' . $accKey . '][active]',
+                                    'label' => $accLabel,
+                                    'value' => '1',
+                                    'check_value' => '1',
+                                    'checked' => !empty($accountRow['active']),
+                                    'context' => 'setup',
+                                    'label_class' => 'checkbox-row setup-check',
+                                ]) ?>
+                            </div>
+                            <label class="setup-field setup-field-account-opening">
+                                <span><?= e(__('setup.accounts_opening')) ?></span>
+                                <div class="setup-price-with-currency">
+                                    <?= field('number', [
+                                        'name' => 'accounts[' . $accKey . '][opening_balance]',
+                                        'label' => '',
+                                        'value' => '',
+                                        'context' => 'inline',
+                                        'wrapper_class' => 'sf-field--price-inline',
+                                        'step' => '0.01',
+                                        'min' => 0,
+                                        'placeholder' => '0.00',
+                                    ]) ?>
+                                    <span class="setup-price-currency" aria-hidden="true"><?= e($currencyDisplay) ?></span>
+                                </div>
+                            </label>
+                        </div>
+                        <?php
+                    };
                     ?>
                     <div class="setup-accounts" data-setup-line>
                         <p class="setup-hint muted"><?= e(__('setup.accounts_hint')) ?></p>
@@ -1909,47 +1960,42 @@ $showNameDe = !empty($showNameDe);
                             <p class="setup-hint setup-hint-warn"><?= e(__('setup.accounts_unavailable')) ?></p>
                         <?php endif; ?>
                         <div class="setup-accounts-list">
-                            <?php foreach ($accountRows as $accountRow): ?>
-                                <?php
-                                if (!is_array($accountRow)) {
-                                    continue;
-                                }
-                                $accKey = (string) ($accountRow['key'] ?? '');
-                                if ($accKey === '') {
-                                    continue;
-                                }
-                                $accLabel = (string) ($accountRow['label'] ?? $accKey);
-                                ?>
-                                <div class="setup-account-row">
-                                    <div class="setup-account-active">
-                                        <?= field('checkbox', [
-                                            'name' => 'accounts[' . $accKey . '][active]',
-                                            'label' => $accLabel,
-                                            'value' => '1',
-                                            'check_value' => '1',
-                                            'checked' => !empty($accountRow['active']),
-                                            'context' => 'setup',
-                                            'label_class' => 'checkbox-row setup-check',
-                                        ]) ?>
-                                    </div>
+                            <?php foreach ($builtinAccounts as $accountRow): ?>
+                                <?php $renderAccountRow($accountRow); ?>
+                            <?php endforeach; ?>
+                        </div>
+                        <?php if ($customAccounts !== []): ?>
+                            <p class="setup-subhead"><?= e(__('setup.accounts_custom_existing')) ?></p>
+                            <div class="setup-accounts-list">
+                                <?php foreach ($customAccounts as $accountRow): ?>
+                                    <?php $renderAccountRow($accountRow); ?>
+                                <?php endforeach; ?>
+                            </div>
+                        <?php endif; ?>
+                        <div class="setup-accounts-new" data-setup-accounts-new data-next-index="<?= count($customAccounts) ?>">
+                            <p class="setup-subhead"><?= e(__('setup.accounts_custom_title')) ?></p>
+                            <p class="setup-hint muted"><?= e(__('setup.accounts_custom_hint')) ?></p>
+                            <div class="setup-accounts-list" data-accounts-new-list></div>
+                            <template data-accounts-new-template>
+                                <div class="setup-account-row setup-account-row-new">
+                                    <label class="setup-field">
+                                        <span><?= e(__('setup.accounts_custom_name')) ?></span>
+                                        <input class="sf-field__control" type="text" name="accounts_new[__INDEX__][label]"
+                                               maxlength="80" autocomplete="off"
+                                               placeholder="<?= e(__('setup.accounts_custom_name_placeholder')) ?>">
+                                    </label>
                                     <label class="setup-field setup-field-account-opening">
                                         <span><?= e(__('setup.accounts_opening')) ?></span>
                                         <div class="setup-price-with-currency">
-                                            <?= field('number', [
-                                                'name' => 'accounts[' . $accKey . '][opening_balance]',
-                                                'label' => '',
-                                                'value' => '',
-                                                'context' => 'inline',
-                                                'wrapper_class' => 'sf-field--price-inline',
-                                                'step' => '0.01',
-                                                'min' => 0,
-                                                'placeholder' => '0.00',
-                                            ]) ?>
+                                            <input class="sf-field__control" type="number" name="accounts_new[__INDEX__][opening_balance]"
+                                                   step="0.01" min="0" placeholder="0.00">
                                             <span class="setup-price-currency" aria-hidden="true"><?= e($currencyDisplay) ?></span>
                                         </div>
                                     </label>
+                                    <button type="button" class="btn btn-ghost btn-sm setup-account-row-remove" data-accounts-new-remove><?= e(__('setup.accounts_custom_remove')) ?></button>
                                 </div>
-                            <?php endforeach; ?>
+                            </template>
+                            <button type="button" class="btn btn-ghost btn-sm" data-accounts-new-add><?= e(__('setup.accounts_custom_add')) ?></button>
                         </div>
                     </div>
                 <?php elseif ($stepType === 'platform_consents'): ?>

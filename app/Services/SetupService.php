@@ -3274,6 +3274,7 @@ final class SetupService
         $errors = [];
         $activeCount = 0;
         $createdMovementIds = [];
+        $createdAccountIds = [];
 
         try {
             foreach ($accounts as $account) {
@@ -3322,6 +3323,60 @@ final class SetupService
                 }
                 $createdMovementIds[] = (int) ($result['id'] ?? 0);
             }
+
+            // New wallets typed in the wizard ("Altri conti"): created on the fly,
+            // with their opening balance registered like the built-in ones.
+            $newRows = is_array($input['accounts_new'] ?? null) ? (array) $input['accounts_new'] : [];
+            foreach ($newRows as $row) {
+                if (!is_array($row)) {
+                    continue;
+                }
+                $label = trim(mb_substr((string) ($row['label'] ?? ''), 0, 80));
+                $rawValue = $row['opening_balance'] ?? '';
+                $raw = is_scalar($rawValue) ? trim((string) $rawValue) : '';
+                $opening = $raw === '' ? 0.0 : (float) str_replace(',', '.', $raw);
+                if ($label === '' && $opening <= 0.0) {
+                    continue; // empty row
+                }
+                if ($label === '') {
+                    $errors['accounts'] = __('setup.accounts_custom_label_required');
+                    break;
+                }
+                if (!is_finite($opening) || $opening < 0) {
+                    $errors['accounts'] = __('setup.accounts_opening_invalid');
+                    break;
+                }
+                $created = $treasury->createAccount($label, true, $ip);
+                if (empty($created['ok'])) {
+                    $errors['accounts'] = (string) (($created['errors']['label'] ?? '')
+                        ?: __('setup.accounts_custom_failed', ['account' => $label]));
+                    break;
+                }
+                $newAccountId = (int) ($created['id'] ?? 0);
+                $newSlug = (string) ($created['slug'] ?? '');
+                if ($newAccountId > 0) {
+                    $createdAccountIds[] = $newAccountId;
+                }
+                $activeCount++;
+                if (!$firstRun || $opening <= 0.0 || $newSlug === '') {
+                    continue;
+                }
+                $result = $treasury->create([
+                    'direction' => 'income',
+                    'amount' => $opening,
+                    'movement_date' => date('Y-m-d'),
+                    'account' => $newSlug,
+                    'payment_method' => 'other',
+                    'category' => 'other',
+                    'description' => __('setup.accounts_opening_movement', ['account' => $label]),
+                    'member_involved' => 0,
+                ], null, $ip, null);
+                if (empty($result['ok'])) {
+                    $errors['accounts'] = __('setup.accounts_opening_failed', ['account' => $label]);
+                    break;
+                }
+                $createdMovementIds[] = (int) ($result['id'] ?? 0);
+            }
         } catch (\Throwable $e) {
             try {
                 app('logger')->warning('setup.accounts_save_failed', ['error' => $e::class]);
@@ -3334,13 +3389,19 @@ final class SetupService
             $errors['accounts'] = __('setup.accounts_at_least_one');
         }
         if ($errors !== []) {
-            // Never leave half-written opening movements behind.
+            // Never leave half-written opening movements/accounts behind.
             foreach ($createdMovementIds as $movementId) {
                 if ($movementId < 1) {
                     continue;
                 }
                 try {
                     $this->db->query('DELETE FROM treasury_movements WHERE id = :id', ['id' => $movementId]);
+                } catch (\Throwable) {
+                }
+            }
+            foreach ($createdAccountIds as $accountId) {
+                try {
+                    $treasury->deleteAccount($accountId, $ip);
                 } catch (\Throwable) {
                 }
             }
