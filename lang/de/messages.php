@@ -77,6 +77,8 @@ return [
         'updates_none_text' => 'Sie nutzen die neueste verfügbare Version (v:version).',
         'updates_error_title' => 'Prüfung fehlgeschlagen',
         'updates_error_text' => 'Updates konnten gerade nicht geprüft werden. Bitte später erneut versuchen.',
+        'updates_available_short' => 'Update v:version verfügbar',
+        'updates_login_hint' => 'Zur Installation als Administrator anmelden: die Schaltfläche „Installieren“ findest du in der Seitenleiste (oder bin/update.php --apply ausführen).',
         'secure_area' => 'Nur für autorisierte Mitarbeitende',
         'welcome_title' => 'Willkommen zurück',
         'welcome_text' => 'Melden Sie sich an, um die Verwaltung Ihres Vereins zu öffnen.',

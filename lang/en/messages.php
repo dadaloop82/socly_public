@@ -77,6 +77,8 @@ return [
         'updates_none_text' => 'You are on the latest available version (v:version).',
         'updates_error_title' => 'Check failed',
         'updates_error_text' => 'Could not check for updates right now. Please try again shortly.',
+        'updates_available_short' => 'Update v:version available',
+        'updates_login_hint' => 'To install it, sign in as an administrator: the “Install” button is in the sidebar (or run bin/update.php --apply).',
         'secure_area' => 'Restricted area for authorised staff',
         'welcome_title' => 'Welcome back',
         'welcome_text' => 'Enter your credentials to open your association’s management area.',

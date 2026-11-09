@@ -79,6 +79,8 @@ return [
         'updates_none_text' => 'Stai usando l’ultima versione disponibile (v:version).',
         'updates_error_title' => 'Verifica non riuscita',
         'updates_error_text' => 'Impossibile controllare gli aggiornamenti in questo momento. Riprova tra poco.',
+        'updates_available_short' => 'Aggiornamento v:version disponibile',
+        'updates_login_hint' => 'Per installarlo accedi come amministratore: trovi «Installa» nella barra laterale (oppure esegui bin/update.php --apply).',
         'secure_area' => 'Area riservata agli operatori autorizzati',
         'welcome_title' => 'Bentornato',
         'welcome_text' => 'Inserisci le tue credenziali per accedere alla gestione dell’associazione.',

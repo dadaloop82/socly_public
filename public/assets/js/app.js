@@ -413,11 +413,9 @@ function enterScope(scope, opts = {}) {
     '.auth-motto',
     '.auth-desc',
     '.auth-news-slot',
-    '.auth-brand-meta',
     '.auth-lede',
     '.auth-panel',
     '.auth-card',
-    '.auth-footer',
     '.auth-lang',
     '.auth-form > *',
     '.auth-card > *',
@@ -459,6 +457,18 @@ function enterScope(scope, opts = {}) {
     io.unobserve(el);
     io.observe(el);
   });
+
+  // Safety net: a block glued to the viewport's bottom edge never satisfies the
+  // observer's bottom rootMargin, so it would stay at opacity 0 forever. Once
+  // the stagger is over, reveal anything that already starts inside the viewport.
+  window.setTimeout(() => {
+    items.forEach((el) => {
+      if (el.classList.contains('is-entered')) return;
+      if (el.getBoundingClientRect().top >= window.innerHeight) return;
+      el.classList.add('is-entered');
+      if (io) io.unobserve(el);
+    });
+  }, 1600);
 }
 const PASSWORD_TOGGLE_ICON_SHOW =
   '<svg class="password-toggle-icon password-toggle-icon--show" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path fill="currentColor" d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5zM12 17c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z"/></svg>';
@@ -11288,8 +11298,49 @@ function initAuthUpdateCheck() {
   const metaEl = dialog.querySelector('[data-auth-updates-meta]');
   const actionsEl = dialog.querySelector('[data-auth-updates-actions]');
   const closeBtn = dialog.querySelector('[data-auth-updates-close]');
+  const labelEl = btn.querySelector('[data-auth-update-label]');
+  const dotEl = btn.querySelector('[data-auth-update-dot]');
 
   const tpl = (key, fallback = '') => dialog.dataset[key] || fallback;
+
+  const availableTpl = btn.dataset.msgAvailable || '';
+
+  /** Footer badge: “Update v… available” + accent dot. */
+  const markAvailable = (remoteVersion) => {
+    if (dotEl instanceof HTMLElement) dotEl.hidden = false;
+    btn.classList.add('is-available');
+    if (labelEl instanceof HTMLElement && availableTpl !== '') {
+      // Server-rendered (already localised): drop the i18n hook so a locale
+      // switch does not overwrite the “available” wording with the default one.
+      labelEl.removeAttribute('data-i18n');
+      labelEl.textContent = availableTpl.replace(':version', String(remoteVersion || ''));
+    }
+  };
+
+  // Gentle background check (once per browser session) so the footer can
+  // advertise a pending update without the visitor clicking anything.
+  const AUTOCHECK_TTL = 6 * 60 * 60 * 1000;
+  const autoCheck = async () => {
+    if (btn.dataset.authUpdatesAutocheck !== '1') return;
+    try {
+      const last = Number(window.sessionStorage.getItem('socly.updatesChecked') || 0);
+      if (last && Date.now() - last < AUTOCHECK_TTL) return;
+      window.sessionStorage.setItem('socly.updatesChecked', String(Date.now()));
+    } catch {
+      // Private mode / storage disabled: stay silent.
+    }
+    try {
+      const endpoint = btn.dataset.updatesEndpoint || '/api/updates/check';
+      const res = await fetch(endpoint, {
+        credentials: 'same-origin',
+        headers: { Accept: 'application/json' },
+      });
+      const data = await res.json();
+      if (data?.ok && data.available) markAvailable(String(data.remote || ''));
+    } catch {
+      // Offline or endpoint unavailable: the manual button still works.
+    }
+  };
 
   const formatReleaseDate = (iso) => {
     if (!iso) return '';
@@ -11386,6 +11437,7 @@ function initAuthUpdateCheck() {
       renderMeta(data);
 
       if (data.available) {
+        markAvailable(String(data.remote || ''));
         if (titleEl) titleEl.textContent = tpl('i18nAvailableTitle', 'Aggiornamento disponibile');
         const textTemplate = tpl('i18nAvailableText', 'Versione attuale v:current · nuova v:remote');
         if (textEl) {
@@ -11394,7 +11446,6 @@ function initAuthUpdateCheck() {
             .replace(':remote', data.remote || '');
         }
         if (actionsEl) {
-          actionsEl.hidden = false;
           const links = [];
           if (data.notes_url) {
             links.push(`<a class="btn btn-sm btn-ghost" href="${escapeHtml(data.notes_url)}" target="_blank" rel="noopener noreferrer">${escapeHtml(tpl('i18nNotes', 'Novità'))}</a>`);
@@ -11405,12 +11456,19 @@ function initAuthUpdateCheck() {
           if (data.install_guide_url) {
             links.push(`<a class="btn btn-sm btn-ghost" href="${escapeHtml(data.install_guide_url)}" target="_blank" rel="noopener noreferrer">${escapeHtml(tpl('i18nGuide', 'Come aggiornare'))}</a>`);
           }
-          if (!data.install_available && links.length === 0) {
+          actionsEl.innerHTML = links.join('');
+
+          // A guest cannot run the update (the install endpoint needs an admin
+          // session): point at the sidebar button / CLI instead of a dead end.
+          if (data.install_available) {
+            const hint = tpl('i18nLoginHint', '');
+            if (textEl && hint) textEl.textContent += '\n\n' + hint;
+          } else if (links.length === 0) {
             if (textEl) {
               textEl.textContent += '\n\n' + tpl('i18nManualHint', '');
             }
           }
-          actionsEl.innerHTML = links.join('');
+          actionsEl.hidden = links.length === 0;
         }
       } else {
         if (titleEl) titleEl.textContent = tpl('i18nNoneTitle', 'Nessun aggiornamento');
@@ -11428,6 +11486,8 @@ function initAuthUpdateCheck() {
       btn.disabled = false;
     }
   });
+
+  void autoCheck();
 }
 
 function initTreasuryCategory(root = document) {

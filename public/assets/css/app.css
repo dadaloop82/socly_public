@@ -3054,12 +3054,13 @@ tr.clickable-row:focus-visible {
 .detail-item .value { font-size: 1.02rem; }
 
 /* —— Auth shell —— */
-.auth-shell { min-height: 100vh; display: grid; grid-template-rows: 1fr auto; }
+.auth-shell { min-height: 100vh; min-height: 100dvh; display: grid; grid-template-rows: 1fr auto; }
 .auth-main {
   display: grid;
   /* Focus on the login form (right): brand column stays supporting. */
   grid-template-columns: minmax(16rem, 0.62fr) minmax(24rem, 1.38fr);
-  min-height: calc(100vh - 72px);
+  /* Let the footer always fit: the shell's 1fr row absorbs the leftover height. */
+  min-height: 0;
 }
 .auth-brand {
   position: relative;
@@ -3328,7 +3329,6 @@ tr.clickable-row:focus-visible {
   text-decoration: none;
 }
 .auth-news-link:hover { text-decoration: underline; }
-.auth-updates-line { margin: 0; }
 .auth-updates-dialog {
   color: var(--ink, #1a1a1a);
 }
@@ -3374,19 +3374,6 @@ tr.clickable-row:focus-visible {
 .auth-updates-meta a:hover {
   text-decoration: underline;
 }
-.auth-check-updates {
-  background: none;
-  border: none;
-  padding: 0;
-  color: color-mix(in srgb, var(--brand-paper) 78%, transparent);
-  font: inherit;
-  font-size: 0.78rem;
-  text-decoration: underline;
-  text-underline-offset: 0.15em;
-  cursor: pointer;
-}
-.auth-check-updates:hover { color: var(--brand-paper); }
-.auth-check-updates:disabled { opacity: 0.55; cursor: wait; }
 .auth-updates-dialog .auth-updates-actions {
   display: flex;
   flex-wrap: wrap;
@@ -3396,13 +3383,6 @@ tr.clickable-row:focus-visible {
 .auth-asterisk {
   opacity: 0.42;
   font-weight: 500;
-}
-.auth-brand-meta {
-  position: relative; z-index: 1; margin-top: 0; font-size: 0.9rem;
-  color: color-mix(in srgb, var(--brand-paper) 65%, transparent);
-  display: grid;
-  gap: 0.85rem;
-  flex: 0 0 auto;
 }
 .auth-footer-sep {
   opacity: 0.55;
@@ -3423,6 +3403,50 @@ tr.clickable-row:focus-visible {
 .auth-footer-terms:hover {
   opacity: 1;
   color: var(--ink);
+}
+/* Update status in the footer: quiet link, accent dot + wording when an update exists. */
+.auth-footer-status {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex: 0 1 auto;
+  min-width: 0;
+}
+.auth-footer-update {
+  appearance: none;
+  border: 0;
+  background: transparent;
+  padding: 0;
+  margin: 0;
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  text-decoration: underline;
+  text-decoration-color: color-mix(in srgb, currentColor 35%, transparent);
+  text-underline-offset: 2px;
+  opacity: 0.9;
+  transition: color 0.18s ease, opacity 0.18s ease;
+}
+.auth-footer-update:hover,
+.auth-footer-update:focus-visible {
+  opacity: 1;
+  color: var(--ink);
+}
+.auth-footer-update.is-available {
+  color: var(--brand-accent-ink);
+  font-weight: 700;
+  text-decoration-color: color-mix(in srgb, currentColor 45%, transparent);
+}
+.auth-footer-update-dot {
+  flex: 0 0 auto;
+  width: 0.5rem;
+  height: 0.5rem;
+  border-radius: 999px;
+  background: var(--brand-accent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--brand-accent) 22%, transparent);
 }
 .auth-terms-body {
   font-size: 0.92rem;
@@ -5972,8 +5996,7 @@ html.enter-anim .will-enter.is-entered {
   .auth-setup-prep {
     display: none;
   }
-  .auth-desc,
-  .auth-brand-meta {
+  .auth-desc {
     display: none;
   }
   .auth-setup-prep-lede {
@@ -6024,6 +6047,11 @@ html.enter-anim .will-enter.is-entered {
   .auth-footer nav {
     min-width: 0;
     white-space: nowrap;
+  }
+  .auth-footer-status {
+    flex: 0 0 auto;
+    white-space: nowrap;
+    font-size: 0.72rem;
   }
   .auth-footer nav {
     overflow: hidden;
@@ -8730,6 +8758,7 @@ button.setup-scrape-logo-frame:focus-visible .setup-scrape-logo-overlay {
   letter-spacing: -0.02em;
   line-height: 1.35;
   color: var(--brand-primary-deep);
+  white-space: pre-line;
 }
 .setup-exit-actions {
   display: flex;

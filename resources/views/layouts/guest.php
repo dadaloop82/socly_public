@@ -103,15 +103,6 @@ $year = date('Y');
                 hidden
             ></div>
             <?php endif; ?>
-            <?php if (!$showSetupPrep && !is_temporary_instance()): ?>
-            <div class="auth-brand-meta">
-                <p class="auth-updates-line">
-                    <button type="button" class="auth-check-updates" data-auth-check-updates data-updates-endpoint="<?= e(url('/api/updates/check')) ?>">
-                        <span data-i18n="auth.check_updates"><?= e(__('auth.check_updates')) ?></span>
-                    </button>
-                </p>
-            </div>
-            <?php endif; ?>
         </aside>
         <section class="auth-panel">
             <div class="auth-card">
@@ -134,6 +125,7 @@ $year = date('Y');
         data-i18n-available-title="<?= e(__('updates.available_title')) ?>"
         data-i18n-available-text="<?= e(__('updates.available_text')) ?>"
         data-i18n-manual-hint="<?= e(__('updates.manual_hint')) ?>"
+        data-i18n-login-hint="<?= e(__('auth.updates_login_hint')) ?>"
         data-i18n-notes="<?= e(__('updates.notes')) ?>"
         data-i18n-download="<?= e(__('updates.download')) ?>"
         data-i18n-guide="<?= e(__('updates.guide')) ?>"
@@ -169,6 +161,21 @@ $year = date('Y');
             <span class="auth-footer-sep" aria-hidden="true">·</span>
             <button type="button" class="auth-footer-terms" data-terms-open data-i18n="auth.terms_link"><?= e(__('auth.terms_link')) ?></button>
         </div>
+        <?php if (!$showSetupPrep && !is_temporary_instance()): ?>
+        <div class="auth-footer-status">
+            <button
+                type="button"
+                class="auth-footer-update"
+                data-auth-check-updates
+                data-auth-updates-autocheck="1"
+                data-updates-endpoint="<?= e(url('/api/updates/check')) ?>"
+                data-msg-available="<?= e(__('auth.updates_available_short', ['version' => ':version'])) ?>"
+            >
+                <span class="auth-footer-update-dot" data-auth-update-dot aria-hidden="true" hidden></span>
+                <span data-auth-update-label data-i18n="auth.check_updates"><?= e(__('auth.check_updates')) ?></span>
+            </button>
+        </div>
+        <?php endif; ?>
         <nav class="auth-footer-actions">
             <?= view_partial('partials/report_problem') ?>
             <span data-i18n-html="auth.footer_tagline"><?= credit_line() ?></span>
