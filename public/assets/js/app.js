@@ -3933,9 +3933,35 @@ function initLogoFilePickers(scope = document) {
       } else {
         hidePreview();
       }
+      // A manual upload is the user's own choice: it can no longer be replaced
+      // by the website scan, so the badge switches to “uploaded by you”.
+      paintLogoSource(url !== '');
       if (data.primary || data.accent) {
         applyBrandColors(data.primary, data.accent);
       }
+    };
+
+    const paintLogoSource = (isUser) => {
+      if (!(root instanceof HTMLElement)) return;
+      let sourceEl = root.querySelector('[data-setup-logo-source]');
+      if (!isUser) {
+        sourceEl?.remove();
+        return;
+      }
+      const badgeText = root.dataset.msgLogoUserBadge || '';
+      const hintText = root.dataset.msgLogoUserHint || '';
+      if (!(sourceEl instanceof HTMLElement)) {
+        sourceEl = document.createElement('p');
+        sourceEl.className = 'setup-logo-source setup-hint';
+        sourceEl.setAttribute('data-setup-logo-source', '');
+        sourceEl.innerHTML = '<span class="setup-logo-source-badge"></span><span data-setup-logo-source-hint></span>';
+        root.querySelector('[data-setup-logo-preview]')?.insertAdjacentElement('afterend', sourceEl);
+      }
+      sourceEl.classList.add('is-user');
+      const badge = sourceEl.querySelector('.setup-logo-source-badge');
+      if (badge && badgeText !== '') badge.textContent = badgeText;
+      const hint = sourceEl.querySelector('[data-setup-logo-source-hint]');
+      if (hint && hintText !== '') hint.textContent = hintText;
     };
 
     input.addEventListener('change', async () => {

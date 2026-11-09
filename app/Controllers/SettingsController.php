@@ -231,19 +231,23 @@ final class SettingsController extends BaseController
     public function saveGeneral(Request $request): void
     {
         $data = $request->all();
+        // Only the association name is mandatory: whatever the user deferred in
+        // the wizard (seat, contacts, tax ids…) must be allowed to stay empty and
+        // must not block an unrelated edit (logo, colours, a single field).
+        // Formats are still validated whenever a value is typed.
         if (!$this->validator->validate($data, [
             'association_name' => 'required|string|max:120',
-            'association_name_de' => 'nullable|string|max:120',
-            'association_legal_name' => 'required|string|max:6|in:' . implode(',', \Socly\Setup\AssociationLegalForms::codes()),
-            'association_fiscal_code' => 'required|string|max:16',
-            'association_city' => 'required|string|max:120',
-            'association_postal_code' => 'required|string|max:12',
-            'association_province' => 'required|string|max:64',
-            'association_address' => 'required|string|max:255',
-            'association_house_number' => 'required|string|max:20',
-            'association_pec' => 'required|email|max:190',
-            'association_email' => 'nullable|email|max:190',
-            'association_runts' => 'nullable|string|max:6',
+            'association_name_de' => 'string|max:120',
+            'association_legal_name' => 'string|max:6|in:' . implode(',', \Socly\Setup\AssociationLegalForms::codes()),
+            'association_fiscal_code' => 'string|max:16',
+            'association_city' => 'string|max:120',
+            'association_postal_code' => 'string|max:12',
+            'association_province' => 'string|max:64',
+            'association_address' => 'string|max:255',
+            'association_house_number' => 'string|max:20',
+            'association_pec' => 'email|max:190',
+            'association_email' => 'email|max:190',
+            'association_runts' => 'string|max:6',
             'primary' => 'required|color',
             'accent' => 'required|color',
             'locale' => 'required|in:it,de,en',
@@ -266,7 +270,7 @@ final class SettingsController extends BaseController
             $this->settingsFail($request, ['association_vat' => __('setup.validation_vat')], 'general');
         }
         $pec = strtolower(trim((string) ($data['association_pec'] ?? '')));
-        if (!$this->validator->isValidPecAddress($pec)) {
+        if ($pec !== '' && !$this->validator->isValidPecAddress($pec)) {
             $this->settingsFail($request, ['association_pec' => __('setup.contacts_pec_invalid')], 'general');
         }
         $before = [
@@ -284,7 +288,12 @@ final class SettingsController extends BaseController
         $this->settings->set('association.postal_code', $data['association_postal_code']);
         $province = \Socly\Support\ItalianProvinces::expandName((string) ($data['association_province'] ?? ''));
         $foreign = trim((string) ($data['address_foreign'] ?? '')) === '1';
-        if (!$foreign) {
+        // A seat deferred in the wizard is empty: skipping the check avoids both a
+        // misleading mismatch error and a rewritten address_full.
+        $seatComplete = trim((string) ($data['association_city'] ?? '')) !== ''
+            && trim((string) ($data['association_postal_code'] ?? '')) !== ''
+            && $province !== '';
+        if (!$foreign && $seatComplete) {
             $geoCheck = app(\Socly\Services\GeoService::class)->validateItalianAddressTriplet(
                 (string) $data['association_city'],
                 (string) $data['association_postal_code'],
@@ -317,14 +326,16 @@ final class SettingsController extends BaseController
         $this->settings->set('association.province', $province);
         $this->settings->set('association.address', $data['association_address']);
         $this->settings->set('association.house_number', $data['association_house_number']);
-        $this->settings->set('association.address_full', trim(sprintf(
-            '%s %s, %s %s %s',
-            $data['association_address'],
-            $data['association_house_number'],
-            $data['association_postal_code'],
-            $data['association_city'],
-            $province
-        )));
+        if ($seatComplete) {
+            $this->settings->set('association.address_full', trim(sprintf(
+                '%s %s, %s %s %s',
+                $data['association_address'],
+                $data['association_house_number'],
+                $data['association_postal_code'],
+                $data['association_city'],
+                $province
+            )));
+        }
         $this->settings->set('association.pec', $data['association_pec']);
         $this->settings->set('association.email', $data['association_email']);
         $phone = normalize_phone_value($data['association_phone'] ?? '');
@@ -351,14 +362,18 @@ final class SettingsController extends BaseController
                     @unlink($absolute);
                 }
                 $this->settings->set('branding.logo', '');
+                $this->settings->set('branding.logo_source', '');
             }
         } else {
             $logoFile = $request->file('logo');
             if ($logoFile !== null) {
-                $stored = $this->branding->storeLogoUpload($logoFile);
+                $stored = $this->branding->storeLogoUpload($logoFile, true);
                 if (!$stored['ok']) {
                     $this->settingsFail($request, ['logo' => (string) ($stored['error'] ?? __('validation.photo'))], 'general');
                 }
+                // Manual choice: the website scraper must never replace it.
+                $this->settings->set('branding.logo_source', 'user');
+                $this->settings->set('branding.logo_configured', '1');
             }
         }
         \Socly\Support\EnvWriter::setUserValues([

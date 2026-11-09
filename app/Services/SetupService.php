@@ -420,6 +420,7 @@ final class SetupService
             return [
                 'logo_url' => $this->branding->logoUrl(),
                 'has_logo' => $this->branding->logoRelativePath() !== '',
+                'logo_source' => trim((string) $this->settings->get('branding.logo_source', '')),
             ];
         }
 
@@ -1075,9 +1076,13 @@ final class SetupService
 
         $logoUrl = trim((string) ($found['logo_url'] ?? ''));
         $logoApplied = false;
-        if ($logoUrl !== '' && $this->branding->logoRelativePath() === '') {
+        // A logo chosen by the user always wins: the scraper may only fill an
+        // empty slot, never replace (or resurrect) a manual choice.
+        $logoLocked = trim((string) $this->settings->get('branding.logo_source', '')) === 'user';
+        if ($logoUrl !== '' && !$logoLocked && $this->branding->logoRelativePath() === '') {
             $stored = $this->branding->downloadLogoFromUrl($logoUrl);
             if (!empty($stored['ok'])) {
+                $this->settings->set('branding.logo_source', 'scraped');
                 $applied[] = 'logo';
                 $logoApplied = true;
             }
@@ -1152,6 +1157,7 @@ final class SetupService
         if (empty($stored['ok'])) {
             return ['ok' => false, 'error' => (string) ($stored['error'] ?? __('validation.photo'))];
         }
+        $this->markLogoChosenByUser();
 
         $primary = strtoupper(trim((string) $this->settings->get('branding.primary', '')));
         $accent = strtoupper(trim((string) $this->settings->get('branding.accent', '')));
@@ -1176,6 +1182,16 @@ final class SetupService
     }
 
     /**
+     * The user uploaded/chose this logo by hand: from now on the website scraper
+     * must never replace it (a scraped logo is only a suggestion).
+     */
+    private function markLogoChosenByUser(): void
+    {
+        $this->settings->set('branding.logo_source', 'user');
+        $this->settings->set('branding.logo_configured', '1');
+    }
+
+    /**
      * Remove association logo during setup and reset palette to SOCLY defaults.
      *
      * @return array{ok:bool,error?:string,logo_url?:null,primary:string,accent:string,palettes:list<array<string,mixed>>}
@@ -1189,6 +1205,7 @@ final class SetupService
                 @unlink($absolute);
             }
             $this->settings->set('branding.logo', '');
+            $this->settings->set('branding.logo_source', '');
         }
 
         $primary = '#0D6E66';
@@ -1229,6 +1246,8 @@ final class SetupService
         if (empty($stored['ok'])) {
             return ['ok' => false, 'error' => (string) ($stored['error'] ?? __('validation.photo'))];
         }
+        // The user picked this candidate explicitly: it is no longer a guess.
+        $this->markLogoChosenByUser();
 
         $primary = strtoupper(trim((string) $this->settings->get('branding.primary', '')));
         $accent = strtoupper(trim((string) $this->settings->get('branding.accent', '')));

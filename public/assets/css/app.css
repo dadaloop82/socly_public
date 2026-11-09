@@ -8159,6 +8159,31 @@ button.setup-scrape-logo-frame:focus-visible .setup-scrape-logo-overlay {
   color: var(--danger);
   font-weight: 600;
 }
+.setup-logo-source {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.4rem;
+  margin: 0 0 0.5rem;
+  font-size: 0.82rem;
+}
+.setup-logo-source-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.15rem 0.5rem;
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--brand-accent) 35%, var(--line));
+  background: color-mix(in srgb, var(--brand-accent) 10%, white);
+  color: var(--brand-accent);
+  font-weight: 700;
+  font-size: 0.75rem;
+  letter-spacing: 0.02em;
+}
+.setup-logo-source.is-user .setup-logo-source-badge {
+  border-color: color-mix(in srgb, var(--brand-primary) 35%, var(--line));
+  background: color-mix(in srgb, var(--brand-primary) 10%, white);
+  color: var(--brand-primary-deep, var(--brand-primary));
+}
 .setup-logo-preview img[hidden],
 .setup-logo-preview:has(img[hidden]) {
   display: none;

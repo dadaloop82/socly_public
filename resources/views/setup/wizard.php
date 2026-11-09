@@ -267,12 +267,15 @@ $showNameDe = !empty($showNameDe);
                 <?php elseif ($stepType === 'logo'): ?>
                     <?php
                     $logoUrl = is_array($value) ? (string) ($value['logo_url'] ?? '') : '';
+                    $logoSource = is_array($value) ? (string) ($value['logo_source'] ?? '') : '';
                     $hasLogo = $logoUrl !== '';
                     ?>
                     <div class="setup-logo" data-setup-line data-setup-logo
                          data-logo-upload-url="<?= e(url('/setup/logo')) ?>"
                          data-csrf="<?= e(csrf_token()) ?>"
                          data-msg-fail="<?= e(__('setup.scrape_logo_fail')) ?>"
+                         data-msg-logo-user-badge="<?= e(__('setup.logo_source_user_badge')) ?>"
+                         data-msg-logo-user-hint="<?= e(__('setup.logo_source_user_hint')) ?>"
                          data-msg-uploading="<?= e(__('setup.logo_uploading')) ?>">
                         <div class="setup-logo-preview" data-setup-logo-preview<?= $hasLogo ? '' : ' hidden' ?>>
                             <img
@@ -283,6 +286,12 @@ $showNameDe = !empty($showNameDe);
                                 data-setup-logo-img<?= $hasLogo ? '' : ' hidden' ?>
                             >
                         </div>
+                        <?php if ($hasLogo): ?>
+                            <p class="setup-logo-source setup-hint<?= $logoSource === 'user' ? ' is-user' : '' ?>" data-setup-logo-source>
+                                <span class="setup-logo-source-badge"><?= e($logoSource === 'user' ? __('setup.logo_source_user_badge') : __('setup.logo_source_scraped_badge')) ?></span>
+                                <span data-setup-logo-source-hint><?= e($logoSource === 'user' ? __('setup.logo_source_user_hint') : __('setup.logo_source_scraped_hint')) ?></span>
+                            </p>
+                        <?php endif; ?>
                         <div class="setup-logo-actions">
                             <?= field('file', [
                                 'name' => '',

@@ -56,6 +56,14 @@ This document captures mistakes and costly fixes from the previous membership co
 | Comparing the typed street with plain equality against the OSM name | OSM names are often bilingual (“Piazza Giacomo Matteotti - Giacomo-Matteotti-Platz”): split on ` - `/` / `, normalize, and accept a typed name when every one of its words appears in the canonical one (“Piazza Matteotti” ⊂ “Piazza Giacomo Matteotti”) |
 | Expecting the street field to hold only the street | Users paste the whole address (“Piazza Matteotti a Bolzano 39100”): strip a trailing “, city [CAP]”, “a/in city [CAP]” or “city CAP” before searching, but only with an explicit separator so “Via Roma” in Rome is never truncated |
 
+## Setup & settings
+
+| Anti-pattern | Socly practice |
+|--------------|----------------|
+| Re-requiring every wizard field when the user edits settings | Validate only what belongs to the section being saved: a step deferred in the wizard (“do it later”) must stay empty without blocking an unrelated edit (logo, colours, one field). Formats are still checked whenever a value is typed; only the association name is mandatory |
+| Letting an automatic source (website scrape) win over an explicit user choice | Record who chose: `branding.logo_source = user` on a manual upload/pick, `scraped` when the scraper fills an empty slot. Scrapers may only fill gaps — never replace, and never resurrect a logo the user removed |
+| Skipping a step because a guess filled it | Show the value and label its origin (“suggested by your site”), so the user can replace it before finishing |
+
 ## Architecture & ops
 
 | Anti-pattern (legacy) | Socly practice |
