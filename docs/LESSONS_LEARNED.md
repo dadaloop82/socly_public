@@ -63,6 +63,7 @@ This document captures mistakes and costly fixes from the previous membership co
 | Re-requiring every wizard field when the user edits settings | Validate only what belongs to the section being saved: a step deferred in the wizard (“do it later”) must stay empty without blocking an unrelated edit (logo, colours, one field). Formats are still checked whenever a value is typed; only the association name is mandatory |
 | Letting an automatic source (website scrape) win over an explicit user choice | Record who chose: `branding.logo_source = user` on a manual upload/pick, `scraped` when the scraper fills an empty slot. Scrapers may only fill gaps — never replace, and never resurrect a logo the user removed |
 | Skipping a step because a guess filled it | Show the value and label its origin (“suggested by your site”), so the user can replace it before finishing |
+| Adding a wizard step to the catalogue without updating the hosted sample seeder | The hosted sample (the “try it” button on the login page) then fails with a generic error because `isComplete()` still has that step: seed it in the sample seeder or let it defer optional steps; required ones must be surfaced with their title |
 
 ## Architecture & ops
 
