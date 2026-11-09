@@ -48,6 +48,14 @@ This document captures mistakes and costly fixes from the previous membership co
 | Calling `form.requestSubmit()` while a modal `<dialog>` is open | The rest of the page is inert, so constraint validation shows no bubble and cannot focus the field: the click looks like it does nothing. Close the dialog first, then submit and fall back to `reportValidity()` if the submit was blocked |
 | Submitting a form programmatically without its save button | `requestSubmit()` without a submitter drops the button's name/value (`action=save`, `data-tpl-submit`) and skips its click handlers: pick the first non-destructive submit button and `.click()` it |
 
+## Geocoding (addresses)
+
+| Anti-pattern | Socly practice |
+|--------------|----------------|
+| Asking Photon for `osm_tag=highway` only | Squares and parks are `place`/`leisure` features: “Piazza Matteotti” came back empty. Skip the filter for square-ish names (piazza/largo/parco/platz…) and retry unfiltered when the filtered pass has nothing usable |
+| Comparing the typed street with plain equality against the OSM name | OSM names are often bilingual (“Piazza Giacomo Matteotti - Giacomo-Matteotti-Platz”): split on ` - `/` / `, normalize, and accept a typed name when every one of its words appears in the canonical one (“Piazza Matteotti” ⊂ “Piazza Giacomo Matteotti”) |
+| Expecting the street field to hold only the street | Users paste the whole address (“Piazza Matteotti a Bolzano 39100”): strip a trailing “, city [CAP]”, “a/in city [CAP]” or “city CAP” before searching, but only with an explicit separator so “Via Roma” in Rome is never truncated |
+
 ## Architecture & ops
 
 | Anti-pattern (legacy) | Socly practice |

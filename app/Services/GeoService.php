@@ -176,9 +176,17 @@ final class GeoService
         if ($city === '' || mb_strlen($query) < 2) {
             return [];
         }
+        $query = $this->stripCityFromQuery($query, $city);
 
         // Photon is built for typeahead (partial streets like "Via Ro"); Nominatim is a fallback.
-        $photon = $this->searchAddressesPhoton($query, $city, $limit, $houseNumber);
+        // Squares and parks are OSM `place`/`leisure` features, not highways: asking for
+        // highways only hides them, so skip the filter for those names.
+        $highwaysOnly = !$this->queryLooksLikeSquare($query);
+        $photon = $this->searchAddressesPhoton($query, $city, $limit, $houseNumber, $highwaysOnly);
+        if ($photon === [] && $highwaysOnly) {
+            // Nothing usable among highways (squares, courtyards, addresses): retry unfiltered.
+            $photon = $this->searchAddressesPhoton($query, $city, $limit, $houseNumber, false);
+        }
         if ($photon !== []) {
             return $photon;
         }
@@ -186,20 +194,61 @@ final class GeoService
         return $this->searchAddressesNominatim($query, $city, $limit, $houseNumber);
     }
 
+    /** True for names that usually map to a square/park instead of a street. */
+    private function queryLooksLikeSquare(string $query): bool
+    {
+        return (bool) preg_match(
+            '/^(piazza|piazzetta|piazzale|largo|parco|giardino|platz)\b/iu',
+            trim($query)
+        );
+    }
+
+    /**
+     * The street field is often filled with the whole address ("Piazza Matteotti
+     * a Bolzano 39100") although city and CAP have their own fields: drop the
+     * trailing city (+ CAP) before searching. Only explicit separators count, so
+     * "Via Roma" in Rome is never truncated to "Via".
+     */
+    private function stripCityFromQuery(string $query, string $city): string
+    {
+        $query = trim($query);
+        $city = trim($city);
+        if ($query === '' || $city === '') {
+            return $query;
+        }
+        $needle = preg_quote($city, '/');
+        $patterns = [
+            // "…, Bolzano", "… - Bolzano", "… a Bolzano", "… in Bolzano"
+            '/(?:\s*[,\-–]\s*|\s+(?:a|in|di)\s+)' . $needle . '(?:\s*,?\s*\d{5})?\s*$/iu',
+            // "… Bolzano 39100" (CAP makes the intent explicit)
+            '/\s+' . $needle . '\s*,?\s*\d{5}\s*$/iu',
+        ];
+        foreach ($patterns as $pattern) {
+            $stripped = preg_replace($pattern, '', $query);
+            if (is_string($stripped) && $stripped !== $query) {
+                $stripped = trim($stripped);
+                return mb_strlen($stripped) >= 3 ? $stripped : $query;
+            }
+        }
+        return $query;
+    }
+
     /**
      * Fast autocomplete via Photon (Komoot). One request, prefix-friendly.
      *
      * @return list<array{label:string,address:string,house_number:string,city:string,postal_code:string,lat:float,lon:float}>
      */
-    private function searchAddressesPhoton(string $query, string $city, int $limit, string $houseNumber = ''): array
+    private function searchAddressesPhoton(string $query, string $city, int $limit, string $houseNumber = '', bool $highwaysOnly = true): array
     {
         $q = $houseNumber !== '' ? trim($query . ' ' . $houseNumber) : $query;
         $params = [
             'q' => $q . ' ' . $city,
             'lang' => 'en',
             'limit' => max($limit * 3, 12),
-            'osm_tag' => 'highway',
         ];
+        if ($highwaysOnly) {
+            $params['osm_tag'] = 'highway';
+        }
         // Avoid Nominatim bbox lookup here — it is slow/rate-limited and blocks typeahead.
         // City name in the query + post-filter is enough for suggestions.
 
@@ -338,7 +387,7 @@ final class GeoService
                 continue;
             }
             $addr = is_array($row['address'] ?? null) ? $row['address'] : [];
-            $road = trim((string) ($addr['road'] ?? $addr['pedestrian'] ?? $addr['residential'] ?? $addr['path'] ?? $row['name'] ?? ''));
+            $road = trim((string) ($addr['road'] ?? $addr['pedestrian'] ?? $addr['square'] ?? $addr['place'] ?? $addr['residential'] ?? $addr['path'] ?? $row['name'] ?? ''));
             $rowHouse = trim((string) ($addr['house_number'] ?? ''));
             $cityName = trim((string) ($addr['city'] ?? $addr['town'] ?? $addr['village'] ?? $addr['municipality'] ?? $addr['city_district'] ?? ''));
             $display = (string) ($row['display_name'] ?? '');
@@ -568,6 +617,7 @@ final class GeoService
         if ($city === '' || mb_strlen($query) < 2) {
             return ['action' => 'none'];
         }
+        $query = $this->stripCityFromQuery($query, $city);
 
         $typedNorm = $this->normalizePlace($query);
         $results = $this->searchAddresses($query, $city, 5, $houseNumber);
@@ -976,7 +1026,21 @@ final class GeoService
     private function roadMatchesQuery(string $query, string $road): bool
     {
         $q = $this->normalizePlace($query);
-        $r = $this->normalizePlace($road);
+        if ($q === '') {
+            return false;
+        }
+        // OSM names are often bilingual ("Via Roma - Romstraße"): compare every part.
+        foreach ($this->placeNameVariants($road) as $variant) {
+            if ($this->roadNameMatches($q, $variant)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /** Compare one normalized name variant against the typed query. */
+    private function roadNameMatches(string $q, string $r): bool
+    {
         if ($q === '' || $r === '') {
             return false;
         }
@@ -987,31 +1051,82 @@ final class GeoService
         if (str_contains($r, $q) || str_contains($q, $r)) {
             return true;
         }
-        $strip = static function (string $value): string {
-            return trim(preg_replace('/^(via|viale|corso|piazza|piazzale|largo|vicolo|strada|contrada|localita)\\s+/u', '', $value) ?? $value);
-        };
-        $qCore = $strip($q);
-        $rCore = $strip($r);
-        return $qCore !== '' && $rCore !== '' && ($qCore === $rCore || $this->placesSimilar($qCore, $rCore));
+        $qCore = $this->stripRoadPrefix($q);
+        $rCore = $this->stripRoadPrefix($r);
+        if ($qCore !== '' && $rCore !== '' && ($qCore === $rCore || $this->placesSimilar($qCore, $rCore))) {
+            return true;
+        }
+        // "Piazza Matteotti" vs "Piazza Giacomo Matteotti": the typed name may omit
+        // middle names, as long as every typed word appears in the canonical one.
+        return $this->nameWordsContained($qCore !== '' ? $qCore : $q, $rCore !== '' ? $rCore : $r);
+    }
+
+    /**
+     * Normalized name variants, one per language of a bilingual OSM name.
+     *
+     * @return list<string>
+     */
+    private function placeNameVariants(string $name): array
+    {
+        $variants = [];
+        $whole = $this->normalizePlace($name);
+        if ($whole !== '') {
+            $variants[] = $whole;
+        }
+        foreach (preg_split('/\s+[-–—\/]\s+/u', $name) ?: [] as $part) {
+            $norm = $this->normalizePlace((string) $part);
+            if ($norm !== '') {
+                $variants[] = $norm;
+            }
+        }
+        return array_values(array_unique($variants));
+    }
+
+    /** Drop the street-type prefix ("piazza matteotti" → "matteotti"). */
+    private function stripRoadPrefix(string $value): string
+    {
+        return trim(preg_replace(
+            '/^(via|viale|corso|piazza|piazzetta|piazzale|largo|vicolo|strada|contrada|localita|platz|strasse)\s+/u',
+            '',
+            $value
+        ) ?? $value);
+    }
+
+    /** True when every word of the typed name appears in the canonical one. */
+    private function nameWordsContained(string $typed, string $canonical): bool
+    {
+        $typedWords = array_values(array_filter(preg_split('/\s+/u', trim($typed)) ?: []));
+        $canonicalWords = array_values(array_filter(preg_split('/\s+/u', trim($canonical)) ?: []));
+        if ($typedWords === [] || count($typedWords) > count($canonicalWords)) {
+            return false;
+        }
+        foreach ($typedWords as $word) {
+            // Ignore 1-2 letter noise ("a", "di") instead of treating it as a match.
+            if (mb_strlen($word) < 3 || !in_array($word, $canonicalWords, true)) {
+                return false;
+            }
+        }
+        return true;
     }
 
     /** Prefix match for live typing: "via ro" → "via roma". */
     private function roadPrefixMatches(string $query, string $road): bool
     {
         $q = $this->normalizePlace($query);
-        $r = $this->normalizePlace($road);
-        if ($q === '' || $r === '') {
+        if ($q === '') {
             return false;
         }
-        if (str_starts_with($r, $q)) {
-            return true;
+        $qCore = $this->stripRoadPrefix($q);
+        foreach ($this->placeNameVariants($road) as $variant) {
+            if (str_starts_with($variant, $q)) {
+                return true;
+            }
+            $rCore = $this->stripRoadPrefix($variant);
+            if ($qCore !== '' && $rCore !== '' && str_starts_with($rCore, $qCore)) {
+                return true;
+            }
         }
-        $strip = static function (string $value): string {
-            return trim(preg_replace('/^(via|viale|corso|piazza|piazzale|largo|vicolo|strada|contrada|localita)\\s+/u', '', $value) ?? $value);
-        };
-        $qCore = $strip($q);
-        $rCore = $strip($r);
-        return $qCore !== '' && $rCore !== '' && str_starts_with($rCore, $qCore);
+        return false;
     }
 
     /** Match rules for typeahead: prefer prefixes; avoid "vi" matching inside "… paolo vi". */
