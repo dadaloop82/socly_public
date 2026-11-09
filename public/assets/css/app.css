@@ -960,8 +960,53 @@ a.sidebar-brand-home:hover {
   line-height: 1.35;
 }
 .config-accordion-body {
-  padding: 0 1.15rem 1.2rem;
+  padding: 1.15rem 1.15rem 1.3rem;
   border-top: 1px solid color-mix(in srgb, var(--line) 80%, transparent);
+  /* Uniform vertical rhythm: every block in a section is spaced by `gap`, while
+     hints stay glued to the control they explain (rules below). */
+  display: flex;
+  flex-direction: column;
+  gap: 1.1rem;
+}
+.config-accordion-body > * { margin-block: 0; }
+/* Forms are the real containers in most sections: same rhythm inside them. */
+.config-accordion-body > form {
+  display: flex;
+  flex-direction: column;
+  gap: 1.1rem;
+}
+.config-accordion-body > form > * { margin-block: 0; }
+/* Legacy bottom margins would add to the flex gap: neutralise them here so the
+   rhythm is exactly `gap` (and hints can sit right under their control). */
+.config-accordion-body .sf-field,
+.config-accordion-body .sf-field.setup-field,
+.config-accordion-body .checkbox-row,
+.config-accordion-body .checkbox-row-lg,
+.config-accordion-body .setup-check {
+  margin-bottom: 0;
+}
+/* Section headers inside a panel breathe a little more. */
+.config-accordion-body > .setup-subhead,
+.config-accordion-body > form > .setup-subhead {
+  margin-top: 0.35rem;
+  margin-bottom: -0.25rem;
+}
+/* Hints describe the control right above them: pull them closer (never the
+   section intro hint, which follows the CSRF field). */
+.config-accordion-body form > .sf-field + .setup-hint,
+.config-accordion-body form > .setup-check + .setup-hint,
+.config-accordion-body form > .checkbox-row + .setup-hint,
+.config-accordion-body form > .grid-2 + .setup-hint,
+.config-accordion-body form > .grid-3 + .setup-hint,
+.config-accordion-body form > .setup-equal-row + .setup-hint,
+.config-accordion-body form > .setup-smtp-fields + .setup-hint,
+.config-accordion-body > .sf-field + .setup-hint,
+.config-accordion-body > .setup-check + .setup-hint {
+  margin-top: -0.55rem;
+}
+/* The trailing autosave note duplicates the explicit save row: hide it while empty. */
+.config-accordion-body .settings-autosave-status:empty {
+  display: none;
 }
 
 /* —— Configuration: macro-area navigation (2-column layout) —— */
@@ -977,6 +1022,11 @@ a.sidebar-brand-home:hover {
   gap: 0.4rem;
   position: sticky;
   top: 1rem;
+  /* Long indexes (all groups expanded) must stay reachable on short screens. */
+  max-height: calc(100vh - 2rem);
+  max-height: calc(100dvh - 2rem);
+  overflow-y: auto;
+  overscroll-behavior: contain;
 }
 .config-nav-item {
   appearance: none;

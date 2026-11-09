@@ -19,6 +19,11 @@ final class SetupGate
         if (!app()->isInstalled()) {
             return true;
         }
+        // A demo/showcase is not an installation to complete: never hijack its
+        // navigation into the guided setup wizard.
+        if (function_exists('is_demo_instance') && is_demo_instance()) {
+            return true;
+        }
         $path = $request->path();
         if (str_starts_with($path, '/setup') || str_starts_with($path, '/logout') || str_starts_with($path, '/updates')) {
             return true;

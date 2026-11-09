@@ -12181,7 +12181,8 @@ function initSettingsNav() {
       history.replaceState(null, '', `#${panel.id}`);
     }
     if (scroll) {
-      panel.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      // Keep the page header in sight: scroll only when the section is out of view.
+      panel.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'nearest' });
     }
   };
 

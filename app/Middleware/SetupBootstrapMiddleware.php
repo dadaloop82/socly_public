@@ -23,6 +23,12 @@ final class SetupBootstrapMiddleware
 
     public function handle(Request $request): bool
     {
+        // The guided setup is not available inside a demo: the showcase must
+        // never rewrite its own seeded data through the wizard.
+        if (function_exists('is_demo_instance') && is_demo_instance()) {
+            redirect('/dashboard');
+        }
+
         if (!$this->setup->isComplete()) {
             SetupSessionKeeper::keepAlive();
             if ($this->setup->allowsAnonymousSetup()) {

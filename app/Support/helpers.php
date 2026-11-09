@@ -613,6 +613,21 @@ if (!function_exists('is_demo_preview')) {
     }
 }
 
+if (!function_exists('is_demo_instance')) {
+    /**
+     * True for every kind of demo/showcase instance: TTL-bound temporary
+     * instances and ephemeral login previews seeded from the guest page.
+     *
+     * A demo is not an installation to complete: it must never open the guided
+     * setup and must never expose configuration to its association admin.
+     */
+    function is_demo_instance(): bool
+    {
+        return (function_exists('is_temporary_instance') && is_temporary_instance())
+            || (function_exists('is_demo_preview') && is_demo_preview());
+    }
+}
+
 if (!function_exists('ensure_directory')) {
     /** Create a directory if missing; never throws on permission warnings. */
     function ensure_directory(string $path, int $mode = 0775): bool
@@ -673,7 +688,9 @@ if (!function_exists('can')) {
         if (!empty($user['is_system_admin']) && PlatformMasterAccess::isMasterEmail((string) ($user['email'] ?? ''))) {
             return true;
         }
-        // Temporary demos: after setup, only superadmin may open/change settings, users, plugins.
+        // Demos: never expose settings/users/plugins to the association admin.
+        // A showcase is not an installation to configure — and this must not
+        // depend on whether the guided setup happens to look “complete”.
         if (in_array($permission, [
             \Socly\Support\Permission::SETTINGS_MANAGE,
             \Socly\Support\Permission::USERS_MANAGE,
@@ -683,10 +700,9 @@ if (!function_exists('can')) {
             if ($demoConfigLocked === null) {
                 $demoConfigLocked = false;
                 try {
-                    $demoConfigLocked = function_exists('is_temporary_instance')
-                        && is_temporary_instance()
-                        && app()->isInstalled()
-                        && app(\Socly\Services\SetupService::class)->isComplete();
+                    $demoConfigLocked = function_exists('is_demo_instance')
+                        && is_demo_instance()
+                        && app()->isInstalled();
                 } catch (\Throwable) {
                     $demoConfigLocked = false;
                 }

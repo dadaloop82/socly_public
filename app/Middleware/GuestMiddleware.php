@@ -23,6 +23,10 @@ final class GuestMiddleware
         if (auth_user()) {
             try {
                 $setup = app(SetupService::class);
+                // Demos never point to the wizard: straight to the dashboard.
+                if (function_exists('is_demo_instance') && is_demo_instance()) {
+                    redirect('/dashboard');
+                }
                 if ($setup->isAdmin() && !$setup->isComplete()) {
                     redirect('/setup');
                 }
