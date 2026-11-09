@@ -3093,12 +3093,13 @@ tr.clickable-row:focus-visible {
   flex: 1 1 auto;
   display: flex;
   align-items: center;
-  justify-content: center;
-  width: 100%;
-  max-width: 34rem;
+  justify-content: flex-start;
+  /* Half width, aligned left (the sidebar is a flex column: stretch would win). */
+  width: 50%;
+  max-width: 26rem;
   margin: 0.75rem 0;
   min-height: 5.5rem;
-  align-self: stretch;
+  align-self: flex-start;
 }
 .auth-news-slot > .auth-news-card {
   width: 100%;
@@ -3147,6 +3148,8 @@ tr.clickable-row:focus-visible {
   background-size: cover;
   background-position: center;
   background-color: color-mix(in srgb, var(--brand-primary-deep) 55%, #000);
+  /* Image deliberately semi-transparent so the sidebar gradient shows through. */
+  opacity: 0.6;
 }
 .auth-news-body {
   padding: 0.85rem 1rem 1rem;
