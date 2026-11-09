@@ -986,6 +986,7 @@ return [
         'runts_detail_fail' => 'Die Organisation wurde in der Liste gefunden, die RUNTS-Detailseite konnte jedoch nicht geöffnet werden.',
         'runts_docs_fail' => 'Die Detailseite wurde gelesen, aber Anhänge konnten nicht heruntergeladen werden.',
         'runts_docs_partial' => 'Einige RUNTS-Anhänge konnten nicht heruntergeladen werden (:failed).',
+        'runts_docs_ocr_fail' => 'Die Anhänge sind gespeichert, aber die Texterkennung (OCR) konnte nicht gestartet werden. Sie können es später auf der Mitgliedsseite erneut versuchen.',
         'runts_docs_saved' => 'Unter Dokumente gespeichert',
         'runts_docs_none' => 'Keine Anhänge auf der RUNTS-Detailseite.',
         'runts_doc_view' => 'Ansehen',

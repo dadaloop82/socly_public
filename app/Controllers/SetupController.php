@@ -1235,6 +1235,9 @@ final class SetupController extends BaseController
             'message' => __('setup.runts_ok', ['name' => $displayName]),
         ]);
 
+        $savedDocuments = [];
+        $legalPrefill = [];
+
         try {
             if ($docs !== []) {
                 $emit(['type' => 'progress', 'phase' => 'docs_save', 'percent' => 90, 'number' => $number]);
@@ -1245,6 +1248,18 @@ final class SetupController extends BaseController
                     $userId,
                     (string) ($fields['runts'] ?? $number)
                 );
+            }
+        } catch (\Throwable $e) {
+            // Only the download/import failed: the page itself was read fine.
+            app('logger')->error('setup.runts_docs_failed', [
+                'runts_number' => $number,
+                'error' => $e->getMessage(),
+            ]);
+            $warnings[] = __('setup.runts_docs_fail');
+        }
+
+        try {
+            if ($savedDocuments !== []) {
                 $emit(['type' => 'progress', 'phase' => 'docs_ocr', 'percent' => 94, 'number' => $number]);
                 // Clear sticky OCR status from earlier lookups on this demo.
                 $this->setup->storeLegalOcrState('none', [], [], false);
@@ -1295,7 +1310,12 @@ final class SetupController extends BaseController
                 ]);
             }
         } catch (\Throwable $e) {
-            $warnings[] = __('setup.runts_docs_fail');
+            // Attachments are already on disk: only text extraction (OCR) failed.
+            app('logger')->error('setup.runts_docs_ocr_failed', [
+                'runts_number' => $number,
+                'error' => $e->getMessage(),
+            ]);
+            $warnings[] = __('setup.runts_docs_ocr_fail');
         }
 
         $publicDocs = array_map(static function (array $doc): array {

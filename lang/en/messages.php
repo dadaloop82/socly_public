@@ -988,6 +988,7 @@ return [
         'runts_detail_fail' => 'I found the entity in the list, but could not open the RUNTS detail page.',
         'runts_docs_fail' => 'The detail page was read, but attachments could not be downloaded.',
         'runts_docs_partial' => 'Some RUNTS attachments could not be downloaded (:failed).',
+        'runts_docs_ocr_fail' => 'Attachments are saved, but text extraction (OCR) could not be started. You can retry later from the member page.',
         'runts_docs_saved' => 'Saved to Documents',
         'runts_docs_none' => 'No attachments on the RUNTS detail page.',
         'runts_doc_view' => 'View',

@@ -2081,19 +2081,34 @@ final class SetupService
             $candidates[] = $binary;
         }
         $major = PHP_MAJOR_VERSION . '.' . PHP_MINOR_VERSION;
+        // Plesk/FPM: PHP_BINDIR points to the CLI directory of this PHP version.
+        $binDir = defined('PHP_BINDIR') ? rtrim((string) PHP_BINDIR, '/') : '';
+        if ($binDir !== '') {
+            $candidates[] = $binDir . '/php' . $major;
+            $candidates[] = $binDir . '/php';
+        }
         $candidates = array_merge($candidates, [
             '/usr/bin/php' . $major,
             '/usr/local/bin/php' . $major,
             '/usr/bin/php',
             '/usr/local/bin/php',
-            'php',
         ]);
         foreach ($candidates as $candidate) {
-            if ($candidate === 'php') {
-                return 'php';
-            }
-            if (is_file($candidate) && is_executable($candidate)) {
+            // open_basedir raises a warning on out-of-tree probes and a throwing
+            // error handler turns it into an exception: probe silently and rely on
+            // the `command -v` fallback below (exec is not bound by open_basedir).
+            if (@is_file($candidate) && @is_executable($candidate)) {
                 return $candidate;
+            }
+        }
+        // Minimal PATH under FPM: ask the shell for the interpreter. exec/shell are
+        // not bound by open_basedir, so trust its answer without re-probing.
+        if (function_exists('shell_exec')
+            && !in_array('shell_exec', array_map('trim', explode(',', (string) ini_get('disable_functions'))), true)
+        ) {
+            $found = trim((string) @shell_exec('command -v php 2>/dev/null'));
+            if ($found !== '' && str_starts_with($found, '/')) {
+                return $found;
             }
         }
         return 'php';

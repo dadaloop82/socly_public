@@ -388,15 +388,25 @@ final class PdfTextExtractor
             '/usr/local/bin/' . $name,
             '/bin/' . $name,
         ];
+        // Plesk/PHP-FPM: PHP_BINDIR holds the real bin directory of this runtime.
+        $binDir = defined('PHP_BINDIR') ? rtrim((string) PHP_BINDIR, '/') : '';
+        if ($binDir !== '') {
+            $candidates[] = $binDir . '/' . $name;
+        }
         foreach ($candidates as $path) {
-            if (is_file($path) && is_executable($path)) {
+            // open_basedir raises a warning on out-of-tree probes and a throwing
+            // error handler turns it into a fatal exception: probe silently and
+            // let the `command -v` fallback below (exec is not bound by it) decide.
+            if (@is_file($path) && @is_executable($path)) {
                 return $cache[$name] = $path;
             }
         }
         // FPM often has a minimal PATH; still try command -v when shell_exec works.
+        // exec/shell are not bound by open_basedir, so the answer is authoritative:
+        // do not re-probe with is_executable(), which would fail inside the cage.
         if (function_exists('shell_exec') && !in_array('shell_exec', array_map('trim', explode(',', (string) ini_get('disable_functions'))), true)) {
-            $path = trim((string) shell_exec('command -v ' . escapeshellarg($name) . ' 2>/dev/null'));
-            if ($path !== '' && is_executable($path)) {
+            $path = trim((string) @shell_exec('command -v ' . escapeshellarg($name) . ' 2>/dev/null'));
+            if ($path !== '' && str_starts_with($path, '/')) {
                 return $cache[$name] = $path;
             }
         }

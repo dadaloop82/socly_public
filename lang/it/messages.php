@@ -990,6 +990,7 @@ return [
         'runts_detail_fail' => 'Ho trovato l’ente in elenco, ma non sono riuscito a leggere la scheda dettaglio RUNTS.',
         'runts_docs_fail' => 'La scheda è stata letta, ma non sono riuscito a scaricare gli allegati.',
         'runts_docs_partial' => 'Alcuni allegati RUNTS non sono stati scaricati (:failed).',
+        'runts_docs_ocr_fail' => 'Gli allegati sono salvati, ma non sono riuscito ad avviare l’estrazione del testo (OCR). Puoi riprovare più tardi dalla scheda del socio.',
         'runts_docs_saved' => 'Salvati in Documenti',
         'runts_docs_heading_short' => 'Documenti trovati e salvati',
         'runts_docs_pending' => 'Documenti in scaricamento…',
