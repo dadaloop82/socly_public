@@ -4152,6 +4152,10 @@ function initLegalDocEditors(scope = document) {
     const busyMsg = translateBtn.dataset.msgBusy || '…';
     const emptyMsg = translateBtn.dataset.msgEmpty || '';
     const failMsg = translateBtn.dataset.msgFail || '';
+    const timeoutMsg = translateBtn.dataset.msgTimeout || failMsg;
+    // Long statutes need many chunked requests: give up after two minutes
+    // instead of leaving the button spinning forever.
+    const translateTimeoutMs = 120000;
     const csrf = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content')
       || document.querySelector('[data-setup-form]')?.dataset?.csrf
       || '';
@@ -4163,6 +4167,8 @@ function initLegalDocEditors(scope = document) {
         return;
       }
       const original = translateBtn.textContent;
+      const controller = new AbortController();
+      const timer = window.setTimeout(() => controller.abort(), translateTimeoutMs);
       translateBtn.disabled = true;
       translateBtn.classList.add('is-busy');
       translateBtn.textContent = busyMsg;
@@ -4179,6 +4185,7 @@ function initLegalDocEditors(scope = document) {
             },
             credentials: 'same-origin',
             body: JSON.stringify({ text, target }),
+            signal: controller.signal,
           });
           const data = await res.json().catch(() => ({}));
           if (!res.ok || !data.ok || !data.text) {
@@ -4189,8 +4196,10 @@ function initLegalDocEditors(scope = document) {
           setTabCheck(target, true);
         }
       } catch {
-        window.alert(failMsg);
+        // Aborted by our own timer => the document is too long to translate.
+        window.alert(controller.signal.aborted ? timeoutMsg : failMsg);
       } finally {
+        window.clearTimeout(timer);
         translateBtn.disabled = false;
         translateBtn.classList.remove('is-busy');
         translateBtn.textContent = original;

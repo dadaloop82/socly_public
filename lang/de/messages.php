@@ -754,6 +754,7 @@ return [
         'legal_translating' => 'KI-Übersetzung läuft…',
         'legal_translate_empty' => 'Bitte zuerst den italienischen Text eingeben.',
         'legal_translate_fail' => 'Automatische Übersetzung fehlgeschlagen. Bitte später erneut versuchen.',
+        'legal_translate_timeout' => 'Die Übersetzung ist zu komplex, um sie auszuführen: Sie wurde nach 2 Minuten abgebrochen. Übersetzen Sie den Text in kürzeren Abschnitten und versuchen Sie es erneut.',
         'types_lede' => 'Mitgliedskategorien und Preise.',
         'types_single_active_hint' => 'Bei nur einer Art kann sie nicht deaktiviert werden — sie bleibt aktiv.',
         'periods_lede' => 'Aktuelle und frühere Mitgliedschaftszeiträume.',

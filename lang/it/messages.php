@@ -758,6 +758,7 @@ return [
         'legal_translating' => 'Traduzione con IA in corso…',
         'legal_translate_empty' => 'Scrivi prima il testo in italiano.',
         'legal_translate_fail' => 'Traduzione automatica non riuscita. Riprova tra poco.',
+        'legal_translate_timeout' => 'La traduzione è troppo complessa per essere eseguita: dopo 2 minuti è stata interrotta. Traduci il testo in parti più brevi e riprova.',
         'types_lede' => 'Categorie di socio e relativi prezzi.',
         'types_single_active_hint' => 'Con una sola tipologia non puoi disattivarla: resta sempre attiva.',
         'periods_lede' => 'Finestre di tesseramento attive e storiche.',

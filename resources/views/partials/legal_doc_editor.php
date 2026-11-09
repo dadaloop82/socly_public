@@ -57,6 +57,7 @@ $locales = [
                 data-msg-busy="<?= e(__('settings.legal_translating')) ?>"
                 data-msg-empty="<?= e(__('settings.legal_translate_empty')) ?>"
                 data-msg-fail="<?= e(__('settings.legal_translate_fail')) ?>"
+                data-msg-timeout="<?= e(__('settings.legal_translate_timeout')) ?>"
             ><?= e(__('settings.legal_translate')) ?></button>
             <button
                 type="button"

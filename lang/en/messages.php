@@ -756,6 +756,7 @@ return [
         'legal_translating' => 'AI translation in progress…',
         'legal_translate_empty' => 'Enter the Italian text first.',
         'legal_translate_fail' => 'Automatic translation failed. Try again shortly.',
+        'legal_translate_timeout' => 'The translation is too complex to be completed: it was stopped after 2 minutes. Translate the text in shorter parts and try again.',
         'types_lede' => 'Member categories and prices.',
         'types_single_active_hint' => 'With only one type it cannot be deactivated — it stays active.',
         'periods_lede' => 'Current and past membership windows.',
