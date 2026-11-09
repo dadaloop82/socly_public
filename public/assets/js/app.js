@@ -4351,9 +4351,9 @@ function initSettingsAutosave(scope = document) {
 }
 
 /**
- * Settings search: filters the accordion sections by their visible text, shows
- * the first group with a match and dims the nav entries left without results.
- * Works together with initSettingsNav() (which owns group switching).
+ * Settings search: filters the sections by their visible text and shows every
+ * match (across macro-areas), highlighting the matching sub-items. Clearing the
+ * query restores the normal one-section view.
  */
 function initSettingsSearch(scope = document) {
   const nav = scope.querySelector('[data-settings-nav]');
@@ -4367,31 +4367,33 @@ function initSettingsSearch(scope = document) {
   input.dataset.settingsSearchBound = '1';
 
   const panels = Array.from(root.querySelectorAll('[data-config-accordion]'));
-  const navItems = Array.from(nav.querySelectorAll('[data-settings-nav-item]'));
+  const groups = Array.from(nav.querySelectorAll('[data-settings-nav-item]'));
+  const links = Array.from(nav.querySelectorAll('[data-settings-nav-link]'));
   const groupOf = (panel) => String(panel.getAttribute('data-settings-group') || '');
-  const activeGroup = () => {
-    const active = navItems.find((item) => item.getAttribute('aria-selected') === 'true');
-    return active ? String(active.getAttribute('data-settings-nav-item') || '') : '';
-  };
-  const setGroup = (group) => {
-    navItems.forEach((item) => {
-      const on = String(item.getAttribute('data-settings-nav-item') || '') === group;
-      item.setAttribute('aria-selected', on ? 'true' : 'false');
-      item.setAttribute('tabindex', on ? '0' : '-1');
-    });
-  };
   const normalize = (value) => String(value || '')
     .toLowerCase()
     .normalize('NFD')
     .replace(/[\u0300-\u036f]/g, '');
 
-  const clear = () => {
-    const group = activeGroup();
-    panels.forEach((panel) => {
-      panel.hidden = group !== '' && groupOf(panel) !== group;
+  const setGroupExpanded = (group) => {
+    groups.forEach((item) => {
+      const key = String(item.getAttribute('data-settings-nav-item') || '');
+      const on = key === group;
+      item.classList.toggle('is-search-active', on);
+      const controls = String(item.getAttribute('aria-controls') || '');
+      const sub = controls !== '' ? document.getElementById(controls) : null;
+      if (sub instanceof HTMLElement && on) sub.hidden = false;
     });
-    navItems.forEach((item) => item.classList.remove('is-dim'));
+  };
+
+  const clear = () => {
+    links.forEach((link) => {
+      link.hidden = false;
+      link.classList.remove('is-dim');
+    });
+    groups.forEach((item) => item.classList.remove('is-dim', 'is-search-active'));
     if (emptyNote instanceof HTMLElement) emptyNote.hidden = true;
+    document.dispatchEvent(new Event('settings:restore-view'));
   };
 
   const apply = () => {
@@ -4401,47 +4403,69 @@ function initSettingsSearch(scope = document) {
       return;
     }
     const terms = query.split(/\s+/).filter(Boolean);
-    const hits = panels.filter((panel) => {
-      const haystack = normalize(panel.textContent || '');
-      return terms.every((term) => haystack.includes(term));
+    const hits = [];
+    panels.forEach((panel) => {
+      // Search the visible text plus field names/ids/placeholders, so typing
+      // “pec” or “smtp_host” finds the right section.
+      const fields = Array.from(panel.querySelectorAll('input, select, textarea'))
+        .map((field) => [field.name, field.id, field.placeholder, field.getAttribute('aria-label')].filter(Boolean).join(' '))
+        .join(' ');
+      const haystack = normalize(`${panel.textContent || ''} ${fields}`);
+      if (terms.every((term) => haystack.includes(term))) hits.push(panel);
     });
+    const hitIds = new Set(hits.map((panel) => panel.id));
     const hitGroups = new Set(hits.map(groupOf));
-    navItems.forEach((item) => {
+
+    // Sub-items: keep the ones with a match, dim the others.
+    links.forEach((link) => {
+      const id = String(link.getAttribute('data-settings-nav-link') || '');
+      const on = hitIds.has(id);
+      link.hidden = false;
+      link.classList.toggle('is-dim', !on);
+    });
+    groups.forEach((item) => {
       const key = String(item.getAttribute('data-settings-nav-item') || '');
       item.classList.toggle('is-dim', !hitGroups.has(key));
     });
+
     if (hits.length === 0) {
       panels.forEach((panel) => { panel.hidden = true; });
       if (emptyNote instanceof HTMLElement) emptyNote.hidden = false;
       return;
     }
     if (emptyNote instanceof HTMLElement) emptyNote.hidden = true;
-    const current = activeGroup();
-    const targetGroup = current !== '' && hitGroups.has(current) ? current : groupOf(hits[0]);
-    setGroup(targetGroup);
+    // Show every matching section, grouped by macro-area, so nothing is missed.
     panels.forEach((panel) => {
-      const match = hits.includes(panel) && groupOf(panel) === targetGroup;
-      panel.hidden = !match;
-      if (match && panel instanceof HTMLDetailsElement) panel.open = true;
+      const on = hitIds.has(panel.id);
+      panel.hidden = !on;
+      if (on && panel instanceof HTMLDetailsElement) panel.open = true;
     });
+    // Expand the sub-list of the first macro-area with hits.
+    const firstGroup = groupOf(hits[0]);
+    setGroupExpanded(firstGroup);
+    links.forEach((link) => {
+      const id = String(link.getAttribute('data-settings-nav-link') || '');
+      const on = hitIds.has(id);
+      link.classList.toggle('is-active', on);
+      if (on) {
+        link.setAttribute('aria-current', 'true');
+      } else {
+        link.removeAttribute('aria-current');
+      }
+    });
+    hits[0].scrollIntoView({ behavior: 'smooth', block: 'start' });
   };
 
   let timer = null;
   input.addEventListener('input', () => {
     window.clearTimeout(timer);
-    timer = window.setTimeout(apply, 120);
+    timer = window.setTimeout(apply, 140);
   });
   input.addEventListener('keydown', (event) => {
     if (event.key === 'Escape' && input.value !== '') {
       input.value = '';
-      apply();
+      clear();
     }
-  });
-  // A nav click switches group in initSettingsNav(): re-apply the filter after it.
-  navItems.forEach((item) => {
-    item.addEventListener('click', () => {
-      window.setTimeout(apply, 0);
-    });
   });
 }
 
@@ -12044,67 +12068,81 @@ function initSettingsNav() {
   const root = document.querySelector('[data-config-accordions]');
   if (!nav || !root) return;
 
-  const items = Array.from(nav.querySelectorAll('[data-settings-nav-item]'));
+  const groups = Array.from(nav.querySelectorAll('[data-settings-nav-item]'));
+  const links = Array.from(nav.querySelectorAll('[data-settings-nav-link]'));
   const panels = Array.from(root.querySelectorAll('[data-config-accordion]'));
-  if (items.length === 0 || panels.length === 0) return;
+  if (groups.length === 0 || panels.length === 0) return;
 
   const groupOf = (panel) => String(panel.getAttribute('data-settings-group') || '');
-  const groupIds = items
-    .map((item) => String(item.getAttribute('data-settings-nav-item') || ''))
-    .filter((group) => group !== '');
-  const defaultGroup = groupIds[0] || '';
-  const panelsOf = (group) => panels.filter((panel) => groupOf(panel) === group);
+  const panelById = (id) => panels.find((panel) => panel.id === id) || null;
+  const subListOf = (group) => {
+    const item = groups.find((entry) => String(entry.getAttribute('data-settings-nav-item') || '') === group);
+    const controls = item ? String(item.getAttribute('aria-controls') || '') : '';
+    return controls !== '' ? document.getElementById(controls) : null;
+  };
 
+  // Voci: only one macro-area is open at a time (its sub-list is expanded).
   const setActiveGroup = (group) => {
-    items.forEach((item) => {
-      const isActive = String(item.getAttribute('data-settings-nav-item') || '') === group;
-      item.setAttribute('aria-selected', isActive ? 'true' : 'false');
-      item.setAttribute('tabindex', isActive ? '0' : '-1');
+    groups.forEach((item) => {
+      const on = String(item.getAttribute('data-settings-nav-item') || '') === group;
+      item.setAttribute('aria-selected', on ? 'true' : 'false');
+      item.setAttribute('aria-expanded', on ? 'true' : 'false');
+      item.setAttribute('tabindex', on ? '0' : '-1');
     });
-    panels.forEach((panel) => {
-      panel.hidden = groupOf(panel) !== group;
+    groups.forEach((item) => {
+      const key = String(item.getAttribute('data-settings-nav-item') || '');
+      const sub = subListOf(key);
+      if (sub instanceof HTMLElement) sub.hidden = key !== group;
     });
   };
 
-  // Sections of the active macro-area are shown open: no accordion hunting.
-  const showGroup = (group, focus, scroll = true) => {
-    const target = group !== '' && panelsOf(group).length > 0 ? group : defaultGroup;
-    setActiveGroup(target);
-    panelsOf(target).forEach((panel) => {
-      panel.open = focus ? panel === focus : true;
-    });
-    if (!scroll) return;
-    const anchor = focus || root;
-    anchor.scrollIntoView({ behavior: 'smooth', block: 'start' });
-  };
-
-  const panelForHash = () => {
-    let hash = (location.hash || '').replace(/^#/, '');
-    if (!hash) return null;
-    if (hash === 'plugins') hash = 'components';
-    return panels.find((panel) => panel.id === hash) || null;
-  };
-
-  const syncFromHash = (initial = false) => {
-    const target = panelForHash();
-    if (!target) {
-      showGroup(defaultGroup, null, !initial);
-      return;
-    }
-    if (location.hash !== `#${target.id}`) {
-      history.replaceState(null, '', `#${target.id}`);
-    }
-    showGroup(groupOf(target), target, true);
-  };
-
-  items.forEach((item) => {
-    item.addEventListener('click', () => {
-      const group = String(item.getAttribute('data-settings-nav-item') || '');
-      const first = panelsOf(group)[0];
-      if (first) {
-        history.replaceState(null, '', `#${first.id}`);
+  const markActiveLink = (panelId) => {
+    links.forEach((link) => {
+      const on = String(link.getAttribute('data-settings-nav-link') || '') === panelId;
+      link.classList.toggle('is-active', on);
+      if (on) {
+        link.setAttribute('aria-current', 'true');
+      } else {
+        link.removeAttribute('aria-current');
       }
-      showGroup(group, null, true);
+    });
+  };
+
+  // Sottovoci: exactly one section is visible, so the right pane stays readable.
+  const showPanel = (panel, scroll = true) => {
+    if (!(panel instanceof HTMLElement)) return;
+    setActiveGroup(groupOf(panel));
+    panels.forEach((entry) => {
+      entry.hidden = entry !== panel;
+    });
+    if (panel instanceof HTMLDetailsElement) panel.open = true;
+    markActiveLink(panel.id);
+    if (panel.id && location.hash !== `#${panel.id}`) {
+      history.replaceState(null, '', `#${panel.id}`);
+    }
+    if (scroll) {
+      panel.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+  };
+
+  const showGroup = (group, scroll = true) => {
+    const first = panels.find((panel) => groupOf(panel) === group);
+    if (first) {
+      showPanel(first, scroll);
+    } else {
+      setActiveGroup(group);
+    }
+  };
+
+  groups.forEach((item) => {
+    item.addEventListener('click', () => {
+      showGroup(String(item.getAttribute('data-settings-nav-item') || ''), true);
+    });
+  });
+  links.forEach((link) => {
+    link.addEventListener('click', () => {
+      const panel = panelById(String(link.getAttribute('data-settings-nav-link') || ''));
+      if (panel) showPanel(panel, true);
     });
   });
 
@@ -12116,6 +12154,21 @@ function initSettingsNav() {
       }
     });
   });
+
+  const syncFromHash = (initial = false) => {
+    const hash = (location.hash || '').replace(/^#/, '');
+    const target = hash !== '' ? panelById(hash) : null;
+    if (target) {
+      showPanel(target, !initial);
+      return;
+    }
+    const firstGroup = String(groups[0].getAttribute('data-settings-nav-item') || '');
+    showGroup(firstGroup, false);
+  };
+
+  // Search mode hides/shows panels on its own: restore the single-section view
+  // when the query is cleared.
+  document.addEventListener('settings:restore-view', () => syncFromHash(false));
 
   syncFromHash(true);
   window.addEventListener('hashchange', () => syncFromHash(false));

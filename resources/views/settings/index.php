@@ -24,42 +24,104 @@
             >
             <p class="config-search-empty muted" data-settings-search-empty hidden><?= e(__('settings.search_empty')) ?></p>
         </div>
-        <button type="button" class="config-nav-item" role="tab" data-settings-nav-item="assoc" aria-selected="true" aria-controls="settings-group-assoc">
-            <span class="config-nav-icon" aria-hidden="true">
-                <svg width="20" height="20" viewBox="0 0 24 24" focusable="false"><path fill="currentColor" d="M3 21V8l9-5 9 5v13h-7v-6h-4v6H3z"/></svg>
-            </span>
-            <span class="config-nav-text">
-                <span class="config-nav-title"><?= e(__('settings.nav_assoc')) ?></span>
-                <span class="config-nav-lede"><?= e(__('settings.nav_assoc_lede')) ?></span>
-            </span>
-        </button>
-        <button type="button" class="config-nav-item" role="tab" data-settings-nav-item="members" aria-selected="false" aria-controls="settings-group-members" tabindex="-1">
-            <span class="config-nav-icon" aria-hidden="true">
-                <svg width="20" height="20" viewBox="0 0 24 24" focusable="false"><path fill="currentColor" d="M16 11a3 3 0 1 0 0-6 3 3 0 0 0 0 6zm-8 0a3 3 0 1 0 0-6 3 3 0 0 0 0 6zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5C15 14.17 10.33 13 8 13zm8 0c-.29 0-.62.02-.97.05A4.4 4.4 0 0 1 17 16.5V19h6v-2.5c0-2.33-4.67-3.5-7-3.5z"/></svg>
-            </span>
-            <span class="config-nav-text">
-                <span class="config-nav-title"><?= e(__('settings.nav_members')) ?></span>
-                <span class="config-nav-lede"><?= e(__('settings.nav_members_lede')) ?></span>
-            </span>
-        </button>
-        <button type="button" class="config-nav-item" role="tab" data-settings-nav-item="comms" aria-selected="false" aria-controls="settings-group-comms" tabindex="-1">
-            <span class="config-nav-icon" aria-hidden="true">
-                <svg width="20" height="20" viewBox="0 0 24 24" focusable="false"><path fill="currentColor" d="M20 4H4a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2zm0 4-8 5-8-5V6l8 5 8-5v2z"/></svg>
-            </span>
-            <span class="config-nav-text">
-                <span class="config-nav-title"><?= e(__('settings.nav_comms')) ?></span>
-                <span class="config-nav-lede"><?= e(__('settings.nav_comms_lede')) ?></span>
-            </span>
-        </button>
-        <button type="button" class="config-nav-item" role="tab" data-settings-nav-item="cassa" aria-selected="false" aria-controls="settings-group-cassa" tabindex="-1">
-            <span class="config-nav-icon" aria-hidden="true">
-                <svg width="20" height="20" viewBox="0 0 24 24" focusable="false"><path fill="currentColor" d="M18 8h-1V6a5 5 0 0 0-10 0v2H6a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V10a2 2 0 0 0-2-2zm-6 9a2 2 0 1 1 0-4 2 2 0 0 1 0 4zm3-9H9V6a3 3 0 0 1 6 0v2z"/></svg>
-            </span>
-            <span class="config-nav-text">
-                <span class="config-nav-title"><?= e(__('settings.nav_cassa')) ?></span>
-                <span class="config-nav-lede"><?= e(__('settings.nav_cassa_lede')) ?></span>
-            </span>
-        </button>
+        <?php
+        // Indice a due livelli: voci (macro-aree) con le loro sottovoci.
+        // Ogni sottovoce punta all'id dell'accordion corrispondente qui sotto.
+        $configNavGroups = [
+            'assoc' => [
+                'title' => 'settings.nav_assoc',
+                'lede' => 'settings.nav_assoc_lede',
+                'icon' => 'M3 21V8l9-5 9 5v13h-7v-6h-4v6H3z',
+                'items' => [
+                    'general' => ['settings.general', 'settings.general_lede'],
+                    'people' => ['settings.people', 'settings.people_lede'],
+                    'components' => ['settings.components_title', 'settings.components_lede'],
+                ],
+            ],
+            'members' => [
+                'title' => 'settings.nav_members',
+                'lede' => 'settings.nav_members_lede',
+                'icon' => 'M16 11a3 3 0 1 0 0-6 3 3 0 0 0 0 6zm-8 0a3 3 0 1 0 0-6 3 3 0 0 0 0 6zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5C15 14.17 10.33 13 8 13zm8 0c-.29 0-.62.02-.97.05A4.4 4.4 0 0 1 17 16.5V19h6v-2.5c0-2.33-4.67-3.5-7-3.5z',
+                'items' => [
+                    'types' => ['settings.types', 'settings.types_lede'],
+                    'periods' => ['settings.periods', 'settings.periods_lede'],
+                    'fields' => ['settings.fields', 'settings.fields_lede'],
+                    'enrollment' => ['settings.enrollment', 'settings.enrollment_lede'],
+                ],
+            ],
+            'cassa' => [
+                'title' => 'settings.nav_cassa',
+                'lede' => 'settings.nav_cassa_lede',
+                'icon' => 'M18 8h-1V6a5 5 0 0 0-10 0v2H6a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V10a2 2 0 0 0-2-2zm-6 9a2 2 0 1 1 0-4 2 2 0 0 1 0 4zm3-9H9V6a3 3 0 0 1 6 0v2z',
+                'items' => [
+                    'treasury-accounts' => ['settings.treasury_accounts_title', 'settings.treasury_accounts_lede'],
+                ],
+            ],
+            'comms' => [
+                'title' => 'settings.nav_comms',
+                'lede' => 'settings.nav_comms_lede',
+                'icon' => 'M20 4H4a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2zm0 4-8 5-8-5V6l8 5 8-5v2z',
+                'items' => [
+                    'mail' => ['settings.mail', 'settings.mail_lede'],
+                    'email-templates' => ['settings.email_templates_title', 'settings.email_templates_lede'],
+                    'workflow' => ['settings.workflow_title', 'settings.workflow_lede'],
+                ],
+            ],
+            'privacy' => [
+                'title' => 'settings.nav_privacy',
+                'lede' => 'settings.nav_privacy_lede',
+                'icon' => 'M12 2 4 5v6c0 5 3.4 9.4 8 11 4.6-1.6 8-6 8-11V5l-8-3zm0 6a2.5 2.5 0 0 1 2.5 2.5c0 .9-.5 1.7-1.2 2.1l.7 3.4h-4l.7-3.4a2.5 2.5 0 0 1-1.2-2.1A2.5 2.5 0 0 1 12 8z',
+                'items' => [
+                    'legal' => ['settings.legal', 'settings.legal_lede'],
+                ],
+            ],
+            'system' => [
+                'title' => 'settings.nav_system',
+                'lede' => 'settings.nav_system_lede',
+                'icon' => 'M12 15.5A3.5 3.5 0 1 1 12 8.5a3.5 3.5 0 0 1 0 7zM19.4 13a7.6 7.6 0 0 0 0-2l2-1.5-2-3.4-2.3 1a7.6 7.6 0 0 0-1.7-1L15 3.5h-4l-.4 2.6c-.6.2-1.2.6-1.7 1l-2.3-1-2 3.4L6.6 11a7.6 7.6 0 0 0 0 2l-2 1.5 2 3.4 2.3-1c.5.4 1.1.8 1.7 1l.4 2.6h4l.4-2.6c.6-.2 1.2-.6 1.7-1l2.3 1 2-3.4-2-1.5z',
+                'items' => [
+                    'users' => ['settings.users_manage_title', 'users.lede'],
+                    'platform' => ['settings.platform', 'settings.platform_lede'],
+                ],
+            ],
+        ];
+        $navGroupFirst = true;
+        ?>
+        <?php foreach ($configNavGroups as $navGroupKey => $navGroup): ?>
+            <div class="config-nav-group">
+                <button
+                    type="button"
+                    class="config-nav-item"
+                    data-settings-nav-item="<?= e($navGroupKey) ?>"
+                    aria-selected="<?= $navGroupFirst ? 'true' : 'false' ?>"
+                    aria-expanded="<?= $navGroupFirst ? 'true' : 'false' ?>"
+                    aria-controls="settings-nav-sub-<?= e($navGroupKey) ?>"
+                >
+                    <span class="config-nav-icon" aria-hidden="true">
+                        <svg width="20" height="20" viewBox="0 0 24 24" focusable="false"><path fill="currentColor" d="<?= e($navGroup['icon']) ?>"/></svg>
+                    </span>
+                    <span class="config-nav-text">
+                        <span class="config-nav-title"><?= e(__($navGroup['title'])) ?></span>
+                        <span class="config-nav-lede"><?= e(__($navGroup['lede'])) ?></span>
+                    </span>
+                    <span class="config-nav-chevron" aria-hidden="true"></span>
+                </button>
+                <div class="config-nav-sub" id="settings-nav-sub-<?= e($navGroupKey) ?>"<?= $navGroupFirst ? '' : ' hidden' ?>>
+                    <?php foreach ($navGroup['items'] as $navPanelId => [$navItemTitleKey, $navItemLedeKey]): ?>
+                        <button
+                            type="button"
+                            class="config-nav-link"
+                            data-settings-nav-link="<?= e($navPanelId) ?>"
+                            data-settings-group="<?= e($navGroupKey) ?>"
+                        >
+                            <span class="config-nav-link-title"><?= e(__($navItemTitleKey)) ?></span>
+                            <span class="config-nav-link-lede"><?= e(__($navItemLedeKey)) ?></span>
+                        </button>
+                    <?php endforeach; ?>
+                </div>
+            </div>
+            <?php $navGroupFirst = false; ?>
+        <?php endforeach; ?>
     </nav>
 
     <div class="config-accordions" data-config-accordions
@@ -477,7 +539,7 @@
     </div>
 </details>
 
-<details class="config-accordion" id="legal" data-config-accordion data-settings-group="cassa">
+<details class="config-accordion" id="legal" data-config-accordion data-settings-group="privacy">
     <summary class="config-accordion-summary">
         <span class="config-accordion-title"><?= e(__('settings.legal')) ?></span>
         <span class="config-accordion-lede"><?= e(__('settings.legal_lede')) ?></span>
@@ -849,7 +911,7 @@
     </div>
 </details>
 
-<details class="config-accordion" id="platform" data-config-accordion data-settings-group="assoc">
+<details class="config-accordion" id="platform" data-config-accordion data-settings-group="system">
     <summary class="config-accordion-summary">
         <span class="config-accordion-title"><?= e(__('settings.platform')) ?></span>
         <span class="config-accordion-lede"><?= e(__('settings.platform_lede')) ?></span>
@@ -937,7 +999,7 @@
 </details>
 
 <?php if (can('users.manage')): ?>
-<details class="config-accordion" id="users" data-config-accordion data-settings-group="assoc">
+<details class="config-accordion" id="users" data-config-accordion data-settings-group="system">
     <summary class="config-accordion-summary">
         <span class="config-accordion-title"><?= e(__('settings.users_manage_title')) ?></span>
         <span class="config-accordion-lede"><?= e(__('users.lede')) ?></span>

@@ -1010,6 +1010,77 @@ a.sidebar-brand-home:hover {
 .config-nav-item.is-dim {
   opacity: 0.38;
 }
+/* Two-level index: macro-area (voce) + its sections (sottovoci). */
+.config-nav-group {
+  display: grid;
+  gap: 0.15rem;
+}
+.config-nav-chevron {
+  margin-left: auto;
+  align-self: center;
+  width: 0.55rem;
+  height: 0.55rem;
+  border-right: 2px solid currentColor;
+  border-bottom: 2px solid currentColor;
+  transform: rotate(-45deg);
+  opacity: 0.55;
+  transition: transform 0.18s ease;
+}
+.config-nav-item[aria-expanded="true"] .config-nav-chevron {
+  transform: rotate(45deg);
+}
+.config-nav-sub {
+  display: grid;
+  gap: 0.1rem;
+  margin: 0.15rem 0 0.35rem 0.75rem;
+  padding-left: 0.7rem;
+  border-left: 2px solid color-mix(in srgb, var(--brand-primary) 22%, var(--line));
+}
+.config-nav-sub[hidden] {
+  display: none !important;
+}
+.config-nav-link {
+  appearance: none;
+  border: 1px solid transparent;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--ink);
+  font: inherit;
+  text-align: left;
+  display: grid;
+  gap: 0.05rem;
+  padding: 0.42rem 0.6rem;
+  cursor: pointer;
+}
+.config-nav-link:hover {
+  background: color-mix(in srgb, var(--brand-primary) 8%, #fff);
+  border-color: color-mix(in srgb, var(--brand-primary) 16%, var(--line));
+}
+.config-nav-link:focus-visible {
+  outline: 2px solid var(--brand-primary);
+  outline-offset: 2px;
+}
+.config-nav-link.is-active {
+  background: color-mix(in srgb, var(--brand-primary) 14%, #fff);
+  border-color: color-mix(in srgb, var(--brand-primary) 38%, var(--line));
+  font-weight: 700;
+}
+.config-nav-link.is-active .config-nav-link-title {
+  color: var(--brand-primary-deep);
+}
+.config-nav-link.is-dim {
+  opacity: 0.35;
+}
+.config-nav-link-title {
+  font-size: 0.9rem;
+  font-weight: 650;
+  line-height: 1.2;
+}
+.config-nav-link-lede {
+  font-size: 0.76rem;
+  color: var(--muted);
+  line-height: 1.25;
+}
 .config-search {
   display: grid;
   gap: 0.35rem;
