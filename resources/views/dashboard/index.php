@@ -17,7 +17,8 @@ $enabled = $enabled ?? [
     'org' => false,
 ];
 $hasMembers = (int) ($stats['members_total'] ?? 0) > 0;
-$hasCollections = array_sum($charts['collections']['values'] ?? []) > 0;
+$hasCollections = array_sum($charts['collections']['values'] ?? []) > 0
+    || array_sum($charts['collections_pending']['values'] ?? []) > 0;
 $hasTypes = array_sum($charts['by_type']['values'] ?? []) > 0;
 $treasuryCharts = $widgets['treasury']['charts'] ?? [];
 $treasuryFlowValues = $treasuryCharts['flow']['values'] ?? [0, 0];
@@ -148,7 +149,7 @@ $defaultTab = $tabs[0]['id'] ?? '';
                     <div class="label"><?= e(__('dashboard.members_total')) ?></div>
                     <div class="value"><?= (int) ($stats['members_total'] ?? 0) ?></div>
                 </div>
-                <div class="stat">
+                <div class="stat<?= ((int) ($stats['overdue_count'] ?? 0)) > 0 ? ' is-alert' : '' ?>">
                     <div class="label"><?= e(__('dashboard.overdue_count')) ?></div>
                     <div class="value"><?= (int) ($stats['overdue_count'] ?? 0) ?></div>
                 </div>
@@ -168,11 +169,11 @@ $defaultTab = $tabs[0]['id'] ?? '';
                     <div class="label"><?= e(__('dashboard.collected_year')) ?></div>
                     <div class="value"><?= e($currency->format((float) ($stats['collected_year'] ?? 0))) ?></div>
                 </div>
-                <div class="stat">
+                <div class="stat<?= ((int) ($stats['members_expired'] ?? 0)) > 0 ? ' is-warn' : '' ?>">
                     <div class="label"><?= e(__('dashboard.members_expired')) ?></div>
                     <div class="value"><?= (int) ($stats['members_expired'] ?? 0) ?></div>
                 </div>
-                <div class="stat">
+                <div class="stat<?= ((int) ($stats['members_suspended'] ?? 0)) > 0 ? ' is-alert' : '' ?>">
                     <div class="label"><?= e(__('dashboard.members_suspended')) ?></div>
                     <div class="value"><?= (int) ($stats['members_suspended'] ?? 0) ?></div>
                 </div>

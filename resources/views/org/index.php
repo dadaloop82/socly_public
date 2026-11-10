@@ -254,7 +254,22 @@ $votingMembersCount = (int) ($votingMembersCount ?? 0);
     </div>
 </div>
 
-<div class="panel org-chart-panel">
+<div class="panel org-control-body-panel">
+        <form method="post" action="<?= e(url('/org/control-body')) ?>" class="org-control-body-form">
+            <?= csrf_field() ?>
+            <?= field('checkbox', [
+                'name' => 'has_control_body',
+                'check_value' => '1',
+                'label' => (string) __('org.control_body_label'),
+                'value' => ($hasControlBody ?? true) ? '1' : '0',
+                'checked' => (bool) ($hasControlBody ?? true),
+                'context' => 'inline',
+            ]) ?>
+            <p class="muted org-control-body-hint"><?= e(__('org.control_body_hint')) ?></p>
+            <button class="btn btn-sm btn-ghost" type="submit"><?= e(__('common.save')) ?></button>
+        </form>
+    </div>
+    <div class="panel org-chart-panel">
     <div class="panel-header">
         <div>
             <h2 class="section-title"><?= e(__('org.chart_title')) ?></h2>

@@ -23,6 +23,32 @@ final class OrgController extends BaseController
         parent::__construct($view);
     }
 
+    /** Declare that the association has (or has not) a control body: hides the role and the reminder. */
+    public function saveControlBody(Request $request): void
+    {
+        require_component('org_roles');
+        if (!can('org.manage')) {
+            http_response_code(403);
+            $this->render('errors/403');
+            return;
+        }
+        $hasControlBody = (string) $request->input('has_control_body', '') === '1';
+        $this->settings->set('org.has_control_body', $hasControlBody ? '1' : '0');
+        try {
+            app(\Socly\Services\AuditService::class)->log(
+                'org.control_body_updated',
+                'settings',
+                'org.has_control_body',
+                null,
+                ['has_control_body' => $hasControlBody],
+                $request->ip()
+            );
+        } catch (\Throwable) {
+        }
+        $this->flash('success', __('org.control_body_saved'));
+        redirect('/org');
+    }
+
     public function index(Request $request): void
     {
         require_component('org_roles');
@@ -56,6 +82,7 @@ final class OrgController extends BaseController
             'canEdit' => $this->canEditOrg(),
             'votingMembersCount' => (int) ($this->members->dashboardStats()['members_active'] ?? 0),
             'assemblyTypes' => $this->members->membersByType(6),
+            'hasControlBody' => (string) $this->settings->get('org.has_control_body', '1') !== '0',
             'exportIncompleteCount' => count($incompleteOfficers),
         ]);
     }

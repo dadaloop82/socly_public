@@ -132,6 +132,7 @@ final class DashboardController extends BaseController
             'chartI18n' => json_encode([
                 'collected' => __('dashboard.chart_collected_series'),
                 'newMembers' => __('dashboard.chart_new_members_series'),
+                'pending' => __('dashboard.chart_pending_series'),
                 'currency' => $this->currency->display(),
             ], JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR),
             'treasuryChartsJson' => json_encode(

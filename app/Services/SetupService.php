@@ -65,6 +65,10 @@ final class SetupService
                 }
             } elseif ((string) ($step['type'] ?? '') === 'people_list') {
                 $role = (string) ($step['role'] ?? '');
+                // "No control body" is a valid answer: the step stops being incomplete.
+                if ($role === 'auditor' && (string) $this->settings->get('org.has_control_body', '1') === '0') {
+                    continue;
+                }
                 if ($role !== '' && $this->people->countByRole($role) > 0) {
                     continue;
                 }

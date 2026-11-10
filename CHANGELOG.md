@@ -103,6 +103,12 @@ versions without curated notes).
   with the checkbox on the left and a readable label
 - Org chart: the member picker lists every member (eligible ones first) with a “not active” /
   “fee outstanding” suffix, instead of hiding members whose fee is unpaid
+- Org chart: a checkbox declares that the association has no control body — the auditor/ombudsman
+  roles and the “incomplete configuration” reminder disappear
+- Dashboard: KPIs turn red/orange when expired memberships, suspended members or unpaid fees are
+  above zero
+- Dashboard chart: income still awaiting approval is drawn as a grey translucent segment (chart only,
+  never in balances or totals)
 - The registry PDF hides the fiscal code, birth and residence columns when those profile fields are
   disabled
 - The registry PDF prints the membership-card QR next to the card number when the card stores one

@@ -63,7 +63,20 @@ final class AssociationPeopleService
             $sql .= ' WHERE is_active = 1';
         }
         $sql .= ' ORDER BY hierarchy_level ASC, sort_order ASC, id ASC';
-        return $this->db->fetchAll($sql);
+        $rows = $this->db->fetchAll($sql);
+        // Declared "no control body": auditor/ombudsman roles disappear from chart and forms.
+        try {
+            $hasControlBody = (string) app(SettingsService::class)->get('org.has_control_body', '1') !== '0';
+        } catch (\Throwable) {
+            $hasControlBody = true;
+        }
+        if (!$hasControlBody) {
+            $rows = array_values(array_filter(
+                $rows,
+                static fn (array $role): bool => !in_array((string) ($role['key'] ?? ''), self::CONTROL_ROLE_KEYS, true)
+            ));
+        }
+        return $rows;
     }
 
     /** @return array<string, mixed>|null */

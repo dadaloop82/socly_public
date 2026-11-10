@@ -2324,6 +2324,20 @@ final class MemberService
             $methodByMonth[$method][(string) $row['ym']] = (float) $row['total'];
         }
 
+        // First-note income still awaiting approval: shown in the chart only (grey segment),
+        // never added to balances or totals.
+        $pendingRows = $this->db->fetchAll(
+            "SELECT DATE_FORMAT(movement_date, '%Y-%m') AS ym, COALESCE(SUM(amount), 0) AS total
+             FROM treasury_movements
+             WHERE direction = 'income' AND approved_at IS NULL
+               AND movement_date >= DATE_FORMAT(DATE_SUB(CURDATE(), INTERVAL 11 MONTH), '%Y-%m-01')
+             GROUP BY ym"
+        );
+        $pendingByMonth = [];
+        foreach ($pendingRows as $row) {
+            $pendingByMonth[(string) $row['ym']] = (float) $row['total'];
+        }
+
         // Registration date (admitted_at) is the real join date: grouping imported members by
         // created_at would pile every historic member into the import month.
         $memberRows = $this->db->fetchAll(
@@ -2393,6 +2407,13 @@ final class MemberService
             'new_members' => [
                 'labels' => $collectionLabels,
                 'values' => $newMemberValues,
+            ],
+            'collections_pending' => [
+                'labels' => $collectionLabels,
+                'values' => array_map(
+                    static fn (string $ym): float => round((float) ($pendingByMonth[$ym] ?? 0), 2),
+                    $months
+                ),
             ],
             'by_type' => [
                 'labels' => $typeLabels,

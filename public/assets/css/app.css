@@ -2084,10 +2084,37 @@ a.sidebar-brand-home:hover {
   gap: 1rem;
   margin-bottom: 1.5rem;
 }
+.org-control-body-panel {
+  padding: 0.85rem 1rem;
+  margin-bottom: 1rem;
+}
+.org-control-body-form {
+  display: grid;
+  gap: 0.35rem;
+}
+.org-control-body-hint {
+  margin: 0 0 0.35rem;
+  font-size: 0.85rem;
+}
+/* Dashboard KPIs: a value that needs attention turns red/orange. */
 .stat {
   padding: 1.2rem 1.25rem;
   position: relative;
   overflow: hidden;
+}
+.stat.is-alert {
+  background: color-mix(in srgb, var(--danger, #b42318) 8%, #fff);
+  border-color: color-mix(in srgb, var(--danger, #b42318) 35%, var(--line));
+}
+.stat.is-alert .value {
+  color: var(--danger, #b42318);
+}
+.stat.is-warn {
+  background: color-mix(in srgb, #d97706 9%, #fff);
+  border-color: color-mix(in srgb, #d97706 35%, var(--line));
+}
+.stat.is-warn .value {
+  color: #b45309;
 }
 .stat::after {
   content: "";

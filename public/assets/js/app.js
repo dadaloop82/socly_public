@@ -12678,12 +12678,29 @@ function initDashboardCharts() {
 
   const collectionsEl = document.getElementById('chart-collections');
   if (collectionsEl) {
+    const pendingSeries = data.collections_pending?.values || [];
+    const pendingDataset = pendingSeries.some((value) => Number(value) > 0)
+      ? [{
+        type: 'bar',
+        label: i18n.pending || 'Awaiting approval',
+        data: pendingSeries,
+        backgroundColor: 'rgba(107, 114, 128, 0.28)',
+        hoverBackgroundColor: 'rgba(107, 114, 128, 0.45)',
+        borderRadius: 6,
+        borderSkipped: false,
+        maxBarThickness: 28,
+        yAxisID: 'y',
+        stack: 'collections',
+        order: 3,
+      }]
+      : [];
     new Chart(collectionsEl, {
       type: 'bar',
       data: {
         labels: data.collections?.labels || [],
         datasets: [
           ...collectionDatasets,
+          ...pendingDataset,
           {
             type: 'line',
             label: i18n.newMembers || 'New members',
