@@ -347,7 +347,7 @@ final class OrgController extends BaseController
         if ($person !== null && empty($values['member_id']) && !empty($person['member_id'])) {
             $values['member_id'] = (string) $person['member_id'];
         }
-        $memberOptions = $this->members->listActiveForOrgSelect();
+        $memberOptions = $this->members->listForOrgSelect();
         if (!empty($values['member_id'])) {
             $selectedId = (int) $values['member_id'];
             $found = false;

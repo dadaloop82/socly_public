@@ -2600,6 +2600,8 @@ return [
         'member_required' => 'Select a member from the registry.',
         'member_not_found' => 'Member not found.',
         'member_not_active' => 'The selected member is not active.',
+        'option_inactive' => 'not active',
+        'option_fee_due' => 'fee outstanding',
         'member_fee_due' => 'The selected member has outstanding membership fees.',
         'member_already_assigned' => 'This member already holds this role. You can still assign other roles.',
         'member_profile_incomplete' => 'The member record is incomplete (missing name or fiscal code).',

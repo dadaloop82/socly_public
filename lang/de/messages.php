@@ -2598,6 +2598,8 @@ return [
         'member_required' => 'Bitte ein Mitglied aus der Liste wählen.',
         'member_not_found' => 'Mitglied nicht gefunden.',
         'member_not_active' => 'Das gewählte Mitglied ist nicht aktiv.',
+        'option_inactive' => 'nicht aktiv',
+        'option_fee_due' => 'Beitrag offen',
         'member_fee_due' => 'Beim gewählten Mitglied sind Beiträge offen.',
         'member_already_assigned' => 'Dieses Mitglied hat diese Funktion bereits. Andere Funktionen können weiterhin zugewiesen werden.',
         'member_profile_incomplete' => 'Die Mitgliederakte ist unvollständig (Name oder Steuernummer fehlt).',

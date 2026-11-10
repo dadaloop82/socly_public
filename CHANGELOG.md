@@ -101,6 +101,8 @@ versions without curated notes).
   under the name, membership type as large as the card number, member-since and expiry dates
 - Member edit: consent rows (photo release, newsletter, phone notices) render as one full-width line
   with the checkbox on the left and a readable label
+- Org chart: the member picker lists every member (eligible ones first) with a “not active” /
+  “fee outstanding” suffix, instead of hiding members whose fee is unpaid
 - The registry PDF hides the fiscal code, birth and residence columns when those profile fields are
   disabled
 - The registry PDF prints the membership-card QR next to the card number when the card stores one

@@ -2470,14 +2470,15 @@ final class MemberService
     }
 
     /**
-     * Active members eligible for org-chart assignment (membership fee settled).
+     * Members for org-chart assignment: everyone (eligible ones first) with a status suffix, so a
+     * suspended member or an unpaid fee is visible instead of silently missing from the list.
      *
-     * @return list<array{id:int,member_number:string,first_name:string,last_name:string,display_name:string}>
+     * @return list<array{id:int,member_number:string,first_name:string,last_name:string,display_name:string,eligible:bool}>
      */
-    public function listActiveForOrgSelect(): array
+    public function listForOrgSelect(): array
     {
         $rows = $this->db->fetchAll(
-            "SELECT m.id, m.member_number, m.balance_due,
+            "SELECT m.id, m.member_number, m.status, m.balance_due,
                     COALESCE((
                         SELECT v.value FROM member_field_values v
                         INNER JOIN member_field_definitions d ON d.id = v.field_definition_id AND d.`key` = 'last_name'
@@ -2489,16 +2490,23 @@ final class MemberService
                         WHERE v.member_id = m.id LIMIT 1
                     ), '') AS first_name
              FROM members m
-             WHERE m.status = 'active' AND m.balance_due <= 0
-             ORDER BY last_name ASC, first_name ASC, m.id ASC
-             LIMIT 500"
+             ORDER BY (m.status = 'active' AND m.balance_due <= 0) DESC, last_name ASC, first_name ASC, m.id ASC
+             LIMIT 2000"
         );
         foreach ($rows as &$row) {
             $name = trim((string) (($row['last_name'] ?? '') . ' ' . ($row['first_name'] ?? '')));
             $num = trim((string) ($row['member_number'] ?? ''));
-            $row['display_name'] = $name !== ''
+            $base = $name !== ''
                 ? ($num !== '' ? $name . ' (' . $num . ')' : $name)
                 : ($num !== '' ? $num : '#' . (string) ($row['id'] ?? ''));
+            $suffix = '';
+            if ((string) ($row['status'] ?? '') !== 'active') {
+                $suffix = ' — ' . __('org.option_inactive');
+            } elseif ((float) ($row['balance_due'] ?? 0) > 0) {
+                $suffix = ' — ' . __('org.option_fee_due');
+            }
+            $row['display_name'] = $base . $suffix;
+            $row['eligible'] = $suffix === '';
         }
         unset($row);
         return $rows;

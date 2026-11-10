@@ -2423,6 +2423,8 @@ return [
         'member_required' => 'Seleziona un socio dall’anagrafica.',
         'member_not_found' => 'Socio non trovato.',
         'member_not_active' => 'Il socio selezionato non è attivo.',
+        'option_inactive' => 'non attivo',
+        'option_fee_due' => 'quota da saldare',
         'member_fee_due' => 'Il socio selezionato ha quote associative da saldare.',
         'member_already_assigned' => 'Questo socio ricopre già questa carica. Puoi assegnargli altre cariche diverse da questa.',
         'member_profile_incomplete' => 'L’anagrafica del socio è incompleta (nome, cognome o codice fiscale mancanti).',
