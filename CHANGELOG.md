@@ -88,6 +88,8 @@ versions without curated notes).
   approval: they are listed as “Awaiting approval” and do not affect balances, charts, budgets or
   reports until approved (one by one or in bulk); manually entered movements are approved on save
 - First note: multi-select with bulk approve and delete, like the member list
+- First note: pagination (50 rows per page, search/filters/sort preserved) and a “select all”
+  checkbox on every ledger table
 - The registry PDF hides the fiscal code, birth and residence columns when those profile fields are
   disabled
 - The registry PDF prints the membership-card QR next to the card number when the card stores one

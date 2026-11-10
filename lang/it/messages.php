@@ -1949,6 +1949,7 @@ return [
         'description' => 'Descrizione / causale',
         'ledger' => 'Libro mastro',
         'pending' => 'Da approvare',
+        'select_all' => 'Seleziona tutti',
         'pending_banner' => 'Ci sono :count movimenti in attesa di approvazione: non concorrono ai saldi finché non li approvi.',
         'approve' => 'Approva',
         'approved' => 'Movimento approvato.',
@@ -2446,6 +2447,10 @@ return [
     ],
     'common' => [
         'save' => 'Salva',
+        'pager_aria' => 'Pagine',
+        'pager_prev' => 'Precedente',
+        'pager_next' => 'Successiva',
+        'pager_info' => 'Pagina :page di :pages',
         'cancel' => 'Annulla',
         'close' => 'Chiudi',
         'back' => 'Indietro',

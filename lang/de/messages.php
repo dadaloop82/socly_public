@@ -1858,6 +1858,10 @@ return [
     ],
     'common' => [
         'save' => 'Speichern',
+        'pager_aria' => 'Seiten',
+        'pager_prev' => 'Zurück',
+        'pager_next' => 'Weiter',
+        'pager_info' => 'Seite :page von :pages',
         'cancel' => 'Abbrechen',
         'close' => 'Schließen',
         'back' => 'Zurück',
@@ -2121,6 +2125,7 @@ return [
         'description' => 'Beschreibung',
         'ledger' => 'Kassenbuch',
         'pending' => 'Zu genehmigen',
+        'select_all' => 'Alle auswählen',
         'pending_banner' => 'Es gibt :count Bewegungen, die auf die Genehmigung warten: sie zählen erst nach der Genehmigung zu den Salden.',
         'approve' => 'Genehmigen',
         'approved' => 'Bewegung genehmigt.',

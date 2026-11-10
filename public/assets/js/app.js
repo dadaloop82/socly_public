@@ -2554,6 +2554,23 @@ function initTreasuryBulk() {
 
   checkboxes.forEach((cb) => cb.addEventListener('change', sync));
 
+  // “Select all” per ledger table (the first note can show several category groups).
+  root.querySelectorAll('[data-treasury-select-all]').forEach((master) => {
+    const table = master.closest('table');
+    const boxes = table ? [...table.querySelectorAll('[data-treasury-select]')] : [];
+    master.addEventListener('change', () => {
+      boxes.forEach((cb) => {
+        cb.checked = master.checked;
+      });
+      sync();
+    });
+    boxes.forEach((cb) => cb.addEventListener('change', () => {
+      const checked = boxes.filter((box) => box.checked).length;
+      master.indeterminate = checked > 0 && checked < boxes.length;
+      master.checked = boxes.length > 0 && checked === boxes.length;
+    }));
+  });
+
   bar.querySelectorAll('[data-treasury-bulk-action]').forEach((btn) => {
     btn.addEventListener('click', async () => {
       const ids = selectedIds();

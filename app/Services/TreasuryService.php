@@ -271,15 +271,14 @@ final class TreasuryService
         };
     }
 
-    /** @return array{movements:list<array<string,mixed>>,balance:float,income:float,expense:float} */
     /**
      * Ledger rows + global balance (the KPI boxes always reflect the whole cash book).
      *
-     * @param array{direction?:string,category?:string,from?:string,to?:string} $filters
+     * @param array{direction?:string,category?:string,from?:string,to?:string,account?:string} $filters
+     * @return array{movements:list<array<string,mixed>>,balance:float,income:float,expense:float,total:int,limit:int,offset:int}
      */
-    public function ledger(int $limit = 200, string $query = '', string $sort = 'date_desc', array $filters = []): array
+    public function ledger(int $limit = 200, string $query = '', string $sort = 'date_desc', array $filters = [], int $offset = 0): array
     {
-        $params = [];
         $sql = "SELECT m.*,
                     (SELECT v.value FROM member_field_values v
                      INNER JOIN member_field_definitions d ON d.id = v.field_definition_id AND d.`key` = 'first_name'
@@ -297,7 +296,63 @@ final class TreasuryService
              LEFT JOIN members mem ON mem.id = m.member_id
              LEFT JOIN users u ON u.id = m.created_by";
 
+        [$where, $params] = $this->ledgerConditions($query, $filters);
+        if ($where !== []) {
+            $sql .= ' WHERE ' . implode(' AND ', $where);
+        }
+
+        $order = match ($sort) {
+            'date_asc' => 'm.movement_date ASC, m.id ASC',
+            'created_desc' => 'm.created_at DESC, m.id DESC',
+            'invoice_desc' => 'm.invoice_date IS NULL, m.invoice_date DESC, m.movement_date DESC, m.id DESC',
+            default => 'm.movement_date DESC, m.id DESC',
+        };
+        $limit = max(1, min(500, $limit));
+        $offset = max(0, $offset);
+        $sql .= ' ORDER BY ' . $order . ' LIMIT ' . $limit . ' OFFSET ' . $offset;
+        $movements = $this->db->fetchAll($sql, $params);
+
+        $balanceRow = $this->db->fetch(
+            "SELECT
+                COALESCE(SUM(CASE WHEN direction = 'income' THEN amount ELSE 0 END), 0) AS inc,
+                COALESCE(SUM(CASE WHEN direction = 'expense' THEN amount ELSE 0 END), 0) AS exp
+             FROM treasury_movements
+             WHERE approved_at IS NOT NULL"
+        );
+        $balance = (float) ($balanceRow['inc'] ?? 0) - (float) ($balanceRow['exp'] ?? 0);
+
+        return [
+            'movements' => $movements,
+            'balance' => $balance,
+            'income' => (float) ($balanceRow['inc'] ?? 0),
+            'expense' => (float) ($balanceRow['exp'] ?? 0),
+            'total' => $this->ledgerTotal($query, $filters),
+            'limit' => $limit,
+            'offset' => $offset,
+        ];
+    }
+
+    /** Total rows matching the current ledger filters (for the pager). @param array<string,mixed> $filters */
+    public function ledgerTotal(string $query = '', array $filters = []): int
+    {
+        [$where, $params] = $this->ledgerConditions($query, $filters);
+        $sql = 'SELECT COUNT(*) AS c FROM treasury_movements m LEFT JOIN members mem ON mem.id = m.member_id';
+        if ($where !== []) {
+            $sql .= ' WHERE ' . implode(' AND ', $where);
+        }
+        return (int) ($this->db->fetch($sql, $params)['c'] ?? 0);
+    }
+
+    /**
+     * Shared WHERE clause for the ledger list and its count.
+     *
+     * @param array<string,mixed> $filters
+     * @return array{0:list<string>,1:array<string,mixed>}
+     */
+    private function ledgerConditions(string $query, array $filters): array
+    {
         $where = [];
+        $params = [];
         $query = trim($query);
         if ($query !== '') {
             $where[] = $this->buildSearchWhere($query, $params);
@@ -329,34 +384,7 @@ final class TreasuryService
             $params['filter_account'] = $account;
             $params['filter_account_to'] = $account;
         }
-        if ($where !== []) {
-            $sql .= ' WHERE ' . implode(' AND ', $where);
-        }
-
-        $order = match ($sort) {
-            'date_asc' => 'm.movement_date ASC, m.id ASC',
-            'created_desc' => 'm.created_at DESC, m.id DESC',
-            'invoice_desc' => 'm.invoice_date IS NULL, m.invoice_date DESC, m.movement_date DESC, m.id DESC',
-            default => 'm.movement_date DESC, m.id DESC',
-        };
-        $sql .= ' ORDER BY ' . $order . ' LIMIT ' . max(1, min(500, $limit));
-        $movements = $this->db->fetchAll($sql, $params);
-
-        $balanceRow = $this->db->fetch(
-            "SELECT
-                COALESCE(SUM(CASE WHEN direction = 'income' THEN amount ELSE 0 END), 0) AS inc,
-                COALESCE(SUM(CASE WHEN direction = 'expense' THEN amount ELSE 0 END), 0) AS exp
-             FROM treasury_movements
-             WHERE approved_at IS NOT NULL"
-        );
-        $balance = (float) ($balanceRow['inc'] ?? 0) - (float) ($balanceRow['exp'] ?? 0);
-
-        return [
-            'movements' => $movements,
-            'balance' => $balance,
-            'income' => (float) ($balanceRow['inc'] ?? 0),
-            'expense' => (float) ($balanceRow['exp'] ?? 0),
-        ];
+        return [$where, $params];
     }
 
     /** @return array{id:int,slug:string,label:?string,builtin:bool,active:bool,sort_order:int}|null */
@@ -733,9 +761,9 @@ final class TreasuryService
      * @param array{direction?:string,category?:string,from?:string,to?:string} $filters
      * @return list<array{key:string,label:string,items:list<array>}>
      */
-    public function groupedByCategory(int $limit = 200, string $query = '', string $sort = 'date_desc', array $filters = []): array
+    public function groupedByCategory(int $limit = 200, string $query = '', string $sort = 'date_desc', array $filters = [], int $offset = 0): array
     {
-        $ledger = $this->ledger($limit, $query, $sort, $filters);
+        $ledger = $this->ledger($limit, $query, $sort, $filters, $offset);
         $items = $ledger['movements'];
         $labels = $this->categoryMap();
         $buckets = [];

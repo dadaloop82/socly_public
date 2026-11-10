@@ -1860,6 +1860,10 @@ return [
     ],
     'common' => [
         'save' => 'Save',
+        'pager_aria' => 'Pages',
+        'pager_prev' => 'Previous',
+        'pager_next' => 'Next',
+        'pager_info' => 'Page :page of :pages',
         'cancel' => 'Cancel',
         'close' => 'Close',
         'back' => 'Back',
@@ -2123,6 +2127,7 @@ return [
         'description' => 'Description',
         'ledger' => 'Ledger',
         'pending' => 'Awaiting approval',
+        'select_all' => 'Select all',
         'pending_banner' => 'There are :count movements awaiting approval: they do not count towards balances until approved.',
         'approve' => 'Approve',
         'approved' => 'Movement approved.',

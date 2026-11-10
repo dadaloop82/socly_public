@@ -38,7 +38,13 @@ final class TreasuryController extends BaseController
             $sort = 'date_desc';
         }
         $filters = $this->ledgerFilters($request);
-        $ledger = $this->treasury->ledger(200, $query, $sort, $filters);
+        // Paged ledger: 50 rows per page keeps the first note fast on large registers.
+        $perPage = 50;
+        $totalRows = $this->treasury->ledgerTotal($query, $filters);
+        $pages = max(1, (int) ceil($totalRows / $perPage));
+        $page = min($pages, max(1, (int) $request->input('page', 1)));
+        $offset = ($page - 1) * $perPage;
+        $ledger = $this->treasury->ledger($perPage, $query, $sort, $filters, $offset);
         $config = $this->components->config('treasury', ['auto_from_payments' => true]);
         // Only the enabled wallets (+ deactivated ones with movements) are listed.
         $wallets = $this->treasury->overviewWallets();
@@ -46,7 +52,7 @@ final class TreasuryController extends BaseController
             'title' => __('treasury.title'),
             'ledger' => $ledger,
             'movement_groups' => $groupByCategory
-                ? $this->treasury->groupedByCategory(200, $query, $sort, $filters)
+                ? $this->treasury->groupedByCategory($perPage, $query, $sort, $filters, $offset)
                 : [[
                     'key' => 'all',
                     'label' => __('treasury.group_by_category_off'),
@@ -68,6 +74,10 @@ final class TreasuryController extends BaseController
             'currency' => $this->currency,
             'hasAnyMovements' => $this->treasury->movementCount() > 0,
             'pending_count' => $this->treasury->pendingCount(),
+            'page' => $page,
+            'pages' => $pages,
+            'per_page' => $perPage,
+            'total_rows' => $totalRows,
         ]);
     }
 

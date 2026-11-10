@@ -24,6 +24,20 @@ $hasActiveFilters = trim((string) ($search_query ?? '')) !== ''
     || $filterDirection !== ''
     || $filterCategory !== ''
     || $filterAccount !== '';
+// Pager: keep search, filters and sort when moving between pages.
+$pagerQuery = array_filter([
+    'q' => (string) ($search_query ?? ''),
+    'period' => $filterPeriod,
+    'direction' => $filterDirection,
+    'category' => $filterCategory,
+    'account' => $filterAccount,
+    'sort' => $sort,
+    'group' => !empty($group_by_category) ? '1' : '0',
+], static fn ($value): bool => (string) $value !== '');
+$currentPage = (int) ($page ?? 1);
+$totalPages = (int) ($pages ?? 1);
+$pageUrl = static fn (int $p): string => url('/treasury?' . http_build_query(array_merge($pagerQuery, ['page' => $p])));
+$pageWindow = $totalPages > 1 ? range(max(1, $currentPage - 2), min($totalPages, $currentPage + 2)) : [];
 $accountFilterOptions = [];
 foreach (($accounts ?? []) as $accountOption) {
     $accountFilterOptions[(string) ($accountOption['key'] ?? '')] = (string) ($accountOption['label'] ?? '');
@@ -267,7 +281,13 @@ foreach ($categories as $categoryOption) {
                             <thead>
                             <tr>
                                 <?php if ($canManage): ?>
-                                    <th class="treasury-col-check" aria-label="<?= e(__('treasury.bulk_selected')) ?>"></th>
+                                    <th class="treasury-col-check">
+                                        <input
+                                            type="checkbox"
+                                            data-treasury-select-all
+                                            aria-label="<?= e(__('treasury.select_all')) ?>"
+                                        >
+                                    </th>
                                 <?php endif; ?>
                                 <th><?= e(__('treasury.operation_date')) ?></th>
                                 <th><?= e(__('treasury.description')) ?></th>
@@ -405,5 +425,31 @@ foreach ($categories as $categoryOption) {
                 </section>
             <?php endforeach; ?>
         </div>
+    <?php endif; ?>
+    <?php if ($totalPages > 1): ?>
+        <nav class="list-pager" aria-label="<?= e(__('common.pager_aria')) ?>">
+            <?php if ($currentPage > 1): ?>
+                <a class="list-pager-step" href="<?= e($pageUrl($currentPage - 1)) ?>" rel="prev">← <?= e(__('common.pager_prev')) ?></a>
+            <?php else: ?>
+                <span class="list-pager-step is-disabled">← <?= e(__('common.pager_prev')) ?></span>
+            <?php endif; ?>
+            <div class="list-pager-pages">
+                <?php $previousPage = 0; foreach ($pageWindow as $pageNumber): ?>
+                    <?php if ($previousPage > 0 && $pageNumber > $previousPage + 1): ?>
+                        <span class="list-pager-gap" aria-hidden="true">…</span>
+                    <?php endif; ?>
+                    <a class="list-pager-page<?= $pageNumber === $currentPage ? ' is-current' : '' ?>"
+                       href="<?= e($pageUrl($pageNumber)) ?>"
+                       <?= $pageNumber === $currentPage ? 'aria-current="page"' : '' ?>><?= $pageNumber ?></a>
+                    <?php $previousPage = $pageNumber; ?>
+                <?php endforeach; ?>
+            </div>
+            <?php if ($currentPage < $totalPages): ?>
+                <a class="list-pager-step" href="<?= e($pageUrl($currentPage + 1)) ?>" rel="next"><?= e(__('common.pager_next')) ?> →</a>
+            <?php else: ?>
+                <span class="list-pager-step is-disabled"><?= e(__('common.pager_next')) ?> →</span>
+            <?php endif; ?>
+            <span class="muted list-pager-info"><?= e(__('common.pager_info', ['page' => (string) $currentPage, 'pages' => (string) $totalPages])) ?></span>
+        </nav>
     <?php endif; ?>
 </div>
