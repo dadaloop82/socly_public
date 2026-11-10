@@ -2732,16 +2732,13 @@ function initMemberForm() {
 
 function photoGenderFromValue(raw) {
   const gender = String(raw || '').trim().toUpperCase();
-  if (gender === 'M') return 'm';
   if (gender === 'F') return 'f';
-  return 'neutral';
+  return 'm';
 }
 
 function photoPlaceholderUrl(form, gender) {
   const base = (form?.dataset?.photoAvatarBase || '/assets/img/avatars').replace(/\/$/, '');
-  const file = gender === 'm'
-    ? 'placeholder-male.svg'
-    : (gender === 'f' ? 'placeholder-female.svg' : 'placeholder-neutral.svg');
+  const file = gender === 'f' ? 'placeholder-female.svg' : 'placeholder-male.svg';
   // Versioned URL: after an update the browser must not keep the previous silhouette.
   const version = String(form?.dataset?.photoAvatarVersion || '').trim();
   const suffix = version === '' ? '' : `?v=${encodeURIComponent(version)}`;
@@ -2766,7 +2763,7 @@ function seedPhotoPlaceholder(el, form, gender) {
 
 function crossfadePhotoPlaceholder(el, form, gender) {
   if (!(el instanceof HTMLElement)) return;
-  const prev = el.dataset.photoGender || 'neutral';
+  const prev = el.dataset.photoGender || 'm';
   if (prev === gender) {
     if (!el.querySelector('.photo-ph-layer')) {
       seedPhotoPlaceholder(el, form, gender);
@@ -2826,7 +2823,7 @@ function applyPhotoGenderPlaceholder(form, genderRaw, { animate = true } = {}) {
 }
 
 function preloadPhotoPlaceholders(form) {
-  ['neutral', 'm', 'f'].forEach((gender) => {
+  ['m', 'f'].forEach((gender) => {
     const img = new Image();
     img.src = photoPlaceholderUrl(form, gender);
   });

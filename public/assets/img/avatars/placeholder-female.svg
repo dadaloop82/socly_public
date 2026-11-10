@@ -1,13 +1,16 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<!-- Original artwork: Socly placeholder avatar (female bust silhouette). -->
+<!-- Original artwork: Socly placeholder avatar (female). One of the two silhouettes only. -->
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="200" height="200">
-  <rect width="64" height="64" fill="#dcdfe4"/>
-  <!-- Shoulders and neck -->
-  <path fill="#8b919a" stroke="none" d="M32 41.9c-5.2 0-9.4.8-12.7 2.5-4.9 2.6-8 7.1-8.8 12.5-.3 2-.4 3.7-.4 7.1h43.8c0-3.4-.1-5.1-.4-7.1-.8-5.4-3.9-9.9-8.8-12.5-3.3-1.7-7.5-2.5-12.7-2.5z"/>
-  <rect x="28.7" y="31.2" width="6.6" height="14.6" rx="2.2" fill="#8b919a" stroke="none"/>
-  <!-- Hair -->
-  <path fill="#757d89" stroke="none" d="M32 9.9 C38.2 9.9 43 13.4 44.6 19.6 C45.6 23.4 46.6 27.6 47.2 31.8 C47.8 35.8 48 39.6 48 42.4 C48 45.4 47.2 47.9 45.6 47.9 C44.4 47.9 43.4 45.9 42.6 42.8 C41.8 39.8 40 36.8 38.4 35.4 C39.4 33.4 40.4 30.4 41 27 C41.4 24.4 40.8 21.6 40.2 19.6 C39 17 35.4 14.6 32 14 L32 9.9 Z"/>
-  <path fill="#757d89" stroke="none" d="M32 9.9 C25.8 9.9 21 13.4 19.4 19.6 C18.4 23.4 17.4 27.6 16.8 31.8 C16.2 35.8 16 39.6 16 42.4 C16 45.4 16.8 47.9 18.4 47.9 C19.6 47.9 20.6 45.9 21.4 42.8 C22.2 39.8 24 36.8 25.6 35.4 C24.6 33.4 23.6 30.4 23 27 C22.6 24.4 23.2 21.6 23.8 19.6 C25 17 28.6 14.6 32 14 L32 9.9 Z"/>
-  <!-- Face -->
-  <ellipse cx="32" cy="24.6" rx="9.2" ry="11.4" fill="#8b919a" stroke="none"/>
+  <rect width="64" height="64" fill="#e7eaee"/>
+  <!-- long hair, drawn behind the head so it never covers the face -->
+  <rect x="18" y="16" width="6.8" height="25" rx="3.4" fill="#79818d"/>
+  <rect x="39.2" y="16" width="6.8" height="25" rx="3.4" fill="#79818d"/>
+  <!-- shoulders -->
+  <path fill="#9aa2ad" d="M32 36.5c-10.4 0-19 7.9-19 17.6V64h38v-9.9c0-9.7-8.6-17.6-19-17.6z"/>
+  <!-- neck -->
+  <rect x="28.6" y="30" width="6.8" height="9" rx="2.4" fill="#9aa2ad"/>
+  <!-- head -->
+  <circle cx="32" cy="23" r="11" fill="#9aa2ad"/>
+  <!-- hair cap -->
+  <path fill="#79818d" d="M32 10.4c-7.2 0-12.2 5-12.2 12.1 0 1 .1 2 .3 2.9 1-5.2 5.7-8.3 11.9-8.3s10.9 3.1 11.9 8.3c.2-.9.3-1.9.3-2.9 0-7.1-5-12.1-12.2-12.1z"/>
 </svg>

@@ -278,7 +278,7 @@ $buildProfileFieldsHtml = function (array $list, ?string $stepKey = null) use (
         $key = (string) ($field['key'] ?? 'photo');
         $val = $fieldValue($field);
         $genderRaw = strtoupper(trim($valFor('gender')));
-        $photoGender = $genderRaw === 'M' ? 'm' : ($genderRaw === 'F' ? 'f' : 'neutral');
+        $photoGender = $genderRaw === 'F' ? 'f' : 'm';
         $hasExistingPhoto = $isEdit && $val !== '';
         echo field('photo', [
             'name' => 'fields[photo]',
@@ -616,7 +616,7 @@ $paymentExtraHtml = $buildProfileFieldsHtml($paymentExtraFields, \Socly\Services
                 $tesseraPhotoSrc = url('/members/' . (int) $member['id'] . '/photo');
             }
             $tesseraGenderRaw = strtoupper(trim($valFor('gender')));
-            $tesseraPhotoGender = $tesseraGenderRaw === 'M' ? 'm' : ($tesseraGenderRaw === 'F' ? 'f' : 'neutral');
+            $tesseraPhotoGender = $tesseraGenderRaw === 'F' ? 'f' : 'm';
             $tesseraName = trim($fieldValue([
                 'key' => 'first_name',
             ]) . ' ' . $fieldValue([

@@ -222,12 +222,12 @@ $hasPhoto = !empty($fields['photo']);
                     <img src="<?= e(url('/members/'.$member['id'].'/photo')) ?>" alt="">
                 <?php else: ?>
                     <?php
-                    // Single source of truth: the same placeholder SVG used by the photo
-                    // field and the membership card (no per-page re-drawings).
+                    // Two silhouettes only (male/female), shared with the photo field and the
+                    // membership card. Unknown gender falls back to the male artwork but keeps
+                    // a gender-neutral accessible label.
                     $avatarVariant = match ($genderRaw) {
                         'F' => 'female',
-                        'M' => 'male',
-                        default => 'neutral',
+                        default => 'male',
                     };
                     $avatarLabel = match ($genderRaw) {
                         'M' => __('members.avatar_male'),

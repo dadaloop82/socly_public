@@ -4,16 +4,16 @@
  *
  * @var bool $has_existing
  * @var string $existing_url
- * @var string $gender m|f|neutral
+ * @var string $gender m|f
  */
 use Socly\Support\Fields;
 
 $key = $data_field !== '' ? $data_field : 'photo';
 $hasExisting = !empty($has_existing);
 $existingUrl = (string) ($existing_url ?? '');
-$gender = (string) ($gender ?? 'neutral');
-if (!in_array($gender, ['m', 'f', 'neutral'], true)) {
-    $gender = 'neutral';
+$gender = (string) ($gender ?? 'm');
+if (!in_array($gender, ['m', 'f'], true)) {
+    $gender = 'm';
 }
 $uploadLabel = (string) ($upload_label ?? __('members.photo_upload'));
 $removeLabel = (string) ($remove_label ?? __('members.photo_remove'));

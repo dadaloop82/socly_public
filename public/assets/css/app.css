@@ -2506,6 +2506,33 @@ button.btn-icon:hover:not(:disabled) {
   opacity: 1;
   visibility: visible;
 }
+/* Inline action icon: glyph sized like the button label, 80% opacity, no chrome. */
+.btn-action-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  padding: 0.55rem 0.2rem;
+  border: 0;
+  border-radius: 6px;
+  background: none;
+  color: inherit;
+  opacity: 0.8;
+  text-decoration: none;
+  line-height: 1;
+  cursor: pointer;
+}
+.btn-action-icon svg {
+  width: 1.2em;
+  height: 1.2em;
+  display: block;
+}
+.btn-action-icon:hover,
+.btn-action-icon:focus-visible {
+  opacity: 1;
+  color: var(--brand-primary-deep, var(--brand-primary));
+  text-decoration: none;
+}
 .member-row-actions.row-actions,
 .doc-row-actions .row-actions {
   width: auto;
@@ -4757,14 +4784,14 @@ body.legal-doc-expanded::before {
 .photo-placeholder {
   position: relative;
   overflow: hidden;
-  background-color: #dcdfe4;
+  background-color: #e7eaee;
   background-image: none;
 }
 .photo-ph-layer {
   position: absolute;
   inset: 0;
   display: block;
-  background-color: #dcdfe4;
+  background-color: #e7eaee;
   background-repeat: no-repeat;
   background-position: center bottom;
   background-size: cover;
