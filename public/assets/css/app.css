@@ -8225,6 +8225,38 @@ button.setup-scrape-logo-frame:focus-visible .setup-scrape-logo-overlay {
   color: var(--brand-primary-deep, var(--ink));
   pointer-events: none;
 }
+/* Member type: price + activation on one compact row.
+   The € suffix stays attached to the amount and the checkbox is a plain inline check,
+   instead of a stretched column box. */
+.setup-equal-row.setup-type-meta-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 0.6rem 1.5rem;
+}
+.setup-type-meta-row .setup-field {
+  flex: 0 1 12rem;
+  width: auto;
+  max-width: 12rem;
+}
+.setup-type-meta-row .setup-price-with-currency,
+.setup-type-meta-row .setup-price-with-currency input {
+  width: 100%;
+  max-width: 12rem;
+}
+.setup-type-meta-row .setup-check {
+  flex: 0 0 auto;
+  width: auto;
+  align-self: flex-end;
+  margin: 0 0 0.15rem;
+  padding: 0.35rem 0.15rem;
+  border: 0;
+  background: transparent;
+  gap: 0.5rem;
+}
+.setup-type-meta-row .setup-check > span {
+  white-space: nowrap;
+}
 .setup-locale-grid-compact {
   margin-top: 0.35rem;
 }

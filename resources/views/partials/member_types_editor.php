@@ -62,7 +62,7 @@ try {
                             </label>
                         <?php endforeach; ?>
                     </div>
-                    <div class="setup-equal-row">
+                    <div class="setup-equal-row setup-type-meta-row">
                         <label class="setup-field">
                             <span><?= e(__('install.type_price')) ?> *</span>
                             <div class="setup-price-with-currency">
@@ -120,7 +120,7 @@ try {
                         </label>
                     <?php endforeach; ?>
                 </div>
-                <div class="setup-equal-row">
+                <div class="setup-equal-row setup-type-meta-row">
                     <label class="setup-field">
                         <span><?= e(__('install.type_price')) ?><?= $isEmpty ? ' *' : '' ?></span>
                         <div class="setup-price-with-currency">
@@ -175,7 +175,7 @@ try {
                     </label>
                 <?php endforeach; ?>
             </div>
-            <div class="setup-equal-row">
+            <div class="setup-equal-row setup-type-meta-row">
                 <label class="setup-field">
                     <span><?= e(__('install.type_price')) ?></span>
                     <div class="setup-price-with-currency">

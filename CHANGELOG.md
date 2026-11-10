@@ -94,6 +94,8 @@ versions without curated notes).
 - Member edit: “Save” is available on every wizard step and “Back” on the first step leaves the
   wizard, so a single change no longer requires walking through all steps; the card preview sits
   under the photo block
+- Member types editor: the annual fee, its € suffix and the “Active” checkbox share one compact row
+  (no more € detached from the amount and no full-width checkbox box)
 - One placeholder avatar per gender, shared by the member page, the photo field and the membership
   card preview (the card and the detail page no longer draw their own silhouettes)
 - Member list actions: import and export are icon buttons, “Registry” sits after the primary actions
