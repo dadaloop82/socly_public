@@ -223,19 +223,19 @@ final class StatisticsService
     /**
      * Places of origin with map coordinates and simple distance clustering.
      *
-     * The place of birth is the reliable field (it feeds the fiscal code); the city of residence
-     * is only a fallback for members without it.
+     * The city of residence wins when present; the place of birth (the fiscal-code source) is the
+     * fallback for members without it.
      *
      * @return array{
      *   cities:list<array{place:string,count:int,x:float|null,y:float|null}>,
      *   clusters:list<array{label:string,count:int,cities:list<string>,x:float,y:float}>,
-     *   located:int,total:int,max:int,pending:int
+     *   located:int,total:int,max:int,pending:int,unresolved:int,foreign:int
      * }
      */
     public function cityMap(int $maxLookups = 12): array
     {
         $rows = $this->db->fetchAll(
-            'SELECT COALESCE(NULLIF(TRIM(bp.value), \'\'), NULLIF(TRIM(cz.value), \'\')) AS place
+            'SELECT COALESCE(NULLIF(TRIM(cz.value), \'\'), NULLIF(TRIM(bp.value), \'\')) AS place
              FROM members m
              LEFT JOIN member_field_values bp ON bp.member_id = m.id
                 AND bp.field_definition_id = (SELECT d1.id FROM member_field_definitions d1 WHERE d1.`key` = \'birth_place\' LIMIT 1)
