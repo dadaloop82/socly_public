@@ -91,6 +91,12 @@ readable (a clone of this public repository needs no SSH key):
 The updater refuses to run on showcase instances, when `UPDATE_ENABLED=false` or when the working tree
 has local modifications, and every attempt is written to the audit log.
 
+Every update takes a snapshot **before** touching anything: `storage/backups/update-<date>-v<version>/`
+contains the previous code (`git archive`) and a database dump (`mysqldump`). After the fast-forward
+the updater verifies the new version, the database connection and that no migration is left pending;
+if any step fails it restores the previous commit (and the database dump) and reports the failure with
+the backup path.
+
 **Manual update** (ZIP download, no git):
 
 1. Back up the database, `.env` and `storage/`.

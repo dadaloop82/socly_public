@@ -81,6 +81,9 @@ versions without curated notes).
   stored data, never invented
 - The bulk-fix button is enabled only when the derivation really succeeds (the count runs the same
   routine as the fix); otherwise it is disabled and reads “Cannot fix them automatically”
+- One-click and scheduled updates now take a backup of the previous version (code archive + database
+  dump), verify the new version and the migrations, and roll back automatically on failure, reporting
+  version, backup path and outcome in the UI flash, the CLI and the audit log
 - The registry PDF hides the fiscal code, birth and residence columns when those profile fields are
   disabled
 - The registry PDF prints the membership-card QR next to the card number when the card stores one

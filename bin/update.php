@@ -75,9 +75,19 @@ if (!$updates->installEnabled()) {
 
 $result = $updates->apply('cli');
 if (!empty($result['ok'])) {
-    echo 'Updated to v' . (string) ($result['version'] ?? $updates->currentVersion()) . PHP_EOL;
+    echo 'Updated from v' . (string) ($result['from'] ?? '?') . ' to v' . (string) ($result['version'] ?? $updates->currentVersion()) . PHP_EOL;
+    if (!empty($result['backup'])) {
+        echo 'Backup: ' . (string) $result['backup'] . PHP_EOL;
+    }
+    if (!empty($result['database_backup_error'])) {
+        echo 'Warning: database backup not created (' . (string) $result['database_backup_error'] . ')' . PHP_EOL;
+    }
     exit(0);
 }
 
+if (!empty($result['rolled_back'])) {
+    fwrite(STDERR, 'Update failed and the previous version was restored: ' . (string) ($result['message'] ?? 'unknown error') . PHP_EOL);
+    exit(1);
+}
 fwrite(STDERR, 'Update failed: ' . (string) ($result['message'] ?? 'unknown error') . PHP_EOL);
 exit(1);

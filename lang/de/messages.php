@@ -1752,6 +1752,9 @@ return [
         'disabled' => 'Automatische Updates sind deaktiviert.',
         'busy' => 'Ein Update läuft bereits.',
         'dirty' => 'Es gibt lokale ungespeicherte Änderungen (:files). Working Tree bereinigen und erneut versuchen.',
+        'backup_created' => 'Sicherung der vorherigen Version: :path',
+        'backup_missing' => 'Datenbank-Sicherung nicht erstellt (:error): bei einem Fehler würde nur der Code wiederhergestellt.',
+        'rolled_back' => 'Update abgebrochen: die vorherige Version wurde wiederhergestellt (:error).',
     ],
     'validation' => [
         'required' => 'Pflichtfeld.',

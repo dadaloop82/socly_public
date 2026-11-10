@@ -1756,6 +1756,9 @@ return [
         'disabled' => 'Gli aggiornamenti automatici sono disabilitati.',
         'busy' => 'Un aggiornamento è già in corso.',
         'dirty' => 'Ci sono modifiche locali non salvate (:files). Metti in ordine il working tree e riprova.',
+        'backup_created' => 'Backup della versione precedente: :path',
+        'backup_missing' => 'Backup del database non eseguito (:error): il ripristino automatico in caso di errore coprirebbe solo i file.',
+        'rolled_back' => 'Aggiornamento annullato: la versione precedente è stata ripristinata (:error).',
     ],
     'validation' => [
         'required' => 'Campo obbligatorio.',

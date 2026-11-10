@@ -212,6 +212,21 @@ version and, through “Check for updates”, the published/remote version with 
 own `origin` remote, so an installation cloned from the public repository updates with no SSH key
 (anonymous HTTPS read). ZIP installations have no git metadata and must use the manual procedure above.
 
+### Backup, verification and automatic rollback
+
+Before changing anything the updater writes a snapshot to `storage/backups/update-<date>-v<version>/`:
+
+- `code-<commit>.tar.gz` — the previous application code (`git archive`);
+- `database.sql` — a full database dump (`mysqldump`; when the binary/config is missing the update
+  proceeds but reports that only the code could be restored);
+- `update.json` — from-version, from-commit, timestamp and backup outcome.
+
+After the fast-forward it verifies that the version actually changed, that the database answers and
+that no migration file is left pending. If verification (or any step) fails, the previous commit is
+restored with `git reset --hard` and, when available, the database dump is reloaded before reporting
+the failure. The outcome is shown in the UI flash, printed by `bin/update.php` and written to the
+audit log (`update.applied`, `update.rolled_back`, `update.failed`).
+
 ## Troubleshooting
 
 | Symptom | Cause / fix |

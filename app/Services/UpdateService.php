@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Socly\Services;
 
+use Socly\Core\Database;
 use Socly\Core\Migrator;
 
 final class UpdateService
@@ -23,7 +24,8 @@ final class UpdateService
 
     public function __construct(
         private readonly Migrator $migrator,
-        private readonly AuditService $audit
+        private readonly AuditService $audit,
+        private readonly Database $db
     ) {
     }
 
@@ -245,7 +247,12 @@ final class UpdateService
         return $this->writeCache($cacheFile, $this->finalizeResult($result));
     }
 
-    /** @return array{ok:bool,message:string,version?:string} */
+    /**
+     * One-click update: snapshot the running version, fast-forward, migrate, verify and — when
+     * anything fails — restore code and database instead of leaving a broken instance.
+     *
+     * @return array{ok:bool,message:string,version?:string,from?:string,backup?:string,database_backup?:bool,rolled_back?:bool}
+     */
     public function apply(string $ip): array
     {
         if (function_exists('is_temporary_instance') && is_temporary_instance()) {
@@ -269,10 +276,16 @@ final class UpdateService
         }
 
         file_put_contents($lock, date('c'));
+        $before = $this->currentVersion();
+        $beforeSha = '';
+        $backup = ['dir' => '', 'code' => '', 'database' => '', 'database_error' => ''];
+        $merged = false;
         try {
-            $before = $this->currentVersion();
+            $beforeSha = trim($this->git(['rev-parse', 'HEAD']));
+            $backup = $this->createBackup($before, $beforeSha);
             $this->git(['fetch', 'origin']);
             $this->git(['merge', '--ff-only', 'origin/' . $this->channel()]);
+            $merged = true;
             $this->migrator->migrate();
             try {
                 app(InstallerService::class)->seedFields(InstallerService::defaultFields());
@@ -280,17 +293,214 @@ final class UpdateService
                 // seed best-effort
             }
             $after = $this->currentVersion();
-            $this->audit->log('update.applied', 'system', null, ['version' => $before], ['version' => $after], $ip);
+            $this->verifyUpdate($before, $after);
+            $this->audit->log('update.applied', 'system', null, ['version' => $before], [
+                'version' => $after,
+                'backup' => $this->relativePath($backup['code']),
+                'database_backup' => $backup['database'] !== '',
+            ], $ip);
             @unlink(storage_path('cache/update_check.json'));
-            return ['ok' => true, 'message' => __('updates.success', ['version' => $after]), 'version' => $after];
+            return [
+                'ok' => true,
+                'message' => __('updates.success', ['version' => $after]),
+                'version' => $after,
+                'from' => $before,
+                'backup' => $this->relativePath($backup['code']),
+                'database_backup' => $backup['database'] !== '',
+                'database_backup_error' => $backup['database_error'],
+            ];
         } catch (\Throwable $e) {
-            $this->audit->log('update.failed', 'system', null, null, ['error' => $e->getMessage()], $ip);
-            return ['ok' => false, 'message' => __('updates.failed', ['error' => $e->getMessage()])];
+            $rolledBack = false;
+            if ($merged && $beforeSha !== '') {
+                $rolledBack = $this->rollback($beforeSha, $backup['database']);
+            }
+            $this->audit->log($rolledBack ? 'update.rolled_back' : 'update.failed', 'system', null, null, [
+                'error' => $e->getMessage(),
+                'backup' => $this->relativePath($backup['code']),
+            ], $ip);
+            return [
+                'ok' => false,
+                'message' => $rolledBack
+                    ? __('updates.rolled_back', ['error' => $e->getMessage()])
+                    : __('updates.failed', ['error' => $e->getMessage()]),
+                'rolled_back' => $rolledBack,
+                'backup' => $this->relativePath($backup['code']),
+            ];
         } finally {
             if (is_file($lock)) {
                 @unlink($lock);
             }
         }
+    }
+
+    /**
+     * Snapshot of the running version: application code (git archive) plus a database dump.
+     *
+     * @return array{dir:string,code:string,database:string,database_error:string}
+     */
+    private function createBackup(string $version, string $sha): array
+    {
+        $safeVersion = preg_replace('/[^0-9A-Za-z._-]/', '', $version) ?: 'unknown';
+        $dir = storage_path('backups/update-' . date('Ymd-His') . '-v' . $safeVersion);
+        if (!is_dir($dir) && !mkdir($dir, 0775, true) && !is_dir($dir)) {
+            throw new \RuntimeException('backup_dir_failed');
+        }
+        $code = $dir . '/code-' . substr($sha, 0, 12) . '.tar.gz';
+        try {
+            $this->git([
+                'archive', '--format=tar.gz', '--output=' . $code, $sha,
+                'app', 'bootstrap', 'resources', 'lang', 'public', 'database', 'bin', 'VERSION',
+            ]);
+        } catch (\Throwable) {
+            // A path does not exist in this tree: archive everything tracked instead.
+            $this->git(['archive', '--format=tar.gz', '--output=' . $code, $sha]);
+        }
+        [$dbOk, $dbPath, $dbError] = $this->dumpDatabase($dir . '/database.sql');
+        if (!$dbOk && is_file($dir . '/database.sql')) {
+            @unlink($dir . '/database.sql');
+        }
+        @file_put_contents($dir . '/update.json', (string) json_encode([
+            'from_version' => $version,
+            'from_commit' => $sha,
+            'created_at' => date('c'),
+            'database_backup' => $dbOk,
+            'database_error' => $dbError,
+        ], JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES));
+
+        return [
+            'dir' => $dir,
+            'code' => is_file($code) ? $code : '',
+            'database' => $dbOk ? $dbPath : '',
+            'database_error' => $dbError,
+        ];
+    }
+
+    /** @return array{0:bool,1:string,2:string} */
+    private function dumpDatabase(string $path): array
+    {
+        $cfg = (array) config('db', []);
+        $database = (string) ($cfg['database'] ?? '');
+        if ($database === '') {
+            return [false, '', 'db_config_missing'];
+        }
+        if (!$this->binaryAvailable('mysqldump')) {
+            return [false, '', 'mysqldump_missing'];
+        }
+        $args = [
+            'mysqldump',
+            '--host=' . (string) ($cfg['host'] ?? '127.0.0.1'),
+            '--port=' . (string) ($cfg['port'] ?? '3306'),
+            '--user=' . (string) ($cfg['username'] ?? ''),
+            '--single-transaction',
+            '--quick',
+            '--skip-lock-tables',
+            '--default-character-set=utf8mb4',
+            '--result-file=' . $path,
+            $database,
+        ];
+        $env = getenv();
+        $env['MYSQL_PWD'] = (string) ($cfg['password'] ?? '');
+        $proc = proc_open($args, [0 => ['pipe', 'r'], 1 => ['pipe', 'w'], 2 => ['pipe', 'w']], $pipes, base_path(), $env);
+        if (!is_resource($proc)) {
+            return [false, '', 'mysqldump_failed'];
+        }
+        fclose($pipes[0]);
+        $stderr = trim((string) stream_get_contents($pipes[2]));
+        fclose($pipes[1]);
+        fclose($pipes[2]);
+        $code = proc_close($proc);
+        clearstatcache();
+        if ($code !== 0 || !is_file($path) || (int) filesize($path) === 0) {
+            return [false, '', $stderr !== '' ? $stderr : 'mysqldump_failed'];
+        }
+        return [true, $path, ''];
+    }
+
+    private function restoreDatabase(string $dump): bool
+    {
+        $cfg = (array) config('db', []);
+        $database = (string) ($cfg['database'] ?? '');
+        if ($database === '' || !is_file($dump) || !$this->binaryAvailable('mysql')) {
+            return false;
+        }
+        $args = [
+            'mysql',
+            '--host=' . (string) ($cfg['host'] ?? '127.0.0.1'),
+            '--port=' . (string) ($cfg['port'] ?? '3306'),
+            '--user=' . (string) ($cfg['username'] ?? ''),
+            '--default-character-set=utf8mb4',
+            $database,
+        ];
+        $env = getenv();
+        $env['MYSQL_PWD'] = (string) ($cfg['password'] ?? '');
+        $proc = proc_open($args, [
+            0 => ['file', $dump, 'r'],
+            1 => ['pipe', 'w'],
+            2 => ['pipe', 'w'],
+        ], $pipes, base_path(), $env);
+        if (!is_resource($proc)) {
+            return false;
+        }
+        fclose($pipes[1]);
+        fclose($pipes[2]);
+        return proc_close($proc) === 0;
+    }
+
+    private function binaryAvailable(string $binary): bool
+    {
+        $proc = proc_open(['which', $binary], [0 => ['pipe', 'r'], 1 => ['pipe', 'w'], 2 => ['pipe', 'w']], $pipes);
+        if (!is_resource($proc)) {
+            return false;
+        }
+        fclose($pipes[0]);
+        $found = trim((string) stream_get_contents($pipes[1]));
+        fclose($pipes[1]);
+        fclose($pipes[2]);
+        return proc_close($proc) === 0 && $found !== '';
+    }
+
+    /** Post-update sanity check: new version, reachable database, no pending migration. */
+    private function verifyUpdate(string $before, string $after): void
+    {
+        if ($after === '' || $after === '0.0.0') {
+            throw new \RuntimeException('verify_version_missing');
+        }
+        if ($after === $before) {
+            throw new \RuntimeException('verify_version_unchanged');
+        }
+        $probe = $this->db->fetch('SELECT 1 AS ok');
+        if ((int) ($probe['ok'] ?? 0) !== 1) {
+            throw new \RuntimeException('verify_database_unreachable');
+        }
+        $files = glob(base_path('database/migrations/*.sql')) ?: [];
+        $applied = (int) ($this->db->fetch('SELECT COUNT(*) AS c FROM migrations')['c'] ?? 0);
+        if ($applied < count($files)) {
+            throw new \RuntimeException('verify_migrations_pending');
+        }
+    }
+
+    /** Restore the previous commit and, when available, the database dump. */
+    private function rollback(string $sha, string $dump): bool
+    {
+        try {
+            $this->git(['reset', '--hard', $sha]);
+        } catch (\Throwable) {
+            return false;
+        }
+        if ($dump !== '') {
+            $this->restoreDatabase($dump);
+        }
+        $this->migrator->migrate();
+        return true;
+    }
+
+    private function relativePath(string $path): string
+    {
+        if ($path === '') {
+            return '';
+        }
+        $base = rtrim(base_path(), '/') . '/';
+        return str_starts_with($path, $base) ? substr($path, strlen($base)) : $path;
     }
 
     /** @return array<string, mixed> */

@@ -1754,6 +1754,9 @@ return [
         'disabled' => 'Automatic updates are disabled.',
         'busy' => 'An update is already running.',
         'dirty' => 'There are local unsaved changes (:files). Clean the working tree and try again.',
+        'backup_created' => 'Backup of the previous version: :path',
+        'backup_missing' => 'Database backup not created (:error): automatic recovery on failure would cover files only.',
+        'rolled_back' => 'Update cancelled: the previous version has been restored (:error).',
     ],
     'validation' => [
         'required' => 'This field is required.',

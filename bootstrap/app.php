@@ -345,7 +345,11 @@ $app->bind(DocumentService::class, fn (App $a) => new DocumentService(
     $a->get(Validator::class),
     $a->get(ComponentService::class)
 ));
-$app->bind(UpdateService::class, fn (App $a) => new UpdateService($a->get(Migrator::class), $a->get(AuditService::class)));
+$app->bind(UpdateService::class, fn (App $a) => new UpdateService(
+    $a->get(Migrator::class),
+    $a->get(AuditService::class),
+    $a->get(Database::class)
+));
 
 $app->bind(BrandingService::class, fn (App $a) => new BrandingService($a->get(SettingsService::class)));
 $app->bind(BrandingController::class, fn (App $a) => new BrandingController($a->get(View::class), $a->get(BrandingService::class)));

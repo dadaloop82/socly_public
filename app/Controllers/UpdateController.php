@@ -36,7 +36,14 @@ final class UpdateController extends BaseController
                 $this->platform->maybeSyncInstallation(true);
             } catch (\Throwable) {
             }
-            $this->flash('success', $result['message']);
+            $message = (string) $result['message'];
+            if (!empty($result['backup'])) {
+                $message .= ' ' . __('updates.backup_created', ['path' => (string) $result['backup']]);
+            }
+            if (!empty($result['database_backup_error'])) {
+                $message .= ' ' . __('updates.backup_missing', ['error' => (string) $result['database_backup_error']]);
+            }
+            $this->flash('success', $message);
             if (!$this->setup->isComplete()) {
                 unset($_SESSION['setup_greeted']);
                 redirect('/setup');
