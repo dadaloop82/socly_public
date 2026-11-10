@@ -2666,10 +2666,23 @@ button.btn-icon:hover:not(:disabled) {
   width: 1.35rem;
   height: 1.35rem;
   margin-top: 0.15rem;
-  color: #d4a017;
+  color: var(--danger, #b42318);
   cursor: help;
   outline: none;
   z-index: 1;
+}
+/* Missing mandatory data must be impossible to miss: red + gentle pulse (static in banners). */
+.member-anomaly-mark:not(.is-static) {
+  animation: member-anomaly-pulse 1.5s ease-in-out infinite;
+}
+@keyframes member-anomaly-pulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.35; transform: scale(0.9); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .member-anomaly-mark:not(.is-static) {
+    animation: none;
+  }
 }
 .member-anomaly-mark.is-static { cursor: default; z-index: 0; }
 .member-anomaly-mark:hover,
@@ -2713,6 +2726,20 @@ button.btn-icon:hover:not(:disabled) {
   align-items: flex-start;
   gap: 0.65rem;
   margin-bottom: 0.65rem;
+}
+/* List banner: "N members with missing data" + one-click filter. */
+.member-issues-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.65rem 1rem;
+  flex-wrap: wrap;
+  margin: 0 0 0.85rem;
+}
+/* Auto-fix action next to "fix in edit member". */
+.member-anomaly-autofix {
+  display: inline-flex;
+  margin: 0;
 }
 .member-anomaly-list {
   margin: 0 0 0.85rem;

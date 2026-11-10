@@ -1252,6 +1252,19 @@ final class MemberService
                 $where[] = 'm.balance_due > 0';
             }
         }
+        // Missing mandatory data: same rule as the red triangle, also usable as a list filter.
+        $missingCondition = $this->missingDataCondition('m');
+        $missingCount = 0;
+        if ($missingCondition[0] !== '1=0') {
+            $missingCount = (int) $this->db->fetch(
+                "SELECT COUNT(*) AS c FROM members m INNER JOIN member_types mt ON mt.id = m.member_type_id WHERE {$missingCondition[0]}",
+                $missingCondition[1]
+            )['c'];
+        }
+        if (!empty($filters['issues'])) {
+            $where[] = $missingCondition[0];
+            $params += $missingCondition[1];
+        }
         $whereSql = implode(' AND ', $where);
         $total = (int) $this->db->fetch(
             "SELECT COUNT(*) AS c FROM members m INNER JOIN member_types mt ON mt.id = m.member_type_id WHERE {$whereSql}",
@@ -1295,7 +1308,7 @@ final class MemberService
             $item['gdpr_badges'] = $this->gdprBadges($item);
         }
         unset($item);
-        return ['items' => $items, 'total' => $total, 'per_page' => $perPage, 'page' => $page];
+        return ['items' => $items, 'total' => $total, 'per_page' => $perPage, 'page' => $page, 'issues_count' => $missingCount];
     }
 
     public function find(int $id): ?array
@@ -1435,6 +1448,146 @@ final class MemberService
             ]);
         }
         unset($member);
+    }
+
+    /**
+     * Actions the system can apply on its own, only when the source data is complete.
+     *
+     * @param array<string,mixed> $member
+     * @return list<array{key:string,label:string}>
+     */
+    public function autoFixPlan(array $member): array
+    {
+        $fields = is_array($member['fields'] ?? null) ? $member['fields'] : [];
+        $plan = [];
+        if (trim((string) ($fields['fiscal_code'] ?? '')) === '' && $this->canComputeFiscalCode($fields)) {
+            $plan[] = [
+                'key' => 'fiscal_code',
+                'label' => (string) __('setup.field_person_fiscal_code'),
+            ];
+        }
+        return $plan;
+    }
+
+    /** @param array<string,mixed> $fields */
+    private function canComputeFiscalCode(array $fields): bool
+    {
+        return trim((string) ($fields['first_name'] ?? '')) !== ''
+            && trim((string) ($fields['last_name'] ?? '')) !== ''
+            && trim((string) ($fields['birth_date'] ?? '')) !== ''
+            && trim((string) ($fields['birth_place'] ?? '')) !== ''
+            && in_array(strtoupper(trim((string) ($fields['gender'] ?? ''))), ['M', 'F'], true);
+    }
+
+    /**
+     * Apply autoFixPlan(). Values are never guessed: the fiscal code is written only when the
+     * association already stored name, surname, birth date/place and gender.
+     *
+     * @return array{ok:bool,fixed:list<string>,errors:list<string>}
+     */
+    public function autoFixProfile(int $memberId, string $ip): array
+    {
+        $member = $this->find($memberId);
+        if ($member === null) {
+            return ['ok' => false, 'fixed' => [], 'errors' => [(string) __('members.autofix_unavailable')]];
+        }
+        $fields = is_array($member['fields'] ?? null) ? $member['fields'] : [];
+        $fixed = [];
+        $errors = [];
+        foreach ($this->autoFixPlan($member) as $item) {
+            if ($item['key'] !== 'fiscal_code') {
+                continue;
+            }
+            $result = app(GeoService::class)->computeFiscalCode(
+                trim((string) ($fields['first_name'] ?? '')),
+                trim((string) ($fields['last_name'] ?? '')),
+                trim((string) ($fields['birth_date'] ?? '')),
+                strtoupper(trim((string) ($fields['gender'] ?? ''))),
+                trim((string) ($fields['birth_place'] ?? ''))
+            );
+            if (!empty($result['ok']) && isset($result['fiscal_code'])
+                && $this->setFieldValue($memberId, 'fiscal_code', (string) $result['fiscal_code'])) {
+                $fixed[] = $item['label'];
+                continue;
+            }
+            $errors[] = (string) ($result['error'] ?? __('members.autofix_unavailable'));
+        }
+        if ($fixed !== []) {
+            $this->audit->log('member.autofix', 'member', (string) $memberId, null, ['fixed' => $fixed], $ip);
+        }
+        return ['ok' => $fixed !== [], 'fixed' => $fixed, 'errors' => $errors];
+    }
+
+    /** Write one profile field value (creates the row when missing). */
+    public function setFieldValue(int $memberId, string $key, string $value): bool
+    {
+        $definition = $this->db->fetch(
+            'SELECT id FROM member_field_definitions WHERE `key` = :key LIMIT 1',
+            ['key' => $key]
+        );
+        if ($definition === null) {
+            return false;
+        }
+        $fieldId = (int) $definition['id'];
+        $existing = $this->db->fetch(
+            'SELECT id FROM member_field_values WHERE member_id = :member AND field_definition_id = :field',
+            ['member' => $memberId, 'field' => $fieldId]
+        );
+        if ($existing !== null) {
+            $this->db->update('member_field_values', ['value' => $value], 'id = :id', ['id' => (int) $existing['id']]);
+            return true;
+        }
+        $this->db->insert('member_field_values', [
+            'member_id' => $memberId,
+            'field_definition_id' => $fieldId,
+            'value' => $value,
+        ]);
+        return true;
+    }
+
+    /**
+     * SQL fragment for members missing mandatory data (registry identity + required fields),
+     * mirroring complianceIssues() so the list banner and the red triangle agree.
+     *
+     * @return array{0:string,1:array<string,mixed>}
+     */
+    private function missingDataCondition(string $alias): array
+    {
+        $parts = [];
+        $params = [];
+        $gdpr = $this->isGdprEnabled();
+        $index = 0;
+        foreach ($this->fieldDefinitions(true) as $def) {
+            $key = (string) ($def['key'] ?? '');
+            $fieldId = (int) ($def['id'] ?? 0);
+            if ($key === '' || $fieldId < 1) {
+                continue;
+            }
+            $type = MemberFieldTypes::resolve((string) ($def['field_type'] ?? 'text'), $key);
+            if ($type === MemberFieldTypes::PHOTO) {
+                continue;
+            }
+            if ($key === 'privacy_ack' && !$gdpr) {
+                continue;
+            }
+            if ((int) ($def['is_required'] ?? 0) !== 1 && !in_array($key, self::REGISTRY_IDENTITY_KEYS, true)) {
+                continue;
+            }
+            $param = 'miss' . $index;
+            $table = 'mfv' . $index;
+            $params[$param] = $fieldId;
+            $present = $type === MemberFieldTypes::CHECKBOX
+                ? "{$table}.`value` IN ('1','on','yes')"
+                : "{$table}.`value` IS NOT NULL AND TRIM({$table}.`value`) <> ''";
+            $parts[] = "NOT EXISTS (SELECT 1 FROM member_field_values {$table}"
+                . " WHERE {$table}.member_id = {$alias}.id"
+                . " AND {$table}.field_definition_id = :{$param} AND {$present})";
+            $index++;
+        }
+        if ($parts === []) {
+            return ['1=0', []];
+        }
+        return ['(' . implode(' OR ', $parts) . ')', $params];
     }
 
     /** @return array<string,string|null> */

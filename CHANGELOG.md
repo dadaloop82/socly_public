@@ -73,6 +73,9 @@ versions without curated notes).
 - Registry export no longer flags a residence that is disabled or optional in the member profile
 - Member list warning (red triangle) now also flags a missing fiscal code or birth date — matching the
   registry export — even when those fields are optional in the member form
+- The missing-data triangle is red and pulsing, the “Missing: …” label is translated in IT/DE/EN, the
+  list shows a banner with the number of incomplete members (one click filters only those) and the
+  member page offers “Fix automatically” when the fiscal code can be derived from stored data
 - Anonymous telemetry counters pointed at non-existent table/column names and always reported zero
 
 ### Changed

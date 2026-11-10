@@ -3,7 +3,7 @@
 /** @var int $page */
 /** @var array{active_count:int,balance_due_total:float,pending_count:int} $summary */
 $filters = is_array($filters ?? null) ? $filters : [];
-$filters += ['q' => '', 'status' => '', 'member_type_id' => '', 'payment' => '', 'sort' => '', 'dir' => ''];
+$filters += ['q' => '', 'status' => '', 'member_type_id' => '', 'payment' => '', 'sort' => '', 'dir' => '', 'issues' => ''];
 $redirectBack = url('/members?' . http_build_query(array_filter(array_merge($filters, ['page' => $page > 1 ? $page : null]))));
 $canManage = can('members.manage');
 $canPayments = can('payments.manage');
@@ -156,6 +156,24 @@ $totalPages = max(1, (int) ceil(((int) $result['total']) / max(1, $perPage)));
                 </div>
             </div>
         </div>
+        <?php endif; ?>
+        <?php
+        // Banner: members with missing mandatory data, one click to filter them.
+        $issuesCount = (int) ($result['issues_count'] ?? 0);
+        $issuesActive = !empty($filters['issues']);
+        $issuesClearUrl = url('/members?' . http_build_query(array_filter(array_merge($filters, ['issues' => null]))));
+        $issuesFilterUrl = url('/members?' . http_build_query(array_filter(array_merge($filters, ['issues' => '1', 'page' => null]))));
+        ?>
+        <?php if ($issuesActive): ?>
+            <div class="alert alert-warn member-issues-banner" role="status">
+                <span><?= e(__('members.issues_filter_active', ['count' => (string) $issuesCount])) ?></span>
+                <a class="btn btn-sm btn-ghost" href="<?= e($issuesClearUrl) ?>"><?= e(__('members.issues_filter_clear')) ?></a>
+            </div>
+        <?php elseif ($issuesCount > 0): ?>
+            <div class="alert alert-warn member-issues-banner" role="status">
+                <span><?= e(__('members.issues_banner', ['count' => (string) $issuesCount])) ?></span>
+                <a class="btn btn-sm" href="<?= e($issuesFilterUrl) ?>"><?= e(__('members.issues_filter_link')) ?></a>
+            </div>
         <?php endif; ?>
         <div class="table-wrap embedded members-table-wrap">
             <table class="members-table">

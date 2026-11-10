@@ -212,7 +212,13 @@ $cardQrSvgBadge = $cardQrCode !== '' ? \Socly\Support\QrCode::svg($cardQrCode, 3
         <?php endforeach; ?>
     </ul>
     <?php if ($canManage): ?>
-        <a class="btn btn-sm" href="<?= e(url('/members/'.$member['id'].'/edit')) ?>"><?= e(__('members.anomaly_fix')) ?></a>
+        <?php if (($autoFixPlan ?? []) !== []): ?>
+            <form method="post" action="<?= e(url('/members/'.$member['id'].'/autofix')) ?>" class="member-anomaly-autofix">
+                <?= csrf_field() ?>
+                <button class="btn btn-sm" type="submit"><?= e(__('members.autofix_button')) ?></button>
+            </form>
+        <?php endif; ?>
+        <a class="btn btn-sm btn-ghost" href="<?= e(url('/members/'.$member['id'].'/edit')) ?>"><?= e(__('members.anomaly_fix')) ?></a>
     <?php endif; ?>
 </div>
 <?php endif; ?>

@@ -65,6 +65,7 @@ final class MemberController extends BaseController
             'payment' => (string) $request->input('payment', ''),
             'sort' => (string) $request->input('sort', ''),
             'dir' => (string) $request->input('dir', ''),
+            'issues' => (string) $request->input('issues', ''),
         ];
         $page = max(1, (int) $request->input('page', 1));
         $result = $this->members->search($filters, $page);
@@ -165,7 +166,35 @@ final class MemberController extends BaseController
             'enrollmentMethod' => $this->enrollment->method(),
             'enrollmentArtifact' => $this->enrollment->latestArtifact((int) $id),
             'needsGuardian' => $this->members->memberNeedsGuardian($member),
+            'autoFixPlan' => $this->members->autoFixPlan($member),
         ]);
+    }
+
+    /** Fill the missing fields the system can derive (e.g. fiscal code from complete data). */
+    public function autoFix(Request $request, string $id): void
+    {
+        $this->guardMembers();
+        if (!can('members.manage')) {
+            http_response_code(403);
+            $this->render('errors/403');
+            return;
+        }
+        $member = $this->members->find((int) $id);
+        if (!$member) {
+            http_response_code(404);
+            $this->render('errors/404');
+            return;
+        }
+        $result = $this->members->autoFixProfile((int) $id, $request->ip());
+        if (!empty($result['ok'])) {
+            $this->flash('success', __('members.autofix_success', [
+                'fields' => implode(', ', array_map(static fn ($v): string => (string) $v, $result['fixed'])),
+            ]));
+        } else {
+            $errors = $result['errors'] !== [] ? $result['errors'] : [__('members.autofix_unavailable')];
+            $this->flash('errors', array_values(array_map(static fn ($v): string => (string) $v, $errors)));
+        }
+        redirect('/members/' . (int) $id);
     }
 
     public function edit(Request $request, string $id): void

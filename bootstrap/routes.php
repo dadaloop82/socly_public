@@ -129,6 +129,7 @@ $router->post('/members/{id}', [MemberController::class, 'update'], 'members.man
 $router->post('/members/{id}/delete', [MemberController::class, 'destroy'], 'members.delete', ['mw.locale', 'mw.install', 'mw.auth', 'mw.csrf']);
 $router->post('/members/{id}/payments', [MemberController::class, 'storePayment'], 'payments.manage', ['mw.locale', 'mw.install', 'mw.auth', 'mw.csrf']);
 $router->post('/members/{id}/remind-payment', [MemberController::class, 'remindPayment'], 'members.manage', ['mw.locale', 'mw.install', 'mw.auth', 'mw.csrf']);
+$router->post('/members/{id}/autofix', [MemberController::class, 'autoFix'], 'members.manage', ['mw.locale', 'mw.install', 'mw.auth', 'mw.csrf']);
 
 $router->get('/treasury', [TreasuryController::class, 'index'], 'treasury.view', ['mw.locale', 'mw.install', 'mw.auth']);
 $router->get('/treasury/create', [TreasuryController::class, 'create'], 'treasury.manage', ['mw.locale', 'mw.install', 'mw.auth']);
