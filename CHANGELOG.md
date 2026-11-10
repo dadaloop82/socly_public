@@ -124,6 +124,8 @@ versions without curated notes).
   was taken on
 - Updates: optional `UPDATE_SSH_KEY` lets the PHP user read a deploy key; `GIT_TERMINAL_PROMPT=0` and
   `BatchMode=yes` stop a web request from hanging on a credential prompt
+- Updates: `php bin/update.php --apply --force` applies the remote branch even when the check reports
+  “nothing to do” (recovery for an instance stuck on an older release)
 - The registry PDF hides the fiscal code, birth and residence columns when those profile fields are
   disabled
 - The registry PDF prints the membership-card QR next to the card number when the card stores one

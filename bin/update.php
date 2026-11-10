@@ -10,6 +10,8 @@ declare(strict_types=1);
  *   php bin/update.php            # only check, prints installed vs online
  *   php bin/update.php --apply    # fetch + fast-forward + migrations (one click)
  *   php bin/update.php --apply --force-check
+ *   php bin/update.php --apply --force   # apply even if the check reports "nothing to do"
+ *                                        # (recovery when a stale/blocked check says up to date)
  *
  * Cron (automatic nightly updates):
  *   15 4 * * * php /path/to/socly/bin/update.php --apply >> /path/to/socly/storage/logs/update.log 2>&1
@@ -32,6 +34,7 @@ $app = require SOCLY_CODE_PATH . '/bootstrap/app.php';
 $args = array_slice($argv ?? [], 1);
 $apply = in_array('--apply', $args, true);
 $force = in_array('--force-check', $args, true);
+$forceApply = in_array('--force', $args, true);
 
 @set_time_limit(0);
 
@@ -63,9 +66,13 @@ if (!$apply) {
     exit(0);
 }
 
-if (!$available) {
+if (!$available && !$forceApply) {
     echo "Nothing to do." . PHP_EOL;
     exit(0);
+}
+
+if (!$available) {
+    echo "Forcing: applying the remote branch even though the check reported no update." . PHP_EOL;
 }
 
 if (!$updates->installEnabled()) {
