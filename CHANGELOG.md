@@ -95,7 +95,8 @@ versions without curated notes).
 - Member detail page shows the filled membership card (same artwork as the wizard preview) under the
   sidebar panel
 - Membership card shows the QR code in the top-right corner when the card has one (detail page and
-  edit preview); the card in the member sidebar is rendered at half height with the real proportions
+  edit preview); the card in the member sidebar is full width with larger photo, name, number, type
+  and QR, so the content fills the badge like a real membership card
 - Member edit: “Save” is available on every wizard step and “Back” on the first step leaves the
   wizard, so a single change no longer requires walking through all steps; the card preview sits
   under the photo block

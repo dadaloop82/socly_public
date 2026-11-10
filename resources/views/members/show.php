@@ -332,19 +332,17 @@ $cardQrSvgBadge = $cardQrCode !== '' ? \Socly\Support\QrCode::svg($cardQrCode, 3
 
         <div class="member-scheda-tessera">
             <h3 class="member-scheda-side-title"><?= e(__('members.card_block')) ?></h3>
-            <div class="tessera-scale">
-                <?= view_partial('partials/tessera-card', [
-                    'name' => $displayName !== '' ? $displayName : '#' . (string) $member['member_number'],
-                    'number' => (string) $member['member_number'],
-                    'role' => __('members.card_role'),
-                    'type' => $typeLabel,
-                    'photo_url' => $hasPhoto ? url('/members/' . (int) $member['id'] . '/photo') : '',
-                    'gender' => $genderRaw === 'F' ? 'f' : 'm',
-                    'logo_url' => assoc_logo_url(),
-                    'qr_svg' => $cardQrSvgBadge,
-                    'live' => false,
-                ]) ?>
-            </div>
+            <?= view_partial('partials/tessera-card', [
+                'name' => $displayName !== '' ? $displayName : '#' . (string) $member['member_number'],
+                'number' => (string) $member['member_number'],
+                'role' => __('members.card_role'),
+                'type' => $typeLabel,
+                'photo_url' => $hasPhoto ? url('/members/' . (int) $member['id'] . '/photo') : '',
+                'gender' => $genderRaw === 'F' ? 'f' : 'm',
+                'logo_url' => assoc_logo_url(),
+                'qr_svg' => $cardQrSvgBadge,
+                'live' => false,
+            ]) ?>
         </div>
     </aside>
 
