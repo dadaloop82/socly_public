@@ -395,7 +395,8 @@ $app->bind(MemberActionService::class, fn (App $a) => new MemberActionService(
 ));
 $app->bind(MemberRegistryService::class, fn (App $a) => new MemberRegistryService(
     $a->get(SettingsService::class),
-    $a->get(MemberService::class)
+    $a->get(MemberService::class),
+    $a->get(Database::class)
 ));
 $app->bind(EnrollmentFormService::class, fn (App $a) => new EnrollmentFormService(
     $a->get(SettingsService::class),
