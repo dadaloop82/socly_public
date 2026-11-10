@@ -193,11 +193,11 @@ version is published. Manual update:
 ### One-click / automatic update (git checkouts)
 
 Where the app is a **git checkout** whose `origin` remote is readable by the PHP/CLI user, the update
-can be applied without touching files by hand (`UPDATE_ENABLED=true` in `.env`):
+is available out of the box (no `.env` flag required; set `UPDATE_ENABLED=false` to disable it):
 
-- inside the app: sidebar card “Update available” → **Install** (admin only);
+- inside the app: sidebar card “Update available” → **Update** (confirmation required);
 - from the command line: `php bin/update.php` (only checks) or `php bin/update.php --apply`
-  (git fetch + fast-forward + migrations, same engine as the button);
+  (backup + git fetch + fast-forward + migrations, same engine as the button);
 - scheduled (nightly, fully automatic):
 
   ```cron

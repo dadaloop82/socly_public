@@ -29,11 +29,42 @@ final class UpdateService
     ) {
     }
 
+    /** Cached "this tree is a git checkout" probe (avoid spawning git on every call). */
+    private ?bool $gitCheckout = null;
+
     /** Git-based one-click install (the checkout's `origin` remote must be readable). */
     public function installEnabled(): bool
     {
-        $flag = $_ENV['UPDATE_ENABLED'] ?? 'false';
-        return filter_var($flag, FILTER_VALIDATE_BOOL);
+        // Explicit opt-out wins (UPDATE_DISABLED=true).
+        if (filter_var($_ENV['UPDATE_DISABLED'] ?? 'false', FILTER_VALIDATE_BOOL)) {
+            return false;
+        }
+        // UPDATE_ENABLED=true forces the updater; false/empty keeps automatic detection so the
+        // in-app "Update" button works on a git checkout without touching .env.
+        if (filter_var($_ENV['UPDATE_ENABLED'] ?? 'false', FILTER_VALIDATE_BOOL)) {
+            return true;
+        }
+        return $this->isGitCheckout();
+    }
+
+    /** True when the code tree is a git checkout with a readable `origin` remote. */
+    private function isGitCheckout(): bool
+    {
+        if ($this->gitCheckout !== null) {
+            return $this->gitCheckout;
+        }
+        $this->gitCheckout = false;
+        if (!is_dir(base_path('.git'))) {
+            return false;
+        }
+        try {
+            $inside = trim($this->git(['rev-parse', '--is-inside-work-tree']));
+            $remote = trim($this->git(['remote', 'get-url', 'origin']));
+            $this->gitCheckout = $inside === 'true' && $remote !== '';
+        } catch (\Throwable) {
+            $this->gitCheckout = false;
+        }
+        return $this->gitCheckout;
     }
 
     /** @deprecated Use installEnabled() */
@@ -283,6 +314,18 @@ final class UpdateService
         try {
             $beforeSha = trim($this->git(['rev-parse', 'HEAD']));
             $backup = $this->createBackup($before, $beforeSha);
+            if ($backup['database'] === '') {
+                // Never touch the code without a database backup: data safety first.
+                $this->audit->log('update.failed', 'system', null, null, [
+                    'error' => 'database_backup_failed',
+                    'detail' => $backup['database_error'],
+                ], $ip);
+                return [
+                    'ok' => false,
+                    'message' => __('updates.backup_required', ['error' => $backup['database_error']]),
+                    'backup' => $this->relativePath($backup['code']),
+                ];
+            }
             $this->git(['fetch', 'origin']);
             $this->git(['merge', '--ff-only', 'origin/' . $this->channel()]);
             $merged = true;

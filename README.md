@@ -76,12 +76,11 @@ administrators when a newer version is published; every release also ships a cur
 [CHANGELOG](CHANGELOG.md).
 
 **One-click / automatic update** — when the app is a **git checkout** whose `origin` remote is
-readable (a clone of this public repository needs no SSH key):
+readable (a clone of this public repository needs no SSH key, and no `.env` flag is required):
 
-1. Set `UPDATE_ENABLED=true` in `.env`.
-2. Update from the sidebar card (**Install**), or from the command line:
-   `php bin/update.php --apply` — git fetch + fast-forward + migrations + field seeding, same engine
-   as the button.
+1. Sidebar card → **Update** (confirmation required): the updater takes a full backup, pulls,
+   runs migrations and verifies the result; on failure it restores the previous version.
+2. Or from the command line: `php bin/update.php --apply` — same engine as the button.
 3. Schedule it (nightly, fully automatic):
 
    ```cron

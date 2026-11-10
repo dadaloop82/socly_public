@@ -91,6 +91,10 @@ versions without curated notes).
 - First note: pagination (50 rows per page, search/filters/sort preserved) and a “select all”
   checkbox on every ledger table
 - First note: approval-status filter (all / awaiting approval / approved)
+- In-app update works out of the box on git checkouts: the sidebar shows **Update** (with confirmation)
+  instead of “Download” and runs the whole procedure — backup of code and database, pull, migrations,
+  verification and automatic rollback on failure; the update is refused when the database backup
+  cannot be taken, and `UPDATE_DISABLED=true` turns it off explicitly
 - Approving a single movement or a bulk selection no longer reloads the page: rows update in place and
   filters, page and scroll position are preserved
 - Membership card: larger QR, watermark anchored to the top-left corner, gender + birth month/year

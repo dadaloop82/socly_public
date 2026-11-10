@@ -302,29 +302,34 @@ if ($user && app()->isInstalled() && !$temporaryInstance && can('settings.manage
                             'current' => $updateCurrent,
                             'remote' => $updateRemote,
                         ])) ?></p>
-                        <?php if (empty($updateInfo['install_available'])): ?>
+                        <?php
+                        $canAutoUpdate = !empty($updateInfo['install_available']);
+                        $notesUrl = trim((string) ($updateInfo['notes_url'] ?? ''));
+                        $downloadUrl = trim((string) ($updateInfo['download_url'] ?? ''));
+                        $guideUrl = trim((string) ($updateInfo['install_guide_url'] ?? ''));
+                        ?>
+                        <?php if (!$canAutoUpdate): ?>
                             <p class="sidebar-update-hint"><?= e(__('updates.manual_hint')) ?></p>
                         <?php endif; ?>
                         <div class="sidebar-update-actions">
-                            <?php
-                            $notesUrl = trim((string) ($updateInfo['notes_url'] ?? ''));
-                            $downloadUrl = trim((string) ($updateInfo['download_url'] ?? ''));
-                            $guideUrl = trim((string) ($updateInfo['install_guide_url'] ?? ''));
-                            ?>
-                            <?php if ($notesUrl !== ''): ?>
-                                <a class="btn btn-sm btn-ghost" href="<?= e($notesUrl) ?>" target="_blank" rel="noopener noreferrer"><?= e(__('updates.notes')) ?></a>
-                            <?php endif; ?>
-                            <?php if ($downloadUrl !== ''): ?>
-                                <a class="btn btn-sm btn-ghost" href="<?= e($downloadUrl) ?>" target="_blank" rel="noopener noreferrer"><?= e(__('updates.download')) ?></a>
-                            <?php endif; ?>
-                            <?php if ($guideUrl !== '' && empty($updateInfo['install_available'])): ?>
-                                <a class="btn btn-sm btn-ghost" href="<?= e($guideUrl) ?>" target="_blank" rel="noopener noreferrer"><?= e(__('updates.guide')) ?></a>
-                            <?php endif; ?>
-                            <?php if (!empty($updateInfo['install_available'])): ?>
-                                <form method="post" action="<?= e(url('/updates/install')) ?>">
+                            <?php if ($canAutoUpdate): ?>
+                                <form
+                                    method="post"
+                                    action="<?= e(url('/updates/install')) ?>"
+                                    data-confirm="<?= e(__('updates.confirm_update', ['version' => $updateRemote])) ?>"
+                                >
                                     <?= csrf_field() ?>
                                     <button class="btn btn-sm" type="submit"><?= e(__('updates.install')) ?></button>
                                 </form>
+                            <?php endif; ?>
+                            <?php if ($notesUrl !== ''): ?>
+                                <a class="btn btn-sm btn-ghost" href="<?= e($notesUrl) ?>" target="_blank" rel="noopener noreferrer"><?= e(__('updates.notes')) ?></a>
+                            <?php endif; ?>
+                            <?php if (!$canAutoUpdate && $downloadUrl !== ''): ?>
+                                <a class="btn btn-sm btn-ghost" href="<?= e($downloadUrl) ?>" target="_blank" rel="noopener noreferrer"><?= e(__('updates.download')) ?></a>
+                            <?php endif; ?>
+                            <?php if (!$canAutoUpdate && $guideUrl !== ''): ?>
+                                <a class="btn btn-sm btn-ghost" href="<?= e($guideUrl) ?>" target="_blank" rel="noopener noreferrer"><?= e(__('updates.guide')) ?></a>
                             <?php endif; ?>
                         </div>
                     </div>
