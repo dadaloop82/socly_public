@@ -87,6 +87,11 @@ versions without curated notes).
 - Trial/showcase instances detect new releases without running the guided setup, and the login footer
   always shows the installed version plus the update notice
 - Long configuration pages were split into macro areas with one section open at a time
+- Member detail page shows the filled membership card (same artwork as the wizard preview) under the
+  sidebar panel
+- Member edit: “Save” is available on every wizard step and “Back” on the first step leaves the
+  wizard, so a single change no longer requires walking through all steps; the card preview sits
+  under the photo block
 - One placeholder avatar per gender, shared by the member page, the photo field and the membership
   card preview (the card and the detail page no longer draw their own silhouettes)
 - Member list actions: import and export are icon buttons, “Registry” sits after the primary actions

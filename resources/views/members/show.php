@@ -320,6 +320,20 @@ $hasPhoto = !empty($fields['photo']);
                 <span class="muted"><?= e(__('members.balance_due')) ?>: <strong><?= e(number_format($balanceDue, 2, ',', '.')) ?> €</strong></span>
             <?php endif; ?>
         </div>
+
+        <div class="member-scheda-tessera">
+            <h3 class="member-scheda-side-title"><?= e(__('members.card_block')) ?></h3>
+            <?= view_partial('partials/tessera-card', [
+                'name' => $displayName !== '' ? $displayName : '#' . (string) $member['member_number'],
+                'number' => (string) $member['member_number'],
+                'role' => __('members.card_role'),
+                'type' => $typeLabel,
+                'photo_url' => $hasPhoto ? url('/members/' . (int) $member['id'] . '/photo') : '',
+                'gender' => $genderRaw === 'F' ? 'f' : 'm',
+                'logo_url' => assoc_logo_url(),
+                'live' => false,
+            ]) ?>
+        </div>
     </aside>
 
     <div class="member-scheda-main">

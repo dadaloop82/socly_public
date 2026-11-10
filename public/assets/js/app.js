@@ -1946,6 +1946,7 @@ function initMemberWizard() {
   }
 
   const total = Number(form.dataset.totalSteps || 3);
+  const isEdit = form.dataset.wizardEdit === '1';
   let step = 1;
   const panels = [...form.querySelectorAll('[data-wizard-panel]')];
   const indicators = [...form.querySelectorAll('[data-step-indicator]')];
@@ -2265,15 +2266,18 @@ function initMemberWizard() {
     if (progress) {
       progress.style.width = `${(step / total) * 100}%`;
     }
-    if (prevBtn) prevBtn.hidden = step === 1;
+    // Edit mode: “Back” exits to the member page and “Save” is always available,
+    // so a change never requires walking through every remaining step.
+    if (prevBtn) prevBtn.hidden = step === 1 && !isEdit;
     if (nextBtn) {
       nextBtn.hidden = step === total;
       nextBtn.disabled = step === total;
     }
     if (submitBtn) {
       const last = step === total;
-      submitBtn.hidden = !last;
-      submitBtn.disabled = !last;
+      const visible = last || isEdit;
+      submitBtn.hidden = !visible;
+      submitBtn.disabled = !visible;
     }
     if (errorBox) errorBox.hidden = true;
     syncCard();
@@ -2392,7 +2396,14 @@ function initMemberWizard() {
     if (!validateStep()) return;
     showStep(step + 1);
   });
-  prevBtn?.addEventListener('click', () => showStep(step - 1));
+  prevBtn?.addEventListener('click', () => {
+    if (isEdit && step === 1) {
+      // First step has no previous panel: leave the wizard and go back to the member page.
+      window.location.href = form.dataset.wizardBack || '/members';
+      return;
+    }
+    showStep(step - 1);
+  });
   indicators.forEach((item) => {
     item.addEventListener('click', () => {
       const target = Number(item.dataset.stepIndicator);
@@ -2421,7 +2432,9 @@ function initMemberWizard() {
   form.querySelector('[data-last-name]')?.addEventListener('input', syncCard);
 
   form.addEventListener('submit', (e) => {
-    if (step !== total) {
+    // “Save” submits for real (also with Enter in edit mode); only “Next” steps forward.
+    const directSave = e.submitter === submitBtn || (isEdit && !e.submitter);
+    if (step !== total && !directSave) {
       e.preventDefault();
       if (validateStep()) showStep(step + 1);
       return;

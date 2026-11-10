@@ -2934,6 +2934,15 @@ tr.clickable-row:focus-visible {
   padding-top: 0.35rem;
   border-top: 1px solid var(--line);
 }
+/* Membership card under the sidebar panel (same artwork as the wizard preview). */
+.member-scheda-tessera {
+  margin-top: 1rem;
+  padding-top: 0.9rem;
+  border-top: 1px solid var(--line);
+}
+.member-scheda-tessera .tessera-card {
+  margin-top: 0.55rem;
+}
 .member-scheda-main {
   display: grid;
   gap: 1.15rem;
@@ -5326,6 +5335,13 @@ input.is-geo-forced,
 }
 .wizard-panel-side--photo .member-profile-block--photo-side {
   margin: 0;
+}
+/* Membership card placed under the photo block of the profile step. */
+.wizard-panel-side--photo .tessera-preview {
+  margin-top: 1rem;
+}
+.tessera-preview--inline {
+  position: static;
 }
 .wizard-panel-side--photo .photo-upload--card {
   gap: 0.65rem;

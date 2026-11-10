@@ -524,6 +524,8 @@ $paymentExtraHtml = $buildProfileFieldsHtml($paymentExtraFields, \Socly\Services
     enctype="multipart/form-data"
     data-member-form
     data-wizard
+    data-wizard-edit="<?= $isEdit ? '1' : '0' ?>"
+    data-wizard-back="<?= e($isEdit ? url('/members/' . (int) $member['id']) : url('/members')) ?>"
     data-member-leave-guard="<?= $isEdit ? 'edit' : 'create' ?>"
     data-photo-preview-open="<?= e(__('members.photo_preview_open')) ?>"
     data-photo-preview-close="<?= e(__('members.photo_preview_close')) ?>"
@@ -574,6 +576,47 @@ $paymentExtraHtml = $buildProfileFieldsHtml($paymentExtraFields, \Socly\Services
 
     <div class="wizard-progress" aria-hidden="true"><span data-wizard-progress></span></div>
 
+    <?php
+    // Membership-card preview: one shared partial (same artwork as the member detail page).
+    // It is attached under the photo block of the profile step, so face and card stay together.
+    $tesseraPhotoSrc = '';
+    if ($isEdit && !empty($member['id']) && trim((string) ($fieldValues['photo'] ?? '')) !== '') {
+        $tesseraPhotoSrc = url('/members/' . (int) $member['id'] . '/photo');
+    }
+    $tesseraGenderRaw = strtoupper(trim($valFor('gender')));
+    $tesseraPhotoGender = $tesseraGenderRaw === 'F' ? 'f' : 'm';
+    $tesseraName = trim($fieldValue([
+        'key' => 'first_name',
+    ]) . ' ' . $fieldValue([
+        'key' => 'last_name',
+    ]));
+    $tesseraSelectedType = (int) old('member_type_id', $member['member_type_id'] ?? 0);
+    $tesseraTypeLabel = '';
+    foreach ($types as $typeRow) {
+        if ((int) ($typeRow['id'] ?? 0) === $tesseraSelectedType) {
+            $tesseraTypeLabel = localized($typeRow['name_json'] ?? '');
+            break;
+        }
+    }
+    $tesseraCardHtml = view_partial('partials/tessera-card', [
+        'name' => $tesseraName,
+        'number' => (string) old('member_number', $member['member_number'] ?? $nextNumber),
+        'role' => __('members.card_role'),
+        'type' => $tesseraTypeLabel,
+        'photo_url' => $tesseraPhotoSrc,
+        'gender' => $tesseraPhotoGender,
+        'logo_url' => assoc_logo_url(),
+        'live' => true,
+    ]);
+    $tesseraPreviewHtml = '<aside class="wizard-panel-side tessera-preview" aria-hidden="true">'
+        . $tesseraCardHtml
+        . '</aside>';
+    $tesseraInlineHtml = '<div class="tessera-preview tessera-preview--inline" aria-hidden="true">'
+        . $tesseraCardHtml
+        . '</div>';
+    $tesseraPreviewRendered = false;
+    ?>
+
     <?php foreach ($formSteps as $i => $step): ?>
         <?php
         $stepNum = $i + 1;
@@ -587,6 +630,11 @@ $paymentExtraHtml = $buildProfileFieldsHtml($paymentExtraFields, \Socly\Services
             </div>
             <?php
             $sideHtml = trim((string) ($profileSideHtmlByStep[$stepKey] ?? ''));
+            if ($sideHtml !== '' && !$tesseraPreviewRendered) {
+                // Photo block found: place the membership card right below it.
+                $sideHtml .= $tesseraInlineHtml;
+                $tesseraPreviewRendered = true;
+            }
             $hasPhotoSide = $sideHtml !== '';
             ?>
             <div class="wizard-panel-body<?= $hasPhotoSide ? ' wizard-panel-body--photo' : '' ?>">
@@ -610,22 +658,6 @@ $paymentExtraHtml = $buildProfileFieldsHtml($paymentExtraFields, \Socly\Services
             <p class="section-lede"><?= e(__('members.wizard_step2_lede')) ?></p>
         </div>
         <div class="wizard-panel-body wizard-panel-body--tessera">
-            <?php
-            $tesseraPhotoSrc = '';
-            if ($isEdit && !empty($member['id']) && trim((string) ($fieldValues['photo'] ?? '')) !== '') {
-                $tesseraPhotoSrc = url('/members/' . (int) $member['id'] . '/photo');
-            }
-            $tesseraGenderRaw = strtoupper(trim($valFor('gender')));
-            $tesseraPhotoGender = $tesseraGenderRaw === 'F' ? 'f' : 'm';
-            $tesseraName = trim($fieldValue([
-                'key' => 'first_name',
-            ]) . ' ' . $fieldValue([
-                'key' => 'last_name',
-            ]));
-            if ($tesseraName === '') {
-                $tesseraName = __('members.wizard_card_name');
-            }
-            ?>
             <div class="wizard-panel-main tessera-step-fields member-profile-grid">
                 <?php
                 $defaultStatus = $isEdit ? (string) ($member['status'] ?? 'active') : 'active';
@@ -906,44 +938,11 @@ $paymentExtraHtml = $buildProfileFieldsHtml($paymentExtraFields, \Socly\Services
                     <?php endif; ?>
                 </div>
             </div>
-            <aside class="wizard-panel-side tessera-preview" aria-hidden="true">
-                <?php $tesseraLogoUrl = assoc_logo_url(); ?>
-                <div class="tessera-card"<?= $tesseraLogoUrl ? ' style="--tessera-logo:url(\'' . e($tesseraLogoUrl) . '\')"' : '' ?>>
-                    <div class="tessera-card-bg" aria-hidden="true"></div>
-                    <?php if ($tesseraLogoUrl): ?>
-                        <div class="tessera-card-mark" aria-hidden="true"></div>
-                    <?php endif; ?>
-                    <div class="tessera-card-shine"></div>
-                    <div class="tessera-card-face">
-                        <div class="tessera-card-top">
-                            <div class="tessera-brand">
-                                <?= assoc_lockup_html(['class' => 'assoc-lockup-tessera']) ?: socly_mark_img('tessera-mark', 'SOCLY', 'light') ?>
-                            </div>
-                        </div>
-                        <div class="tessera-card-main">
-                            <div class="tessera-photo<?= $tesseraPhotoSrc === '' ? ' is-empty' : '' ?>" data-tessera-photo-wrap>
-                                <?php if ($tesseraPhotoSrc !== ''): ?>
-                                    <img
-                                        class="tessera-photo-img"
-                                        data-tessera-photo
-                                        src="<?= e($tesseraPhotoSrc) ?>"
-                                        alt=""
-                                    >
-                                    <span class="tessera-photo-placeholder photo-placeholder" data-photo-placeholder data-tessera-photo-placeholder data-photo-gender="<?= e($tesseraPhotoGender) ?>" hidden></span>
-                                <?php else: ?>
-                                    <img class="tessera-photo-img" data-tessera-photo alt="" hidden>
-                                    <span class="tessera-photo-placeholder photo-placeholder" data-photo-placeholder data-tessera-photo-placeholder data-photo-gender="<?= e($tesseraPhotoGender) ?>"></span>
-                                <?php endif; ?>
-                            </div>
-                            <div class="tessera-meta">
-                                <span class="tessera-name" data-tessera-name data-fallback="<?= e(__('members.wizard_card_name')) ?>"><?= e($tesseraName) ?></span>
-                                <strong class="tessera-number" data-tessera-number>#<?= e((string) old('member_number', $member['member_number'] ?? $nextNumber)) ?></strong>
-                                <span class="tessera-type" data-tessera-type data-role="<?= e(__('members.card_role')) ?>"><strong><?= e(__('members.card_role')) ?></strong> —</span>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </aside>
+            <?php if ($tesseraPreviewRendered): ?>
+                <aside class="wizard-panel-side wizard-panel-side--spacer" aria-hidden="true"></aside>
+            <?php else: ?>
+                <?= $tesseraPreviewHtml ?>
+            <?php endif; ?>
         </div>
     </section>
 
