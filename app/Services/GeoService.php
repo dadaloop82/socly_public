@@ -140,6 +140,7 @@ final class GeoService
     public function cityCoordinates(string $city): ?array
     {
         static $providerDown = false;
+        static $nullStreak = 0;
 
         $city = trim($city);
         if ($city === '' || $providerDown) {
@@ -156,8 +157,14 @@ final class GeoService
         }
 
         $coords = $this->geocodeCity($city);
+        // Three misses in a row mean the provider is unreachable: stop trying in this request.
         if ($coords === null) {
-            $providerDown = true;
+            $nullStreak++;
+            if ($nullStreak >= 3) {
+                $providerDown = true;
+            }
+        } else {
+            $nullStreak = 0;
         }
         $cache[$key] = $coords;
         if ($cachePath !== '') {
@@ -172,6 +179,21 @@ final class GeoService
             );
         }
         return $coords;
+    }
+
+    /** True when the city already has an entry in the coordinates cache (hit or miss). */
+    public function hasCoordinatesEntry(string $city): bool
+    {
+        static $cache = null;
+        $city = trim($city);
+        if ($city === '') {
+            return false;
+        }
+        if ($cache === null) {
+            $path = function_exists('storage_path') ? storage_path('cache/geo_city_coords.json') : '';
+            $cache = $this->coordinatesCache($path);
+        }
+        return array_key_exists(mb_strtolower($city), $cache);
     }
 
     /** @return array{lat:float,lon:float}|null */

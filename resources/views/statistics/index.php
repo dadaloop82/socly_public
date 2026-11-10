@@ -165,6 +165,15 @@ $chartCard = static function (string $id, string $titleKey, string $ledeKey, boo
                     ])) ?></p>
                 </div>
             </div>
+            <?php if ((int) ($cityMap['pending'] ?? 0) > 0): ?>
+                <p class="statistics-map-pending">
+                    <?= e(__('statistics.map_pending', ['count' => (string) (int) $cityMap['pending']])) ?>
+                </p>
+            <?php elseif ((int) ($cityMap['unresolved'] ?? 0) > 0): ?>
+                <p class="statistics-map-pending">
+                    <?= e(__('statistics.map_unresolved', ['count' => (string) (int) $cityMap['unresolved']])) ?>
+                </p>
+            <?php endif; ?>
             <?php if (($cityMap['clusters'] ?? []) === []): ?>
                 <div class="empty-state compact"><?= e(__('statistics.map_empty')) ?></div>
             <?php else: ?>
@@ -217,6 +226,11 @@ $chartCard = static function (string $id, string $titleKey, string $ledeKey, boo
                         </tbody>
                     </table>
                 </div>
+            <?php endif; ?>
+            <?php if ((int) ($cityMap['foreign'] ?? 0) > 0): ?>
+                <p class="statistics-map-note">
+                    <?= e(__('statistics.map_foreign', ['count' => (string) (int) $cityMap['foreign']])) ?>
+                </p>
             <?php endif; ?>
         </div>
     </section>

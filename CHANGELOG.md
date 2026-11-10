@@ -137,6 +137,9 @@ versions without curated notes).
 - Statistics: **Cities of residence** is now a map — Italy outline generated from Natural Earth
   (public domain) with proportional bubbles and distance clustering; unknown cities are geocoded once
   and cached (`storage/cache/geo_city_coords.json`), with the top cities listed under the map
+- Statistics map: uses the **place of birth** (the field that feeds the fiscal code, filled for every
+  member) with the city of residence as fallback; countries are grouped under “Abroad”, and
+  `php bin/geo-warm.php` pre-computes every coordinate so the map is complete and works offline
 - Statistics: age bands follow the reference report (largest band first, share printed above each
   bar); e-mail providers and preferred language removed
 - Statistics: the sign-ups chart now covers the **whole period** instead of the last 24 months, and

@@ -2239,6 +2239,18 @@ a.sidebar-brand-home:hover {
 .statistics-map-table {
   margin-top: 0.9rem;
 }
+.statistics-map-pending {
+  margin: 0.25rem 0 0;
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: #b45309;
+}
+.statistics-map-note {
+  margin: 0.6rem 0 0;
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: color-mix(in srgb, var(--ink) 55%, transparent);
+}
 .stat::after {
   content: "";
   position: absolute;

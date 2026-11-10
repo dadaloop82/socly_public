@@ -16,6 +16,31 @@ use Socly\Support\ItalyMap;
  */
 final class StatisticsService
 {
+    /**
+     * Country names that must not be geocoded as Italian municipalities
+     * (e.g. "Argentina" is also a comune in Imperia, but it means the country here).
+     *
+     * @var array<string, true>
+     */
+    private const FOREIGN_PLACES = [
+        'italia' => true, 'italy' => true, 'argentina' => true, 'austria' => true, 'brasile' => true,
+        'brazil' => true, 'germania' => true, 'deutschland' => true, 'svizzera' => true, 'switzerland' => true,
+        'francia' => true, 'france' => true, 'romania' => true, 'albania' => true, 'marocco' => true,
+        'tunisia' => true, 'senegal' => true, 'nigeria' => true, 'ghana' => true, 'cina' => true,
+        'china' => true, 'india' => true, 'pakistan' => true, 'bangladesh' => true, 'sri lanka' => true,
+        'filippine' => true, 'philippines' => true, 'vietnam' => true, 'giappone' => true, 'japan' => true,
+        'corea' => true, 'ucraina' => true, 'ukraine' => true, 'polonia' => true, 'poland' => true,
+        'moldavia' => true, 'russia' => true, 'bulgaria' => true, 'serbia' => true, 'croazia' => true,
+        'croatia' => true, 'slovenia' => true, 'kosovo' => true, 'macedonia' => true, 'bosnia' => true,
+        'montenegro' => true, 'ungheria' => true, 'hungary' => true, 'slovacchia' => true, 'repubblica ceca' => true,
+        'spagna' => true, 'spain' => true, 'portogallo' => true, 'belgio' => true, 'olanda' => true,
+        'paesi bassi' => true, 'lussemburgo' => true, 'regno unito' => true, 'inghilterra' => true,
+        'irlanda' => true, 'grecia' => true, 'turchia' => true, 'egitto' => true, 'israele' => true,
+        'libano' => true, 'siria' => true, 'perù' => true, 'peru' => true, 'colombia' => true,
+        'ecuador' => true, 'venezuela' => true, 'messico' => true, 'cuba' => true,
+        'repubblica dominicana' => true, 'stati uniti' => true, 'usa' => true, 'canada' => true,
+        'australia' => true, 'sudafrica' => true, 'kenya' => true, 'etiopia' => true, 'eritrea' => true,
+    ];
     public function __construct(
         private readonly Database $db,
         private readonly GeoService $geo
@@ -196,54 +221,83 @@ final class StatisticsService
     }
 
     /**
-     * Cities of residence with map coordinates and simple distance clustering.
+     * Places of origin with map coordinates and simple distance clustering.
+     *
+     * The place of birth is the reliable field (it feeds the fiscal code); the city of residence
+     * is only a fallback for members without it.
      *
      * @return array{
-     *   cities:list<array{city:string,count:int,x:float|null,y:float|null}>,
+     *   cities:list<array{place:string,count:int,x:float|null,y:float|null}>,
      *   clusters:list<array{label:string,count:int,cities:list<string>,x:float,y:float}>,
-     *   located:int,total:int,max:int
+     *   located:int,total:int,max:int,pending:int
      * }
      */
-    public function cityMap(int $maxLookups = 8): array
+    public function cityMap(int $maxLookups = 12): array
     {
-        $cities = [];
-        foreach ($this->fieldCounts('city') as $row) {
-            $name = trim((string) ($row['val'] ?? ''));
-            if ($name === '') {
+        $rows = $this->db->fetchAll(
+            'SELECT COALESCE(NULLIF(TRIM(bp.value), \'\'), NULLIF(TRIM(cz.value), \'\')) AS place
+             FROM members m
+             LEFT JOIN member_field_values bp ON bp.member_id = m.id
+                AND bp.field_definition_id = (SELECT d1.id FROM member_field_definitions d1 WHERE d1.`key` = \'birth_place\' LIMIT 1)
+             LEFT JOIN member_field_values cz ON cz.member_id = m.id
+                AND cz.field_definition_id = (SELECT d2.id FROM member_field_definitions d2 WHERE d2.`key` = \'city\' LIMIT 1)'
+        );
+
+        $counts = [];
+        $foreign = 0;
+        foreach ($rows as $row) {
+            $place = $this->normalizePlaceName((string) ($row['place'] ?? ''));
+            if ($place === '') {
                 continue;
             }
-            $cities[] = ['city' => $name, 'count' => (int) $row['c']];
+            if (self::isForeignPlace($place)) {
+                $foreign++;
+                $counts['__foreign__'] = ($counts['__foreign__'] ?? 0) + 1;
+                continue;
+            }
+            $counts[$place] = ($counts[$place] ?? 0) + 1;
         }
-        usort($cities, static fn (array $a, array $b): int => ($b['count'] <=> $a['count']) ?: strcmp($a['city'], $b['city']));
-
-        $total = 0;
-        foreach ($cities as $row) {
-            $total += $row['count'];
-        }
+        arsort($counts);
+        $total = array_sum($counts);
 
         $lookups = 0;
         $located = 0;
+        $pending = 0;
+        $unresolved = 0;
         $points = [];
         $out = [];
-        foreach ($cities as $row) {
+        foreach ($counts as $place => $count) {
+            if ($place === '__foreign__') {
+                continue;
+            }
             $coords = null;
-            if ($lookups < $maxLookups) {
-                $coords = $this->geo->cityCoordinates($row['city']);
-                $lookups++;
+            // The per-request lookup budget only applies to network calls, cached places are free.
+            $known = $this->geo->hasCoordinatesEntry((string) $place);
+            if ($known || $lookups < $maxLookups) {
+                $coords = $this->geo->cityCoordinates((string) $place);
+                if (!$known) {
+                    $lookups++;
+                }
             }
             $point = ['x' => null, 'y' => null];
             if ($coords !== null) {
                 $projected = ItalyMap::project((float) $coords['lat'], (float) $coords['lon']);
                 $point = ['x' => $projected['x'], 'y' => $projected['y']];
-                $located += $row['count'];
+                $located += $count;
                 $points[] = [
-                    'city' => $row['city'],
-                    'count' => $row['count'],
+                    'city' => (string) $place,
+                    'count' => $count,
                     'x' => $projected['x'],
                     'y' => $projected['y'],
                 ];
+            } else {
+                if ($known) {
+                    $unresolved++;
+                } else {
+                    $pending++;
+                }
             }
-            $out[] = ['city' => $row['city'], 'count' => $row['count'], 'x' => $point['x'], 'y' => $point['y']];
+            $out[] = ['city' => (string) $place, 'count' => $count, 'x' => $point['x'], 'y' => $point['y']];
         }
 
         // Greedy clustering: points closer than CLUSTER_RADIUS map-percent units merge into one bubble.
@@ -273,13 +327,45 @@ final class StatisticsService
         }
         usort($clusters, static fn (array $a, array $b): int => $b['count'] <=> $a['count']);
 
+        if ($foreign > 0) {
+            $out[] = [
+                'city' => (string) __('statistics.foreign'),
+                'count' => $foreign,
+                'x' => null,
+                'y' => null,
+            ];
+        }
+
         return [
             'cities' => $out,
             'clusters' => $clusters,
             'located' => $located,
             'total' => $total,
             'max' => $clusters === [] ? 0 : (int) max(array_column($clusters, 'count')),
+            'pending' => $pending,
+            'unresolved' => $unresolved,
+            'foreign' => $foreign,
         ];
+    }
+
+    /** True when the value is a country (born abroad), not an Italian municipality. */
+    public static function isForeignPlace(string $place): bool
+    {
+        $key = mb_strtolower(trim($place));
+        return $key !== '' && isset(self::FOREIGN_PLACES[$key]);
+    }
+
+    /** Strip province suffixes/parentheses so "Bolzano (BZ)" geocodes as "Bolzano". */
+    private function normalizePlaceName(string $place): string
+    {
+        $place = trim($place);
+        if ($place === '') {
+            return '';
+        }
+        $place = (string) preg_replace('/\s*\([^)]*\)\s*/u', ' ', $place);
+        $place = (string) preg_replace('/\s*[·,]\s*[A-Z]{2}\s*$/u', '', $place);
+        $place = (string) preg_replace('/\s+/u', ' ', $place);
+        return trim($place);
     }
 
     /** @return list<array{val:string,c:int}> */
