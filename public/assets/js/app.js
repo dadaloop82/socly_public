@@ -12475,6 +12475,47 @@ function initDashboardCharts() {
   Chart.defaults.plugins.legend.labels.boxWidth = 8;
   Chart.defaults.plugins.legend.labels.padding = 16;
 
+  // Collections: one stacked segment per payment account (cash, bank, other).
+  const methodLabels = data.collections_by_method?.labels || {};
+  const methodSeries = data.collections_by_method?.series || {};
+  const methodStyles = {
+    cash: { bg: 'rgba(13, 110, 102, 0.85)', hover: brandDeep },
+    bank: { bg: 'rgba(184, 74, 27, 0.8)', hover: '#8B3A16' },
+    other: { bg: 'rgba(74, 107, 102, 0.7)', hover: '#2F4A46' },
+  };
+  const collectionDatasets = Object.keys(methodSeries)
+    .filter((key) => Array.isArray(methodSeries[key]))
+    .map((key) => {
+      const style = methodStyles[key] || methodStyles.other;
+      return {
+        type: 'bar',
+        label: methodLabels[key] || key,
+        data: methodSeries[key],
+        backgroundColor: style.bg,
+        hoverBackgroundColor: style.hover,
+        borderRadius: 6,
+        borderSkipped: false,
+        maxBarThickness: 28,
+        yAxisID: 'y',
+        stack: 'collections',
+        order: 2,
+      };
+    });
+  if (collectionDatasets.length === 0) {
+    collectionDatasets.push({
+      type: 'bar',
+      label: i18n.collected || 'Collected',
+      data: data.collections?.values || [],
+      backgroundColor: 'rgba(13, 110, 102, 0.78)',
+      hoverBackgroundColor: brandDeep,
+      borderRadius: 8,
+      borderSkipped: false,
+      maxBarThickness: 28,
+      yAxisID: 'y',
+      order: 2,
+    });
+  }
+
   const collectionsEl = document.getElementById('chart-collections');
   if (collectionsEl) {
     new Chart(collectionsEl, {
@@ -12482,18 +12523,7 @@ function initDashboardCharts() {
       data: {
         labels: data.collections?.labels || [],
         datasets: [
-          {
-            type: 'bar',
-            label: i18n.collected || 'Collected',
-            data: data.collections?.values || [],
-            backgroundColor: 'rgba(13, 110, 102, 0.78)',
-            hoverBackgroundColor: brandDeep,
-            borderRadius: 8,
-            borderSkipped: false,
-            maxBarThickness: 28,
-            yAxisID: 'y',
-            order: 2,
-          },
+          ...collectionDatasets,
           {
             type: 'line',
             label: i18n.newMembers || 'New members',
@@ -12532,16 +12562,29 @@ function initDashboardCharts() {
                 }
                 return `${label}: ${value}`;
               },
+              footer(items) {
+                const total = items.reduce((sum, item) => {
+                  if (item.dataset.yAxisID !== 'y') {
+                    return sum;
+                  }
+                  return sum + (Number(item.parsed.y) || 0);
+                }, 0);
+                return total > 0
+                  ? `${i18n.collected || 'Collected'}: ${formatMoney(total, i18n.currency || '€')}`
+                  : '';
+              },
             },
           },
         },
         scales: {
           x: {
+            stacked: true,
             grid: { display: false },
             ticks: { maxRotation: 0, autoSkipPadding: 8 },
             border: { display: false },
           },
           y: {
+            stacked: true,
             position: 'left',
             beginAtZero: true,
             grid: { color: 'rgba(13, 110, 102, 0.08)' },

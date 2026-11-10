@@ -91,6 +91,8 @@ versions without curated notes).
   `created_at`): imported members no longer pile up in the import month
 - Payments can be recorded with their real date (new “payment date” field, default today); charts and
   the first note use that date
+- Dashboard collections chart stacks each month by payment account (cash / bank / other) with
+  distinct colours; the tooltip also shows the month total
 - Fixed a crash (fatal error page) on every member page: the service binding was missing the new
   database dependency
 - Import/export/download actions use bare 80%-opacity icons with tooltips everywhere (member list,

@@ -2307,6 +2307,23 @@ final class MemberService
             $paymentsByMonth[$row['ym']] = (float) $row['total'];
         }
 
+        // Collections split by payment method (cash = cassa, bank = banca, other): the bar chart
+        // stacks them so each month shows how much came into each account.
+        $methodRows = $this->db->fetchAll(
+            "SELECT DATE_FORMAT(created_at, '%Y-%m') AS ym, method, COALESCE(SUM(amount), 0) AS total
+             FROM payments
+             WHERE created_at >= DATE_FORMAT(DATE_SUB(CURDATE(), INTERVAL 11 MONTH), '%Y-%m-01')
+             GROUP BY ym, method"
+        );
+        $methodByMonth = [];
+        foreach ($methodRows as $row) {
+            $method = (string) ($row['method'] ?? 'other');
+            if (!in_array($method, ['cash', 'bank', 'other'], true)) {
+                $method = 'other';
+            }
+            $methodByMonth[$method][(string) $row['ym']] = (float) $row['total'];
+        }
+
         // Registration date (admitted_at) is the real join date: grouping imported members by
         // created_at would pile every historic member into the import month.
         $memberRows = $this->db->fetchAll(
@@ -2351,6 +2368,27 @@ final class MemberService
             'collections' => [
                 'labels' => $collectionLabels,
                 'values' => $collectionValues,
+            ],
+            'collections_by_method' => [
+                'labels' => [
+                    'cash' => __('payments.cash'),
+                    'bank' => __('payments.bank'),
+                    'other' => __('payments.other'),
+                ],
+                'series' => [
+                    'cash' => array_map(
+                        static fn (string $ym): float => round((float) ($methodByMonth['cash'][$ym] ?? 0), 2),
+                        $months
+                    ),
+                    'bank' => array_map(
+                        static fn (string $ym): float => round((float) ($methodByMonth['bank'][$ym] ?? 0), 2),
+                        $months
+                    ),
+                    'other' => array_map(
+                        static fn (string $ym): float => round((float) ($methodByMonth['other'][$ym] ?? 0), 2),
+                        $months
+                    ),
+                ],
             ],
             'new_members' => [
                 'labels' => $collectionLabels,
