@@ -1318,9 +1318,62 @@ if (!function_exists('row_action_icon_svg')) {
             'user' => '<circle cx="12" cy="8" r="3.5"/><path d="M5 19c1.8-3.2 4-4.5 7-4.5s5.2 1.3 7 4.5"/>',
             'delete' => '<path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M10 11v6M14 11v6"/>',
             'toggle' => '<rect x="1" y="5" width="22" height="14" rx="7"/><circle cx="16" cy="12" r="3"/>',
+            'download' => '<path d="M12 3v12"/><path d="m7 10 5 5 5-5"/><path d="M4 19h16"/>',
+            'sheet' => '<rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 9h18"/><path d="M3 14h18"/><path d="M9 9v11"/>',
+            'image' => '<rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="9" cy="10" r="1.6"/><path d="m5 18 5-5 3 3 2-2 4 4"/>',
         ];
         $path = $icons[$key] ?? $icons['view'];
         return '<svg class="row-action-icon" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' . $path . '</svg>';
+    }
+}
+
+if (!function_exists('page_action_icon')) {
+    /**
+     * Page-header icon action: bare glyph (sized like the label, 80% opacity) with a tooltip,
+     * like the member-list import/export controls.
+     *
+     * @param array{
+     *   icon?:string,
+     *   label?:string,
+     *   href?:string,
+     *   target?:string,
+     *   rel?:string,
+     *   confirm?:string,
+     *   attrs?:array<string,scalar|null|bool>
+     * } $opts
+     */
+    function page_action_icon(array $opts): string
+    {
+        $href = trim((string) ($opts['href'] ?? ''));
+        if ($href === '') {
+            return '';
+        }
+        $label = trim((string) ($opts['label'] ?? ''));
+        $attributes = '';
+        if (!empty($opts['target'])) {
+            $attributes .= ' target="' . e((string) $opts['target']) . '"';
+        }
+        if (!empty($opts['rel'])) {
+            $attributes .= ' rel="' . e((string) $opts['rel']) . '"';
+        }
+        if (!empty($opts['confirm'])) {
+            $attributes .= ' data-confirm="' . e((string) $opts['confirm']) . '"';
+        }
+        foreach (($opts['attrs'] ?? []) as $name => $value) {
+            $name = (string) $name;
+            if ($name === '' || $value === null || $value === false) {
+                continue;
+            }
+            if ($value === true) {
+                $attributes .= ' ' . e($name);
+                continue;
+            }
+            $attributes .= ' ' . e($name) . '="' . e((string) $value) . '"';
+        }
+        $tooltip = $label !== '' ? ' title="' . e($label) . '" aria-label="' . e($label) . '"' : '';
+        return '<a class="btn-action-icon" href="' . e($href) . '"' . $attributes . $tooltip . '>'
+            . row_action_icon_svg((string) ($opts['icon'] ?? 'download'))
+            . '</a>';
     }
 }
 

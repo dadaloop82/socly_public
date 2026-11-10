@@ -36,7 +36,13 @@ $rowPartial = static fn (?array $row, string $sectionKey): string => view_partia
     <div class="actions budget-header-actions">
         <a class="btn btn-ghost btn-sm" href="<?= e(url('/budgets')) ?>"><?= e(__('budget.all_budgets')) ?></a>
         <a class="btn btn-ghost btn-sm" href="<?= e(url('/budgets/' . $budgetId . '/compare')) ?>"><?= e(__('budget.compare')) ?></a>
-        <a class="btn btn-ghost btn-sm" href="<?= e(url('/budgets/' . $budgetId . '/rendiconto')) ?>" target="_blank" rel="noopener"><?= e(__('budget.rendiconto_export')) ?></a>
+        <?= page_action_icon([
+            'icon' => 'file',
+            'label' => (string) __('budget.rendiconto_export'),
+            'href' => url('/budgets/' . $budgetId . '/rendiconto'),
+            'target' => '_blank',
+            'rel' => 'noopener',
+        ]) ?>
         <?php if ($canManage && !$isApproved): ?>
             <form method="post" action="<?= e(url('/budgets/' . $budgetId . '/approve')) ?>" data-confirm="<?= e(__('budget.approve_confirm')) ?>">
                 <?= csrf_field() ?>

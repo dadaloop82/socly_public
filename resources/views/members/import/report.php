@@ -67,7 +67,11 @@ $failed = (int) ($report['failed'] ?? 0);
         </div>
         <?php if ($failed > 0): ?>
             <div class="actions">
-                <a class="btn btn-ghost" href="<?= e(url('/members/import/errors')) ?>"><?= e(__('members.import.report_download')) ?></a>
+                <?= page_action_icon([
+                    'icon' => 'sheet',
+                    'label' => (string) __('members.import.report_download'),
+                    'href' => url('/members/import/errors'),
+                ]) ?>
             </div>
         <?php endif; ?>
     </header>

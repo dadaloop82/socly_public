@@ -26,7 +26,13 @@ $percentLabel = static fn (float $value): string => number_format($value, 0, ','
     </div>
     <div class="actions budget-header-actions">
         <a class="btn btn-ghost btn-sm" href="<?= e(url('/budgets/' . $budgetId)) ?>"><?= e(__('budget.open')) ?></a>
-        <a class="btn btn-ghost btn-sm" href="<?= e(url('/budgets/' . $budgetId . '/rendiconto')) ?>" target="_blank" rel="noopener"><?= e(__('budget.rendiconto_export')) ?></a>
+        <?= page_action_icon([
+            'icon' => 'file',
+            'label' => (string) __('budget.rendiconto_export'),
+            'href' => url('/budgets/' . $budgetId . '/rendiconto'),
+            'target' => '_blank',
+            'rel' => 'noopener',
+        ]) ?>
     </div>
 </div>
 

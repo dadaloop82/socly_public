@@ -35,7 +35,11 @@ $languageLabel = $language !== '' ? __('documents.language_' . $language) : '—
     <?php if (!empty($document['file_path'])): ?>
         <div class="actions" style="margin-top:1rem">
             <a class="btn" href="<?= e(url('/documents/' . $docId . '/file')) ?>" target="_blank" rel="noopener"><?= e(__('documents.open_file')) ?></a>
-            <a class="btn btn-ghost" href="<?= e(url('/documents/' . $docId . '/download')) ?>"><?= e(__('documents.download_file')) ?></a>
+            <?= page_action_icon([
+                'icon' => 'download',
+                'label' => (string) __('documents.download_file'),
+                'href' => url('/documents/' . $docId . '/download'),
+            ]) ?>
         </div>
     <?php else: ?>
         <p class="muted" style="margin-top:1rem"><?= e(__('documents.no_file')) ?></p>

@@ -231,9 +231,26 @@ $votingMembersCount = (int) ($votingMembersCount ?? 0);
             <a class="btn" href="<?= e(url('/org/people/create')) ?>"><?= e(__('org.add_person')) ?></a>
             <a class="btn btn-ghost" href="<?= e(url('/org/history')) ?>"><?= e(__('org.history_title')) ?></a>
         <?php endif; ?>
-        <a class="btn btn-ghost" href="<?= e(url('/org/export.chart')) ?>" target="_blank" rel="noopener"><?= e(__('org.export_chart')) ?></a>
-        <a class="btn btn-ghost" href="<?= e(url('/org/export.csv')) ?>"><?= e(__('org.export_csv')) ?></a>
-        <a class="btn btn-ghost" href="<?= e(url('/org/export.pdf')) ?>" target="_blank" rel="noopener"<?= $exportConfirm !== '' ? ' data-confirm="' . e($exportConfirm) . '"' : '' ?>><?= e(__('org.export_pdf')) ?></a>
+        <?= page_action_icon([
+            'icon' => 'image',
+            'label' => (string) __('org.export_chart'),
+            'href' => url('/org/export.chart'),
+            'target' => '_blank',
+            'rel' => 'noopener',
+        ]) ?>
+        <?= page_action_icon([
+            'icon' => 'sheet',
+            'label' => (string) __('org.export_csv'),
+            'href' => url('/org/export.csv'),
+        ]) ?>
+        <?= page_action_icon([
+            'icon' => 'file',
+            'label' => (string) __('org.export_pdf'),
+            'href' => url('/org/export.pdf'),
+            'target' => '_blank',
+            'rel' => 'noopener',
+            'confirm' => (string) $exportConfirm,
+        ]) ?>
     </div>
 </div>
 

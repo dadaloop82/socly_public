@@ -296,7 +296,7 @@ foreach ($documents as $doc) {
                                                 'primary' => $hasFile,
                                             ],
                                             [
-                                                'icon' => 'external',
+                                                'icon' => 'download',
                                                 'label' => __('documents.download_file'),
                                                 'show' => $hasFile,
                                                 'href' => $hasFile ? url('/documents/' . $docId . '/download') : '',

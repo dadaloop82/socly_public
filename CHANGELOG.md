@@ -84,6 +84,8 @@ versions without curated notes).
 - The registry PDF hides the fiscal code, birth and residence columns when those profile fields are
   disabled
 - The registry PDF prints the membership-card QR next to the card number when the card stores one
+- Import/export/download actions use bare 80%-opacity icons with tooltips everywhere (member list,
+  organisation chart exports, budget report, documents, import error report)
 - Anonymous telemetry counters pointed at non-existent table/column names and always reported zero
 
 ### Changed
