@@ -91,6 +91,8 @@ versions without curated notes).
 - Long configuration pages were split into macro areas with one section open at a time
 - Member detail page shows the filled membership card (same artwork as the wizard preview) under the
   sidebar panel
+- Membership card shows the QR code in the top-right corner when the card has one (detail page and
+  edit preview); the card in the member sidebar is rendered at half height with the real proportions
 - Member edit: “Save” is available on every wizard step and “Back” on the first step leaves the
   wizard, so a single change no longer requires walking through all steps; the card preview sits
   under the photo block

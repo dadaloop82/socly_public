@@ -170,6 +170,9 @@ if ($periodEndsOn !== '') {
 }
 $redirectBack = url('/members/' . (int) $member['id']);
 $hasPhoto = !empty($fields['photo']);
+// Membership-card QR: only when the card really stores a qr_code (shown top-right on the card).
+$cardQrCode = is_array($card ?? null) ? trim((string) ($card['qr_code'] ?? '')) : '';
+$cardQrSvgBadge = $cardQrCode !== '' ? \Socly\Support\QrCode::svg($cardQrCode, 3, 2, 'M') : '';
 ?>
 <div class="page-header">
     <div class="titles">
@@ -323,16 +326,19 @@ $hasPhoto = !empty($fields['photo']);
 
         <div class="member-scheda-tessera">
             <h3 class="member-scheda-side-title"><?= e(__('members.card_block')) ?></h3>
-            <?= view_partial('partials/tessera-card', [
-                'name' => $displayName !== '' ? $displayName : '#' . (string) $member['member_number'],
-                'number' => (string) $member['member_number'],
-                'role' => __('members.card_role'),
-                'type' => $typeLabel,
-                'photo_url' => $hasPhoto ? url('/members/' . (int) $member['id'] . '/photo') : '',
-                'gender' => $genderRaw === 'F' ? 'f' : 'm',
-                'logo_url' => assoc_logo_url(),
-                'live' => false,
-            ]) ?>
+            <div class="tessera-scale">
+                <?= view_partial('partials/tessera-card', [
+                    'name' => $displayName !== '' ? $displayName : '#' . (string) $member['member_number'],
+                    'number' => (string) $member['member_number'],
+                    'role' => __('members.card_role'),
+                    'type' => $typeLabel,
+                    'photo_url' => $hasPhoto ? url('/members/' . (int) $member['id'] . '/photo') : '',
+                    'gender' => $genderRaw === 'F' ? 'f' : 'm',
+                    'logo_url' => assoc_logo_url(),
+                    'qr_svg' => $cardQrSvgBadge,
+                    'live' => false,
+                ]) ?>
+            </div>
         </div>
     </aside>
 

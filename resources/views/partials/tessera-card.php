@@ -10,6 +10,7 @@
  * @var string $photo_url Member photo URL, empty when there is no photo
  * @var string $gender    m|f
  * @var string $logo_url  Association logo URL, empty to hide the watermark
+ * @var string $qr_svg    Pre-rendered QR SVG, empty to hide the badge (top-right corner)
  * @var bool   $live      Expose the data-* hooks updated live by the member wizard
  */
 
@@ -20,6 +21,7 @@ $type = trim((string) ($type ?? ''));
 $photoUrl = trim((string) ($photo_url ?? ''));
 $gender = strtolower(trim((string) ($gender ?? 'm'))) === 'f' ? 'f' : 'm';
 $logoUrl = trim((string) ($logo_url ?? ''));
+$qrSvg = trim((string) ($qr_svg ?? ''));
 $live = !empty($live);
 
 $hook = static function (string $attribute) use ($live): string {
@@ -37,6 +39,9 @@ $hook = static function (string $attribute) use ($live): string {
             <div class="tessera-brand">
                 <?= assoc_lockup_html(['class' => 'assoc-lockup-tessera']) ?: socly_mark_img('tessera-mark', 'SOCLY', 'light') ?>
             </div>
+            <?php if ($qrSvg !== ''): ?>
+                <div class="tessera-qr" aria-hidden="true"><?= $qrSvg ?></div>
+            <?php endif; ?>
         </div>
         <div class="tessera-card-main">
             <div class="tessera-photo<?= $photoUrl === '' ? ' is-empty' : '' ?>"<?= $hook('data-tessera-photo-wrap') ?>>

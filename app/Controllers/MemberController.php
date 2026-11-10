@@ -195,6 +195,7 @@ final class MemberController extends BaseController
             'hasEnrollmentArtifact' => $this->enrollment->hasArtifact((int) $id),
             'treasuryEnabled' => $this->components->isEnabled('treasury'),
             'guardianCandidates' => $this->members->guardianPickerOptions((int) $id),
+            'card' => $this->members->membershipCard((int) $id),
         ]);
     }
 

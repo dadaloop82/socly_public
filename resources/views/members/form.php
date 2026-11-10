@@ -598,6 +598,10 @@ $paymentExtraHtml = $buildProfileFieldsHtml($paymentExtraFields, \Socly\Services
             break;
         }
     }
+    $tesseraCardRow = is_array($card ?? null) ? $card : null;
+    $tesseraQrCode = trim((string) ($tesseraCardRow['qr_code'] ?? ''));
+    // QR only when the card actually stores a code (no invented payload).
+    $tesseraQrSvg = $tesseraQrCode !== '' ? \Socly\Support\QrCode::svg($tesseraQrCode, 3, 2, 'M') : '';
     $tesseraCardHtml = view_partial('partials/tessera-card', [
         'name' => $tesseraName,
         'number' => (string) old('member_number', $member['member_number'] ?? $nextNumber),
@@ -606,6 +610,7 @@ $paymentExtraHtml = $buildProfileFieldsHtml($paymentExtraFields, \Socly\Services
         'photo_url' => $tesseraPhotoSrc,
         'gender' => $tesseraPhotoGender,
         'logo_url' => assoc_logo_url(),
+        'qr_svg' => $tesseraQrSvg,
         'live' => true,
     ]);
     $tesseraPreviewHtml = '<aside class="wizard-panel-side tessera-preview" aria-hidden="true">'
