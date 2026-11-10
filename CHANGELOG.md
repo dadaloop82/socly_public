@@ -90,6 +90,13 @@ versions without curated notes).
 - First note: multi-select with bulk approve and delete, like the member list
 - First note: pagination (50 rows per page, search/filters/sort preserved) and a “select all”
   checkbox on every ledger table
+- First note: approval-status filter (all / awaiting approval / approved)
+- Approving a single movement or a bulk selection no longer reloads the page: rows update in place and
+  filters, page and scroll position are preserved
+- Membership card: larger QR, watermark anchored to the top-left corner, gender + birth month/year
+  under the name, membership type as large as the card number, member-since and expiry dates
+- Member edit: consent rows (photo release, newsletter, phone notices) render as one full-width line
+  with the checkbox on the left and a readable label
 - The registry PDF hides the fiscal code, birth and residence columns when those profile fields are
   disabled
 - The registry PDF prints the membership-card QR next to the card number when the card stores one

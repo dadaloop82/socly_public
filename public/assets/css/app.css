@@ -3928,6 +3928,27 @@ tr.clickable-row:focus-visible {
   border-radius: var(--radius-sm);
   background: color-mix(in srgb, #fff 88%, var(--brand-paper));
 }
+/* Consent rows: checkbox on the left, label filling the row (never a squeezed column). */
+.ack-optional-row.checkbox-row,
+.ack-optional-row .checkbox-row {
+  display: flex !important;
+  flex-wrap: nowrap;
+  align-items: flex-start;
+  justify-content: flex-start;
+  gap: 0.6rem;
+  width: 100%;
+}
+.ack-optional-row.checkbox-row > span,
+.ack-optional-row .checkbox-row > span {
+  flex: 1 1 auto;
+  min-width: 0;
+  white-space: normal;
+  text-align: left;
+}
+.ack-optional-row input[type="checkbox"] {
+  flex: 0 0 auto;
+  margin-top: 0.2rem;
+}
 .ack-trace {
   margin: 0.35rem 0 0;
   padding: 0.65rem 0.8rem;
@@ -5471,14 +5492,16 @@ input.is-geo-forced,
 }
 .tessera-card-mark {
   position: absolute;
-  right: -8%;
-  bottom: -18%;
+  left: -6%;
+  top: -10%;
+  right: auto;
+  bottom: auto;
   width: 78%;
   height: 92%;
   z-index: 0;
   background-image: var(--tessera-logo);
   background-repeat: no-repeat;
-  background-position: center right;
+  background-position: left top;
   background-size: contain;
   opacity: 0.18;
   filter: grayscale(0.15) contrast(1.05);
@@ -5498,10 +5521,10 @@ input.is-geo-forced,
   position: relative;
   z-index: 3;
   height: 100%;
-  padding: 0.8rem 0.85rem 0.75rem;
+  padding: 0.65rem 0.8rem 0.6rem;
   display: flex;
   flex-direction: column;
-  gap: 0.45rem;
+  gap: 0.4rem;
   color: color-mix(in srgb, var(--brand-paper) 94%, white);
 }
 .tessera-card-top {
@@ -5514,8 +5537,8 @@ input.is-geo-forced,
 /* Card QR badge: top-right, white quiet zone so it stays scannable on the brand gradient. */
 .tessera-qr {
   flex: 0 0 auto;
-  width: 3rem;
-  height: 3rem;
+  width: 3.4rem;
+  height: 3.4rem;
   padding: 2px;
   border-radius: 5px;
   margin-left: auto;
@@ -5643,13 +5666,13 @@ input.is-geo-forced,
 .tessera-meta {
   text-align: left;
   display: grid;
-  gap: 0.18rem;
+  gap: 0.1rem;
   align-content: end;
   min-width: 0;
   padding-bottom: 0.1rem;
 }
 .tessera-name {
-  font-size: 0.9rem;
+  font-size: 0.85rem;
   font-weight: 650;
   line-height: 1.2;
   opacity: 0.92;
@@ -5658,22 +5681,36 @@ input.is-geo-forced,
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
 }
+.tessera-person-meta {
+  font-size: 0.74rem;
+  font-weight: 700;
+  line-height: 1.2;
+  opacity: 0.9;
+}
 .tessera-number {
   font-family: var(--font-display);
-  font-size: 1.35rem;
+  font-size: 1.2rem;
   letter-spacing: -0.03em;
   font-weight: 700;
   line-height: 1.1;
 }
-.tessera-type {
-  font-size: 0.8rem;
-  letter-spacing: 0.01em;
+.tessera-membership {
+  font-size: 0.68rem;
+  font-weight: 600;
   line-height: 1.2;
+  opacity: 0.88;
+}
+.tessera-type {
+  font-family: var(--font-display);
+  font-size: 1.15rem;
+  letter-spacing: -0.02em;
+  font-weight: 700;
+  line-height: 1.15;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
   text-transform: none;
-  opacity: 0.95;
+  opacity: 0.98;
 }
 /* Physical card code, shown only when it differs from the member number. */
 .tessera-card-code {

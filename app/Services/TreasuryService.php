@@ -384,6 +384,12 @@ final class TreasuryService
             $params['filter_account'] = $account;
             $params['filter_account_to'] = $account;
         }
+        $approval = (string) ($filters['approval'] ?? '');
+        if ($approval === 'pending') {
+            $where[] = 'm.approved_at IS NULL';
+        } elseif ($approval === 'approved') {
+            $where[] = 'm.approved_at IS NOT NULL';
+        }
         return [$where, $params];
     }
 

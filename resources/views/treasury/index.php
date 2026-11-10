@@ -31,6 +31,7 @@ $pagerQuery = array_filter([
     'direction' => $filterDirection,
     'category' => $filterCategory,
     'account' => $filterAccount,
+    'approval' => (string) ($filters['approval'] ?? ''),
     'sort' => $sort,
     'group' => !empty($group_by_category) ? '1' : '0',
 ], static fn ($value): bool => (string) $value !== '');
@@ -209,6 +210,19 @@ foreach ($categories as $categoryOption) {
                 'invoice_desc' => (string) __('treasury.sort_invoice_desc'),
             ],
         ]) ?>
+        <?= field('select', [
+            'name' => 'approval',
+            'id' => 'treasury-approval',
+            'label' => (string) __('treasury.filter_approval'),
+            'include_empty' => false,
+            'value' => (string) ($filters['approval'] ?? ''),
+            'options' => [
+                ['value' => '', 'label' => (string) __('treasury.approval_all')],
+                ['value' => 'pending', 'label' => (string) __('treasury.approval_pending')],
+                ['value' => 'approved', 'label' => (string) __('treasury.approval_approved')],
+            ],
+            'context' => 'filter',
+        ]) ?>
         <?= field('hidden', ['name' => 'group', 'value' => '0']) ?>
         <?= field('checkbox', [
             'name' => 'group',
@@ -235,8 +249,8 @@ foreach ($categories as $categoryOption) {
     </div>
     <?php $pendingCount = (int) ($pending_count ?? 0); ?>
     <?php if ($pendingCount > 0): ?>
-        <div class="alert alert-warn treasury-pending-banner" role="status">
-            <span><?= e(__('treasury.pending_banner', ['count' => (string) $pendingCount])) ?></span>
+        <div class="alert alert-warn treasury-pending-banner" role="status" data-treasury-pending-banner>
+            <span><?= str_replace(':count', '<strong data-treasury-pending-count>' . $pendingCount . '</strong>', e(__('treasury.pending_banner', ['count' => ':count']))) ?></span>
         </div>
     <?php endif; ?>
     <?php if ($canManage): ?>
@@ -347,6 +361,7 @@ foreach ($categories as $categoryOption) {
                                 ?>
                                 <tr
                                     class="treasury-row treasury-row-<?= $isTransfer ? 'transfer' : ($isIncome ? 'income' : 'expense') ?><?= $canManage ? ' doc-row-editable' : '' ?>"
+                                    data-treasury-row="<?= $rowId ?>"
                                     <?php if ($canManage): ?>
                                         data-href="<?= e($editUrl) ?>"
                                         tabindex="0"
@@ -400,6 +415,10 @@ foreach ($categories as $categoryOption) {
                                                 'label' => __('treasury.approve'),
                                                 'show' => $canManage && $isPending,
                                                 'form_action' => url('/treasury/' . $rowId . '/approve'),
+                                                'form_attrs' => [
+                                                    'data-treasury-approve' => true,
+                                                    'data-treasury-id' => (string) $rowId,
+                                                ],
                                             ],
                                             [
                                                 'icon' => 'file',

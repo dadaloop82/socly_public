@@ -2039,6 +2039,23 @@ function initMemberWizard() {
     if (nameTarget) {
       nameTarget.textContent = [first, last].filter(Boolean).join(' ') || nameTarget.dataset.fallback || '—';
     }
+    const metaTarget = form.querySelector('[data-tessera-meta]');
+    if (metaTarget) {
+      const genderSelect = form.querySelector('[data-gender-input]');
+      const genderValue = genderSelect instanceof HTMLSelectElement || genderSelect instanceof HTMLInputElement
+        ? genderSelect.value.trim()
+        : '';
+      const birthInput = form.querySelector('input[name="fields[birth_date]"]');
+      const birthValue = birthInput instanceof HTMLInputElement ? birthInput.value.trim() : '';
+      let birthLabel = '';
+      if (birthValue !== '') {
+        const parts = birthValue.split('-');
+        if (parts.length >= 2) {
+          birthLabel = `${parts[1]}/${parts[0]}`;
+        }
+      }
+      metaTarget.textContent = [genderValue, birthLabel].filter(Boolean).join(' · ');
+    }
     if (numberTarget && numberInput) {
       numberTarget.textContent = `#${numberInput.value || '—'}`;
     }
@@ -2571,6 +2588,50 @@ function initTreasuryBulk() {
     }));
   });
 
+  const pendingBanner = root.querySelector('[data-treasury-pending-banner]');
+  const pendingCountEl = root.querySelector('[data-treasury-pending-count]');
+  const dropPending = (count = 1) => {
+    if (!pendingBanner || !pendingCountEl) return;
+    const left = Math.max(0, Number(pendingCountEl.textContent || '0') - count);
+    pendingCountEl.textContent = String(left);
+    if (left === 0) pendingBanner.remove();
+  };
+  const approveRow = (id) => {
+    const row = root.querySelector(`[data-treasury-row="${id}"]`);
+    if (!row) return;
+    row.classList.remove('is-pending');
+    row.querySelector('.treasury-pending-badge')?.remove();
+    row.querySelector('[data-treasury-approve]')?.remove();
+  };
+
+  // Approve one movement in place: no reload, filters and scroll position stay untouched.
+  root.querySelectorAll('[data-treasury-approve]').forEach((approveForm) => {
+    approveForm.addEventListener('submit', async (event) => {
+      event.preventDefault();
+      const id = approveForm.getAttribute('data-treasury-id') || '';
+      const button = approveForm.querySelector('button[type="submit"]');
+      if (button) button.disabled = true;
+      const body = new FormData(approveForm);
+      body.append('ajax', '1');
+      try {
+        const res = await fetch(approveForm.getAttribute('action') || '', {
+          method: 'POST',
+          headers: { 'X-Requested-With': 'XMLHttpRequest' },
+          body,
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok || !data.ok) {
+          if (button) button.disabled = false;
+          return;
+        }
+        approveRow(id);
+        dropPending(1);
+      } catch (err) {
+        if (button) button.disabled = false;
+      }
+    });
+  });
+
   bar.querySelectorAll('[data-treasury-bulk-action]').forEach((btn) => {
     btn.addEventListener('click', async () => {
       const ids = selectedIds();
@@ -2583,17 +2644,48 @@ function initTreasuryBulk() {
           : window.confirm(message);
         if (!ok) return;
       }
-      actionInput.value = action;
-      idHost.replaceChildren();
-      ids.forEach((id) => {
-        const input = document.createElement('input');
-        input.type = 'hidden';
-        input.name = 'movement_ids[]';
-        input.value = id;
-        idHost.appendChild(input);
-      });
-      form.hidden = false;
-      form.requestSubmit();
+      const body = new FormData(form);
+      body.set('action', action);
+      body.append('ajax', '1');
+      ids.forEach((id) => body.append('movement_ids[]', id));
+      try {
+        const res = await fetch(form.getAttribute('action') || '', {
+          method: 'POST',
+          headers: { 'X-Requested-With': 'XMLHttpRequest' },
+          body,
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok || !data.ok) {
+          throw new Error('ajax failed');
+        }
+        if (action === 'approve') {
+          ids.forEach((id) => {
+            approveRow(id);
+          });
+          dropPending(ids.length);
+        } else if (action === 'delete') {
+          ids.forEach((id) => {
+            root.querySelector(`[data-treasury-row="${id}"]`)?.remove();
+          });
+        }
+        checkboxes.forEach((cb) => {
+          cb.checked = false;
+        });
+        sync();
+      } catch (err) {
+        // Fallback: classic form submit (full reload) when AJAX is not available.
+        actionInput.value = action;
+        idHost.replaceChildren();
+        ids.forEach((id) => {
+          const input = document.createElement('input');
+          input.type = 'hidden';
+          input.name = 'movement_ids[]';
+          input.value = id;
+          idHost.appendChild(input);
+        });
+        form.hidden = false;
+        form.requestSubmit();
+      }
     });
   });
 }

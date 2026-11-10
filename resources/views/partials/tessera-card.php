@@ -6,6 +6,8 @@
  * @var string $name      Member display name
  * @var string $number    Membership-card number (= member number)
  * @var string $card_number Physical card code, shown when it differs from the member number
+ * @var string $person_meta Gender + birth month/year line ("M · 09/1965")
+ * @var string $membership_line Member since / expiry line
  * @var string $role      Localised role label ("Socio" / "Member")
  * @var string $type      Localised membership type
  * @var string $photo_url Member photo URL, empty when there is no photo
@@ -18,6 +20,8 @@
 $name = trim((string) ($name ?? ''));
 $number = trim((string) ($number ?? ''));
 $cardNumber = trim((string) ($card_number ?? ''));
+$personMeta = trim((string) ($person_meta ?? ''));
+$membershipLine = trim((string) ($membership_line ?? ''));
 $role = trim((string) ($role ?? __('members.card_role')));
 $type = trim((string) ($type ?? ''));
 $photoUrl = trim((string) ($photo_url ?? ''));
@@ -73,9 +77,15 @@ $hook = static function (string $attribute) use ($live): string {
             </div>
             <div class="tessera-meta">
                 <span class="tessera-name"<?= $hook('data-tessera-name') ?> data-fallback="<?= e(__('members.wizard_card_name')) ?>"><?= e($name !== '' ? $name : __('members.wizard_card_name')) ?></span>
+                <?php if ($personMeta !== ''): ?>
+                    <span class="tessera-person-meta"<?= $hook('data-tessera-meta') ?>><?= e($personMeta) ?></span>
+                <?php endif; ?>
                 <strong class="tessera-number"<?= $hook('data-tessera-number') ?>>#<?= e($number !== '' ? $number : '—') ?></strong>
                 <?php if ($cardNumber !== '' && $cardNumber !== $number): ?>
                     <span class="tessera-card-code"><?= e(__('members.card_number_label', ['number' => $cardNumber])) ?></span>
+                <?php endif; ?>
+                <?php if ($membershipLine !== ''): ?>
+                    <span class="tessera-membership"<?= $hook('data-tessera-membership') ?>><?= e($membershipLine) ?></span>
                 <?php endif; ?>
                 <span class="tessera-type"<?= $hook('data-tessera-type') ?> data-role="<?= e($role) ?>"><strong><?= e(trim($role . ' ' . $type)) ?></strong></span>
             </div>

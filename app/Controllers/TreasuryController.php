@@ -201,7 +201,17 @@ final class TreasuryController extends BaseController
             return;
         }
         $result = $this->treasury->approve((int) $id, $request->ip(), auth_user()['id'] ?? null);
-        if (empty($result['ok'])) {
+        $ok = !empty($result['ok']);
+        if ((string) $request->input('ajax', '') === '1') {
+            header('Content-Type: application/json; charset=utf-8');
+            echo json_encode([
+                'ok' => $ok,
+                'id' => (int) $id,
+                'message' => $ok ? (string) __('treasury.approved') : (string) ($result['message'] ?? __('validation.required')),
+            ], JSON_UNESCAPED_UNICODE);
+            return;
+        }
+        if (!$ok) {
             $this->flash('errors', [(string) ($result['message'] ?? __('validation.required'))]);
         } else {
             $this->flash('success', __('treasury.approved'));
@@ -229,18 +239,43 @@ final class TreasuryController extends BaseController
             }
         }
         if ($ids === []) {
+            if ((string) $request->input('ajax', '') === '1') {
+                header('Content-Type: application/json; charset=utf-8');
+                echo json_encode(['ok' => false, 'message' => (string) __('treasury.bulk_none')], JSON_UNESCAPED_UNICODE);
+                return;
+            }
             $this->flash('errors', ['treasury' => __('treasury.bulk_none')]);
             redirect('/treasury');
         }
         $action = (string) $request->input('action', '');
+        $isAjax = (string) $request->input('ajax', '') === '1';
         if ($action === 'approve') {
             $count = $this->treasury->approveMany(array_values($ids), $request->ip(), auth_user()['id'] ?? null);
-            $this->flash('success', __('treasury.bulk_approved', ['count' => (string) $count]));
         } elseif ($action === 'delete') {
             $count = $this->treasury->deleteMany(array_values($ids), $request->ip());
-            $this->flash('success', __('treasury.bulk_deleted', ['count' => (string) $count]));
         } else {
+            if ($isAjax) {
+                header('Content-Type: application/json; charset=utf-8');
+                echo json_encode(['ok' => false, 'message' => (string) __('validation.required')], JSON_UNESCAPED_UNICODE);
+                return;
+            }
             $this->flash('errors', ['treasury' => __('validation.required')]);
+            redirect('/treasury');
+        }
+        if ($isAjax) {
+            header('Content-Type: application/json; charset=utf-8');
+            echo json_encode([
+                'ok' => true,
+                'action' => $action,
+                'count' => $count,
+                'ids' => array_values($ids),
+            ], JSON_UNESCAPED_UNICODE);
+            return;
+        }
+        if ($action === 'approve') {
+            $this->flash('success', __('treasury.bulk_approved', ['count' => (string) $count]));
+        } else {
+            $this->flash('success', __('treasury.bulk_deleted', ['count' => (string) $count]));
         }
         redirect('/treasury');
     }
@@ -303,6 +338,10 @@ final class TreasuryController extends BaseController
         if (!in_array($period, ['month', 'year', 'days30'], true)) {
             $period = '';
         }
+        $approval = (string) $request->input('approval', '');
+        if (!in_array($approval, ['pending', 'approved'], true)) {
+            $approval = '';
+        }
         $from = $this->isoDate((string) $request->input('from', ''));
         $to = $this->isoDate((string) $request->input('to', ''));
         if ($from === '' && $to === '' && $period !== '') {
@@ -319,6 +358,7 @@ final class TreasuryController extends BaseController
             'from' => $from,
             'to' => $to,
             'period' => $period,
+            'approval' => $approval,
         ];
     }
 

@@ -602,6 +602,27 @@ $paymentExtraHtml = $buildProfileFieldsHtml($paymentExtraFields, \Socly\Services
     $tesseraQrCode = trim((string) ($tesseraCardRow['qr_code'] ?? ''));
     // QR only when the card actually stores a code (no invented payload).
     $tesseraQrSvg = $tesseraQrCode !== '' ? \Socly\Support\QrCode::svg($tesseraQrCode, 3, 2, 'M') : '';
+    $tesseraMetaBits = [];
+    if ($tesseraGenderRaw !== '') {
+        $tesseraMetaBits[] = $tesseraGenderRaw;
+    }
+    $tesseraBirthRaw = trim((string) $valFor('birth_date'));
+    if ($tesseraBirthRaw !== '') {
+        $tesseraBirthTs = strtotime($tesseraBirthRaw);
+        if ($tesseraBirthTs !== false) {
+            $tesseraMetaBits[] = date('m/Y', $tesseraBirthTs);
+        }
+    }
+    $tesseraMembershipBits = [];
+    if ($isEdit && !empty($member['admitted_at'])) {
+        $tesseraMembershipBits[] = __('members.card_since', ['date' => (string) format_date((string) $member['admitted_at'])]);
+    }
+    $tesseraExpiresOn = $isEdit
+        ? (string) ($tesseraCardRow['expires_on'] ?? ($member['period_ends_on'] ?? ''))
+        : '';
+    if ($tesseraExpiresOn !== '') {
+        $tesseraMembershipBits[] = __('members.card_until', ['date' => (string) format_date($tesseraExpiresOn)]);
+    }
     $tesseraCardHtml = view_partial('partials/tessera-card', [
         'name' => $tesseraName,
         'number' => (string) old('member_number', $member['member_number'] ?? $nextNumber),
@@ -612,6 +633,8 @@ $paymentExtraHtml = $buildProfileFieldsHtml($paymentExtraFields, \Socly\Services
         'logo_url' => assoc_logo_url(),
         'qr_svg' => $tesseraQrSvg,
         'card_number' => trim((string) ($tesseraCardRow['card_number'] ?? '')),
+        'person_meta' => implode(' · ', $tesseraMetaBits),
+        'membership_line' => implode(' · ', $tesseraMembershipBits),
         'live' => true,
     ]);
     $tesseraPreviewHtml = '<aside class="wizard-panel-side tessera-preview" aria-hidden="true">'

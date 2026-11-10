@@ -174,6 +174,26 @@ $hasPhoto = !empty($fields['photo']);
 $cardQrCode = is_array($card ?? null) ? trim((string) ($card['qr_code'] ?? '')) : '';
 $cardQrSvgBadge = $cardQrCode !== '' ? \Socly\Support\QrCode::svg($cardQrCode, 3, 2, 'M') : '';
 $cardCodeValue = is_array($card ?? null) ? trim((string) ($card['card_number'] ?? '')) : '';
+// Card identity line: gender + birth month/year, then member-since / expiry.
+$cardPersonMeta = (string) $genderRaw;
+$cardBirthRaw = trim((string) ($fields['birth_date'] ?? ''));
+if ($cardBirthRaw !== '') {
+    $cardBirthTs = strtotime($cardBirthRaw);
+    if ($cardBirthTs !== false) {
+        $cardPersonMeta = trim($cardPersonMeta . ($cardPersonMeta !== '' ? ' · ' : '') . date('m/Y', $cardBirthTs));
+    }
+}
+$cardMembershipBits = [];
+if (!empty($member['admitted_at'])) {
+    $cardMembershipBits[] = __('members.card_since', ['date' => (string) format_date((string) $member['admitted_at'])]);
+}
+$cardExpiresOn = is_array($card ?? null) && !empty($card['expires_on'])
+    ? (string) $card['expires_on']
+    : (string) ($member['period_ends_on'] ?? '');
+if ($cardExpiresOn !== '') {
+    $cardMembershipBits[] = __('members.card_until', ['date' => (string) format_date($cardExpiresOn)]);
+}
+$cardMembershipLine = implode(' · ', $cardMembershipBits);
 ?>
 <div class="page-header">
     <div class="titles">
@@ -343,6 +363,8 @@ $cardCodeValue = is_array($card ?? null) ? trim((string) ($card['card_number'] ?
                 'logo_url' => assoc_logo_url(),
                 'qr_svg' => $cardQrSvgBadge,
                 'card_number' => $cardCodeValue,
+                'person_meta' => $cardPersonMeta,
+                'membership_line' => $cardMembershipLine,
                 'live' => false,
             ]) ?>
         </div>
