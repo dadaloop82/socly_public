@@ -71,6 +71,8 @@ versions without curated notes).
 - Legal editor fills the viewport in full screen and AI translation output is bounded
 - Address lookup finds squares and “piazza” names
 - Registry export no longer flags a residence that is disabled or optional in the member profile
+- Member list warning (red triangle) now also flags a missing fiscal code or birth date — matching the
+  registry export — even when those fields are optional in the member form
 - Anonymous telemetry counters pointed at non-existent table/column names and always reported zero
 
 ### Changed

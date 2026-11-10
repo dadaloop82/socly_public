@@ -15,6 +15,14 @@ final class MemberService
     public const STEP_ACKNOWLEDGEMENTS = 'acknowledgements';
     public const STEP_PAYMENT = 'payment';
 
+    /**
+     * Identity data required by an official registry (Libro Soci). They are flagged even when
+     * the field is optional in the member form, so the list warning matches the registry export.
+     *
+     * @var list<string>
+     */
+    private const REGISTRY_IDENTITY_KEYS = ['fiscal_code', 'birth_date'];
+
     /** @return list<string> */
     public static function systemFormStepKeys(): array
     {
@@ -1354,7 +1362,8 @@ final class MemberService
             if ($key === 'privacy_ack' && !$gdprEnabled) {
                 continue;
             }
-            if ((int) ($def['is_required'] ?? 0) !== 1) {
+            // Required fields plus the registry identity data (CF, birth date) even when optional.
+            if ((int) ($def['is_required'] ?? 0) !== 1 && !in_array($key, self::REGISTRY_IDENTITY_KEYS, true)) {
                 continue;
             }
             $raw = $fields[$key] ?? null;
