@@ -10,9 +10,9 @@ every 100 patches bump the series, and each bump is published to this repository
 
 Nothing yet — entries are added here while a release is in progress.
 
-## [1.5.39] - 2026-11-10
+## [1.5.41] - 2026-11-10
 
-This entry covers everything published up to v1.5.39 (the automatic sync published intermediate
+This entry covers everything published up to v1.5.41 (the automatic sync published intermediate
 versions without curated notes).
 
 ### Added
@@ -70,6 +70,7 @@ versions without curated notes).
 - OCR binaries and the PHP CLI are detected inside an `open_basedir` cage
 - Legal editor fills the viewport in full screen and AI translation output is bounded
 - Address lookup finds squares and “piazza” names
+- Registry export no longer flags a residence that is disabled or optional in the member profile
 - Anonymous telemetry counters pointed at non-existent table/column names and always reported zero
 
 ### Changed
@@ -86,6 +87,9 @@ versions without curated notes).
 - Trial/showcase instances detect new releases without running the guided setup, and the login footer
   always shows the installed version plus the update notice
 - Long configuration pages were split into macro areas with one section open at a time
+- One placeholder avatar per gender, shared by the member page, the photo field and the membership
+  card preview (the card and the detail page no longer draw their own silhouettes)
+- Member list actions: import and export are icon buttons, “Registry” sits after the primary actions
 
 ## [1.0.0] - 2026-08-15
 
