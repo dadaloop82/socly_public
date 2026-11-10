@@ -115,6 +115,8 @@ versions without curated notes).
 - Member page: previous/next arrows to walk through the members without going back to the list
 - Membership card on the member page: association name, person name and card number are noticeably
   larger
+- Wording (IT): payment states now read **Saldato / Parzialmente saldato / Da saldare / Non saldato**
+  instead of “Pagato / Parziale / Da pagare / Non pagato”; “Importo pagato” became “Totale versato”
 - The registry PDF hides the fiscal code, birth and residence columns when those profile fields are
   disabled
 - The registry PDF prints the membership-card QR next to the card number when the card stores one
