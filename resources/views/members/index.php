@@ -211,7 +211,7 @@ $totalPages = max(1, (int) ceil(((int) $result['total']) / max(1, $perPage)));
                         <th><?= e(__('members.gdpr_column')) ?></th>
                     <?php endif; ?>
                     <?= $sortHeader('payment', (string) __('members.payment')) ?>
-                    <?= $sortHeader('balance_due', (string) __('members.balance_due')) ?>
+                    <th><?= e(__('members.situation_column')) ?></th>
                     <th><?= e(__('members.actions')) ?></th>
                 </tr>
                 </thead>
@@ -350,8 +350,55 @@ $totalPages = max(1, (int) ceil(((int) $result['total']) / max(1, $perPage)));
                             <?php endif; ?>
                         </td>
                         <?php endif; ?>
-                        <td data-label="<?= e(__('members.payment')) ?>"><span class="badge <?= $item['payment_status']==='paid'?'badge-ok':($item['payment_status']==='due'?'badge-due':'badge-warn') ?>"><?= e(__('members.payment_'.$item['payment_status'])) ?></span></td>
-                        <td data-label="<?= e(__('members.balance_due')) ?>"><?= e(number_format($balanceDue, 2, ',', '.')) ?> €</td>
+                        <?php
+                        $lastPaidAmount = $item['last_payment_amount'] ?? null;
+                        $lastPaidAt = (string) ($item['last_payment_at'] ?? '');
+                        $paymentLabel = __('members.payment_' . $item['payment_status']);
+                        if ($lastPaidAmount !== null && $lastPaidAmount !== '' && $lastPaidAt !== '') {
+                            $paymentLabel .= ' ' . __('members.payment_last_suffix', [
+                                'amount' => number_format((float) $lastPaidAmount, 2, ',', '.'),
+                                'date' => (string) format_date($lastPaidAt),
+                            ]);
+                        }
+                        ?>
+                        <td data-label="<?= e(__('members.payment')) ?>"><span class="badge <?= $item['payment_status']==='paid'?'badge-ok':($item['payment_status']==='due'?'badge-due':'badge-warn') ?>"><?= e($paymentLabel) ?></span></td>
+                        <?php
+                        // "Situazione": small anomaly column replacing the plain balance amount.
+                        $situationBadges = [];
+                        $typePrice = (float) ($item['type_price'] ?? 0);
+                        $paidTotal = (float) ($item['paid_total'] ?? 0);
+                        $creditAmount = $typePrice > 0 ? round($paidTotal - $typePrice, 2) : 0.0;
+                        if ($balanceDue > 0.009) {
+                            $situationBadges[] = [
+                                'class' => 'badge-due',
+                                'label' => __('members.situation_debt', ['amount' => number_format($balanceDue, 2, ',', '.')]),
+                            ];
+                        } elseif ($creditAmount > 0.009) {
+                            $situationBadges[] = [
+                                'class' => 'badge-ok',
+                                'label' => __('members.situation_credit', ['amount' => number_format($creditAmount, 2, ',', '.')]),
+                            ];
+                        }
+                        $periodEndSince = !empty($item['period_ends_on']) ? strtotime((string) $item['period_ends_on']) : false;
+                        if ($periodEndSince !== false
+                            && $periodEndSince < strtotime('today')
+                            && !in_array($memberStatus, ['expired', 'cancelled'], true)) {
+                            $situationBadges[] = [
+                                'class' => 'badge-warn',
+                                'label' => __('members.situation_card_expired'),
+                            ];
+                        }
+                        if ($situationBadges === []) {
+                            $situationBadges[] = ['class' => 'badge-ok', 'label' => __('members.situation_ok')];
+                        }
+                        ?>
+                        <td data-label="<?= e(__('members.situation_column')) ?>">
+                            <div class="member-situation">
+                                <?php foreach ($situationBadges as $situationBadge): ?>
+                                    <span class="badge <?= e((string) $situationBadge['class']) ?>"><?= e((string) $situationBadge['label']) ?></span>
+                                <?php endforeach; ?>
+                            </div>
+                        </td>
                         <td data-label="<?= e(__('members.actions')) ?>" data-stop-row-nav>
                             <?= row_actions([
                                 [

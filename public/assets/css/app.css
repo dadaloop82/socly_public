@@ -3011,6 +3011,67 @@ tr.clickable-row:focus-visible {
   height: 200px;
   margin-top: 0.55rem;
 }
+/* The card on the member page is the biggest one: make association and person names clearly
+   readable (minicard in the member form keeps the compact scale). */
+.member-scheda-tessera .tessera-brand .assoc-name {
+  font-size: 1.24rem;
+  letter-spacing: -0.03em;
+}
+.member-scheda-tessera .tessera-brand .assoc-legal {
+  font-size: 0.78rem;
+}
+.member-scheda-tessera .tessera-name {
+  font-size: 1.08rem;
+  line-height: 1.15;
+}
+.member-scheda-tessera .tessera-person-meta {
+  font-size: 0.8rem;
+}
+.member-scheda-tessera .tessera-number {
+  font-size: 1.4rem;
+}
+.member-scheda-tessera .tessera-membership {
+  font-size: 0.74rem;
+}
+.member-scheda-tessera .tessera-type {
+  font-size: 1.24rem;
+}
+.member-scheda-tessera .tessera-card-main {
+  grid-template-columns: 5.3rem 1fr;
+  gap: 0.65rem;
+}
+.member-scheda-tessera .tessera-photo {
+  width: 5.3rem;
+  height: 5.4rem;
+}
+.member-scheda-tessera .tessera-qr {
+  width: 3.5rem;
+  height: 3.5rem;
+}
+/* Previous/next member stepper in the member page header. */
+.member-nav {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+.member-nav-btn {
+  min-width: 2.4rem;
+  padding: 0.35rem 0.6rem;
+  font-size: 1.15rem;
+  line-height: 1;
+  justify-content: center;
+}
+.member-nav-btn[aria-disabled="true"] {
+  opacity: 0.4;
+  pointer-events: none;
+}
+/* Member list: "Situazione" badges (debt / credit / expired card / all good). */
+.member-situation {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+  align-items: center;
+}
 .member-scheda-main {
   display: grid;
   gap: 1.15rem;
@@ -5548,10 +5609,10 @@ input.is-geo-forced,
   position: relative;
   z-index: 3;
   height: 100%;
-  padding: 0.65rem 0.8rem 0.6rem;
+  padding: 0.6rem 0.78rem 0.55rem;
   display: flex;
   flex-direction: column;
-  gap: 0.4rem;
+  gap: 0.35rem;
   color: color-mix(in srgb, var(--brand-paper) 94%, white);
 }
 .tessera-card-top {
@@ -5564,8 +5625,8 @@ input.is-geo-forced,
 /* Card QR badge: top-right, white quiet zone so it stays scannable on the brand gradient. */
 .tessera-qr {
   flex: 0 0 auto;
-  width: 3.4rem;
-  height: 3.4rem;
+  width: 3.2rem;
+  height: 3.2rem;
   padding: 2px;
   border-radius: 5px;
   margin-left: auto;
@@ -5602,14 +5663,14 @@ input.is-geo-forced,
   text-overflow: ellipsis;
   white-space: nowrap;
   max-width: 100%;
-  font-size: 0.98rem;
+  font-size: 1.06rem;
   font-weight: 800;
-  line-height: 1.15;
+  line-height: 1.12;
   color: inherit;
 }
 .tessera-brand .assoc-legal {
   display: block !important;
-  font-size: 0.68rem;
+  font-size: 0.72rem;
   font-weight: 600;
   opacity: 0.78;
   line-height: 1.2;
@@ -5699,8 +5760,8 @@ input.is-geo-forced,
   padding-bottom: 0.1rem;
 }
 .tessera-name {
-  font-size: 0.85rem;
-  font-weight: 650;
+  font-size: 0.94rem;
+  font-weight: 700;
   line-height: 1.2;
   opacity: 0.92;
   overflow: hidden;
@@ -5709,20 +5770,20 @@ input.is-geo-forced,
   -webkit-box-orient: vertical;
 }
 .tessera-person-meta {
-  font-size: 0.74rem;
+  font-size: 0.76rem;
   font-weight: 700;
   line-height: 1.2;
   opacity: 0.9;
 }
 .tessera-number {
   font-family: var(--font-display);
-  font-size: 1.2rem;
+  font-size: 1.28rem;
   letter-spacing: -0.03em;
   font-weight: 700;
   line-height: 1.1;
 }
 .tessera-membership {
-  font-size: 0.68rem;
+  font-size: 0.7rem;
   font-weight: 600;
   line-height: 1.2;
   opacity: 0.88;

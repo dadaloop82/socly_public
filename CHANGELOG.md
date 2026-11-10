@@ -109,6 +109,12 @@ versions without curated notes).
   above zero
 - Dashboard chart: income still awaiting approval is drawn as a grey translucent segment (chart only,
   never in balances or totals)
+- Member list: the payment badge now shows when and how much was paid last
+  (`Paid (50.00 € on 09/11/2026)`); the “Balance due” column became **Standing**, flagging the
+  outstanding balance, a credit, an expired card or “all good”
+- Member page: previous/next arrows to walk through the members without going back to the list
+- Membership card on the member page: association name, person name and card number are noticeably
+  larger
 - The registry PDF hides the fiscal code, birth and residence columns when those profile fields are
   disabled
 - The registry PDF prints the membership-card QR next to the card number when the card stores one

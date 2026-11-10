@@ -1289,7 +1289,12 @@ final class MemberService
         $offset = max(0, ($page - 1) * $perPage);
         $items = $this->db->fetchAll(
             "SELECT m.*, mt.name_json AS type_name_json, mt.price AS type_price,
-                    mp.label AS period_label, mp.ends_on AS period_ends_on
+                    mp.label AS period_label, mp.ends_on AS period_ends_on,
+                    (SELECT p.amount FROM payments p WHERE p.member_id = m.id
+                     ORDER BY p.created_at DESC, p.id DESC LIMIT 1) AS last_payment_amount,
+                    (SELECT p.created_at FROM payments p WHERE p.member_id = m.id
+                     ORDER BY p.created_at DESC, p.id DESC LIMIT 1) AS last_payment_at,
+                    (SELECT COALESCE(SUM(p.amount), 0) FROM payments p WHERE p.member_id = m.id) AS paid_total
              FROM members m
              INNER JOIN member_types mt ON mt.id = m.member_type_id
              INNER JOIN membership_periods mp ON mp.id = m.membership_period_id
@@ -2488,6 +2493,35 @@ final class MemberService
              ORDER BY last_name ASC, first_name ASC, m.id ASC
              LIMIT 500"
         );
+    }
+
+    /** Previous/next member in the default list order (member number, then id). */
+    public function adjacentMembers(int $id): array
+    {
+        $current = $this->db->fetch('SELECT id, member_number FROM members WHERE id = :id', ['id' => $id]);
+        if ($current === null) {
+            return ['prev' => null, 'next' => null];
+        }
+        $number = (string) ($current['member_number'] ?? '');
+        $row = $this->db->fetch(
+            'SELECT
+                (SELECT m2.id FROM members m2
+                 WHERE (CAST(m2.member_number AS UNSIGNED), m2.id) < (CAST(:num_prev AS UNSIGNED), :id_prev)
+                 ORDER BY CAST(m2.member_number AS UNSIGNED) DESC, m2.id DESC LIMIT 1) AS prev_id,
+                (SELECT m3.id FROM members m3
+                 WHERE (CAST(m3.member_number AS UNSIGNED), m3.id) > (CAST(:num_next AS UNSIGNED), :id_next)
+                 ORDER BY CAST(m3.member_number AS UNSIGNED) ASC, m3.id ASC LIMIT 1) AS next_id',
+            [
+                'num_prev' => $number,
+                'id_prev' => $id,
+                'num_next' => $number,
+                'id_next' => $id,
+            ]
+        );
+        return [
+            'prev' => isset($row['prev_id']) ? (int) $row['prev_id'] : null,
+            'next' => isset($row['next_id']) ? (int) $row['next_id'] : null,
+        ];
     }
 
     /**

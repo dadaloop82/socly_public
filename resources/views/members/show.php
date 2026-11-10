@@ -194,6 +194,8 @@ if ($cardExpiresOn !== '') {
     $cardMembershipBits[] = __('members.card_until', ['date' => (string) format_date($cardExpiresOn)]);
 }
 $cardMembershipLine = implode(' · ', $cardMembershipBits);
+$prevMemberId = isset($adjacentMembers['prev']) ? (int) $adjacentMembers['prev'] : 0;
+$nextMemberId = isset($adjacentMembers['next']) ? (int) $adjacentMembers['next'] : 0;
 ?>
 <div class="page-header">
     <div class="titles">
@@ -201,6 +203,18 @@ $cardMembershipLine = implode(' · ', $cardMembershipBits);
         <p class="page-lede"><?= e($displayName !== '' ? $displayName : __('members.show_lede')) ?></p>
     </div>
     <div class="actions">
+        <div class="member-nav" role="group" aria-label="<?= e(__('members.nav_label')) ?>">
+            <?php if ($prevMemberId > 0): ?>
+                <a class="btn btn-ghost btn-sm member-nav-btn" href="<?= e(url('/members/' . $prevMemberId)) ?>" title="<?= e(__('members.nav_prev')) ?>" aria-label="<?= e(__('members.nav_prev')) ?>">‹</a>
+            <?php else: ?>
+                <span class="btn btn-ghost btn-sm member-nav-btn" aria-disabled="true" title="<?= e(__('members.nav_first')) ?>">‹</span>
+            <?php endif; ?>
+            <?php if ($nextMemberId > 0): ?>
+                <a class="btn btn-ghost btn-sm member-nav-btn" href="<?= e(url('/members/' . $nextMemberId)) ?>" title="<?= e(__('members.nav_next')) ?>" aria-label="<?= e(__('members.nav_next')) ?>">›</a>
+            <?php else: ?>
+                <span class="btn btn-ghost btn-sm member-nav-btn" aria-disabled="true" title="<?= e(__('members.nav_last')) ?>">›</span>
+            <?php endif; ?>
+        </div>
         <?php if ($canManage): ?>
             <a class="btn" href="<?= e(url('/members/'.$member['id'].'/edit')) ?>"><?= e(__('members.edit')) ?></a>
         <?php endif; ?>

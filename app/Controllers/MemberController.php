@@ -168,6 +168,7 @@ final class MemberController extends BaseController
             'enrollmentArtifact' => $this->enrollment->latestArtifact((int) $id),
             'needsGuardian' => $this->members->memberNeedsGuardian($member),
             'autoFixPlan' => $this->members->autoFixPlan($member),
+            'adjacentMembers' => $this->members->adjacentMembers((int) $id),
         ]);
     }
 
