@@ -139,13 +139,25 @@ $generatedAt = $generatedAt !== '' ? $generatedAt : date('d/m/Y H:i');
         }
         th { background: #ececec; text-align: left; font-weight: 700; }
         .col-prog { width: 4.2%; }
-        .col-card { width: 6.5%; }
+        .col-card { width: 9%; }
         .col-member { width: 20%; }
         .col-birth { width: 15%; }
         .col-res { width: 20%; }
         .col-adm { width: 16%; }
         .col-type { width: 18.3%; }
         .cell-stack { display: block; }
+        /* Card QR: printed at 9mm so it stays scannable on paper. */
+        .cell-qr {
+          display: block;
+          width: 9mm;
+          height: 9mm;
+          margin: 0 0 1mm;
+        }
+        .cell-qr svg {
+          width: 100%;
+          height: 100%;
+          display: block;
+        }
         .cell-muted {
           display: block;
           margin-top: 0.15rem;
@@ -278,10 +290,18 @@ $generatedAt = $generatedAt !== '' ? $generatedAt : date('d/m/Y H:i');
                 $residence = trim((string) ($row['residence'] ?? ''));
                 $applied = trim((string) ($row['applied_at'] ?? ''));
                 $admitted = trim((string) ($row['admitted_at'] ?? ''));
+                // Card QR: only when the membership card actually stores a code.
+                $qrPayload = trim((string) ($row['qr_code'] ?? ''));
+                $qrSvg = $qrPayload !== '' ? \Socly\Support\QrCode::svg($qrPayload, 1, 1, 'L') : '';
                 ?>
                 <tr<?= empty($row['missing']) ? '' : ' class="row-incomplete" title="' . e(implode(', ', (array) $row['missing'])) . '"' ?>>
                     <td><?= (int) ($row['progressive'] ?? 0) ?></td>
-                    <td><?= e((string) ($row['member_number'] ?? '')) ?></td>
+                    <td>
+                        <?php if ($qrSvg !== ''): ?>
+                            <span class="cell-qr" aria-hidden="true"><?= $qrSvg ?></span>
+                        <?php endif; ?>
+                        <span class="cell-stack"><?= e((string) ($row['member_number'] ?? '')) ?></span>
+                    </td>
                     <td>
                         <span class="cell-stack"><?= e($fullName !== '' ? $fullName : '—') ?></span>
                         <?php if ($showFiscalCode && $fiscal !== ''): ?>

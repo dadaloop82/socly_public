@@ -4,13 +4,15 @@ declare(strict_types=1);
 
 namespace Socly\Services;
 
+use Socly\Core\Database;
 use Socly\Setup\AssociationLegalForms;
 
 final class MemberRegistryService
 {
     public function __construct(
         private readonly SettingsService $settings,
-        private readonly MemberService $members
+        private readonly MemberService $members,
+        private readonly Database $db
     ) {
     }
 
@@ -22,6 +24,38 @@ final class MemberRegistryService
         $items = $result['items'];
         if ($items === []) {
             return null;
+        }
+
+        // Membership cards (the PDF shows the card QR when the card actually stores one).
+        $cardMap = [];
+        $memberIds = [];
+        foreach ($items as $item) {
+            $mid = (int) ($item['id'] ?? 0);
+            if ($mid > 0) {
+                $memberIds[$mid] = true;
+            }
+        }
+        if ($memberIds !== []) {
+            $params = [];
+            $placeholders = [];
+            $i = 0;
+            foreach (array_keys($memberIds) as $mid) {
+                $key = 'cm' . $i++;
+                $placeholders[] = ':' . $key;
+                $params[$key] = $mid;
+            }
+            $cards = $this->db->fetchAll(
+                'SELECT member_id, card_number, qr_code FROM membership_cards'
+                . ' WHERE member_id IN (' . implode(',', $placeholders) . ')'
+                . ' ORDER BY is_active DESC, id DESC',
+                $params
+            );
+            foreach ($cards as $card) {
+                $mid = (int) ($card['member_id'] ?? 0);
+                if ($mid > 0 && !isset($cardMap[$mid])) {
+                    $cardMap[$mid] = $card;
+                }
+            }
         }
 
         $rows = [];
@@ -73,6 +107,7 @@ final class MemberRegistryService
             $row = [
                 'progressive' => $n++,
                 'member_number' => (string) ($item['member_number'] ?? ''),
+                'qr_code' => trim((string) ($cardMap[(int) ($item['id'] ?? 0)]['qr_code'] ?? '')),
                 'last_name' => trim((string) ($fields['last_name'] ?? '')),
                 'first_name' => trim((string) ($fields['first_name'] ?? '')),
                 'fiscal_code' => trim((string) ($fields['fiscal_code'] ?? $fields['tax_code'] ?? '')),

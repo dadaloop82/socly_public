@@ -467,6 +467,8 @@ final class MemberController extends BaseController
     public function exportRegistry(Request $request): void
     {
         $this->guardMembers();
+        // One SVG QR per member: allow the page to finish on large registries.
+        @set_time_limit(120);
         $filters = [
             'q' => (string) $request->input('q', ''),
             'status' => (string) $request->input('status', ''),
