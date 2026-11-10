@@ -103,16 +103,9 @@ final class UpdateService
      */
     public function check(bool $force = false): array
     {
-        if (function_exists('is_temporary_instance') && is_temporary_instance()) {
-            $current = $this->currentVersion();
-            $result = $this->baseResult($current, $current, false);
-            $result['source'] = 'demo';
-            $result['install_available'] = false;
-
-            return $this->finalizeResult($result);
-        }
-
         $cacheFile = storage_path('cache/update_check.json');
+
+        // Risposta in cache (vale anche per le istanze di prova).
         if (!$force && is_file($cacheFile)) {
             $cached = json_decode((string) file_get_contents($cacheFile), true);
             if (is_array($cached) && (($cached['checked_at'] ?? 0) + self::CACHE_TTL) > time()) {
@@ -123,6 +116,36 @@ final class UpdateService
                     return $this->finalizeResult($cached);
                 }
             }
+        }
+
+        if (function_exists('is_temporary_instance') && is_temporary_instance()) {
+            $current = $this->currentVersion();
+            $result = $this->baseResult($current, $current, false);
+            $result['source'] = 'demo';
+            $result['install_available'] = false;
+
+            // Un'istanza di prova non si aggiorna da sola, ma deve comunque
+            // accorgersi se esiste una versione pubblica più recente.
+            if ($this->notifyEnabled()) {
+                try {
+                    $manifest = $this->fetchManifest();
+                    $public = trim((string) ($manifest['version'] ?? ''));
+                    if ($public !== '') {
+                        $result['public_version'] = $public;
+                        $result['remote'] = $public;
+                        $result['available'] = $this->isNewer($public, $current);
+                    }
+                    $result['notes_url'] = (string) ($manifest['notes_url'] ?? '');
+                    $result['download_url'] = (string) ($manifest['download_url'] ?? '');
+                    $result['install_guide_url'] = (string) ($manifest['install_guide_url'] ?? '');
+                    $result['released_at'] = (string) ($manifest['released_at'] ?? '');
+                    $result['repository_url'] = (string) ($manifest['repository_url'] ?? '');
+                } catch (\Throwable) {
+                    // Nessuna rete/manifest: resta "nessun aggiornamento".
+                }
+            }
+
+            return $this->writeCache($cacheFile, $this->finalizeResult($result));
         }
 
         $current = $this->currentVersion();

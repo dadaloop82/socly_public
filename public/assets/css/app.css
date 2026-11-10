@@ -3104,7 +3104,40 @@ tr.clickable-row:focus-visible {
 .detail-item .value { font-size: 1.02rem; }
 
 /* —— Auth shell —— */
-.auth-shell { min-height: 100vh; min-height: 100dvh; display: grid; grid-template-rows: 1fr auto; }
+.auth-shell {
+  min-height: 100vh;
+  min-height: 100dvh;
+  display: grid;
+  /* Il footer non deve mai finire sotto la piega: la riga del contenuto
+     può restringersi e scorrere al suo interno. */
+  grid-template-rows: minmax(0, 1fr) auto;
+}
+/* Cintura di sicurezza: il footer resta agganciato in basso anche quando
+   il contenuto è più alto della finestra (es. widget news molto lungo). */
+.auth-footer {
+  position: sticky;
+  bottom: 0;
+  z-index: 30;
+}
+@media (min-width: 901px) {
+  .auth-shell {
+    height: 100vh;
+    height: 100dvh;
+    overflow: hidden;
+  }
+  .auth-main {
+    overflow: hidden;
+  }
+  .auth-brand {
+    min-height: 0;
+    overflow-x: hidden;
+    overflow-y: auto;
+  }
+  .auth-panel {
+    min-height: 0;
+    overflow-y: auto;
+  }
+}
 .auth-main {
   display: grid;
   /* Focus on the login form (right): brand column stays supporting. */
