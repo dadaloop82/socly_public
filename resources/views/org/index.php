@@ -7,12 +7,14 @@
  * @var bool $canEdit
  * @var list<array> $customOrgans
  * @var int $votingMembersCount
+ * @var list<array{id:int,name:string,count:int,members:list<array{id:int,name:string,number:string}>,more:int}> $assemblyTypes
  * @var int $exportIncompleteCount
  */
 $canEdit = !empty($canEdit);
 $assocLegalCode = strtoupper(trim((string) ($assocLegalCode ?? '')));
 $assocLegalLabel = trim((string) ($assocLegalLabel ?? ''));
 $hasLogo = assoc_logo_url() !== null;
+$assemblyTypes = is_array($assemblyTypes ?? null) ? $assemblyTypes : [];
 $exportIncompleteCount = (int) ($exportIncompleteCount ?? 0);
 $exportConfirm = $exportIncompleteCount > 0
     ? (string) __('org.export_missing_confirm', ['count' => (string) $exportIncompleteCount])
@@ -287,6 +289,39 @@ $votingMembersCount = (int) ($votingMembersCount ?? 0);
                     <p class="org-node-meta muted"><?= e(__('org.voting_members_empty')) ?></p>
                 <?php endif; ?>
             </article>
+            <?php if ($assemblyTypes !== []): ?>
+                <div class="org-assembly-types">
+                    <p class="org-assembly-types-title"><?= e(__('org.assembly_types_title')) ?></p>
+                    <div class="org-assembly-types-grid">
+                        <?php foreach ($assemblyTypes as $typeItem): ?>
+                            <?php
+                            $typeUrl = url('/members?member_type_id=' . (int) $typeItem['id']);
+                            $typeName = (string) ($typeItem['name'] ?? '');
+                            ?>
+                            <article class="org-type-card">
+                                <a class="org-type-card-head" href="<?= e($typeUrl) ?>" title="<?= e(__('org.type_view_members', ['type' => $typeName])) ?>">
+                                    <span class="org-type-name"><?= e($typeName) ?></span>
+                                    <span class="org-type-count"><?= e((string) (int) $typeItem['count']) ?></span>
+                                </a>
+                                <?php if ($typeItem['members'] !== []): ?>
+                                    <ul class="org-type-list">
+                                        <?php foreach ($typeItem['members'] as $typeMember): ?>
+                                            <li>
+                                                <a href="<?= e(url('/members/' . (int) $typeMember['id'])) ?>"><?= e((string) $typeMember['name']) ?></a>
+                                            </li>
+                                        <?php endforeach; ?>
+                                    </ul>
+                                <?php endif; ?>
+                                <?php if ((int) $typeItem['more'] > 0): ?>
+                                    <p class="org-type-more">
+                                        <a href="<?= e($typeUrl) ?>"><?= e(__('org.type_more', ['count' => (string) (int) $typeItem['more']])) ?></a>
+                                    </p>
+                                <?php endif; ?>
+                            </article>
+                        <?php endforeach; ?>
+                    </div>
+                </div>
+            <?php endif; ?>
         </div>
 
         <div class="org-spine" aria-hidden="true"></div>

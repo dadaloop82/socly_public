@@ -3917,6 +3917,7 @@ function initLogoFilePickers(scope = document) {
         img.removeAttribute('src');
       }
       removeBtn?.setAttribute('hidden', '');
+      root.querySelector('[data-logo-remove-row]')?.setAttribute('hidden', '');
     };
 
     const showPreview = (url) => {
@@ -3929,6 +3930,7 @@ function initLogoFilePickers(scope = document) {
         preview.hidden = false;
         preview.classList.remove('is-loading');
         removeBtn?.removeAttribute('hidden');
+        root.querySelector('[data-logo-remove-row]')?.removeAttribute('hidden');
       };
       img.onerror = () => {
         preview.classList.remove('is-loading');
@@ -4298,6 +4300,11 @@ function initSettingsAutosave(scope = document) {
       window.clearTimeout(timer);
       setStatus('busy', busyMsg);
       const fd = new FormData(form);
+      // The logo has its own uploader (progress + preview + inline errors): keep
+      // it out of the autosave payload so the file is not sent twice.
+      if (form.querySelector('[data-setup-logo][data-logo-upload-url]')) {
+        fd.delete('logo');
+      }
       try {
         const res = await fetch(form.action, {
           method: 'POST',
@@ -10150,7 +10157,12 @@ function dismissFlashAlert(alertEl) {
 }
 
 function initFlashDismiss() {
-  document.querySelectorAll('[data-flash-success]').forEach((alertEl) => {
+  document.querySelectorAll('[data-flash-success], .alert-error').forEach((alertEl) => {
+    // After a save we redirect to a section anchor (e.g. /settings#general): the
+    // browser jumps past the banner, so keep it pinned while the user scrolls.
+    if (window.location.hash !== '') {
+      alertEl.classList.add('alert--pinned');
+    }
     const dismissBtn = alertEl.querySelector('.alert-dismiss');
     dismissBtn?.addEventListener('click', () => dismissFlashAlert(alertEl));
     const ms = Number.parseInt(String(alertEl.getAttribute('data-auto-dismiss-ms') || ''), 10);

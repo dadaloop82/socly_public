@@ -2162,6 +2162,64 @@ final class MemberService
     }
 
     /**
+     * Active members grouped by membership type, capped per type so the org
+     * chart can show “e altri N” instead of listing everybody.
+     *
+     * @return list<array{id:int,name:string,count:int,members:list<array{id:int,name:string,number:string}>,more:int}>
+     */
+    public function membersByType(int $limitPerType = 6): array
+    {
+        $limitPerType = max(1, $limitPerType);
+        $counts = [];
+        foreach ($this->db->fetchAll(
+            "SELECT member_type_id, COUNT(*) AS c FROM members WHERE status = 'active' GROUP BY member_type_id"
+        ) as $row) {
+            $counts[(int) ($row['member_type_id'] ?? 0)] = (int) ($row['c'] ?? 0);
+        }
+        $out = [];
+        foreach ($this->types(true) as $type) {
+            $typeId = (int) ($type['id'] ?? 0);
+            $count = $counts[$typeId] ?? 0;
+            if ($typeId < 1 || $count < 1) {
+                continue;
+            }
+            $rows = $this->db->fetchAll(
+                "SELECT m.id, m.member_number,
+                        COALESCE(MAX(CASE WHEN d.`key` = 'first_name' THEN v.value END), '') AS first_name,
+                        COALESCE(MAX(CASE WHEN d.`key` = 'last_name' THEN v.value END), '') AS last_name
+                 FROM members m
+                 LEFT JOIN member_field_values v ON v.member_id = m.id
+                 LEFT JOIN member_field_definitions d ON d.id = v.field_definition_id
+                 WHERE m.status = 'active' AND m.member_type_id = :tid
+                 GROUP BY m.id, m.member_number
+                 ORDER BY last_name ASC, first_name ASC, m.id ASC
+                 LIMIT {$limitPerType}",
+                ['tid' => $typeId]
+            );
+            $members = [];
+            foreach ($rows as $row) {
+                $first = trim((string) ($row['first_name'] ?? ''));
+                $last = trim((string) ($row['last_name'] ?? ''));
+                $name = trim($last . ' ' . $first);
+                $number = trim((string) ($row['member_number'] ?? ''));
+                $members[] = [
+                    'id' => (int) ($row['id'] ?? 0),
+                    'name' => $name !== '' ? $name : ($number !== '' ? $number : '—'),
+                    'number' => $number,
+                ];
+            }
+            $out[] = [
+                'id' => $typeId,
+                'name' => localized($type['name_json'] ?? null),
+                'count' => $count,
+                'members' => $members,
+                'more' => max(0, $count - count($members)),
+            ];
+        }
+        return $out;
+    }
+
+    /**
      * @return array{ok:bool,message?:string}
      */
     public function orgEligibility(int $memberId): array

@@ -295,23 +295,31 @@
                 ]) ?>
             </div>
         </div>
-        <div class="setup-logo settings-logo-block" data-setup-logo>
+        <div class="setup-logo settings-logo-block" data-setup-logo
+             data-logo-upload-url="<?= e(url('/settings/logo')) ?>"
+             data-csrf="<?= e(csrf_token()) ?>"
+             data-msg-fail="<?= e(__('setup.logo_error_upload')) ?>"
+             data-msg-uploading="<?= e(__('setup.logo_uploading')) ?>"
+             data-msg-logo-user-badge="<?= e(__('setup.logo_source_user_badge')) ?>"
+             data-msg-logo-user-hint="<?= e(__('setup.logo_source_user_hint')) ?>">
             <?php $settingsLogo = assoc_logo_url(); ?>
             <?php if ($settingsLogo): ?>
                 <div class="setup-logo-preview" data-setup-logo-preview>
                     <img src="<?= e($settingsLogo) ?>" alt="<?= e(__('setup.field_logo')) ?>" data-setup-logo-img>
                 </div>
+            <?php else: ?>
+                <div class="setup-logo-preview" data-setup-logo-preview hidden>
+                    <img alt="<?= e(__('setup.field_logo')) ?>" data-setup-logo-img hidden>
+                </div>
+            <?php endif; ?>
+            <div class="setup-logo-remove-row" data-logo-remove-row<?= $settingsLogo ? '' : ' hidden' ?>>
                 <?= field('checkbox', [
                     'name' => 'remove_logo',
                     'label' => (string) __('setup.logo_remove'),
                     'context' => 'setup',
                     'label_class' => 'checkbox-row setup-check',
                 ]) ?>
-            <?php else: ?>
-                <div class="setup-logo-preview" data-setup-logo-preview hidden>
-                    <img alt="<?= e(__('setup.field_logo')) ?>" data-setup-logo-img hidden>
-                </div>
-            <?php endif; ?>
+            </div>
             <div class="setup-logo-actions">
                 <?= field('file', [
                     'name' => 'logo',
@@ -326,6 +334,7 @@
             <div class="setup-logo-upload-progress" data-setup-logo-progress hidden>
                 <span class="setup-logo-upload-progress-bar" data-setup-logo-progress-bar style="--progress: 0%"></span>
             </div>
+            <p class="setup-logo-status setup-hint" data-setup-logo-status hidden></p>
             <p class="setup-hint muted"><?= e(__('setup.logo_hint')) ?></p>
         </div>
         <?php $paletteOptions = app(\Socly\Services\BrandingService::class)->paletteSuggestions(); ?>

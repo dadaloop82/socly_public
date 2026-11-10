@@ -7,7 +7,10 @@ namespace Socly\Services;
 final class BrandingService
 {
     private const MAX_LOGO_BYTES = 3 * 1024 * 1024;
+    /** Lato più lungo minimo: i loghi orizzontali (es. 600×80) sono normali. */
     private const MIN_LOGO_PX = 100;
+    /** Lato più corto minimo, solo per scartare immagini degeneri (righe di 1 px). */
+    private const MIN_LOGO_SHORT_PX = 20;
     /** @var list<string> */
     private const ALLOWED_MIMES = ['image/jpeg', 'image/png', 'image/webp', 'image/gif', 'image/svg+xml'];
 
@@ -116,6 +119,28 @@ final class BrandingService
             return ['ok' => false, 'error' => $error];
         }
         return $this->persistLogoFromPath((string) $file['tmp_name'], $replace);
+    }
+
+    /**
+     * Deletes the stored logo (file + settings) and lets the website scan
+     * propose one again.
+     *
+     * @return array{ok:bool,removed:bool}
+     */
+    public function removeLogo(): array
+    {
+        $relative = $this->logoRelativePath();
+        $removed = false;
+        if ($relative !== '') {
+            $absolute = resolve_upload_absolute_path($relative);
+            if ($absolute !== null && is_file($absolute)) {
+                $removed = @unlink($absolute);
+            }
+            $this->settings->set('branding.logo', '');
+            $this->settings->set('branding.logo_source', '');
+            $this->settings->set('branding.logo_configured', '0');
+        }
+        return ['ok' => true, 'removed' => $removed];
     }
 
     /** @return array{ok:bool,path?:string,error?:string} */
@@ -335,15 +360,15 @@ final class BrandingService
     private function validateLogoFile(array $file): ?string
     {
         if (($file['error'] ?? UPLOAD_ERR_OK) !== UPLOAD_ERR_OK) {
-            return __('validation.photo');
+            return __('setup.logo_error_upload');
         }
         if (($file['size'] ?? 0) > self::MAX_LOGO_BYTES) {
-            return __('validation.photo');
+            return __('setup.logo_error_size');
         }
         $finfo = new \finfo(FILEINFO_MIME_TYPE);
         $mime = $finfo->file($file['tmp_name']) ?: '';
         if (!in_array($mime, self::ALLOWED_MIMES, true)) {
-            return __('validation.photo');
+            return __('setup.logo_error_format');
         }
         return null;
     }
@@ -352,7 +377,7 @@ final class BrandingService
     private function persistLogoFromPath(string $sourcePath, bool $replace): array
     {
         if (!is_file($sourcePath)) {
-            return ['ok' => false, 'error' => __('validation.photo')];
+            return ['ok' => false, 'error' => __('setup.logo_error_upload')];
         }
         $finfo = new \finfo(FILEINFO_MIME_TYPE);
         $mime = $finfo->file($sourcePath) ?: '';
@@ -365,19 +390,20 @@ final class BrandingService
             default => null,
         };
         if ($ext === null) {
-            return ['ok' => false, 'error' => __('validation.photo')];
+            return ['ok' => false, 'error' => __('setup.logo_error_format')];
         }
 
         if ($ext !== 'svg') {
             $raw = @file_get_contents($sourcePath);
             if ($raw === false) {
-                return ['ok' => false, 'error' => __('validation.photo')];
+                return ['ok' => false, 'error' => __('setup.logo_error_upload')];
             }
             $info = @getimagesizefromstring($raw);
             $width = is_array($info) ? (int) ($info[0] ?? 0) : 0;
             $height = is_array($info) ? (int) ($info[1] ?? 0) : 0;
-            if ($width < self::MIN_LOGO_PX || $height < self::MIN_LOGO_PX) {
-                return ['ok' => false, 'error' => __('validation.photo')];
+            // Un logo può essere orizzontale o verticale: conta il lato lungo.
+            if (max($width, $height) < self::MIN_LOGO_PX || min($width, $height) < self::MIN_LOGO_SHORT_PX) {
+                return ['ok' => false, 'error' => __('setup.logo_error_small')];
             }
         }
 
@@ -392,7 +418,7 @@ final class BrandingService
         }
 
         if (!@copy($sourcePath, $absolute)) {
-            return ['ok' => false, 'error' => __('validation.photo')];
+            return ['ok' => false, 'error' => __('setup.logo_error_store')];
         }
         @chmod($absolute, 0644);
         $this->settings->set('branding.logo', $relative);

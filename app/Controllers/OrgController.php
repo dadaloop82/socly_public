@@ -55,6 +55,7 @@ final class OrgController extends BaseController
             'assocLegalLabel' => $legal['label'],
             'canEdit' => $this->canEditOrg(),
             'votingMembersCount' => (int) ($this->members->dashboardStats()['members_active'] ?? 0),
+            'assemblyTypes' => $this->members->membersByType(6),
             'exportIncompleteCount' => count($incompleteOfficers),
         ]);
     }
