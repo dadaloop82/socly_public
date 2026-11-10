@@ -1456,6 +1456,7 @@ return [
         'field_logo' => 'Logo',
         'logo_upload' => 'Logo hochladen',
         'logo_uploading' => 'Logo wird hochgeladen…',
+        'logo_saved' => 'Logo aktualisiert: jetzt in der ganzen App aktiv.',
         'logo_remove' => 'Aktuelles Logo entfernen',
         'logo_empty' => 'Kein Logo hochgeladen',
         'logo_no_file' => 'Keine Datei ausgewählt',

@@ -1460,6 +1460,7 @@ return [
         'field_logo' => 'Logo',
         'logo_upload' => 'Carica logo',
         'logo_uploading' => 'Caricamento logo…',
+        'logo_saved' => 'Logo aggiornato: ora è attivo in tutta l’app.',
         'logo_remove' => 'Rimuovi logo attuale',
         'logo_empty' => 'Nessun logo caricato',
         'logo_no_file' => 'Nessun file selezionato',

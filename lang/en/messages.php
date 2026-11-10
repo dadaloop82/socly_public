@@ -1458,6 +1458,7 @@ return [
         'field_logo' => 'Logo',
         'logo_upload' => 'Upload logo',
         'logo_uploading' => 'Uploading logo…',
+        'logo_saved' => 'Logo updated: it is now live across the app.',
         'logo_remove' => 'Remove current logo',
         'logo_empty' => 'No logo uploaded',
         'logo_no_file' => 'No file selected',

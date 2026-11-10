@@ -300,6 +300,7 @@
              data-csrf="<?= e(csrf_token()) ?>"
              data-msg-fail="<?= e(__('setup.logo_error_upload')) ?>"
              data-msg-uploading="<?= e(__('setup.logo_uploading')) ?>"
+             data-msg-logo-saved="<?= e(__('setup.logo_saved')) ?>"
              data-msg-logo-user-badge="<?= e(__('setup.logo_source_user_badge')) ?>"
              data-msg-logo-user-hint="<?= e(__('setup.logo_source_user_hint')) ?>">
             <?php $settingsLogo = assoc_logo_url(); ?>

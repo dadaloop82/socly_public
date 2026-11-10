@@ -3951,12 +3951,32 @@ function initLogoFilePickers(scope = document) {
       } else {
         hidePreview();
       }
+      // Il logo cambia ovunque nella pagina (sidebar, layout ospite, organigramma):
+      // niente refresh manuale dopo il salvataggio.
+      syncPageLogos(data.logo_url ? String(data.logo_url) : '');
       // A manual upload is the user's own choice: it can no longer be replaced
       // by the website scan, so the badge switches to “uploaded by you”.
       paintLogoSource(url !== '');
       if (data.primary || data.accent) {
         applyBrandColors(data.primary, data.accent);
       }
+    };
+
+    const syncPageLogos = (url) => {
+      const busted = url !== '' ? `${url}${url.includes('?') ? '&' : '?'}v=${Date.now()}` : '';
+      document.querySelectorAll('img[data-assoc-logo]').forEach((img) => {
+        if (!(img instanceof HTMLImageElement)) return;
+        if (busted !== '') {
+          img.src = busted;
+          img.hidden = false;
+        } else {
+          img.removeAttribute('src');
+          img.hidden = true;
+        }
+      });
+      document.querySelectorAll('.sidebar-brand').forEach((brand) => {
+        brand.classList.toggle('has-assoc-logo', busted !== '');
+      });
     };
 
     const paintLogoSource = (isUser) => {
@@ -4014,8 +4034,14 @@ function initLogoFilePickers(scope = document) {
         const data = await uploadLogoWithProgress(uploadUrl, body, csrf, setProgress);
         URL.revokeObjectURL(localUrl);
         setProgress(null);
-        setStatus('');
         applyLogoResponse(data);
+        const savedMsg = root.dataset.msgLogoSaved || '';
+        if (savedMsg !== '') {
+          setStatus(savedMsg, false);
+          window.setTimeout(() => setStatus(''), 2600);
+        } else {
+          setStatus('');
+        }
       } catch (err) {
         URL.revokeObjectURL(localUrl);
         setProgress(null);

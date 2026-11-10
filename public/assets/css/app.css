@@ -12189,3 +12189,4 @@ tr.doc-row-editable:focus-visible {
   background: color-mix(in srgb, var(--ink) 6%, #fff);
   word-break: break-all;
 }
+.assoc-logo[hidden] { display: none !important; }

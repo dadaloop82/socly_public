@@ -1092,14 +1092,20 @@ if (!function_exists('assoc_logo_img')) {
     function assoc_logo_img(string $class = 'assoc-logo', string $alt = ''): string
     {
         $url = assoc_logo_url();
-        if ($url === null) {
-            return '';
-        }
         if ($alt === '') {
             $branding = app()->branding();
             $alt = trim((string) ($branding['name'] ?? 'SOCLY'));
         }
-        return '<img class="' . e($class) . '" src="' . e($url) . '" alt="' . e($alt) . '" decoding="async">';
+        // L'elemento resta sempre nel DOM (nascosto se non c'è logo): così
+        // l'upload dalla pagina impostazioni aggiorna subito anche la sidebar,
+        // senza dover ricaricare.
+        $attrs = ' class="' . e($class) . '" data-assoc-logo alt="' . e($alt) . '" decoding="async"';
+        if ($url !== null) {
+            $attrs .= ' src="' . e($url) . '"';
+        } else {
+            $attrs .= ' hidden';
+        }
+        return '<img' . $attrs . '>';
     }
 }
 
