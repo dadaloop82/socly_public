@@ -79,6 +79,10 @@ versions without curated notes).
 - The incomplete-members banner is red and can fix the whole list at once (“Fix N automatically”),
   reporting how many were corrected and how many lack the data needed; values are only derived from
   stored data, never invented
+- The bulk-fix button is enabled only when the derivation really succeeds (the count runs the same
+  routine as the fix); otherwise it is disabled and reads “Cannot fix them automatically”
+- The registry PDF hides the fiscal code, birth and residence columns when those profile fields are
+  disabled
 - Anonymous telemetry counters pointed at non-existent table/column names and always reported zero
 
 ### Changed

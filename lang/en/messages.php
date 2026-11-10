@@ -713,6 +713,7 @@ return [
         'autofix_all_button' => 'Fix :count automatically',
         'autofix_all_success' => 'Automatic fix completed: :fixed corrected out of :scanned checked, :skipped without enough data.',
         'autofix_all_none' => 'No member can be fixed automatically: the required data is missing.',
+        'autofix_all_disabled' => 'Cannot fix them automatically',
         'issues_banner' => 'There are :count members with missing mandatory data.',
         'issues_filter_link' => 'Show only these',
         'issues_filter_active' => 'Showing only the :count members with missing data.',

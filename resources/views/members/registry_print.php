@@ -22,6 +22,12 @@ $assocLegalLabel = trim((string) ($association['legal_label'] ?? ''));
 $assocFiscalCode = trim((string) ($association['fiscal_code'] ?? ''));
 $assocAddress = trim((string) ($association['address'] ?? ''));
 $incomplete = is_array($incomplete ?? null) ? $incomplete : [];
+$columns = is_array($columns ?? null)
+    ? $columns
+    : ['fiscal_code' => true, 'birth' => true, 'residence' => true];
+$showFiscalCode = !empty($columns['fiscal_code']);
+$showBirth = !empty($columns['birth']);
+$showResidence = !empty($columns['residence']);
 $summary = is_array($summary ?? null) ? $summary : ['total' => (int) $total, 'active' => 0];
 $generatedAt = trim((string) ($generated_at ?? ''));
 $generatedAt = $generatedAt !== '' ? $generatedAt : date('d/m/Y H:i');
@@ -253,8 +259,12 @@ $generatedAt = $generatedAt !== '' ? $generatedAt : date('d/m/Y H:i');
                 <th class="col-prog"><?= e(__('members.registry_col_progressive')) ?></th>
                 <th class="col-card"><?= e(__('members.registry_col_card')) ?></th>
                 <th class="col-member"><?= e(__('members.registry_col_member')) ?></th>
-                <th class="col-birth"><?= e(__('members.registry_col_birth')) ?></th>
-                <th class="col-res"><?= e(__('members.registry_col_residence')) ?></th>
+                <?php if ($showBirth): ?>
+                    <th class="col-birth"><?= e(__('members.registry_col_birth')) ?></th>
+                <?php endif; ?>
+                <?php if ($showResidence): ?>
+                    <th class="col-res"><?= e(__('members.registry_col_residence')) ?></th>
+                <?php endif; ?>
                 <th class="col-adm"><?= e(__('members.registry_col_admission')) ?></th>
                 <th class="col-type"><?= e(__('members.registry_col_type_status')) ?></th>
             </tr>
@@ -274,12 +284,16 @@ $generatedAt = $generatedAt !== '' ? $generatedAt : date('d/m/Y H:i');
                     <td><?= e((string) ($row['member_number'] ?? '')) ?></td>
                     <td>
                         <span class="cell-stack"><?= e($fullName !== '' ? $fullName : '—') ?></span>
-                        <?php if ($fiscal !== ''): ?>
+                        <?php if ($showFiscalCode && $fiscal !== ''): ?>
                             <span class="cell-muted"><?= e(__('members.registry_cf_prefix')) ?>: <?= e($fiscal) ?></span>
                         <?php endif; ?>
                     </td>
-                    <td><?= e($birth !== '' ? $birth : '—') ?></td>
-                    <td><?= e($residence !== '' ? $residence : '—') ?></td>
+                    <?php if ($showBirth): ?>
+                        <td><?= e($birth !== '' ? $birth : '—') ?></td>
+                    <?php endif; ?>
+                    <?php if ($showResidence): ?>
+                        <td><?= e($residence !== '' ? $residence : '—') ?></td>
+                    <?php endif; ?>
                     <td>
                         <span class="cell-stack">
                             <span class="cell-label"><?= e(__('members.registry_applied_short')) ?>:</span>

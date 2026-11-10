@@ -1546,9 +1546,53 @@ final class MemberService
     }
 
     /**
-     * How many members could be fixed automatically right now (fiscal code derivable).
+     * Members that can really be fixed automatically right now. The check runs the same
+     * derivation used by the fix, so the banner never promises a correction that would fail.
      */
-    public function autoFixableCount(): int
+    public function autoFixableCount(int $limit = 200): int
+    {
+        $candidates = $this->missingFiscalCandidates($limit);
+        if ($candidates === []) {
+            return 0;
+        }
+        $geo = app(GeoService::class);
+        $count = 0;
+        foreach ($candidates as $memberId) {
+            $fields = $this->fieldValues($memberId);
+            if (!$this->canComputeFiscalCode($fields)) {
+                continue;
+            }
+            $result = $geo->computeFiscalCode(
+                trim((string) ($fields['first_name'] ?? '')),
+                trim((string) ($fields['last_name'] ?? '')),
+                trim((string) ($fields['birth_date'] ?? '')),
+                strtoupper(trim((string) ($fields['gender'] ?? ''))),
+                trim((string) ($fields['birth_place'] ?? ''))
+            );
+            if (!empty($result['ok'])) {
+                $count++;
+            }
+        }
+        return $count;
+    }
+
+    /**
+     * Candidate ids: fiscal code missing but every source datum already stored.
+     *
+     * @return list<int>
+     */
+    private function missingFiscalCandidates(int $limit): array
+    {
+        $limit = max(1, min(1000, $limit));
+        $rows = $this->db->fetchAll(
+            "SELECT m.id FROM members m WHERE " . $this->missingFiscalCondition()
+            . " ORDER BY m.id ASC LIMIT {$limit}"
+        );
+        return array_map(static fn (array $row): int => (int) ($row['id'] ?? 0), $rows);
+    }
+
+    /** SQL condition for "fiscal code missing but all source data present". */
+    private function missingFiscalCondition(): string
     {
         $present = static function (string $key, string $table, bool $gender = false): string {
             $valueTest = $gender
@@ -1562,7 +1606,7 @@ final class MemberService
             . " INNER JOIN member_field_definitions dcf ON dcf.id = vcf.field_definition_id"
             . " WHERE vcf.member_id = m.id AND dcf.`key` = 'fiscal_code'"
             . " AND TRIM(COALESCE(vcf.`value`, '')) <> '')";
-        $where = implode(' AND ', [
+        return implode(' AND ', [
             $missingFiscal,
             $present('first_name', 'vfn'),
             $present('last_name', 'vln'),
@@ -1570,8 +1614,6 @@ final class MemberService
             $present('birth_place', 'vbp'),
             $present('gender', 'vgn', true),
         ]);
-        $row = $this->db->fetch("SELECT COUNT(*) AS c FROM members m WHERE {$where}");
-        return (int) ($row['c'] ?? 0);
     }
 
     /**

@@ -138,6 +138,12 @@ final class MemberRegistryService
             'brand_accent' => (string) $this->settings->get('branding.accent', '#B84A1B'),
             'rows' => $rows,
             'incomplete' => $incomplete,
+            // Columns follow the enabled profile fields: a disabled field must not appear in the PDF.
+            'columns' => [
+                'fiscal_code' => $hasField(['fiscal_code']),
+                'birth' => $hasField(['birth_date', 'birth_place']),
+                'residence' => $hasField(['address', 'house_number', 'postal_code', 'city', 'province']),
+            ],
             'summary' => [
                 'total' => count($rows),
                 'active' => (int) ($statusCounts['active'] ?? 0),

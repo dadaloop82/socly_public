@@ -76,7 +76,7 @@ final class MemberController extends BaseController
             'page' => $page,
             'types' => $this->members->types(),
             'hasAnyMembers' => $this->members->totalCount() > 0,
-            'autofixCount' => $this->members->autoFixableCount(),
+            'autofixCount' => ((int) ($result['issues_count'] ?? 0)) > 0 ? $this->members->autoFixableCount() : 0,
             'gdprEnabled' => $this->members->isGdprEnabled(),
             'summary' => $this->memberActions->listSummaryMetrics(),
             'mailReady' => $this->mail->isReady(),

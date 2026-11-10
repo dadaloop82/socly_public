@@ -710,6 +710,7 @@ return [
         'autofix_unavailable' => 'Nicht genügend Daten für die automatische Korrektur.',
         'autofix_all_button' => ':count automatisch korrigieren',
         'autofix_all_success' => 'Automatische Korrektur abgeschlossen: :fixed von :scanned korrigiert, :skipped ohne ausreichende Daten.',
+        'autofix_all_disabled' => 'Automatische Korrektur nicht möglich',
         'autofix_all_none' => 'Kein Mitglied kann automatisch korrigiert werden: die nötigen Daten fehlen.',
         'issues_banner' => 'Es gibt :count Mitglieder mit fehlenden Pflichtangaben.',
         'issues_filter_link' => 'Nur diese anzeigen',

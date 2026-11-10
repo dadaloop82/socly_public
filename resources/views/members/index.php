@@ -177,6 +177,8 @@ $totalPages = max(1, (int) ceil(((int) $result['total']) / max(1, $perPage)));
                             <?= csrf_field() ?>
                             <button class="btn btn-sm" type="submit"><?= e(__('members.autofix_all_button', ['count' => (string) $autofixCount])) ?></button>
                         </form>
+                    <?php elseif ($canManage): ?>
+                        <button class="btn btn-sm" type="button" disabled title="<?= e(__('members.autofix_all_disabled')) ?>"><?= e(__('members.autofix_all_disabled')) ?></button>
                     <?php endif; ?>
                     <?php if ($issuesActive): ?>
                         <a class="btn btn-sm btn-ghost" href="<?= e($issuesClearUrl) ?>"><?= e(__('members.issues_filter_clear')) ?></a>

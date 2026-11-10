@@ -715,6 +715,7 @@ return [
         'autofix_all_button' => 'Correggi :count in automatico',
         'autofix_all_success' => 'Correzione automatica completata: :fixed corretti su :scanned esaminati, :skipped senza dati sufficienti.',
         'autofix_all_none' => 'Nessun socio correggibile automaticamente: mancano i dati necessari.',
+        'autofix_all_disabled' => 'Impossibile correggerli in automatico',
         'issues_banner' => 'Ci sono :count soci con dati obbligatori mancanti.',
         'issues_filter_link' => 'Mostra solo questi',
         'issues_filter_active' => 'Stai vedendo solo i :count soci con dati mancanti.',
