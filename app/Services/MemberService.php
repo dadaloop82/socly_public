@@ -2270,7 +2270,7 @@ final class MemberService
             'overdue_count' => (int) ($this->db->fetch('SELECT COUNT(*) c FROM members WHERE balance_due > 0')['c'] ?? 0),
             'members_settled' => (int) ($this->db->fetch('SELECT COUNT(*) c FROM members WHERE balance_due <= 0')['c'] ?? 0),
             'new_members_year' => (int) ($this->db->fetch(
-                'SELECT COUNT(*) c FROM members WHERE YEAR(created_at) = YEAR(CURDATE())'
+                'SELECT COUNT(*) c FROM members WHERE YEAR(COALESCE(admitted_at, created_at)) = YEAR(CURDATE())'
             )['c'] ?? 0),
             'collected_year' => (float) ($this->db->fetch(
                 'SELECT COALESCE(SUM(amount), 0) c FROM payments WHERE YEAR(created_at) = YEAR(CURDATE())'
@@ -2307,10 +2307,12 @@ final class MemberService
             $paymentsByMonth[$row['ym']] = (float) $row['total'];
         }
 
+        // Registration date (admitted_at) is the real join date: grouping imported members by
+        // created_at would pile every historic member into the import month.
         $memberRows = $this->db->fetchAll(
-            "SELECT DATE_FORMAT(created_at, '%Y-%m') AS ym, COUNT(*) AS total
+            "SELECT DATE_FORMAT(COALESCE(admitted_at, created_at), '%Y-%m') AS ym, COUNT(*) AS total
              FROM members
-             WHERE created_at >= DATE_FORMAT(DATE_SUB(CURDATE(), INTERVAL 11 MONTH), '%Y-%m-01')
+             WHERE COALESCE(admitted_at, created_at) >= DATE_FORMAT(DATE_SUB(CURDATE(), INTERVAL 11 MONTH), '%Y-%m-01')
              GROUP BY ym"
         );
         $membersByMonth = [];

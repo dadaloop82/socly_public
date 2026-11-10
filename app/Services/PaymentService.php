@@ -48,6 +48,15 @@ final class PaymentService
         }
 
         $amount = round((float) $data['amount'], 2);
+        // Payment date: defaults to today, but the real (possibly past) date is accepted so
+        // charts and the first note stay aligned with reality.
+        $paidOn = trim((string) ($data['paid_on'] ?? ''));
+        if ($paidOn !== '' && !$this->validator->validate(['paid_on' => $paidOn], ['paid_on' => 'date'])) {
+            return ['ok' => false, 'errors' => $this->validator->firstErrors()];
+        }
+        if ($paidOn === '') {
+            $paidOn = date('Y-m-d');
+        }
         $before = $member;
         $newBalance = max(0, round((float) $member['balance_due'] - $amount, 2));
         if ($data['type'] === 'adjustment' && !empty($data['set_balance'])) {
@@ -63,6 +72,7 @@ final class PaymentService
                 'type' => $data['type'],
                 'note' => $data['note'] ?? null,
                 'created_by' => auth_user()['id'] ?? null,
+                'created_at' => $paidOn . ' 12:00:00',
             ]);
             $this->db->update('members', ['balance_due' => $newBalance], 'id = :id', ['id' => $memberId]);
             if (in_array($data['type'], ['membership', 'debt'], true)) {
@@ -71,7 +81,7 @@ final class PaymentService
                     $memberId,
                     $amount,
                     (string) $data['method'],
-                    date('Y-m-d')
+                    $paidOn
                 );
             }
             $this->db->commit();

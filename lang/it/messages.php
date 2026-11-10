@@ -949,6 +949,7 @@ return [
         'record' => 'Registra pagamento',
         'recorded' => 'Pagamento registrato.',
         'amount' => 'Importo',
+        'paid_on' => 'Data pagamento',
         'method' => 'Metodo',
         'type' => 'Tipo',
         'note' => 'Nota',

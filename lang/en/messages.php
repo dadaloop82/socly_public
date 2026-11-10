@@ -947,6 +947,7 @@ return [
         'record' => 'Record payment',
         'recorded' => 'Payment recorded.',
         'amount' => 'Amount',
+        'paid_on' => 'Payment date',
         'method' => 'Method',
         'type' => 'Type',
         'note' => 'Note',

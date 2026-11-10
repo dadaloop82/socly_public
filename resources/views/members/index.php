@@ -478,6 +478,13 @@ $totalPages = max(1, (int) ceil(((int) $result['total']) / max(1, $perPage)));
                     ],
                 ]) ?>
             </div>
+            <?= field('date', [
+                'name' => 'paid_on',
+                'label' => (string) __('payments.paid_on'),
+                'context' => 'member',
+                'required' => true,
+                'value' => date('Y-m-d'),
+            ]) ?>
             <?= field('text', [
                 'name' => 'note',
                 'label' => (string) __('payments.note'),

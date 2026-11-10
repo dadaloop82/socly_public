@@ -945,6 +945,7 @@ return [
         'record' => 'Zahlung erfassen',
         'recorded' => 'Zahlung erfasst.',
         'amount' => 'Betrag',
+        'paid_on' => 'Zahlungsdatum',
         'method' => 'Methode',
         'type' => 'Typ',
         'note' => 'Notiz',

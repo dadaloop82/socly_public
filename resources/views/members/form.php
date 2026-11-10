@@ -1230,6 +1230,12 @@ $paymentExtraHtml = $buildProfileFieldsHtml($paymentExtraFields, \Socly\Services
                 'required' => true,
                 'step' => '0.01',
             ]) ?>
+            <?= field('date', [
+                'name' => 'paid_on',
+                'label' => (string) __('payments.paid_on'),
+                'required' => true,
+                'value' => date('Y-m-d'),
+            ]) ?>
             <?= field('select', [
                 'name' => 'method',
                 'label' => (string) __('payments.method'),

@@ -84,6 +84,10 @@ versions without curated notes).
 - The registry PDF hides the fiscal code, birth and residence columns when those profile fields are
   disabled
 - The registry PDF prints the membership-card QR next to the card number when the card stores one
+- Dashboard charts count new members by registration date (`admitted_at`, falling back to
+  `created_at`): imported members no longer pile up in the import month
+- Payments can be recorded with their real date (new “payment date” field, default today); charts and
+  the first note use that date
 - Fixed a crash (fatal error page) on every member page: the service binding was missing the new
   database dependency
 - Import/export/download actions use bare 80%-opacity icons with tooltips everywhere (member list,
