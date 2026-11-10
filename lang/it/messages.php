@@ -1732,7 +1732,7 @@ return [
         'released_label' => 'Pubblicata il',
         'commit_label' => 'Ultimo commit (repo pubblico)',
         'commit_develop_label' => 'Ultimo commit (repo develop)',
-        'manual_hint' => 'Scarica la nuova versione dal repository pubblico e segui la guida di aggiornamento.',
+        'manual_hint' => 'Aggiorna dal repository pubblico oppure abilita l’aggiornamento automatico: imposta UPDATE_ENABLED=true nel file .env, poi usa il pulsante o “php bin/update.php --apply”.',
         'notes' => 'Novità',
         'download' => 'Scarica',
         'guide' => 'Come aggiornare',

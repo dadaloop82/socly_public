@@ -27,6 +27,33 @@ final class MemberRegistryService
         $rows = [];
         $incomplete = [];
         $n = 1;
+        // Only data whose profile field is enabled *and* mandatory may be reported as
+        // missing: a disabled or optional field must never flag a member in the registry.
+        $fieldDefs = [];
+        foreach ($this->members->fieldDefinitions(false) as $definition) {
+            $key = trim((string) ($definition['key'] ?? ''));
+            if ($key !== '') {
+                $fieldDefs[$key] = $definition;
+            }
+        }
+        $hasField = static function (array $keys) use ($fieldDefs): bool {
+            foreach ($keys as $key) {
+                $definition = $fieldDefs[$key] ?? null;
+                if (is_array($definition) && !empty($definition['is_enabled'])) {
+                    return true;
+                }
+            }
+            return false;
+        };
+        $needsField = static function (array $keys) use ($fieldDefs): bool {
+            foreach ($keys as $key) {
+                $definition = $fieldDefs[$key] ?? null;
+                if (is_array($definition) && !empty($definition['is_enabled']) && !empty($definition['is_required'])) {
+                    return true;
+                }
+            }
+            return false;
+        };
         foreach ($items as $item) {
             $fields = is_array($item['fields'] ?? null) ? $item['fields'] : [];
             $rawFiscal = trim((string) ($fields['fiscal_code'] ?? $fields['tax_code'] ?? ''));
@@ -59,13 +86,17 @@ final class MemberRegistryService
             ];
 
             $missing = [];
-            if ($rawFiscal === '') {
+            // Identity data is reported whenever the field is enabled (a registry is an
+            // official document); optional fields never block it.
+            if ($hasField(['fiscal_code']) && $rawFiscal === '') {
                 $missing[] = __('setup.field_person_fiscal_code');
             }
-            if ($rawBirth === '') {
+            if ($hasField(['birth_date']) && $rawBirth === '') {
                 $missing[] = __('setup.field_birth_date');
             }
-            if ($residence === '') {
+            // Residence is only a required registry datum when its profile fields are
+            // enabled *and* mandatory: a disabled or optional address must not flag members.
+            if ($needsField(['address', 'house_number', 'postal_code', 'city', 'province']) && $residence === '') {
                 $missing[] = __('members.registry_col_residence');
             }
             $row['missing'] = $missing;

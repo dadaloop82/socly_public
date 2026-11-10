@@ -3,9 +3,17 @@
 All notable changes to the public Socly base product are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
-and this project follows a simple `1.0.x` versioning scheme driven by release syncs.
+and versions follow the automatic `1.<series>.<patch>` scheme: every commit on `main` bumps the patch,
+every 100 patches bump the series, and each bump is published to this repository by the release sync.
 
 ## [Unreleased]
+
+Nothing yet — entries are added here while a release is in progress.
+
+## [1.5.39] - 2026-11-10
+
+This entry covers everything published up to v1.5.39 (the automatic sync published intermediate
+versions without curated notes).
 
 ### Added
 
@@ -24,6 +32,16 @@ and this project follows a simple `1.0.x` versioning scheme driven by release sy
   `.env`, migrations and local server
 - Single built-in maintenance SuperAdmin (hardcoded credentials); the installer no longer asks for or
   creates a SuperAdmin, and users cannot be promoted to system administrator
+- `/install` now only wires the database; the guided setup wizard is the real configuration flow, with
+  a treasury step that can create custom cash accounts
+- Member import from any CSV with guided column mapping, a preview of the first five rows and search
+  across every row of the file; importing updates changed values instead of wiping existing data
+- Server-side QR membership card rendered as SVG (MIT-licensed encoder vendored)
+- Automatic reminder of the membership cards to renew for each period, with a counter that decreases
+  on every renewal
+- Yearly forecast budget with actuals derived from the cash book
+- Two-level settings index (macro areas → sections), one section at a time
+- CLI updater (`bin/update.php`) sharing the same engine as the sidebar “Install” button
 - RUNTS-first onboarding step with a “fill in the fields manually” link; the fetch button stays
   visible (disabled) and pulses clearly once a code is entered
 
@@ -40,6 +58,18 @@ and this project follows a simple `1.0.x` versioning scheme driven by release sy
 - President-name confirmation is case-insensitive and ignores apostrophes, hyphens and spacing;
   the two confirmation inputs are no longer auto-capitalised
 - German denomination field is shown only for South Tyrol associations (or when already filled)
+- Member list and search: crash on search, avatars, gender/age/birthday columns, card expiry under the
+  membership type, pager, column sorting and multi-row trash
+- Branding: the logo refreshes immediately across the page after upload (sidebar, guest layout,
+  org chart); horizontal logos are accepted and the upload outcome is shown in settings
+- Import: cash book entries are dated with the payment date
+- Settings: the outcome banner stays anchored when returning to a section and the “unsaved changes”
+  save button actually saves
+- Setup: no login form before the configuration is complete, no hangs, no silent database password
+  reset and no duplicated PHP/DB stack
+- OCR binaries and the PHP CLI are detected inside an `open_basedir` cage
+- Legal editor fills the viewport in full screen and AI translation output is bounded
+- Address lookup finds squares and “piazza” names
 - Anonymous telemetry counters pointed at non-existent table/column names and always reported zero
 
 ### Changed
@@ -53,6 +83,9 @@ and this project follows a simple `1.0.x` versioning scheme driven by release sy
 - Installation cards are refreshed on consent save, settings changes, update checks/installs, daily
   and immediately when the installed version changes
 - Public showcase consent was removed from the wizard and the admin panel (existing data is retained)
+- Trial/showcase instances detect new releases without running the guided setup, and the login footer
+  always shows the installed version plus the update notice
+- Long configuration pages were split into macro areas with one section open at a time
 
 ## [1.0.0] - 2026-08-15
 

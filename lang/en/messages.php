@@ -1730,7 +1730,7 @@ return [
         'released_label' => 'Published on',
         'commit_label' => 'Latest commit (public repo)',
         'commit_develop_label' => 'Latest commit (develop repo)',
-        'manual_hint' => 'Download the new version from the public repository and follow the update guide.',
+        'manual_hint' => 'Update from the public repository, or enable automatic updates: set UPDATE_ENABLED=true in .env and use the button or “php bin/update.php --apply”.',
         'notes' => 'Release notes',
         'download' => 'Download',
         'guide' => 'How to update',

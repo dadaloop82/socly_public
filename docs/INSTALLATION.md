@@ -1,213 +1,6 @@
-# Installazione / Installation
+# Installation
 
-Guida all'installazione self-hosted di Socly. · Step-by-step self-hosted installation guide.
-
-<details open>
-<summary><strong>🇮🇹 Italiano</strong></summary>
-
-## Requisiti
-
-| Componente | Versione / note |
-|------------|-----------------|
-| PHP | 8.2+ con `pdo_mysql`, `openssl`, `mbstring`, `json`, `fileinfo` |
-| Database | MariaDB 10.4+ / MySQL 8+ (`utf8mb4`) |
-| Web server | Apache 2.4+ con `mod_rewrite`, oppure Nginx + PHP-FPM |
-| Composer | 2.x (solo per installazione e aggiornamenti) |
-| Permessi | `storage/` e `.env` scrivibili dall'utente del web server |
-| HTTPS | consigliato (cookie di sessione `Secure`, HSTS) |
-
-OCR **opzionale**, necessario solo per precompilare statuto e informativa privacy dai PDF del RUNTS:
-
-```bash
-sudo apt install poppler-utils tesseract-ocr tesseract-ocr-ita
-```
-
-Serve `exec()` abilitato in PHP e il binario CLI `php` (il worker OCR parte in background con `nohup`).
-Se `exec()` è disabilitato Socly usa un OCR inline ridotto e segnala nell'interfaccia quando il testo
-letto è parziale.
-
-## Installazione one-click (Linux, macOS, Windows)
-
-Gli script in `bin/install/` verificano l'ambiente, installano PHP 8.4/8.3 (preferiti) o 8.2 con le
-estensioni richieste, MariaDB/MySQL, Composer e (opzionale) gli strumenti OCR, creano database e
-`.env`, applicano le migrazioni e avviano il server locale:
-
-```bash
-sudo bash bin/install/linux.sh                                      # Linux
-bash bin/install/macos.sh                                           # macOS (Homebrew)
-powershell -ExecutionPolicy Bypass -File bin\install\windows.ps1    # Windows (admin)
-```
-
-Opzioni utili: `--check` (solo verifica), `--plan` (mostra le azioni senza modifiche), `--no-ocr`,
-`--no-serve`, `--port=8080`, `--db-root-pass=...`, `--user=<utente di sistema>` (proprietario di
-`.env`/`storage/`; usalo quando installi come root su un host servito da `www-data`),
-`--reset-db-pass` (ruota la password di un utente DB già esistente: senza questo flag un account
-omonimo con password diversa blocca l'installazione invece di essere sovrascritto), `--force`
-(sovrascrive un `.env` che punta a un altro database). Su Windows i parametri sono `-Check` (con
-`-Json` e `-ReportPath` per un report machine-readable), `-Plan`, `-Ocr`, `-NoOcr`, `-NoServe`,
-`-Port`, `-DbRootPass`, `-ResetDbPass`, `-Force`, `-Uninstall`, `-PurgeDatabase`, `-PurgeMariaDb`.
-Dettagli in [`bin/install/README.md`](../bin/install/README.md).
-
-Gli script **non toccano un'istanza esistente**: installano PHP e il server MariaDB solo se mancano
-(su un host già servito da Plesk/cPanel o con un PHP completo non viene aggiunto un secondo stack),
-non riscrivono un `.env` che punta a un altro database e non cambiano la password di un utente MySQL
-preesistente. Su un server condiviso installa in una cartella nuova con DB e utente dedicati.
-
-Al termine apri `http://127.0.0.1:8080/install` e completa il wizard (associazione, periodo/quota,
-campi). Poi accedi con `admin@socly.it` (password di manutenzione definita nel codice, mai stampata
-dagli script) e completa il setup in `/setup`: il wizard di primo avvio crea l'account **Admin
-dell'associazione**. Il server PHP integrato serve per installazione e valutazione: per la produzione
-usa Apache/Nginx + HTTPS come descritto sotto.
-
-`/install` si occupa **solo dell'infrastruttura**: credenziali del database, creazione del DB se
-manca, migrazioni e `storage/installed.lock`. Se lo script one-click ha già scritto `.env` e creato il
-database, la pagina non chiede nulla: chiude l'installazione e apre **direttamente la configurazione
-guidata** (`/setup`) con la sessione di manutenzione già attiva, senza passare dal login. Il wizard
-raccoglie lingua, dati e sede dell'associazione, logo e colori, organi sociali, statuto e privacy,
-tipi di socio e periodi, campi anagrafica, tesoreria, posta, iscrizioni, componenti, account Admin e
-consensi.
-Finché non esiste l'account **Admin dell'associazione** il wizard è l'unica porta d'ingresso: `/login`
-non mostra il modulo credenziali ma solo il pulsante che riapre la configurazione (con il testo
-«Riprendi la configurazione» se hai già salvato dei passi). «Esci e riprendi dopo» salva e sospende:
-al rientro si riparte dal primo passo ancora mancante. «Scarta tutto» cancella quanto fatto e riapre
-il wizard dal passo 1. Appena creato l'Admin (ultimo passo del wizard) o completati tutti i passi,
-serve l'account di manutenzione `admin@socly.it`.
-`/install` torna utile solo per ripristinare le credenziali del database se l'istanza non riesce più a
-connettersi.
-
-## 1. Scarica il codice
-
-```bash
-git clone https://github.com/dadaloop82/socly_public.git socly
-cd socly
-composer install --no-dev --optimize-autoloader
-cp .env.example .env
-```
-
-Imposta almeno `APP_URL` e i parametri `DB_*` in `.env` (oppure lascia che li scriva il wizard).
-`APP_KEY` viene generato dall'installer: **salvalo insieme ai backup**, senza di esso le impostazioni
-cifrate non sono più leggibili.
-
-## 2. Database
-
-Crea database e utente (in alternativa l'installer crea il database se l'utente ha il privilegio
-`CREATE`):
-
-```sql
-CREATE DATABASE socly CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
-CREATE USER 'socly'@'localhost' IDENTIFIED BY 'una-password-lunga';
-GRANT ALL PRIVILEGES ON socly.* TO 'socly'@'localhost';
-FLUSH PRIVILEGES;
-```
-
-Le migrazioni (`database/migrations/`) girano automaticamente al primo avvio e a ogni aggiornamento:
-non serve lanciare comandi manuali.
-
-## 3. Permessi
-
-```bash
-# adatta l'utente al tuo sistema: www-data (Debian/Ubuntu), apache, nginx…
-sudo chown -R www-data:www-data storage
-sudo find storage -type d -exec chmod 775 {} \;
-sudo chown www-data:www-data .env
-```
-
-La document root deve puntare **solo** a `public/`. `.env`, `storage/` e `vendor/` restano fuori.
-
-## 4. Web server
-
-**Apache** (`a2enmod rewrite`, `AllowOverride All`):
-
-```apache
-<VirtualHost *:443>
-    ServerName socly.example.org
-    DocumentRoot /var/www/socly/public
-    <Directory /var/www/socly/public>
-        AllowOverride All
-        Require all granted
-    </Directory>
-</VirtualHost>
-```
-
-**Nginx + PHP-FPM**:
-
-```nginx
-server {
-    listen 443 ssl;
-    server_name socly.example.org;
-    root /var/www/socly/public;
-    index index.php;
-
-    location / { try_files $uri $uri/ /index.php?$query_string; }
-    location ~ \.php$ {
-        include fastcgi_params;
-        fastcgi_param SCRIPT_FILENAME $document_root$fastcgi_script_name;
-        fastcgi_pass unix:/run/php/php8.2-fpm.sock;
-    }
-    location ~ /\.(?!well-known) { deny all; }
-}
-```
-
-`public/.user.ini` alza i limiti di upload a 25 MB per i PDF. Con Nginx + PHP-FPM verifica anche
-`upload_max_filesize` / `post_max_size` nel `php.ini`.
-
-## 5. Installazione guidata
-
-Apri `https://socly.example.org/install` e completa i cinque passaggi:
-
-1. **Database e URL** — credenziali MySQL e indirizzo pubblico dell'applicazione.
-2. **Associazione** — nome, contatti, colori del brand, lingua predefinita, GDPR.
-3. **Periodo associativo e tipo di quota** — etichetta, date, nome e prezzo del tipo di socio.
-4. **Campi profilo** — campi predefiniti da abilitare e quelli obbligatori.
-5. **Riepilogo** — conferma: vengono create le tabelle, i permessi e il file `storage/installed.lock`.
-
-L'**account di manutenzione** (l'unico SuperAdmin, `admin@socly.it`) è predefinito nel codice: non
-viene creato dal wizard, non è modificabile né eliminabile dall'interfaccia e non può essere creato da
-altri utenti. La password è salvata solo come hash Argon2id in `app/Support/PlatformMasterAccess.php`.
-Dopo l'installazione accedi con l'account di manutenzione e completa il **wizard di primo avvio** su
-`/setup`: crea l'account **Admin dell'associazione** e guida la configurazione (dati dell'associazione,
-recupero dal RUNTS o dal sito web, logo e colori, statuto e informativa privacy, tesoreria e scadenze).
-Il setup non è anonimo: senza login di manutenzione nessuno può creare l'Admin dell'associazione.
-
-## 6. Verifica
-
-- `https://socly.example.org/login` risponde e il login funziona.
-- Dashboard, creazione di un socio e aggiornamento di una quota funzionano.
-- Se usi l'OCR, controlla la diagnostica:
-
-```bash
-php -r 'require "vendor/autoload.php"; print_r((new Socly\Services\PdfTextExtractor())->ocrDiagnostics());'
-```
-
-Log utili: `storage/logs/app.log`, `storage/cache/runts_ocr_job.log`,
-`storage/cache/runts_ocr_last.json`.
-
-## 7. Aggiornamenti
-
-Le istanze installate leggono il manifest pubblico `latest.json` e avvisano gli amministratori quando
-esce una nuova versione. Aggiornamento manuale:
-
-1. Backup di database, `.env` e `storage/`.
-2. Scarica l'ultima release da `dadaloop82/socly_public` (branch `main` o ZIP).
-3. Sostituisci i file applicativi conservando `.env`, `.env.user` e `storage/`.
-4. `composer install --no-dev` se sono cambiate le dipendenze.
-5. Apri il sito: le migrazioni in attesa partono al primo request.
-
-## Problemi comuni
-
-| Sintomo | Causa / soluzione |
-|---------|-------------------|
-| Errore 500 immediato | Permessi su `storage/` o `.env` non scrivibile; leggi `storage/logs/app.log` |
-| “DB error” nel wizard | Credenziali errate o database mancante; riapri `/install` (passo 1) per correggerle |
-| OCR non disponibile | `exec()` disabilitato, oppure mancano `pdftoppm`/`tesseract`/`tessdata` italiano |
-| OCR molto lento | Normale su PDF scansionati lunghi: il worker legge tutte le pagine (fino a 30 minuti) |
-| Upload PDF rifiutato | Limite 25 MB (`public/.user.ini`) o `post_max_size` del `php.ini` |
-| Migrazioni fallite | L'utente DB deve poter creare/alterare tabelle e indici |
-
-</details>
-
-<details>
-<summary><strong>🇬🇧 English</strong></summary>
+Step-by-step self-hosted installation guide for Socly.
 
 ## Requirements
 
@@ -399,10 +192,10 @@ version is published. Manual update:
 
 ### One-click / automatic update (git checkouts)
 
-Where the app is a **git checkout** of the private repository with SSH access, the update can be
-applied without touching files by hand (`UPDATE_ENABLED=true` in `.env`):
+Where the app is a **git checkout** whose `origin` remote is readable by the PHP/CLI user, the update
+can be applied without touching files by hand (`UPDATE_ENABLED=true` in `.env`):
 
-- inside the app: sidebar card “Aggiornamento disponibile” → **Aggiorna** (admin only);
+- inside the app: sidebar card “Update available” → **Install** (admin only);
 - from the command line: `php bin/update.php` (only checks) or `php bin/update.php --apply`
   (git fetch + fast-forward + migrations, same engine as the button);
 - scheduled (nightly, fully automatic):
@@ -413,7 +206,11 @@ applied without touching files by hand (`UPDATE_ENABLED=true` in `.env`):
 
 Both paths refuse to run on temporary demo instances, when `UPDATE_ENABLED` is false and when the
 working tree has local modifications (`updates.dirty`). The login page always shows the installed
-version and, through “Verifica aggiornamenti”, the published/remote version with the release notes.
+version and, through “Check for updates”, the published/remote version with the release notes.
+
+`UPDATE_REPO` only feeds the “last commit” line in the UI: fetch and merge always use the checkout’s
+own `origin` remote, so an installation cloned from the public repository updates with no SSH key
+(anonymous HTTPS read). ZIP installations have no git metadata and must use the manual procedure above.
 
 ## Troubleshooting
 
@@ -425,6 +222,3 @@ version and, through “Verifica aggiornamenti”, the published/remote version 
 | OCR very slow | Normal for long scanned PDFs: the worker reads every page (up to 30 minutes) |
 | PDF upload rejected | 25 MB limit (`public/.user.ini`) or `php.ini` `post_max_size` |
 | Migrations failed | The DB user must be allowed to create/alter tables and indexes |
-
-</details>
-

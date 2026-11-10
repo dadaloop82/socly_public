@@ -29,7 +29,7 @@ Every user-facing control in SOCLY must go through `field()`.
 | `select` | | `options`, `groups`, `trailing_options` |
 | `checkbox` | `check` | |
 | `radio` | | Simple list |
-| `radio_cards` | `choice` | Tessera/setup cards |
+| `radio_cards` | `choice` | Card/setup selector cards |
 | `phone` | `tel` | Dial + national |
 | `password` | `pwd` | Show/hide |
 | `file` | | Button or native |

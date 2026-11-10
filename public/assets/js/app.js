@@ -2742,7 +2742,10 @@ function photoPlaceholderUrl(form, gender) {
   const file = gender === 'm'
     ? 'placeholder-male.svg'
     : (gender === 'f' ? 'placeholder-female.svg' : 'placeholder-neutral.svg');
-  return `${base}/${file}`;
+  // Versioned URL: after an update the browser must not keep the previous silhouette.
+  const version = String(form?.dataset?.photoAvatarVersion || '').trim();
+  const suffix = version === '' ? '' : `?v=${encodeURIComponent(version)}`;
+  return `${base}/${file}${suffix}`;
 }
 
 function ensurePhotoPlaceholderLayer(el, form, gender, active = true) {

@@ -201,7 +201,7 @@ $generatedAt = $generatedAt !== '' ? $generatedAt : date('d/m/Y H:i');
 <body>
 <div class="sheet">
     <div class="toolbar no-print">
-        <button type="button" class="btn btn-ghost" onclick="window.close()"><?= e(__('common.close')) ?></button>
+        <button type="button" class="btn btn-ghost" data-registry-close><?= e(__('common.close')) ?></button>
         <button type="button" class="btn btn-primary" onclick="window.print()"><?= e(__('members.registry_print')) ?></button>
     </div>
 
@@ -308,5 +308,22 @@ $generatedAt = $generatedAt !== '' ? $generatedAt : date('d/m/Y H:i');
     <p class="legal"><?= e(__('members.registry_legal_note')) ?></p>
 </div>
 
+<script>
+    (function () {
+        var closeBtn = document.querySelector('[data-registry-close]');
+        if (!closeBtn) {
+            return;
+        }
+        closeBtn.addEventListener('click', function () {
+            // Browsers only close windows opened by script: fall back to the member list.
+            window.close();
+            window.setTimeout(function () {
+                if (!window.closed) {
+                    window.location.href = '<?= e(url('/members')) ?>';
+                }
+            }, 150);
+        });
+    })();
+</script>
 </body>
 </html>

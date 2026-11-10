@@ -27,7 +27,7 @@ final class UpdateService
     ) {
     }
 
-    /** Git-based one-click install (requires SSH). */
+    /** Git-based one-click install (the checkout's `origin` remote must be readable). */
     public function installEnabled(): bool
     {
         $flag = $_ENV['UPDATE_ENABLED'] ?? 'false';

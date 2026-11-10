@@ -1728,7 +1728,7 @@ return [
         'released_label' => 'Veröffentlicht am',
         'commit_label' => 'Letzter Commit (öffentliches Repo)',
         'commit_develop_label' => 'Letzter Commit (Develop-Repo)',
-        'manual_hint' => 'Laden Sie die neue Version aus dem öffentlichen Repository herunter und folgen Sie der Anleitung.',
+        'manual_hint' => 'Aktualisieren Sie aus dem öffentlichen Repository oder aktivieren Sie die automatische Aktualisierung: UPDATE_ENABLED=true in .env setzen, dann die Schaltfläche bzw. „php bin/update.php --apply“ verwenden.',
         'notes' => 'Neuigkeiten',
         'download' => 'Herunterladen',
         'guide' => 'So aktualisieren',

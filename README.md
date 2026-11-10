@@ -1,92 +1,6 @@
 # Socly
 
-Self-hosted membership management for associations · Gestione associativa self-hosted.
-
-<details open>
-<summary><strong>🇮🇹 Italiano</strong></summary>
-
-## Socly
-
-**Socly** è una piattaforma **self-hosted** e modulare per la gestione delle associazioni.
-
-L'**edizione base è gratuita**: puoi scaricarla e installarla sul tuo server. Installazione
-professionale, configurazione, supporto dedicato e moduli aggiuntivi opzionali sono disponibili
-separatamente su [socly.it](https://socly.it).
-
-### Funzionalità
-
-- Archivio soci con campi profilo configurabili
-- Tipi e periodi di iscrizione, quote e pagamenti (pagato / parziale / dovuto)
-- Interfaccia multilingua (italiano, tedesco, inglese)
-- Wizard di installazione e pannello di controllo
-- Plugin drop-in (`plugins/*.php`)
-- Branding, documenti, tesoreria, scadenze (componenti modulari)
-- Recupero dal RUNTS: dati dell'ente, documenti e precompilazione di statuto e informativa privacy
-  (testo del PDF + OCR)
-
-### Requisiti
-
-- PHP 8.2+
-- MariaDB / MySQL 8+
-- Apache o Nginx con document root su `public/`
-- Estensioni PHP: `pdo_mysql`, `openssl`, `mbstring`, `json`
-- Composer
-- OCR (opzionale): `poppler-utils`, `tesseract-ocr`, `tesseract-ocr-ita`
-
-### Avvio rapido
-
-```bash
-git clone https://github.com/dadaloop82/socly_public.git socly
-cd socly
-composer install --no-dev
-cp .env.example .env
-# Punta la document root del web server su public/
-# Apri il sito nel browser e completa il wizard di installazione
-```
-
-La guida completa (Apache, Nginx, permessi, database, OCR, aggiornamenti e troubleshooting) è in
-[docs/INSTALLATION.md](docs/INSTALLATION.md). In alternativa, gli script one-click in `bin/install/`
-installano ambiente, database e applicazione e avviano il wizard:
-
-```bash
-sudo bash bin/install/linux.sh   # Linux
-bash bin/install/macos.sh        # macOS
-powershell -ExecutionPolicy Bypass -File bin\install\windows.ps1   # Windows
-```
-
-Durante il wizard configuri database, branding dell'associazione e periodo associativo. L'account
-**SuperAdmin di manutenzione** (`admin@socly.it`) è predefinito nel codice e non viene creato dal
-wizard; la password è salvata solo come hash. Dopo l'installazione accedi con l'account di manutenzione
-e completa il primo avvio, che crea l'account **Admin dell'associazione** usato quotidianamente. Il
-setup non è anonimo.
-
-### Documentazione
-
-- [Installazione](docs/INSTALLATION.md)
-- [Architettura](docs/ARCHITECTURE.md)
-- [Requisiti](docs/REQUIREMENTS.md)
-- [Modello dati](docs/DATA_MODEL.md)
-- [Plugin API](docs/PLUGIN_API.md)
-- [Internazionalizzazione](docs/I18N.md)
-- [Design system](docs/DESIGN.md)
-- [Sicurezza](docs/SECURITY.md)
-- [Rischi](docs/RISKS.md)
-- [Roadmap](docs/ROADMAP.md)
-- [Lessons learned](docs/LESSONS_LEARNED.md)
-- [Changelog](CHANGELOG.md)
-- [Contributing](CONTRIBUTING.md)
-
-### Licenza
-
-Source-available. Gratuita per uso self-hosted base. Vedi [LICENSE](LICENSE).
-Installazione, supporto e moduli aggiuntivi: [socly.it](https://socly.it).
-
-</details>
-
-<details>
-<summary><strong>🇬🇧 English</strong></summary>
-
-## Socly
+Self-hosted membership management for associations.
 
 **Socly** is a self-hosted, modular membership management platform for associations.
 
@@ -94,7 +8,7 @@ The **base edition is free** to download and run on your own server. Professiona
 configuration, dedicated support, and optional paid add-ons are available separately from
 [socly.it](https://socly.it).
 
-### Features
+## Features
 
 - Member archive with configurable profile fields
 - Membership types and periods, payments (paid / partial / due)
@@ -104,7 +18,7 @@ configuration, dedicated support, and optional paid add-ons are available separa
 - Association branding, documents, treasury, deadlines (modular components)
 - RUNTS lookup: association data, documents, and statute/privacy prefill (PDF text + OCR)
 
-### Requirements
+## Requirements
 
 - PHP 8.2+
 - MariaDB / MySQL 8+
@@ -113,7 +27,7 @@ configuration, dedicated support, and optional paid add-ons are available separa
 - Composer
 - OCR (optional): `poppler-utils`, `tesseract-ocr`, `tesseract-ocr-ita`
 
-### Quick start
+## Quick start
 
 ```bash
 git clone https://github.com/dadaloop82/socly_public.git socly
@@ -139,7 +53,7 @@ During the wizard you configure the database, association branding, and membersh
 After install, sign in with the maintenance account and complete the first-run setup, which creates
 the association **Admin** account used day to day. Setup is not anonymous.
 
-### Documentation
+## Documentation
 
 - [Installation](docs/INSTALLATION.md)
 - [Architecture](docs/ARCHITECTURE.md)
@@ -155,21 +69,37 @@ the association **Admin** account used day to day. Setup is not anonymous.
 - [Changelog](CHANGELOG.md)
 - [Contributing](CONTRIBUTING.md)
 
-### Updates
+## Updates
 
-Installed instances check the public release manifest at `latest.json` (HTTPS, no credentials) and
-notify administrators when a newer version is published.
+Installed instances read the public release manifest (`latest.json`, HTTPS, no credentials) and notify
+administrators when a newer version is published; every release also ships a curated
+[CHANGELOG](CHANGELOG.md).
 
-To update manually:
+**One-click / automatic update** — when the app is a **git checkout** whose `origin` remote is
+readable (a clone of this public repository needs no SSH key):
 
-1. Back up the database and `storage/`.
-2. Download the latest release from [socly_public](https://github.com/dadaloop82/socly_public)
-   (branch `main` or release ZIP).
-3. Replace application files, keeping `.env`, `.env.user`, and `storage/`.
+1. Set `UPDATE_ENABLED=true` in `.env`.
+2. Update from the sidebar card (**Install**), or from the command line:
+   `php bin/update.php --apply` — git fetch + fast-forward + migrations + field seeding, same engine
+   as the button.
+3. Schedule it (nightly, fully automatic):
+
+   ```cron
+   15 4 * * * php /path/to/socly/bin/update.php --apply >> /path/to/socly/storage/logs/update.log 2>&1
+   ```
+
+The updater refuses to run on showcase instances, when `UPDATE_ENABLED=false` or when the working tree
+has local modifications, and every attempt is written to the audit log.
+
+**Manual update** (ZIP download, no git):
+
+1. Back up the database, `.env` and `storage/`.
+2. Download the latest release from this repository (branch `main` or release ZIP).
+3. Replace application files, keeping `.env`, `.env.user`, `storage/` and `plugins/`.
 4. Run `composer install --no-dev` if dependencies changed.
 5. Open the site — pending database migrations run automatically on first request.
 
-### Project layout
+## Project layout
 
 | Path | Purpose |
 |------|---------|
@@ -182,10 +112,7 @@ To update manually:
 | `storage/` | Logs, cache, sessions, install lock |
 | `docs/` | Architecture, installation and contributor docs |
 
-### License
+## License
 
 Source-available. Free for self-hosted base use. See [LICENSE](LICENSE).
 Installation services, support, and paid add-ons: [socly.it](https://socly.it).
-
-</details>
-

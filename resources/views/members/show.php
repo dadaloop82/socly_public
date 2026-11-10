@@ -222,10 +222,11 @@ $hasPhoto = !empty($fields['photo']);
                     <img src="<?= e(url('/members/'.$member['id'].'/photo')) ?>" alt="">
                 <?php else: ?>
                     <?php
-                    // Segnaposto per sesso: silhouette maschile/femminile (o neutra).
+                    // Single source of truth: the same placeholder SVG used by the photo
+                    // field and the membership card (no per-page re-drawings).
                     $avatarVariant = match ($genderRaw) {
-                        'M' => 'male',
                         'F' => 'female',
+                        'M' => 'male',
                         default => 'neutral',
                     };
                     $avatarLabel = match ($genderRaw) {
@@ -234,19 +235,7 @@ $hasPhoto = !empty($fields['photo']);
                         default => __('members.avatar_neutral'),
                     };
                     ?>
-                    <svg class="member-scheda-avatar-placeholder" viewBox="0 0 96 96" role="img"
-                         aria-label="<?= e($avatarLabel) ?>">
-                        <circle cx="48" cy="48" r="48" fill="currentColor" opacity="0.10"/>
-                        <?php if ($avatarVariant === 'female'): ?>
-                            <path d="M33 36c-2.5 6.5-2.5 13 0 19.5M63 36c2.5 6.5 2.5 13 0 19.5"
-                                  fill="none" stroke="currentColor" stroke-width="4.5" stroke-linecap="round" opacity="0.8"/>
-                            <circle cx="48" cy="38" r="13" fill="currentColor" opacity="0.6"/>
-                            <path d="M48 57c-10 0-17.5 8-19.5 21h39C65.5 65 58 57 48 57z" fill="currentColor" opacity="0.55"/>
-                        <?php else: ?>
-                            <circle cx="48" cy="38" r="14" fill="currentColor" opacity="0.7"/>
-                            <path d="M48 56c-11 0-20 8-22 22h44c-2-14-11-22-22-22z" fill="currentColor" opacity="0.55"/>
-                        <?php endif; ?>
-                    </svg>
+                    <img class="member-scheda-avatar-placeholder" src="<?= e(asset('img/avatars/placeholder-' . $avatarVariant . '.svg') . '?v=' . rawurlencode(app_version())) ?>" alt="<?= e($avatarLabel) ?>">
                 <?php endif; ?>
                 <?php if ($showStatus !== ''): ?>
                     <span class="member-scheda-status-badge badge<?= $showStatusBadge !== '' ? ' ' . e($showStatusBadge) : '' ?>">

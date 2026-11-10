@@ -38,10 +38,14 @@ $totalPages = max(1, (int) ceil(((int) $result['total']) / max(1, $perPage)));
     <div class="actions">
         <?php if ($canManage): ?>
             <a class="btn<?= empty($hasAnyMembers) ? ' is-first-cta' : '' ?>" href="<?= e(url('/members/create')) ?>"><?= e(__('members.create')) ?></a>
-            <a class="btn btn-ghost" href="<?= e(url('/members/import')) ?>"><?= e(__('members.import.button')) ?></a>
+            <a class="btn-icon" href="<?= e(url('/members/import')) ?>" aria-label="<?= e(__('members.import.button')) ?>">
+                <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true" focusable="false"><path fill="currentColor" d="M12 3l5 5h-3v6h-4V8H7l5-5zM5 19h14v2H5v-2z"/></svg>
+            </a>
         <?php endif; ?>
-        <a class="btn btn-ghost" href="<?= e(url('/members/export?' . http_build_query(array_filter($filters)))) ?>"><?= e(__('members.export')) ?></a>
         <a class="btn btn-ghost" href="<?= e(url('/members/export/registry?' . http_build_query(array_filter($filters)))) ?>" target="_blank" rel="noopener"><?= e(__('members.registry_export')) ?></a>
+        <a class="btn-icon" href="<?= e(url('/members/export?' . http_build_query(array_filter($filters)))) ?>" aria-label="<?= e(__('members.export')) ?>">
+            <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true" focusable="false"><path fill="currentColor" d="M12 21l-5-5h3v-6h4v6h3l-5 5zM5 3h14v2H5V3z"/></svg>
+        </a>
     </div>
 </div>
 

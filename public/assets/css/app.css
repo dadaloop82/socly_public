@@ -5283,6 +5283,20 @@ input.is-geo-forced,
   visibility: visible;
   pointer-events: auto;
 }
+/* Tessera preview: full-width block under the fields, never a squeezed side column. */
+.wizard-panel-body--tessera {
+  display: block;
+}
+.wizard-panel-body--tessera .wizard-panel-main {
+  width: 100%;
+}
+.wizard-panel-body--tessera .tessera-preview,
+.wizard-panel-body--tessera .wizard-panel-side.tessera-preview {
+  position: static;
+  width: 100%;
+  max-width: 26rem;
+  margin: 1.15rem auto 0;
+}
 .wizard-panel-side--photo .member-profile-block--photo-side {
   margin: 0;
 }

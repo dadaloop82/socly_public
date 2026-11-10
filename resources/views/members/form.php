@@ -528,6 +528,7 @@ $paymentExtraHtml = $buildProfileFieldsHtml($paymentExtraFields, \Socly\Services
     data-photo-preview-open="<?= e(__('members.photo_preview_open')) ?>"
     data-photo-preview-close="<?= e(__('members.photo_preview_close')) ?>"
     data-photo-avatar-base="<?= e(asset('img/avatars')) ?>"
+    data-photo-avatar-version="<?= e(app_version()) ?>"
     data-total-steps="<?= (int)$totalSteps ?>"
     data-cities-url="<?= e(url('/api/geo/cities')) ?>"
     data-addresses-url="<?= e(url('/api/geo/addresses')) ?>"
