@@ -84,6 +84,10 @@ versions without curated notes).
 - One-click and scheduled updates now take a backup of the previous version (code archive + database
   dump), verify the new version and the migrations, and roll back automatically on failure, reporting
   version, backup path and outcome in the UI flash, the CLI and the audit log
+- First-note movements generated automatically (membership payments, imports) now require manual
+  approval: they are listed as “Awaiting approval” and do not affect balances, charts, budgets or
+  reports until approved (one by one or in bulk); manually entered movements are approved on save
+- First note: multi-select with bulk approve and delete, like the member list
 - The registry PDF hides the fiscal code, birth and residence columns when those profile fields are
   disabled
 - The registry PDF prints the membership-card QR next to the card number when the card stores one

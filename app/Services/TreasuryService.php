@@ -77,6 +77,14 @@ final class TreasuryService
         return (int) ($this->db->fetch('SELECT COUNT(*) AS c FROM treasury_movements')['c'] ?? 0);
     }
 
+    /** Movements waiting for manual approval (they do not count towards balances yet). */
+    public function pendingCount(): int
+    {
+        return (int) ($this->db->fetch(
+            'SELECT COUNT(*) AS c FROM treasury_movements WHERE approved_at IS NULL'
+        )['c'] ?? 0);
+    }
+
     /** @return list<string> */
     public static function movementKinds(): array
     {
@@ -338,7 +346,8 @@ final class TreasuryService
             "SELECT
                 COALESCE(SUM(CASE WHEN direction = 'income' THEN amount ELSE 0 END), 0) AS inc,
                 COALESCE(SUM(CASE WHEN direction = 'expense' THEN amount ELSE 0 END), 0) AS exp
-             FROM treasury_movements"
+             FROM treasury_movements
+             WHERE approved_at IS NOT NULL"
         );
         $balance = (float) ($balanceRow['inc'] ?? 0) - (float) ($balanceRow['exp'] ?? 0);
 
@@ -418,7 +427,7 @@ final class TreasuryService
         foreach ($this->db->fetchAll(
             'SELECT account, direction, COALESCE(SUM(amount), 0) AS total
              FROM treasury_movements
-             WHERE 1 = 1' . $where . '
+             WHERE approved_at IS NOT NULL' . $where . '
              GROUP BY account, direction',
             $params
         ) as $row) {
@@ -440,7 +449,7 @@ final class TreasuryService
         foreach ($this->db->fetchAll(
             "SELECT transfer_account, COALESCE(SUM(amount), 0) AS total
              FROM treasury_movements
-             WHERE direction = 'transfer' AND transfer_account IS NOT NULL AND transfer_account <> ''" . $where . '
+             WHERE direction = 'transfer' AND approved_at IS NOT NULL AND transfer_account IS NOT NULL AND transfer_account <> ''" . $where . '
              GROUP BY transfer_account',
             $params
         ) as $row) {
@@ -670,7 +679,8 @@ final class TreasuryService
             "SELECT
                 COALESCE(SUM(CASE WHEN direction = 'income' THEN amount ELSE 0 END), 0) AS inc,
                 COALESCE(SUM(CASE WHEN direction = 'expense' THEN amount ELSE 0 END), 0) AS exp
-             FROM treasury_movements"
+             FROM treasury_movements
+             WHERE approved_at IS NOT NULL"
         );
         $income = (float) ($totals['inc'] ?? 0);
         $expense = (float) ($totals['exp'] ?? 0);
@@ -696,7 +706,7 @@ final class TreasuryService
         $rows = $this->db->fetchAll(
             "SELECT category, COALESCE(SUM(amount), 0) AS total
              FROM treasury_movements
-             WHERE direction = :dir
+             WHERE direction = :dir AND approved_at IS NOT NULL
              GROUP BY category
              HAVING total > 0
              ORDER BY total DESC
@@ -897,6 +907,9 @@ final class TreasuryService
         $data['attachment_path'] = $attachment['path'] ?? null;
         $data['document_id'] = $attachment['document_id'] ?? null;
         $data['created_by'] = $userId;
+        // Manually entered movements are approved on save; automatic ones stay pending.
+        $data['approved_at'] = date('Y-m-d H:i:s');
+        $data['approved_by'] = $userId;
         $id = $this->db->insert('treasury_movements', $data);
         $this->audit->log('treasury.created', 'treasury', (string) $id, null, $input, $ip);
         return ['ok' => true, 'id' => $id];
@@ -940,6 +953,68 @@ final class TreasuryService
             'movement_date' => $data['movement_date'],
         ], $ip);
         return ['ok' => true, 'id' => $id];
+    }
+
+    /**
+     * Approve a pending movement: only approved movements count towards balances, charts,
+     * budgets and reports.
+     *
+     * @return array{ok:bool,message?:string}
+     */
+    public function approve(int $id, string $ip, ?int $userId = null): array
+    {
+        $row = $this->db->fetch('SELECT id, approved_at FROM treasury_movements WHERE id = :id', ['id' => $id]);
+        if ($row === null) {
+            return ['ok' => false, 'message' => __('errors.404')];
+        }
+        if (trim((string) ($row['approved_at'] ?? '')) !== '') {
+            return ['ok' => true];
+        }
+        $this->db->update('treasury_movements', [
+            'approved_at' => date('Y-m-d H:i:s'),
+            'approved_by' => $userId,
+        ], 'id = :id', ['id' => $id]);
+        $this->audit->log('treasury.approved', 'treasury', (string) $id, null, ['approved_by' => $userId], $ip);
+        return ['ok' => true];
+    }
+
+    /** @param list<int> $ids @return int Number of approved movements */
+    public function approveMany(array $ids, string $ip, ?int $userId = null): int
+    {
+        $count = 0;
+        foreach (array_unique(array_map('intval', $ids)) as $id) {
+            if ($id < 1) {
+                continue;
+            }
+            if (!empty($this->approve($id, $ip, $userId)['ok'])) {
+                $count++;
+            }
+        }
+        return $count;
+    }
+
+    /** @param list<int> $ids @return int Number of deleted movements */
+    public function deleteMany(array $ids, string $ip): int
+    {
+        $count = 0;
+        foreach (array_unique(array_map('intval', $ids)) as $id) {
+            if ($id < 1) {
+                continue;
+            }
+            $row = $this->db->fetch('SELECT * FROM treasury_movements WHERE id = :id', ['id' => $id]);
+            if ($row === null) {
+                continue;
+            }
+            $this->db->query('DELETE FROM treasury_movements WHERE id = :id', ['id' => $id]);
+            $this->audit->log('treasury.deleted', 'treasury', (string) $id, [
+                'direction' => $row['direction'] ?? null,
+                'amount' => $row['amount'] ?? null,
+                'movement_date' => $row['movement_date'] ?? null,
+                'description' => $row['description'] ?? null,
+            ], null, $ip);
+            $count++;
+        }
+        return $count;
     }
 
     public function autoRegisterFromPayment(int $paymentId, int $memberId, float $amount, string $method, string $date): void

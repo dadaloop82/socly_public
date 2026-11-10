@@ -9354,6 +9354,9 @@ button.setup-scrape-logo-frame:focus-visible .setup-scrape-logo-overlay {
 .stat-positive { color: #0f7a48; }
 .stat-negative { color: #b42318; }
 .treasury-ledger .treasury-row-income { background: color-mix(in srgb, #0f7a48 6%, transparent); }
+.treasury-col-check { width: 2.25rem; }
+.treasury-pending-badge { margin-left: 0.35rem; }
+.treasury-pending-banner { margin: 0 0 0.85rem; }
 .treasury-ledger .treasury-row-expense { background: color-mix(in srgb, #b42318 5%, transparent); }
 /* Giroconto: liquidity moved between own accounts — neutral, balance-safe row. */
 .treasury-ledger .treasury-row-transfer { background: color-mix(in srgb, #5b6472 7%, transparent); }

@@ -243,7 +243,7 @@ final class BudgetService
         $rows = $this->db->fetchAll(
             "SELECT direction, category, COALESCE(SUM(amount), 0) AS total
              FROM treasury_movements
-             WHERE YEAR(movement_date) = :y AND direction IN ('income', 'expense')
+             WHERE YEAR(movement_date) = :y AND approved_at IS NOT NULL AND direction IN ('income', 'expense')
              GROUP BY direction, category
              ORDER BY direction ASC, total DESC",
             ['y' => $year - 1]
@@ -575,7 +575,7 @@ final class BudgetService
             foreach ($this->db->fetchAll(
                 "SELECT budget_item_id, direction, COALESCE(SUM(amount), 0) AS total
                  FROM treasury_movements
-                 WHERE budget_item_id IN (" . $in . ")
+                 WHERE approved_at IS NOT NULL AND budget_item_id IN (" . $in . ")
                  GROUP BY budget_item_id, direction"
             ) as $row) {
                 $actuals[(int) $row['budget_item_id']][(string) $row['direction']] = (float) ($row['total'] ?? 0);
@@ -645,6 +645,7 @@ final class BudgetService
             "SELECT direction, category, COUNT(*) AS movements, COALESCE(SUM(amount), 0) AS total
              FROM treasury_movements
              WHERE budget_item_id IS NULL
+               AND approved_at IS NOT NULL
                AND YEAR(movement_date) = :y
                AND direction IN ('income', 'expense')
              GROUP BY direction, category
@@ -813,7 +814,7 @@ final class BudgetService
         foreach ($this->db->fetchAll(
             "SELECT budget_item_id, movement_date, direction, amount, description, invoice_number, invoice_date, beneficiary
              FROM treasury_movements
-             WHERE budget_item_id IN (" . $in . ")
+             WHERE approved_at IS NOT NULL AND budget_item_id IN (" . $in . ")
              ORDER BY movement_date ASC, id ASC"
         ) as $row) {
             $out[(int) $row['budget_item_id']][] = $row;

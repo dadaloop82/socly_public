@@ -67,6 +67,7 @@ final class TreasuryController extends BaseController
             'beneficiaries' => $this->treasury->beneficiaries(),
             'currency' => $this->currency,
             'hasAnyMovements' => $this->treasury->movementCount() > 0,
+            'pending_count' => $this->treasury->pendingCount(),
         ]);
     }
 
@@ -177,6 +178,60 @@ final class TreasuryController extends BaseController
             redirect('/treasury/create');
         }
         $this->flash('success', __('treasury.saved'));
+        redirect('/treasury');
+    }
+
+    /** Approve a pending first-note movement (only approved movements count). */
+    public function approve(Request $request, string $id): void
+    {
+        require_component('treasury');
+        if (!can('treasury.manage')) {
+            http_response_code(403);
+            $this->render('errors/403');
+            return;
+        }
+        $result = $this->treasury->approve((int) $id, $request->ip(), auth_user()['id'] ?? null);
+        if (empty($result['ok'])) {
+            $this->flash('errors', [(string) ($result['message'] ?? __('validation.required'))]);
+        } else {
+            $this->flash('success', __('treasury.approved'));
+        }
+        redirect('/treasury');
+    }
+
+    /** Bulk actions on the first note: approve or delete the selected movements. */
+    public function bulk(Request $request): void
+    {
+        require_component('treasury');
+        if (!can('treasury.manage')) {
+            http_response_code(403);
+            $this->render('errors/403');
+            return;
+        }
+        $raw = $request->input('movement_ids', []);
+        $ids = [];
+        if (is_array($raw)) {
+            foreach ($raw as $value) {
+                $id = (int) $value;
+                if ($id > 0) {
+                    $ids[$id] = $id;
+                }
+            }
+        }
+        if ($ids === []) {
+            $this->flash('errors', ['treasury' => __('treasury.bulk_none')]);
+            redirect('/treasury');
+        }
+        $action = (string) $request->input('action', '');
+        if ($action === 'approve') {
+            $count = $this->treasury->approveMany(array_values($ids), $request->ip(), auth_user()['id'] ?? null);
+            $this->flash('success', __('treasury.bulk_approved', ['count' => (string) $count]));
+        } elseif ($action === 'delete') {
+            $count = $this->treasury->deleteMany(array_values($ids), $request->ip());
+            $this->flash('success', __('treasury.bulk_deleted', ['count' => (string) $count]));
+        } else {
+            $this->flash('errors', ['treasury' => __('validation.required')]);
+        }
         redirect('/treasury');
     }
 

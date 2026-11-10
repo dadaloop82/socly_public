@@ -181,6 +181,7 @@ document.addEventListener('DOMContentLoaded', () => {
   initMemberForm();
   initMemberWizard();
   initMembersList();
+  initTreasuryBulk();
   initLegalDocs();
   initSetupSmtp(document);
   initSetupWizard();
@@ -2528,6 +2529,56 @@ function initMemberWizard() {
   });
 
   showStep(1, { animateEnter: false });
+}
+
+function initTreasuryBulk() {
+  const root = document.querySelector('[data-treasury-list]');
+  if (!root) return;
+  const bar = root.querySelector('[data-treasury-bulk-bar]');
+  if (!bar) return;
+  const count = root.querySelector('[data-treasury-bulk-count]');
+  const form = document.querySelector('[data-treasury-bulk-form]');
+  const actionInput = form?.querySelector('[data-treasury-bulk-action-input]');
+  const idHost = form?.querySelector('[data-treasury-bulk-id-host]');
+  const checkboxes = [...root.querySelectorAll('[data-treasury-select]')];
+
+  const selectedIds = () => checkboxes.filter((cb) => cb.checked).map((cb) => cb.value);
+
+  const sync = () => {
+    const ids = selectedIds();
+    const open = ids.length > 0;
+    bar.classList.toggle('is-open', open);
+    bar.setAttribute('aria-hidden', open ? 'false' : 'true');
+    if (count) count.textContent = String(ids.length);
+  };
+
+  checkboxes.forEach((cb) => cb.addEventListener('change', sync));
+
+  bar.querySelectorAll('[data-treasury-bulk-action]').forEach((btn) => {
+    btn.addEventListener('click', async () => {
+      const ids = selectedIds();
+      if (ids.length === 0 || !form || !actionInput || !idHost) return;
+      const action = btn.getAttribute('data-treasury-bulk-action') || '';
+      const message = btn.dataset.confirm || '';
+      if (message !== '') {
+        const ok = typeof appConfirm === 'function'
+          ? await appConfirm(message, { danger: action === 'delete' })
+          : window.confirm(message);
+        if (!ok) return;
+      }
+      actionInput.value = action;
+      idHost.replaceChildren();
+      ids.forEach((id) => {
+        const input = document.createElement('input');
+        input.type = 'hidden';
+        input.name = 'movement_ids[]';
+        input.value = id;
+        idHost.appendChild(input);
+      });
+      form.hidden = false;
+      form.requestSubmit();
+    });
+  });
 }
 
 function initMembersList() {

@@ -212,13 +212,39 @@ foreach ($categories as $categoryOption) {
 </form>
 <?php endif; ?>
 
-<div class="panel">
+<div class="panel" data-treasury-list>
     <div class="panel-header">
         <div>
             <h2 class="section-title"><?= e(__('treasury.ledger')) ?></h2>
             <p class="section-lede"><?= e(__('treasury.ledger_lede')) ?></p>
         </div>
     </div>
+    <?php $pendingCount = (int) ($pending_count ?? 0); ?>
+    <?php if ($pendingCount > 0): ?>
+        <div class="alert alert-warn treasury-pending-banner" role="status">
+            <span><?= e(__('treasury.pending_banner', ['count' => (string) $pendingCount])) ?></span>
+        </div>
+    <?php endif; ?>
+    <?php if ($canManage): ?>
+        <div class="members-bulk-bar" data-treasury-bulk-bar aria-hidden="true">
+            <div class="members-bulk-bar-inner">
+                <span class="members-bulk-count" data-treasury-bulk-count>0</span>
+                <span class="muted"><?= e(__('treasury.bulk_selected')) ?></span>
+                <div class="members-bulk-actions">
+                    <button type="button" class="btn btn-sm btn-ghost" data-treasury-bulk-action="approve"><?= e(__('treasury.bulk_approve')) ?></button>
+                    <button type="button" class="btn btn-sm btn-ghost is-danger" data-treasury-bulk-action="delete" data-confirm="<?= e(__('treasury.bulk_delete_confirm')) ?>">
+                        <?= row_action_icon_svg('delete') ?>
+                        <span><?= e(__('treasury.bulk_delete')) ?></span>
+                    </button>
+                </div>
+            </div>
+        </div>
+        <form method="post" action="<?= e(url('/treasury/bulk')) ?>" data-treasury-bulk-form hidden>
+            <?= csrf_field() ?>
+            <input type="hidden" name="action" value="" data-treasury-bulk-action-input>
+            <span data-treasury-bulk-id-host></span>
+        </form>
+    <?php endif; ?>
     <?php if ($movement_groups === []): ?>
         <div class="empty-state">
             <?php if (trim((string) ($search_query ?? '')) !== ''): ?>
@@ -240,6 +266,9 @@ foreach ($categories as $categoryOption) {
                         <table class="treasury-ledger">
                             <thead>
                             <tr>
+                                <?php if ($canManage): ?>
+                                    <th class="treasury-col-check" aria-label="<?= e(__('treasury.bulk_selected')) ?>"></th>
+                                <?php endif; ?>
                                 <th><?= e(__('treasury.operation_date')) ?></th>
                                 <th><?= e(__('treasury.description')) ?></th>
                                 <th><?= e(__('treasury.method')) ?></th>
@@ -268,6 +297,7 @@ foreach ($categories as $categoryOption) {
                                     $desc = $memberLabel;
                                 }
                                 $rowId = (int) ($row['id'] ?? 0);
+                                $isPending = trim((string) ($row['approved_at'] ?? '')) === '';
                                 $editUrl = $canManage ? url('/treasury/' . $rowId . '/edit') : '';
                                 $accountKey = \Socly\Services\TreasuryService::normalizeAccount((string) ($row['account'] ?? ''));
                                 $accountLabel = $accountKey !== '' ? (string) __('treasury.account_' . $accountKey) : '';
@@ -304,7 +334,23 @@ foreach ($categories as $categoryOption) {
                                         aria-label="<?= e(__('treasury.edit') . ': ' . ($desc !== '' ? $desc : (string) $rowId)) ?>"
                                     <?php endif; ?>
                                 >
-                                    <td><?= e(format_date($row['movement_date'] ?? null) ?: '—') ?></td>
+                                    <?php if ($canManage): ?>
+                                        <td class="treasury-col-check" data-stop-row-nav>
+                                            <?= field('checkbox', [
+                                                'name' => 'treasury_pick_' . $rowId,
+                                                'check_value' => (string) $rowId,
+                                                'label' => '',
+                                                'context' => 'inline',
+                                                'attrs' => ['data-treasury-select' => true],
+                                            ]) ?>
+                                        </td>
+                                    <?php endif; ?>
+                                    <td>
+                                        <?= e(format_date($row['movement_date'] ?? null) ?: '—') ?>
+                                        <?php if ($isPending): ?>
+                                            <span class="badge badge-warn treasury-pending-badge"><?= e(__('treasury.pending')) ?></span>
+                                        <?php endif; ?>
+                                    </td>
                                     <td><?= e($desc !== '' ? $desc : '—') ?></td>
                                     <td>
                                         <?php if ($isTransfer && $transferLabel !== ''): ?>
@@ -329,6 +375,12 @@ foreach ($categories as $categoryOption) {
                                     <td class="amount-expense"><?= $isIncome || $isTransfer ? '—' : e($currency->format($amount)) ?></td>
                                     <td class="doc-row-actions" data-stop-row-nav>
                                         <?= row_actions([
+                                            [
+                                                'icon' => 'check',
+                                                'label' => __('treasury.approve'),
+                                                'show' => $canManage && $isPending,
+                                                'form_action' => url('/treasury/' . $rowId . '/approve'),
+                                            ],
                                             [
                                                 'icon' => 'file',
                                                 'label' => __('treasury.upload_document'),
