@@ -107,8 +107,35 @@ final class MemberActionService
             'payment_reminder' => $this->bulkPaymentReminder($ids, $ip),
             'group_email' => $this->bulkGroupEmail($ids, $payload, $ip),
             'mass_renewal' => $this->bulkMassRenewal($ids, $ip),
+            'delete' => $this->bulkDelete($ids, $ip),
             default => ['ok' => false, 'errors' => ['action' => __('validation.in')]],
         };
+    }
+
+    /**
+     * Cancella i soci selezionati (il cestino della lista): ogni socio passa
+     * dalla stessa `MemberService::delete()` usata dalla scheda, quindi con
+     * audit log e pulizia di pagamenti, tessere e movimenti collegati.
+     *
+     * @param list<int> $ids
+     * @return array{ok:bool,processed?:int,skipped?:int,errors?:array<string,string>}
+     */
+    private function bulkDelete(array $ids, string $ip): array
+    {
+        $processed = 0;
+        $skipped = 0;
+        foreach ($ids as $id) {
+            try {
+                $this->members->delete($id, $ip);
+                $processed++;
+            } catch (\Throwable) {
+                $skipped++;
+            }
+        }
+        if ($processed === 0) {
+            return ['ok' => false, 'errors' => ['members' => __('members.bulk_delete_failed')], 'processed' => 0, 'skipped' => $skipped];
+        }
+        return ['ok' => true, 'processed' => $processed, 'skipped' => $skipped];
     }
 
     /** @param list<int> $ids */

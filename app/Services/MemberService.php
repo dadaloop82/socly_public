@@ -1217,10 +1217,15 @@ final class MemberService
         $where = ['1=1'];
         $params = [];
         if (!empty($filters['q'])) {
-            $where[] = '(m.member_number LIKE :q OR m.notes LIKE :q OR EXISTS (
-                SELECT 1 FROM member_field_values v WHERE v.member_id = m.id AND v.value LIKE :q
+            // Placeholder distinti: con ATTR_EMULATE_PREPARES=false PDO non
+            // permette di riusare lo stesso segnaposto nella stessa query.
+            $where[] = '(m.member_number LIKE :q1 OR m.notes LIKE :q2 OR EXISTS (
+                SELECT 1 FROM member_field_values v WHERE v.member_id = m.id AND v.value LIKE :q3
             ))';
-            $params['q'] = '%' . $filters['q'] . '%';
+            $like = '%' . $filters['q'] . '%';
+            $params['q1'] = $like;
+            $params['q2'] = $like;
+            $params['q3'] = $like;
         }
         if (!empty($filters['status'])) {
             $where[] = 'm.status = :status';
@@ -1244,6 +1249,22 @@ final class MemberService
             "SELECT COUNT(*) AS c FROM members m INNER JOIN member_types mt ON mt.id = m.member_type_id WHERE {$whereSql}",
             $params
         )['c'];
+        // Ordinamento per colonna (whitelist): asc/desc su ogni intestazione lista.
+        $sortKey = (string) ($filters['sort'] ?? 'member_number');
+        $dir = strtolower((string) ($filters['dir'] ?? 'asc')) === 'desc' ? 'DESC' : 'ASC';
+        $orderSql = match ($sortKey) {
+            'name' => "(SELECT v.value FROM member_field_values v
+                            INNER JOIN member_field_definitions d ON d.id = v.field_definition_id AND d.`key` = 'last_name'
+                            WHERE v.member_id = m.id LIMIT 1) {$dir},
+                       (SELECT v.value FROM member_field_values v
+                            INNER JOIN member_field_definitions d ON d.id = v.field_definition_id AND d.`key` = 'first_name'
+                            WHERE v.member_id = m.id LIMIT 1) {$dir}",
+            'type' => "mt.name_json {$dir}",
+            'status' => "m.status {$dir}",
+            'payment', 'balance_due' => "m.balance_due {$dir}",
+            'expires' => "mp.ends_on {$dir}",
+            default => "CAST(m.member_number AS UNSIGNED) {$dir}",
+        };
         $offset = max(0, ($page - 1) * $perPage);
         $items = $this->db->fetchAll(
             "SELECT m.*, mt.name_json AS type_name_json, mt.price AS type_price,
@@ -1252,7 +1273,7 @@ final class MemberService
              INNER JOIN member_types mt ON mt.id = m.member_type_id
              INNER JOIN membership_periods mp ON mp.id = m.membership_period_id
              WHERE {$whereSql}
-             ORDER BY m.member_number ASC
+             ORDER BY {$orderSql}, m.id ASC
              LIMIT {$perPage} OFFSET {$offset}",
             $params
         );
@@ -1266,7 +1287,7 @@ final class MemberService
             $item['gdpr_badges'] = $this->gdprBadges($item);
         }
         unset($item);
-        return ['items' => $items, 'total' => $total];
+        return ['items' => $items, 'total' => $total, 'per_page' => $perPage, 'page' => $page];
     }
 
     public function find(int $id): ?array
@@ -2217,6 +2238,27 @@ final class MemberService
             ];
         }
         return $out;
+    }
+
+    /**
+     * Tessera associativa del socio (numero, emissione, scadenza, QR).
+     *
+     * @return array<string,mixed>|null
+     */
+    public function membershipCard(int $memberId): ?array
+    {
+        if ($memberId < 1) {
+            return null;
+        }
+        try {
+            $row = $this->db->fetch(
+                'SELECT * FROM membership_cards WHERE member_id = :m ORDER BY is_active DESC, id DESC LIMIT 1',
+                ['m' => $memberId]
+            );
+        } catch (\Throwable) {
+            return null;
+        }
+        return $row === null ? null : $row;
     }
 
     /**

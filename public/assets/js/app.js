@@ -2586,15 +2586,20 @@ function initMembersList() {
   };
 
   root.querySelectorAll('[data-members-bulk-action]').forEach((btn) => {
-    btn.addEventListener('click', () => {
+    btn.addEventListener('click', async () => {
       const action = btn.getAttribute('data-members-bulk-action') || '';
       if (action === 'group_email') {
         emailDialog?.showModal?.();
         return;
       }
-      if (action === 'mass_renewal') {
-        const ok = window.confirm(btn.dataset.confirm || '');
-        if (!ok) return;
+      if (action === 'mass_renewal' || action === 'delete') {
+        const message = btn.dataset.confirm || '';
+        if (message !== '') {
+          const ok = typeof appConfirm === 'function'
+            ? await appConfirm(message, { danger: action === 'delete' })
+            : window.confirm(message);
+          if (!ok) return;
+        }
       }
       submitBulk(action);
     });
@@ -13548,5 +13553,40 @@ function initBudgetGrid(scope = document) {
       return;
     }
     startProgress();
+  });
+})();
+
+/* Copia negli appunti un valore testuale (es. codice QR della tessera). */
+(() => {
+  document.querySelectorAll('[data-copy-text]').forEach((button) => {
+    button.addEventListener('click', async () => {
+      const value = String(button.getAttribute('data-copy-text') || '');
+      if (value === '') return;
+      let ok = false;
+      try {
+        if (navigator.clipboard?.writeText) {
+          await navigator.clipboard.writeText(value);
+          ok = true;
+        }
+      } catch {
+        ok = false;
+      }
+      if (!ok) {
+        const field = document.createElement('textarea');
+        field.value = value;
+        document.body.appendChild(field);
+        field.select();
+        try { ok = document.execCommand('copy'); } catch { ok = false; }
+        field.remove();
+      }
+      if (!ok) return;
+      const done = String(button.dataset.copied || '');
+      const original = button.textContent;
+      button.classList.add('is-copied');
+      if (done !== '') {
+        button.textContent = done;
+        window.setTimeout(() => { button.textContent = original; button.classList.remove('is-copied'); }, 1800);
+      }
+    });
   });
 })();

@@ -142,12 +142,18 @@ foreach ($fieldDefs as $def) {
 }
 $birthSummary = '';
 $birthDateFmt = $birthDateRaw !== '' ? format_date($birthDateRaw) : '';
+$genderRaw = strtoupper(trim((string) ($fields['gender'] ?? '')));
+$bornVerbKey = match ($genderRaw) {
+    'M' => 'members.born_m',
+    'F' => 'members.born_f',
+    default => 'members.born_x',
+};
 if ($birthPlace !== '' && $birthDateFmt !== '') {
-    $birthSummary = __('members.born_at_on', ['place' => $birthPlace, 'date' => $birthDateFmt]);
+    $birthSummary = __('members.born_at_on', ['verb' => __($bornVerbKey), 'place' => $birthPlace, 'date' => $birthDateFmt]);
 } elseif ($birthPlace !== '') {
-    $birthSummary = __('members.born_in', ['place' => $birthPlace]);
+    $birthSummary = __('members.born_in', ['verb' => __($bornVerbKey), 'place' => $birthPlace]);
 } elseif ($birthDateFmt !== '') {
-    $birthSummary = __('members.born_on', ['date' => $birthDateFmt]);
+    $birthSummary = __('members.born_on', ['verb' => __($bornVerbKey), 'date' => $birthDateFmt]);
 }
 if ($birthSummary !== '' && $age !== null) {
     $birthSummary .= ' (' . __('members.age_years', ['age' => (string) $age]) . ')';
@@ -214,6 +220,33 @@ $hasPhoto = !empty($fields['photo']);
             <div class="member-scheda-avatar<?= $hasPhoto ? '' : ' is-empty' ?>">
                 <?php if ($hasPhoto): ?>
                     <img src="<?= e(url('/members/'.$member['id'].'/photo')) ?>" alt="">
+                <?php else: ?>
+                    <?php
+                    // Segnaposto per sesso: silhouette maschile/femminile (o neutra).
+                    $avatarVariant = match ($genderRaw) {
+                        'M' => 'male',
+                        'F' => 'female',
+                        default => 'neutral',
+                    };
+                    $avatarLabel = match ($genderRaw) {
+                        'M' => __('members.avatar_male'),
+                        'F' => __('members.avatar_female'),
+                        default => __('members.avatar_neutral'),
+                    };
+                    ?>
+                    <svg class="member-scheda-avatar-placeholder" viewBox="0 0 96 96" role="img"
+                         aria-label="<?= e($avatarLabel) ?>">
+                        <circle cx="48" cy="48" r="48" fill="currentColor" opacity="0.10"/>
+                        <?php if ($avatarVariant === 'female'): ?>
+                            <path d="M48 20c9 0 15 6.5 15 15.5 0 5-2 9-5 12 3 2 5.5 5 7 9l-6 2.5c-2.5-6.5-6.5-10-11-10s-8.5 3.5-11 10L31 56.5c1.5-4 4-7 7-9-3-3-5-7-5-12C33 26.5 39 20 48 20z"
+                                  fill="currentColor" opacity="0.75"/>
+                            <circle cx="48" cy="56" r="9" fill="currentColor" opacity="0.55"/>
+                            <path d="M48 65c-9 0-16 6-18 16h36c-2-10-9-16-18-16z" fill="currentColor" opacity="0.55"/>
+                        <?php else: ?>
+                            <circle cx="48" cy="38" r="14" fill="currentColor" opacity="0.7"/>
+                            <path d="M48 56c-11 0-20 8-22 22h44c-2-14-11-22-22-22z" fill="currentColor" opacity="0.55"/>
+                        <?php endif; ?>
+                    </svg>
                 <?php endif; ?>
                 <?php if ($showStatus !== ''): ?>
                     <span class="member-scheda-status-badge badge<?= $showStatusBadge !== '' ? ' ' . e($showStatusBadge) : '' ?>">
@@ -352,6 +385,38 @@ $hasPhoto = !empty($fields['photo']);
                     <div class="value"><?= e((string) $item['value']) ?></div>
                 </div>
                 <?php endforeach; ?>
+                <?php
+                $card = is_array($card ?? null) ? $card : null;
+                if ($card !== null):
+                    $cardNumber = trim((string) ($card['card_number'] ?? ''));
+                    $cardIssued = format_date((string) ($card['issued_on'] ?? ''));
+                    $cardExpires = format_date((string) ($card['expires_on'] ?? ''));
+                    if ($cardExpires === '' ) {
+                        $cardExpires = format_date((string) ($member['period_ends_on'] ?? ''));
+                    }
+                    $cardQr = trim((string) ($card['qr_code'] ?? ''));
+                ?>
+                <?php if ($cardNumber !== ''): ?>
+                <div class="member-scheda-fact">
+                    <div class="label"><?= e(__('members.card_block')) ?></div>
+                    <div class="value">
+                        <strong><?= e($cardNumber) ?></strong>
+                        <?php if ($cardIssued !== ''): ?> · <?= e(__('members.card_issued_on', ['date' => $cardIssued])) ?><?php endif; ?>
+                        <?php if ($cardExpires !== ''): ?> · <?= e(__('members.card_expires_on', ['date' => $cardExpires])) ?><?php endif; ?>
+                        <?php if (empty($card['is_active'])): ?> · <span class="badge badge-muted"><?= e(__('members.card_inactive')) ?></span><?php endif; ?>
+                    </div>
+                </div>
+                <?php endif; ?>
+                <?php if ($cardQr !== ''): ?>
+                <div class="member-scheda-fact">
+                    <div class="label"><?= e(__('members.card_qr')) ?></div>
+                    <div class="value member-card-qr">
+                        <code><?= e($cardQr) ?></code>
+                        <button type="button" class="btn btn-sm btn-ghost" data-copy-text="<?= e($cardQr) ?>" data-copied="<?= e(__('members.card_qr_copied')) ?>"><?= e(__('members.copy')) ?></button>
+                    </div>
+                </div>
+                <?php endif; ?>
+                <?php endif; ?>
             </div>
             <?php if (!empty($member['notes'])): ?>
                 <p class="member-scheda-notes"><strong><?= e(__('members.notes')) ?>:</strong> <?= e($member['notes']) ?></p>

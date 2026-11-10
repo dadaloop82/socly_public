@@ -507,7 +507,7 @@ final class MemberImportService
             'default_type_id' => (string) (int) ($types[0]['id'] ?? 0),
             'status' => 'active',
             'update_existing' => '1',
-            'update_strategy' => 'fill_empty',
+            'update_strategy' => 'overwrite',
             'duplicate_policy' => 'first',
             'import_payments' => '1',
             'register_treasury' => '0',
@@ -2089,11 +2089,17 @@ final class MemberImportService
         }
 
         $current = $this->memberFieldValues($memberId);
+        $written = [];
         foreach ($incoming as $key => $value) {
             if (!$isNew && $strategy === 'keep') {
                 continue;
             }
             if (!$isNew && $strategy === 'fill_empty' && N::text((string) ($current[$key] ?? '')) !== '') {
+                continue;
+            }
+            // In "aggiorna i valori cambiati" una cella vuota del CSV non deve
+            // cancellare quello che l'associazione ha già registrato.
+            if (!$isNew && $strategy === 'overwrite' && N::text($value) === '') {
                 continue;
             }
             $fieldId = (int) ($fields[$key]['id'] ?? 0);
@@ -2113,8 +2119,13 @@ final class MemberImportService
                     'value' => $value,
                 ]);
             }
+            $written[$key] = $value;
         }
-        $this->fieldValueCache[$memberId] = $this->mergeFieldCache($current, $incoming);
+        // La cache riflette solo i valori realmente scritti (non quelli saltati
+        // dalla strategia), così le righe successive leggono dati coerenti.
+        if ($written !== []) {
+            $this->fieldValueCache[$memberId] = $this->mergeFieldCache($current, $written);
+        }
     }
 
     /**

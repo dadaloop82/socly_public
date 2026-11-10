@@ -63,6 +63,8 @@ final class MemberController extends BaseController
             'status' => (string) $request->input('status', ''),
             'member_type_id' => $request->input('member_type_id', ''),
             'payment' => (string) $request->input('payment', ''),
+            'sort' => (string) $request->input('sort', ''),
+            'dir' => (string) $request->input('dir', ''),
         ];
         $page = max(1, (int) $request->input('page', 1));
         $result = $this->members->search($filters, $page);
@@ -159,6 +161,7 @@ final class MemberController extends BaseController
             'member' => $member,
             'fieldDefs' => $this->members->fieldDefinitions(true),
             'payments' => $this->payments->forMember((int) $id),
+            'card' => $this->members->membershipCard((int) $id),
             'enrollmentMethod' => $this->enrollment->method(),
             'enrollmentArtifact' => $this->enrollment->latestArtifact((int) $id),
             'needsGuardian' => $this->members->memberNeedsGuardian($member),
@@ -373,6 +376,8 @@ final class MemberController extends BaseController
             'status' => (string) $request->input('status', ''),
             'member_type_id' => $request->input('member_type_id', ''),
             'payment' => (string) $request->input('payment', ''),
+            'sort' => (string) $request->input('sort', ''),
+            'dir' => (string) $request->input('dir', ''),
         ];
         $result = $this->members->search($filters, 1, 100000);
         $defs = $this->members->fieldDefinitions(true);

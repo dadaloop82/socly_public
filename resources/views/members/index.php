@@ -2,9 +2,33 @@
 /** @var array<string,mixed> $filters */
 /** @var int $page */
 /** @var array{active_count:int,balance_due_total:float,pending_count:int} $summary */
+$filters = is_array($filters ?? null) ? $filters : [];
+$filters += ['q' => '', 'status' => '', 'member_type_id' => '', 'payment' => '', 'sort' => '', 'dir' => ''];
 $redirectBack = url('/members?' . http_build_query(array_filter(array_merge($filters, ['page' => $page > 1 ? $page : null]))));
 $canManage = can('members.manage');
 $canPayments = can('payments.manage');
+$sortKey = (string) ($filters['sort'] ?? 'member_number');
+$sortDir = strtolower((string) ($filters['dir'] ?? 'asc')) === 'desc' ? 'desc' : 'asc';
+$sortUrl = static function (string $key) use ($filters, $sortKey, $sortDir): string {
+    $next = ($sortKey === $key && $sortDir === 'asc') ? 'desc' : 'asc';
+    $params = $filters;
+    $params['sort'] = $key;
+    $params['dir'] = $next;
+    return url('/members?' . http_build_query(array_filter($params, static fn ($v): bool => $v !== '' && $v !== null)));
+};
+$sortHeader = static function (string $key, string $label) use ($sortKey, $sortDir, $sortUrl): string {
+    $active = $sortKey === $key;
+    $icon = $active ? ($sortDir === 'asc' ? '↑' : '↓') : '↕';
+    $aria = $active
+        ? ($sortDir === 'asc' ? __('members.sort_desc_hint') : __('members.sort_asc_hint'))
+        : __('members.sort_hint');
+    return '<th class="th-sort' . ($active ? ' is-sorted' : '') . '">'
+        . '<a href="' . e($sortUrl($key)) . '" title="' . e($aria) . '" aria-label="' . e($label . ' — ' . $aria) . '">'
+        . e($label) . ' <span class="th-sort-icon" aria-hidden="true">' . $icon . '</span></a></th>';
+};
+$today = new DateTimeImmutable('today');
+$perPage = (int) ($result['per_page'] ?? 25);
+$totalPages = max(1, (int) ceil(((int) $result['total']) / max(1, $perPage)));
 ?>
 <div class="page-header">
     <div class="titles">
@@ -119,6 +143,10 @@ $canPayments = can('payments.manage');
                     <button type="button" class="btn btn-sm btn-ghost" data-members-bulk-action="payment_reminder" <?= empty($mailReady) ? 'disabled title="' . e(__('mail.required_for_reminder')) . '"' : '' ?>><?= e(__('members.bulk_remind')) ?></button>
                     <button type="button" class="btn btn-sm btn-ghost" data-members-bulk-action="group_email" <?= empty($mailReady) ? 'disabled title="' . e(__('mail.required_for_group')) . '"' : '' ?>><?= e(__('members.bulk_email')) ?></button>
                     <button type="button" class="btn btn-sm btn-ghost" data-members-bulk-action="mass_renewal" data-confirm="<?= e(__('members.bulk_renew_confirm')) ?>"><?= e(__('members.bulk_renew')) ?></button>
+                    <button type="button" class="btn btn-sm btn-ghost is-danger" data-members-bulk-action="delete" data-confirm="<?= e(__('members.bulk_delete_confirm')) ?>">
+                        <?= row_action_icon_svg('delete') ?>
+                        <span><?= e(__('members.bulk_delete')) ?></span>
+                    </button>
                 </div>
             </div>
         </div>
@@ -139,14 +167,14 @@ $canPayments = can('payments.manage');
                             ],
                         ]) ?></th>
                     <?php endif; ?>
-                    <th><?= e(__('members.member_number')) ?></th>
-                    <th><?= e(__('members.type')) ?></th>
-                    <th><?= e(__('members.status')) ?></th>
+                    <?= $sortHeader('name', (string) __('members.column_member')) ?>
+                    <?= $sortHeader('type', (string) __('members.type')) ?>
+                    <?= $sortHeader('status', (string) __('members.status')) ?>
                     <?php if (!empty($gdprEnabled)): ?>
                         <th><?= e(__('members.gdpr_column')) ?></th>
                     <?php endif; ?>
-                    <th><?= e(__('members.payment')) ?></th>
-                    <th><?= e(__('members.balance_due')) ?></th>
+                    <?= $sortHeader('payment', (string) __('members.payment')) ?>
+                    <?= $sortHeader('balance_due', (string) __('members.balance_due')) ?>
                     <th><?= e(__('members.actions')) ?></th>
                 </tr>
                 </thead>
@@ -173,11 +201,32 @@ $canPayments = can('payments.manage');
                     };
                     $periodEndsOn = format_date((string) ($item['period_ends_on'] ?? ''));
                     $periodLabel = trim((string) ($item['period_label'] ?? ''));
-                    $metaBits = ['#' . (string) $item['member_number']];
-                    if ($periodEndsOn !== '') {
-                        $metaBits[] = __('members.expires_short', ['date' => $periodEndsOn]);
-                    } elseif ($periodLabel !== '') {
-                        $metaBits[] = $periodLabel;
+                    // Sotto il nome: sesso, età aggiornata e torta nel giorno del compleanno.
+                    $genderRaw = strtoupper(trim((string) ($item['fields']['gender'] ?? '')));
+                    $genderLabel = match ($genderRaw) {
+                        'M' => (string) __('members.gender_m'),
+                        'F' => (string) __('members.gender_f'),
+                        'X' => (string) __('members.gender_x'),
+                        default => '',
+                    };
+                    $birthRaw = trim((string) ($item['fields']['birth_date'] ?? ''));
+                    $age = null;
+                    $isBirthday = false;
+                    if (preg_match('/^\d{4}-\d{2}-\d{2}$/', $birthRaw) === 1) {
+                        try {
+                            $birthDt = new DateTimeImmutable($birthRaw);
+                            $age = (int) $birthDt->diff($today)->y;
+                            $isBirthday = $birthDt->format('m-d') === $today->format('m-d');
+                        } catch (Throwable) {
+                            $age = null;
+                        }
+                    }
+                    $metaBits = [];
+                    if ($genderLabel !== '') {
+                        $metaBits[] = $genderLabel;
+                    }
+                    if ($age !== null) {
+                        $metaBits[] = (string) __('members.age_years', ['age' => (string) $age]);
                     }
                     ?>
                     <tr
@@ -202,7 +251,7 @@ $canPayments = can('payments.manage');
                             ]) ?>
                         </td>
                         <?php endif; ?>
-                        <td data-label="<?= e(__('members.member_number')) ?>">
+                        <td data-label="<?= e(__('members.column_member')) ?>">
                             <div class="member-list-identity">
                                 <?php if ($issueLabels !== []): ?>
                                     <span
@@ -222,12 +271,28 @@ $canPayments = can('payments.manage');
                                 <div>
                                     <a class="member-list-name" href="<?= e(url('/members/'.$item['id'])) ?>">
                                         <?= e($fullName !== '' ? $fullName : $item['member_number']) ?>
+                                        <?php if ($isBirthday): ?>
+                                            <span class="member-birthday" title="<?= e(__('members.birthday_today')) ?>" aria-label="<?= e(__('members.birthday_today')) ?>">
+                                                <svg viewBox="0 0 24 24" width="15" height="15" aria-hidden="true" focusable="false">
+                                                    <path fill="currentColor" d="M12 2.2c.9 1.1 1.6 2 1.6 2.9a1.6 1.6 0 0 1-3.2 0c0-.9.7-1.8 1.6-2.9zM5 9h14a1 1 0 0 1 1 1v3H4v-3a1 1 0 0 1 1-1zm-1 6h16v5.3a.7.7 0 0 1-.7.7H4.7a.7.7 0 0 1-.7-.7V15zm2.2-1.6c.9 0 1.6-.6 2-1.2.4.6 1.1 1.2 2 1.2s1.6-.6 2-1.2c.4.6 1.1 1.2 2 1.2s1.6-.6 2-1.2c.4.6 1.1 1.2 2 1.2V15h-12v-1.6z"/>
+                                                </svg>
+                                            </span>
+                                        <?php endif; ?>
                                     </a>
-                                    <div class="muted member-list-meta"><?= e(implode(' · ', $metaBits)) ?></div>
+                                    <?php if ($metaBits !== []): ?>
+                                        <div class="muted member-list-meta"><?= e(implode(' · ', $metaBits)) ?></div>
+                                    <?php endif; ?>
                                 </div>
                             </div>
                         </td>
-                        <td data-label="<?= e(__('members.type')) ?>"><?= e(localized($item['type_name_json'])) ?></td>
+                        <td data-label="<?= e(__('members.type')) ?>">
+                            <div><?= e(localized($item['type_name_json'])) ?></div>
+                            <?php if ($periodEndsOn !== ''): ?>
+                                <div class="muted members-type-expiry"><?= e(__('members.card_expiry_short', ['date' => $periodEndsOn])) ?></div>
+                            <?php elseif ($periodLabel !== ''): ?>
+                                <div class="muted members-type-expiry"><?= e($periodLabel) ?></div>
+                            <?php endif; ?>
+                        </td>
                         <td data-label="<?= e(__('members.status')) ?>">
                             <span class="badge<?= $statusBadgeClass !== '' ? ' ' . e($statusBadgeClass) : '' ?>"><?= e(__('members.status_'.$memberStatus)) ?></span>
                         </td>
@@ -289,6 +354,49 @@ $canPayments = can('payments.manage');
                 </tbody>
             </table>
         </div>
+        <?php if ($totalPages > 1): ?>
+            <?php
+            // Pager: finestra di pagine attorno a quella corrente + prima/ultima.
+            $pageWindow = [];
+            $pageWindow[] = 1;
+            for ($p = max(2, $page - 1); $p <= min($totalPages - 1, $page + 1); $p++) {
+                $pageWindow[] = $p;
+            }
+            if ($totalPages > 1) {
+                $pageWindow[] = $totalPages;
+            }
+            $pageWindow = array_values(array_unique($pageWindow));
+            sort($pageWindow);
+            $pageUrl = static function (int $target) use ($filters): string {
+                $params = array_filter(array_merge($filters, ['page' => $target > 1 ? $target : null]), static fn ($v): bool => $v !== '' && $v !== null);
+                return url('/members?' . http_build_query($params));
+            };
+            ?>
+            <nav class="list-pager" aria-label="<?= e(__('members.pager_aria')) ?>">
+                <?php if ($page > 1): ?>
+                    <a class="list-pager-step" href="<?= e($pageUrl($page - 1)) ?>" rel="prev">← <?= e(__('members.pager_prev')) ?></a>
+                <?php else: ?>
+                    <span class="list-pager-step is-disabled">← <?= e(__('members.pager_prev')) ?></span>
+                <?php endif; ?>
+                <div class="list-pager-pages">
+                    <?php $previous = 0; foreach ($pageWindow as $p): ?>
+                        <?php if ($previous > 0 && $p > $previous + 1): ?>
+                            <span class="list-pager-gap" aria-hidden="true">…</span>
+                        <?php endif; ?>
+                        <a class="list-pager-page<?= $p === $page ? ' is-current' : '' ?>"
+                           href="<?= e($pageUrl($p)) ?>"
+                           <?= $p === $page ? 'aria-current="page"' : '' ?>><?= $p ?></a>
+                        <?php $previous = $p; ?>
+                    <?php endforeach; ?>
+                </div>
+                <?php if ($page < $totalPages): ?>
+                    <a class="list-pager-step" href="<?= e($pageUrl($page + 1)) ?>" rel="next"><?= e(__('members.pager_next')) ?> →</a>
+                <?php else: ?>
+                    <span class="list-pager-step is-disabled"><?= e(__('members.pager_next')) ?> →</span>
+                <?php endif; ?>
+                <span class="muted list-pager-info"><?= e(__('members.pager_info', ['page' => (string) $page, 'pages' => (string) $totalPages])) ?></span>
+            </nav>
+        <?php endif; ?>
     <?php endif; ?>
 </div>
 
