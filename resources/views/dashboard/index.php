@@ -20,6 +20,7 @@ $hasMembers = (int) ($stats['members_total'] ?? 0) > 0;
 $hasCollections = array_sum($charts['collections']['values'] ?? []) > 0
     || array_sum($charts['collections_pending']['values'] ?? []) > 0;
 $hasTypes = array_sum($charts['by_type']['values'] ?? []) > 0;
+$hasCards = array_sum($charts['cards_distribution']['values'] ?? []) > 0;
 $treasuryCharts = $widgets['treasury']['charts'] ?? [];
 $treasuryFlowValues = $treasuryCharts['flow']['values'] ?? [0, 0];
 $hasTreasuryFlow = ((float) ($treasuryFlowValues[0] ?? 0) + (float) ($treasuryFlowValues[1] ?? 0)) > 0;
@@ -139,6 +140,7 @@ $defaultTab = $tabs[0]['id'] ?? '';
                     <?php endif; ?>
                     <?php if ($hasMembers): ?>
                         <a class="btn btn-ghost btn-sm" href="<?= e(url('/members')) ?>"><?= e(__('dashboard.open_members')) ?></a>
+                        <a class="btn btn-ghost btn-sm" href="<?= e(url('/statistics')) ?>"><?= e(__('statistics.open')) ?></a>
                     <?php endif; ?>
                 </div>
             </div>
@@ -241,10 +243,26 @@ $defaultTab = $tabs[0]['id'] ?? '';
                             <canvas id="chart-standing" aria-label="<?= e(__('dashboard.chart_standing_title')) ?>"></canvas>
                         </div>
                     </div>
+                    <div class="panel chart-panel">
+                        <div class="panel-header">
+                            <div>
+                                <h2 class="section-title"><?= e(__('statistics.chart_cards_status')) ?></h2>
+                                <p class="section-lede"><?= e(__('statistics.chart_cards_status_lede')) ?></p>
+                            </div>
+                        </div>
+                        <?php if (!$hasCards): ?>
+                            <div class="empty-state compact"><?= e(__('dashboard.chart_empty')) ?></div>
+                        <?php else: ?>
+                            <div class="chart-frame chart-frame-donut">
+                                <canvas id="chart-cards" aria-label="<?= e(__('statistics.chart_cards_status')) ?>"></canvas>
+                            </div>
+                        <?php endif; ?>
+                    </div>
                 </div>
             <?php endif; ?>
         </section>
     <?php endif; ?>
+
 
     <?php if (!empty($enabled['treasury']) && is_array($widgets['treasury'] ?? null)): ?>
         <section

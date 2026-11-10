@@ -18,6 +18,7 @@ use Socly\Controllers\I18nController;
 use Socly\Controllers\PluginController;
 use Socly\Controllers\SettingsController;
 use Socly\Controllers\SetupController;
+use Socly\Controllers\StatisticsController;
 use Socly\Controllers\TreasuryController;
 use Socly\Controllers\UpdateController;
 use Socly\Controllers\UserController;
@@ -76,6 +77,7 @@ use Socly\Services\RuntsDetailScrapeService;
 use Socly\Services\RuntsLookupService;
 use Socly\Services\SettingsService;
 use Socly\Services\SetupService;
+use Socly\Services\StatisticsService;
 use Socly\Services\TreasuryService;
 use Socly\Services\GitHubIssueService;
 use Socly\Services\UpdateService;
@@ -385,6 +387,13 @@ $app->bind(DashboardController::class, fn (App $a) => new DashboardController(
     $a->get(DeadlineService::class),
     $a->get(DocumentService::class),
     $a->get(AssociationPeopleService::class),
+    $a->get(CurrencyService::class)
+));
+$app->bind(StatisticsService::class, fn (App $a) => new StatisticsService($a->get(Database::class)));
+$app->bind(StatisticsController::class, fn (App $a) => new StatisticsController(
+    $a->get(View::class),
+    $a->get(StatisticsService::class),
+    $a->get(ComponentService::class),
     $a->get(CurrencyService::class)
 ));
 $app->bind(MemberActionService::class, fn (App $a) => new MemberActionService(

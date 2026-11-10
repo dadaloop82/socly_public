@@ -14,9 +14,10 @@ use Socly\Controllers\MemberImportController;
 use Socly\Controllers\OrgController;
 use Socly\Controllers\ApiController;
 use Socly\Controllers\PluginController;
+use Socly\Controllers\SessionController;
 use Socly\Controllers\SettingsController;
 use Socly\Controllers\SetupController;
-use Socly\Controllers\SessionController;
+use Socly\Controllers\StatisticsController;
 use Socly\Controllers\TreasuryController;
 use Socly\Controllers\UpdateController;
 use Socly\Controllers\UserController;
@@ -88,6 +89,7 @@ $router->post('/updates/install', [UpdateController::class, 'install'], 'setting
 $router->get('/api/updates/check', [UpdateController::class, 'check'], null, ['mw.locale', 'mw.install']);
 
 $router->get('/dashboard', [DashboardController::class, 'index'], 'dashboard.view', ['mw.locale', 'mw.install', 'mw.auth']);
+$router->get('/statistics', [StatisticsController::class, 'index'], 'members.view', ['mw.locale', 'mw.install', 'mw.auth']);
 
 $router->get('/api/geo/cities', [ApiController::class, 'cities'], null, ['mw.locale', 'mw.install', 'mw.setup_or_auth']);
 $router->get('/api/geo/addresses', [ApiController::class, 'addresses'], null, ['mw.locale', 'mw.install', 'mw.setup_or_auth']);

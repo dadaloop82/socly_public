@@ -126,6 +126,14 @@ versions without curated notes).
   `BatchMode=yes` stop a web request from hanging on a credential prompt
 - Updates: `php bin/update.php --apply --force` applies the remote branch even when the check reports
   “nothing to do” (recovery for an instance stuck on an older release)
+- Dashboard (members tab): new **Card distribution** doughnut (active / expired / revoked) plus a
+  **Detailed statistics** button
+- New **Statistics** page (`/statistics`, sidebar entry under Members): KPI row (members, active
+  members, cards issued, active cards, expiring soon, collected, members owing, settled share) and
+  four tabs — Demographics (gender, age bands, e-mail provider, cities, language), Sign-ups
+  (24-month trend, seasons, weekday, top-10 months table), Cards (status, type, year) and Financial
+  (12-month collections, by method, by reason). Every chart is a bar or a doughnut built from real
+  data; events, attendance and feedback are not offered because the product stores no such data
 - The registry PDF hides the fiscal code, birth and residence columns when those profile fields are
   disabled
 - The registry PDF prints the membership-card QR next to the card number when the card stores one

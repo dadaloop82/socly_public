@@ -194,6 +194,8 @@ document.addEventListener('DOMContentLoaded', () => {
   initPlaceSuggest(document);
   initDashboardTabs();
   initDashboardCharts();
+  initStatisticsTabs();
+  initStatisticsCharts();
   initTreasuryCharts();
   initTreasuryBudgetImpute(document);
   initAuthLoginI18nLive();
@@ -12829,8 +12831,157 @@ function initDashboardCharts() {
     });
   }
 
+  const cardsEl = document.getElementById('chart-cards');
+  if (cardsEl) {
+    new Chart(cardsEl, {
+      type: 'doughnut',
+      data: {
+        labels: data.cards_distribution?.labels || [],
+        datasets: [{
+          data: data.cards_distribution?.values || [],
+          backgroundColor: [brand, accent, '#9AA5A2'],
+          borderColor: '#fff',
+          borderWidth: 3,
+          hoverOffset: 6,
+        }],
+      },
+      options: donutOptions(),
+    });
+  }
+
   root.dataset.chartsReady = '1';
 }
+
+function initStatisticsTabs() {
+  const root = document.querySelector('[data-statistics-tabs]');
+  if (!root) {
+    return;
+  }
+  const tabs = [...root.querySelectorAll('[data-statistics-tab]')];
+  const panels = [...root.querySelectorAll('[data-statistics-panel]')];
+  if (tabs.length === 0 || panels.length === 0) {
+    return;
+  }
+
+  const activate = (id, { updateHash = true } = {}) => {
+    const valid = tabs.some((tab) => tab.getAttribute('data-statistics-tab') === id);
+    const target = valid ? id : tabs[0].getAttribute('data-statistics-tab');
+    tabs.forEach((tab) => {
+      const selected = tab.getAttribute('data-statistics-tab') === target;
+      tab.setAttribute('aria-selected', selected ? 'true' : 'false');
+      tab.tabIndex = selected ? 0 : -1;
+    });
+    panels.forEach((panel) => {
+      panel.hidden = panel.getAttribute('data-statistics-panel') !== target;
+    });
+    if (updateHash) {
+      const nextHash = `#stats-${target}`;
+      if (location.hash !== nextHash) {
+        history.replaceState(null, '', nextHash);
+      }
+    }
+    window.requestAnimationFrame(() => initStatisticsCharts());
+  };
+
+  tabs.forEach((tab) => {
+    tab.addEventListener('click', () => activate(tab.getAttribute('data-statistics-tab')));
+  });
+
+  const hash = (location.hash || '').replace(/^#/, '');
+  activate(
+    hash.startsWith('stats-') ? hash.slice(6) : (root.getAttribute('data-default-tab') || tabs[0].getAttribute('data-statistics-tab')),
+    { updateHash: false }
+  );
+}
+
+/** Feed every visible statistics canvas from the JSON payload baked into the view. */
+function initStatisticsCharts() {
+  if (typeof Chart === 'undefined') {
+    return;
+  }
+  const palette = ['#0D6E66', '#B84A1B', '#2A8F85', '#C56A3A', '#4A6B66', '#8B3A16', '#6FA8A1', '#E08A5C', '#9AA5A2', '#084B46'];
+  const money = (value) =>
+    `${Number(value || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €`;
+
+  Chart.defaults.font.family = '"Manrope", "Avenir Next", "Segoe UI", sans-serif';
+  Chart.defaults.color = 'rgba(11, 31, 28, 0.55)';
+  Chart.defaults.plugins.legend.labels.usePointStyle = true;
+  Chart.defaults.plugins.legend.labels.boxWidth = 8;
+  Chart.defaults.plugins.legend.labels.padding = 16;
+
+  document.querySelectorAll('[data-statistics-charts]').forEach((root) => {
+    const panel = root.closest('[data-statistics-panel]');
+    if (panel && panel.hidden) {
+      return;
+    }
+    let payload;
+    try {
+      payload = JSON.parse(root.getAttribute('data-statistics-charts') || '{}');
+    } catch (err) {
+      return;
+    }
+    const charts = payload.charts || {};
+    Object.entries(charts).forEach(([key, spec]) => {
+      const canvas = document.getElementById(`stat-chart-${key}`);
+      if (!canvas || Chart.getChart(canvas)) {
+        return;
+      }
+      const values = Array.isArray(spec.values) ? spec.values : [];
+      if (values.length === 0) {
+        return;
+      }
+      const isPie = spec.type === 'doughnut' || spec.type === 'pie';
+      const horizontal = Boolean(spec.horizontal);
+      const isMoney = Boolean(spec.money);
+      new Chart(canvas, {
+        type: spec.type || 'bar',
+        data: {
+          labels: Array.isArray(spec.labels) ? spec.labels : [],
+          datasets: [{
+            data: values,
+            backgroundColor: isPie ? palette : 'rgba(13, 110, 102, 0.78)',
+            hoverBackgroundColor: isPie ? palette : '#084B46',
+            borderWidth: isPie ? 2 : 0,
+            borderColor: isPie ? '#ffffff' : 'transparent',
+            borderRadius: isPie ? 0 : 6,
+            borderSkipped: false,
+            maxBarThickness: 34,
+          }],
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          indexAxis: horizontal ? 'y' : 'x',
+          plugins: {
+            legend: { display: isPie, position: 'bottom' },
+            tooltip: {
+              callbacks: {
+                label: (ctx) => {
+                  const value = ctx.parsed.y ?? ctx.parsed.x ?? ctx.parsed;
+                  return `${ctx.label}: ${isMoney ? money(value) : value}`;
+                },
+              },
+            },
+          },
+          scales: isPie
+            ? {}
+            : {
+              x: { grid: { display: false } },
+              y: {
+                beginAtZero: true,
+                grid: { color: 'rgba(11, 31, 28, 0.08)' },
+                ticks: {
+                  precision: 0,
+                  callback: (value) => (isMoney ? money(value) : value),
+                },
+              },
+            },
+        },
+      });
+    });
+  });
+}
+
 
 function initTreasuryCharts() {
   const root = document.querySelector('[data-treasury-charts]');

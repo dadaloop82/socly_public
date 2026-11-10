@@ -2383,6 +2383,14 @@ final class MemberService
         $settled = (int) ($this->db->fetch('SELECT COUNT(*) c FROM members WHERE balance_due <= 0')['c'] ?? 0);
         $overdue = (int) ($this->db->fetch('SELECT COUNT(*) c FROM members WHERE balance_due > 0')['c'] ?? 0);
 
+        // Membership-card split: active, expired, revoked/disabled.
+        $cardStats = $this->db->fetch(
+            'SELECT SUM(CASE WHEN is_active = 1 AND (expires_on IS NULL OR expires_on >= CURDATE()) THEN 1 ELSE 0 END) AS active,
+                    SUM(CASE WHEN is_active = 1 AND expires_on IS NOT NULL AND expires_on < CURDATE() THEN 1 ELSE 0 END) AS expired,
+                    SUM(CASE WHEN is_active = 0 THEN 1 ELSE 0 END) AS inactive
+             FROM membership_cards'
+        ) ?? [];
+
         return [
             'collections' => [
                 'labels' => $collectionLabels,
@@ -2430,6 +2438,18 @@ final class MemberService
                     __('dashboard.chart_overdue'),
                 ],
                 'values' => [$settled, $overdue],
+            ],
+            'cards_distribution' => [
+                'labels' => [
+                    __('statistics.card_active'),
+                    __('statistics.card_expired'),
+                    __('statistics.card_inactive'),
+                ],
+                'values' => [
+                    (int) ($cardStats['active'] ?? 0),
+                    (int) ($cardStats['expired'] ?? 0),
+                    (int) ($cardStats['inactive'] ?? 0),
+                ],
             ],
         ];
     }
