@@ -1485,9 +1485,9 @@ final class MemberService
      *
      * @return array{ok:bool,fixed:list<string>,errors:list<string>}
      */
-    public function autoFixProfile(int $memberId, string $ip): array
+    public function autoFixProfile(int $memberId, string $ip, ?array $member = null): array
     {
-        $member = $this->find($memberId);
+        $member ??= $this->find($memberId);
         if ($member === null) {
             return ['ok' => false, 'fixed' => [], 'errors' => [(string) __('members.autofix_unavailable')]];
         }
@@ -1543,6 +1543,84 @@ final class MemberService
             'value' => $value,
         ]);
         return true;
+    }
+
+    /**
+     * How many members could be fixed automatically right now (fiscal code derivable).
+     */
+    public function autoFixableCount(): int
+    {
+        $present = static function (string $key, string $table, bool $gender = false): string {
+            $valueTest = $gender
+                ? "UPPER(TRIM({$table}.`value`)) IN ('M','F')"
+                : "TRIM(COALESCE({$table}.`value`, '')) <> ''";
+            return "EXISTS (SELECT 1 FROM member_field_values {$table}"
+                . " INNER JOIN member_field_definitions d{$table} ON d{$table}.id = {$table}.field_definition_id"
+                . " WHERE {$table}.member_id = m.id AND d{$table}.`key` = '{$key}' AND {$valueTest})";
+        };
+        $missingFiscal = "NOT EXISTS (SELECT 1 FROM member_field_values vcf"
+            . " INNER JOIN member_field_definitions dcf ON dcf.id = vcf.field_definition_id"
+            . " WHERE vcf.member_id = m.id AND dcf.`key` = 'fiscal_code'"
+            . " AND TRIM(COALESCE(vcf.`value`, '')) <> '')";
+        $where = implode(' AND ', [
+            $missingFiscal,
+            $present('first_name', 'vfn'),
+            $present('last_name', 'vln'),
+            $present('birth_date', 'vbd'),
+            $present('birth_place', 'vbp'),
+            $present('gender', 'vgn', true),
+        ]);
+        $row = $this->db->fetch("SELECT COUNT(*) AS c FROM members m WHERE {$where}");
+        return (int) ($row['c'] ?? 0);
+    }
+
+    /**
+     * Run the automatic fix on every member flagged with missing mandatory data.
+     * Values are derived only from stored data — nothing is invented.
+     *
+     * @return array{scanned:int,fixed:int,skipped:int,failed:int}
+     */
+    public function autoFixAllMissing(string $ip, int $limit = 500): array
+    {
+        [$condition, $params] = $this->missingDataCondition('m');
+        if ($condition === '1=0') {
+            return ['scanned' => 0, 'fixed' => 0, 'skipped' => 0, 'failed' => 0];
+        }
+        $limit = max(1, min(2000, $limit));
+        $rows = $this->db->fetchAll(
+            "SELECT m.id FROM members m INNER JOIN member_types mt ON mt.id = m.member_type_id"
+            . " WHERE {$condition} ORDER BY m.id ASC LIMIT {$limit}",
+            $params
+        );
+        $fixed = 0;
+        $skipped = 0;
+        $failed = 0;
+        foreach ($rows as $row) {
+            $memberId = (int) ($row['id'] ?? 0);
+            if ($memberId < 1) {
+                continue;
+            }
+            $fields = $this->fieldValues($memberId);
+            if ($this->autoFixPlan(['id' => $memberId, 'fields' => $fields]) === []) {
+                $skipped++;
+                continue;
+            }
+            $result = $this->autoFixProfile($memberId, $ip, ['id' => $memberId, 'fields' => $fields]);
+            if (!empty($result['ok'])) {
+                $fixed++;
+            } else {
+                $failed++;
+            }
+        }
+        if ($fixed > 0) {
+            $this->audit->log('member.autofix_bulk', 'system', null, null, [
+                'scanned' => count($rows),
+                'fixed' => $fixed,
+                'skipped' => $skipped,
+                'failed' => $failed,
+            ], $ip);
+        }
+        return ['scanned' => count($rows), 'fixed' => $fixed, 'skipped' => $skipped, 'failed' => $failed];
     }
 
     /**

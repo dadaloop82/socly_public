@@ -2727,7 +2727,7 @@ button.btn-icon:hover:not(:disabled) {
   gap: 0.65rem;
   margin-bottom: 0.65rem;
 }
-/* List banner: "N members with missing data" + one-click filter. */
+/* List banner: "N members with missing data" + bulk fix / one-click filter. */
 .member-issues-banner {
   display: flex;
   align-items: center;
@@ -2735,6 +2735,16 @@ button.btn-icon:hover:not(:disabled) {
   gap: 0.65rem 1rem;
   flex-wrap: wrap;
   margin: 0 0 0.85rem;
+}
+.member-issues-banner-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+.member-issues-autofix {
+  display: inline-flex;
+  margin: 0;
 }
 /* Auto-fix action next to "fix in edit member". */
 .member-anomaly-autofix {

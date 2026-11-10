@@ -158,21 +158,32 @@ $totalPages = max(1, (int) ceil(((int) $result['total']) / max(1, $perPage)));
         </div>
         <?php endif; ?>
         <?php
-        // Banner: members with missing mandatory data, one click to filter them.
+        // Banner: members with missing mandatory data — fix in bulk (only derivable values) or filter.
         $issuesCount = (int) ($result['issues_count'] ?? 0);
         $issuesActive = !empty($filters['issues']);
+        $autofixCount = (int) ($autofixCount ?? 0);
+        $issuesAutofix = $canManage && $autofixCount > 0;
         $issuesClearUrl = url('/members?' . http_build_query(array_filter(array_merge($filters, ['issues' => null]))));
         $issuesFilterUrl = url('/members?' . http_build_query(array_filter(array_merge($filters, ['issues' => '1', 'page' => null]))));
         ?>
-        <?php if ($issuesActive): ?>
-            <div class="alert alert-warn member-issues-banner" role="status">
-                <span><?= e(__('members.issues_filter_active', ['count' => (string) $issuesCount])) ?></span>
-                <a class="btn btn-sm btn-ghost" href="<?= e($issuesClearUrl) ?>"><?= e(__('members.issues_filter_clear')) ?></a>
-            </div>
-        <?php elseif ($issuesCount > 0): ?>
-            <div class="alert alert-warn member-issues-banner" role="status">
-                <span><?= e(__('members.issues_banner', ['count' => (string) $issuesCount])) ?></span>
-                <a class="btn btn-sm" href="<?= e($issuesFilterUrl) ?>"><?= e(__('members.issues_filter_link')) ?></a>
+        <?php if ($issuesActive || $issuesCount > 0): ?>
+            <div class="alert alert-error member-issues-banner" role="status">
+                <span><?= e($issuesActive
+                    ? __('members.issues_filter_active', ['count' => (string) $issuesCount])
+                    : __('members.issues_banner', ['count' => (string) $issuesCount])) ?></span>
+                <div class="member-issues-banner-actions">
+                    <?php if ($issuesAutofix): ?>
+                        <form method="post" action="<?= e(url('/members/autofix-all')) ?>" class="member-issues-autofix">
+                            <?= csrf_field() ?>
+                            <button class="btn btn-sm" type="submit"><?= e(__('members.autofix_all_button', ['count' => (string) $autofixCount])) ?></button>
+                        </form>
+                    <?php endif; ?>
+                    <?php if ($issuesActive): ?>
+                        <a class="btn btn-sm btn-ghost" href="<?= e($issuesClearUrl) ?>"><?= e(__('members.issues_filter_clear')) ?></a>
+                    <?php else: ?>
+                        <a class="btn btn-sm btn-ghost" href="<?= e($issuesFilterUrl) ?>"><?= e(__('members.issues_filter_link')) ?></a>
+                    <?php endif; ?>
+                </div>
             </div>
         <?php endif; ?>
         <div class="table-wrap embedded members-table-wrap">

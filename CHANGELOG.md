@@ -76,6 +76,9 @@ versions without curated notes).
 - The missing-data triangle is red and pulsing, the “Missing: …” label is translated in IT/DE/EN, the
   list shows a banner with the number of incomplete members (one click filters only those) and the
   member page offers “Fix automatically” when the fiscal code can be derived from stored data
+- The incomplete-members banner is red and can fix the whole list at once (“Fix N automatically”),
+  reporting how many were corrected and how many lack the data needed; values are only derived from
+  stored data, never invented
 - Anonymous telemetry counters pointed at non-existent table/column names and always reported zero
 
 ### Changed

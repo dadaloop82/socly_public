@@ -117,6 +117,7 @@ $router->post('/members/import/header', [MemberImportController::class, 'header'
 $router->post('/members/import/cancel', [MemberImportController::class, 'cancel'], 'members.manage', ['mw.locale', 'mw.install', 'mw.auth', 'mw.csrf']);
 $router->get('/members/create', [MemberController::class, 'create'], 'members.manage', ['mw.locale', 'mw.install', 'mw.auth']);
 $router->post('/members/bulk', [MemberController::class, 'bulk'], 'members.manage', ['mw.locale', 'mw.install', 'mw.auth', 'mw.csrf']);
+$router->post('/members/autofix-all', [MemberController::class, 'autoFixAll'], 'members.manage', ['mw.locale', 'mw.install', 'mw.auth', 'mw.csrf']);
 $router->post('/members', [MemberController::class, 'store'], 'members.manage', ['mw.locale', 'mw.install', 'mw.auth', 'mw.csrf']);
 $router->post('/members/enrollment/otp', [MemberController::class, 'sendEnrollmentOtp'], 'members.manage', ['mw.locale', 'mw.install', 'mw.auth', 'mw.csrf']);
 $router->get('/members/{id}', [MemberController::class, 'show'], 'members.view', ['mw.locale', 'mw.install', 'mw.auth']);

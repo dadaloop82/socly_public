@@ -76,6 +76,7 @@ final class MemberController extends BaseController
             'page' => $page,
             'types' => $this->members->types(),
             'hasAnyMembers' => $this->members->totalCount() > 0,
+            'autofixCount' => $this->members->autoFixableCount(),
             'gdprEnabled' => $this->members->isGdprEnabled(),
             'summary' => $this->memberActions->listSummaryMetrics(),
             'mailReady' => $this->mail->isReady(),
@@ -195,6 +196,30 @@ final class MemberController extends BaseController
             $this->flash('errors', array_values(array_map(static fn ($v): string => (string) $v, $errors)));
         }
         redirect('/members/' . (int) $id);
+    }
+
+    /** Run the automatic fix on every member with missing mandatory data (no invented values). */
+    public function autoFixAll(Request $request): void
+    {
+        $this->guardMembers();
+        if (!can('members.manage')) {
+            http_response_code(403);
+            $this->render('errors/403');
+            return;
+        }
+        $result = $this->members->autoFixAllMissing($request->ip());
+        $fixed = (int) ($result['fixed'] ?? 0);
+        $unfixable = (int) ($result['skipped'] ?? 0) + (int) ($result['failed'] ?? 0);
+        if ($fixed > 0) {
+            $this->flash('success', __('members.autofix_all_success', [
+                'fixed' => (string) $fixed,
+                'scanned' => (string) (int) ($result['scanned'] ?? 0),
+                'skipped' => (string) $unfixable,
+            ]));
+        } else {
+            $this->flash('errors', [__('members.autofix_all_none')]);
+        }
+        redirect('/members?issues=1');
     }
 
     public function edit(Request $request, string $id): void
