@@ -508,7 +508,7 @@ final class MemberImportService
             'duplicate_policy' => 'first',
             'import_payments' => '1',
             'register_treasury' => '0',
-            'treasury_date_source' => 'registration',
+            'treasury_date_source' => 'payment',
             'accept_consents' => '1',
             'create_cards' => '1',
             'default_payment_method' => 'cash',
@@ -541,8 +541,8 @@ final class MemberImportService
             ? $options['duplicate_policy'] : 'first';
         $options['default_payment_method'] = in_array($options['default_payment_method'], ['cash', 'bank', 'other'], true)
             ? $options['default_payment_method'] : 'cash';
-        $options['treasury_date_source'] = in_array($options['treasury_date_source'], ['registration', 'payment'], true)
-            ? $options['treasury_date_source'] : 'registration';
+        $options['treasury_date_source'] = in_array($options['treasury_date_source'], ['payment', 'registration'], true)
+            ? $options['treasury_date_source'] : 'payment';
         foreach (['period_id', 'default_type_id'] as $numeric) {
             $options[$numeric] = (string) max(0, (int) $options[$numeric]);
         }
@@ -2149,8 +2149,9 @@ final class MemberImportService
         }
         $paymentId = $this->db->insert('payments', $paymentData);
         if ($options['register_treasury'] === '1') {
-            // Data del movimento in prima cassa: iscrizione (predefinita) o pagamento.
-            $useRegistration = ($options['treasury_date_source'] ?? 'registration') === 'registration';
+            // Data del movimento in prima cassa: quella del pagamento (predefinita).
+            // Se il file non ha la data di pagamento si usa l'iscrizione, mai "oggi".
+            $useRegistration = ($options['treasury_date_source'] ?? 'payment') === 'registration';
             $movementDate = $useRegistration && $admittedAt !== ''
                 ? substr($admittedAt, 0, 10)
                 : substr($paymentDate, 0, 10);

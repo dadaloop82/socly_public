@@ -256,12 +256,12 @@ $kindLabels = [
         <?= field('select', [
             'name' => 'treasury_date_source',
             'label' => (string) __('members.import.opt_treasury_date'),
-            'value' => (string) ($options['treasury_date_source'] ?? 'registration'),
+            'value' => (string) ($options['treasury_date_source'] ?? 'payment'),
             'context' => 'setup',
             'include_empty' => false,
             'options' => [
-                ['value' => 'registration', 'label' => (string) __('members.import.opt_treasury_date_registration')],
                 ['value' => 'payment', 'label' => (string) __('members.import.opt_treasury_date_payment')],
+                ['value' => 'registration', 'label' => (string) __('members.import.opt_treasury_date_registration')],
             ],
         ]) ?>
         <?= field('select', [
