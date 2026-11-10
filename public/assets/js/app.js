@@ -10157,7 +10157,7 @@ function dismissFlashAlert(alertEl) {
 }
 
 function initFlashDismiss() {
-  document.querySelectorAll('[data-flash-success], .alert-error').forEach((alertEl) => {
+  document.querySelectorAll('[data-flash-success], [data-flash-error]').forEach((alertEl) => {
     // After a save we redirect to a section anchor (e.g. /settings#general): the
     // browser jumps past the banner, so keep it pinned while the user scrolls.
     if (window.location.hash !== '') {

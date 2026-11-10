@@ -384,7 +384,7 @@ if ($user && app()->isInstalled() && !$temporaryInstance && can('settings.manage
                 </div>
             <?php endif; ?>
             <?php if ($errors = flash('errors')): ?>
-                <div class="alert alert-error">
+                <div class="alert alert-error" data-flash-error role="alert">
                     <?php if (is_array($errors)): foreach ($errors as $err): ?>
                         <div><?= e(is_array($err) ? implode(', ', $err) : (string) $err) ?></div>
                     <?php endforeach; else: ?>
