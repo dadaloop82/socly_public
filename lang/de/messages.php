@@ -1757,6 +1757,7 @@ return [
         'commit_label' => 'Letzter Commit (öffentliches Repo)',
         'commit_develop_label' => 'Letzter Commit (Develop-Repo)',
         'manual_hint' => 'Aktualisieren Sie aus dem öffentlichen Repository oder aktivieren Sie die automatische Aktualisierung: UPDATE_ENABLED=true in .env setzen, dann die Schaltfläche bzw. „php bin/update.php --apply“ verwenden.',
+        'auto_unavailable' => 'Die automatische Aktualisierung ist von dieser Instanz aus nicht erreichbar (meist fehlt dem Webserver der SSH-Schlüssel für das private Repository). Aktualisieren Sie über die Kommandozeile als Benutzer mit SSH-Zugang: „php bin/update.php --apply“.',
         'notes' => 'Neuigkeiten',
         'download' => 'Herunterladen',
         'guide' => 'So aktualisieren',

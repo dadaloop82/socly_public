@@ -125,6 +125,7 @@ $year = date('Y');
         data-i18n-available-title="<?= e(__('updates.available_title')) ?>"
         data-i18n-available-text="<?= e(__('updates.available_text')) ?>"
         data-i18n-manual-hint="<?= e(__('updates.manual_hint')) ?>"
+        data-i18n-auto-unavailable="<?= e(__('updates.auto_unavailable')) ?>"
         data-i18n-login-hint="<?= e(__('auth.updates_login_hint')) ?>"
         data-i18n-notes="<?= e(__('updates.notes')) ?>"
         data-i18n-download="<?= e(__('updates.download')) ?>"

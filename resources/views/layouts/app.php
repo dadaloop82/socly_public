@@ -310,6 +310,8 @@ if ($user && app()->isInstalled() && !$temporaryInstance && can('settings.manage
                         ?>
                         <?php if (!$canAutoUpdate): ?>
                             <p class="sidebar-update-hint"><?= e(__('updates.manual_hint')) ?></p>
+                        <?php elseif (!empty($updateInfo['error'])): ?>
+                            <p class="sidebar-update-hint"><?= e(__('updates.auto_unavailable')) ?></p>
                         <?php endif; ?>
                         <div class="sidebar-update-actions">
                             <?php if ($canAutoUpdate): ?>

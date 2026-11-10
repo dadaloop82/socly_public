@@ -141,7 +141,9 @@ final class UpdateService
         // Risposta in cache (vale anche per le istanze di prova).
         if (!$force && is_file($cacheFile)) {
             $cached = json_decode((string) file_get_contents($cacheFile), true);
-            if (is_array($cached) && (($cached['checked_at'] ?? 0) + self::CACHE_TTL) > time()) {
+            if (is_array($cached)
+                && (($cached['checked_at'] ?? 0) + self::CACHE_TTL) > time()
+                && (string) ($cached['current'] ?? '') === $this->currentVersion()) {
                 $staleManifestOnly = $this->installEnabled()
                     && ($cached['source'] ?? '') === 'manifest'
                     && trim((string) ($cached['develop_version'] ?? '')) === '';
@@ -224,9 +226,18 @@ final class UpdateService
                 $publicVersion = $gitRemote;
             }
         } elseif ($this->installEnabled()) {
-            $remote = $current;
-            $source = 'git';
-            $available = false;
+            // Git checkout where `git fetch` failed (typical on web servers: the PHP user has no
+            // SSH key for the private remote). Fall back to the public manifest, otherwise the
+            // instance would report "up to date" while a newer release is published.
+            if ($publicVersion !== null) {
+                $remote = $publicVersion;
+                $source = 'manifest';
+                $available = $this->isNewer($publicVersion, $current);
+            } else {
+                $remote = $current;
+                $source = 'git';
+                $available = false;
+            }
         } elseif ($publicVersion !== null) {
             $remote = $publicVersion;
             $source = 'manifest';
@@ -754,9 +765,19 @@ final class UpdateService
             2 => ['pipe', 'w'],
         ];
         $env = $_ENV;
+        // A web request must never block on a credential prompt.
+        $env['GIT_TERMINAL_PROMPT'] = '0';
         $sshHost = trim((string) ($_ENV['UPDATE_SSH_HOST'] ?? 'github.com-socly'));
         if ($sshHost !== '') {
-            $env['GIT_SSH_COMMAND'] = 'ssh -o IdentitiesOnly=yes -o StrictHostKeyChecking=accept-new';
+            // Deploy keys live outside the web user's $HOME on most servers: allow pointing at an
+            // explicit key file (UPDATE_SSH_KEY=/path/to/deploy_key) and fail fast instead of
+            // hanging on a passphrase prompt.
+            $sshCommand = 'ssh -o IdentitiesOnly=yes -o BatchMode=yes -o StrictHostKeyChecking=accept-new';
+            $sshKey = trim((string) ($_ENV['UPDATE_SSH_KEY'] ?? ''));
+            if ($sshKey !== '') {
+                $sshCommand .= ' -i ' . escapeshellarg($sshKey);
+            }
+            $env['GIT_SSH_COMMAND'] = $sshCommand;
         }
         $proc = proc_open($cmd, $descriptors, $pipes, base_path(), $env);
         if (!is_resource($proc)) {
@@ -811,6 +832,7 @@ final class UpdateService
         $develop = trim((string) ($result['develop_version'] ?? ''));
         $source = (string) ($result['source'] ?? '');
         $installAvailable = !empty($result['install_available']);
+        $public = trim((string) ($result['public_version'] ?? ''));
 
         if ($develop !== '') {
             $result['remote'] = $develop;
@@ -820,15 +842,21 @@ final class UpdateService
             $result['remote'] = $remote !== '' ? $remote : $current;
             $result['available'] = $this->isNewer($result['remote'], $current);
         } elseif ($installAvailable) {
-            $result['remote'] = $current;
-            $result['available'] = false;
+            // One-click install available but the git remote could not be read: still surface a
+            // newer public release instead of claiming the instance is up to date.
+            if ($public !== '' && $this->isNewer($public, $current)) {
+                $result['remote'] = $public;
+                $result['available'] = true;
+            } else {
+                $result['remote'] = $current;
+                $result['available'] = false;
+            }
         } else {
             $remote = trim((string) ($result['remote'] ?? $current));
             $result['remote'] = $remote !== '' ? $remote : $current;
             $result['available'] = $this->isNewer($result['remote'], $current);
         }
 
-        $public = trim((string) ($result['public_version'] ?? ''));
         if ($develop !== '' && $public !== '' && $this->isNewer($public, $develop)) {
             $result['public_version'] = $develop;
         }

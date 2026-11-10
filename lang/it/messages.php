@@ -1761,6 +1761,7 @@ return [
         'commit_label' => 'Ultimo commit (repo pubblico)',
         'commit_develop_label' => 'Ultimo commit (repo develop)',
         'manual_hint' => 'Aggiorna dal repository pubblico oppure abilita l’aggiornamento automatico: imposta UPDATE_ENABLED=true nel file .env, poi usa il pulsante o “php bin/update.php --apply”.',
+        'auto_unavailable' => 'L’aggiornamento automatico non è raggiungibile da questa istanza (di norma al server web manca la chiave SSH del repository privato). Aggiorna da riga di comando come utente con accesso SSH: “php bin/update.php --apply”.',
         'notes' => 'Novità',
         'download' => 'Scarica',
         'guide' => 'Come aggiornare',

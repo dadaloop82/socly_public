@@ -117,6 +117,13 @@ versions without curated notes).
   larger
 - Wording (IT): payment states now read **Saldato / Parzialmente saldato / Da saldare / Non saldato**
   instead of “Pagato / Parziale / Da pagare / Non pagato”; “Importo pagato” became “Totale versato”
+- Update check: when `git fetch` fails on a git checkout (typically the web server has no SSH key for
+  the private remote) the instance no longer claims to be up to date — it falls back to the public
+  `latest.json` and reports the newer release, with a hint to update from the command line
+- Update check: the cached snapshot is invalidated when the installed version differs from the one it
+  was taken on
+- Updates: optional `UPDATE_SSH_KEY` lets the PHP user read a deploy key; `GIT_TERMINAL_PROMPT=0` and
+  `BatchMode=yes` stop a web request from hanging on a credential prompt
 - The registry PDF hides the fiscal code, birth and residence columns when those profile fields are
   disabled
 - The registry PDF prints the membership-card QR next to the card number when the card stores one

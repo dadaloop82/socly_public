@@ -11661,6 +11661,10 @@ function initAuthUpdateCheck() {
             .replace(':current', data.current || '')
             .replace(':remote', data.remote || '');
         }
+        if (data.error) {
+          const autoHint = tpl('i18nAutoUnavailable', '');
+          if (textEl && autoHint) textEl.textContent += '\n\n' + autoHint;
+        }
         if (actionsEl) {
           const links = [];
           if (data.notes_url) {
@@ -11690,6 +11694,10 @@ function initAuthUpdateCheck() {
         if (titleEl) titleEl.textContent = tpl('i18nNoneTitle', 'Nessun aggiornamento');
         const noneText = tpl('i18nNoneText', 'Stai usando l’ultima versione (v:version).').replace(':version', data.current || '');
         if (textEl) textEl.textContent = noneText;
+        if (data.error) {
+          const autoHint = tpl('i18nAutoUnavailable', '');
+          if (textEl && autoHint) textEl.textContent += '\n\n' + autoHint;
+        }
       }
     } catch {
       if (titleEl) titleEl.textContent = tpl('i18nErrorTitle', 'Verifica non riuscita');
