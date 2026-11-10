@@ -12909,6 +12909,50 @@ function initStatisticsCharts() {
   Chart.defaults.plugins.legend.labels.boxWidth = 8;
   Chart.defaults.plugins.legend.labels.padding = 16;
 
+  // Share of the total drawn on top of each bar (age bands, seasons), same as the reference report.
+  if (!Chart.registry.plugins.get('soclyValueLabels')) {
+    Chart.register({
+      id: 'soclyValueLabels',
+      afterDatasetsDraw(chart) {
+        const opts = chart.options.plugins?.soclyValueLabels;
+        if (!opts || !opts.enabled) {
+          return;
+        }
+        const ctx = chart.ctx;
+        chart.data.datasets.forEach((dataset, index) => {
+          const meta = chart.getDatasetMeta(index);
+          if (!meta || meta.hidden) {
+            return;
+          }
+          const total = dataset.data.reduce((acc, value) => acc + Number(value || 0), 0);
+          if (total <= 0) {
+            return;
+          }
+          meta.data.forEach((element, i) => {
+            const value = Number(dataset.data[i] || 0);
+            if (!value) {
+              return;
+            }
+            const percent = ((value * 100) / total).toFixed(1);
+            const props = element.getProps(['x', 'y', 'base'], true);
+            const horizontal = chart.options.indexAxis === 'y';
+            ctx.save();
+            ctx.fillStyle = 'rgba(11, 31, 28, 0.72)';
+            ctx.font = '600 11px "Manrope", "Segoe UI", sans-serif';
+            ctx.textBaseline = 'bottom';
+            ctx.textAlign = horizontal ? 'left' : 'center';
+            if (horizontal) {
+              ctx.fillText(`${percent}%`, props.base + 6, props.y + 4);
+            } else {
+              ctx.fillText(`${percent}%`, props.x, Math.min(props.base, props.y) - 4);
+            }
+            ctx.restore();
+          });
+        });
+      },
+    });
+  }
+
   document.querySelectorAll('[data-statistics-charts]').forEach((root) => {
     const panel = root.closest('[data-statistics-panel]');
     if (panel && panel.hidden) {
@@ -12954,6 +12998,7 @@ function initStatisticsCharts() {
           indexAxis: horizontal ? 'y' : 'x',
           plugins: {
             legend: { display: isPie, position: 'bottom' },
+            soclyValueLabels: { enabled: Boolean(spec.percent_labels) },
             tooltip: {
               callbacks: {
                 label: (ctx) => {

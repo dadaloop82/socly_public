@@ -389,7 +389,10 @@ $app->bind(DashboardController::class, fn (App $a) => new DashboardController(
     $a->get(AssociationPeopleService::class),
     $a->get(CurrencyService::class)
 ));
-$app->bind(StatisticsService::class, fn (App $a) => new StatisticsService($a->get(Database::class)));
+$app->bind(StatisticsService::class, fn (App $a) => new StatisticsService(
+    $a->get(Database::class),
+    $a->get(GeoService::class)
+));
 $app->bind(StatisticsController::class, fn (App $a) => new StatisticsController(
     $a->get(View::class),
     $a->get(StatisticsService::class),

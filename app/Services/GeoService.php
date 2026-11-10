@@ -129,6 +129,110 @@ final class GeoService
     }
 
     /**
+     * Latitude/longitude for a city name, cached on disk (statistics map).
+     *
+     * One HTTP lookup per unknown city, then the answer is reused across requests. When the
+     * provider is unreachable the lookups stop for the rest of the request instead of timing out
+     * once per city.
+     *
+     * @return array{lat:float,lon:float}|null
+     */
+    public function cityCoordinates(string $city): ?array
+    {
+        static $providerDown = false;
+
+        $city = trim($city);
+        if ($city === '' || $providerDown) {
+            return null;
+        }
+        $key = mb_strtolower($city);
+        $cachePath = function_exists('storage_path') ? storage_path('cache/geo_city_coords.json') : '';
+        $cache = $this->coordinatesCache($cachePath);
+        if (array_key_exists($key, $cache)) {
+            $row = $cache[$key];
+            return is_array($row) && isset($row['lat'], $row['lon'])
+                ? ['lat' => (float) $row['lat'], 'lon' => (float) $row['lon']]
+                : null;
+        }
+
+        $coords = $this->geocodeCity($city);
+        if ($coords === null) {
+            $providerDown = true;
+        }
+        $cache[$key] = $coords;
+        if ($cachePath !== '') {
+            $dir = dirname($cachePath);
+            if (!is_dir($dir)) {
+                mkdir($dir, 0775, true);
+            }
+            file_put_contents(
+                $cachePath,
+                (string) json_encode($cache, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT),
+                LOCK_EX
+            );
+        }
+        return $coords;
+    }
+
+    /** @return array{lat:float,lon:float}|null */
+    private function geocodeCity(string $city): ?array
+    {
+        $json = $this->httpGet('https://photon.komoot.io/api/?' . http_build_query([
+            'q' => $city,
+            'limit' => 1,
+            'lang' => 'it',
+        ]));
+        if ($json !== null) {
+            $data = json_decode($json, true);
+            $feature = is_array($data['features'][0] ?? null) ? $data['features'][0] : null;
+            $coords = is_array($feature) ? ($feature['coordinates'] ?? null) : null;
+            $country = strtoupper((string) ($feature['properties']['countrycode'] ?? 'IT'));
+            if (is_array($coords) && ($country === 'IT' || $country === '')) {
+                $lat = (float) ($coords[1] ?? 0);
+                $lon = (float) ($coords[0] ?? 0);
+                if ($this->isInItaly($lat, $lon)) {
+                    return ['lat' => round($lat, 5), 'lon' => round($lon, 5)];
+                }
+            }
+        }
+
+        $json = $this->httpGet('https://nominatim.openstreetmap.org/search?' . http_build_query([
+            'q' => $city . ', Italia',
+            'format' => 'json',
+            'limit' => 1,
+            'countrycodes' => 'it',
+        ]));
+        if ($json !== null) {
+            $data = json_decode($json, true);
+            $row = is_array($data[0] ?? null) ? $data[0] : null;
+            if ($row !== null) {
+                $lat = (float) ($row['lat'] ?? 0);
+                $lon = (float) ($row['lon'] ?? 0);
+                if ($this->isInItaly($lat, $lon)) {
+                    return ['lat' => round($lat, 5), 'lon' => round($lon, 5)];
+                }
+            }
+        }
+        return null;
+    }
+
+    private function isInItaly(float $lat, float $lon): bool
+    {
+        return $lat >= 35.5 && $lat <= 47.5 && $lon >= 6.0 && $lon <= 19.0
+            && !($lat === 0.0 && $lon === 0.0);
+    }
+
+    /** @return array<string,mixed> */
+    private function coordinatesCache(string $path): array
+    {
+        if ($path === '' || !is_file($path)) {
+            return [];
+        }
+        $decoded = json_decode((string) file_get_contents($path), true);
+        return is_array($decoded) ? $decoded : [];
+    }
+
+    /**
      * @return array{action:'none'|'apply'|'confirm'|'not_found',item?:array<string,mixed>,label?:string}
      */
     public function resolveProvinceQuery(string $query): array

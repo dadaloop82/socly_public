@@ -134,6 +134,13 @@ versions without curated notes).
   (24-month trend, seasons, weekday, top-10 months table), Cards (status, type, year) and Financial
   (12-month collections, by method, by reason). Every chart is a bar or a doughnut built from real
   data; events, attendance and feedback are not offered because the product stores no such data
+- Statistics: **Cities of residence** is now a map — Italy outline generated from Natural Earth
+  (public domain) with proportional bubbles and distance clustering; unknown cities are geocoded once
+  and cached (`storage/cache/geo_city_coords.json`), with the top cities listed under the map
+- Statistics: age bands follow the reference report (largest band first, share printed above each
+  bar); e-mail providers and preferred language removed
+- Statistics: the sign-ups chart now covers the **whole period** instead of the last 24 months, and
+  seasons show their share
 - The registry PDF hides the fiscal code, birth and residence columns when those profile fields are
   disabled
 - The registry PDF prints the membership-card QR next to the card number when the card stores one

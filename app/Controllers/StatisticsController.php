@@ -36,6 +36,7 @@ final class StatisticsController extends BaseController
         $registrations = $this->statistics->registrations();
         $cards = $this->statistics->cards();
         $finances = $this->statistics->finances();
+        $cityMap = $this->statistics->cityMap();
 
         // Generic chart payload: the view renders one canvas per key and app.js feeds Chart.js.
         $charts = [
@@ -46,24 +47,9 @@ final class StatisticsController extends BaseController
             ],
             'age_bands' => [
                 'type' => 'bar',
+                'percent_labels' => true,
                 'labels' => $demographics['age_bands']['labels'],
                 'values' => $demographics['age_bands']['values'],
-            ],
-            'email_providers' => [
-                'type' => 'doughnut',
-                'labels' => $demographics['email_providers']['labels'],
-                'values' => $demographics['email_providers']['values'],
-            ],
-            'cities' => [
-                'type' => 'bar',
-                'horizontal' => true,
-                'labels' => $demographics['cities']['labels'],
-                'values' => $demographics['cities']['values'],
-            ],
-            'languages' => [
-                'type' => 'doughnut',
-                'labels' => $demographics['languages']['labels'],
-                'values' => $demographics['languages']['values'],
             ],
             'registrations_monthly' => [
                 'type' => 'bar',
@@ -76,7 +62,8 @@ final class StatisticsController extends BaseController
                 'values' => $registrations['weekdays']['values'],
             ],
             'seasons' => [
-                'type' => 'doughnut',
+                'type' => 'bar',
+                'percent_labels' => true,
                 'labels' => $registrations['seasons']['labels'],
                 'values' => $registrations['seasons']['values'],
             ],
@@ -122,6 +109,8 @@ final class StatisticsController extends BaseController
             'registrations' => $registrations,
             'cards' => $cards,
             'finances' => $finances,
+            'cityMap' => $cityMap,
+            'italySvg' => \Socly\Support\ItalyMap::svg(),
             'currency' => $this->currency,
             'chartsJson' => json_encode(
                 ['charts' => $charts],

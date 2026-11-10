@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Socly\Services;
 
 use Socly\Core\Database;
+use Socly\Support\ItalyMap;
 
 /**
  * Aggregate, read-only statistics for the dedicated statistics page.
@@ -16,7 +17,8 @@ use Socly\Core\Database;
 final class StatisticsService
 {
     public function __construct(
-        private readonly Database $db
+        private readonly Database $db,
+        private readonly GeoService $geo
     ) {
     }
 
@@ -136,12 +138,12 @@ final class StatisticsService
         }
 
         $bands = [
-            '0-17' => 0,
-            '18-25' => 0,
-            '26-35' => 0,
-            '36-50' => 0,
-            '51-65' => 0,
-            '66+' => 0,
+            'under18' => 0,
+            '18_25' => 0,
+            '26_35' => 0,
+            '36_50' => 0,
+            '51_65' => 0,
+            'over65' => 0,
             'unknown' => 0,
         ];
         $today = new \DateTimeImmutable('today');
@@ -153,109 +155,131 @@ final class StatisticsService
             }
             $age = $birth->diff($today)->y;
             if ($age < 18) {
-                $bands['0-17']++;
+                $bands['under18']++;
             } elseif ($age <= 25) {
-                $bands['18-25']++;
+                $bands['18_25']++;
             } elseif ($age <= 35) {
-                $bands['26-35']++;
+                $bands['26_35']++;
             } elseif ($age <= 50) {
-                $bands['36-50']++;
+                $bands['36_50']++;
             } elseif ($age <= 65) {
-                $bands['51-65']++;
+                $bands['51_65']++;
             } else {
-                $bands['66+']++;
+                $bands['over65']++;
             }
         }
+        $ageTotal = array_sum($bands);
+        // Largest band first, like the reference report.
+        arsort($bands);
         $ageLabels = [];
         $ageValues = [];
+        $agePercents = [];
         foreach ($bands as $band => $count) {
             if ($band === 'unknown' && $count === 0) {
                 continue;
             }
-            $ageLabels[] = $band === 'unknown' ? (string) __('statistics.unknown') : $band;
+            $ageLabels[] = $band === 'unknown'
+                ? (string) __('statistics.unknown')
+                : (string) __('statistics.age_' . $band);
             $ageValues[] = $count;
-        }
-
-        $providers = [];
-        foreach ($this->fieldRawValues('email') as $email) {
-            $email = trim($email);
-            $domain = '';
-            $at = strrpos($email, '@');
-            if ($at !== false) {
-                $domain = strtolower(substr($email, $at + 1));
-            }
-            $key = $this->emailProviderKey($domain);
-            $providers[$key] = ($providers[$key] ?? 0) + 1;
-        }
-        arsort($providers);
-
-        $cityLabels = [];
-        $cityValues = [];
-        $cityRest = 0;
-        foreach ($this->fieldCounts('city') as $index => $row) {
-            if ($index < 8) {
-                $cityLabels[] = (string) ($row['val'] ?? '');
-                $cityValues[] = (int) $row['c'];
-            } else {
-                $cityRest += (int) $row['c'];
-            }
-        }
-        if ($cityRest > 0) {
-            $cityLabels[] = (string) __('statistics.other');
-            $cityValues[] = $cityRest;
-        }
-
-        $languageLabels = [];
-        $languageValues = [];
-        foreach ($this->fieldCounts('preferred_language') as $row) {
-            $code = strtolower(trim((string) ($row['val'] ?? '')));
-            $languageLabels[] = $code === '' ? (string) __('statistics.unknown') : strtoupper($code);
-            $languageValues[] = (int) $row['c'];
+            $agePercents[] = $ageTotal > 0 ? round($count * 100 / $ageTotal, 1) : 0.0;
         }
 
         return [
             'gender' => ['labels' => $genderLabels, 'values' => $genderValues, 'total' => $genderTotal],
-            'age_bands' => ['labels' => $ageLabels, 'values' => $ageValues],
-            'email_providers' => ['labels' => array_keys($providers), 'values' => array_values($providers)],
-            'cities' => ['labels' => $cityLabels, 'values' => $cityValues],
-            'languages' => ['labels' => $languageLabels, 'values' => $languageValues],
+            'age_bands' => [
+                'labels' => $ageLabels,
+                'values' => $ageValues,
+                'percents' => $agePercents,
+            ],
         ];
     }
 
-    /** Group an e-mail domain into a readable provider label. */
-    private function emailProviderKey(string $domain): string
+    /**
+     * Cities of residence with map coordinates and simple distance clustering.
+     *
+     * @return array{
+     *   cities:list<array{city:string,count:int,x:float|null,y:float|null}>,
+     *   clusters:list<array{label:string,count:int,cities:list<string>,x:float,y:float}>,
+     *   located:int,total:int,max:int
+     * }
+     */
+    public function cityMap(int $maxLookups = 8): array
     {
-        if ($domain === '') {
-            return (string) __('statistics.no_email');
+        $cities = [];
+        foreach ($this->fieldCounts('city') as $row) {
+            $name = trim((string) ($row['val'] ?? ''));
+            if ($name === '') {
+                continue;
+            }
+            $cities[] = ['city' => $name, 'count' => (int) $row['c']];
         }
-        $known = [
-            'gmail.com' => 'Gmail',
-            'googlemail.com' => 'Gmail',
-            'libero.it' => 'Libero',
-            'virgilio.it' => 'Virgilio',
-            'outlook.com' => 'Outlook',
-            'outlook.it' => 'Outlook',
-            'hotmail.com' => 'Outlook',
-            'hotmail.it' => 'Outlook',
-            'live.com' => 'Outlook',
-            'live.it' => 'Outlook',
-            'icloud.com' => 'iCloud',
-            'me.com' => 'iCloud',
-            'yahoo.com' => 'Yahoo',
-            'yahoo.it' => 'Yahoo',
-            'tiscali.it' => 'Tiscali',
-            'alice.it' => 'Alice',
-            'poste.it' => 'Poste',
-            'aruba.it' => 'Aruba',
-            'pec.it' => 'PEC',
+        usort($cities, static fn (array $a, array $b): int => ($b['count'] <=> $a['count']) ?: strcmp($a['city'], $b['city']));
+
+        $total = 0;
+        foreach ($cities as $row) {
+            $total += $row['count'];
+        }
+
+        $lookups = 0;
+        $located = 0;
+        $points = [];
+        $out = [];
+        foreach ($cities as $row) {
+            $coords = null;
+            if ($lookups < $maxLookups) {
+                $coords = $this->geo->cityCoordinates($row['city']);
+                $lookups++;
+            }
+            $point = ['x' => null, 'y' => null];
+            if ($coords !== null) {
+                $projected = ItalyMap::project((float) $coords['lat'], (float) $coords['lon']);
+                $point = ['x' => $projected['x'], 'y' => $projected['y']];
+                $located += $row['count'];
+                $points[] = [
+                    'city' => $row['city'],
+                    'count' => $row['count'],
+                    'x' => $projected['x'],
+                    'y' => $projected['y'],
+                ];
+            }
+            $out[] = ['city' => $row['city'], 'count' => $row['count'], 'x' => $point['x'], 'y' => $point['y']];
+        }
+
+        // Greedy clustering: points closer than CLUSTER_RADIUS map-percent units merge into one bubble.
+        $radius = 4.0;
+        $clusters = [];
+        foreach ($points as $point) {
+            $merged = false;
+            foreach ($clusters as $index => $cluster) {
+                $dx = (float) $cluster['x'] - (float) $point['x'];
+                $dy = (float) $cluster['y'] - (float) $point['y'];
+                if (sqrt($dx * $dx + $dy * $dy) <= $radius) {
+                    $clusters[$index]['count'] += (int) $point['count'];
+                    $clusters[$index]['cities'][] = (string) $point['city'];
+                    $merged = true;
+                    break;
+                }
+            }
+            if (!$merged) {
+                $clusters[] = [
+                    'label' => (string) $point['city'],
+                    'count' => (int) $point['count'],
+                    'cities' => [(string) $point['city']],
+                    'x' => (float) $point['x'],
+                    'y' => (float) $point['y'],
+                ];
+            }
+        }
+        usort($clusters, static fn (array $a, array $b): int => $b['count'] <=> $a['count']);
+
+        return [
+            'cities' => $out,
+            'clusters' => $clusters,
+            'located' => $located,
+            'total' => $total,
+            'max' => $clusters === [] ? 0 : (int) max(array_column($clusters, 'count')),
         ];
-        if (isset($known[$domain])) {
-            return $known[$domain];
-        }
-        if (str_starts_with($domain, 'pec.') || str_ends_with($domain, '.pec.it')) {
-            return 'PEC';
-        }
-        return (string) __('statistics.other_provider');
     }
 
     /** @return list<array{val:string,c:int}> */
@@ -293,7 +317,12 @@ final class StatisticsService
             }
         }
 
-        $months = $this->monthKeys(24);
+        $months = $allMonths === []
+            ? []
+            : $this->monthRange((string) array_key_first($allMonths), date('Y-m'));
+        if (count($months) > 240) {
+            $months = array_slice($months, -240);
+        }
         $monthLabels = [];
         $monthValues = [];
         foreach ($months as $ym) {
@@ -342,6 +371,11 @@ final class StatisticsService
             (string) __('statistics.season_autumn'),
         ];
         $seasonValues = array_values($seasons);
+        $seasonTotal = array_sum($seasonValues);
+        $seasonPercents = [];
+        foreach ($seasonValues as $value) {
+            $seasonPercents[] = $seasonTotal > 0 ? round($value * 100 / $seasonTotal, 1) : 0.0;
+        }
         $bestSeasonIndex = 0;
         foreach ($seasonValues as $index => $value) {
             if ($value > $seasonValues[$bestSeasonIndex]) {
@@ -384,8 +418,10 @@ final class StatisticsService
             'seasons' => [
                 'labels' => $seasonLabels,
                 'values' => $seasonValues,
+                'percents' => $seasonPercents,
                 'best' => $seasonLabels[$bestSeasonIndex],
                 'best_count' => $seasonValues[$bestSeasonIndex],
+                'best_percent' => $seasonPercents[$bestSeasonIndex],
             ],
             'weekdays' => [
                 'labels' => $weekdayLabels,
@@ -411,6 +447,25 @@ final class StatisticsService
             $out[] = (string) ($row['value'] ?? '');
         }
         return $out;
+    }
+
+    /** @return list<string> */
+    private function monthRange(string $from, string $to): array
+    {
+        $keys = [];
+        $cursor = \DateTimeImmutable::createFromFormat('Y-m-d', $from . '-01');
+        $end = \DateTimeImmutable::createFromFormat('Y-m-d', $to . '-01');
+        if (!$cursor instanceof \DateTimeImmutable || !$end instanceof \DateTimeImmutable) {
+            return $keys;
+        }
+        while ($cursor <= $end) {
+            $keys[] = $cursor->format('Y-m');
+            $cursor = $cursor->modify('+1 month');
+            if (count($keys) > 600) {
+                break;
+            }
+        }
+        return $keys;
     }
 
     /** @return list<string> */

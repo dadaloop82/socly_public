@@ -152,10 +152,72 @@ $chartCard = static function (string $id, string $titleKey, string $ledeKey, boo
             <?php
             $chartCard('gender', 'statistics.chart_gender', 'statistics.chart_gender_lede');
             $chartCard('age_bands', 'statistics.chart_age', 'statistics.chart_age_lede', false);
-            $chartCard('email_providers', 'statistics.chart_email', 'statistics.chart_email_lede');
-            $chartCard('cities', 'statistics.chart_cities', 'statistics.chart_cities_lede', false, true);
-            $chartCard('languages', 'statistics.chart_languages', 'statistics.chart_languages_lede');
             ?>
+        </div>
+
+        <div class="panel chart-panel chart-panel-wide statistics-map-panel">
+            <div class="panel-header">
+                <div>
+                    <h2 class="section-title"><?= e(__('statistics.map_title')) ?></h2>
+                    <p class="section-lede"><?= e(__('statistics.map_lede', [
+                        'located' => (string) (int) ($cityMap['located'] ?? 0),
+                        'total' => (string) (int) ($cityMap['total'] ?? 0),
+                    ])) ?></p>
+                </div>
+            </div>
+            <?php if (($cityMap['clusters'] ?? []) === []): ?>
+                <div class="empty-state compact"><?= e(__('statistics.map_empty')) ?></div>
+            <?php else: ?>
+                <?php $clusterMax = max(1, (int) ($cityMap['max'] ?? 0)); ?>
+                <div class="statistics-map" role="group" aria-label="<?= e(__('statistics.map_title')) ?>">
+                    <?php if (($italySvg ?? '') !== ''): ?>
+                        <div class="statistics-map-bg" aria-hidden="true"><?= $italySvg ?></div>
+                    <?php endif; ?>
+                    <?php foreach ($cityMap['clusters'] as $cluster): ?>
+                        <?php
+                        $clusterSize = 30 + (int) round(34 * ((int) $cluster['count'] / $clusterMax));
+                        $clusterNames = implode(' · ', array_map('strval', (array) $cluster['cities']));
+                        ?>
+                        <span class="map-cluster"
+                            style="left:<?= e((string) $cluster['x']) ?>%;top:<?= e((string) $cluster['y']) ?>%;--cluster-size:<?= (int) $clusterSize ?>px"
+                            title="<?= e($clusterNames) ?>">
+                            <span class="map-cluster-count"><?= (int) $cluster['count'] ?></span>
+                            <span class="map-cluster-label"><?= e((string) $cluster['label']) ?></span>
+                        </span>
+                    <?php endforeach; ?>
+                </div>
+            <?php endif; ?>
+            <?php if (($cityMap['cities'] ?? []) !== []): ?>
+                <div class="table-wrap embedded statistics-map-table">
+                    <table class="data-table statistics-table">
+                        <thead>
+                            <tr>
+                                <th><?= e(__('statistics.col_city')) ?></th>
+                                <th><?= e(__('statistics.col_members')) ?></th>
+                                <th><?= e(__('statistics.col_percent')) ?></th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <?php foreach (array_slice($cityMap['cities'], 0, 12) as $cityRow): ?>
+                                <?php
+                                $cityTotal = (int) ($cityMap['total'] ?? 0);
+                                $cityCount = (int) $cityRow['count'];
+                                ?>
+                                <tr>
+                                    <td>
+                                        <?= e((string) $cityRow['city']) ?>
+                                        <?php if (($cityRow['x'] ?? null) === null): ?>
+                                            <span class="muted">· <?= e(__('statistics.not_on_map')) ?></span>
+                                        <?php endif; ?>
+                                    </td>
+                                    <td><?= $cityCount ?></td>
+                                    <td><?= e(number_format($cityTotal > 0 ? $cityCount * 100 / $cityTotal : 0, 1, ',', '.')) ?>%</td>
+                                </tr>
+                            <?php endforeach; ?>
+                        </tbody>
+                    </table>
+                </div>
+            <?php endif; ?>
         </div>
     </section>
 
@@ -211,7 +273,7 @@ $chartCard = static function (string $id, string $titleKey, string $ledeKey, boo
             </div>
             <div class="statistics-fact">
                 <span class="label"><?= e(__('statistics.fact_best_season')) ?></span>
-                <strong><?= e((string) ($registrations['seasons']['best'] ?? '')) ?> · <?= (int) ($registrations['seasons']['best_count'] ?? 0) ?></strong>
+                <strong><?= e((string) ($registrations['seasons']['best'] ?? '')) ?> · <?= (int) ($registrations['seasons']['best_count'] ?? 0) ?> (<?= e(number_format((float) ($registrations['seasons']['best_percent'] ?? 0), 1, ',', '.')) ?>%)</strong>
             </div>
             <div class="statistics-fact">
                 <span class="label"><?= e(__('statistics.fact_best_weekday')) ?></span>
