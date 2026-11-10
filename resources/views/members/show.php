@@ -173,6 +173,7 @@ $hasPhoto = !empty($fields['photo']);
 // Membership-card QR: only when the card really stores a qr_code (shown top-right on the card).
 $cardQrCode = is_array($card ?? null) ? trim((string) ($card['qr_code'] ?? '')) : '';
 $cardQrSvgBadge = $cardQrCode !== '' ? \Socly\Support\QrCode::svg($cardQrCode, 3, 2, 'M') : '';
+$cardCodeValue = is_array($card ?? null) ? trim((string) ($card['card_number'] ?? '')) : '';
 ?>
 <div class="page-header">
     <div class="titles">
@@ -341,6 +342,7 @@ $cardQrSvgBadge = $cardQrCode !== '' ? \Socly\Support\QrCode::svg($cardQrCode, 3
                 'gender' => $genderRaw === 'F' ? 'f' : 'm',
                 'logo_url' => assoc_logo_url(),
                 'qr_svg' => $cardQrSvgBadge,
+                'card_number' => $cardCodeValue,
                 'live' => false,
             ]) ?>
         </div>

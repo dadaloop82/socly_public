@@ -100,6 +100,9 @@ versions without curated notes).
 - Membership card shows the QR code in the top-right corner when the card has one (detail page and
   edit preview); the card in the member sidebar is full width with larger photo, name, number, type
   and QR, so the content fills the badge like a real membership card
+- Sidebar card is capped at 200px height (no aspect-ratio) on wide screens, the QR is larger, the
+  gender avatar is shown when there is no photo, and the physical card code appears when it differs
+  from the member number
 - Member edit: “Save” is available on every wizard step and “Back” on the first step leaves the
   wizard, so a single change no longer requires walking through all steps; the card preview sits
   under the photo block

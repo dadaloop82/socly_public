@@ -580,6 +580,7 @@ return [
         'expires_short' => 'Ablauf :date',
         'card_expiry_short' => 'Kartenablauf :date',
         'card_block' => 'Karte',
+        'card_number_label' => 'Karte :number',
         'card_issued_on' => 'ausgestellt am :date',
         'card_expires_on' => 'läuft ab am :date',
         'card_inactive' => 'inaktiv',

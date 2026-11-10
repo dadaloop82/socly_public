@@ -584,6 +584,7 @@ return [
         'expires_short' => 'Scad. :date',
         'card_expiry_short' => 'Scad. tessera :date',
         'card_block' => 'Tessera',
+        'card_number_label' => 'Tessera :number',
         'card_issued_on' => 'emessa il :date',
         'card_expires_on' => 'scade il :date',
         'card_inactive' => 'non attiva',

@@ -2977,9 +2977,11 @@ tr.clickable-row:focus-visible {
   padding-top: 0.9rem;
   border-top: 1px solid var(--line);
 }
-/* Membership card under the sidebar panel: full width, so every element stays readable.
-   Artwork, photo, name, number, type and QR are sized to fill the card like a real badge. */
+/* Membership card under the sidebar panel: fixed 200px height (no aspect-ratio) so it never
+   becomes huge on wide screens and the content stays readable. */
 .member-scheda-tessera .tessera-card {
+  aspect-ratio: auto;
+  height: 200px;
   margin-top: 0.55rem;
 }
 .member-scheda-main {
@@ -5512,8 +5514,8 @@ input.is-geo-forced,
 /* Card QR badge: top-right, white quiet zone so it stays scannable on the brand gradient. */
 .tessera-qr {
   flex: 0 0 auto;
-  width: 2.8rem;
-  height: 2.8rem;
+  width: 3rem;
+  height: 3rem;
   padding: 2px;
   border-radius: 5px;
   margin-left: auto;
@@ -5579,7 +5581,7 @@ input.is-geo-forced,
 }
 .tessera-photo {
   width: 5.1rem;
-  height: 5.4rem;
+  height: 5.2rem;
   border-radius: 9px;
   overflow: hidden;
   background:
@@ -5671,6 +5673,13 @@ input.is-geo-forced,
   text-overflow: ellipsis;
   white-space: nowrap;
   text-transform: none;
+  opacity: 0.95;
+}
+/* Physical card code, shown only when it differs from the member number. */
+.tessera-card-code {
+  font-size: 0.76rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
   opacity: 0.95;
 }
 .tessera-type strong {

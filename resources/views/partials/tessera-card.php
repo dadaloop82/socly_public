@@ -5,6 +5,7 @@
  *
  * @var string $name      Member display name
  * @var string $number    Membership-card number (= member number)
+ * @var string $card_number Physical card code, shown when it differs from the member number
  * @var string $role      Localised role label ("Socio" / "Member")
  * @var string $type      Localised membership type
  * @var string $photo_url Member photo URL, empty when there is no photo
@@ -16,6 +17,7 @@
 
 $name = trim((string) ($name ?? ''));
 $number = trim((string) ($number ?? ''));
+$cardNumber = trim((string) ($card_number ?? ''));
 $role = trim((string) ($role ?? __('members.card_role')));
 $type = trim((string) ($type ?? ''));
 $photoUrl = trim((string) ($photo_url ?? ''));
@@ -53,6 +55,13 @@ $hook = static function (string $attribute) use ($live): string {
                         data-photo-gender="<?= e($gender) ?>"
                         hidden
                     ></span>
+                <?php elseif (!$live): ?>
+                    <?php /* Read-only card (member page): show the gender avatar instead of an empty box. */ ?>
+                    <img
+                        class="tessera-photo-img"
+                        src="<?= e(asset('img/avatars/placeholder-' . ($gender === 'f' ? 'female' : 'male') . '.svg') . '?v=' . rawurlencode(app_version())) ?>"
+                        alt=""
+                    >
                 <?php else: ?>
                     <img class="tessera-photo-img"<?= $hook('data-tessera-photo') ?> alt="" hidden>
                     <span
@@ -65,6 +74,9 @@ $hook = static function (string $attribute) use ($live): string {
             <div class="tessera-meta">
                 <span class="tessera-name"<?= $hook('data-tessera-name') ?> data-fallback="<?= e(__('members.wizard_card_name')) ?>"><?= e($name !== '' ? $name : __('members.wizard_card_name')) ?></span>
                 <strong class="tessera-number"<?= $hook('data-tessera-number') ?>>#<?= e($number !== '' ? $number : '—') ?></strong>
+                <?php if ($cardNumber !== '' && $cardNumber !== $number): ?>
+                    <span class="tessera-card-code"><?= e(__('members.card_number_label', ['number' => $cardNumber])) ?></span>
+                <?php endif; ?>
                 <span class="tessera-type"<?= $hook('data-tessera-type') ?> data-role="<?= e($role) ?>"><strong><?= e(trim($role . ' ' . $type)) ?></strong></span>
             </div>
         </div>

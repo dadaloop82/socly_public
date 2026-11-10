@@ -582,6 +582,7 @@ return [
         'expires_short' => 'Exp. :date',
         'card_expiry_short' => 'Card exp. :date',
         'card_block' => 'Card',
+        'card_number_label' => 'Card :number',
         'card_issued_on' => 'issued on :date',
         'card_expires_on' => 'expires on :date',
         'card_inactive' => 'inactive',

@@ -611,6 +611,7 @@ $paymentExtraHtml = $buildProfileFieldsHtml($paymentExtraFields, \Socly\Services
         'gender' => $tesseraPhotoGender,
         'logo_url' => assoc_logo_url(),
         'qr_svg' => $tesseraQrSvg,
+        'card_number' => trim((string) ($tesseraCardRow['card_number'] ?? '')),
         'live' => true,
     ]);
     $tesseraPreviewHtml = '<aside class="wizard-panel-side tessera-preview" aria-hidden="true">'
