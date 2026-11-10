@@ -2251,6 +2251,76 @@ a.sidebar-brand-home:hover {
   font-weight: 600;
   color: color-mix(in srgb, var(--ink) 55%, transparent);
 }
+/* Update progress overlay (started from the sidebar "Update" form). */
+.update-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 120;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+  background: color-mix(in srgb, #0b1f1c 48%, transparent);
+  backdrop-filter: blur(2px);
+}
+.update-overlay[hidden] {
+  display: none;
+}
+.update-overlay-card {
+  width: min(26rem, 92vw);
+  padding: 1.6rem 1.6rem 1.35rem;
+  border-radius: 16px;
+  background: #ffffff;
+  box-shadow: 0 24px 60px color-mix(in srgb, black 28%, transparent);
+  text-align: center;
+}
+.update-spinner {
+  width: 2.2rem;
+  height: 2.2rem;
+  margin: 0 auto 0.9rem;
+  border-radius: 50%;
+  border: 3px solid color-mix(in srgb, var(--brand-primary) 22%, #ffffff);
+  border-top-color: var(--brand-primary);
+  animation: update-spin 0.9s linear infinite;
+}
+@keyframes update-spin {
+  to { transform: rotate(360deg); }
+}
+.update-overlay-title {
+  margin: 0 0 0.35rem;
+  font-family: var(--font-display);
+  font-size: 1.15rem;
+  letter-spacing: -0.01em;
+}
+.update-overlay-text {
+  margin: 0 0 0.9rem;
+  font-size: 0.92rem;
+  line-height: 1.45;
+}
+.update-overlay-bar {
+  height: 0.45rem;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--brand-primary) 14%, #ffffff);
+  overflow: hidden;
+}
+.update-overlay-bar span {
+  display: block;
+  width: 8%;
+  height: 100%;
+  border-radius: 999px;
+  background: var(--brand-primary);
+  transition: width 0.35s ease;
+}
+.update-overlay-hint {
+  margin: 0.8rem 0 0;
+  font-size: 0.78rem;
+  line-height: 1.4;
+  color: color-mix(in srgb, var(--ink) 55%, transparent);
+}
+@media (prefers-reduced-motion: reduce) {
+  .update-spinner { animation-duration: 3s; }
+  .update-overlay-bar span { transition: none; }
+}
 .stat::after {
   content: "";
   position: absolute;

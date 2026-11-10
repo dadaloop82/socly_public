@@ -54,6 +54,16 @@ final class UpdateController extends BaseController
         redirect('/dashboard');
     }
 
+    /** Current step of a running update (polled by the UI). */
+    public function progress(Request $request): void
+    {
+        if (!can(Permission::SETTINGS_MANAGE)) {
+            $this->json(['ok' => false, 'error' => 'forbidden'], 403);
+            return;
+        }
+        $this->json(['ok' => true, 'progress' => $this->updates->progressState()]);
+    }
+
     public function check(Request $request): void
     {
         $force = (string) $request->input('force', '') === '1';

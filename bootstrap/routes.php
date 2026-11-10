@@ -87,6 +87,7 @@ $router->post('/setup', [SetupController::class, 'save'], null, ['mw.locale', 'm
 
 $router->post('/updates/install', [UpdateController::class, 'install'], 'settings.manage', ['mw.locale', 'mw.install', 'mw.auth', 'mw.csrf']);
 $router->get('/api/updates/check', [UpdateController::class, 'check'], null, ['mw.locale', 'mw.install']);
+$router->get('/api/updates/progress', [UpdateController::class, 'progress'], 'settings.manage', ['mw.locale', 'mw.install', 'mw.auth']);
 
 $router->get('/dashboard', [DashboardController::class, 'index'], 'dashboard.view', ['mw.locale', 'mw.install', 'mw.auth']);
 $router->get('/statistics', [StatisticsController::class, 'index'], 'members.view', ['mw.locale', 'mw.install', 'mw.auth']);

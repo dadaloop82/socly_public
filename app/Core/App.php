@@ -63,6 +63,26 @@ final class App
         $this->config = $config;
     }
 
+    /**
+     * Update a single dotted config key without replacing the whole tree
+     * (setConfig() would drop every other value).
+     */
+    public function setConfigValue(string $key, mixed $value): void
+    {
+        $segments = explode('.', $key);
+        $cursor = &$this->config;
+        foreach ($segments as $index => $segment) {
+            if ($index === count($segments) - 1) {
+                $cursor[$segment] = $value;
+                return;
+            }
+            if (!isset($cursor[$segment]) || !is_array($cursor[$segment])) {
+                $cursor[$segment] = [];
+            }
+            $cursor = &$cursor[$segment];
+        }
+    }
+
     public function config(string $key, mixed $default = null): mixed
     {
         $segments = explode('.', $key);

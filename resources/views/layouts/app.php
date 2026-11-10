@@ -322,6 +322,21 @@ if ($user && app()->isInstalled() && !$temporaryInstance && can('settings.manage
                                     method="post"
                                     action="<?= e(url('/updates/install')) ?>"
                                     data-confirm="<?= e(__('updates.confirm_update', ['version' => $updateRemote])) ?>"
+                                    data-update-form
+                                    data-update-progress-url="<?= e(url('/api/updates/progress')) ?>"
+                                    data-update-steps="<?= e((string) json_encode([
+                                        'title' => __('updates.in_progress_title'),
+                                        'hint' => __('updates.in_progress_hint'),
+                                        'starting' => __('updates.step_starting'),
+                                        'backup' => __('updates.step_backup'),
+                                        'fetch' => __('updates.step_fetch'),
+                                        'merge' => __('updates.step_merge'),
+                                        'migrate' => __('updates.step_migrate'),
+                                        'verify' => __('updates.step_verify'),
+                                        'done' => __('updates.step_done'),
+                                        'rollback' => __('updates.step_rollback'),
+                                        'failed' => __('updates.step_failed'),
+                                    ], JSON_UNESCAPED_UNICODE)) ?>"
                                 >
                                     <?= csrf_field() ?>
                                     <button class="btn btn-sm" type="submit"><?= e(__('updates.install')) ?></button>

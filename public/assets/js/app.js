@@ -196,6 +196,7 @@ document.addEventListener('DOMContentLoaded', () => {
   initDashboardCharts();
   initStatisticsTabs();
   initStatisticsCharts();
+  initUpdateProgress();
   initTreasuryCharts();
   initTreasuryBudgetImpute(document);
   initAuthLoginI18nLive();
@@ -12892,6 +12893,103 @@ function initStatisticsTabs() {
     hash.startsWith('stats-') ? hash.slice(6) : (root.getAttribute('data-default-tab') || tabs[0].getAttribute('data-statistics-tab')),
     { updateHash: false }
   );
+}
+
+/** Overlay with live progress while an update runs (server writes storage/cache/update_progress.json). */
+function initUpdateProgress() {
+  const forms = [...document.querySelectorAll('form[data-update-form]')];
+  if (forms.length === 0) {
+    return;
+  }
+
+  const order = ['starting', 'backup', 'fetch', 'merge', 'migrate', 'verify', 'done'];
+  let overlay = null;
+
+  const ensureOverlay = () => {
+    if (overlay) {
+      return overlay;
+    }
+    overlay = document.createElement('div');
+    overlay.className = 'update-overlay';
+    overlay.innerHTML = [
+      '<div class="update-overlay-card" role="status" aria-live="polite">',
+      '<div class="update-spinner" aria-hidden="true"></div>',
+      '<h2 class="update-overlay-title" data-update-title></h2>',
+      '<p class="update-overlay-text" data-update-text></p>',
+      '<div class="update-overlay-bar"><span data-update-bar></span></div>',
+      '<p class="update-overlay-hint" data-update-hint></p>',
+      '</div>',
+    ].join('');
+    document.body.appendChild(overlay);
+    return overlay;
+  };
+
+  forms.forEach((form) => {
+    form.addEventListener('submit', () => {
+      let steps = {};
+      try {
+        steps = JSON.parse(form.getAttribute('data-update-steps') || '{}');
+      } catch (err) {
+        steps = {};
+      }
+      const endpoint = form.getAttribute('data-update-progress-url') || '/api/updates/progress';
+      const box = ensureOverlay();
+      const setText = (selector, value) => {
+        const el = box.querySelector(selector);
+        if (el && value) {
+          el.textContent = value;
+        }
+      };
+
+      setText('[data-update-title]', steps.title);
+      setText('[data-update-hint]', steps.hint);
+      box.hidden = false;
+
+      const button = form.querySelector('button[type="submit"]');
+      if (button) {
+        button.disabled = true;
+      }
+
+      let alive = true;
+      window.addEventListener('pagehide', () => {
+        alive = false;
+      });
+
+      const paint = (step) => {
+        setText('[data-update-text]', steps[step] || '');
+        const bar = box.querySelector('[data-update-bar]');
+        const index = order.indexOf(step);
+        if (bar && index >= 0) {
+          bar.style.width = `${Math.round(((index + 1) / order.length) * 100)}%`;
+        }
+      };
+
+      const poll = async () => {
+        if (!alive) {
+          return;
+        }
+        try {
+          const res = await fetch(endpoint, {
+            credentials: 'same-origin',
+            headers: { Accept: 'application/json' },
+          });
+          const data = await res.json();
+          const step = data?.progress?.step || '';
+          if (step) {
+            paint(step);
+          }
+        } catch (err) {
+          // Keep the last known step; the page will reload when the request finishes.
+        }
+        if (alive) {
+          window.setTimeout(poll, 1500);
+        }
+      };
+
+      paint('starting');
+      poll();
+    }, { capture: true });
+  });
 }
 
 /** Feed every visible statistics canvas from the JSON payload baked into the view. */

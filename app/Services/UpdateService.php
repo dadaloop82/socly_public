@@ -32,6 +32,9 @@ final class UpdateService
     /** Cached "this tree is a git checkout" probe (avoid spawning git on every call). */
     private ?bool $gitCheckout = null;
 
+    /** When the running update started (seconds), used by the progress snapshot. */
+    private ?int $progressStartedAt = null;
+
     /** Git-based one-click install (the checkout's `origin` remote must be readable). */
     public function installEnabled(): bool
     {
@@ -39,10 +42,12 @@ final class UpdateService
         if (filter_var($_ENV['UPDATE_DISABLED'] ?? 'false', FILTER_VALIDATE_BOOL)) {
             return false;
         }
-        // UPDATE_ENABLED=true forces the updater; false/empty keeps automatic detection so the
-        // in-app "Update" button works on a git checkout without touching .env.
-        if (filter_var($_ENV['UPDATE_ENABLED'] ?? 'false', FILTER_VALIDATE_BOOL)) {
-            return true;
+        // An explicit UPDATE_ENABLED value decides (true = force, false = disabled); when the
+        // variable is empty/absent we keep the automatic detection so the button works on a
+        // git checkout without touching .env.
+        $enabledRaw = trim((string) ($_ENV['UPDATE_ENABLED'] ?? ''));
+        if ($enabledRaw !== '') {
+            return filter_var($enabledRaw, FILTER_VALIDATE_BOOL);
         }
         return $this->isGitCheckout();
     }
@@ -297,6 +302,9 @@ final class UpdateService
      */
     public function apply(string $ip): array
     {
+        if (function_exists('set_time_limit')) {
+            set_time_limit(0);
+        }
         if (function_exists('is_temporary_instance') && is_temporary_instance()) {
             return ['ok' => false, 'message' => __('updates.disabled')];
         }
@@ -318,12 +326,16 @@ final class UpdateService
         }
 
         file_put_contents($lock, date('c'));
+        $this->progress('starting');
         $before = $this->currentVersion();
         $beforeSha = '';
+        $afterSha = '';
+        $dbTouched = false;
         $backup = ['dir' => '', 'code' => '', 'database' => '', 'database_error' => ''];
         $merged = false;
         try {
             $beforeSha = trim($this->git(['rev-parse', 'HEAD']));
+            $this->progress('backup');
             $backup = $this->createBackup($before, $beforeSha);
             if ($backup['database'] === '') {
                 // Never touch the code without a database backup: data safety first.
@@ -337,21 +349,39 @@ final class UpdateService
                     'backup' => $this->relativePath($backup['code']),
                 ];
             }
+            $this->progress('fetch');
             $this->git(['fetch', 'origin']);
+            $this->progress('merge');
             $this->git(['merge', '--ff-only', 'origin/' . $this->channel()]);
             $merged = true;
-            $this->migrator->migrate();
+            $afterSha = trim($this->git(['rev-parse', 'HEAD']));
+
+            // VERSION is read from disk: config('app.version') was built before the merge, and
+            // comparing it with itself is what made every in-app update roll back.
+            $after = $this->versionOnDisk();
+            $this->progress('verify');
+            $this->verifyUpdate($before, $after, $beforeSha, $afterSha);
+            // Keep the rest of this request (footer, flash, audit) in sync with the new version.
+            app()->setConfigValue('app.version', $after);
+            $this->resetOpcache();
+
+            $this->progress('migrate');
+            if ($this->pendingMigrations() > 0) {
+                $dbTouched = true;
+                $this->migrator->migrate();
+            }
             try {
                 app(InstallerService::class)->seedFields(InstallerService::defaultFields());
             } catch (\Throwable) {
                 // seed best-effort
             }
-            $after = $this->currentVersion();
-            $this->verifyUpdate($before, $after);
+            $this->progress('done');
             $this->audit->log('update.applied', 'system', null, ['version' => $before], [
                 'version' => $after,
+                'commit' => $afterSha,
                 'backup' => $this->relativePath($backup['code']),
                 'database_backup' => $backup['database'] !== '',
+                'migrations_applied' => $dbTouched,
             ], $ip);
             @unlink(storage_path('cache/update_check.json'));
             return [
@@ -366,11 +396,14 @@ final class UpdateService
         } catch (\Throwable $e) {
             $rolledBack = false;
             if ($merged && $beforeSha !== '') {
-                $rolledBack = $this->rollback($beforeSha, $backup['database']);
+                // Only re-import the dump when the schema could actually have changed.
+                $rolledBack = $this->rollback($beforeSha, $dbTouched ? $backup['database'] : '');
             }
+            $this->progress($rolledBack ? 'rollback' : 'failed');
             $this->audit->log($rolledBack ? 'update.rolled_back' : 'update.failed', 'system', null, null, [
                 'error' => $e->getMessage(),
                 'backup' => $this->relativePath($backup['code']),
+                'database_restored' => $dbTouched,
             ], $ip);
             return [
                 'ok' => false,
@@ -514,22 +547,88 @@ final class UpdateService
     }
 
     /** Post-update sanity check: new version, reachable database, no pending migration. */
-    private function verifyUpdate(string $before, string $after): void
+    /** Version read from the on-disk VERSION file (the in-memory config is stale after a merge). */
+    private function versionOnDisk(): string
+    {
+        foreach ([code_path('VERSION'), base_path('VERSION')] as $path) {
+            if (!is_file($path)) {
+                continue;
+            }
+            clearstatcache(true, $path);
+            $raw = trim((string) file_get_contents($path));
+            return function_exists('sanitize_app_version') ? sanitize_app_version($raw) : $raw;
+        }
+        return '0.0.0';
+    }
+
+    /** Migrations still to run (0 when the schema is already up to date). */
+    private function pendingMigrations(): int
+    {
+        $files = glob(base_path('database/migrations/*.sql')) ?: [];
+        $applied = (int) ($this->db->fetch('SELECT COUNT(*) AS c FROM migrations')['c'] ?? 0);
+        return max(0, count($files) - $applied);
+    }
+
+    /** Drop the opcache so the merged PHP files are used immediately (opcache.validate_timestamps=0). */
+    private function resetOpcache(): void
+    {
+        if (function_exists('opcache_reset')) {
+            opcache_reset();
+        }
+    }
+
+    /** Publish the current update step so the UI can poll it (best effort, never throws). */
+    private function progress(string $step): void
+    {
+        try {
+            $this->progressStartedAt ??= time();
+            $file = storage_path('cache/update_progress.json');
+            $dir = dirname($file);
+            if (!is_dir($dir)) {
+                mkdir($dir, 0775, true);
+            }
+            file_put_contents($file, (string) json_encode([
+                'step' => $step,
+                'started_at' => $this->progressStartedAt,
+                'at' => time(),
+            ]), LOCK_EX);
+        } catch (\Throwable) {
+            // Progress reporting must never break the update itself.
+        }
+    }
+
+    /** @return array{step:string,started_at:int,at:int} */
+    public function progressState(): array
+    {
+        $file = storage_path('cache/update_progress.json');
+        $empty = ['step' => '', 'started_at' => 0, 'at' => 0];
+        if (!is_file($file)) {
+            return $empty;
+        }
+        $decoded = json_decode((string) file_get_contents($file), true);
+        if (!is_array($decoded)) {
+            return $empty;
+        }
+        return [
+            'step' => (string) ($decoded['step'] ?? ''),
+            'started_at' => (int) ($decoded['started_at'] ?? 0),
+            'at' => (int) ($decoded['at'] ?? 0),
+        ];
+    }
+
+    private function verifyUpdate(string $before, string $after, string $beforeSha = '', string $afterSha = ''): void
     {
         if ($after === '' || $after === '0.0.0') {
             throw new \RuntimeException('verify_version_missing');
         }
-        if ($after === $before) {
-            throw new \RuntimeException('verify_version_unchanged');
+        // Success is proven by the fast-forward: a new commit or a new version is enough.
+        $commitChanged = $beforeSha !== '' && $afterSha !== '' && $beforeSha !== $afterSha;
+        if (!$commitChanged && $after === $before) {
+            throw new \RuntimeException('verify_no_changes');
         }
         $probe = $this->db->fetch('SELECT 1 AS ok');
         if ((int) ($probe['ok'] ?? 0) !== 1) {
             throw new \RuntimeException('verify_database_unreachable');
-        }
-        $files = glob(base_path('database/migrations/*.sql')) ?: [];
-        $applied = (int) ($this->db->fetch('SELECT COUNT(*) AS c FROM migrations')['c'] ?? 0);
-        if ($applied < count($files)) {
-            throw new \RuntimeException('verify_migrations_pending');
         }
     }
 

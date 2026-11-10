@@ -140,6 +140,18 @@ versions without curated notes).
 - Statistics map: uses the **city of residence**, falling back to the **place of birth** (the field
   that feeds the fiscal code) for members without it; countries are grouped under “Abroad”, and
   `php bin/geo-warm.php` pre-computes every coordinate so the map is complete and works offline
+- **Fix**: the in-app update could never finish — the post-merge verification compared the version
+  from the in-memory config (built before the merge) with itself and always rolled back with
+  `verify_version_unchanged`. The version is now read from the `VERSION` file on disk
+  (`clearstatcache` included) and the running config is realigned via `App::setConfigValue()`
+- Update safety: success is verified by the **commit SHA** as well (a fast-forward that does not bump
+  `VERSION` is still an update), the schema check runs **before** the migrations, and the database
+  dump is re-imported on rollback **only when migrations were actually applied** — so a failed
+  verification no longer does a full `DROP/CREATE` re-import on a live database
+- Update: opcache is flushed after the merge (`opcache.validate_timestamps=0` servers pick up the new
+  code immediately), and `UPDATE_ENABLED=false` now really disables the updater (empty = auto-detect)
+- Update: live progress overlay (backup → download → merge → migrate → verify), polled from
+  `/api/updates/progress`, and `set_time_limit(0)` so the request cannot time out mid-update
 - Statistics: age bands follow the reference report (largest band first, share printed above each
   bar); e-mail providers and preferred language removed
 - Statistics: the sign-ups chart now covers the **whole period** instead of the last 24 months, and
