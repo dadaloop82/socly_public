@@ -186,14 +186,14 @@ if ($user && app()->isInstalled() && !$temporaryInstance && can('settings.manage
                 <?php if (($item['key'] ?? '') === 'treasury' && can('treasury.view')): ?>
                     <a href="<?= e(url('/budgets')) ?>" class="<?= e($navActive('/budgets')) ?>"><?= e(__('nav.budgets')) ?></a>
                 <?php endif; ?>
-                <?php if (($item['key'] ?? '') === 'members' && can('members.view')): ?>
-                    <a href="<?= e(url('/statistics')) ?>" class="<?= e($navActive('/statistics')) ?>"><?= e(__('nav.statistics')) ?></a>
-                <?php endif; ?>
             <?php endforeach; ?>
             <?php foreach ($pluginMenu as $item): ?>
                 <?php if (!empty($item['permission']) && !can($item['permission'])) continue; ?>
                 <a href="<?= e(url($item['path'])) ?>"><?= e(__($item['label'])) ?></a>
             <?php endforeach; ?>
+            <?php if (can('members.view')): ?>
+                <a href="<?= e(url('/statistics')) ?>" class="<?= e($navActive('/statistics')) ?>"><?= e(__('nav.statistics')) ?></a>
+            <?php endif; ?>
         </nav>
 
         <?php
