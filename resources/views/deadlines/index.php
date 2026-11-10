@@ -259,6 +259,13 @@ foreach ($deadline_items as $item) {
                                             'href' => !empty($item['member_id']) ? url('/members/' . (int) $item['member_id']) : '',
                                             'show' => !empty($item['member_id']) && can('members.view'),
                                         ];
+                                    } elseif (str_starts_with($source, 'system:membership_cards:')) {
+                                        $sourceAction = [
+                                            'icon' => 'user',
+                                            'label' => __('deadlines.open_members_list'),
+                                            'href' => url('/members?status=active'),
+                                            'show' => can('members.view'),
+                                        ];
                                     } elseif (str_starts_with($source, 'system:membership_period:')) {
                                         $sourceAction = [
                                             'icon' => 'toggle',

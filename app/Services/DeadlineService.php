@@ -43,6 +43,16 @@ final class DeadlineService
     /** @var list<string> */
     public const STATUSES = ['open', 'done', 'dismissed'];
 
+    /** Un solo sync automatico per richiesta (dashboard: counts + elenco). */
+    private bool $systemSyncedThisRequest = false;
+
+    /**
+     * Quanti giorni prima della fine del periodo compare il promemoria
+     * aggregato «tessere da rinnovare» (poi resta finché ci sono soci da
+     * rinnovare). Le tessere scadono alla fine del periodo di tesseramento.
+     */
+    private const CARD_RENEWAL_LEAD_DAYS = 120;
+
     public function __construct(
         private readonly Database $db,
         private readonly AuditService $audit,
@@ -54,7 +64,7 @@ final class DeadlineService
     /** @return list<array<string,mixed>> */
     public function upcoming(int $limit = 200, string $query = '', bool $openOnly = true, string $bucket = '', ?string $untilDate = null, string $category = ''): array
     {
-        $this->syncSystemDeadlines();
+        $this->ensureSystemSynced();
         $limitSql = ' LIMIT ' . max(1, min(500, $limit));
         $base = "SELECT d.*,
                     (SELECT v.value FROM member_field_values v
@@ -155,24 +165,73 @@ final class DeadlineService
         return $ordered;
     }
 
+    /**
+     * Sync automatico una volta per richiesta: le pagine che leggono l'elenco e i
+     * contatori non devono ricalcolare due volte le stesse scadenze di sistema.
+     */
+    private function ensureSystemSynced(): void
+    {
+        if ($this->systemSyncedThisRequest) {
+            return;
+        }
+        $this->systemSyncedThisRequest = true;
+        $this->syncSystemDeadlines();
+    }
+
     public function syncSystemDeadlines(): void
     {
         $sources = [];
         $periods = $this->db->fetchAll(
             'SELECT id, label, ends_on FROM membership_periods WHERE ends_on IS NOT NULL'
         );
+        $today = date('Y-m-d');
+        $leadDate = date('Y-m-d', strtotime('+' . self::CARD_RENEWAL_LEAD_DAYS . ' days'));
         foreach ($periods as $period) {
-            $source = 'system:membership_period:' . (int) $period['id'];
-            $sources[] = $source;
-            $this->upsertSystemDeadline($source, [
-                'title' => __('deadlines.auto_membership_period', [
-                    'label' => (string) ($period['label'] ?? ''),
-                ]),
-                'category' => 'membership',
-                'due_date' => (string) $period['ends_on'],
-                'member_id' => null,
-                'notes' => __('deadlines.auto_generated_note'),
-            ]);
+            $periodId = (int) $period['id'];
+            $periodLabel = (string) ($period['label'] ?? '');
+            $endsOn = (string) $period['ends_on'];
+
+            // Tessere: una sola voce per periodo con il numero delle tessere
+            // ancora da rinnovare. Il conteggio scende da solo man mano che i soci
+            // passano al periodo successivo e la voce sparisce quando hanno
+            // rinnovato tutti.
+            $pendingCards = $this->pendingCardRenewals($periodId);
+            $withinRenewalWindow = $endsOn <= $leadDate;
+            $periodEnded = $endsOn < $today;
+            $showCardsItem = $pendingCards > 0 && $withinRenewalWindow;
+
+            if ($showCardsItem) {
+                $cardSource = 'system:membership_cards:' . $periodId;
+                $sources[] = $cardSource;
+                $this->upsertSystemDeadline($cardSource, [
+                    'title' => __('deadlines.auto_membership_cards', [
+                        'count' => (string) $pendingCards,
+                        'label' => $periodLabel,
+                    ]),
+                    'category' => 'membership',
+                    'due_date' => $endsOn,
+                    'member_id' => null,
+                    'notes' => __('deadlines.auto_membership_cards_note', [
+                        'count' => (string) $pendingCards,
+                        'label' => $periodLabel,
+                        'date' => format_date($endsOn),
+                    ]),
+                ]);
+            }
+
+            // Voce informativa sul periodo: niente doppioni quando c'è già il
+            // promemoria tessere, e nessun residuo per periodi chiusi e svuotati.
+            if (!$showCardsItem && !($periodEnded && $pendingCards === 0)) {
+                $source = 'system:membership_period:' . $periodId;
+                $sources[] = $source;
+                $this->upsertSystemDeadline($source, [
+                    'title' => __('deadlines.auto_membership_period', ['label' => $periodLabel]),
+                    'category' => 'membership',
+                    'due_date' => $endsOn,
+                    'member_id' => null,
+                    'notes' => __('deadlines.auto_generated_note'),
+                ]);
+            }
         }
 
         $people = $this->db->fetchAll(
@@ -333,6 +392,8 @@ final class DeadlineService
     /** @return array{overdue:int,due_soon:int,open:int} */
     public function counts(): array
     {
+        // Keep the badges on the dashboard in step with renewals (cards, mandates…).
+        $this->ensureSystemSynced();
         $today = date('Y-m-d');
         $soon = date('Y-m-d', strtotime('+30 days'));
         $row = $this->db->fetch(
@@ -806,6 +867,33 @@ final class DeadlineService
     }
 
     /** @param array<string,mixed> $data */
+    /**
+     * Tessere ancora da rinnovare per un periodo: conta le tessere attive dei
+     * soci ancora iscritti a quel periodo. Chi passa al periodo successivo esce
+     * dal conteggio, quindi il promemoria si aggiorna da solo.
+     */
+    private function pendingCardRenewals(int $periodId): int
+    {
+        if ($periodId < 1) {
+            return 0;
+        }
+        try {
+            $row = $this->db->fetch(
+                "SELECT COUNT(*) AS c
+                 FROM membership_cards c
+                 INNER JOIN members m ON m.id = c.member_id
+                 WHERE m.membership_period_id = :pid
+                   AND m.status = 'active'
+                   AND c.is_active = 1",
+                ['pid' => $periodId]
+            );
+        } catch (\Throwable) {
+            // Installazioni vecchie senza tabella tessere: nessun promemoria.
+            return 0;
+        }
+        return (int) ($row['c'] ?? 0);
+    }
+
     private function upsertSystemDeadline(string $source, array $data): void
     {
         $existing = $this->db->fetch(
