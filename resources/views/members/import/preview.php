@@ -3,7 +3,9 @@
  * Import soci — step 3: anteprima e analisi (nuovi, aggiornamenti, errori).
  *
  * @var array<string,mixed> $analysis
+ * @var string $previewQuery
  */
+$previewQuery = trim((string) ($previewQuery ?? ''));
 $stats = is_array($analysis['stats'] ?? null) ? $analysis['stats'] : [];
 $rows = is_array($analysis['rows'] ?? null) ? $analysis['rows'] : [];
 $gaps = is_array($analysis['gaps'] ?? null) ? $analysis['gaps'] : ['types' => [], 'fields' => [], 'methods' => [], 'statuses' => []];
@@ -83,11 +85,41 @@ $gapLabels = static function (array $gapsList, string $key): string {
     <header class="panel-header">
         <div>
             <h2 class="section-title"><?= e(__('members.import.preview_title')) ?></h2>
-            <p class="section-lede"><?= e(__('members.import.preview_lede', [
-                'shown' => (string) count($rows),
-                'total' => (string) (int) ($analysis['rows_total'] ?? 0),
-            ])) ?></p>
+            <?php if ($previewQuery !== ''): ?>
+                <p class="section-lede"><?= e(__('members.import.preview_results', [
+                    'q' => $previewQuery,
+                    'match' => (string) (int) ($analysis['rows_filtered'] ?? 0),
+                    'total' => (string) (int) ($analysis['rows_total'] ?? 0),
+                ])) ?></p>
+            <?php else: ?>
+                <p class="section-lede"><?= e(__('members.import.preview_lede', [
+                    'shown' => (string) count($rows),
+                    'total' => (string) (int) ($analysis['rows_total'] ?? 0),
+                ])) ?></p>
+            <?php endif; ?>
         </div>
+        <form method="get" action="<?= e(url('/members/import/preview')) ?>" class="import-preview-search" role="search">
+            <?= field('search', [
+                'name' => 'q',
+                'id' => 'import-preview-q',
+                'label' => (string) __('members.import.preview_search_label'),
+                'value' => $previewQuery,
+                'context' => 'filter',
+                'wrapper_class' => 'import-preview-search-field',
+                'placeholder' => (string) __('members.import.preview_search_placeholder'),
+                'attrs' => [
+                    'enterkeyhint' => 'search',
+                    'autocomplete' => 'off',
+                    'spellcheck' => 'false',
+                ],
+            ]) ?>
+            <div class="import-preview-search-actions">
+                <button class="btn btn-sm" type="submit"><?= e(__('members.import.preview_search_submit')) ?></button>
+                <?php if ($previewQuery !== ''): ?>
+                    <a class="btn btn-sm btn-ghost" href="<?= e(url('/members/import/preview')) ?>"><?= e(__('members.import.preview_search_clear')) ?></a>
+                <?php endif; ?>
+            </div>
+        </form>
     </header>
     <div class="table-wrap embedded">
         <table class="import-preview-table">
@@ -176,6 +208,11 @@ $gapLabels = static function (array $gapsList, string $key): string {
                     </td>
                 </tr>
             <?php endforeach; ?>
+            <?php if ($rows === []): ?>
+                <tr>
+                    <td colspan="4" class="muted import-preview-empty"><?= e(__('members.import.preview_empty')) ?></td>
+                </tr>
+            <?php endif; ?>
             </tbody>
         </table>
     </div>

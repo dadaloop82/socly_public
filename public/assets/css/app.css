@@ -11956,6 +11956,17 @@ tr.doc-row-editable:focus-visible {
 }
 .import-preview-table td { padding: 0.55rem 0.65rem; border-bottom: 1px solid color-mix(in srgb, var(--line) 60%, transparent); vertical-align: top; }
 .import-line { font-variant-numeric: tabular-nums; color: var(--muted); }
+.import-preview-search {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 0.5rem;
+  min-width: min(22rem, 100%);
+}
+.import-preview-search > * { min-width: 0; }
+.import-preview-search-field { flex: 1 1 14rem; }
+.import-preview-search-actions { display: flex; gap: 0.4rem; }
+.import-preview-empty { text-align: center; font-size: 0.9rem; }
 .import-reason { font-size: 0.76rem; margin-top: 0.15rem; }
 .import-details { display: flex; flex-wrap: wrap; gap: 0.35rem 0.9rem; font-size: 0.8rem; }
 .import-diff { margin-top: 0.35rem; font-size: 0.8rem; }

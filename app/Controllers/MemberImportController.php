@@ -84,7 +84,8 @@ final class MemberImportController extends BaseController
     public function preview(Request $request): void
     {
         require_component('members');
-        $analysis = $this->import->analyze();
+        $query = trim((string) $request->input('q', ''));
+        $analysis = $this->import->analyze($query);
         if (empty($analysis['ok'])) {
             $this->flash('errors', ['csv_file' => __((string) ($analysis['error'] ?? 'members.import.error_no_mapping'))]);
             redirect('/members/import/map');
@@ -92,6 +93,7 @@ final class MemberImportController extends BaseController
         $this->render('members/import/preview', [
             'title' => __('members.import.step_preview_title'),
             'analysis' => $analysis,
+            'previewQuery' => $query,
         ]);
     }
 

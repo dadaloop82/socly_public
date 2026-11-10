@@ -25,7 +25,10 @@ final class MemberImportService
     private const PROFILE_SETTING = 'members.import.profiles';
     private const MAX_BYTES = 5 * 1024 * 1024;
     private const MAX_ROWS = 20000;
+    /** Righe mostrate nell'anteprima quando c'è una ricerca attiva. */
     private const PREVIEW_ROWS = 200;
+    /** Righe mostrate nell'anteprima senza ricerca: solo un saggio. */
+    private const PREVIEW_DEFAULT_ROWS = 5;
     private const SAMPLE_ROWS = 40;
     private const BATCH_SIZE = 100;
 
@@ -728,9 +731,13 @@ final class MemberImportService
     /**
      * Full analysis of the mapped file: normalized rows, duplicates, gaps.
      *
+     * Con `$query` valorizzata l'anteprima mostra solo le righe che
+     * corrispondono alla ricerca (nome, cognome, numero tessera, errori…):
+     * la ricerca lavora su tutte le righe del file, non solo su quelle mostrate.
+     *
      * @return array<string,mixed>
      */
-    public function analyze(): array
+    public function analyze(string $query = ''): array
     {
         $table = $this->table();
         if (empty($table['ok'])) {
@@ -743,6 +750,10 @@ final class MemberImportService
         $options = $this->options();
         $fields = $this->fieldDefinitions();
         $computed = $this->computeRows($table, $map, $options, $fields);
+        $allRows = $computed['rows'];
+        $query = trim($query);
+        $matchedRows = $query !== '' ? $this->filterRows($allRows, $query) : $allRows;
+        $limit = $query !== '' ? self::PREVIEW_ROWS : self::PREVIEW_DEFAULT_ROWS;
 
         return [
             'ok' => true,
@@ -756,11 +767,79 @@ final class MemberImportService
             'types' => $this->members->types(false),
             'periods' => $this->members->periods(),
             'stats' => $computed['stats'],
-            'rows' => array_slice($computed['rows'], 0, self::PREVIEW_ROWS),
-            'rows_total' => count($computed['rows']),
+            'rows' => array_slice($matchedRows, 0, $limit),
+            'rows_total' => count($allRows),
+            'rows_filtered' => count($matchedRows),
+            'preview_query' => $query,
             'gaps' => $computed['gaps'],
             'source_name' => (string) ($this->state()['source_name'] ?? ''),
         ];
+    }
+
+    /**
+     * Righe dell'anteprima che corrispondono a tutti i termini cercati,
+     * senza distinzione fra maiuscole e accenti.
+     *
+     * @param list<array<string,mixed>> $rows
+     * @return list<array<string,mixed>>
+     */
+    private function filterRows(array $rows, string $query): array
+    {
+        $terms = [];
+        foreach (preg_split('/\s+/u', $this->foldPreviewText($query)) ?: [] as $term) {
+            if ($term !== '') {
+                $terms[] = $term;
+            }
+        }
+        if ($terms === []) {
+            return $rows;
+        }
+        $matched = [];
+        foreach ($rows as $row) {
+            $haystack = $this->foldPreviewText($this->previewHaystack($row));
+            foreach ($terms as $term) {
+                if (!str_contains($haystack, $term)) {
+                    continue 2;
+                }
+            }
+            $matched[] = $row;
+        }
+        return $matched;
+    }
+
+    /** @param array<string,mixed> $row */
+    private function previewHaystack(array $row): string
+    {
+        $parts = [
+            (string) ($row['member_label'] ?? ''),
+            (string) ($row['reason'] ?? ''),
+            (string) ($row['line'] ?? ''),
+        ];
+        foreach (['resolved', 'values', 'errors', 'warnings'] as $key) {
+            $bucket = $row[$key] ?? [];
+            if (!is_array($bucket)) {
+                continue;
+            }
+            foreach ($bucket as $value) {
+                if (is_scalar($value)) {
+                    $parts[] = (string) $value;
+                }
+            }
+        }
+        return implode(' ', $parts);
+    }
+
+    private function foldPreviewText(string $value): string
+    {
+        $value = trim($value);
+        if ($value === '') {
+            return '';
+        }
+        $ascii = @iconv('UTF-8', 'ASCII//TRANSLIT//IGNORE', $value);
+        if (is_string($ascii) && $ascii !== '') {
+            $value = $ascii;
+        }
+        return mb_strtolower($value, 'UTF-8');
     }
 
     /**
