@@ -11,6 +11,7 @@ use Socly\Controllers\DeadlinesController;
 use Socly\Controllers\DocumentsController;
 use Socly\Controllers\InstallController;
 use Socly\Controllers\MemberController;
+use Socly\Controllers\MemberImportController;
 use Socly\Controllers\OrgController;
 use Socly\Controllers\ApiController;
 use Socly\Controllers\I18nController;
@@ -63,6 +64,7 @@ use Socly\Services\GeoService;
 use Socly\Services\InstallerService;
 use Socly\Services\MailService;
 use Socly\Services\MemberActionService;
+use Socly\Services\MemberImportService;
 use Socly\Services\MemberService;
 use Socly\Services\SmtpDiscoveryService;
 use Socly\Services\PaymentService;
@@ -215,6 +217,15 @@ $app->bind(PaymentService::class, fn (App $a) => new PaymentService(
     $a->get(Validator::class),
     $a->get(PluginManager::class),
     $a->get(TreasuryService::class)
+));
+$app->bind(MemberImportService::class, fn (App $a) => new MemberImportService(
+    $a->get(Database::class),
+    $a->get(MemberService::class),
+    $a->get(SettingsService::class),
+    $a->get(AuditService::class),
+    $a->get(PluginManager::class),
+    $a->get(TreasuryService::class),
+    $a->get(Validator::class)
 ));
 $app->bind(UserService::class, fn (App $a) => new UserService(
     $a->get(Database::class),
@@ -407,6 +418,11 @@ $app->bind(MemberController::class, fn (App $a) => new MemberController(
     $a->get(MemberRegistryService::class),
     $a->get(MemberActionService::class),
     $a->get(MailService::class)
+));
+$app->bind(MemberImportController::class, fn (App $a) => new MemberImportController(
+    $a->get(View::class),
+    $a->get(MemberImportService::class),
+    $a->get(MemberService::class)
 ));
 $app->bind(SettingsController::class, fn (App $a) => new SettingsController(
     $a->get(View::class),

@@ -10,6 +10,7 @@ use Socly\Controllers\DeadlinesController;
 use Socly\Controllers\DocumentsController;
 use Socly\Controllers\InstallController;
 use Socly\Controllers\MemberController;
+use Socly\Controllers\MemberImportController;
 use Socly\Controllers\OrgController;
 use Socly\Controllers\ApiController;
 use Socly\Controllers\PluginController;
@@ -101,6 +102,18 @@ $router->get('/branding/logo', [BrandingController::class, 'logo'], null, ['mw.l
 $router->get('/members', [MemberController::class, 'index'], 'members.view', ['mw.locale', 'mw.install', 'mw.auth']);
 $router->get('/members/export', [MemberController::class, 'export'], 'members.view', ['mw.locale', 'mw.install', 'mw.auth']);
 $router->get('/members/export/registry', [MemberController::class, 'exportRegistry'], 'members.view', ['mw.locale', 'mw.install', 'mw.auth']);
+// Import CSV: registrato prima di /members/{id} (il parametro catturerebbe "import").
+$router->get('/members/import', [MemberImportController::class, 'index'], 'members.manage', ['mw.locale', 'mw.install', 'mw.auth']);
+$router->post('/members/import/upload', [MemberImportController::class, 'upload'], 'members.manage', ['mw.locale', 'mw.install', 'mw.auth', 'mw.csrf']);
+$router->get('/members/import/map', [MemberImportController::class, 'map'], 'members.manage', ['mw.locale', 'mw.install', 'mw.auth']);
+$router->post('/members/import/map', [MemberImportController::class, 'saveMap'], 'members.manage', ['mw.locale', 'mw.install', 'mw.auth', 'mw.csrf']);
+$router->get('/members/import/preview', [MemberImportController::class, 'preview'], 'members.manage', ['mw.locale', 'mw.install', 'mw.auth']);
+$router->get('/members/import/references', [MemberImportController::class, 'references'], 'members.manage', ['mw.locale', 'mw.install', 'mw.auth']);
+$router->post('/members/import/commit', [MemberImportController::class, 'commit'], 'members.manage', ['mw.locale', 'mw.install', 'mw.auth', 'mw.csrf']);
+$router->get('/members/import/report', [MemberImportController::class, 'report'], 'members.manage', ['mw.locale', 'mw.install', 'mw.auth']);
+$router->get('/members/import/errors', [MemberImportController::class, 'errorsCsv'], 'members.manage', ['mw.locale', 'mw.install', 'mw.auth']);
+$router->post('/members/import/header', [MemberImportController::class, 'header'], 'members.manage', ['mw.locale', 'mw.install', 'mw.auth', 'mw.csrf']);
+$router->post('/members/import/cancel', [MemberImportController::class, 'cancel'], 'members.manage', ['mw.locale', 'mw.install', 'mw.auth', 'mw.csrf']);
 $router->get('/members/create', [MemberController::class, 'create'], 'members.manage', ['mw.locale', 'mw.install', 'mw.auth']);
 $router->post('/members/bulk', [MemberController::class, 'bulk'], 'members.manage', ['mw.locale', 'mw.install', 'mw.auth', 'mw.csrf']);
 $router->post('/members', [MemberController::class, 'store'], 'members.manage', ['mw.locale', 'mw.install', 'mw.auth', 'mw.csrf']);

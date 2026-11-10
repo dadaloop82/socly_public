@@ -55,6 +55,12 @@ EAV: `member_id`, `field_definition_id`, `value`.
 ### payments
 `member_id`, `amount`, `method` (`cash`, `bank`, `other`), `type` (`membership`, `debt`, `adjustment`), `note`, `created_by`, `created_at`.
 
+### membership_cards
+Tessere associative: `member_id` (nullable, `SET NULL` on delete), `card_number` (unique — coincide con `members.member_number`: il numero tessera è il numero socio), `qr_code`, `member_type_id` (tipo tessera), `issued_on`, `expires_on`, `is_active`, `notes`. Alimentata dall'import CSV e riusabile per la gestione tessere.
+
+### member_import_runs / member_import_rows
+Tracciabilità degli import soci da CSV. `member_import_runs`: `user_id`, `source_name`, `source_hash`, `delimiter`, `encoding`, `mapping_json`, `options_json`, `stats_json`, `status` (`preview` / `committed` / `failed`), `created_at`, `committed_at`. `member_import_rows`: una riga per socio elaborato (`run_id`, `line_no`, `member_id`, `card_id`, `payment_id`, `action` `create|update|skip|error`, `result` `created|updated|skipped|failed`, `message`, `payload_json`, `diff_json`, `errors_json`).
+
 ### audit_logs
 `user_id`, `action`, `entity_type`, `entity_id`, `before_json`, `after_json`, `ip`, `created_at`.
 

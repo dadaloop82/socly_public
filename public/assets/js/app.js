@@ -13335,3 +13335,206 @@ function initBudgetGrid(scope = document) {
 
   recalc();
 }
+
+/* Import soci: la dropzone è l'unico comando (click o trascinamento) e avvia l'analisi. */
+(() => {
+  const importField = document.querySelector('[data-import-file-field]');
+  if (!(importField instanceof HTMLElement)) return;
+  const fileInput = importField.querySelector('[data-import-file-input]');
+  const dropzone = importField.querySelector('[data-import-dropzone]');
+  const nameEl = importField.querySelector('[data-import-file-name]');
+  const statusEl = importField.querySelector('[data-import-status]');
+  const submitButton = importField.querySelector('[data-import-submit]');
+  const form = importField instanceof HTMLFormElement ? importField : importField.closest('form');
+  if (!(fileInput instanceof HTMLInputElement) || !(dropzone instanceof HTMLElement)) return;
+
+  const emptyLabel = nameEl instanceof HTMLElement ? nameEl.textContent || '' : '';
+  let submitted = false;
+
+  const openPicker = () => fileInput.click();
+
+  const submitForm = () => {
+    if (submitted || !(form instanceof HTMLFormElement)) return;
+    submitted = true;
+    if (submitButton instanceof HTMLButtonElement) submitButton.disabled = true;
+    if (statusEl instanceof HTMLElement) statusEl.hidden = false;
+    if (typeof form.requestSubmit === 'function') {
+      form.requestSubmit();
+    } else {
+      form.submit();
+    }
+  };
+
+  const showSelection = () => {
+    const file = fileInput.files && fileInput.files[0] ? fileInput.files[0] : null;
+    if (nameEl instanceof HTMLElement) {
+      if (file) {
+        const kilobytes = Math.max(1, Math.round(file.size / 1024));
+        nameEl.textContent = `${file.name} · ${kilobytes} KB`;
+      } else {
+        nameEl.textContent = emptyLabel;
+      }
+    }
+    if (!file) {
+      submitted = false;
+      if (statusEl instanceof HTMLElement) statusEl.hidden = true;
+      if (submitButton instanceof HTMLButtonElement) submitButton.disabled = false;
+      return;
+    }
+    // Analisi automatica: l'utente non deve premere altro.
+    window.setTimeout(submitForm, 120);
+  };
+
+  fileInput.addEventListener('change', showSelection);
+
+  dropzone.addEventListener('click', (event) => {
+    if (event.target === fileInput) return;
+    event.preventDefault();
+    openPicker();
+  });
+  dropzone.addEventListener('keydown', (event) => {
+    if (event.key !== 'Enter' && event.key !== ' ') return;
+    event.preventDefault();
+    openPicker();
+  });
+
+  ['dragenter', 'dragover'].forEach((eventName) => {
+    dropzone.addEventListener(eventName, (event) => {
+      event.preventDefault();
+      dropzone.classList.add('is-dragging');
+    });
+  });
+  ['dragleave', 'dragend', 'drop'].forEach((eventName) => {
+    dropzone.addEventListener(eventName, () => dropzone.classList.remove('is-dragging'));
+  });
+  dropzone.addEventListener('drop', (event) => {
+    const transfer = event.dataTransfer;
+    if (!transfer || !transfer.files || !transfer.files.length) return;
+    event.preventDefault();
+    try {
+      fileInput.files = transfer.files;
+    } catch (error) {
+      return; // Browser senza supporto: resta la selezione manuale.
+    }
+    showSelection();
+  });
+})();
+
+/* Import soci: ogni campo del programma può essere scelto una sola volta. */
+(() => {
+  const form = document.querySelector('[data-import-map-form]');
+  if (!(form instanceof HTMLFormElement)) return;
+  const selects = Array.from(form.querySelectorAll('[data-import-map-select]'))
+    .filter((element) => element instanceof HTMLSelectElement);
+  if (selects.length === 0) return;
+
+  const warning = form.querySelector('[data-import-map-warning]');
+  const submitButton = form.querySelector('[data-import-map-submit]');
+  const ignored = new Set(['', '__ignore']);
+
+  const refresh = () => {
+    const owners = new Map();
+    selects.forEach((select) => {
+      if (ignored.has(select.value)) return;
+      if (!owners.has(select.value)) owners.set(select.value, []);
+      owners.get(select.value).push(select);
+    });
+
+    let duplicateLabel = '';
+    selects.forEach((select) => {
+      Array.from(select.options).forEach((option) => {
+        const usedBy = owners.get(option.value) || [];
+        option.disabled = !ignored.has(option.value) && usedBy.length > 0 && !usedBy.includes(select);
+      });
+      const usedBy = owners.get(select.value) || [];
+      const isDuplicate = usedBy.length > 1;
+      select.classList.toggle('is-duplicate', isDuplicate);
+      if (isDuplicate && duplicateLabel === '') {
+        const option = select.options[select.selectedIndex];
+        duplicateLabel = option ? option.textContent.trim() : select.value;
+      }
+    });
+
+    if (warning instanceof HTMLElement) {
+      warning.hidden = duplicateLabel === '';
+      if (duplicateLabel !== '') {
+        const template = warning.dataset.template || ':field';
+        warning.textContent = template.replace(':field', duplicateLabel);
+      }
+    }
+    if (submitButton instanceof HTMLButtonElement) {
+      submitButton.disabled = duplicateLabel !== '';
+    }
+  };
+
+  selects.forEach((select) => select.addEventListener('change', refresh));
+  refresh();
+})();
+
+/* Import soci: i nomi nelle altre lingue si compilano dal nome italiano. */
+(() => {
+  const boxes = document.querySelectorAll('[data-import-translations]');
+  if (boxes.length === 0) return;
+
+  boxes.forEach((box) => {
+    const card = box.closest('.import-ref-card') || box.parentElement;
+    if (!(card instanceof Element)) return;
+    const source = card.querySelector('[data-import-name-source]');
+    const targets = Array.from(box.querySelectorAll('[data-import-translation]'))
+      .filter((element) => element instanceof HTMLInputElement);
+    if (!(source instanceof HTMLInputElement) || targets.length === 0) return;
+
+    const sync = () => {
+      targets.forEach((target) => {
+        if (target.dataset.touched === '1') return;
+        target.value = source.value;
+      });
+    };
+
+    targets.forEach((target) => {
+      target.addEventListener('input', () => {
+        target.dataset.touched = target.value !== source.value ? '1' : '';
+      });
+    });
+    source.addEventListener('input', sync);
+    sync();
+  });
+})();
+
+/* Import soci: conferma, pulsante disabilitato e avviso "importazione in corso". */
+(() => {
+  const form = document.querySelector('[data-import-commit]');
+  if (!(form instanceof HTMLFormElement)) return;
+  const button = form.querySelector('[data-import-commit-submit]');
+  const overlay = document.querySelector('[data-import-progress]');
+  let busy = false;
+
+  const startProgress = () => {
+    busy = true;
+    if (button instanceof HTMLButtonElement) {
+      button.disabled = true;
+      const running = button.dataset.runningLabel || '';
+      if (running !== '') button.textContent = running;
+    }
+    if (overlay instanceof HTMLElement) overlay.hidden = false;
+    document.documentElement.classList.add('is-importing');
+  };
+
+  form.addEventListener('submit', async (event) => {
+    if (busy) {
+      event.preventDefault();
+      return;
+    }
+    const message = form.dataset.importConfirm || '';
+    if (form.dataset.confirmed !== '1' && message !== '') {
+      event.preventDefault();
+      const ok = typeof appConfirm === 'function' ? await appConfirm(message) : true;
+      if (!ok) return;
+      form.dataset.confirmed = '1';
+      startProgress();
+      HTMLFormElement.prototype.submit.call(form);
+      return;
+    }
+    startProgress();
+  });
+})();
