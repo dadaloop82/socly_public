@@ -96,6 +96,11 @@ versions without curated notes).
   under the photo block
 - Member types editor: the annual fee, its € suffix and the “Active” checkbox share one compact row
   (no more € detached from the amount and no full-width checkbox box)
+- CSV import remembers the choices made for the same file layout (register in first note / treasury,
+  payment method, update strategy, duplicate policy) and proposes them again on the next import
+- CSV import is idempotent: one imported payment per member, updated when amount, date or method
+  change instead of being duplicated; the first-note movement is created only when missing and
+  realigned when the payment changes
 - One placeholder avatar per gender, shared by the member page, the photo field and the membership
   card preview (the card and the detail page no longer draw their own silhouettes)
 - Member list actions: import and export are icon buttons, “Registry” sits after the primary actions

@@ -23,6 +23,26 @@ final class MemberImportService
     private const SESSION_KEY = '_member_import';
     private const REPORT_KEY = '_member_import_report';
     private const PROFILE_SETTING = 'members.import.profiles';
+
+    /**
+     * Options remembered per file layout (same headers): behaviour and bookkeeping choices only —
+     * period/type stay contextual. This is what makes a second identical import propose the
+     * previous "register in treasury" (first note) choice again.
+     *
+     * @var list<string>
+     */
+    private const PROFILE_OPTION_KEYS = [
+        'status',
+        'update_existing',
+        'update_strategy',
+        'duplicate_policy',
+        'import_payments',
+        'register_treasury',
+        'treasury_date_source',
+        'default_payment_method',
+        'accept_consents',
+        'create_cards',
+    ];
     private const MAX_BYTES = 5 * 1024 * 1024;
     private const MAX_ROWS = 20000;
     /** Righe mostrate nell'anteprima quando c'è una ricerca attiva. */
@@ -233,6 +253,20 @@ final class MemberImportService
             return ['ok' => false, 'error' => 'members.import.error_too_many_rows'];
         }
 
+        $hasHeader = $reader->hasHeader($rows);
+        $options = $this->defaultOptions();
+        if ($hasHeader && $rows !== []) {
+            $headers = array_map(
+                static fn ($cell): string => (string) $cell,
+                array_values((array) ($rows[0]['cells'] ?? []))
+            );
+            $remembered = $this->profileOptions($headers);
+            if ($remembered !== []) {
+                // Same layout as a previous import: propose its choices again
+                // (e.g. “register in treasury”, payment method, update strategy).
+                $options = $this->normalizeOptions(array_merge($options, $remembered));
+            }
+        }
         $this->reset();
         $this->saveState([
             'token' => bin2hex(random_bytes(8)),
@@ -241,9 +275,9 @@ final class MemberImportService
             'source_hash' => hash_file('sha256', $target) ?: null,
             'delimiter' => $reader->delimiter(),
             'encoding' => $reader->encoding(),
-            'has_header' => $reader->hasHeader($rows),
+            'has_header' => $hasHeader,
             'map' => [],
-            'options' => $this->defaultOptions(),
+            'options' => $options,
             'created_at' => date('c'),
         ]);
 
@@ -604,7 +638,7 @@ final class MemberImportService
         $state['options'] = $this->normalizeOptions($rawOptions);
         $this->saveState($state);
         // Ricorda le associazioni per i prossimi file con le stesse intestazioni.
-        $this->rememberMappingProfile($table['headers'], $map);
+        $this->rememberMappingProfile($table['headers'], $map, $state['options'] ?? []);
         return ['ok' => true];
     }
 
@@ -717,15 +751,44 @@ final class MemberImportService
     /**
      * @param list<string> $headers
      * @param array<int,string> $map
+     * @param array<string,string> $options
      */
-    private function rememberMappingProfile(array $headers, array $map): void
+    private function rememberMappingProfile(array $headers, array $map, array $options = []): void
     {
         $profiles = $this->profiles();
-        $profiles[$this->signature($headers)] = ['map' => $map, 'saved_at' => date('c')];
+        $saved = [];
+        foreach (self::PROFILE_OPTION_KEYS as $key) {
+            if (array_key_exists($key, $options)) {
+                $saved[$key] = (string) $options[$key];
+            }
+        }
+        $profiles[$this->signature($headers)] = ['map' => $map, 'options' => $saved, 'saved_at' => date('c')];
         if (count($profiles) > 20) {
             $profiles = array_slice($profiles, -20, null, true);
         }
         $this->settings->set(self::PROFILE_SETTING, $profiles);
+    }
+
+    /**
+     * Behaviour options remembered for this exact file layout (empty when unknown).
+     *
+     * @param list<string> $headers
+     * @return array<string,string>
+     */
+    private function profileOptions(array $headers): array
+    {
+        $profiles = $this->profiles();
+        $profile = $profiles[$this->signature($headers)] ?? null;
+        if (!is_array($profile) || !is_array($profile['options'] ?? null)) {
+            return [];
+        }
+        $out = [];
+        foreach (self::PROFILE_OPTION_KEYS as $key) {
+            if (array_key_exists($key, $profile['options'])) {
+                $out[$key] = (string) $profile['options'][$key];
+            }
+        }
+        return $out;
     }
 
     /**
@@ -2220,7 +2283,39 @@ final class MemberImportService
             'created_by' => auth_user()['id'] ?? null,
             'created_at' => $paymentDate,
         ];
-        // Idempotenza: reimportando lo stesso file il pagamento non viene duplicato.
+        // Idempotenza: un solo pagamento "da import" per socio. Se il file cambia importo,
+        // metodo o data lo si aggiorna; il movimento di prima nota viene creato solo se manca
+        // e riallineato solo quando il pagamento è cambiato (mai movimenti doppi).
+        $existing = $this->importedPayment($memberId);
+        if ($existing !== null) {
+            $paymentId = (int) $existing['id'];
+            $patch = [];
+            if (abs((float) $existing['amount'] - $amount) > 0.0001) {
+                $patch['amount'] = $amount;
+            }
+            if ((string) ($existing['method'] ?? '') !== $method) {
+                $patch['method'] = $method;
+            }
+            if (substr((string) ($existing['created_at'] ?? ''), 0, 10) !== substr($paymentDate, 0, 10)) {
+                $patch['created_at'] = $paymentDate;
+            }
+            if ($patch !== []) {
+                $this->db->update('payments', $patch, 'id = :id', ['id' => $paymentId]);
+            }
+            $this->syncImportedTreasury(
+                $paymentId,
+                $memberId,
+                $amount,
+                $method,
+                $paymentDate,
+                $admittedAt,
+                $options,
+                $patch !== []
+            );
+            return $paymentId;
+        }
+
+        // Fallback per pagamenti creati prima della tracciatura delle righe di import.
         $duplicate = $this->db->fetch(
             "SELECT id FROM payments
              WHERE member_id = :member AND amount = :amount AND method = :method
@@ -2235,25 +2330,88 @@ final class MemberImportService
             ]
         );
         if ($duplicate !== null) {
-            return (int) $duplicate['id'];
-        }
-        $paymentId = $this->db->insert('payments', $paymentData);
-        if ($options['register_treasury'] === '1') {
-            // Data del movimento in prima cassa: quella del pagamento (predefinita).
-            // Se il file non ha la data di pagamento si usa l'iscrizione, mai "oggi".
-            $useRegistration = ($options['treasury_date_source'] ?? 'payment') === 'registration';
-            $movementDate = $useRegistration && $admittedAt !== ''
-                ? substr($admittedAt, 0, 10)
-                : substr($paymentDate, 0, 10);
-            $this->treasury->autoRegisterFromPayment(
+            $paymentId = (int) $duplicate['id'];
+            $this->syncImportedTreasury(
                 $paymentId,
                 $memberId,
                 $amount,
                 $method,
-                $movementDate
+                $paymentDate,
+                $admittedAt,
+                $options,
+                false
             );
+            return $paymentId;
         }
+
+        $paymentId = $this->db->insert('payments', $paymentData);
+        $this->syncImportedTreasury(
+            $paymentId,
+            $memberId,
+            $amount,
+            $method,
+            $paymentDate,
+            $admittedAt,
+            $options,
+            false
+        );
         return $paymentId;
+    }
+
+    /**
+     * Payment already created by a previous import for this member (idempotency anchor).
+     *
+     * @return array<string,mixed>|null
+     */
+    private function importedPayment(int $memberId): ?array
+    {
+        return $this->db->fetch(
+            "SELECT p.id, p.amount, p.method, p.created_at
+             FROM payments p
+             INNER JOIN member_import_rows r ON r.payment_id = p.id
+             WHERE p.member_id = :member AND p.`type` = 'membership'
+             ORDER BY r.id ASC
+             LIMIT 1",
+            ['member' => $memberId]
+        );
+    }
+
+    /**
+     * First-note movement for an imported payment: created only when missing (the treasury
+     * service is idempotent on payment_id) and realigned only when the payment itself changed,
+     * so a repeated import never produces a second movement.
+     *
+     * @param array<string,string> $options
+     */
+    private function syncImportedTreasury(
+        int $paymentId,
+        int $memberId,
+        float $amount,
+        string $method,
+        string $paymentDate,
+        string $admittedAt,
+        array $options,
+        bool $paymentChanged
+    ): void {
+        if (($options['register_treasury'] ?? '0') !== '1') {
+            return;
+        }
+        // Data del movimento in prima cassa: quella del pagamento (predefinita).
+        // Se il file non ha la data di pagamento si usa l'iscrizione, mai “oggi”.
+        $useRegistration = ($options['treasury_date_source'] ?? 'payment') === 'registration';
+        $movementDate = $useRegistration && $admittedAt !== ''
+            ? substr($admittedAt, 0, 10)
+            : substr($paymentDate, 0, 10);
+        $this->treasury->autoRegisterFromPayment($paymentId, $memberId, $amount, $method, $movementDate);
+        if (!$paymentChanged) {
+            return;
+        }
+        $this->db->update('treasury_movements', [
+            'amount' => $amount,
+            'movement_date' => $movementDate,
+            'payment_method' => $method,
+            'account' => TreasuryService::accountForPaymentMethod($method),
+        ], 'payment_id = :payment', ['payment' => $paymentId]);
     }
 
     /**
