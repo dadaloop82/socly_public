@@ -238,10 +238,10 @@ $hasPhoto = !empty($fields['photo']);
                          aria-label="<?= e($avatarLabel) ?>">
                         <circle cx="48" cy="48" r="48" fill="currentColor" opacity="0.10"/>
                         <?php if ($avatarVariant === 'female'): ?>
-                            <path d="M48 20c9 0 15 6.5 15 15.5 0 5-2 9-5 12 3 2 5.5 5 7 9l-6 2.5c-2.5-6.5-6.5-10-11-10s-8.5 3.5-11 10L31 56.5c1.5-4 4-7 7-9-3-3-5-7-5-12C33 26.5 39 20 48 20z"
-                                  fill="currentColor" opacity="0.75"/>
-                            <circle cx="48" cy="56" r="9" fill="currentColor" opacity="0.55"/>
-                            <path d="M48 65c-9 0-16 6-18 16h36c-2-10-9-16-18-16z" fill="currentColor" opacity="0.55"/>
+                            <path d="M33 36c-2.5 6.5-2.5 13 0 19.5M63 36c2.5 6.5 2.5 13 0 19.5"
+                                  fill="none" stroke="currentColor" stroke-width="4.5" stroke-linecap="round" opacity="0.8"/>
+                            <circle cx="48" cy="38" r="13" fill="currentColor" opacity="0.6"/>
+                            <path d="M48 57c-10 0-17.5 8-19.5 21h39C65.5 65 58 57 48 57z" fill="currentColor" opacity="0.55"/>
                         <?php else: ?>
                             <circle cx="48" cy="38" r="14" fill="currentColor" opacity="0.7"/>
                             <path d="M48 56c-11 0-20 8-22 22h44c-2-14-11-22-22-22z" fill="currentColor" opacity="0.55"/>
@@ -407,12 +407,21 @@ $hasPhoto = !empty($fields['photo']);
                     </div>
                 </div>
                 <?php endif; ?>
-                <?php if ($cardQr !== ''): ?>
+                <?php
+                $cardQrPayload = $cardQr !== '' ? $cardQr : $cardNumber;
+                $cardQrSvg = $cardQrPayload !== '' ? \Socly\Support\QrCode::svg($cardQrPayload, 4, 4, 'M') : '';
+                ?>
+                <?php if ($cardQrPayload !== ''): ?>
                 <div class="member-scheda-fact">
                     <div class="label"><?= e(__('members.card_qr')) ?></div>
                     <div class="value member-card-qr">
-                        <code><?= e($cardQr) ?></code>
-                        <button type="button" class="btn btn-sm btn-ghost" data-copy-text="<?= e($cardQr) ?>" data-copied="<?= e(__('members.card_qr_copied')) ?>"><?= e(__('members.copy')) ?></button>
+                        <?php if ($cardQrSvg !== ''): ?>
+                            <div class="member-card-qr-image"><?= $cardQrSvg ?></div>
+                        <?php endif; ?>
+                        <div class="member-card-qr-text">
+                            <code><?= e($cardQrPayload) ?></code>
+                            <button type="button" class="btn btn-sm btn-ghost" data-copy-text="<?= e($cardQrPayload) ?>" data-copied="<?= e(__('members.card_qr_copied')) ?>"><?= e(__('members.copy')) ?></button>
+                        </div>
                     </div>
                 </div>
                 <?php endif; ?>

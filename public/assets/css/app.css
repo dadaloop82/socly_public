@@ -12190,3 +12190,15 @@ tr.doc-row-editable:focus-visible {
   word-break: break-all;
 }
 .assoc-logo[hidden] { display: none !important; }
+.member-card-qr-image {
+  color: var(--ink);
+  line-height: 0;
+}
+.member-card-qr-image .qr-code {
+  width: 9rem;
+  height: 9rem;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: #fff;
+}
+.member-card-qr-text { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem; }
