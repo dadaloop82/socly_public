@@ -209,6 +209,7 @@ document.addEventListener('DOMContentLoaded', () => {
   initFreshnessGuard();
   initTreasuryRecurring();
   initTreasurySimilar();
+  initTreasuryAdvancedFilters();
   initBudgetSectionSort();
   initBudgetCategoryRename();
   restoreFilterFocus();
@@ -1767,6 +1768,25 @@ function initTreasurySimilar() {
     actions.append(apply, dismiss);
     panel.appendChild(actions);
   }
+}
+
+/** Filtri avanzati della prima nota: pannello a scomparsa dietro il bottone “Filtri”. */
+function initTreasuryAdvancedFilters() {
+  const form = document.querySelector('form[data-treasury-filter]');
+  if (!form) return;
+  const toggle = form.querySelector('[data-treasury-advanced-toggle]');
+  const panel = form.querySelector('[data-treasury-advanced]');
+  if (!(toggle instanceof HTMLButtonElement) || !(panel instanceof HTMLElement)) return;
+  const sync = () => {
+    const open = !panel.hidden;
+    toggle.setAttribute('aria-expanded', open ? 'true' : 'false');
+    panel.classList.toggle('is-open', open);
+  };
+  toggle.addEventListener('click', () => {
+    panel.hidden = !panel.hidden;
+    sync();
+  });
+  sync();
 }
 
 function initSessionHeartbeat() {

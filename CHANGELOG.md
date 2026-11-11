@@ -58,6 +58,10 @@ every 100 patches bump the series, and each bump is published to this repository
 
 ### Changed
 
+- First-note filters are now a compact bar: search, period and type stay visible, while a **Filters**
+  button (with the number of active filters) opens type, Model D line, cost centre, account, approval
+  and sorting. The three classification filters include **“Not assigned”**, and “Group by category”
+  is a proper toggle button instead of a loose checkbox.
 - The first-note entry form is now organised into cards — amount and date, account and method,
   invoice, category and details, recurrence, counterparty, document — with a sticky action bar.
 - The financial accounts section has a single “Save account changes” button instead of one save per

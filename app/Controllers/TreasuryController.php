@@ -78,6 +78,9 @@ final class TreasuryController extends BaseController
             'beneficiaries' => $this->treasury->beneficiaries(),
             'currency' => $this->currency,
             'hasAnyMovements' => $this->treasury->movementCount() > 0,
+            'runts_filter_groups' => $this->runtsFilterGroups(),
+            'budget_filter_options' => $this->treasury->budgetItemFilterOptions(),
+            'advanced_filters_count' => $this->advancedFilterCount($filters),
             'pending_count' => $this->treasury->pendingCount(),
             'page' => $page,
             'pages' => $pages,
@@ -522,6 +525,39 @@ final class TreasuryController extends BaseController
      *
      * @return array{direction:string,category:string,account:string,from:string,to:string,period:string}
      */
+    /**
+     * Voci del Modello D raggruppate (Uscite / Entrate) per il filtro avanzato.
+     *
+     * @return list<array{label:string,options:list<array{value:string,label:string}>}>
+     */
+    private function runtsFilterGroups(): array
+    {
+        $groups = [];
+        foreach (['expense' => 'runts.expenses', 'income' => 'runts.incomes'] as $direction => $headingKey) {
+            foreach (\Socly\Services\RuntsReportService::selectGroups($direction) as $group) {
+                $groups[] = [
+                    'label' => (string) __($headingKey) . ' · ' . (string) ($group['label'] ?? ''),
+                    'options' => $group['options'] ?? [],
+                ];
+            }
+        }
+
+        return $groups;
+    }
+
+    /** Quanti filtri “avanzati” sono attivi (mostrato sul bottone). */
+    private function advancedFilterCount(array $filters): int
+    {
+        $count = 0;
+        foreach (['category', 'runts_line', 'budget_item_id', 'account', 'approval'] as $key) {
+            if (trim((string) ($filters[$key] ?? '')) !== '') {
+                $count++;
+            }
+        }
+
+        return $count;
+    }
+
     private function ledgerFilters(Request $request): array
     {
         $direction = (string) $request->input('direction', '');
@@ -533,8 +569,20 @@ final class TreasuryController extends BaseController
             $account = '';
         }
         $category = trim((string) $request->input('category', ''));
-        if ($category !== '' && !in_array($category, array_column($this->treasury->categoryOptions(), 'key'), true)) {
+        if ($category !== '' && $category !== '__none__' && !in_array($category, array_column($this->treasury->categoryOptions(), 'key'), true)) {
             $category = '';
+        }
+        $runtsLine = strtoupper(trim((string) $request->input('runts_line', '')));
+        if ($runtsLine !== '' && $runtsLine !== '__NONE__' && !\Socly\Services\RuntsReportService::isKnownLine($runtsLine, 'expense')
+            && !\Socly\Services\RuntsReportService::isKnownLine($runtsLine, 'income')) {
+            $runtsLine = '';
+        }
+        if ($runtsLine === '__NONE__') {
+            $runtsLine = '__none__';
+        }
+        $budgetItem = trim((string) $request->input('budget_item_id', ''));
+        if ($budgetItem !== '__none__' && (int) $budgetItem <= 0) {
+            $budgetItem = '';
         }
         $period = (string) $request->input('period', '');
         if (!in_array($period, ['month', 'year', 'days30'], true)) {
@@ -556,6 +604,8 @@ final class TreasuryController extends BaseController
         return [
             'direction' => $direction,
             'category' => $category,
+            'runts_line' => $runtsLine,
+            'budget_item_id' => $budgetItem,
             'account' => $account,
             'from' => $from,
             'to' => $to,

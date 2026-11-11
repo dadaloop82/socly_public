@@ -12499,6 +12499,66 @@ tr.doc-row-editable:focus-visible {
   .tmf-grid--2,
   .tmf-grid--3 { grid-template-columns: minmax(0, 1fr); }
 }
+/* ── Prima nota: barra filtri compatta + pannello avanzato ──────────────────── */
+.treasury-filter-tools {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 0.45rem;
+  margin-left: auto;
+}
+.treasury-filter-toggle { position: relative; }
+.treasury-filter-count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 1.15rem;
+  height: 1.15rem;
+  margin-left: 0.35rem;
+  padding: 0 0.3rem;
+  border-radius: 999px;
+  background: var(--brand-primary);
+  color: #fff;
+  font-size: 0.72rem;
+  font-weight: 800;
+  line-height: 1;
+}
+.treasury-group-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.4rem 0.7rem;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: #fff;
+  font-size: 0.82rem;
+  font-weight: 700;
+  cursor: pointer;
+  user-select: none;
+}
+.treasury-group-toggle:has(input:checked) {
+  border-color: color-mix(in srgb, var(--brand-primary) 45%, var(--line));
+  background: color-mix(in srgb, var(--brand-primary) 10%, #fff);
+  color: var(--brand-primary-deep);
+}
+.treasury-group-toggle input { margin: 0; }
+.treasury-advanced {
+  margin-top: 0.7rem;
+  padding-top: 0.7rem;
+  border-top: 1px dashed color-mix(in srgb, var(--ink) 14%, transparent);
+}
+.treasury-advanced[hidden] { display: none; }
+.treasury-advanced-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 0.7rem 0.9rem;
+  align-items: end;
+}
+@media (max-width: 720px) {
+  .treasury-filter-tools { margin-left: 0; width: 100%; justify-content: flex-start; }
+  .treasury-group-toggle-text { display: inline; }
+}
+
 /* ── Movimenti simili: proposta di classificazione in blocco ───────────────── */
 .tmf-similar {
   display: grid;

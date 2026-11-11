@@ -410,8 +410,29 @@ final class TreasuryService
         }
         $category = trim((string) ($filters['category'] ?? ''));
         if ($category !== '') {
-            $where[] = 'm.category = :filter_category';
-            $params['filter_category'] = $category;
+            if ($category === '__none__') {
+                // “Non assegnato”: movimenti senza tipologia.
+                $where[] = "(m.category IS NULL OR m.category = '')";
+            } else {
+                $where[] = 'm.category = :filter_category';
+                $params['filter_category'] = $category;
+            }
+        }
+        $runtsFilter = trim((string) ($filters['runts_line'] ?? ''));
+        if ($runtsFilter !== '') {
+            if ($runtsFilter === '__none__') {
+                $where[] = "(m.runts_line IS NULL OR m.runts_line = '')";
+            } else {
+                $where[] = 'm.runts_line = :filter_runts';
+                $params['filter_runts'] = strtoupper($runtsFilter);
+            }
+        }
+        $budgetFilter = $filters['budget_item_id'] ?? '';
+        if ((string) $budgetFilter === '__none__') {
+            $where[] = 'm.budget_item_id IS NULL';
+        } elseif ((int) $budgetFilter > 0) {
+            $where[] = 'm.budget_item_id = :filter_budget_item';
+            $params['filter_budget_item'] = (int) $budgetFilter;
         }
         $from = trim((string) ($filters['from'] ?? ''));
         if ($from !== '') {
@@ -852,6 +873,29 @@ final class TreasuryService
             ];
         }
         return $ordered;
+    }
+
+    /**
+     * Righe di preventivo per il filtro del libro mastro: “2026 · Affitto sede”.
+     *
+     * @return list<array{value:string,label:string}>
+     */
+    public function budgetItemFilterOptions(): array
+    {
+        $options = [];
+        foreach ($this->db->fetchAll(
+            "SELECT i.id, b.fiscal_year, i.label
+             FROM budget_items i
+             INNER JOIN budgets b ON b.id = i.budget_id
+             ORDER BY b.fiscal_year DESC, i.sort_order ASC, i.id ASC"
+        ) as $row) {
+            $options[] = [
+                'value' => (string) (int) $row['id'],
+                'label' => (string) $row['fiscal_year'] . ' · ' . mb_substr(trim((string) $row['label']), 0, 90),
+            ];
+        }
+
+        return $options;
     }
 
     /**

@@ -19,6 +19,7 @@ $filterPeriod = (string) ($filters['period'] ?? '');
 $filterDirection = (string) ($filters['direction'] ?? '');
 $filterCategory = (string) ($filters['category'] ?? '');
 $filterAccount = (string) ($filters['account'] ?? '');
+$advancedCount = (int) ($advanced_filters_count ?? 0);
 $hasActiveFilters = trim((string) ($search_query ?? '')) !== ''
     || $filterPeriod !== ''
     || $filterDirection !== ''
@@ -178,6 +179,36 @@ foreach ($categories as $categoryOption) {
                 'transfer' => (string) __('treasury.direction_transfer'),
             ],
         ]) ?>
+        <div class="treasury-filter-tools">
+            <button type="button" class="btn btn-ghost btn-sm treasury-filter-toggle" data-treasury-advanced-toggle
+                    aria-controls="treasury-advanced-filters" aria-expanded="<?= $advancedCount > 0 ? 'true' : 'false' ?>">
+                <?= e(__('treasury.filters_button')) ?>
+                <?php if ($advancedCount > 0): ?><span class="treasury-filter-count"><?= $advancedCount ?></span><?php endif; ?>
+            </button>
+            <label class="treasury-group-toggle" title="<?= e(__('treasury.group_toggle')) ?>">
+                <span class="visually-hidden"><?= e(__('treasury.group_toggle')) ?></span>
+                <?= field('hidden', ['name' => 'group', 'value' => '0']) ?>
+                <?= field('checkbox', [
+                    'name' => 'group',
+                    'id' => 'treasury-group',
+                    'label' => '',
+                    'value' => !empty($group_by_category) ? '1' : '',
+                    'check_value' => '1',
+                    'context' => 'inline',
+                ]) ?>
+                <span class="treasury-group-toggle-text"><?= e(__('treasury.group_toggle')) ?></span>
+            </label>
+            <?php if ($hasActiveFilters): ?>
+                <a class="btn btn-ghost btn-sm treasury-filter-reset" href="<?= e(url('/treasury')) ?>"><?= e(__('treasury.filter_reset')) ?></a>
+            <?php endif; ?>
+        </div>
+    </div>
+    <div class="treasury-advanced<?= $advancedCount > 0 ? ' is-open' : '' ?>" id="treasury-advanced-filters" data-treasury-advanced <?= $advancedCount > 0 ? '' : 'hidden' ?>>
+        <div class="treasury-advanced-grid">
+        <?php
+        $categoryFilterOptions = $categoryFilterOptions ?? [];
+        $categoryFilterOptions['__none__'] = (string) __('treasury.filter_none');
+        ?>
         <?= field('select', [
             'name' => 'category',
             'id' => 'treasury-category-filter',
@@ -186,6 +217,38 @@ foreach ($categories as $categoryOption) {
             'context' => 'filter',
             'empty_label' => (string) __('treasury.filter_all'),
             'options' => $categoryFilterOptions,
+        ]) ?>
+        <?php
+        $runtsFilterGroups = is_array($runts_filter_groups ?? null) ? $runts_filter_groups : [];
+        $runtsNoneGroup = [['label' => (string) __('treasury.filter_none_group'), 'options' => [['value' => '__none__', 'label' => (string) __('treasury.filter_none')]]]];
+        $runtsGroupsForFilter = array_merge([], $runtsFilterGroups, $runtsNoneGroup);
+        ?>
+        <?= field('select', [
+            'name' => 'runts_line',
+            'id' => 'treasury-runts-filter',
+            'label' => (string) __('runts.line_label'),
+            'value' => (string) ($filters['runts_line'] ?? ''),
+            'context' => 'filter',
+            'empty_label' => (string) __('treasury.filter_all'),
+            'groups' => $runtsGroupsForFilter,
+            'options' => [],
+        ]) ?>
+        <?php
+        $budgetFilterOptions = is_array($budget_filter_options ?? null) ? $budget_filter_options : [];
+        $budgetFilterFlat = [];
+        foreach ($budgetFilterOptions as $option) {
+            $budgetFilterFlat[(string) $option['value']] = (string) $option['label'];
+        }
+        $budgetFilterFlat['__none__'] = (string) __('treasury.filter_none');
+        ?>
+        <?= field('select', [
+            'name' => 'budget_item_id',
+            'id' => 'treasury-budget-filter',
+            'label' => (string) __('treasury.budget_item'),
+            'value' => (string) ($filters['budget_item_id'] ?? ''),
+            'context' => 'filter',
+            'empty_label' => (string) __('treasury.filter_all'),
+            'options' => $budgetFilterFlat,
         ]) ?>
         <?= field('select', [
             'name' => 'account',
@@ -223,19 +286,7 @@ foreach ($categories as $categoryOption) {
             ],
             'context' => 'filter',
         ]) ?>
-        <?= field('hidden', ['name' => 'group', 'value' => '0']) ?>
-        <?= field('checkbox', [
-            'name' => 'group',
-            'id' => 'treasury-group',
-            'label' => (string) __('treasury.group_toggle'),
-            'value' => !empty($group_by_category) ? '1' : '',
-            'check_value' => '1',
-            'context' => 'filter',
-            'wrapper_class' => 'treasury-filter-group',
-        ]) ?>
-        <?php if ($hasActiveFilters): ?>
-            <a class="btn btn-ghost btn-sm treasury-filter-reset" href="<?= e(url('/treasury')) ?>"><?= e(__('treasury.filter_reset')) ?></a>
-        <?php endif; ?>
+        </div>
     </div>
 </form>
 <?php endif; ?>
