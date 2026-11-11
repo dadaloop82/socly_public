@@ -114,6 +114,20 @@ $year = date('Y');
                 <?php endif; ?>
                 <?= $content ?>
             </div>
+            <?php if ($showNewsWidget): ?>
+            <div
+                class="auth-news-slot auth-news-slot--compact"
+                data-auth-news
+                data-auth-news-compact="1"
+                data-news-api="<?= e((string) ($newsApiUrl ?? socly_news_api_url())) ?>"
+                data-news-unavailable="<?= e(__('auth.news_unavailable')) ?>"
+                data-news-error-prefix="<?= e(__('auth.news_error_prefix')) ?>"
+                data-news-read-more="<?= e(__('auth.news_read_more')) ?>"
+                data-news-compact-label="<?= e(__('auth.news_compact_label')) ?>"
+                data-news-dismiss="<?= e(__('auth.news_dismiss')) ?>"
+                hidden
+            ></div>
+            <?php endif; ?>
         </section>
     </div>
     <dialog class="setup-exit-dialog auth-updates-dialog" data-auth-updates-dialog
@@ -124,9 +138,6 @@ $year = date('Y');
         data-i18n-error-text="<?= e(__('auth.updates_error_text')) ?>"
         data-i18n-available-title="<?= e(__('updates.available_title')) ?>"
         data-i18n-available-text="<?= e(__('updates.available_text')) ?>"
-        data-i18n-manual-hint="<?= e(__('updates.manual_hint')) ?>"
-        data-i18n-auto-unavailable="<?= e(__('updates.auto_unavailable')) ?>"
-        data-i18n-login-hint="<?= e(__('auth.updates_login_hint')) ?>"
         data-i18n-notes="<?= e(__('updates.notes')) ?>"
         data-i18n-download="<?= e(__('updates.download')) ?>"
         data-i18n-guide="<?= e(__('updates.guide')) ?>"

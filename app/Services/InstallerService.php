@@ -54,7 +54,7 @@ final class InstallerService
         $merged['UPDATE_NOTIFY'] = (string) ($existing['UPDATE_NOTIFY'] ?? 'true');
         $merged['UPDATE_MANIFEST_URL'] = (string) ($existing['UPDATE_MANIFEST_URL']
             ?? 'https://raw.githubusercontent.com/dadaloop82/socly_public/main/latest.json');
-        $merged['UPDATE_REPO'] = (string) ($existing['UPDATE_REPO'] ?? 'git@github.com-socly:dadaloop82/socly.git');
+        $merged['UPDATE_REPO'] = (string) ($existing['UPDATE_REPO'] ?? 'https://github.com/dadaloop82/socly_public.git');
         $merged['UPDATE_CHANNEL'] = (string) ($existing['UPDATE_CHANNEL'] ?? 'main');
         $merged['UPDATE_ENABLED'] = isset($data['update_enabled'])
             ? (!empty($data['update_enabled']) ? 'true' : 'false')

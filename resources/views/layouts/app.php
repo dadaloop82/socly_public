@@ -310,11 +310,12 @@ if ($user && app()->isInstalled() && !$temporaryInstance && can('settings.manage
                         $notesUrl = trim((string) ($updateInfo['notes_url'] ?? ''));
                         $downloadUrl = trim((string) ($updateInfo['download_url'] ?? ''));
                         $guideUrl = trim((string) ($updateInfo['install_guide_url'] ?? ''));
+                        $updateError = trim((string) ($updateInfo['error'] ?? ''));
                         ?>
                         <?php if (!$canAutoUpdate): ?>
                             <p class="sidebar-update-hint"><?= e(__('updates.manual_hint')) ?></p>
-                        <?php elseif (!empty($updateInfo['error'])): ?>
-                            <p class="sidebar-update-hint"><?= e(__('updates.auto_unavailable')) ?></p>
+                        <?php elseif ($updateError !== ''): ?>
+                            <p class="sidebar-update-hint"><?= e($updateError) ?></p>
                         <?php endif; ?>
                         <div class="sidebar-update-actions">
                             <?php if ($canAutoUpdate): ?>

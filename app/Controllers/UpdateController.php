@@ -67,6 +67,9 @@ final class UpdateController extends BaseController
     public function check(Request $request): void
     {
         $force = (string) $request->input('force', '') === '1';
+        // The update endpoint is also called by the public login page: technical
+        // details (git/SSH/permission errors) are visible to admins only.
+        $isAdmin = can(Permission::SETTINGS_MANAGE);
         try {
             $info = $this->updates->check($force);
             try {
@@ -85,15 +88,15 @@ final class UpdateController extends BaseController
                 'source' => (string) ($info['source'] ?? ''),
                 'released_at' => (string) ($info['released_at'] ?? ''),
                 'repository_url' => (string) ($info['repository_url'] ?? ''),
-                'last_commit' => is_array($info['last_commit'] ?? null) ? $info['last_commit'] : null,
+                'last_commit' => $isAdmin && is_array($info['last_commit'] ?? null) ? $info['last_commit'] : null,
                 'install_available' => !empty($info['install_available']),
                 'notes_url' => (string) ($info['notes_url'] ?? ''),
                 'download_url' => (string) ($info['download_url'] ?? ''),
                 'install_guide_url' => (string) ($info['install_guide_url'] ?? ''),
-                'error' => (string) ($info['error'] ?? ''),
+                'error' => $isAdmin ? (string) ($info['error'] ?? '') : '',
             ]);
         } catch (\Throwable $e) {
-            $this->json(['ok' => false, 'error' => $e->getMessage()], 500);
+            $this->json(['ok' => false, 'error' => $isAdmin ? $e->getMessage() : ''], 500);
         }
     }
 

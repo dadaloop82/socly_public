@@ -124,7 +124,7 @@ $app->setConfig([
     'update' => [
         'notify' => filter_var($_ENV['UPDATE_NOTIFY'] ?? 'true', FILTER_VALIDATE_BOOL),
         'manifest_url' => $_ENV['UPDATE_MANIFEST_URL'] ?? 'https://raw.githubusercontent.com/dadaloop82/socly_public/main/latest.json',
-        'repo' => $_ENV['UPDATE_REPO'] ?? 'git@github.com-socly:dadaloop82/socly.git',
+        'repo' => $_ENV['UPDATE_REPO'] ?? 'https://github.com/dadaloop82/socly_public.git',
         'channel' => $_ENV['UPDATE_CHANNEL'] ?? 'main',
         'enabled' => filter_var($_ENV['UPDATE_ENABLED'] ?? 'false', FILTER_VALIDATE_BOOL),
     ],
@@ -370,7 +370,8 @@ $app->bind(AuthController::class, static fn (App $a) => new AuthController(
     $a->get(View::class),
     $a->get(AuthService::class),
     $a->get(Validator::class),
-    $a->get(SetupService::class)
+    $a->get(SetupService::class),
+    $a->get(MailService::class)
 ));
 $privateBindings = $codePath . '/bootstrap/bindings_private.php';
 if (!is_file($privateBindings) && defined('SOCLY_PRIVATE_PATH')) {

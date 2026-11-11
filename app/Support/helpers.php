@@ -1241,7 +1241,10 @@ if (!function_exists('brand_derived_css_vars')) {
         $deep = brand_mix_hex($primary, '#000000', 0.72);
         $accentInk = brand_readable_hex($accent, $paper, 4.5);
         $primaryInk = brand_readable_hex($primary, $paper, 4.5);
-        $accentOnDark = brand_readable_hex($accent, $deep, 4.5);
+        // Dark panels (auth brand column, sidebar) start from --brand-primary,
+        // the lightest shade of the gradient: checking the contrast there — not
+        // only on the deepest mix — keeps the association name readable (AA).
+        $accentOnDark = brand_readable_hex($accent, $primary, 4.5);
         $accentMuted = brand_readable_hex(brand_mix_hex($accentInk, $paper, 0.28), $paper, 3.0);
 
         return [

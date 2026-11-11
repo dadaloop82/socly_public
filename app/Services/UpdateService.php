@@ -13,6 +13,9 @@ final class UpdateService
 
     private const DEFAULT_MANIFEST_URL = 'https://raw.githubusercontent.com/dadaloop82/socly_public/main/latest.json';
 
+    /** Public HTTPS repository: readable anonymously, no deploy key required. */
+    private const DEFAULT_REPO_URL = 'https://github.com/dadaloop82/socly_public.git';
+
     /** @var list<string> */
     private const ALLOWED_MANIFEST_HOSTS = [
         'raw.githubusercontent.com',
@@ -38,18 +41,33 @@ final class UpdateService
     /** Git-based one-click install (the checkout's `origin` remote must be readable). */
     public function installEnabled(): bool
     {
+        $flag = self::installFlagFromEnv($_ENV);
+        if ($flag !== null) {
+            return $flag;
+        }
+        return $this->isGitCheckout();
+    }
+
+    /**
+     * Resolve the UPDATE_DISABLED / UPDATE_ENABLED flags without booting the app.
+     *
+     * @param array<string,mixed> $env
+     * @return bool|null null = rely on the git-checkout detection
+     */
+    public static function installFlagFromEnv(array $env): ?bool
+    {
         // Explicit opt-out wins (UPDATE_DISABLED=true).
-        if (filter_var($_ENV['UPDATE_DISABLED'] ?? 'false', FILTER_VALIDATE_BOOL)) {
+        if (filter_var($env['UPDATE_DISABLED'] ?? 'false', FILTER_VALIDATE_BOOL)) {
             return false;
         }
         // An explicit UPDATE_ENABLED value decides (true = force, false = disabled); when the
         // variable is empty/absent we keep the automatic detection so the button works on a
         // git checkout without touching .env.
-        $enabledRaw = trim((string) ($_ENV['UPDATE_ENABLED'] ?? ''));
-        if ($enabledRaw !== '') {
-            return filter_var($enabledRaw, FILTER_VALIDATE_BOOL);
+        $enabledRaw = trim((string) ($env['UPDATE_ENABLED'] ?? ''));
+        if ($enabledRaw === '') {
+            return null;
         }
-        return $this->isGitCheckout();
+        return filter_var($enabledRaw, FILTER_VALIDATE_BOOL);
     }
 
     /** True when the code tree is a git checkout with a readable `origin` remote. */
@@ -120,7 +138,13 @@ final class UpdateService
 
     public function repo(): string
     {
-        return trim((string) ($_ENV['UPDATE_REPO'] ?? 'git@github.com-socly:dadaloop82/socly.git'));
+        $repo = trim((string) ($_ENV['UPDATE_REPO'] ?? self::DEFAULT_REPO_URL));
+        // Instances provisioned before the public mirror keep the old private
+        // remote in .env: treat it as the public default instead of leaking it.
+        if ($repo === '' || preg_match('#^git@github\.com[^:]*:dadaloop82/socly(_public)?\.git$#', $repo) === 1) {
+            return self::DEFAULT_REPO_URL;
+        }
+        return $repo;
     }
 
     /**
@@ -231,9 +255,9 @@ final class UpdateService
                 $publicVersion = $gitRemote;
             }
         } elseif ($this->installEnabled()) {
-            // Git checkout where `git fetch` failed (typical on web servers: the PHP user has no
-            // SSH key for the private remote). Fall back to the public manifest, otherwise the
-            // instance would report "up to date" while a newer release is published.
+            // Git checkout where `git fetch` failed (permissions on .git, no network or a
+            // private fork without credentials). Fall back to the public manifest, otherwise
+            // the instance would report "up to date" while a newer release is published.
             if ($publicVersion !== null) {
                 $remote = $publicVersion;
                 $source = 'manifest';
@@ -283,12 +307,10 @@ final class UpdateService
             }
         }
 
-        if ($gitError !== null && $manifestError !== null) {
-            $result['error'] = $gitError;
-        } elseif ($gitError !== null && $this->installEnabled()) {
-            $result['error'] = $gitError;
+        if ($gitError !== null && ($manifestError !== null || $this->installEnabled())) {
+            $result['error'] = $this->describeUpdateError($gitError);
         } elseif ($manifestError !== null && !$this->installEnabled()) {
-            $result['error'] = $manifestError;
+            $result['error'] = $this->describeUpdateError($manifestError);
         }
 
         return $this->writeCache($cacheFile, $this->finalizeResult($result));
@@ -323,6 +345,12 @@ final class UpdateService
                 'ok' => false,
                 'message' => __('updates.dirty', ['files' => implode(', ', array_slice($dirty, 0, 5))]),
             ];
+        }
+
+        $preflight = $this->preflightRepository();
+        if ($preflight !== null) {
+            $this->audit->log('update.failed', 'system', null, null, ['error' => $preflight], $ip);
+            return ['ok' => false, 'message' => $preflight];
         }
 
         file_put_contents($lock, date('c'));
@@ -656,6 +684,70 @@ final class UpdateService
         return str_starts_with($path, $base) ? substr($path, strlen($base)) : $path;
     }
 
+    /**
+     * Human-readable update error: neutral classification + real detail
+     * (permissions / authentication / network) for the admin UI.
+     */
+    private function describeUpdateError(string $detail): string
+    {
+        $detail = trim($detail);
+        $message = __(self::classifyUpdateError($detail));
+        if ($detail === '') {
+            return $message;
+        }
+        return $message . ' ' . __('updates.error_detail', ['detail' => $detail]);
+    }
+
+    /** Map a git/HTTP failure to a stable i18n key. */
+    public static function classifyUpdateError(string $message): string
+    {
+        $normalized = strtolower($message);
+        if ($normalized === '') {
+            return 'updates.error_generic';
+        }
+        if (preg_match('/authentication failed|could not read username|publickey|invalid username or password|terminal prompts disabled|host key verification failed|access denied \(publickey/', $normalized) === 1) {
+            return 'updates.error_auth';
+        }
+        if (preg_match('/permission denied|not writable|read-only file system|unable to create|operation not permitted|eacces|failed to write|object file|insufficient permission/', $normalized) === 1) {
+            return 'updates.error_permissions';
+        }
+        if (preg_match('/could not resolve host|connection timed out|network is unreachable|connection refused|failed to connect|ssl certificate|name resolution|early eof|unable to access/', $normalized) === 1) {
+            return 'updates.error_network';
+        }
+        return 'updates.error_generic';
+    }
+
+    /**
+     * Fail before touching the tree when the PHP user cannot write the git
+     * metadata (typical: .git owned by root) or when the repository is damaged.
+     */
+    private function preflightRepository(): ?string
+    {
+        $gitDir = base_path('.git');
+        if (!file_exists($gitDir)) {
+            return __('updates.git_missing');
+        }
+        if (is_file($gitDir)) {
+            // Worktrees/submodules: .git is a pointer to the real git directory.
+            $pointer = trim((string) @file_get_contents($gitDir));
+            if (preg_match('/^gitdir:\s*(.+)$/i', $pointer, $m) === 1) {
+                $candidate = trim($m[1]);
+                $gitDir = str_starts_with($candidate, '/') ? $candidate : base_path($candidate);
+            }
+        }
+        $objects = rtrim($gitDir, '/') . '/objects';
+        if (!is_dir($gitDir) || !is_writable($gitDir) || !is_dir($objects) || !is_writable($objects)) {
+            return __('updates.git_not_writable', ['path' => $this->relativePath($gitDir)]);
+        }
+        try {
+            // Detect a corrupted object store before the merge (cheap connectivity-only run).
+            $this->git(['fsck', '--no-progress', '--connectivity-only']);
+        } catch (\Throwable $e) {
+            return __('updates.git_check_failed', ['error' => $e->getMessage()]);
+        }
+        return null;
+    }
+
     /** @return array<string, mixed> */
     private function fetchManifest(): array
     {
@@ -866,13 +958,14 @@ final class UpdateService
         $env = $_ENV;
         // A web request must never block on a credential prompt.
         $env['GIT_TERMINAL_PROMPT'] = '0';
-        $sshHost = trim((string) ($_ENV['UPDATE_SSH_HOST'] ?? 'github.com-socly'));
-        if ($sshHost !== '') {
+        // The default remote is public HTTPS: only set up SSH when a fork needs it.
+        $sshHost = trim((string) ($_ENV['UPDATE_SSH_HOST'] ?? ''));
+        $sshKey = trim((string) ($_ENV['UPDATE_SSH_KEY'] ?? ''));
+        if ($sshHost !== '' || $sshKey !== '') {
             // Deploy keys live outside the web user's $HOME on most servers: allow pointing at an
             // explicit key file (UPDATE_SSH_KEY=/path/to/deploy_key) and fail fast instead of
             // hanging on a passphrase prompt.
             $sshCommand = 'ssh -o IdentitiesOnly=yes -o BatchMode=yes -o StrictHostKeyChecking=accept-new';
-            $sshKey = trim((string) ($_ENV['UPDATE_SSH_KEY'] ?? ''));
             if ($sshKey !== '') {
                 $sshCommand .= ' -i ' . escapeshellarg($sshKey);
             }

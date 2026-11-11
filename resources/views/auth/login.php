@@ -108,7 +108,11 @@ if ($setupUrl === '') {
         ]) ?>
 
         <div class="auth-links">
-            <a href="<?= e(url('/password/forgot')) ?>" data-i18n="auth.forgot"><?= e(__('auth.forgot')) ?></a>
+            <?php if (!empty($mailReady)): ?>
+                <a href="<?= e(url('/password/forgot')) ?>" data-i18n="auth.forgot"><?= e(__('auth.forgot')) ?></a>
+            <?php else: ?>
+                <p class="auth-forgot-note" data-i18n="auth.forgot_unavailable"><?= e(__('auth.forgot_unavailable')) ?></p>
+            <?php endif; ?>
         </div>
 
         <button class="btn btn-block" type="submit" data-i18n="auth.submit_full"><?= e(__('auth.submit_full')) ?></button>

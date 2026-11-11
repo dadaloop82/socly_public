@@ -201,6 +201,7 @@ document.addEventListener('DOMContentLoaded', () => {
   initTreasuryBudgetImpute(document);
   initAuthLoginI18nLive();
   syncBrandReadableColors();
+  initBrokenImageGuards();
   initSessionHeartbeat();
   initPlatformConsents(document);
   initResetUserData();
@@ -417,6 +418,8 @@ function enterScope(scope, opts = {}) {
     '.auth-motto',
     '.auth-desc',
     '.auth-news-slot',
+    '.auth-news-card',
+    '.auth-news-banner',
     '.auth-lede',
     '.auth-panel',
     '.auth-card',
@@ -1358,7 +1361,9 @@ function applyReadableBrandVars(primary, accent, target = document.documentEleme
     '--brand-accent-muted',
     brandReadableHex(brandMixHex(accentInk, paper, 0.28), paper, 3.0)
   );
-  target.style.setProperty('--brand-accent-on-dark', brandReadableHex(a, deep, 4.5));
+  // Dark panels start from --brand-primary (lightest gradient shade): check
+  // the contrast there so association names stay readable (WCAG AA).
+  target.style.setProperty('--brand-accent-on-dark', brandReadableHex(a, p, 4.5));
   target.style.setProperty('--brand-on-primary', brandOnColor(p));
   target.style.setProperty('--brand-on-primary-deep', brandOnColor(deep));
   target.style.setProperty('--brand-on-accent', brandOnColor(a));
@@ -11002,31 +11007,85 @@ function formatNewsDate(iso) {
   }
 }
 
+function initBrokenImageGuards() {
+  // Broken or unavailable images must never be shown (no broken icon, no alt
+  // text box). Branding helpers rely on the [hidden] attribute — see the
+  // img[hidden] rule in app.css — and this listener covers 404/network errors.
+  const hide = (img) => {
+    if (!(img instanceof HTMLImageElement)) return;
+    img.hidden = true;
+    img.classList.add('is-broken');
+  };
+  document.addEventListener('error', (event) => {
+    if (event.target instanceof HTMLImageElement) hide(event.target);
+  }, true);
+  document.querySelectorAll('img').forEach((img) => {
+    if (img.complete && img.naturalWidth === 0) hide(img);
+  });
+}
+
 function initAuthNewsWidget() {
-  const slot = document.querySelector('[data-auth-news]');
-  if (!(slot instanceof HTMLElement)) return;
-  const api = slot.dataset.newsApi || '';
-  const unavailable = slot.dataset.newsUnavailable || 'News non disponibili';
-  const errorPrefix = slot.dataset.newsErrorPrefix || 'Errore';
-  const readMore = slot.dataset.newsReadMore || 'Leggi tutta →';
+  // Two slots share the same feed: the sidebar card (desktop) and the compact
+  // dismissible banner rendered below the login form (mobile).
+  const slots = [...document.querySelectorAll('[data-auth-news]')].filter((el) => el instanceof HTMLElement);
+  if (slots.length === 0) return;
+  const primary = slots[0];
+  const api = primary.dataset.newsApi || '';
+  const errorPrefix = primary.dataset.newsErrorPrefix || 'Errore';
+  const readMore = primary.dataset.newsReadMore || 'Leggi tutta →';
+  const dismissKey = 'socly.newsDismissed';
+
+  const isCompact = (slot) => slot.dataset.authNewsCompact === '1';
+
+  const hideSlot = (slot) => {
+    slot.hidden = true;
+    slot.innerHTML = '';
+  };
+
+  const dismissed = () => {
+    try {
+      return window.sessionStorage.getItem(dismissKey) === '1';
+    } catch {
+      return false;
+    }
+  };
 
   const showUnavailable = (errorDetail = '') => {
     // Product news are optional: a network/HTTP error (e.g. the instance has no
     // public endpoint) must never clutter the login screen.
-    slot.classList.add('is-empty');
-    slot.hidden = true;
-    slot.innerHTML = '';
+    slots.forEach((slot) => {
+      slot.classList.add('is-empty');
+      hideSlot(slot);
+    });
     if (errorDetail) console.warn(`[socly] ${errorPrefix}: ${errorDetail}`);
   };
 
-  const showItem = (item) => {
-    slot.classList.remove('is-empty');
-    const heroStyle = item.image ? `background-image:url('${String(item.image).replace(/'/g, "\\'")}')` : '';
-    const excerpt = item.excerpt || item.body || '';
-    const url = item.url || '#';
+  const newsToken = (item) => String(item.id ?? item.slug ?? item.url ?? item.title ?? '');
+
+  const renderCompact = (slot, item, url, initial = false) => {
+    const label = slot.dataset.newsCompactLabel || 'Novità';
+    const dismissLabel = slot.dataset.newsDismiss || 'Chiudi avviso';
     slot.innerHTML = `
-      <article class="auth-news-card will-enter">
-        ${heroStyle ? `<div class="auth-news-hero" style="${heroStyle}"></div>` : ''}
+      <div class="auth-news-banner${initial ? ' will-enter' : ''}" data-news-id="${escapeHtml(newsToken(item))}">
+        <span class="auth-news-banner-label">${escapeHtml(label)}</span>
+        <a class="auth-news-banner-link" href="${escapeHtml(String(url))}" target="_blank" rel="noopener noreferrer" title="${escapeHtml(String(item.title))}">${escapeHtml(String(item.title))}</a>
+        <button type="button" class="auth-news-banner-close" data-news-dismiss aria-label="${escapeHtml(dismissLabel)}"><span aria-hidden="true">×</span></button>
+      </div>`;
+    slot.querySelector('[data-news-dismiss]')?.addEventListener('click', () => {
+      try {
+        window.sessionStorage.setItem(dismissKey, '1');
+      } catch {
+        // Private mode / storage disabled: dismissing still works for this page.
+      }
+      hideSlot(slot);
+    });
+    slot.hidden = dismissed();
+  };
+
+  const renderCard = (slot, item, url, initial = false) => {
+    const excerpt = item.excerpt || item.body || '';
+    slot.innerHTML = `
+      <article class="auth-news-card${initial ? ' will-enter' : ''}" data-news-id="${escapeHtml(newsToken(item))}">
         <div class="auth-news-body">
           ${item.published_at ? `<div class="auth-news-date">${formatNewsDate(item.published_at)}</div>` : ''}
           <h2 class="auth-news-title">${escapeHtml(String(item.title))}</h2>
@@ -11035,7 +11094,122 @@ function initAuthNewsWidget() {
         </div>
       </article>`;
     slot.hidden = false;
-    enterScope(slot, { reset: true });
+  };
+
+  // Broken/tiny images are never shown: only real covers (>= 480px) become the
+  // <img> hero. The promise is cached so concurrent/rotating renders reuse the
+  // same probe instead of downloading the cover twice.
+  /** @type {Map<string, Promise<boolean>>} */
+  const heroCache = new Map();
+  const heroAvailable = (url) => {
+    if (!url) return Promise.resolve(false);
+    const key = String(url);
+    if (heroCache.has(key)) return heroCache.get(key);
+    const pending = new Promise((resolve) => {
+      const probe = new Image();
+      probe.onload = () => resolve(probe.naturalWidth >= 480);
+      probe.onerror = () => resolve(false);
+      probe.src = key;
+    });
+    heroCache.set(key, pending);
+    return pending;
+  };
+
+  const applyHero = (item) => {
+    if (!item.image) return;
+    const token = newsToken(item);
+    void heroAvailable(item.image).then((ok) => {
+      if (!ok) return;
+      slots.forEach((slot) => {
+        if (isCompact(slot) || slot.hidden) return;
+        const card = slot.querySelector('.auth-news-card');
+        if (!card || card.dataset.newsId !== token || card.querySelector('.auth-news-hero')) return;
+        const hero = document.createElement('img');
+        hero.className = 'auth-news-hero';
+        hero.src = String(item.image);
+        hero.alt = '';
+        hero.decoding = 'async';
+        hero.addEventListener('error', () => hero.remove(), { once: true });
+        card.insertBefore(hero, card.firstChild);
+      });
+    });
+  };
+
+  const ROTATE_MS = 5000;
+  const SLIDE_MS = 420;
+  const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
+  let newsItems = [];
+  let currentIndex = 0;
+  let switching = false;
+  let focusPaused = false;
+  let rotateTimer = null;
+
+  const renderItem = (item, initial = false) => {
+    const url = item.url || '#';
+    slots.forEach((slot) => {
+      slot.classList.remove('is-empty');
+      if (isCompact(slot)) {
+        renderCompact(slot, item, url, initial);
+      } else {
+        renderCard(slot, item, url, initial);
+      }
+      if (initial && !slot.hidden) enterScope(slot, { reset: true });
+    });
+    applyHero(item);
+  };
+
+  const rotateNews = () => {
+    if (switching || newsItems.length < 2 || focusPaused || document.hidden) return;
+    switching = true;
+    const nextIndex = (currentIndex + 1) % newsItems.length;
+    const next = newsItems[nextIndex];
+
+    const slideIn = () => {
+      currentIndex = nextIndex;
+      renderItem(next);
+      // Warm just the following cover, keeping the rotation smooth without
+      // downloading the whole feed on the login page.
+      const upcoming = newsItems[(currentIndex + 1) % newsItems.length];
+      if (upcoming && upcoming !== newsItems[currentIndex]) void heroAvailable(upcoming.image);
+      // Park the fresh card off-screen right without a transition, then slide in.
+      slots.forEach((slot) => {
+        slot.classList.add('is-sliding-prep');
+        slot.classList.remove('is-sliding-out');
+      });
+      slots.forEach((slot) => { void slot.offsetWidth; });
+      window.requestAnimationFrame(() => {
+        slots.forEach((slot) => slot.classList.remove('is-sliding-prep'));
+      });
+      window.setTimeout(() => {
+        slots.forEach((slot) => slot.classList.remove('is-animating'));
+        switching = false;
+      }, SLIDE_MS);
+    };
+
+    if (reducedMotion.matches) {
+      currentIndex = nextIndex;
+      renderItem(next);
+      switching = false;
+      return;
+    }
+
+    slots.forEach((slot) => slot.classList.add('is-animating', 'is-sliding-out'));
+    window.setTimeout(slideIn, SLIDE_MS);
+  };
+
+  const startRotation = () => {
+    if (newsItems.length < 2 || reducedMotion.matches) return;
+    const restartTimer = () => {
+      window.clearInterval(rotateTimer);
+      rotateTimer = window.setInterval(rotateNews, ROTATE_MS);
+    };
+    restartTimer();
+    slots.forEach((slot) => {
+      // Pause only while keyboard focus is inside the news block (accessibility).
+      // Mouse hover does not stop the 5s slide anymore.
+      slot.addEventListener('focusin', () => { focusPaused = true; });
+      slot.addEventListener('focusout', () => { focusPaused = false; restartTimer(); });
+    });
   };
 
   if (!api) {
@@ -11043,7 +11217,7 @@ function initAuthNewsWidget() {
     return;
   }
 
-  fetch(api + (api.includes('?') ? '&' : '?') + 'limit=1', { credentials: 'omit' })
+  fetch(api + (api.includes('?') ? '&' : '?') + 'limit=5', { credentials: 'omit' })
     .then(async (res) => {
       if (!res.ok) {
         const err = new Error('HTTP ' + res.status);
@@ -11058,14 +11232,28 @@ function initAuthNewsWidget() {
         err.code = 'parse';
         throw err;
       }
-      const item = data?.items?.[0];
-      if (!item || !item.title) {
+      const raw = Array.isArray(data?.items) ? data.items : [];
+      // Newest first, oldest last; id desc is the fallback when dates are equal.
+      newsItems = raw
+        .filter((item) => item && item.title)
+        .sort((a, b) => {
+          const left = Date.parse(String(a.published_at || '')) || 0;
+          const right = Date.parse(String(b.published_at || '')) || 0;
+          if (right !== left) return right - left;
+          return (Number(b.id) || 0) - (Number(a.id) || 0);
+        });
+      if (newsItems.length === 0) {
         // No published news at all: keep the brand column tidy.
-        slot.hidden = true;
-        slot.innerHTML = '';
+        slots.forEach(hideSlot);
         return;
       }
-      showItem(item);
+      // Warm the current cover and the next one only (no eager download of the
+      // whole feed on the login page).
+      void heroAvailable(newsItems[0].image);
+      if (newsItems[1]) void heroAvailable(newsItems[1].image);
+      currentIndex = 0;
+      renderItem(newsItems[0], true);
+      startRotation();
     })
     .catch((err) => {
       const detail = err && typeof err.message === 'string' && err.message

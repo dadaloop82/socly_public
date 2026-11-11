@@ -212,16 +212,23 @@ version and, through “Check for updates”, the published/remote version with 
 own `origin` remote, so an installation cloned from the public repository updates with no SSH key
 (anonymous HTTPS read). ZIP installations have no git metadata and must use the manual procedure above.
 
-If the private remote is reachable only with a deploy key, make it readable by the PHP user:
+Before the backup the updater runs a preflight on the local repository: `.git` (or the gitdir it
+points to) and `.git/objects` must be writable by the PHP user, and `git fsck --connectivity-only`
+must succeed. A tree owned by root fails with an actionable message (`updates.git_not_writable`):
+fix it with `chown -R <web-user> .git` in the application folder — do not run PHP as root.
+
+### Forks on a private remote
+
+If the remote is reachable only with a deploy key (private fork), make it readable by the PHP user:
 
 ```env
-UPDATE_SSH_HOST=github.com-socly
-UPDATE_SSH_KEY=/var/www/.ssh/socly_deploy_key   # 0600, owned by the PHP user
+UPDATE_SSH_HOST=github.com
+UPDATE_SSH_KEY=/var/www/.ssh/your_deploy_key   # 0600, owned by the PHP user
 ```
 
 Without a readable key the check still works (it falls back to the public `latest.json`, so a newer
 release is reported instead of “up to date”), but the **Update** button cannot pull: the card shows a
-hint and you update from the command line as a user with SSH access
+hint and you update from the command line with a user that can access the remote
 (`php bin/update.php --apply`). `GIT_TERMINAL_PROMPT=0` and `BatchMode=yes` keep a web request from
 hanging on a passphrase prompt.
 

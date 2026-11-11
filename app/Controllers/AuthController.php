@@ -8,6 +8,7 @@ use Socly\Core\Http\Request;
 use Socly\Core\Validator;
 use Socly\Core\View;
 use Socly\Services\AuthService;
+use Socly\Services\MailService;
 use Socly\Services\SettingsService;
 use Socly\Services\SetupService;
 
@@ -23,6 +24,7 @@ final class AuthController extends BaseController
         private readonly AuthService $auth,
         private readonly Validator $validator,
         private readonly SetupService $setup,
+        private readonly MailService $mail,
         private readonly ?object $previewSession = null
     ) {
         parent::__construct($view);
@@ -71,7 +73,20 @@ final class AuthController extends BaseController
             'showNewsWidget' => !$dbDown && !$needsSetup,
             'newsApiUrl' => socly_news_api_url(),
             'demoLoginNotice' => $dbDown ? null : $this->demoLoginNotice(),
+            // Password recovery needs working outbound mail: hide the link
+            // (and show the “contact your admin” note) until SMTP is verified.
+            'mailReady' => $this->isMailReady(),
         ], 'layouts/guest');
+    }
+
+    /** SMTP configured and last test succeeded; never fails the login page. */
+    private function isMailReady(): bool
+    {
+        try {
+            return $this->mail->isReady();
+        } catch (\Throwable) {
+            return false;
+        }
     }
 
     /** True when the operator already saved at least one setup step. */
@@ -155,11 +170,17 @@ final class AuthController extends BaseController
     {
         $this->render('auth/forgot', [
             'title' => __('auth.forgot_title'),
+            'mailReady' => $this->isMailReady(),
         ], 'layouts/guest');
     }
 
     public function sendForgot(Request $request): void
     {
+        // Without a verified SMTP the email cannot be delivered: show the
+        // “contact your admin” note instead of a form that silently does nothing.
+        if (!$this->isMailReady()) {
+            redirect('/password/forgot');
+        }
         $data = $request->only(['email']);
         $this->rememberOld($data);
         if (!$this->validator->validate($data, ['email' => 'required|email'])) {
