@@ -234,7 +234,7 @@ $topIncome = is_array($statistics['categories']['income'] ?? null) ? $statistics
         <?php else: ?>
             <div class="panel">
                 <div class="table-wrap embedded">
-                    <table class="data-table">
+                    <table class="data-table statistics-table">
                         <thead>
                         <tr>
                             <th><?= e(__('runts.year')) ?></th>
@@ -300,7 +300,7 @@ $topIncome = is_array($statistics['categories']['income'] ?? null) ? $statistics
 
             <div class="panel">
                 <div class="table-wrap embedded">
-                    <table class="data-table">
+                    <table class="data-table statistics-table">
                         <thead>
                         <tr>
                             <th><?= e(__('runts.year')) ?></th>
@@ -341,7 +341,7 @@ $topIncome = is_array($statistics['categories']['income'] ?? null) ? $statistics
                         <div class="empty-state compact">—</div>
                     <?php else: ?>
                         <div class="table-wrap embedded">
-                            <table class="data-table">
+                            <table class="data-table statistics-table">
                                 <thead>
                                 <tr>
                                     <th><?= e(__('budget.category_label')) ?></th>
@@ -373,7 +373,7 @@ $topIncome = is_array($statistics['categories']['income'] ?? null) ? $statistics
                         <div class="empty-state compact">—</div>
                     <?php else: ?>
                         <div class="table-wrap embedded">
-                            <table class="data-table">
+                            <table class="data-table statistics-table">
                                 <thead>
                                 <tr>
                                     <th><?= e(__('budget.category_label')) ?></th>
