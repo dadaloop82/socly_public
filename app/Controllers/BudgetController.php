@@ -132,9 +132,26 @@ final class BudgetController extends BaseController
     {
         require_component('treasury');
         $result = $this->budgets->saveGrid((int) $id, $request->all(), $request->ip());
+        $wantsJson = strtolower((string) $request->header('X-Requested-With')) === 'xmlhttprequest'
+            || str_contains(strtolower((string) $request->header('Accept')), 'application/json');
         if (empty($result['ok'])) {
             $message = trim((string) ($result['message'] ?? ''));
-            $this->flash('errors', ['budget' => $message !== '' ? $message : __('budget.save_failed')]);
+            $message = $message !== '' ? $message : (string) __('budget.save_failed');
+            if ($wantsJson) {
+                $this->jsonResponse(['ok' => false, 'message' => $message], 422);
+                return;
+            }
+            $this->flash('errors', ['budget' => $message]);
+        } elseif ($wantsJson) {
+            // Autosave: the page needs the new row/section ids, otherwise the next save would
+            // re-insert the freshly created lines.
+            $this->jsonResponse([
+                'ok' => true,
+                'message' => (string) __('budget.saved'),
+                'sections' => $result['sections'] ?? [],
+                'items' => $result['items'] ?? [],
+            ]);
+            return;
         } else {
             $this->flash('success', __('budget.saved'));
         }

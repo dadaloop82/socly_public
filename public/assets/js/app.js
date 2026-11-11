@@ -14748,6 +14748,128 @@ function initBudgetGrid(scope = document) {
     }
   });
 
+  // Autosave: 5 secondi di inattività dopo l'ultima modifica, poi salvataggio in background.
+  const autosaveStatus = form.querySelector('[data-budget-autosave]');
+  const autosaveLabels = {
+    pending: form.dataset.msgAutosavePending || 'Unsaved changes',
+    saving: form.dataset.msgAutosaveSaving || 'Saving…',
+    saved: form.dataset.msgAutosaveSaved || 'Saved at :time',
+    error: form.dataset.msgAutosaveError || 'Save failed',
+  };
+  const autosaveDelay = 5000;
+  const autosaveToken = () => form.querySelector('input[name="_token"]')?.value || '';
+  let autosaveTimer = null;
+  let autosaveBusy = false;
+  let autosaveQueued = false;
+  let autosaveDirty = false;
+
+  const setAutosaveStatus = (state, text) => {
+    if (!(autosaveStatus instanceof HTMLElement)) return;
+    autosaveStatus.dataset.state = state;
+    autosaveStatus.textContent = text;
+  };
+
+  // The server returns the ids of the rows/sections it created, so the next save updates them
+  // instead of inserting them again.
+  const applySavedIds = (payload) => {
+    const items = payload && typeof payload.items === 'object' && payload.items !== null ? payload.items : {};
+    const rows = [...grid.querySelectorAll('[data-budget-row]')];
+    Object.keys(items).forEach((index) => {
+      const row = rows[Number(index)];
+      const input = row ? row.querySelector('input[name="item_id[]"]') : null;
+      if (input instanceof HTMLInputElement) {
+        input.value = String(items[index]);
+      }
+    });
+    const sections = payload && typeof payload.sections === 'object' && payload.sections !== null ? payload.sections : {};
+    grid.querySelectorAll('[data-budget-section]').forEach((section) => {
+      const key = section.dataset.sectionKey || '';
+      const input = section.querySelector('input[name="section_id[]"]');
+      if (input instanceof HTMLInputElement && sections[key] !== undefined) {
+        input.value = String(sections[key]);
+      }
+    });
+  };
+
+  const autosave = async () => {
+    window.clearTimeout(autosaveTimer);
+    if (!autosaveDirty) return;
+    if (autosaveBusy) {
+      autosaveQueued = true;
+      return;
+    }
+    autosaveBusy = true;
+    autosaveDirty = false;
+    setAutosaveStatus('saving', autosaveLabels.saving);
+    try {
+      const response = await fetch(form.action, {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: {
+          Accept: 'application/json',
+          'X-Requested-With': 'XMLHttpRequest',
+          'X-CSRF-Token': autosaveToken(),
+        },
+        body: new FormData(form),
+      });
+      const payload = await response.json().catch(() => null);
+      if (!response.ok || !payload || payload.ok !== true) {
+        throw new Error(payload && payload.message ? String(payload.message) : autosaveLabels.error);
+      }
+      applySavedIds(payload);
+      form.dispatchEvent(new CustomEvent('socly:form-saved', { bubbles: true }));
+      const now = new Date();
+      const time = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+      setAutosaveStatus('saved', autosaveLabels.saved.replace(':time', time));
+    } catch (error) {
+      autosaveDirty = true;
+      setAutosaveStatus('error', error instanceof Error && error.message ? error.message : autosaveLabels.error);
+    } finally {
+      autosaveBusy = false;
+      if (autosaveQueued) {
+        autosaveQueued = false;
+        autosaveDirty = true;
+        autosaveTimer = window.setTimeout(() => { void autosave(); }, autosaveDelay);
+      }
+    }
+  };
+
+  const queueAutosave = () => {
+    autosaveDirty = true;
+    setAutosaveStatus('pending', autosaveLabels.pending);
+    window.clearTimeout(autosaveTimer);
+    autosaveTimer = window.setTimeout(() => { void autosave(); }, autosaveDelay);
+  };
+
+  form.addEventListener('input', queueAutosave);
+  form.addEventListener('change', queueAutosave);
+  form.addEventListener('click', (event) => {
+    const target = event.target;
+    if (!(target instanceof Element)) return;
+    if (target.closest('[data-budget-add-row], [data-budget-add-section], [data-budget-row-remove], [data-budget-section-remove]')) {
+      queueAutosave();
+    }
+  });
+  form.addEventListener('submit', () => {
+    window.clearTimeout(autosaveTimer);
+    autosaveDirty = false;
+  });
+  // Leaving before the debounce fires: flush the pending save in background.
+  window.addEventListener('pagehide', () => {
+    if (!autosaveDirty || autosaveBusy) return;
+    void fetch(form.action, {
+      method: 'POST',
+      body: new FormData(form),
+      credentials: 'same-origin',
+      keepalive: true,
+      headers: {
+        Accept: 'application/json',
+        'X-Requested-With': 'XMLHttpRequest',
+        'X-CSRF-Token': autosaveToken(),
+      },
+    }).catch(() => {});
+  });
+
   recalc();
 }
 

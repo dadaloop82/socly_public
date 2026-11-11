@@ -29,6 +29,8 @@ every 100 patches bump the series, and each bump is published to this repository
   a draft is open the page points to it (finish/approve or delete it) instead of offering a new one.
 - Budget lines can create a new treasury category on the spot (“+ Nuova categoria…”), no need to
   fall back to “Other”.
+- Budget grid autosaves 5 seconds after the last change (also when adding/removing lines), with a
+  discreet status next to “Save draft” and a background flush when leaving mid-edit.
 
 ## [1.5.41] - 2026-11-10
 

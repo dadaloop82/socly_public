@@ -65,6 +65,10 @@ $rowPartial = static fn (?array $row, string $sectionKey): string => view_partia
     data-budget-grid
     data-currency-symbol="<?= e($currencySymbol) ?>"
     data-msg-remove-section="<?= e(__('budget.remove_section_confirm')) ?>"
+    data-msg-autosave-pending="<?= e(__('budget.autosave_pending')) ?>"
+    data-msg-autosave-saving="<?= e(__('budget.autosave_saving')) ?>"
+    data-msg-autosave-saved="<?= e(__('budget.autosave_saved')) ?>"
+    data-msg-autosave-error="<?= e(__('budget.autosave_error')) ?>"
 >
     <?= csrf_field() ?>
     <div class="budget-grid">
@@ -177,6 +181,7 @@ $rowPartial = static fn (?array $row, string $sectionKey): string => view_partia
         </div>
         <?php if ($canManage): ?>
             <div class="budget-summary-actions">
+                <p class="budget-autosave" data-budget-autosave data-state="idle" aria-live="polite"><?= e(__('budget.autosave_idle')) ?></p>
                 <button class="btn" type="submit"><?= e(__('budget.save_draft')) ?></button>
             </div>
         <?php endif; ?>

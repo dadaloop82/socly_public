@@ -31,4 +31,16 @@ abstract class BaseController
     {
         unset($_SESSION['_old']);
     }
+
+    /**
+     * Send a JSON payload (used by AJAX saves such as the budget autosave).
+     *
+     * @param array<string,mixed> $payload
+     */
+    protected function jsonResponse(array $payload, int $status = 200): void
+    {
+        http_response_code($status);
+        header('Content-Type: application/json; charset=utf-8');
+        echo json_encode($payload, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+    }
 }

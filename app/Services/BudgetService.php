@@ -354,7 +354,7 @@ final class BudgetService
      * item_direction[], item_amount[], item_notes[].
      *
      * @param array<string,mixed> $input
-     * @return array{ok:bool,error?:string,message?:string}
+     * @return array{ok:bool,error?:string,message?:string,sections?:array<string,int>,items?:array<int,int>}
      */
     public function saveGrid(int $id, array $input, string $ip): array
     {
@@ -446,6 +446,7 @@ final class BudgetService
 
 
             $keptItems = [];
+            $savedItemIds = [];
             $orderBySection = [];
             foreach ($itemIds as $index => $rawItemId) {
                 $label = mb_substr(trim((string) ($itemLabels[$index] ?? '')), 0, 190);
@@ -479,6 +480,7 @@ final class BudgetService
                     $itemId = $this->db->insert('budget_items', $payload);
                 }
                 $keptItems[] = $itemId;
+                $savedItemIds[$index] = $itemId;
             }
 
             $this->deleteMissing('budget_items', $id, $keptItems);
@@ -494,7 +496,13 @@ final class BudgetService
             'sections' => count($keptSections),
             'items' => count($keptItems),
         ], $ip);
-        return ['ok' => true];
+        return [
+            'ok' => true,
+            // Row/section ids for the AJAX autosave: the page keeps posting item_id[] values,
+            // so freshly inserted rows must receive their new id to avoid duplicates.
+            'sections' => $keyToSectionId,
+            'items' => $savedItemIds,
+        ];
     }
 
     /** @param list<int> $keptIds */

@@ -12879,6 +12879,22 @@ tr.doc-row-editable:focus-visible {
   z-index: 5;
 }
 .budget-summary-kpis { display: flex; gap: 1.35rem; flex-wrap: wrap; }
+/* Autosave: stato discreto accanto al pulsante di salvataggio manuale. */
+.budget-summary-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+.budget-autosave {
+  margin: 0;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--muted, #667085);
+}
+.budget-autosave[data-state="saving"] { color: var(--brand-primary, #0D6E66); }
+.budget-autosave[data-state="saved"] { color: #0f7b46; }
+.budget-autosave[data-state="error"] { color: #b42318; }
 .budget-summary-item { display: grid; gap: 0.1rem; }
 .budget-summary-item span {
   font-size: 0.7rem;
