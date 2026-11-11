@@ -2194,7 +2194,7 @@ return [
         'currency_rate_unavailable' => 'Tasso di cambio non disponibile per la valuta selezionata.',
         'date' => 'Data',
         'operation_date' => 'Data dell\'operazione',
-        'category' => 'Categoria',
+        'category' => 'Tipologia',
         'cat_group_income' => 'Entrate',
         'cat_group_expense' => 'Uscite',
         'cat_group_financial' => 'Movimenti finanziari e interni',

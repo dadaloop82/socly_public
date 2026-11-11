@@ -2404,7 +2404,7 @@ return [
         'currency_rate_unavailable' => 'Exchange rate unavailable for the selected currency.',
         'date' => 'Date',
         'operation_date' => 'Operation date',
-        'category' => 'Category',
+        'category' => 'Type',
         'cat_group_income' => 'Income',
         'cat_group_expense' => 'Expenses',
         'cat_group_financial' => 'Financial & internal',

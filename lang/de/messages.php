@@ -2402,7 +2402,7 @@ return [
         'currency_rate_unavailable' => 'Wechselkurs für die gewählte Währung nicht verfügbar.',
         'date' => 'Datum',
         'operation_date' => 'Datum der Operation',
-        'category' => 'Kategorie',
+        'category' => 'Typ',
         'cat_group_income' => 'Einnahmen',
         'cat_group_expense' => 'Ausgaben',
         'cat_group_financial' => 'Finanz- & interne Bewegungen',
