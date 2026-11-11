@@ -79,6 +79,10 @@ $accountFilterUrl = static function (string $accountKey) use ($ledgerParams): st
     </div>
     <?php if ($canManage): ?>
         <div class="actions">
+            <?php if ($canManage): ?>
+                <a class="btn btn-ghost btn-sm" href="<?= e(url('/treasury/import')) ?>"><?= e(__('treasury.csv_import_button')) ?></a>
+            <?php endif; ?>
+            <a class="btn btn-ghost btn-sm" href="<?= e(url('/treasury/export')) ?>"><?= e(__('treasury.csv_export_button')) ?></a>
             <a class="btn<?= empty($hasAnyMovements) ? ' is-first-cta' : '' ?>" href="<?= e(url('/treasury/create')) ?>"><?= e(__('treasury.add_movement')) ?></a>
         </div>
     <?php endif; ?>
@@ -500,6 +504,8 @@ foreach ($categories as $categoryOption) {
                                 }
                                 $rowId = (int) ($row['id'] ?? 0);
                                 $isPending = trim((string) ($row['approved_at'] ?? '')) === '';
+                                $isSuperseded = trim((string) ($row['superseded_at'] ?? '')) !== '';
+                                $supersededNote = trim((string) ($row['superseded_note'] ?? ''));
                                 $editUrl = $canManage ? url('/treasury/' . $rowId . '/edit') : '';
                                 $accountKey = \Socly\Services\TreasuryService::normalizeAccount((string) ($row['account'] ?? ''));
                                 $accountLabel = $accountKey !== '' ? (string) __('treasury.account_' . $accountKey) : '';
@@ -528,9 +534,9 @@ foreach ($categories as $categoryOption) {
                                 }
                                 ?>
                                 <tr
-                                    class="treasury-row treasury-row-<?= $isTransfer ? 'transfer' : ($isIncome ? 'income' : 'expense') ?><?= $canManage ? ' doc-row-editable' : '' ?>"
+                                    class="treasury-row treasury-row-<?= $isTransfer ? 'transfer' : ($isIncome ? 'income' : 'expense') ?><?= $canManage && !$isSuperseded ? ' doc-row-editable' : '' ?><?= $isSuperseded ? ' is-superseded' : '' ?>"
                                     data-treasury-row="<?= $rowId ?>" data-treasury-approved="<?= $isPending ? '0' : '1' ?>" data-treasury-account="<?= e($accountKey) ?>"
-                                    <?php if ($canManage): ?>
+                                    <?php if ($canManage && !$isSuperseded): ?>
                                         data-href="<?= e($editUrl) ?>"
                                         tabindex="0"
                                         role="link"
@@ -554,7 +560,15 @@ foreach ($categories as $categoryOption) {
                                             <span class="badge badge-warn treasury-pending-badge"><?= e(__('treasury.pending')) ?></span>
                                         <?php endif; ?>
                                     </td>
-                                    <td><?= e($desc !== '' ? $desc : '—') ?></td>
+                                    <td>
+                                        <?= e($desc !== '' ? $desc : '—') ?>
+                                        <?php if ($isSuperseded): ?>
+                                            <span class="badge badge-muted treasury-superseded-badge"><?= e(__('treasury.superseded_badge')) ?></span>
+                                            <?php if ($supersededNote !== ''): ?>
+                                                <div class="muted treasury-superseded-note"><?= e($supersededNote) ?></div>
+                                            <?php endif; ?>
+                                        <?php endif; ?>
+                                    </td>
                                     <td>
                                         <?php if ($isTransfer && $transferLabel !== ''): ?>
                                             <?= e($methodCell) ?> → <?= e($transferLabel) ?>

@@ -21,6 +21,7 @@ use Socly\Controllers\SettingsController;
 use Socly\Controllers\SetupController;
 use Socly\Controllers\StatisticsController;
 use Socly\Controllers\TreasuryController;
+use Socly\Controllers\TreasuryCsvController;
 use Socly\Controllers\UpdateController;
 use Socly\Controllers\UserController;
 use Socly\Controllers\WidgetController;
@@ -87,6 +88,7 @@ use Socly\Services\SettingsService;
 use Socly\Services\SetupService;
 use Socly\Services\StatisticsService;
 use Socly\Services\TreasuryService;
+use Socly\Services\TreasuryCsvService;
 use Socly\Services\GitHubIssueService;
 use Socly\Services\UpdateService;
 use Socly\Services\UserService;
@@ -349,6 +351,15 @@ $app->bind(TreasuryService::class, fn (App $a) => new TreasuryService(
     $a->get(DocumentService::class),
     $a->get(CurrencyService::class),
     $a->get(VersionService::class)
+));
+$app->bind(TreasuryCsvController::class, fn (App $a) => new TreasuryCsvController(
+    $a->get(View::class),
+    $a->get(TreasuryService::class),
+    $a->get(TreasuryCsvService::class)
+));
+$app->bind(TreasuryCsvService::class, fn (App $a) => new TreasuryCsvService(
+    $a->get(Database::class),
+    $a->get(TreasuryService::class)
 ));
 $app->bind(BudgetService::class, fn (App $a) => new BudgetService(
     $a->get(Database::class),

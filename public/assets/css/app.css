@@ -12590,6 +12590,17 @@ tr.doc-row-editable:focus-visible {
 .tmf-similar-actions { display: flex; flex-wrap: wrap; gap: 0.5rem; }
 .tmf-similar-done { margin: 0; font-weight: 700; color: var(--brand-primary-deep); }
 
+/* ── Prima nota: riga girocontata (storico, esclusa dai conteggi) ───────────── */
+.treasury-row.is-superseded { opacity: 0.55; }
+.treasury-row.is-superseded td { text-decoration: line-through; text-decoration-thickness: 1px; }
+.treasury-row.is-superseded .badge,
+.treasury-row.is-superseded .treasury-superseded-note,
+.treasury-row.is-superseded .doc-row-actions,
+.treasury-row.is-superseded .treasury-col-check { text-decoration: none; }
+.treasury-superseded-badge { margin-left: 0.4rem; }
+.treasury-superseded-note { font-size: 0.78rem; margin-top: 0.15rem; }
+.treasury-transfer-pick select { min-width: 9rem; }
+
 /* ── Proposta “movimenti simili”: richiama l'attenzione per qualche secondo ─── */
 .tmf-similar-probe {
   position: relative;
