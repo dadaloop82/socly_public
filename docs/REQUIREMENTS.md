@@ -16,7 +16,7 @@
 12. **Charts & statistics** — chart cards on dashboard, statistics and treasury panels with per-user order, visibility and width on a three-column grid; statistics page with demographics, registrations, cards, finances and a members map whose places are geocoded automatically.
 13. **Organization chart** — association bodies and appointments (members or external people) with role compatibility checks; outstanding membership fees never block an appointment.
 14. **Documents, deadlines, treasury** — modular components: document archive with categories, deadlines, cash book with approvals, wallet balances and budget imputation.
-15. **Forecast budget** — one document per fiscal year, inline grid with autosave, expense/income types, custom categories, comparison with the cash actuals and a printable rendiconto.
+15. **Forecast budget** — one document per fiscal year, inline grid with autosave, expense/income types, custom categories, comparison with the cash actuals and a printable rendiconto; the year-end RUNTS report and the budget statistics live in the same **Bilanci** page (Preventivo / Consuntivo / Statistiche tabs).
 
 ## Non-functional
 
