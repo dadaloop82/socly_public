@@ -2343,6 +2343,7 @@ return [
         'cat_group_financial' => 'Financial & internal',
         'cat_group_other' => 'Other',
         'cat_group_custom' => 'Custom',
+        'category_permanent' => 'Categories are never deleted: they stay available in movements, forecast and year-end reports.',
         'category_new' => '+ New category…',
         'budget_item' => 'Cost centre / project',
         'budget_item_none' => 'No specific project — ordinary management',

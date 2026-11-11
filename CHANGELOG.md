@@ -48,6 +48,10 @@ every 100 patches bump the series, and each bump is published to this repository
   a draft is open the page points to it (finish/approve or delete it) instead of offering a new one.
 - Budget cards give the amounts more room: a single budget fills the row, the KPI columns grow with
   the card and the currency symbol never wraps onto its own line.
+- Categories are now one shared taxonomy for expense notes (movements), forecast budgets and the
+  year-end report: the budget grid uses the same grouped list (income / expense / financial /
+  custom), a category already used by a movement or a budget line is always kept available, and
+  categories are never deleted.
 - Saving an org-chart appointment no longer hangs for minutes (the background geocoding used to keep
   the PHP session locked, so the next click waited for it): the deferred pass now releases the session
   first, and the save button shows “Saving…” while it ignores double clicks.

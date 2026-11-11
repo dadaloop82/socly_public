@@ -14,10 +14,12 @@ $approvedAt = trim((string) ($budget['approved_at'] ?? ''));
 $approvedBy = trim((string) ($budget['approver_name'] ?? ''));
 $budgetTitle = trim((string) ($budget['title'] ?? ''));
 $currencySymbol = $currency->display();
+$categoryGroups = is_array($category_groups ?? null) ? $category_groups : [];
 $rowPartial = static fn (?array $row, string $sectionKey): string => view_partial('budgets/_row', [
     'row' => $row,
     'sectionKey' => $sectionKey,
     'categories' => $categories,
+    'category_groups' => $categoryGroups,
     'currencySymbol' => $currencySymbol,
 ]);
 ?>

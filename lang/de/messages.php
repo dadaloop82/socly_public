@@ -2341,6 +2341,7 @@ return [
         'cat_group_financial' => 'Finanz- & interne Bewegungen',
         'cat_group_other' => 'Sonstiges',
         'cat_group_custom' => 'Eigene',
+        'category_permanent' => 'Kategorien werden nie gelöscht: Sie bleiben in Bewegungen, Voranschlag und Jahresabschluss verfügbar.',
         'category_new' => '+ Neue Kategorie…',
         'budget_item' => 'Kostenstelle / Projekt',
         'budget_item_none' => 'Kein spezifisches Projekt — ordentliche Verwaltung',

@@ -328,6 +328,7 @@ $invoiceActive = $selectedDirection === 'expense' && !empty($values['invoice_pay
                 'attrs' => ['data-treasury-new-category-input' => true],
             ]) ?>
         </div>
+        <p class="setup-hint muted"><?= e(__('treasury.category_permanent')) ?></p>
         <?php
         // Voce del Modello D (RUNTS): le voci di uscita e di entrata restano tutte disponibili,
         // il servizio riallinea la scelta alla direzione del movimento.

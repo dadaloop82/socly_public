@@ -123,6 +123,8 @@ final class BudgetController extends BaseController
             'title' => __('budget.title_year', ['year' => (string) $budget['fiscal_year']]),
             'budget' => $budget,
             'categories' => $this->treasury->categoryOptions(),
+            // Stessa tassonomia dei movimenti (Entrate / Uscite / Finanziarie / Personalizzate).
+            'category_groups' => $this->treasury->categorySelectGroups(false),
             'currency' => $this->currency,
             'canManage' => can('treasury.manage'),
         ]);

@@ -2148,6 +2148,7 @@ return [
         'cat_group_financial' => 'Movimenti finanziari e interni',
         'cat_group_other' => 'Altro',
         'cat_group_custom' => 'Personalizzate',
+        'category_permanent' => 'Le categorie non si eliminano: restano sempre disponibili in movimenti, preventivi e consuntivi.',
         'category_new' => '+ Nuova categoria…',
         'budget_item' => 'Centro di costo / Progetto',
         'budget_item_none' => 'Nessun progetto specifico — gestione ordinaria',

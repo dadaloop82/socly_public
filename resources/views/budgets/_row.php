@@ -24,10 +24,26 @@ $amount = $row !== null ? number_format((float) ($row['amount'] ?? 0), 2, ',', '
         <input type="hidden" name="item_notes[]" value="<?= e((string) ($row['notes'] ?? '')) ?>">
         <select class="budget-select" name="item_category[]" data-budget-category aria-label="<?= e(__('budget.category_label')) ?>">
             <option value=""><?= e(__('budget.category_none')) ?></option>
-            <?php foreach ($categories as $option): ?>
-                <?php $optionKey = (string) ($option['key'] ?? ''); ?>
-                <option value="<?= e($optionKey) ?>" <?= $optionKey === $category ? 'selected' : '' ?>><?= e((string) ($option['label'] ?? $optionKey)) ?></option>
-            <?php endforeach; ?>
+            <?php $categoryGroups = is_array($category_groups ?? null) ? $category_groups : []; ?>
+            <?php if ($categoryGroups !== []): ?>
+                <?php foreach ($categoryGroups as $group): ?>
+                    <?php $groupOptions = is_array($group['options'] ?? null) ? $group['options'] : []; ?>
+                    <?php if ($groupOptions === []) {
+                        continue;
+                    } ?>
+                    <optgroup label="<?= e((string) ($group['label'] ?? '')) ?>">
+                        <?php foreach ($groupOptions as $option): ?>
+                            <?php $optionKey = (string) ($option['value'] ?? ''); ?>
+                            <option value="<?= e($optionKey) ?>" <?= $optionKey === $category ? 'selected' : '' ?>><?= e((string) ($option['label'] ?? $optionKey)) ?></option>
+                        <?php endforeach; ?>
+                    </optgroup>
+                <?php endforeach; ?>
+            <?php else: ?>
+                <?php foreach ($categories as $option): ?>
+                    <?php $optionKey = (string) ($option['key'] ?? ''); ?>
+                    <option value="<?= e($optionKey) ?>" <?= $optionKey === $category ? 'selected' : '' ?>><?= e((string) ($option['label'] ?? $optionKey)) ?></option>
+                <?php endforeach; ?>
+            <?php endif; ?>
             <?php if ($showUnknownCategory): ?>
                 <option value="<?= e($category) ?>" selected><?= e($category) ?></option>
             <?php endif; ?>

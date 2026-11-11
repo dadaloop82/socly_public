@@ -176,6 +176,51 @@ final class TreasuryService
         return $out;
     }
 
+    /**
+     * Categorie pronte per un <select>, con la stessa struttura in movimenti, preventivo e
+     * consuntivo: gruppi Entrate / Uscite / Movimenti finanziari / Personalizzate / Altro.
+     *
+     * @return list<array{label:string,options:list<array{value:string,label:string}>}>
+     */
+    public function categorySelectGroups(bool $includeNewOption = true): array
+    {
+        $map = $this->categoryMap();
+        $groups = [];
+        foreach ($this->categoryGroups() as $group) {
+            $options = [];
+            foreach ($group['keys'] as $key) {
+                if ($key === 'other' || !isset($map[$key])) {
+                    continue;
+                }
+                $options[] = ['value' => (string) $key, 'label' => (string) $map[$key]];
+            }
+            if ($options !== []) {
+                $groups[] = ['label' => (string) $group['label'], 'options' => $options];
+            }
+        }
+        $custom = [];
+        foreach ($this->customCategories() as $row) {
+            if ($row['slug'] === 'other') {
+                continue;
+            }
+            $custom[] = ['value' => $row['slug'], 'label' => $row['label']];
+        }
+        if ($custom !== []) {
+            $groups[] = ['label' => (string) __('treasury.cat_group_custom'), 'options' => $custom];
+        }
+        $other = [];
+        if (isset($map['other'])) {
+            $other[] = ['value' => 'other', 'label' => (string) $map['other']];
+        }
+        if ($includeNewOption) {
+            $other[] = ['value' => '__new__', 'label' => (string) __('treasury.category_new')];
+        }
+        if ($other !== []) {
+            $groups[] = ['label' => (string) __('treasury.cat_group_other'), 'options' => $other];
+        }
+        return $groups;
+    }
+
     public static function normalizePaymentMethod(string $method): string
     {
         $method = trim($method);
@@ -1550,7 +1595,46 @@ final class TreasuryService
             $seen[$slug] = true;
             $out[] = ['slug' => $slug, 'label' => mb_substr($label, 0, 80)];
         }
+        // Una categoria già usata da un movimento o da una voce di bilancio non può sparire:
+        // la teniamo in elenco anche se è stata tolta dalla configurazione (etichetta dallo slug).
+        $known = [];
+        foreach ($out as $row) {
+            $known[$row['slug']] = true;
+        }
+        foreach ($this->categoriesInUse() as $slug) {
+            if (isset($known[$slug]) || in_array($slug, self::BUILTIN_CATEGORIES, true)) {
+                continue;
+            }
+            $out[] = ['slug' => $slug, 'label' => $this->humanizeSlug($slug)];
+            $known[$slug] = true;
+        }
         return $out;
+    }
+
+    /**
+     * Categorie referenziate da movimenti o voci di bilancio (per non perderle mai).
+     *
+     * @return list<string>
+     */
+    private function categoriesInUse(): array
+    {
+        $out = [];
+        try {
+            $rows = $this->db->fetchAll(
+                "SELECT category FROM treasury_movements WHERE category IS NOT NULL AND category <> ''
+                 UNION
+                 SELECT category FROM budget_items WHERE category IS NOT NULL AND category <> ''"
+            );
+        } catch (\Throwable) {
+            return [];
+        }
+        foreach ($rows as $row) {
+            $slug = $this->slugifyCategory((string) ($row['category'] ?? ''));
+            if ($slug !== '') {
+                $out[$slug] = true;
+            }
+        }
+        return array_keys($out);
     }
 
     private function ensureCustomCategory(string $slug, string $label): void
