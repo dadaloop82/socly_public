@@ -12590,6 +12590,28 @@ tr.doc-row-editable:focus-visible {
 .tmf-similar-actions { display: flex; flex-wrap: wrap; gap: 0.5rem; }
 .tmf-similar-done { margin: 0; font-weight: 700; color: var(--brand-primary-deep); }
 
+/* ── Proposta “movimenti simili”: richiama l'attenzione per qualche secondo ─── */
+.tmf-similar-probe {
+  position: relative;
+  border: 2px solid color-mix(in srgb, var(--brand-primary) 55%, var(--line));
+  scroll-margin-top: 4rem;
+  animation: similar-probe-attention 1.4s ease-in-out 5;
+}
+@keyframes similar-probe-attention {
+  0%, 100% {
+    border-color: color-mix(in srgb, var(--brand-primary) 55%, var(--line));
+    box-shadow: 0 0 0 0 color-mix(in srgb, var(--brand-primary) 0%, transparent);
+  }
+  50% {
+    border-color: var(--brand-primary);
+    box-shadow: 0 0 0 5px color-mix(in srgb, var(--brand-primary) 22%, transparent);
+  }
+}
+.tmf-similar-probe .tmf-similar-actions { justify-content: flex-end; }
+@media (prefers-reduced-motion: reduce) {
+  .tmf-similar-probe { animation: none; }
+}
+
 /* ── Preventivo: sezioni trascinabili + rinomina tipologia ─────────────────── */
 .budget-section-drag {
   display: inline-flex;

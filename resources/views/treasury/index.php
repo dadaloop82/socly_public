@@ -292,7 +292,7 @@ foreach ($categories as $categoryOption) {
 
 <?php $probe = is_array($similar_probe ?? null) ? $similar_probe : null; ?>
 <?php if ($probe !== null): ?>
-    <section class="panel tmf-similar-probe" data-similar-probe>
+    <section class="panel tmf-similar-probe" data-similar-probe role="alert" aria-live="polite" id="similar-probe">
         <strong class="tmf-similar-title">
             <?= e(__('treasury.similar_title', ['count' => (string) (int) ($probe['total'] ?? 0)])) ?>
         </strong>
