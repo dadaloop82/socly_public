@@ -69,6 +69,7 @@ foreach ($memberOptions as $memberOption) {
     data-member-external="<?= e(AssociationPeopleService::MEMBER_EXTERNAL) ?>"
     data-org-member-profile-url="<?= e(url('/api/org/members/__ID__/profile')) ?>"
     data-msg-role-incompatible="<?= e(__('org.role_incompatible_warn')) ?>"
+    data-msg-saving="<?= e(__('org.saving')) ?>"
     <?php if ($isEdit && !empty($person['id'])): ?>
     data-org-person-id="<?= (int) $person['id'] ?>"
     <?php endif; ?>

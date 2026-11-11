@@ -10944,6 +10944,20 @@ function initOrgPersonForm(form) {
   }
 
   form.addEventListener('submit', (event) => {
+    // One submit at a time: with a slow response a second click used to send a duplicate POST.
+    if (form.dataset.submitting === '1') {
+      event.preventDefault();
+      return;
+    }
+    form.dataset.submitting = '1';
+    const submitter = event.submitter instanceof HTMLButtonElement
+      ? event.submitter
+      : form.querySelector('button[type="submit"]:not(.btn-danger)');
+    if (submitter instanceof HTMLButtonElement) {
+      // .btn[aria-busy="true"] already dims the button and ignores further clicks.
+      submitter.textContent = form.dataset.msgSaving || 'Saving…';
+      submitter.setAttribute('aria-busy', 'true');
+    }
     if (replaceInput?.value === '1') {
       return;
     }

@@ -2777,6 +2777,7 @@ return [
         'member_search_placeholder' => 'Name oder Nachname…',
         'member_external' => '+ Externe Person (Nicht-Mitglied)',
         'form_section_role' => 'Amt',
+        'saving' => 'Speichern…',
         'form_section_person' => 'Personendaten',
         'person_fields_locked_hint' => 'Daten aus der Mitgliederakte übernommen (schreibgeschützt). Zur Korrektur die Mitgliederakte öffnen.',
         'form_section_contacts' => 'Kontakt und Notizen',

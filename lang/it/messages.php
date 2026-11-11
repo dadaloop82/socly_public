@@ -2585,6 +2585,7 @@ return [
         'member_search_placeholder' => 'Nome o cognome…',
         'member_external' => '+ Persona esterna (non socio)',
         'form_section_role' => 'Incarico',
+        'saving' => 'Salvataggio…',
         'form_section_person' => 'Dati anagrafici',
         'person_fields_locked_hint' => 'Dati importati dall’anagrafica soci (sola lettura). Per correggerli, apri la scheda del socio.',
         'form_section_contacts' => 'Contatti e note',

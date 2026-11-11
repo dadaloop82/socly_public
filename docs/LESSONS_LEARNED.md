@@ -57,6 +57,7 @@ This document captures mistakes and costly fixes from the previous membership co
 | Formatting money with `Intl.NumberFormat` | A reduced ICU build returns `9000,00` (no grouping) and the euro sign silently drops to the next line. Format amounts from an explicit separator map (it/de `.` + `,`, en `,` + `.`), keep the currency as a suffix and set `white-space: nowrap` on money cells and totals |
 | Autosaving a grid whose rows are created server-side | The debounced POST must return the ids of the new sections and lines and the page must apply them; otherwise the next autosave posts `item_id=0` again and duplicates every row |
 | Running a public geocoder inside the request | A slow provider hangs the page. Queue the lookups after the response (`fastcgi_finish_request()`) and retry missed places later, instead of asking the administrator to run a CLI script |
+| Background work after `fastcgi_finish_request()` | The PHP session file stays locked for the whole request, so the user's next click (save, navigation) waits for the background job — minutes with a slow geocoder. Call `session_write_close()` and `ignore_user_abort(true)` before starting the pass |
 | Hiding the grid while moving cards | Users cannot see where a card will land: show the slots while dragging/resizing (and while the manage panel is open) and preview the new order live before the drop |
 
 ## Geocoding (addresses)

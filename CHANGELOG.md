@@ -42,6 +42,9 @@ every 100 patches bump the series, and each bump is published to this repository
   a draft is open the page points to it (finish/approve or delete it) instead of offering a new one.
 - Budget cards give the amounts more room: a single budget fills the row, the KPI columns grow with
   the card and the currency symbol never wraps onto its own line.
+- Saving an org-chart appointment no longer hangs for minutes (the background geocoding used to keep
+  the PHP session locked, so the next click waited for it): the deferred pass now releases the session
+  first, and the save button shows “Saving…” while it ignores double clicks.
 
 ## [1.5.41] - 2026-11-10
 

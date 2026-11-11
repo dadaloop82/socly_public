@@ -2779,6 +2779,7 @@ return [
         'member_search_placeholder' => 'Name or surname…',
         'member_external' => '+ External person (not a member)',
         'form_section_role' => 'Office',
+        'saving' => 'Saving…',
         'form_section_person' => 'Identity details',
         'person_fields_locked_hint' => 'Data imported from the member record (read-only). Open the member profile to fix it.',
         'form_section_contacts' => 'Contact and notes',

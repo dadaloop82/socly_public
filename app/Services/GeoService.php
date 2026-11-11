@@ -344,11 +344,19 @@ final class GeoService
         }
         self::$deferredRegistered = true;
         register_shutdown_function(static function (): void {
+            // Release the session file lock BEFORE the background pass: PHP keeps the session
+            // locked for the whole request, so otherwise the user's next click (save, navigation)
+            // would wait for the geocoder to finish — seconds, sometimes minutes.
+            if (session_status() === PHP_SESSION_ACTIVE) {
+                session_write_close();
+            }
             if (function_exists('fastcgi_finish_request')) {
                 fastcgi_finish_request();
             } elseif (function_exists('litespeed_finish_request')) {
                 litespeed_finish_request();
             }
+            // The response is gone: keep working even if the browser closes the connection.
+            ignore_user_abort(true);
             foreach (self::$deferredTasks as $job) {
                 try {
                     $job();

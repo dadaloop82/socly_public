@@ -109,6 +109,8 @@ automatically, never in the critical path:
 
 - saving a member queues the residence / birth place for geocoding **after** the response
   (`register_shutdown_function()` + `fastcgi_finish_request()` when available);
+- the deferred pass closes the PHP session first (`session_write_close()`), so the browser's next
+  request never waits on the session lock while the geocoder runs;
 - each statistics visit runs a throttled background pass (25 places, 30 s lock) over the places still
   missing, so an existing archive fills the map visit after visit;
 - failed lookups are stored with a timestamp and retried after a week, so a geocoder outage heals
