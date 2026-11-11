@@ -122,6 +122,7 @@ $submitLabel = $isEdit ? __('treasury.update') : __('treasury.submit');
       data-msg-similar-apply="<?= e(__('treasury.similar_apply')) ?>"
       data-msg-similar-dismiss="<?= e(__('treasury.similar_dismiss')) ?>"
       data-msg-similar-done="<?= e(__('treasury.similar_applied', ['count' => ':count'])) ?>"
+      data-msg-similar-skipped="<?= e(__('treasury.similar_skipped', ['count' => ':count'])) ?>"
       data-max-upload-bytes="<?= (int) upload_limit_bytes() ?>"
       data-msg-upload-too-large="<?= e(__('documents.upload_too_large', ['max' => upload_max_mb()])) ?>">
     <?= csrf_field() ?>

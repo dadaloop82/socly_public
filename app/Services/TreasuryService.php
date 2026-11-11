@@ -966,9 +966,24 @@ final class TreasuryService
             ? strcmp((string) $b['movement_date'], (string) $a['movement_date'])
             : ($a['score'] < $b['score'] ? 1 : -1));
 
-        $ids = array_map(static fn (array $row): int => (int) $row['id'], $scored);
+        // Solo i movimenti ancora da classificare: chi ha già tipologia, voce Modello D o centro di
+        // costo non viene proposto né toccato (nessuna sovrascrittura).
+        $open = [];
+        $skipped = 0;
+        foreach ($scored as $row) {
+            $hasCategory = trim((string) ($row['category'] ?? '')) !== '';
+            $hasRunts = trim((string) ($row['runts_line'] ?? '')) !== '';
+            $hasBudget = (int) ($row['budget_item_id'] ?? 0) > 0;
+            if ($hasCategory || $hasRunts || $hasBudget) {
+                $skipped++;
+                continue;
+            }
+            $open[] = $row;
+        }
+
+        $ids = array_map(static fn (array $row): int => (int) $row['id'], $open);
         $matches = [];
-        foreach (array_slice($scored, 0, max(1, $limit)) as $row) {
+        foreach (array_slice($open, 0, max(1, $limit)) as $row) {
             $categoryKey = trim((string) ($row['category'] ?? ''));
             $matches[] = [
                 'id' => (int) $row['id'],
@@ -988,7 +1003,8 @@ final class TreasuryService
 
         return [
             'count' => count($matches),
-            'total' => count($scored),
+            'total' => count($open),
+            'skipped' => $skipped,
             'ids' => $ids,
             'matches' => $matches,
             'score_min' => 0.45,
@@ -1024,8 +1040,28 @@ final class TreasuryService
             if ($id < 1) {
                 continue;
             }
-            $this->db->update('treasury_movements', $payload, 'id = :id', ['id' => $id]);
-            $updated++;
+            // Riempie solo i campi vuoti: un valore già presente non viene mai sovrascritto.
+            $sets = [];
+            $params = ['id' => $id];
+            if (isset($payload['category'])) {
+                $sets[] = "category = CASE WHEN category IS NULL OR category = '' THEN :set_category ELSE category END";
+                $params['set_category'] = $payload['category'];
+            }
+            if (isset($payload['runts_line'])) {
+                $sets[] = "runts_line = CASE WHEN runts_line IS NULL OR runts_line = '' THEN :set_runts ELSE runts_line END";
+                $params['set_runts'] = $payload['runts_line'];
+            }
+            if (isset($payload['budget_item_id'])) {
+                $sets[] = 'budget_item_id = CASE WHEN budget_item_id IS NULL THEN :set_budget ELSE budget_item_id END';
+                $params['set_budget'] = $payload['budget_item_id'];
+            }
+            $stmt = $this->db->query(
+                'UPDATE treasury_movements SET ' . implode(', ', $sets) . ' WHERE id = :id',
+                $params
+            );
+            if ($stmt->rowCount() > 0) {
+                $updated++;
+            }
         }
         if ($updated > 0) {
             $this->audit->log('treasury.classified_bulk', 'treasury', null, null, [

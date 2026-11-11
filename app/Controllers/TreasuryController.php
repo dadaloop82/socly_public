@@ -306,6 +306,7 @@ final class TreasuryController extends BaseController
         $this->jsonResponse([
             'ok' => true,
             'total' => (int) $result['total'],
+            'skipped' => (int) ($result['skipped'] ?? 0),
             'ids' => $result['ids'],
             'matches' => $result['matches'],
             'changes' => $this->describeClassification($data),

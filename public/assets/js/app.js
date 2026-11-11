@@ -1611,6 +1611,7 @@ function initTreasurySimilar() {
     apply: form.getAttribute('data-msg-similar-apply') || '',
     dismiss: form.getAttribute('data-msg-similar-dismiss') || '',
     done: form.getAttribute('data-msg-similar-done') || ':count',
+    skipped: form.getAttribute('data-msg-similar-skipped') || ':count',
   };
 
   let timer = null;
@@ -1712,6 +1713,13 @@ function initTreasurySimilar() {
       list.appendChild(item);
     });
     panel.appendChild(list);
+
+    if (Number(data.skipped) > 0) {
+      const skipped = document.createElement('p');
+      skipped.className = 'tmf-similar-skipped';
+      skipped.textContent = String(messages.skipped).replace(':count', String(data.skipped));
+      panel.appendChild(skipped);
+    }
 
     const summary = document.createElement('p');
     summary.className = 'tmf-similar-changes';
