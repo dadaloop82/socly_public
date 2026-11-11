@@ -36,6 +36,8 @@ every 100 patches bump the series, and each bump is published to this repository
   progetto/attività, Entrata, Contributo/entrata vincolata (the type sets the accounting sign, so
   totals and the comparison with the cash book stay correct). The section is labelled
   **Macrocategoria**.
+- Budget cards give the amounts more room: a single budget fills the row, the KPI columns grow with
+  the card and the currency symbol never wraps onto its own line.
 
 ## [1.5.41] - 2026-11-10
 

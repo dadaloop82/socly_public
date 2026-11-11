@@ -12687,7 +12687,8 @@ tr.doc-row-editable:focus-visible {
 }
 .budget-list {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  /* auto-fit: un preventivo da solo occupa tutta la larghezza disponibile */
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 18rem), 1fr));
   gap: 0.85rem;
   margin-bottom: 1.25rem;
 }
@@ -12695,9 +12696,21 @@ tr.doc-row-editable:focus-visible {
 .budget-card-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 0.5rem; }
 .budget-card-year { margin: 0; font-size: 1.35rem; line-height: 1.1; }
 .budget-card-title { margin: 0.15rem 0 0; font-size: 0.82rem; }
-.budget-card-kpis { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0.5rem; margin: 0; }
+.budget-card-kpis {
+  display: grid;
+  /* Colonne larghe almeno per “21.100,00 €”: su card strette i KPI scendono su più righe */
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 8.5rem), 1fr));
+  gap: 0.5rem 0.75rem;
+  margin: 0;
+}
 .budget-card-kpis dt { font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted, #667085); }
-.budget-card-kpis dd { margin: 0.15rem 0 0; font-weight: 700; font-variant-numeric: tabular-nums; }
+.budget-card-kpis dd {
+  margin: 0.15rem 0 0;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  /* Il simbolo € non va mai a capo da solo */
+  white-space: nowrap;
+}
 .budget-card-actions { display: flex; gap: 0.4rem; flex-wrap: wrap; }
 .budget-empty { padding: 1.1rem 1.25rem; display: grid; gap: 0.35rem; margin-bottom: 1.25rem; }
 .budget-create { padding: 1.1rem 1.25rem 1.25rem; }
@@ -12902,7 +12915,7 @@ tr.doc-row-editable:focus-visible {
   letter-spacing: 0.06em;
   color: var(--muted, #667085);
 }
-.budget-summary-item strong { font-size: 1.05rem; font-variant-numeric: tabular-nums; }
+.budget-summary-item strong { font-size: 1.05rem; font-variant-numeric: tabular-nums; white-space: nowrap; }
 .budget-summary-need strong { color: var(--brand-primary, #2563eb); }
 .budget-danger { margin-top: 1.5rem; display: flex; justify-content: flex-end; }
 
