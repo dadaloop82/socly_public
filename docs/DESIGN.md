@@ -61,6 +61,18 @@ Rules:
 4. Wire geo API URLs on `body` or the form (`data-cities-url`, `data-addresses-url`, `data-cap-url`, `data-provinces-url`).
 5. Borders use `--line` (derived from `--brand-primary-ink`) so light association palettes stay readable.
 
+## Money & numbers
+
+- Amounts always use the server format: thousands separator, two decimals, currency symbol as a
+  suffix (`21.100,00 €`). The symbol never wraps alone (`white-space: nowrap` on the value).
+- Amount inputs show the grouped value and keep the symbol as an input-group suffix separated by a
+  hairline, never overlapping the digits; `inputmode="decimal"` on touch keyboards.
+- Numeric columns use `font-variant-numeric: tabular-nums` so rows and KPIs stay aligned.
+- Money formatting is deterministic (explicit separators per locale), never delegated to
+  `Intl.NumberFormat`: reduced ICU builds silently lose the thousands separator.
+- Card and KPI grids use `auto-fit`, so a lone document fills the row instead of squeezing the
+  amounts, and the KPIs wrap onto a new line when the card is narrow.
+
 ## Motion & attention cues
 
 Motion is functional: it explains the next action, never decorates for its own sake.

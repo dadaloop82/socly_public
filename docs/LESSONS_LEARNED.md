@@ -28,6 +28,8 @@ This document captures mistakes and costly fixes from the previous membership co
 | Permission keys renamed repeatedly | Stable catalogue in `Socly\Support\Permission` |
 | User-facing SuperAdmin creation | Single built-in maintenance account; `is_system_admin` is never settable from the UI |
 | Uniqueness on email with empty string vs NULL confusion | Normalize empty optional fields to `null` before store/unique checks |
+| One column carrying both the meaning and the sign of a row | Keep `budget_items.kind` (nature: expense, investment, project, income, grant) next to `direction` (accounting sign): a capital expense stays an expense, a restricted grant stays income, and every total keeps summing `direction` only |
+| Offering “create another” for a yearly document | One document per fiscal year: list only the free years and link the open draft until it is approved or deleted, instead of accepting a second document that the service then rejects |
 
 ## Document extraction (OCR)
 
@@ -47,6 +49,15 @@ This document captures mistakes and costly fixes from the previous membership co
 |--------------|----------------|
 | Calling `form.requestSubmit()` while a modal `<dialog>` is open | The rest of the page is inert, so constraint validation shows no bubble and cannot focus the field: the click looks like it does nothing. Close the dialog first, then submit and fall back to `reportValidity()` if the submit was blocked |
 | Submitting a form programmatically without its save button | `requestSubmit()` without a submitter drops the button's name/value (`action=save`, `data-tpl-submit`) and skips its click handlers: pick the first non-destructive submit button and `.click()` it |
+
+## Money, numbers and autosave
+
+| Anti-pattern | Socly practice |
+|--------------|----------------|
+| Formatting money with `Intl.NumberFormat` | A reduced ICU build returns `9000,00` (no grouping) and the euro sign silently drops to the next line. Format amounts from an explicit separator map (it/de `.` + `,`, en `,` + `.`), keep the currency as a suffix and set `white-space: nowrap` on money cells and totals |
+| Autosaving a grid whose rows are created server-side | The debounced POST must return the ids of the new sections and lines and the page must apply them; otherwise the next autosave posts `item_id=0` again and duplicates every row |
+| Running a public geocoder inside the request | A slow provider hangs the page. Queue the lookups after the response (`fastcgi_finish_request()`) and retry missed places later, instead of asking the administrator to run a CLI script |
+| Hiding the grid while moving cards | Users cannot see where a card will land: show the slots while dragging/resizing (and while the manage panel is open) and preview the new order live before the drop |
 
 ## Geocoding (addresses)
 

@@ -18,6 +18,9 @@
 - [x] Platform installation registry (consented contact cards) and telemetry dashboard with charts
 - [x] One-click installers for Linux, macOS and Windows (environment + database + app + local server)
 - [x] Hardcoded maintenance SuperAdmin; no user-created system administrators
+- [x] Treasury cash book (approvals, wallets, budget imputation) and yearly forecast budget compared with the actuals
+- [x] Statistics page with charts, per-user widget layout (order, visibility, three-column width) and members map with automatic geocoding
+- [x] Organization chart with association bodies, roles and compatibility checks
 
 ## Planned plugins (sold separately)
 

@@ -86,6 +86,47 @@ See [PLUGIN_API.md](PLUGIN_API.md). Plugins are discovered by scanning `plugins/
 
 Translations are PHP arrays under `lang/{locale}/`. See [I18N.md](I18N.md).
 
+## Dashboard & statistics widgets
+
+Chart cards in the dashboard, statistics and treasury panels share one layout engine.
+`WidgetLayoutService` keeps a per-user JSON in `user_widget_layouts` (`order`, `hidden`, `sizes`) and
+`POST /api/widgets/layout` stores it; the in-card controls (drag, move up/down, hide, width cycle and
+the bottom-right resize grip) are mounted client-side by `initWidgetLayouts()`.
+
+The grid is three columns wide (`data-chart-size` spans 1–3, dense packing). It becomes visible while
+dragging or resizing — and while the “manage charts” panel is open — so cards can be placed side by
+side, and the reorder previews live before the drop. Every change survives a reload.
+
+## Geocoding (statistics map)
+
+`GeoService` caches coordinates in `storage/cache/geo_city_coords.json`. Lookups happen
+automatically, never in the critical path:
+
+- saving a member queues the residence / birth place for geocoding **after** the response
+  (`register_shutdown_function()` + `fastcgi_finish_request()` when available);
+- each statistics visit runs a throttled background pass (25 places, 30 s lock) over the places still
+  missing, so an existing archive fills the map visit after visit;
+- failed lookups are stored with a timestamp and retried after a week, so a geocoder outage heals
+  itself instead of leaving “not found” forever.
+
+`bin/geo-warm.php` remains an optional bulk / `--force` pass. No CLI step is required for the map to
+complete.
+
+## Budget editor
+
+`budgets/show` is an inline grid: sections (macro-categories) and lines with
+type / description / amount. The form autosaves through `POST /budgets/{id}` after 5 seconds of
+inactivity (and flushes with `keepalive` when leaving mid-edit):
+
+- the request asks for JSON (`Accept: application/json` or `X-Requested-With: XMLHttpRequest`);
+- the controller answers with the ids of the sections and lines it created, so the page updates its
+  hidden `item_id[]` / `section_id[]` inputs and the next save updates the rows instead of inserting
+  duplicates;
+- categories are resolved **before** the transaction, so a new label registers a treasury custom
+  category and an invalid one never leaves half-saved rows;
+- one document per year and one open draft at a time are enforced by the controller: the create form
+  lists only the free years and links the open draft until it is approved or deleted.
+
 ## Design principles
 
 - One installation = one association.

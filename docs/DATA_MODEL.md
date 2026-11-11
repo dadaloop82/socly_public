@@ -70,13 +70,35 @@ Traceability of CSV member imports. `member_import_runs`: `user_id`, `source_nam
 ### treasury_movements
 Cash book rows: `movement_date`, `direction` (`income` / `expense` / `transfer`), `category`, `budget_item_id` (nullable cost centre), `amount`, `description`, `payment_method`, `account`, `transfer_account`, invoice fields, `attachment_path`, `member_id`, `payment_id`, `created_by`.
 
+Treasury categories are the built-in list plus `treasury.custom_categories` in the component config
+(`[{slug, label}]`). New categories can be created on the fly from movements, documents, deadlines
+and budget lines; the label is shared by every feature that offers the same picker.
+
 ### budgets / budget_sections / budget_items
 Yearly forecast budget, one per fiscal year (`budgets.fiscal_year` unique; `status` `draft` / `approved`).
+Only one document per year is allowed: the create form proposes just the free years and, while a draft
+is open, it points to that draft instead of offering another document.
 
 - `budget_sections` — collapsible groups (`title`, `sort_order`), cascade-deleted with the budget.
-- `budget_items` — one line: `direction` (`income` / `expense`), `label`, `amount`, optional `category` (matches the treasury categories), `notes`, `sort_order`.
+  In the UI a section is the **macro-category** of its lines.
+- `budget_items` — one line: `direction` (`income` / `expense`, the accounting sign), `kind`
+  (`expense`, `investment`, `project`, `income`, `grant` — the “tipo” shown in the grid), `label`
+  (description), `amount`, optional `category` (matches the treasury categories, custom ones
+  included), `notes`, `sort_order`.
+
+`kind` is stored next to `direction` on purpose: a capital expense stays an expense and a restricted
+grant stays income, while every total keeps reading `direction` only. `BudgetService` derives the sign
+from the type (`expense` / `investment` / `project` → expense, `income` / `grant` → income).
 
 The actuals are **derived**: `SUM(treasury_movements.amount)` grouped by `budget_item_id`. No duplicated actuals table; movements without imputation are reported separately as “not imputed”.
+
+### user_widget_layouts
+Per-user chart layout for the dashboard, statistics and treasury card grids: `user_id`, `context`
+(e.g. `dashboard.members`, `statistics.finance`), `layout` JSON, unique on `user_id + context`,
+cascade-deleted with the user.
+
+`layout` is `{"order": [ids…], "hidden": [ids…], "sizes": {id: 1|2|3}}`: the order and visibility of
+the cards plus their width as a span of 1–3 columns of the chart grid.
 
 ### plugins
 `id` (plugin slug), `is_enabled`, `enabled_at`, `meta_json`.

@@ -16,6 +16,10 @@ configuration, dedicated support, and optional paid add-ons are available separa
 - Installation wizard and control panel
 - Drop-in plugins (`plugins/*.php`)
 - Association branding, documents, treasury, deadlines (modular components)
+- Treasury cash book with approvals, wallets and budget imputation; changing a member-type price realigns the open balances and a “recalculate balances” action repairs them
+- Forecast budget, one document per fiscal year, with inline grid, autosave after 5 seconds of inactivity, expense/income types, custom categories and comparison with the cash actuals
+- Dashboard and statistics charts with a per-user layout (order, visibility, one-to-three column width on a visible grid) and a members map that geocodes residences and birth places automatically
+- Organization chart with association bodies, roles and compatibility checks (outstanding fees never block an appointment)
 - RUNTS lookup: association data, documents, and statute/privacy prefill (PDF text + OCR)
 
 ## Requirements
