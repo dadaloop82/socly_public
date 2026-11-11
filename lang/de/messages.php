@@ -2560,6 +2560,7 @@ return [
         'audit_updated' => 'Letzte Änderung: :date',
         'created' => 'Erstellt',
         'confirm_summary' => 'Buchung bestätigen: :type über :amount für :category vom :date?',
+        'confirm_summary_edit' => 'Änderungen an dieser Buchung bestätigen: :type über :amount für :category vom :date?',
     ],
     'currency' => [
         'eur' => 'Euro',

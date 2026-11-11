@@ -2351,6 +2351,7 @@ return [
         'audit_updated' => 'Ultima modifica: :date',
         'created' => 'Creazione',
         'confirm_summary' => 'Confermi l\'inserimento di un movimento di tipo :type di :amount per :category con valuta il :date?',
+        'confirm_summary_edit' => 'Confermi la modifica del movimento di tipo :type di :amount per :category con valuta il :date?',
     ],
     'currency' => [
         'eur' => 'Euro',

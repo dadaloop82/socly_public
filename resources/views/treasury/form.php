@@ -112,7 +112,7 @@ $submitLabel = $isEdit ? __('treasury.update') : __('treasury.submit');
 
 <form id="treasury-form" class="panel treasury-movement-form" method="post" action="<?= e($action) ?>" enctype="multipart/form-data"
       <?php if (!empty($isEdit)): ?><?= version_attrs('treasury', ['id' => (int) ($movement['id'] ?? 0), 'row_version' => (int) ($movement_version ?? ($movement['row_version'] ?? 0))]) ?><?php endif; ?>
-      data-treasury-form data-leave-guard data-confirm-template="<?= e(__('treasury.confirm_summary')) ?>"
+      data-treasury-form data-leave-guard data-confirm-template="<?= e($isEdit ? __('treasury.confirm_summary_edit') : __('treasury.confirm_summary')) ?>"
       data-base-currency="<?= e($currency->code()) ?>"
       data-account-balances-url="<?= e(url('/treasury/accounts/balances')) ?>"
       data-msg-account-option="<?= e(__('treasury.account_option_balance')) ?>"

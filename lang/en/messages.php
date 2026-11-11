@@ -2562,6 +2562,7 @@ return [
         'audit_updated' => 'Last updated: :date',
         'created' => 'Created',
         'confirm_summary' => 'Confirm a :type movement of :amount for :category dated :date?',
+        'confirm_summary_edit' => 'Confirm the changes to this :type movement of :amount for :category dated :date?',
     ],
     'currency' => [
         'eur' => 'Euro',

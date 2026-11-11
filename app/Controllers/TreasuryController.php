@@ -229,6 +229,7 @@ final class TreasuryController extends BaseController
             redirect('/treasury/' . (int) $id . '/edit?retry=1');
         }
         $posted = $request->all();
+        $before = $this->treasury->find((int) $id);
         $result = $this->treasury->update(
             (int) $id,
             $posted,
@@ -252,6 +253,13 @@ final class TreasuryController extends BaseController
         }
         $this->clearOld();
         $this->flash('success', __('treasury.updated'));
+        // Modifica con classificazione: si riapre la scheda con la proposta sui movimenti simili.
+        $classificationChanged = trim((string) ($posted['category'] ?? '')) !== trim((string) ($before['category'] ?? ''))
+            || strtoupper(trim((string) ($posted['runts_line'] ?? ''))) !== strtoupper(trim((string) ($before['runts_line'] ?? '')))
+            || (int) ($posted['budget_item_id'] ?? 0) !== (int) ($before['budget_item_id'] ?? 0);
+        if ($classificationChanged) {
+            redirect('/treasury/' . (int) $id . '/edit?similar=1');
+        }
         redirect('/treasury');
     }
 
