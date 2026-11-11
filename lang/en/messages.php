@@ -373,9 +373,11 @@ return [
     ],
     'widgets' => [
         'manage' => 'Manage charts',
-        'hint' => 'Drag or use the arrows to reorder; uncheck to hide. Preferences are saved in your profile.',
+        'hint' => 'Use the icons in the top-right corner of each card (or this list) to move and hide charts. Preferences are saved in your profile.',
         'move_up' => 'Move up',
         'move_down' => 'Move down',
+        'drag' => 'Drag to move',
+        'hide' => 'Hide chart',
     ],
     'email_templates' => [
         'intro' => 'Each template has IT / EN / DE versions. Use {{placeholders}} and conditional blocks {{#flag}}…{{/flag}}.',

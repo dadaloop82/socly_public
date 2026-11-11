@@ -373,9 +373,11 @@ return [
     ],
     'widgets' => [
         'manage' => 'Diagramme verwalten',
-        'hint' => 'Ziehen oder Pfeile zum Sortieren; abwählen zum Ausblenden. Die Einstellungen werden in Ihrem Profil gespeichert.',
+        'hint' => 'Nutzen Sie die Symbole oben rechts auf der Karte (oder diese Liste), um Diagramme zu verschieben und auszublenden. Die Einstellungen werden in Ihrem Profil gespeichert.',
         'move_up' => 'Nach oben',
         'move_down' => 'Nach unten',
+        'drag' => 'Zum Verschieben ziehen',
+        'hide' => 'Diagramm ausblenden',
     ],
     'email_templates' => [
         'intro' => 'Jede Vorlage hat IT / EN / DE. Platzhalter {{name}} und Bedingungen {{#flag}}…{{/flag}}.',

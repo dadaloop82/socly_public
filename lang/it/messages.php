@@ -375,9 +375,11 @@ return [
     ],
     'widgets' => [
         'manage' => 'Gestisci grafici',
-        'hint' => 'Trascina o usa le frecce per riordinare; deseleziona per nascondere. Le preferenze sono salvate nel tuo profilo.',
+        'hint' => 'Usa le icone in alto a destra sulla card (o questo elenco) per spostare e nascondere i grafici. Le preferenze sono salvate nel tuo profilo.',
         'move_up' => 'Sposta su',
         'move_down' => 'Sposta giù',
+        'drag' => 'Trascina per spostare',
+        'hide' => 'Nascondi grafico',
     ],
     'email_templates' => [
         'intro' => 'Ogni template ha versione IT / EN / DE. Usa placeholder {{nome}} e blocchi condizionali {{#flag}}…{{/flag}}.',

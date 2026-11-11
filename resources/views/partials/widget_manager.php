@@ -26,7 +26,11 @@ foreach ($widgets as $id => $label) {
 $hidden = array_flip(array_map('strval', $layout['hidden'] ?? []));
 ?>
 <div class="widget-manager-row">
-    <details class="widget-manager" data-widget-manager="<?= e($context) ?>">
+    <details class="widget-manager" data-widget-manager="<?= e($context) ?>"
+        data-msg-drag="<?= e(__('widgets.drag')) ?>"
+        data-msg-hide="<?= e(__('widgets.hide')) ?>"
+        data-msg-up="<?= e(__('widgets.move_up')) ?>"
+        data-msg-down="<?= e(__('widgets.move_down')) ?>">
         <summary class="widget-manager-summary"><?= e(__('widgets.manage')) ?></summary>
         <div class="widget-manager-body">
             <p class="setup-hint muted"><?= e(__('widgets.hint')) ?></p>

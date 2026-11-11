@@ -12723,6 +12723,7 @@ function initWidgetLayouts() {
       layout = {};
     }
     const ids = items.map((li) => li.getAttribute('data-widget-item') || '');
+    const itemsById = new Map(items.map((li) => [li.getAttribute('data-widget-item') || '', li]));
     const savedOrder = Array.isArray(layout.order) ? layout.order : [];
     let order = savedOrder.filter((id) => ids.includes(id) && panels.has(id));
     ids.forEach((id) => {
@@ -12737,8 +12738,12 @@ function initWidgetLayouts() {
           panel.style.order = String(index);
           panel.hidden = hidden.has(id);
         }
-        const li = items.find((el) => el.getAttribute('data-widget-item') === id);
-        if (li) list.appendChild(li);
+        const li = itemsById.get(id);
+        if (li) {
+          list.appendChild(li);
+          const cb = li.querySelector('[data-widget-visible]');
+          if (cb instanceof HTMLInputElement) cb.checked = !hidden.has(id);
+        }
       });
       // Non-widget panels (e.g. the “top months” table) stay after the charts.
       const tail = order.length + 1;
@@ -12750,60 +12755,126 @@ function initWidgetLayouts() {
         }
       });
     };
-    apply();
+    // apply() is called after the in-card controls are mounted.
+
+    const save = () => {
+      const body = new URLSearchParams();
+      body.set('context', context);
+      order.forEach((id) => body.append('order[]', id));
+      [...hidden].forEach((id) => body.append('hidden[]', id));
+      fetch(group.getAttribute('data-widget-save-url') || '/api/widgets/layout', {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: {
+          Accept: 'application/json',
+          'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8',
+          'X-Requested-With': 'XMLHttpRequest',
+          'X-CSRF-Token': csrf,
+        },
+        body: body.toString(),
+      }).catch(() => {
+        // Offline/expired session: the layout already applied in this page.
+      });
+    };
 
     let saveTimer = null;
-    const save = () => {
+    const queueSave = () => {
       window.clearTimeout(saveTimer);
-      saveTimer = window.setTimeout(() => {
-        const body = new URLSearchParams();
-        body.set('context', context);
-        order.forEach((id) => body.append('order[]', id));
-        [...hidden].forEach((id) => body.append('hidden[]', id));
-        fetch(group.getAttribute('data-widget-save-url') || '/api/widgets/layout', {
-          method: 'POST',
-          credentials: 'same-origin',
-          headers: {
-            Accept: 'application/json',
-            'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8',
-            'X-Requested-With': 'XMLHttpRequest',
-            'X-CSRF-Token': csrf,
-          },
-          body: body.toString(),
-        }).catch(() => {
-          // Offline/expired session: the layout already applied in this page.
-        });
-      }, 350);
+      saveTimer = window.setTimeout(save, 350);
     };
+
+    const move = (id, direction) => {
+      const index = order.indexOf(id);
+      const target = index + direction;
+      if (index < 0 || target < 0 || target >= order.length) return;
+      [order[index], order[target]] = [order[target], order[index]];
+      apply();
+      queueSave();
+    };
+
+    const setHidden = (id, visible) => {
+      if (visible) {
+        hidden.delete(id);
+      } else {
+        hidden.add(id);
+      }
+      apply();
+      queueSave();
+      if (visible) {
+        window.setTimeout(() => window.dispatchEvent(new Event('resize')), 60);
+      }
+    };
+
+    const labels = {
+      drag: manager.dataset.msgDrag || 'Drag to move',
+      hide: manager.dataset.msgHide || 'Hide chart',
+      up: manager.dataset.msgUp || 'Move up',
+      down: manager.dataset.msgDown || 'Move down',
+    };
+    const iconDrag = '<svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><circle cx="7" cy="4" r="1.4"/><circle cx="13" cy="4" r="1.4"/><circle cx="7" cy="10" r="1.4"/><circle cx="13" cy="10" r="1.4"/><circle cx="7" cy="16" r="1.4"/><circle cx="13" cy="16" r="1.4"/></svg>';
+    const iconUp = '<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12l5-5 5 5"/></svg>';
+    const iconDown = '<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 8l5 5 5-5"/></svg>';
+    const iconHide = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 3l18 18"/><path d="M10.6 5.1A11 11 0 0 1 12 5c5 0 9 4.5 9 7 0 .8-.5 1.9-1.4 3"/><path d="M6.2 6.2C3.8 7.8 2 10.2 2 12c0 2.5 4 7 10 7 1.5 0 2.9-.4 4.1-1"/><path d="M9.9 9.9a3 3 0 0 0 4.2 4.2"/></svg>';
+    const controlsHtml = `
+      <button type="button" class="chart-widget-btn chart-widget-drag" draggable="true" data-chart-drag aria-label="${escapeHtml(labels.drag)}" title="${escapeHtml(labels.drag)}">${iconDrag}</button>
+      <button type="button" class="chart-widget-btn" data-chart-up aria-label="${escapeHtml(labels.up)}" title="${escapeHtml(labels.up)}">${iconUp}</button>
+      <button type="button" class="chart-widget-btn" data-chart-down aria-label="${escapeHtml(labels.down)}" title="${escapeHtml(labels.down)}">${iconDown}</button>
+      <button type="button" class="chart-widget-btn" data-chart-hide aria-label="${escapeHtml(labels.hide)}" title="${escapeHtml(labels.hide)}">${iconHide}</button>`;
+
+    panels.forEach((panel, id) => {
+      if (!(panel instanceof HTMLElement) || panel.dataset.chartControls === '1') return;
+      panel.dataset.chartControls = '1';
+      const controls = document.createElement('div');
+      controls.className = 'chart-widget-controls';
+      controls.innerHTML = controlsHtml;
+      panel.appendChild(controls);
+      controls.querySelector('[data-chart-hide]')?.addEventListener('click', () => setHidden(id, false));
+      controls.querySelector('[data-chart-up]')?.addEventListener('click', () => move(id, -1));
+      controls.querySelector('[data-chart-down]')?.addEventListener('click', () => move(id, 1));
+      const handle = controls.querySelector('[data-chart-drag]');
+      handle?.addEventListener('dragstart', (event) => {
+        if (!(event instanceof DragEvent) || !event.dataTransfer) return;
+        panel.classList.add('is-dragging');
+        event.dataTransfer.effectAllowed = 'move';
+        event.dataTransfer.setData('text/plain', id);
+        try {
+          event.dataTransfer.setDragImage(panel, 24, 24);
+        } catch {
+          // Some browsers refuse custom drag images: the default is fine.
+        }
+      });
+      handle?.addEventListener('dragend', () => panel.classList.remove('is-dragging'));
+      panel.addEventListener('dragover', (event) => {
+        event.preventDefault();
+        panel.classList.add('is-drop-target');
+      });
+      panel.addEventListener('dragleave', () => panel.classList.remove('is-drop-target'));
+      panel.addEventListener('drop', (event) => {
+        if (!(event instanceof DragEvent) || !event.dataTransfer) return;
+        event.preventDefault();
+        panel.classList.remove('is-drop-target');
+        const dragged = event.dataTransfer.getData('text/plain') || '';
+        const from = order.indexOf(dragged);
+        const to = order.indexOf(id);
+        if (!dragged || dragged === id || from < 0 || to < 0) return;
+        order.splice(from, 1);
+        order.splice(to, 0, dragged);
+        apply();
+        queueSave();
+      });
+    });
+
+    apply();
+
 
     items.forEach((li) => {
       const id = li.getAttribute('data-widget-item') || '';
       const cb = li.querySelector('[data-widget-visible]');
       if (cb instanceof HTMLInputElement) {
-        cb.checked = !hidden.has(id);
-        cb.addEventListener('change', () => {
-          if (cb.checked) {
-            hidden.delete(id);
-          } else {
-            hidden.add(id);
-          }
-          apply();
-          save();
-          if (cb.checked) {
-            window.setTimeout(() => window.dispatchEvent(new Event('resize')), 60);
-          }
-        });
+        cb.addEventListener('change', () => setHidden(id, cb.checked));
       }
-      const move = (direction) => {
-        const index = order.indexOf(id);
-        const target = index + direction;
-        if (index < 0 || target < 0 || target >= order.length) return;
-        [order[index], order[target]] = [order[target], order[index]];
-        apply();
-        save();
-      };
-      li.querySelector('[data-widget-up]')?.addEventListener('click', () => move(-1));
-      li.querySelector('[data-widget-down]')?.addEventListener('click', () => move(1));
+      li.querySelector('[data-widget-up]')?.addEventListener('click', () => move(id, -1));
+      li.querySelector('[data-widget-down]')?.addEventListener('click', () => move(id, 1));
       li.addEventListener('dragstart', (event) => {
         if (!(event instanceof DragEvent) || !event.dataTransfer) return;
         li.classList.add('is-dragging');
@@ -12827,7 +12898,7 @@ function initWidgetLayouts() {
         order.splice(from, 1);
         order.splice(to, 0, dragged);
         apply();
-        save();
+        queueSave();
       });
     });
 
