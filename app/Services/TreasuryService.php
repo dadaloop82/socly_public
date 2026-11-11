@@ -334,6 +334,10 @@ final class TreasuryService
                      WHERE v.member_id = mem.id LIMIT 1) AS last_name,
                     mem.member_number,
                     u.name AS creator_name,
+                    (SELECT COALESCE(NULLIF(o.account, ''), NULL) FROM treasury_movements o
+                     WHERE o.id = m.transfer_origin_id LIMIT 1) AS transfer_origin_account,
+                    (SELECT o.movement_date FROM treasury_movements o
+                     WHERE o.id = m.transfer_origin_id LIMIT 1) AS transfer_origin_date,
                     (SELECT CONCAT(b.fiscal_year, ' · ', i.label)
                      FROM budget_items i
                      INNER JOIN budgets b ON b.id = i.budget_id
@@ -404,7 +408,11 @@ final class TreasuryService
             $where[] = $this->buildSearchWhere($query, $params);
         }
         $direction = (string) ($filters['direction'] ?? '');
-        if (in_array($direction, self::DIRECTIONS, true)) {
+        if ($direction === 'transfer') {
+            // “Giroconto” raccoglie i trasferimenti interni classici, gli originali
+            // storicizzati (barrati) e le copie generate sul conto di destinazione.
+            $where[] = "(m.direction = 'transfer' OR m.superseded_at IS NOT NULL OR m.transfer_origin_id IS NOT NULL)";
+        } elseif (in_array($direction, self::DIRECTIONS, true)) {
             $where[] = 'm.direction = :filter_direction';
             $params['filter_direction'] = $direction;
         }

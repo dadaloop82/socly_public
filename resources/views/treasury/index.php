@@ -430,8 +430,19 @@ foreach ($categories as $categoryOption) {
                 <div class="members-bulk-actions">
                     <button type="button" class="btn btn-sm btn-ghost" data-treasury-bulk-action="approve"><?= e(__('treasury.bulk_approve')) ?></button>
                     <button type="button" class="btn btn-sm btn-ghost" data-treasury-bulk-action="unapprove"><?= e(__('treasury.bulk_unapprove')) ?></button>
-                    <label class="treasury-transfer-pick"><span class="visually-hidden"><?= e(__('treasury.transfer_target')) ?></span><select name="target_account" data-treasury-transfer-target><option value=""><?= e(__('treasury.transfer_target')) ?></option><?php foreach (($accounts ?? []) as $accountOption): ?><?php if (empty($accountOption['active'])) { continue; } ?><option value="<?= e((string) $accountOption['key']) ?>"><?= e((string) $accountOption['label']) ?></option><?php endforeach; ?></select></label>
-                    <button type="button" class="btn btn-sm btn-primary" data-treasury-bulk-action="transfer" disabled><?= e(__('treasury.transfer_bulk')) ?></button>
+                    <span class="treasury-bulk-divider" aria-hidden="true"></span>
+                    <label class="treasury-transfer-pick">
+                        <span class="visually-hidden"><?= e(__('treasury.transfer_target')) ?></span>
+                        <select class="sf-field__control treasury-transfer-select" name="target_account" data-treasury-transfer-target>
+                            <option value=""><?= e(__('treasury.transfer_target')) ?></option>
+                            <?php foreach (($accounts ?? []) as $accountOption): ?><?php if (empty($accountOption['active'])) { continue; } ?><option value="<?= e((string) $accountOption['key']) ?>"><?= e((string) $accountOption['label']) ?></option><?php endforeach; ?>
+                        </select>
+                    </label>
+                    <button type="button" class="btn btn-sm" data-treasury-bulk-action="transfer" disabled>
+                        <span class="treasury-transfer-arrow" aria-hidden="true">↔</span>
+                        <span><?= e(__('treasury.transfer_bulk')) ?></span>
+                    </button>
+                    <span class="treasury-bulk-divider" aria-hidden="true"></span>
                     <button type="button" class="btn btn-sm btn-ghost is-danger" data-treasury-bulk-action="delete" data-confirm="<?= e(__('treasury.bulk_delete_confirm')) ?>">
                         <?= row_action_icon_svg('delete') ?>
                         <span><?= e(__('treasury.bulk_delete')) ?></span>
@@ -439,7 +450,10 @@ foreach ($categories as $categoryOption) {
                 </div>
             </div>
         </div>
-        <form method="post" action="<?= e(url('/treasury/bulk')) ?>" data-treasury-bulk-form hidden>
+        <form method="post" action="<?= e(url('/treasury/bulk')) ?>" data-treasury-bulk-form hidden
+              data-msg-transfer-confirm="<?= e(__('treasury.transfer_confirm')) ?>"
+              data-msg-transfer-target="<?= e(__('treasury.transfer_target_required')) ?>"
+              data-msg-transfer-mixed="<?= e(__('treasury.transfer_mixed')) ?>">
             <?= csrf_field() ?>
             <input type="hidden" name="action" value="" data-treasury-bulk-action-input>
             <span data-treasury-bulk-id-host></span>
@@ -567,6 +581,16 @@ foreach ($categories as $categoryOption) {
                                             <?php if ($supersededNote !== ''): ?>
                                                 <div class="muted treasury-superseded-note"><?= e($supersededNote) ?></div>
                                             <?php endif; ?>
+                                        <?php endif; ?>
+                                        <?php $originAccount = trim((string) ($row['transfer_origin_account'] ?? '')); ?>
+                                        <?php if ($originAccount !== ''): ?>
+                                            <?php $originKey = \Socly\Services\TreasuryService::normalizeAccount($originAccount); ?>
+                                            <?php $originLabel = $originKey !== '' ? (string) __('treasury.account_' . $originKey) : $originAccount; ?>
+                                            <span class="badge badge-ok treasury-superseded-badge"><?= e(__('treasury.transfer_origin_badge')) ?></span>
+                                            <div class="muted treasury-superseded-note"><?= e(__('treasury.transfer_origin_note', [
+                                                'account' => $originLabel,
+                                                'date' => format_date($row['transfer_origin_date'] ?? null) ?: (string) ($row['transfer_origin_date'] ?? ''),
+                                            ])) ?></div>
                                         <?php endif; ?>
                                     </td>
                                     <td>

@@ -3312,7 +3312,30 @@ function initTreasuryBulk() {
       const ids = selectedIds();
       if (ids.length === 0 || !form || !actionInput || !idHost) return;
       const action = btn.getAttribute('data-treasury-bulk-action') || '';
-      const message = btn.dataset.confirm || '';
+      let message = btn.dataset.confirm || '';
+      if (action === 'transfer') {
+        // Giroconto: conto obbligatorio + conferma esplicita con conto e numero movimenti.
+        const pick = bar.querySelector('[data-treasury-transfer-target]');
+        const target = pick && pick.value !== '' && pick.selectedIndex >= 0
+          ? (pick.options[pick.selectedIndex].textContent || '').trim()
+          : '';
+        if (target === '') {
+          const hint = form.getAttribute('data-msg-transfer-target') || '';
+          if (hint !== '') {
+            if (typeof appConfirm === 'function') {
+              await appConfirm(hint, { alert: true });
+            } else {
+              window.alert(hint);
+            }
+          }
+          if (pick) pick.focus();
+          return;
+        }
+        const template = form.getAttribute('data-msg-transfer-confirm') || '';
+        if (template !== '') {
+          message = template.replace(':count', String(ids.length)).replace(':account', target);
+        }
+      }
       if (message !== '') {
         const ok = typeof appConfirm === 'function'
           ? await appConfirm(message, { danger: action === 'delete' })
@@ -3343,6 +3366,10 @@ function initTreasuryBulk() {
           ids.forEach((id) => {
             root.querySelector(`[data-treasury-row="${id}"]`)?.remove();
           });
+        } else if (action === 'transfer') {
+          // Gli originali diventano storici e compaiono le copie: ricarica per riallineare la lista.
+          window.location.reload();
+          return;
         }
         checkboxes.forEach((cb) => {
           cb.checked = false;

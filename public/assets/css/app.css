@@ -12599,7 +12599,36 @@ tr.doc-row-editable:focus-visible {
 .treasury-row.is-superseded .treasury-col-check { text-decoration: none; }
 .treasury-superseded-badge { margin-left: 0.4rem; }
 .treasury-superseded-note { font-size: 0.78rem; margin-top: 0.15rem; }
-.treasury-transfer-pick select { min-width: 9rem; }
+/* Picker “Conto di destinazione” nella barra azioni: stessa altezza/raggio dei bottoni. */
+.treasury-transfer-pick { display: inline-flex; align-items: center; }
+.treasury-transfer-pick .treasury-transfer-select {
+  min-width: 9rem;
+  max-width: 15rem;
+  height: 2.25rem;
+  padding: 0 2rem 0 0.9rem;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background-color: #fff;
+  font-size: 0.88rem;
+  color: var(--ink);
+}
+.treasury-transfer-pick .treasury-transfer-select:focus-visible {
+  outline: 3px solid color-mix(in srgb, var(--brand-primary) 35%, white);
+  outline-offset: 1px;
+}
+.members-bulk-actions { align-items: center; }
+.members-bulk-actions .btn { flex: 0 0 auto; white-space: nowrap; }
+.treasury-bulk-divider {
+  width: 1px;
+  height: 1.6rem;
+  background: color-mix(in srgb, var(--ink) 14%, var(--line));
+}
+.treasury-transfer-arrow { font-weight: 700; }
+@media (max-width: 720px) {
+  .treasury-bulk-divider { display: none; }
+  .treasury-transfer-pick,
+  .treasury-transfer-pick .treasury-transfer-select { width: 100%; max-width: none; }
+}
 
 /* ── Proposta “movimenti simili”: richiama l'attenzione per qualche secondo ─── */
 .tmf-similar-probe {
