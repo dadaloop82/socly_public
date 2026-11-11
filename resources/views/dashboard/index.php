@@ -21,6 +21,10 @@ $hasCollections = array_sum($charts['collections']['values'] ?? []) > 0
     || array_sum($charts['collections_pending']['values'] ?? []) > 0;
 $hasTypes = array_sum($charts['by_type']['values'] ?? []) > 0;
 $hasCards = array_sum($charts['cards_distribution']['values'] ?? []) > 0;
+$methodSeries = $charts['collections_by_method']['series'] ?? [];
+$hasMethods = (array_sum($methodSeries['cash'] ?? []) + array_sum($methodSeries['bank'] ?? []) + array_sum($methodSeries['other'] ?? [])) > 0;
+$hasNewMembersChart = array_sum($charts['new_members']['values'] ?? []) > 0;
+$hasPendingChart = array_sum($charts['collections_pending']['values'] ?? []) > 0;
 $treasuryCharts = $widgets['treasury']['charts'] ?? [];
 $treasuryFlowValues = $treasuryCharts['flow']['values'] ?? [0, 0];
 $hasTreasuryFlow = ((float) ($treasuryFlowValues[0] ?? 0) + (float) ($treasuryFlowValues[1] ?? 0)) > 0;
@@ -203,8 +207,33 @@ $defaultTab = $tabs[0]['id'] ?? '';
                     </div>
                 </div>
             <?php else: ?>
+                <?php
+                $chartToggles = [
+                    'collections' => __('dashboard.chart_collections_title'),
+                    'method' => __('dashboard.chart_method_title'),
+                    'types' => __('dashboard.chart_types_title'),
+                    'standing' => __('dashboard.chart_standing_title'),
+                    'cards' => __('statistics.chart_cards_status'),
+                    'new-members' => __('dashboard.chart_new_members_title'),
+                    'pending' => __('dashboard.chart_pending_title'),
+                ];
+                ?>
+                <div class="dashboard-charts-toolbar">
+                    <details class="dashboard-charts-config" data-charts-user="<?= (int) (auth_user()['id'] ?? 0) ?>">
+                        <summary class="dashboard-charts-manage" data-i18n="dashboard.charts_manage"><?= e(__('dashboard.charts_manage')) ?></summary>
+                        <div class="dashboard-charts-config-body">
+                            <p class="setup-hint muted"><?= e(__('dashboard.charts_manage_hint')) ?></p>
+                            <?php foreach ($chartToggles as $chartId => $chartLabel): ?>
+                                <label class="dashboard-charts-option">
+                                    <input type="checkbox" data-chart-toggle="<?= e($chartId) ?>" checked>
+                                    <span><?= e($chartLabel) ?></span>
+                                </label>
+                            <?php endforeach; ?>
+                        </div>
+                    </details>
+                </div>
                 <div class="charts" data-dashboard-charts="<?= e($chartsJson) ?>" data-chart-i18n="<?= e($chartI18n) ?>">
-                    <div class="panel chart-panel chart-panel-wide chart-panel-primary">
+                    <div class="panel chart-panel chart-panel-wide chart-panel-primary" data-chart-widget="collections">
                         <div class="panel-header">
                             <div>
                                 <h2 class="section-title"><?= e(__('dashboard.chart_collections_title')) ?></h2>
@@ -220,7 +249,23 @@ $defaultTab = $tabs[0]['id'] ?? '';
                         <?php endif; ?>
                     </div>
 
-                    <div class="panel chart-panel">
+                    <div class="panel chart-panel" data-chart-widget="method">
+                        <div class="panel-header">
+                            <div>
+                                <h2 class="section-title"><?= e(__('dashboard.chart_method_title')) ?></h2>
+                                <p class="section-lede"><?= e(__('dashboard.chart_method_lede')) ?></p>
+                            </div>
+                        </div>
+                        <?php if (!$hasMethods): ?>
+                            <div class="empty-state compact"><?= e(__('dashboard.chart_empty')) ?></div>
+                        <?php else: ?>
+                            <div class="chart-frame chart-frame-donut">
+                                <canvas id="chart-method" aria-label="<?= e(__('dashboard.chart_method_title')) ?>"></canvas>
+                            </div>
+                        <?php endif; ?>
+                    </div>
+
+                    <div class="panel chart-panel" data-chart-widget="types">
                         <div class="panel-header">
                             <div>
                                 <h2 class="section-title"><?= e(__('dashboard.chart_types_title')) ?></h2>
@@ -236,7 +281,7 @@ $defaultTab = $tabs[0]['id'] ?? '';
                         <?php endif; ?>
                     </div>
 
-                    <div class="panel chart-panel">
+                    <div class="panel chart-panel" data-chart-widget="standing">
                         <div class="panel-header">
                             <div>
                                 <h2 class="section-title"><?= e(__('dashboard.chart_standing_title')) ?></h2>
@@ -247,7 +292,7 @@ $defaultTab = $tabs[0]['id'] ?? '';
                             <canvas id="chart-standing" aria-label="<?= e(__('dashboard.chart_standing_title')) ?>"></canvas>
                         </div>
                     </div>
-                    <div class="panel chart-panel">
+                    <div class="panel chart-panel" data-chart-widget="cards">
                         <div class="panel-header">
                             <div>
                                 <h2 class="section-title"><?= e(__('statistics.chart_cards_status')) ?></h2>
@@ -259,6 +304,37 @@ $defaultTab = $tabs[0]['id'] ?? '';
                         <?php else: ?>
                             <div class="chart-frame chart-frame-donut">
                                 <canvas id="chart-cards" aria-label="<?= e(__('statistics.chart_cards_status')) ?>"></canvas>
+                            </div>
+                        <?php endif; ?>
+                    </div>
+                    <div class="panel chart-panel" data-chart-widget="new-members">
+                        <div class="panel-header">
+                            <div>
+                                <h2 class="section-title"><?= e(__('dashboard.chart_new_members_title')) ?></h2>
+                                <p class="section-lede"><?= e(__('dashboard.chart_new_members_lede')) ?></p>
+                            </div>
+                        </div>
+                        <?php if (!$hasNewMembersChart): ?>
+                            <div class="empty-state compact"><?= e(__('dashboard.chart_empty')) ?></div>
+                        <?php else: ?>
+                            <div class="chart-frame">
+                                <canvas id="chart-new-members" aria-label="<?= e(__('dashboard.chart_new_members_title')) ?>"></canvas>
+                            </div>
+                        <?php endif; ?>
+                    </div>
+
+                    <div class="panel chart-panel" data-chart-widget="pending">
+                        <div class="panel-header">
+                            <div>
+                                <h2 class="section-title"><?= e(__('dashboard.chart_pending_title')) ?></h2>
+                                <p class="section-lede"><?= e(__('dashboard.chart_pending_lede')) ?></p>
+                            </div>
+                        </div>
+                        <?php if (!$hasPendingChart): ?>
+                            <div class="empty-state compact"><?= e(__('dashboard.chart_empty')) ?></div>
+                        <?php else: ?>
+                            <div class="chart-frame">
+                                <canvas id="chart-pending" aria-label="<?= e(__('dashboard.chart_pending_title')) ?>"></canvas>
                             </div>
                         <?php endif; ?>
                     </div>

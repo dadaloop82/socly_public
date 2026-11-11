@@ -2052,9 +2052,15 @@ a.sidebar-brand-home:hover {
 }
 .charts {
   display: grid;
-  grid-template-columns: 1.4fr 1fr;
-  gap: 1.25rem;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 1rem;
   margin-bottom: 1.25rem;
+}
+@media (max-width: 1100px) {
+  .charts { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 760px) {
+  .charts { grid-template-columns: 1fr; }
 }
 .charts-treasury {
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -2067,6 +2073,16 @@ a.sidebar-brand-home:hover {
 .chart-panel {
   margin-bottom: 0;
 }
+.charts .chart-panel {
+  padding: 1rem 1.1rem;
+}
+.charts .chart-panel .panel-header {
+  margin-bottom: 0.55rem;
+  padding-bottom: 0.55rem;
+}
+.chart-panel[hidden] {
+  display: none !important;
+}
 .chart-panel-wide {
   grid-column: 1 / -1;
 }
@@ -2074,9 +2090,12 @@ a.sidebar-brand-home:hover {
   position: relative;
   height: 280px;
 }
+.charts .chart-panel:not(.chart-panel-wide) .chart-frame:not(.chart-frame-donut) {
+  height: 220px;
+}
 .chart-frame-donut {
-  height: 260px;
-  max-width: 360px;
+  height: 210px;
+  max-width: 240px;
   margin: 0 auto;
 }
 .empty-state.compact {
@@ -11054,6 +11073,61 @@ a.org-mandate-badge--soon:hover {
   display: flex;
   flex-direction: column;
   gap: 1rem;
+}
+/* Chart widgets: user-selectable visibility (saved per user in localStorage). */
+.dashboard-charts-toolbar {
+  display: flex;
+  justify-content: flex-end;
+  margin: -0.25rem 0 0.75rem;
+}
+.dashboard-charts-config {
+  position: relative;
+}
+.dashboard-charts-config > summary {
+  list-style: none;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.45rem 0.8rem;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: #fff;
+  color: var(--brand-primary-deep, var(--brand-primary, #0D6E66));
+  font-size: 0.82rem;
+  font-weight: 700;
+}
+.dashboard-charts-config > summary::-webkit-details-marker {
+  display: none;
+}
+.dashboard-charts-config[open] > summary {
+  box-shadow: var(--shadow-soft);
+}
+.dashboard-charts-config-body {
+  position: absolute;
+  right: 0;
+  z-index: 20;
+  width: min(320px, 90vw);
+  margin-top: 0.45rem;
+  padding: 0.85rem 0.95rem;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: #fff;
+  box-shadow: var(--shadow-soft);
+  display: grid;
+  gap: 0.45rem;
+}
+.dashboard-charts-option {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.86rem;
+  font-weight: 600;
+  color: var(--ink);
+}
+.dashboard-charts-option input {
+  width: auto;
+  margin: 0;
 }
 .dashboard-tablist-wrap {
   position: relative;

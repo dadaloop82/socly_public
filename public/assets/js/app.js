@@ -195,6 +195,7 @@ document.addEventListener('DOMContentLoaded', () => {
   initDashboardTabs();
   initDashboardMoreToggles();
   initDashboardCharts();
+  initDashboardChartWidgets();
   initStatisticsTabs();
   initStatisticsCharts();
   initUpdateProgress();
@@ -12698,6 +12699,57 @@ function initDemoBannerCompact() {
   window.addEventListener('scroll', sync, { passive: true });
 }
 
+function initDashboardChartWidgets() {
+  const config = document.querySelector('[data-charts-user]');
+  if (!(config instanceof HTMLElement)) return;
+  const checkboxes = [...config.querySelectorAll('[data-chart-toggle]')];
+  if (checkboxes.length === 0) return;
+  const key = 'socly.dashboardCharts.' + (config.dataset.chartsUser || '0');
+  const panels = new Map([...document.querySelectorAll('[data-chart-widget]')]
+    .map((el) => [el.getAttribute('data-chart-widget'), el]));
+  let state = {};
+  try {
+    state = JSON.parse(localStorage.getItem(key) || '{}') || {};
+  } catch {
+    state = {};
+  }
+  const apply = () => {
+    let revealed = false;
+    checkboxes.forEach((cb) => {
+      if (!(cb instanceof HTMLInputElement)) return;
+      const id = cb.getAttribute('data-chart-toggle');
+      const on = state[id] !== false;
+      cb.checked = on;
+      const panel = panels.get(id);
+      if (!panel) return;
+      const wasHidden = panel.hidden;
+      panel.hidden = !on;
+      if (wasHidden && on) revealed = true;
+    });
+    if (revealed) {
+      window.setTimeout(() => window.dispatchEvent(new Event('resize')), 60);
+    }
+  };
+  apply();
+  checkboxes.forEach((cb) => {
+    cb.addEventListener('change', () => {
+      if (!(cb instanceof HTMLInputElement)) return;
+      state[cb.getAttribute('data-chart-toggle')] = cb.checked;
+      try {
+        localStorage.setItem(key, JSON.stringify(state));
+      } catch {
+        // Storage disabled: the choice still applies for this page view.
+      }
+      apply();
+    });
+  });
+  document.addEventListener('click', (event) => {
+    if (config.open && event.target instanceof Node && !config.contains(event.target)) {
+      config.open = false;
+    }
+  });
+}
+
 function initDashboardMoreToggles() {
   const container = document.querySelector('.dashboard-tabs');
   if (!(container instanceof HTMLElement)) return;
@@ -13132,6 +13184,107 @@ function initDashboardCharts() {
         }],
       },
       options: donutOptions(),
+    });
+  }
+
+  const methodEl = document.getElementById('chart-method');
+  if (methodEl) {
+    const series = data.collections_by_method?.series || {};
+    const labels = data.collections_by_method?.labels || {};
+    const methodKeys = ['cash', 'bank', 'other'];
+    const methodValues = methodKeys.map((key) => (Array.isArray(series[key]) ? series[key] : [])
+      .reduce((sum, value) => sum + (Number(value) || 0), 0));
+    new Chart(methodEl, {
+      type: 'doughnut',
+      data: {
+        labels: methodKeys.map((key) => labels[key] || key),
+        datasets: [{
+          data: methodValues,
+          backgroundColor: [brand, accent, '#4A6B66'],
+          borderColor: '#fff',
+          borderWidth: 3,
+          hoverOffset: 6,
+        }],
+      },
+      options: donutOptions(),
+    });
+  }
+
+  const compactBarOptions = (money = false) => ({
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: { legend: { display: false } },
+    scales: {
+      x: {
+        grid: { display: false },
+        ticks: { maxRotation: 0, autoSkipPadding: 8 },
+        border: { display: false },
+      },
+      y: {
+        beginAtZero: true,
+        grid: { color: 'rgba(13, 110, 102, 0.08)' },
+        border: { display: false },
+        ticks: money
+          ? { callback(value) { return formatMoney(value, i18n.currency || '€', true); } }
+          : { precision: 0 },
+      },
+    },
+  });
+
+  const newMembersEl = document.getElementById('chart-new-members');
+  if (newMembersEl) {
+    new Chart(newMembersEl, {
+      type: 'bar',
+      data: {
+        labels: data.new_members?.labels || [],
+        datasets: [{
+          label: i18n.newMembers || 'New members',
+          data: data.new_members?.values || [],
+          backgroundColor: 'rgba(184, 74, 27, 0.78)',
+          hoverBackgroundColor: accent,
+          borderRadius: 6,
+          borderSkipped: false,
+          maxBarThickness: 28,
+        }],
+      },
+      options: compactBarOptions(false),
+    });
+  }
+
+  const pendingEl = document.getElementById('chart-pending');
+  if (pendingEl) {
+    new Chart(pendingEl, {
+      type: 'bar',
+      data: {
+        labels: data.collections_pending?.labels || [],
+        datasets: [{
+          label: i18n.pending || 'Awaiting approval',
+          data: data.collections_pending?.values || [],
+          backgroundColor: 'rgba(107, 114, 128, 0.32)',
+          hoverBackgroundColor: 'rgba(107, 114, 128, 0.5)',
+          borderRadius: 6,
+          borderSkipped: false,
+          maxBarThickness: 28,
+        }],
+      },
+      options: {
+        ...compactBarOptions(true),
+        plugins: {
+          legend: { display: false },
+          tooltip: {
+            backgroundColor: brandDeep,
+            titleColor: '#F4FBF9',
+            bodyColor: mist,
+            padding: 12,
+            cornerRadius: 10,
+            callbacks: {
+              label(ctx) {
+                return `${ctx.dataset.label}: ${formatMoney(ctx.parsed.y || 0, i18n.currency || '€')}`;
+              },
+            },
+          },
+        },
+      },
     });
   }
 
