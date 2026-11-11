@@ -2231,6 +2231,8 @@ return [
         'approve' => 'Approva',
         'approved' => 'Movimento approvato.',
         'bulk_selected' => 'movimenti selezionati',
+        'bulk_unapprove' => 'Disapprova selezionati',
+        'bulk_unapproved' => ':count movimenti disapprovati.',
         'bulk_approve' => 'Approva selezionati',
         'bulk_delete' => 'Elimina selezionati',
         'bulk_delete_confirm' => 'Eliminare i movimenti selezionati? L’operazione non si può annullare.',

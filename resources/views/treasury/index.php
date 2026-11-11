@@ -425,6 +425,7 @@ foreach ($categories as $categoryOption) {
                 <span class="muted"><?= e(__('treasury.bulk_selected')) ?></span>
                 <div class="members-bulk-actions">
                     <button type="button" class="btn btn-sm btn-ghost" data-treasury-bulk-action="approve"><?= e(__('treasury.bulk_approve')) ?></button>
+                    <button type="button" class="btn btn-sm btn-ghost" data-treasury-bulk-action="unapprove"><?= e(__('treasury.bulk_unapprove')) ?></button>
                     <button type="button" class="btn btn-sm btn-ghost is-danger" data-treasury-bulk-action="delete" data-confirm="<?= e(__('treasury.bulk_delete_confirm')) ?>">
                         <?= row_action_icon_svg('delete') ?>
                         <span><?= e(__('treasury.bulk_delete')) ?></span>
@@ -526,7 +527,7 @@ foreach ($categories as $categoryOption) {
                                 ?>
                                 <tr
                                     class="treasury-row treasury-row-<?= $isTransfer ? 'transfer' : ($isIncome ? 'income' : 'expense') ?><?= $canManage ? ' doc-row-editable' : '' ?>"
-                                    data-treasury-row="<?= $rowId ?>"
+                                    data-treasury-row="<?= $rowId ?>" data-treasury-approved="<?= $isPending ? '0' : '1' ?>"
                                     <?php if ($canManage): ?>
                                         data-href="<?= e($editUrl) ?>"
                                         tabindex="0"

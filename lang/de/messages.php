@@ -2440,6 +2440,8 @@ return [
         'approve' => 'Genehmigen',
         'approved' => 'Bewegung genehmigt.',
         'bulk_selected' => 'ausgewählte Bewegungen',
+        'bulk_unapprove' => 'Auswahl freigeben aufheben',
+        'bulk_unapproved' => ':count Buchungen nicht mehr freigegeben.',
         'bulk_approve' => 'Auswahl genehmigen',
         'bulk_delete' => 'Auswahl löschen',
         'bulk_delete_confirm' => 'Die ausgewählten Bewegungen löschen? Dies kann nicht rückgängig gemacht werden.',

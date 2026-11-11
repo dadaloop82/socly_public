@@ -530,7 +530,9 @@ final class TreasuryController extends BaseController
         }
         $action = (string) $request->input('action', '');
         $isAjax = (string) $request->input('ajax', '') === '1';
-        if ($action === 'approve') {
+        if ($action === 'unapprove') {
+            $count = $this->treasury->setApprovalMany(array_values($ids), false, $request->ip(), auth_user()['id'] ?? null);
+        } elseif ($action === 'approve') {
             $count = $this->treasury->approveMany(array_values($ids), $request->ip(), auth_user()['id'] ?? null);
         } elseif ($action === 'delete') {
             $count = $this->treasury->deleteMany(array_values($ids), $request->ip());
@@ -554,7 +556,9 @@ final class TreasuryController extends BaseController
             ], JSON_UNESCAPED_UNICODE);
             return;
         }
-        if ($action === 'approve') {
+        if ($action === 'unapprove') {
+            $this->flash('success', __('treasury.bulk_unapproved', ['count' => (string) $count]));
+        } elseif ($action === 'approve') {
             $this->flash('success', __('treasury.bulk_approved', ['count' => (string) $count]));
         } else {
             $this->flash('success', __('treasury.bulk_deleted', ['count' => (string) $count]));

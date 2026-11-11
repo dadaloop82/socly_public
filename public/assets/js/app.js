@@ -3196,9 +3196,19 @@ function initTreasuryBulk() {
 
   const selectedIds = () => checkboxes.filter((cb) => cb.checked).map((cb) => cb.value);
 
+  const approveBtn = bar.querySelector('[data-treasury-bulk-action="approve"]');
+  const unapproveBtn = bar.querySelector('[data-treasury-bulk-action="unapprove"]');
+
   const sync = () => {
     const ids = selectedIds();
     const open = ids.length > 0;
+    if (approveBtn && unapproveBtn) {
+      const states = ids.map((id) => root.querySelector(`[data-treasury-row="${id}"]`)?.getAttribute('data-treasury-approved') || '0');
+      const allApproved = states.length > 0 && states.every((state) => state === '1');
+      const allPending = states.length > 0 && states.every((state) => state === '0');
+      approveBtn.hidden = allApproved;
+      unapproveBtn.hidden = allPending;
+    }
     bar.classList.toggle('is-open', open);
     bar.setAttribute('aria-hidden', open ? 'false' : 'true');
     if (count) count.textContent = String(ids.length);

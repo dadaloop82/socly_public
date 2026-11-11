@@ -1452,6 +1452,32 @@ final class TreasuryService
         return ['ok' => true];
     }
 
+
+    /**
+     * Rimuove l'approvazione (o la ripristina) su più movimenti in un colpo solo.
+     *
+     * @param list<int> $ids
+     */
+    public function setApprovalMany(array $ids, bool $approved, string $ip, ?int $userId = null): int
+    {
+        $count = 0;
+        foreach (array_unique(array_map('intval', $ids)) as $id) {
+            if ($id < 1) {
+                continue;
+            }
+            $this->db->update('treasury_movements', [
+                'approved_at' => $approved ? date('Y-m-d H:i:s') : null,
+                'approved_by' => $approved ? $userId : null,
+            ], 'id = :id', ['id' => $id]);
+            $count++;
+        }
+        if ($count > 0) {
+            $this->audit->log($approved ? 'treasury.approved_bulk' : 'treasury.unapproved_bulk', 'treasury', null, null, ['count' => $count], $ip);
+        }
+
+        return $count;
+    }
+
     /** @param list<int> $ids @return int Number of approved movements */
     public function approveMany(array $ids, string $ip, ?int $userId = null): int
     {

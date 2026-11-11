@@ -2442,6 +2442,8 @@ return [
         'approve' => 'Approve',
         'approved' => 'Movement approved.',
         'bulk_selected' => 'selected movements',
+        'bulk_unapprove' => 'Unapprove selected',
+        'bulk_unapproved' => ':count entries unapproved.',
         'bulk_approve' => 'Approve selected',
         'bulk_delete' => 'Delete selected',
         'bulk_delete_confirm' => 'Delete the selected movements? This cannot be undone.',
