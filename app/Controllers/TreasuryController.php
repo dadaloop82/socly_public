@@ -283,6 +283,96 @@ final class TreasuryController extends BaseController
         redirect('/treasury');
     }
 
+    /**
+     * Movimenti simili al corrente: usato dal pannello “applica anche agli altri”.
+     */
+    public function similar(Request $request): void
+    {
+        require_component('treasury');
+        if (!can('treasury.manage')) {
+            $this->jsonResponse(['ok' => false, 'error' => __('errors.403')], 403);
+            return;
+        }
+        $data = $request->all();
+        $result = $this->treasury->similarMovements([
+            'direction' => (string) ($data['direction'] ?? ''),
+            'description' => (string) ($data['description'] ?? ''),
+            'beneficiary' => (string) ($data['beneficiary'] ?? ''),
+        ], 3, (int) ($data['exclude_id'] ?? 0));
+
+        $this->jsonResponse([
+            'ok' => true,
+            'total' => (int) $result['total'],
+            'ids' => $result['ids'],
+            'matches' => $result['matches'],
+            'changes' => $this->describeClassification($data),
+        ]);
+    }
+
+    /** Applica tipologia / voce Modello D / centro di costo ai movimenti simili scelti. */
+    public function applySimilar(Request $request): void
+    {
+        require_component('treasury');
+        if (!can('treasury.manage')) {
+            $this->jsonResponse(['ok' => false, 'error' => __('errors.403')], 403);
+            return;
+        }
+        $data = $request->all();
+        $rawIds = $data['ids'] ?? [];
+        $ids = [];
+        if (is_array($rawIds)) {
+            foreach ($rawIds as $value) {
+                $id = (int) $value;
+                if ($id > 0) {
+                    $ids[$id] = $id;
+                }
+            }
+        }
+        if ($ids === []) {
+            $this->jsonResponse(['ok' => false, 'error' => __('treasury.similar_none_selected')], 422);
+            return;
+        }
+        $updated = $this->treasury->applyClassification(array_values($ids), [
+            'category' => (string) ($data['category'] ?? ''),
+            'runts_line' => (string) ($data['runts_line'] ?? ''),
+            'budget_item_id' => (string) ($data['budget_item_id'] ?? ''),
+        ], $request->ip());
+
+        $this->jsonResponse([
+            'ok' => true,
+            'updated' => $updated,
+            'message' => (string) __('treasury.similar_applied', ['count' => (string) $updated]),
+        ]);
+    }
+
+    /**
+     * Riepilogo leggibile delle modifiche che verranno applicate.
+     *
+     * @param array<string,mixed> $data
+     * @return list<array{field:string,label:string,value:string}>
+     */
+    private function describeClassification(array $data): array
+    {
+        $changes = [];
+        $category = trim((string) ($data['category'] ?? ''));
+        if ($category !== '' && $category !== '__new__') {
+            $changes[] = ['field' => 'category', 'label' => (string) __('treasury.category'), 'value' => $this->treasury->categoryLabel($category)];
+        }
+        $runtsLine = strtoupper(trim((string) ($data['runts_line'] ?? '')));
+        if ($runtsLine !== '') {
+            $changes[] = ['field' => 'runts_line', 'label' => (string) __('runts.line_label'), 'value' => \Socly\Services\RuntsReportService::lineLabel($runtsLine)];
+        }
+        $budgetItemId = (int) ($data['budget_item_id'] ?? 0);
+        if ($budgetItemId > 0) {
+            $budgetLabel = $this->treasury->budgetItemLabel($budgetItemId);
+            if ($budgetLabel !== '') {
+                $changes[] = ['field' => 'budget_item_id', 'label' => (string) __('treasury.budget_item'), 'value' => $budgetLabel];
+            }
+        }
+
+        return $changes;
+    }
+
     /** Approve a pending first-note movement (only approved movements count). */
     public function approve(Request $request, string $id): void
     {

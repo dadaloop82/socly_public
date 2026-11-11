@@ -161,6 +161,8 @@ $router->get('/budgets/{id}', [BudgetController::class, 'show'], 'treasury.view'
 $router->post('/budgets/{id}', [BudgetController::class, 'save'], 'treasury.manage', ['mw.locale', 'mw.install', 'mw.auth', 'mw.csrf']);
 $router->post('/budgets/{id}/approve', [BudgetController::class, 'approve'], 'treasury.manage', ['mw.locale', 'mw.install', 'mw.auth', 'mw.csrf']);
 $router->post('/treasury/categories/rename', [BudgetController::class, 'renameCategory'], 'treasury.manage', ['mw.locale', 'mw.install', 'mw.auth', 'mw.csrf']);
+$router->post('/treasury/similar', [TreasuryController::class, 'similar'], 'treasury.manage', ['mw.locale', 'mw.install', 'mw.auth', 'mw.csrf']);
+$router->post('/treasury/similar/apply', [TreasuryController::class, 'applySimilar'], 'treasury.manage', ['mw.locale', 'mw.install', 'mw.auth', 'mw.csrf']);
 $router->post('/budgets/{id}/reopen', [BudgetController::class, 'reopen'], 'treasury.manage', ['mw.locale', 'mw.install', 'mw.auth', 'mw.csrf']);
 $router->post('/budgets/{id}/delete', [BudgetController::class, 'destroy'], 'treasury.manage', ['mw.locale', 'mw.install', 'mw.auth', 'mw.csrf']);
 $router->get('/budgets/{id}/compare', [BudgetController::class, 'compare'], 'treasury.view', ['mw.locale', 'mw.install', 'mw.auth']);

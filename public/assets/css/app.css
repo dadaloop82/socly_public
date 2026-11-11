@@ -12499,6 +12499,37 @@ tr.doc-row-editable:focus-visible {
   .tmf-grid--2,
   .tmf-grid--3 { grid-template-columns: minmax(0, 1fr); }
 }
+/* ── Movimenti simili: proposta di classificazione in blocco ───────────────── */
+.tmf-similar {
+  display: grid;
+  gap: 0.45rem;
+  margin: 0.2rem 0 0;
+  padding: 0.9rem 1rem;
+  border-radius: 14px;
+  border: 1px solid color-mix(in srgb, var(--brand-primary) 26%, var(--line));
+  background: color-mix(in srgb, var(--brand-primary) 6%, #fff);
+}
+.tmf-similar[hidden] { display: none; }
+.tmf-similar-title { font-family: var(--font-display); font-size: 1rem; }
+.tmf-similar-hint,
+.tmf-similar-changes { margin: 0; font-size: 0.87rem; line-height: 1.45; color: color-mix(in srgb, var(--ink) 72%, transparent); }
+.tmf-similar-list { margin: 0; padding: 0; list-style: none; display: grid; gap: 0.3rem; }
+.tmf-similar-list li {
+  display: flex;
+  align-items: baseline;
+  gap: 0.5rem;
+  padding: 0.35rem 0.5rem;
+  border-radius: 8px;
+  background: #fff;
+  border: 1px solid color-mix(in srgb, var(--ink) 8%, transparent);
+  font-size: 0.86rem;
+}
+.tmf-similar-date { flex: 0 0 auto; font-variant-numeric: tabular-nums; color: color-mix(in srgb, var(--ink) 55%, transparent); }
+.tmf-similar-text { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tmf-similar-amount { flex: 0 0 auto; font-weight: 700; font-variant-numeric: tabular-nums; }
+.tmf-similar-actions { display: flex; flex-wrap: wrap; gap: 0.5rem; }
+.tmf-similar-done { margin: 0; font-weight: 700; color: var(--brand-primary-deep); }
+
 /* ── Preventivo: sezioni trascinabili + rinomina tipologia ─────────────────── */
 .budget-section-drag {
   display: inline-flex;

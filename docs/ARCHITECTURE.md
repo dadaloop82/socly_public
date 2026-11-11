@@ -134,8 +134,17 @@ inactivity (and flushes with `keepalive` when leaving mid-edit):
 - one document per year and one open draft at a time are enforced by the controller: the create form
   lists only the free years and links the open draft until it is approved or deleted.
 
-## Concurrent editing (optimistic locking)
+## Similar movements (bulk classification)
 
+`POST /treasury/similar` takes the direction, description (or beneficiary) and the classification the
+operator is setting (type, Model D line, cost centre) and returns the similar entries.
+`TreasuryService::similarMovements()` filters by `direction` (income/expense are never mixed), scores
+the last 400 descriptions with Sørensen–Dice over stop-word-filtered tokens plus a containment bonus,
+and keeps everything above 0.45. The form shows up to three examples, the summary of changes and a
+one-click `POST /treasury/similar/apply`, which updates the chosen rows through
+`applyClassification()` (audit `treasury.classified_bulk`). No external service, fully deterministic.
+
+## Concurrent editing (optimistic locking)
 Editable records carry `row_version`. Every form posts it in the hidden `row_version` field
 (`version_field()` / `version_attrs()` helpers + `partials/record_lock_notice.php`), and the service
 writes with `Database::updateVersioned()`: the `UPDATE` only succeeds when the version still matches,

@@ -855,6 +855,206 @@ final class TreasuryService
     }
 
     /**
+     * Etichetta “anno · voce” di una riga di preventivo (per i riepiloghi).
+     */
+    public function budgetItemLabel(int $id): string
+    {
+        if ($id < 1) {
+            return '';
+        }
+        $row = $this->db->fetch(
+            'SELECT CONCAT(b.fiscal_year, \' · \', i.label) AS label
+             FROM budget_items i INNER JOIN budgets b ON b.id = i.budget_id
+             WHERE i.id = :id',
+            ['id' => $id]
+        );
+
+        return $row !== null ? (string) ($row['label'] ?? '') : '';
+    }
+
+    /**
+     * Movimenti “simili” a quello in compilazione: stessa direzione (entrata/uscita) e descrizione
+     * simile. Il punteggio è deterministico (somiglianza fra parole chiave), senza servizi esterni.
+     *
+     * @param array{direction?:string,description?:string,beneficiary?:string} $criteria
+     * @return array{count:int,total:int,ids:list<int>,matches:list<array<string,mixed>>,score_min:float}
+     */
+    public function similarMovements(array $criteria, int $limit = 3, int $excludeId = 0): array
+    {
+        $empty = ['count' => 0, 'total' => 0, 'ids' => [], 'matches' => [], 'score_min' => 0.45];
+        $direction = strtolower(trim((string) ($criteria['direction'] ?? '')));
+        if (!in_array($direction, ['income', 'expense'], true)) {
+            return $empty;
+        }
+        $candidate = trim((string) ($criteria['description'] ?? ''));
+        if ($candidate === '') {
+            $candidate = trim((string) ($criteria['beneficiary'] ?? ''));
+        }
+        $tokens = $this->similarityTokens($candidate);
+        if ($tokens === []) {
+            return $empty;
+        }
+
+        $rows = $this->db->fetchAll(
+            "SELECT m.id, m.movement_date, m.description, m.beneficiary, m.amount, m.category,
+                    m.runts_line, m.budget_item_id, m.approved_at
+             FROM treasury_movements m
+             WHERE m.direction = :direction AND m.id <> :exclude
+               AND m.description IS NOT NULL AND m.description <> ''
+             ORDER BY m.movement_date DESC, m.id DESC
+             LIMIT 400",
+            ['direction' => $direction, 'exclude' => max(0, $excludeId)]
+        );
+
+        $scored = [];
+        foreach ($rows as $row) {
+            $score = $this->similarityScore($tokens, $this->similarityTokens((string) ($row['description'] ?? '')));
+            if (!empty($row['beneficiary'])) {
+                $score = max($score, $this->similarityScore($tokens, $this->similarityTokens((string) $row['beneficiary'])) - 0.05);
+            }
+            if ($score < 0.45) {
+                continue;
+            }
+            $row['score'] = round($score, 3);
+            $scored[] = $row;
+        }
+        usort($scored, static fn (array $a, array $b): int => $a['score'] === $b['score']
+            ? strcmp((string) $b['movement_date'], (string) $a['movement_date'])
+            : ($a['score'] < $b['score'] ? 1 : -1));
+
+        $ids = array_map(static fn (array $row): int => (int) $row['id'], $scored);
+        $matches = [];
+        foreach (array_slice($scored, 0, max(1, $limit)) as $row) {
+            $categoryKey = trim((string) ($row['category'] ?? ''));
+            $matches[] = [
+                'id' => (int) $row['id'],
+                'date' => (string) ($row['movement_date'] ?? ''),
+                'description' => mb_substr(trim((string) ($row['description'] ?? '')), 0, 160),
+                'amount' => (float) ($row['amount'] ?? 0),
+                'amount_formatted' => $this->currency->format((float) ($row['amount'] ?? 0)),
+                'date_formatted' => (string) (format_date((string) ($row['movement_date'] ?? '')) ?: (string) ($row['movement_date'] ?? '')),
+                'category' => $categoryKey,
+                'category_label' => $categoryKey !== '' ? $this->categoryLabel($categoryKey) : '',
+                'runts_line' => (string) ($row['runts_line'] ?? ''),
+                'budget_item_id' => (int) ($row['budget_item_id'] ?? 0),
+                'approved' => trim((string) ($row['approved_at'] ?? '')) !== '',
+                'score' => (float) ($row['score'] ?? 0),
+            ];
+        }
+
+        return [
+            'count' => count($matches),
+            'total' => count($scored),
+            'ids' => $ids,
+            'matches' => $matches,
+            'score_min' => 0.45,
+        ];
+    }
+
+    /**
+     * Applica la stessa classificazione (tipologia, voce Modello D, centro di costo) a più movimenti.
+     *
+     * @param list<int> $ids
+     * @param array{category?:string,runts_line?:string,budget_item_id?:string} $changes
+     */
+    public function applyClassification(array $ids, array $changes, string $ip): int
+    {
+        $payload = [];
+        $category = trim((string) ($changes['category'] ?? ''));
+        if ($category !== '' && $category !== '__new__') {
+            $payload['category'] = $category;
+        }
+        $runtsLine = strtoupper(trim((string) ($changes['runts_line'] ?? '')));
+        if ($runtsLine !== '') {
+            $payload['runts_line'] = $runtsLine;
+        }
+        $budgetItemId = (int) ($changes['budget_item_id'] ?? 0);
+        if ($budgetItemId > 0 && $this->db->fetch('SELECT id FROM budget_items WHERE id = :id', ['id' => $budgetItemId]) !== null) {
+            $payload['budget_item_id'] = $budgetItemId;
+        }
+        if ($payload === []) {
+            return 0;
+        }
+        $updated = 0;
+        foreach (array_unique(array_map('intval', $ids)) as $id) {
+            if ($id < 1) {
+                continue;
+            }
+            $this->db->update('treasury_movements', $payload, 'id = :id', ['id' => $id]);
+            $updated++;
+        }
+        if ($updated > 0) {
+            $this->audit->log('treasury.classified_bulk', 'treasury', null, null, [
+                'count' => $updated,
+                'fields' => array_keys($payload),
+            ], $ip);
+        }
+
+        return $updated;
+    }
+
+    /**
+     * Parole chiave della descrizione: minuscole, senza accenti, senza parole vuote.
+     *
+     * @return list<string>
+     */
+    private function similarityTokens(string $text): array
+    {
+        $text = mb_strtolower(trim($text));
+        if ($text === '') {
+            return [];
+        }
+        if (function_exists('iconv')) {
+            $trans = @iconv('UTF-8', 'ASCII//TRANSLIT//IGNORE', $text);
+            if (is_string($trans) && $trans !== '') {
+                $text = $trans;
+            }
+        }
+        $text = (string) (preg_replace('/[^a-z0-9]+/', ' ', $text) ?? $text);
+        $stop = [
+            'il', 'lo', 'la', 'i', 'gli', 'le', 'un', 'uno', 'una', 'di', 'del', 'dello', 'della', 'dei', 'degli',
+            'delle', 'da', 'dal', 'dalla', 'in', 'nel', 'nella', 'per', 'con', 'su', 'al', 'alla', 'ai', 'e', 'ed',
+            'the', 'and', 'for', 'with', 'of', 'to', 'der', 'die', 'das', 'und', 'fur', 'von', 'mit', 'im', 'den',
+            'dem', 'des', 'ein', 'eine', 'eur', 'euro', 'pagamento', 'payment', 'zahlung',
+        ];
+        $tokens = [];
+        foreach (explode(' ', $text) as $token) {
+            $token = trim($token);
+            if (mb_strlen($token) < 3 || in_array($token, $stop, true)) {
+                continue;
+            }
+            $tokens[$token] = true;
+        }
+
+        return array_keys($tokens);
+    }
+
+    /**
+     * Somiglianza di Sørensen–Dice fra due insiemi di parole, con bonus di contenimento.
+     *
+     * @param list<string> $a
+     * @param list<string> $b
+     */
+    private function similarityScore(array $a, array $b): float
+    {
+        if ($a === [] || $b === []) {
+            return 0.0;
+        }
+        $shared = count(array_intersect($a, $b));
+        if ($shared === 0) {
+            return 0.0;
+        }
+        $dice = (2 * $shared) / (count($a) + count($b));
+        $joinedA = implode(' ', $a);
+        $joinedB = implode(' ', $b);
+        if (str_contains($joinedA, $joinedB) || str_contains($joinedB, $joinedA)) {
+            $dice = min(1.0, $dice + 0.15);
+        }
+
+        return min(1.0, $dice);
+    }
+
+    /**
      * @return list<array{key:string,label:string,builtin:bool}>
      */
     public function categoryOptions(): array

@@ -142,7 +142,29 @@ final class RuntsReportService
     }
 
     /**
-     * Etichetta tradotta della sezione (A–E); il testo ufficiale del Modello D resta il fallback.
+     * Etichetta della voce di Modello D (per il riepilogo delle modifiche).
+     */
+    public static function lineLabel(string $line): string
+    {
+        $line = strtoupper(trim($line));
+        if ($line === '') {
+            return '';
+        }
+        foreach (self::SECTIONS as $letter => $section) {
+            foreach (['expense', 'income'] as $direction) {
+                foreach ($section[$direction] as $key => $label) {
+                    if ($key === $line) {
+                        return $label;
+                    }
+                }
+            }
+        }
+
+        return $line;
+    }
+
+    /**
+     * Etichetta della sezione (A–E); il testo ufficiale del Modello D resta il fallback.
      */
     public static function sectionLabel(string $letter): string
     {

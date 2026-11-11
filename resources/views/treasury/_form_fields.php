@@ -471,6 +471,7 @@ $invoiceActive = $selectedDirection === 'expense' && !empty($values['invoice_pay
     <p class="setup-hint muted"><?= e(__('treasury.recurring_approval_hint')) ?></p>
 </section>
 <?php endif; ?>
+<div class="tmf-similar" data-similar-panel hidden></div>
 <section class="tmf-card">
     <header class="tmf-card-head">
         <h2 class="tmf-card-title"><?= e(__('treasury.form_section_party')) ?></h2>

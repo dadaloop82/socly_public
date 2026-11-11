@@ -114,6 +114,14 @@ $submitLabel = $isEdit ? __('treasury.update') : __('treasury.submit');
       data-msg-doc-loaded="<?= e(__('treasury.document_loaded')) ?>"
       data-msg-doc-idle="<?= e(__('documents.upload_idle')) ?>"
       data-msg-doc-change="<?= e(__('treasury.document_change')) ?>"
+      data-similar-url="<?= e(url('/treasury/similar')) ?>"
+      data-similar-apply-url="<?= e(url('/treasury/similar/apply')) ?>"
+      data-msg-similar-title="<?= e(__('treasury.similar_title', ['count' => ':count'])) ?>"
+      data-msg-similar-hint="<?= e(__('treasury.similar_hint')) ?>"
+      data-msg-similar-changes="<?= e(__('treasury.similar_changes')) ?>"
+      data-msg-similar-apply="<?= e(__('treasury.similar_apply')) ?>"
+      data-msg-similar-dismiss="<?= e(__('treasury.similar_dismiss')) ?>"
+      data-msg-similar-done="<?= e(__('treasury.similar_applied', ['count' => ':count'])) ?>"
       data-max-upload-bytes="<?= (int) upload_limit_bytes() ?>"
       data-msg-upload-too-large="<?= e(__('documents.upload_too_large', ['max' => upload_max_mb()])) ?>">
     <?= csrf_field() ?>

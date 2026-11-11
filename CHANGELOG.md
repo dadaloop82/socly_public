@@ -10,6 +10,12 @@ every 100 patches bump the series, and each bump is published to this repository
 
 ### Added
 
+- While classifying a first-note entry (type, Model D line, cost centre) Socly now looks for other
+  entries with the same sign and a similar description and offers to apply the same changes: it
+  lists up to three examples with date and amount, summarises what will change (“Type: … · Model D
+  line: … · Cost centre: …”) and applies everything in one click (audited). The matching is
+  deterministic (keyword similarity, no external service) and never touches entries of the opposite
+  sign.
 - Budget macro-categories can be reordered by drag & drop in the forecast grid: the numbers follow the
   new order and the change is saved by the existing autosave.
 - Custom types (categories) can be renamed from the pencil next to the type select in the forecast

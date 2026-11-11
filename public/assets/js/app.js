@@ -208,6 +208,7 @@ document.addEventListener('DOMContentLoaded', () => {
   initPresence();
   initFreshnessGuard();
   initTreasuryRecurring();
+  initTreasurySimilar();
   initBudgetSectionSort();
   initBudgetCategoryRename();
   restoreFilterFocus();
@@ -1580,6 +1581,192 @@ function initBudgetCategoryRename() {
       window.alert('Network error');
     }
   });
+}
+
+/**
+ * Movimenti simili: quando classifichi un movimento (tipologia, voce Modello D, centro di costo)
+ * il sistema cerca altri movimenti con descrizione simile e stesso segno, e propone di applicare
+ * le stesse modifiche con un riepilogo.
+ */
+function initTreasurySimilar() {
+  const form = document.querySelector('form[data-treasury-form]');
+  if (!form) return;
+  const panel = form.querySelector('[data-similar-panel]');
+  const url = form.getAttribute('data-similar-url') || '';
+  const applyUrl = form.getAttribute('data-similar-apply-url') || '';
+  if (!(panel instanceof HTMLElement) || url === '' || applyUrl === '') return;
+
+  const description = form.querySelector('[name="description"]');
+  const beneficiary = form.querySelector('[name="beneficiary"]');
+  const category = form.querySelector('[name="category"]');
+  const runts = form.querySelector('[name="runts_line"]');
+  const budgetItem = form.querySelector('[name="budget_item_id"]');
+  const excludeInput = form.querySelector('[name="record_id"]');
+  const token = form.querySelector('input[name="_token"]')?.value || '';
+  const messages = {
+    title: form.getAttribute('data-msg-similar-title') || ':count',
+    hint: form.getAttribute('data-msg-similar-hint') || '',
+    changes: form.getAttribute('data-msg-similar-changes') || '',
+    apply: form.getAttribute('data-msg-similar-apply') || '',
+    dismiss: form.getAttribute('data-msg-similar-dismiss') || '',
+    done: form.getAttribute('data-msg-similar-done') || ':count',
+  };
+
+  let timer = null;
+  let lastPayload = null;
+  let busy = false;
+
+  const direction = () => {
+    const checked = form.querySelector('[data-treasury-direction]:checked');
+    return checked instanceof HTMLInputElement ? checked.value : '';
+  };
+
+  const payload = () => ({
+    direction: direction(),
+    description: description instanceof HTMLTextAreaElement ? description.value : '',
+    beneficiary: beneficiary instanceof HTMLInputElement ? beneficiary.value : '',
+    category: category instanceof HTMLSelectElement ? category.value : '',
+    runts_line: runts instanceof HTMLSelectElement ? runts.value : '',
+    budget_item_id: budgetItem instanceof HTMLSelectElement ? budgetItem.value : '',
+    exclude_id: excludeInput instanceof HTMLInputElement ? excludeInput.value : '',
+  });
+
+  const hasClassification = (data) =>
+    (data.category !== '' && data.category !== '__new__') || data.runts_line !== '' || data.budget_item_id !== '';
+
+  const hide = () => {
+    panel.hidden = true;
+    panel.textContent = '';
+  };
+
+  const refresh = async () => {
+    const data = payload();
+    if (!hasClassification(data) || data.description.trim().length < 3) {
+      hide();
+      return;
+    }
+    lastPayload = data;
+    try {
+      const res = await fetch(url, {
+        method: 'POST',
+        headers: {
+          Accept: 'application/json',
+          'Content-Type': 'application/x-www-form-urlencoded',
+          'X-Requested-With': 'XMLHttpRequest',
+        },
+        body: new URLSearchParams({ ...data, _token: token }),
+      });
+      if (!res.ok) return;
+      render(await res.json());
+    } catch (err) {
+      // rete assente: nessuna proposta
+    }
+  };
+
+  const queue = () => {
+    window.clearTimeout(timer);
+    timer = window.setTimeout(refresh, 700);
+  };
+
+  [category, runts, budgetItem].forEach((el) => {
+    if (el) el.addEventListener('change', queue);
+  });
+  if (description) description.addEventListener('input', queue);
+  form.querySelectorAll('[data-treasury-direction]').forEach((el) => el.addEventListener('change', queue));
+
+  function render(data) {
+    if (!data || !Array.isArray(data.matches) || data.matches.length === 0 || !Array.isArray(data.changes) || data.changes.length === 0) {
+      hide();
+      return;
+    }
+    panel.textContent = '';
+    panel.hidden = false;
+
+    const title = document.createElement('strong');
+    title.className = 'tmf-similar-title';
+    title.textContent = String(messages.title).replace(':count', String(data.total));
+    panel.appendChild(title);
+
+    if (messages.hint !== '') {
+      const hint = document.createElement('p');
+      hint.className = 'tmf-similar-hint';
+      hint.textContent = messages.hint;
+      panel.appendChild(hint);
+    }
+
+    const list = document.createElement('ul');
+    list.className = 'tmf-similar-list';
+    data.matches.forEach((match) => {
+      const item = document.createElement('li');
+      const when = document.createElement('span');
+      when.className = 'tmf-similar-date';
+      when.textContent = String(match.date_formatted || match.date || '');
+      const text = document.createElement('span');
+      text.className = 'tmf-similar-text';
+      text.textContent = String(match.description || '');
+      const amount = document.createElement('span');
+      amount.className = 'tmf-similar-amount';
+      amount.textContent = String(match.amount_formatted || '');
+      item.append(when, text, amount);
+      list.appendChild(item);
+    });
+    panel.appendChild(list);
+
+    const summary = document.createElement('p');
+    summary.className = 'tmf-similar-changes';
+    summary.textContent = messages.changes + ': ' + data.changes
+      .map((change) => `${change.label}: ${change.value}`)
+      .join(' · ');
+    panel.appendChild(summary);
+
+    const actions = document.createElement('div');
+    actions.className = 'tmf-similar-actions';
+    const apply = document.createElement('button');
+    apply.type = 'button';
+    apply.className = 'btn btn-sm';
+    apply.textContent = messages.apply.replace(':count', String(data.total));
+    const dismiss = document.createElement('button');
+    dismiss.type = 'button';
+    dismiss.className = 'btn btn-ghost btn-sm';
+    dismiss.textContent = messages.dismiss;
+    dismiss.addEventListener('click', hide);
+    apply.addEventListener('click', async () => {
+      if (busy) return;
+      busy = true;
+      apply.disabled = true;
+      const current = lastPayload || payload();
+      const body = new URLSearchParams({
+        _token: token,
+        category: current.category === '__new__' ? '' : current.category,
+        runts_line: current.runts_line,
+        budget_item_id: current.budget_item_id,
+      });
+      (data.ids || []).forEach((id) => body.append('ids[]', String(id)));
+      try {
+        const res = await fetch(applyUrl, {
+          method: 'POST',
+          headers: { Accept: 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+          body,
+        });
+        const result = await res.json().catch(() => ({}));
+        if (!res.ok || !result.ok) {
+          apply.disabled = false;
+          return;
+        }
+        panel.textContent = '';
+        const done = document.createElement('p');
+        done.className = 'tmf-similar-done';
+        done.textContent = String(messages.done).replace(':count', String(result.updated || 0));
+        panel.appendChild(done);
+      } catch (err) {
+        apply.disabled = false;
+      } finally {
+        busy = false;
+      }
+    });
+    actions.append(apply, dismiss);
+    panel.appendChild(actions);
+  }
 }
 
 function initSessionHeartbeat() {
