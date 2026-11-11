@@ -13,6 +13,17 @@ every 100 patches bump the series, and each bump is published to this repository
 - Dashboard, Statistics and treasury charts: drag a card to reorder it while the three-column grid
   shows the available slots, resize it to one third, two thirds or the full row (width button or the
   bottom-right handle) and hide the cards you do not need; the layout is saved per user.
+- Budget lines can create a new treasury category on the spot (“+ New category…”), no need to fall
+  back to “Other”; the label is then shared with movements, documents and deadlines.
+- Budget grid autosaves 5 seconds after the last change (also when adding/removing lines), with a
+  discreet status next to “Save draft” and a background flush when leaving mid-edit.
+
+### Changed
+
+- Budget line fields are now **Expense / income type** (treasury category), **Description** (free
+  text) and **Type**, with new types for associations: Expense, Capital expense, Project/activity
+  expense, Income, Grant/restricted income (the type sets the accounting sign, so totals and the
+  comparison with the cash book stay correct). A section is labelled **Macro-category**.
 
 ### Fixed
 
@@ -27,15 +38,6 @@ every 100 patches bump the series, and each bump is published to this repository
   the thousands separator and the currency symbol no longer overlaps the number.
 - Budget: creating a second budget for a year that already has one is no longer proposed, and while
   a draft is open the page points to it (finish/approve or delete it) instead of offering a new one.
-- Budget lines can create a new treasury category on the spot (“+ Nuova categoria…”), no need to
-  fall back to “Other”.
-- Budget grid autosaves 5 seconds after the last change (also when adding/removing lines), with a
-  discreet status next to “Save draft” and a background flush when leaving mid-edit.
-- Budget lines are now **Tipologia di spesa / entrata** (treasury category), **Descrizione** (free
-  text) and **Tipo**, with new types for associations: Spesa, Spesa d’investimento, Spesa per
-  progetto/attività, Entrata, Contributo/entrata vincolata (the type sets the accounting sign, so
-  totals and the comparison with the cash book stay correct). The section is labelled
-  **Macrocategoria**.
 - Budget cards give the amounts more room: a single budget fills the row, the KPI columns grow with
   the card and the currency symbol never wraps onto its own line.
 
