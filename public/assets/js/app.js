@@ -14835,6 +14835,9 @@ function initBudgetGrid(scope = document) {
   };
 
   const queueAutosave = () => {
+    // The status element only exists for users who can manage the treasury: read-only views
+    // never fire background saves.
+    if (!(autosaveStatus instanceof HTMLElement)) return;
     autosaveDirty = true;
     setAutosaveStatus('pending', autosaveLabels.pending);
     window.clearTimeout(autosaveTimer);
