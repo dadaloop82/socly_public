@@ -375,7 +375,7 @@ return [
     ],
     'widgets' => [
         'manage' => 'Gestisci grafici',
-        'hint' => 'Usa le icone in alto a destra sulla card (o questo elenco) per spostare, ridimensionare e nascondere i grafici. Mentre trascini, la griglia mostra gli spazi disponibili. Le preferenze sono salvate nel tuo profilo.',
+        'hint' => 'Usa le icone in alto a destra sulla card (o questo elenco) per spostare, ridimensionare e nascondere i grafici. Mentre trascini, o con questo elenco aperto, la griglia mostra gli spazi disponibili. Le preferenze sono salvate nel tuo profilo.',
         'move_up' => 'Sposta su',
         'move_down' => 'Sposta giù',
         'drag' => 'Trascina per spostare',

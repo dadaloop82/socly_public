@@ -373,7 +373,7 @@ return [
     ],
     'widgets' => [
         'manage' => 'Diagramme verwalten',
-        'hint' => 'Nutzen Sie die Symbole oben rechts auf der Karte (oder diese Liste), um Diagramme zu verschieben, zu vergrößern und auszublenden. Beim Ziehen zeigt das Raster die freien Plätze. Die Einstellungen werden in Ihrem Profil gespeichert.',
+        'hint' => 'Nutzen Sie die Symbole oben rechts auf der Karte (oder diese Liste), um Diagramme zu verschieben, zu vergrößern und auszublenden. Beim Ziehen oder bei geöffneter Liste zeigt das Raster die freien Plätze. Die Einstellungen werden in Ihrem Profil gespeichert.',
         'move_up' => 'Nach oben',
         'move_down' => 'Nach unten',
         'drag' => 'Zum Verschieben ziehen',

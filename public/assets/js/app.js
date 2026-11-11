@@ -12897,12 +12897,16 @@ function initWidgetLayouts() {
 
     let draggingId = '';
     let dragChanged = false;
+    // The grid stays visible while the “manage charts” panel is open (edit mode).
     const clearDragState = () => {
-      group.classList.remove('is-grid-active');
+      if (!manager.open) group.classList.remove('is-grid-active');
       group.querySelectorAll('.chart-panel').forEach((panel) => {
         panel.classList.remove('is-dragging', 'is-drop-target');
       });
     };
+    manager.addEventListener('toggle', () => {
+      group.classList.toggle('is-grid-active', manager.open);
+    });
     // Live reorder while dragging: the grid shows the result before the drop.
     const moveTo = (dragged, target, after) => {
       const from = order.indexOf(dragged);
@@ -12969,7 +12973,7 @@ function initWidgetLayouts() {
           resizeHandle.removeEventListener('pointerup', onEnd);
           resizeHandle.removeEventListener('pointercancel', onEnd);
           panel.classList.remove('is-resizing');
-          group.classList.remove('is-grid-active');
+          if (!manager.open) group.classList.remove('is-grid-active');
           queueSave();
         };
         resizeHandle.addEventListener('pointermove', onMove);

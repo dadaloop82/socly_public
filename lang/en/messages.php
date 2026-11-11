@@ -373,7 +373,7 @@ return [
     ],
     'widgets' => [
         'manage' => 'Manage charts',
-        'hint' => 'Use the icons in the top-right corner of each card (or this list) to move, resize and hide charts. While dragging, the grid shows the available slots. Preferences are saved in your profile.',
+        'hint' => 'Use the icons in the top-right corner of each card (or this list) to move, resize and hide charts. While dragging, or with this list open, the grid shows the available slots. Preferences are saved in your profile.',
         'move_up' => 'Move up',
         'move_down' => 'Move down',
         'drag' => 'Drag to move',
