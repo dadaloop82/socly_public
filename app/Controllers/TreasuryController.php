@@ -142,6 +142,9 @@ final class TreasuryController extends BaseController
     public function create(Request $request): void
     {
         require_component('treasury');
+        if ((string) $request->input('retry', '') !== '1') {
+            $this->clearOld();
+        }
         $this->render('treasury/form', [
             'title' => __('treasury.add_movement'),
             'isEdit' => false,
@@ -164,6 +167,9 @@ final class TreasuryController extends BaseController
     public function edit(Request $request, string $id): void
     {
         require_component('treasury');
+        if ((string) $request->input('retry', '') !== '1') {
+            $this->clearOld();
+        }
         $movement = $this->treasury->find((int) $id);
         if ($movement === null) {
             http_response_code(404);
@@ -220,7 +226,7 @@ final class TreasuryController extends BaseController
                 'invoice_pdf' => __('documents.upload_too_large', ['max' => upload_max_mb()]),
             ]);
             $this->rememberOld($request->all());
-            redirect('/treasury/' . (int) $id . '/edit');
+            redirect('/treasury/' . (int) $id . '/edit?retry=1');
         }
         $posted = $request->all();
         $result = $this->treasury->update(
@@ -239,11 +245,12 @@ final class TreasuryController extends BaseController
                     'user' => (string) ($result['editor']['name'] ?? ''),
                     'at' => (string) ($result['editor']['at'] ?? ''),
                 ])]);
-                redirect('/treasury/' . (int) $id . '/edit?conflict=1&v=' . (int) ($result['current_version'] ?? 0));
+                redirect('/treasury/' . (int) $id . '/edit?retry=1&conflict=1&v=' . (int) ($result['current_version'] ?? 0));
             }
             $this->flash('errors', $result['errors'] ?? []);
-            redirect('/treasury/' . (int) $id . '/edit');
+            redirect('/treasury/' . (int) $id . '/edit?retry=1');
         }
+        $this->clearOld();
         $this->flash('success', __('treasury.updated'));
         redirect('/treasury');
     }
@@ -256,7 +263,7 @@ final class TreasuryController extends BaseController
                 'invoice_pdf' => __('documents.upload_too_large', ['max' => upload_max_mb()]),
             ]);
             $this->rememberOld($request->all());
-            redirect('/treasury/create');
+            redirect('/treasury/create?retry=1');
         }
         $result = $this->treasury->create(
             $request->all(),
@@ -267,7 +274,7 @@ final class TreasuryController extends BaseController
         if (empty($result['ok'])) {
             $this->flash('errors', $result['errors'] ?? ['treasury' => __('validation.required')]);
             $this->rememberOld($request->all());
-            redirect('/treasury/create');
+            redirect('/treasury/create?retry=1');
         }
         // Operazione ricorrente: la regola parte dalla data del movimento appena salvato.
         if (!empty($request->input('recurring'))) {
@@ -282,6 +289,7 @@ final class TreasuryController extends BaseController
                 $this->flash('errors', ['recurring' => __('treasury.recurring_create_failed')]);
             }
         }
+        $this->clearOld();
         $this->flash('success', __('treasury.saved'));
         redirect('/treasury');
     }

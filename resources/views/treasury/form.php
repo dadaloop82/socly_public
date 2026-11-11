@@ -16,6 +16,11 @@
  */
 $movementId = $isEdit ? (int) ($movement['id'] ?? 0) : 0;
 $old = old_input();
+// Solo un reinvio dello stesso form (dopo un errore) può riusare i valori digitati: un `_old`
+// rimasto da un'altra schermata non deve svuotare la scheda in modifica.
+if ($old !== [] && ($movementId > 0 ? !isset($old['direction']) : !array_key_exists('amount', $old))) {
+    $old = [];
+}
 if ($old !== []) {
     $values = $old;
 } elseif ($isEdit && $movement !== null) {

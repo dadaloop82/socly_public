@@ -81,6 +81,10 @@ every 100 patches bump the series, and each bump is published to this repository
 
 ### Fixed
 
+- Opening “Edit movement” could show an empty form (amount, account and method blank, today's date,
+  type always “income”): the page reused a stale `_old` payload left in the session by another form.
+  The edit/create screens now discard foreign old input (only a retry of the same form keeps it) and
+  the success path clears it, so the record's real values are always shown.
 - The planned-vs-actual view showed the raw type key under each line (`rent`, `utilities`,
   `personnel`): it now shows the translated type name (also for older rows imported with foreign
   names).
