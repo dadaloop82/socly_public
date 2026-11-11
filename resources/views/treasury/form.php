@@ -31,6 +31,7 @@ if ($old !== []) {
         'amount_currency' => (string) ($movement['amount_currency'] ?? ''),
         'movement_date' => (string) ($movement['movement_date'] ?? date('Y-m-d')),
         'category' => (string) ($movement['category'] ?? 'membership_fee'),
+        'runts_line' => (string) ($movement['runts_line'] ?? ''),
         'budget_item_id' => (string) ($movement['budget_item_id'] ?? ''),
         'payment_method' => (string) ($movement['payment_method'] ?? ''),
         'account' => (string) ($movement['account'] ?? ''),

@@ -261,7 +261,10 @@ final class TreasuryController extends BaseController
         $classificationChanged = trim((string) ($posted['category'] ?? '')) !== trim((string) ($before['category'] ?? ''))
             || strtoupper(trim((string) ($posted['runts_line'] ?? ''))) !== strtoupper(trim((string) ($before['runts_line'] ?? '')))
             || (int) ($posted['budget_item_id'] ?? 0) !== (int) ($before['budget_item_id'] ?? 0);
-        if ($classificationChanged) {
+        $hasClassification = trim((string) ($posted['category'] ?? '')) !== ''
+            || trim((string) ($posted['runts_line'] ?? '')) !== ''
+            || (int) ($posted['budget_item_id'] ?? 0) > 0;
+        if ($classificationChanged || $hasClassification) {
             $changedFields = [];
             if (trim((string) ($posted['category'] ?? '')) !== trim((string) ($before['category'] ?? ''))) {
                 $changedFields[] = 'category';
@@ -271,6 +274,14 @@ final class TreasuryController extends BaseController
             }
             if ((int) ($posted['budget_item_id'] ?? 0) !== (int) ($before['budget_item_id'] ?? 0)) {
                 $changedFields[] = 'budget_item_id';
+            }
+            if ($changedFields === []) {
+                foreach (['category', 'runts_line', 'budget_item_id'] as $probeField) {
+                    $probeValue = (string) ($posted[$probeField] ?? '');
+                    if ($probeField === 'budget_item_id' ? (int) $probeValue > 0 : trim($probeValue) !== '') {
+                        $changedFields[] = $probeField;
+                    }
+                }
             }
             $_SESSION['_similar_probe'][(int) $id] = [
                 'fields' => $changedFields,
