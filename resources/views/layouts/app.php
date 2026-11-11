@@ -184,8 +184,8 @@ if ($user && app()->isInstalled() && !$temporaryInstance && can_manage_updates()
                 <?php if (!empty($item['permission']) && !can($item['permission'])) continue; ?>
                 <a href="<?= e(url($item['path'])) ?>" class="<?= e($navActive($item['path'])) ?>"><?= e(__($item['label'])) ?></a>
                 <?php if (($item['key'] ?? '') === 'treasury' && can('treasury.view')): ?>
-                    <a href="<?= e(url('/budgets')) ?>" class="<?= e($navActive('/budgets')) ?>"><?= e(__('nav.budget_preventivo')) ?></a>
-                    <a href="<?= e(url('/rendiconto')) ?>" class="<?= e($navActive('/rendiconto')) ?>"><?= e(__('nav.budget_consuntivo')) ?></a>
+                    <?php $budgetNavClass = trim($navActive('/budgets') . ' ' . $navActive('/rendiconto')); ?>
+                    <a href="<?= e(url('/budgets')) ?>" class="<?= e($budgetNavClass) ?>"><?= e(__('nav.bilanci')) ?></a>
                 <?php endif; ?>
             <?php endforeach; ?>
             <?php foreach ($pluginMenu as $item): ?>

@@ -134,9 +134,22 @@ inactivity (and flushes with `keepalive` when leaving mid-edit):
 - one document per year and one open draft at a time are enforced by the controller: the create form
   lists only the free years and links the open draft until it is approved or deleted.
 
+## Budgets
+
+`/budgets` (menu **Bilanci**) hosts three tabs — `data-budget-tabs` in the markup, active tab kept in
+the URL hash (`#bil-preventivo`, `#bil-consuntivo`, `#bil-statistiche`):
+
+- **Preventivo**: the forecast documents (cards, create form, CSV import);
+- **Consuntivo**: the RUNTS year-end list that opens `/rendiconto/{year}`;
+- **Statistiche**: `BudgetService::statistics()` reads the forecast lines and the approved cash-book
+  movements and returns, per year (last 5), planned vs actual expense/income with expense coverage and
+  funding need, plus the membership-fee share of income and the top expense/income categories of the
+  latest year that actually has movements.
+
 ## Year-end report (RUNTS — Model D)
 
-`/rendiconto` is the **Bilancio consuntivo**, a distinct page from the forecast budget (`/budgets`).
+`/rendiconto/{year}` is the **Bilancio consuntivo**, rendered inside the Bilanci page (`/budgets`) as
+the **Consuntivo** tab; `/rendiconto` redirects to `/budgets#bil-consuntivo`.
 `RuntsReportService` rebuilds the ministerial **Rendiconto per cassa (Model D, DM 18 April 2020)**
 from the approved cash-book movements: sections A–E with their official rows, totals, the cash and
 bank statement (opening + year balance = closing) and the optional figurative block; the sheet is

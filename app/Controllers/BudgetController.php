@@ -8,6 +8,7 @@ use Socly\Core\Http\Request;
 use Socly\Core\View;
 use Socly\Services\BudgetService;
 use Socly\Services\CurrencyService;
+use Socly\Services\RuntsReportService;
 use Socly\Services\SettingsService;
 use Socly\Services\TreasuryService;
 
@@ -21,7 +22,8 @@ final class BudgetController extends BaseController
         private readonly BudgetService $budgets,
         private readonly TreasuryService $treasury,
         private readonly CurrencyService $currency,
-        private readonly SettingsService $settings
+        private readonly SettingsService $settings,
+        private readonly RuntsReportService $runts
     ) {
         parent::__construct($view);
     }
@@ -39,12 +41,24 @@ final class BudgetController extends BaseController
         ));
         $years = $this->budgets->creatableYears();
         $defaultYear = in_array($currentYear + 1, $years, true) ? $currentYear + 1 : ($years[0] ?? $currentYear + 1);
+        $rendicontoYears = [];
+        foreach ($this->runts->years() as $year) {
+            $income = $this->runts->totalIncome($year);
+            $rendicontoYears[] = [
+                'year' => $year,
+                'income' => $income,
+                'can_generate' => $income < RuntsReportService::CASH_LIMIT,
+            ];
+        }
         $this->render('budgets/index', [
             'title' => __('budget.title'),
             'budgets' => $budgets,
             'drafts' => $drafts,
             'years' => $years,
             'default_year' => $defaultYear,
+            'rendiconto_years' => $rendicontoYears,
+            'runts_limit' => RuntsReportService::CASH_LIMIT,
+            'statistics' => $this->budgets->statistics(),
             'currency' => $this->currency,
         ]);
     }

@@ -490,7 +490,8 @@ $app->bind(BudgetController::class, fn (App $a) => new BudgetController(
     $a->get(BudgetService::class),
     $a->get(TreasuryService::class),
     $a->get(CurrencyService::class),
-    $a->get(SettingsService::class)
+    $a->get(SettingsService::class),
+    $a->get(RuntsReportService::class)
 ));
 $app->bind(RuntsReportService::class, fn (App $a) => new RuntsReportService($a->get(Database::class)));
 $app->bind(RendicontoController::class, fn (App $a) => new RendicontoController(

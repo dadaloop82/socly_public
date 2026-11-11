@@ -213,6 +213,7 @@ document.addEventListener('DOMContentLoaded', () => {
   initPermissionTemplates(document);
   initBudgetGrid(document);
   initBudgetCreateForm(document);
+  initBudgetTabs();
   initEmailTemplateEditor(document);
   initFieldsSortable(document);
   initComponentCards(document);
@@ -14615,6 +14616,44 @@ function initFieldsSortable(scope = document) {
       tbody.insertBefore(dragRow, before ? target : target.nextSibling);
     });
   });
+}
+
+/* ── Bilanci: schede Preventivo / Consuntivo / Statistiche ───────────────── */
+function initBudgetTabs() {
+  const root = document.querySelector('[data-budget-tabs]');
+  if (!root) return;
+  const tabs = [...root.querySelectorAll('[data-budget-tab]')];
+  const panels = [...root.querySelectorAll('[data-budget-panel]')];
+  if (tabs.length === 0 || panels.length === 0) return;
+
+  const activate = (id, { updateHash = true } = {}) => {
+    const valid = tabs.some((tab) => tab.getAttribute('data-budget-tab') === id);
+    const target = valid ? id : tabs[0].getAttribute('data-budget-tab');
+    tabs.forEach((tab) => {
+      const selected = tab.getAttribute('data-budget-tab') === target;
+      tab.setAttribute('aria-selected', selected ? 'true' : 'false');
+      tab.tabIndex = selected ? 0 : -1;
+    });
+    panels.forEach((panel) => {
+      panel.hidden = panel.getAttribute('data-budget-panel') !== target;
+    });
+    if (updateHash) {
+      const nextHash = `#bil-${target}`;
+      if (location.hash !== nextHash) {
+        history.replaceState(null, '', nextHash);
+      }
+    }
+  };
+
+  tabs.forEach((tab) => {
+    tab.addEventListener('click', () => activate(tab.getAttribute('data-budget-tab')));
+  });
+
+  const hash = (location.hash || '').replace(/^#/, '');
+  activate(
+    hash.startsWith('bil-') ? hash.slice(4) : (root.getAttribute('data-default-tab') || tabs[0].getAttribute('data-budget-tab')),
+    { updateHash: false }
+  );
 }
 
 /* ── Bilancio: dropzone CSV come gli altri upload + attiva il modello "Importa" ── */

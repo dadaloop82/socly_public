@@ -31,21 +31,8 @@ final class RendicontoController extends BaseController
     public function index(Request $request): void
     {
         require_component('treasury');
-        $years = [];
-        foreach ($this->runts->years() as $year) {
-            $income = $this->runts->totalIncome($year);
-            $years[] = [
-                'year' => $year,
-                'income' => $income,
-                'can_generate' => $income < RuntsReportService::CASH_LIMIT,
-            ];
-        }
-        $this->render('rendiconto/index', [
-            'title' => __('runts.title'),
-            'years' => $years,
-            'limit' => RuntsReportService::CASH_LIMIT,
-            'currency' => $this->currency,
-        ]);
+        // Il consuntivo ora vive nella scheda “Consuntivo” della pagina Bilanci.
+        redirect('/budgets#bil-consuntivo');
     }
 
     public function show(Request $request, string $year): void

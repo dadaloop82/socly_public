@@ -22,6 +22,7 @@
 - [x] Statistics page with charts, per-user widget layout (order, visibility, three-column width) and members map with automatic geocoding
 - [x] Organization chart with association bodies, roles and compatibility checks
 - [x] Bilancio consuntivo: RUNTS cash report (Model D) generated from the cash book, with the €220,000 threshold for the accrual statements
+- [x] Bilanci page with three tabs (Preventivo / Consuntivo / Statistiche): planned vs actual by year, expense coverage, funding need, membership-fee share and top categories
 
 ## Planned plugins (sold separately)
 

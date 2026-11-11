@@ -15,12 +15,13 @@ every 100 patches bump the series, and each bump is published to this repository
   bottom-right handle) and hide the cards you do not need; the layout is saved per user.
 - Chart cards: copy the chart as a PNG from the bottom-right tools (clipboard when the browser allows
   it, otherwise the image is downloaded) — the export keeps the card title and a solid background.
-- Bilancio consuntivo: the “Bilancio” menu is now split into **Bilancio preventivo** and **Bilancio
-  consuntivo**. The new page generates the RUNTS cash report (**Model D**, Italian DM 18/04/2020)
-  from the approved cash-book movements: sections A–E, totals, cash and bank statement, optional
-  figurative section, signature block and print/PDF. Every movement is tagged with its Model D line
-  (automatic from the treasury category, overridable). Above the **€220,000** income threshold the
-  page states that the accrual statements (Models A, B and C) must be prepared manually.
+- Bilanci: a single **Bilanci** menu entry with three tabs — **Preventivo** (forecast budgets by year),
+  **Consuntivo** (RUNTS cash report, **Model D** of the Italian DM 18/04/2020: sections A–E, totals,
+  cash and bank statement, optional figurative section, signature block and print/PDF, generated from
+  the approved cash-book movements, each tagged with its Model D line automatically from the treasury
+  category and overridable; above the **€220,000** income threshold the page states that the accrual
+  statements, Models A/B/C, must be prepared manually) and **Statistiche** (planned vs actual per year,
+  expense coverage, funding need, membership fees share of income, top expense and income categories).
 - Budget lines can create a new treasury category on the spot (“+ New category…”), no need to fall
   back to “Other”; the label is then shared with movements, documents and deadlines.
 - Budget grid autosaves 5 seconds after the last change (also when adding/removing lines), with a
@@ -28,6 +29,9 @@ every 100 patches bump the series, and each bump is published to this repository
 
 ### Changed
 
+- The year-end report is no longer a separate menu item: `/rendiconto` redirects to the **Consuntivo**
+  tab of the Bilanci page and the active tab is kept in the URL hash (`#bil-consuntivo`), so links and
+  bookmarks keep working.
 - Budget line fields are now **Expense / income type** (treasury category), **Description** (free
   text) and **Type**, with new types for associations: Expense, Capital expense, Project/activity
   expense, Income, Grant/restricted income (the type sets the accounting sign, so totals and the

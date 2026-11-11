@@ -1090,5 +1090,116 @@ final class BudgetService
         }
         return $direction;
     }
+
+    /**
+     * Statistiche utili all'associazione: pianificato vs consuntivo per anno, copertura delle
+     * spese, quota associativa sul totale entrate e principali categorie dell'ultimo esercizio.
+     *
+     * @return array<string,mixed>
+     */
+    public function statistics(int $maxYears = 5): array
+    {
+        $planned = [];
+        foreach ($this->db->fetchAll(
+            "SELECT b.fiscal_year AS y,
+                    COALESCE(SUM(CASE WHEN i.direction = 'expense' THEN i.amount ELSE 0 END), 0) AS expense,
+                    COALESCE(SUM(CASE WHEN i.direction = 'income' THEN i.amount ELSE 0 END), 0) AS income
+             FROM budgets b
+             LEFT JOIN budget_items i ON i.budget_id = b.id
+             GROUP BY b.fiscal_year"
+        ) as $row) {
+            $planned[(int) $row['y']] = ['expense' => (float) $row['expense'], 'income' => (float) $row['income']];
+        }
+
+        $actual = [];
+        foreach ($this->db->fetchAll(
+            "SELECT YEAR(movement_date) AS y, direction, COALESCE(SUM(amount), 0) AS total
+             FROM treasury_movements
+             WHERE approved_at IS NOT NULL AND direction IN ('income', 'expense')
+             GROUP BY y, direction"
+        ) as $row) {
+            $actual[(int) $row['y']][(string) $row['direction']] = (float) $row['total'];
+        }
+
+        $years = array_values(array_unique(array_merge(array_keys($planned), array_keys($actual))));
+        rsort($years);
+        $years = array_slice($years, 0, max(1, $maxYears));
+        sort($years);
+
+        $rows = [];
+        foreach ($years as $year) {
+            $plan = $planned[$year] ?? ['expense' => 0.0, 'income' => 0.0];
+            $expense = (float) ($actual[$year]['expense'] ?? 0.0);
+            $income = (float) ($actual[$year]['income'] ?? 0.0);
+            $rows[] = [
+                'year' => $year,
+                'planned_expense' => round($plan['expense'], 2),
+                'planned_income' => round($plan['income'], 2),
+                'actual_expense' => round($expense, 2),
+                'actual_income' => round($income, 2),
+                'expense_delta' => round($expense - $plan['expense'], 2),
+                'income_delta' => round($income - $plan['income'], 2),
+                'need' => round($expense - $income, 2),
+                'coverage' => $expense > 0 ? round($income * 100 / $expense, 1) : ($income > 0 ? 100.0 : 0.0),
+            ];
+        }
+
+        // Le statistiche per categoria guardano l'ultimo esercizio con movimenti reali,
+        // non l'anno del preventivo in bozza.
+        $latest = (int) date('Y');
+        foreach (array_reverse($years) as $year) {
+            if (!empty($actual[$year])) {
+                $latest = (int) $year;
+                break;
+            }
+        }
+        $byCategory = ['expense' => [], 'income' => []];
+        foreach ($this->db->fetchAll(
+            "SELECT category, direction, COALESCE(SUM(amount), 0) AS total
+             FROM treasury_movements
+             WHERE approved_at IS NOT NULL AND direction IN ('income', 'expense')
+               AND YEAR(movement_date) = :y
+             GROUP BY category, direction
+             ORDER BY total DESC",
+            ['y' => $latest]
+        ) as $row) {
+            $direction = (string) $row['direction'] === 'income' ? 'income' : 'expense';
+            $amount = (float) ($row['total'] ?? 0);
+            if ($amount <= 0) {
+                continue;
+            }
+            $key = trim((string) ($row['category'] ?? ''));
+            $byCategory[$direction][] = [
+                'key' => $key,
+                'label' => $key !== '' ? $this->treasury->categoryLabel($key) : (string) __('treasury.category_other'),
+                'amount' => round($amount, 2),
+            ];
+        }
+        foreach (['expense', 'income'] as $direction) {
+            $total = array_sum(array_column($byCategory[$direction], 'amount'));
+            $byCategory[$direction] = array_slice($byCategory[$direction], 0, 6);
+            foreach ($byCategory[$direction] as &$category) {
+                $category['percent'] = $total > 0 ? round($category['amount'] * 100 / $total, 1) : 0.0;
+            }
+            unset($category);
+        }
+
+        $fees = (float) ($this->db->fetch(
+            "SELECT COALESCE(SUM(amount), 0) AS total
+             FROM treasury_movements
+             WHERE approved_at IS NOT NULL AND direction = 'income' AND category = 'membership_fee'
+               AND YEAR(movement_date) = :y",
+            ['y' => $latest]
+        )['total'] ?? 0);
+        $incomeTotal = (float) ($actual[$latest]['income'] ?? 0.0);
+
+        return [
+            'years' => $rows,
+            'latest_year' => $latest,
+            'categories' => $byCategory,
+            'fees' => round($fees, 2),
+            'fees_share' => $incomeTotal > 0 ? round($fees * 100 / $incomeTotal, 1) : 0.0,
+        ];
+    }
 }
 
