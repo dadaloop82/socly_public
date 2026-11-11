@@ -305,11 +305,17 @@ final class TreasuryController extends BaseController
             return;
         }
         $data = $request->all();
+        $fieldsToApply = array_values(array_filter([
+            trim((string) ($data['category'] ?? '')) !== '' && (string) $data['category'] !== '__new__' ? 'category' : '',
+            trim((string) ($data['runts_line'] ?? '')) !== '' ? 'runts_line' : '',
+            (int) ($data['budget_item_id'] ?? 0) > 0 ? 'budget_item_id' : '',
+        ]));
+
         $result = $this->treasury->similarMovements([
             'direction' => (string) ($data['direction'] ?? ''),
             'description' => (string) ($data['description'] ?? ''),
             'beneficiary' => (string) ($data['beneficiary'] ?? ''),
-        ], 3, (int) ($data['exclude_id'] ?? 0));
+        ], 3, (int) ($data['exclude_id'] ?? 0), $fieldsToApply);
 
         $this->jsonResponse([
             'ok' => true,

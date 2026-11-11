@@ -923,9 +923,15 @@ final class TreasuryService
      * @param array{direction?:string,description?:string,beneficiary?:string} $criteria
      * @return array{count:int,total:int,ids:list<int>,matches:list<array<string,mixed>>,score_min:float}
      */
-    public function similarMovements(array $criteria, int $limit = 3, int $excludeId = 0): array
+    public function similarMovements(array $criteria, int $limit = 3, int $excludeId = 0, array $applying = []): array
     {
-        $empty = ['count' => 0, 'total' => 0, 'ids' => [], 'matches' => [], 'score_min' => 0.45];
+        $empty = ['count' => 0, 'total' => 0, 'skipped' => 0, 'ids' => [], 'matches' => [], 'score_min' => 0.45];
+        // Campi che stiamo applicando: una riga entra nella proposta se QUEI campi sono vuoti.
+        // Gli altri campi (es. tipologia già impostata) non contano e non vengono toccati.
+        $fields = array_values(array_intersect($applying, ['category', 'runts_line', 'budget_item_id']));
+        if ($fields === []) {
+            $fields = ['category', 'runts_line', 'budget_item_id'];
+        }
         $direction = strtolower(trim((string) ($criteria['direction'] ?? '')));
         if (!in_array($direction, ['income', 'expense'], true)) {
             return $empty;
@@ -966,15 +972,22 @@ final class TreasuryService
             ? strcmp((string) $b['movement_date'], (string) $a['movement_date'])
             : ($a['score'] < $b['score'] ? 1 : -1));
 
-        // Solo i movimenti ancora da classificare: chi ha già tipologia, voce Modello D o centro di
-        // costo non viene proposto né toccato (nessuna sovrascrittura).
+        // Solo le righe in cui i campi che stiamo applicando sono ancora vuoti: un valore già
+        // presente non viene proposto e non viene mai sovrascritto.
         $open = [];
         $skipped = 0;
         foreach ($scored as $row) {
-            $hasCategory = trim((string) ($row['category'] ?? '')) !== '';
-            $hasRunts = trim((string) ($row['runts_line'] ?? '')) !== '';
-            $hasBudget = (int) ($row['budget_item_id'] ?? 0) > 0;
-            if ($hasCategory || $hasRunts || $hasBudget) {
+            $blocked = false;
+            if (in_array('category', $fields, true) && trim((string) ($row['category'] ?? '')) !== '') {
+                $blocked = true;
+            }
+            if (!$blocked && in_array('runts_line', $fields, true) && trim((string) ($row['runts_line'] ?? '')) !== '') {
+                $blocked = true;
+            }
+            if (!$blocked && in_array('budget_item_id', $fields, true) && (int) ($row['budget_item_id'] ?? 0) > 0) {
+                $blocked = true;
+            }
+            if ($blocked) {
                 $skipped++;
                 continue;
             }
