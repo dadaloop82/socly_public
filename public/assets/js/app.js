@@ -3209,6 +3209,19 @@ function initTreasuryBulk() {
       approveBtn.hidden = allApproved;
       unapproveBtn.hidden = allPending;
     }
+    const transferBtn = bar.querySelector('[data-treasury-bulk-action="transfer"]');
+    const transferPick = bar.querySelector('[data-treasury-transfer-target]');
+    if (transferBtn) {
+      const accounts = ids.map((id) => root.querySelector(`[data-treasury-row="${id}"]`)?.getAttribute('data-treasury-account') || '');
+      const uniform = accounts.length > 0 && accounts.every((account) => account !== '' && account === accounts[0]);
+      transferBtn.disabled = !uniform;
+      transferBtn.title = uniform ? '' : (form?.getAttribute('data-msg-transfer-mixed') || '');
+      if (transferPick && uniform) {
+        [...transferPick.options].forEach((option) => {
+          option.hidden = option.value !== '' && option.value === accounts[0];
+        });
+      }
+    }
     bar.classList.toggle('is-open', open);
     bar.setAttribute('aria-hidden', open ? 'false' : 'true');
     if (count) count.textContent = String(ids.length);

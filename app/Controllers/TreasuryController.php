@@ -530,7 +530,26 @@ final class TreasuryController extends BaseController
         }
         $action = (string) $request->input('action', '');
         $isAjax = (string) $request->input('ajax', '') === '1';
-        if ($action === 'unapprove') {
+        if ($action === 'transfer') {
+            $transfer = $this->treasury->transferSelected(array_values($ids), (string) $request->input('target_account', ''), $request->ip(), auth_user()['id'] ?? null);
+            if (empty($transfer['ok'])) {
+                if ($isAjax) {
+                    header('Content-Type: application/json; charset=utf-8');
+                    echo json_encode(['ok' => false, 'message' => (string) ($transfer['error'] ?? __('validation.required'))], JSON_UNESCAPED_UNICODE);
+                    return;
+                }
+                $this->flash('errors', ['transfer' => (string) ($transfer['error'] ?? __('validation.required'))]);
+                redirect('/treasury');
+            }
+            $count = (int) ($transfer['count'] ?? 0);
+            if ($isAjax) {
+                header('Content-Type: application/json; charset=utf-8');
+                echo json_encode(['ok' => true, 'action' => 'transfer', 'count' => $count, 'message' => (string) __('treasury.transfer_done', ['count' => (string) $count])], JSON_UNESCAPED_UNICODE);
+                return;
+            }
+            $this->flash('success', __('treasury.transfer_done', ['count' => (string) $count]));
+            redirect('/treasury');
+        } elseif ($action === 'unapprove') {
             $count = $this->treasury->setApprovalMany(array_values($ids), false, $request->ip(), auth_user()['id'] ?? null);
         } elseif ($action === 'approve') {
             $count = $this->treasury->approveMany(array_values($ids), $request->ip(), auth_user()['id'] ?? null);

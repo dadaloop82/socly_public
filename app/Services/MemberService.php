@@ -2433,7 +2433,7 @@ final class MemberService
         $pendingRows = $this->db->fetchAll(
             "SELECT DATE_FORMAT(movement_date, '%Y-%m') AS ym, COALESCE(SUM(amount), 0) AS total
              FROM treasury_movements
-             WHERE direction = 'income' AND approved_at IS NULL
+             WHERE direction = 'income' AND approved_at IS NULL AND superseded_at IS NULL
                AND movement_date >= DATE_FORMAT(DATE_SUB(CURDATE(), INTERVAL 11 MONTH), '%Y-%m-01')
              GROUP BY ym"
         );

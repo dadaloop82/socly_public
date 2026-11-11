@@ -363,7 +363,7 @@ final class TreasuryService
                 COALESCE(SUM(CASE WHEN direction = 'income' THEN amount ELSE 0 END), 0) AS inc,
                 COALESCE(SUM(CASE WHEN direction = 'expense' THEN amount ELSE 0 END), 0) AS exp
              FROM treasury_movements
-             WHERE approved_at IS NOT NULL"
+             WHERE approved_at IS NOT NULL AND superseded_at IS NULL"
         );
         $balance = (float) ($balanceRow['inc'] ?? 0) - (float) ($balanceRow['exp'] ?? 0);
 
@@ -528,7 +528,7 @@ final class TreasuryService
         foreach ($this->db->fetchAll(
             'SELECT account, direction, COALESCE(SUM(amount), 0) AS total
              FROM treasury_movements
-             WHERE approved_at IS NOT NULL' . $where . '
+             WHERE approved_at IS NOT NULL AND superseded_at IS NULL' . $where . '
              GROUP BY account, direction',
             $params
         ) as $row) {
@@ -550,7 +550,7 @@ final class TreasuryService
         foreach ($this->db->fetchAll(
             "SELECT transfer_account, COALESCE(SUM(amount), 0) AS total
              FROM treasury_movements
-             WHERE direction = 'transfer' AND approved_at IS NOT NULL AND transfer_account IS NOT NULL AND transfer_account <> ''" . $where . '
+             WHERE direction = 'transfer' AND approved_at IS NOT NULL AND superseded_at IS NULL AND transfer_account IS NOT NULL AND transfer_account <> ''" . $where . '
              GROUP BY transfer_account',
             $params
         ) as $row) {
@@ -781,7 +781,7 @@ final class TreasuryService
                 COALESCE(SUM(CASE WHEN direction = 'income' THEN amount ELSE 0 END), 0) AS inc,
                 COALESCE(SUM(CASE WHEN direction = 'expense' THEN amount ELSE 0 END), 0) AS exp
              FROM treasury_movements
-             WHERE approved_at IS NOT NULL"
+             WHERE approved_at IS NOT NULL AND superseded_at IS NULL"
         );
         $income = (float) ($totals['inc'] ?? 0);
         $expense = (float) ($totals['exp'] ?? 0);
@@ -807,7 +807,7 @@ final class TreasuryService
         $rows = $this->db->fetchAll(
             "SELECT category, COALESCE(SUM(amount), 0) AS total
              FROM treasury_movements
-             WHERE direction = :dir AND approved_at IS NOT NULL
+             WHERE direction = :dir AND approved_at IS NOT NULL AND superseded_at IS NULL
              GROUP BY category
              HAVING total > 0
              ORDER BY total DESC
@@ -1476,6 +1476,80 @@ final class TreasuryService
         }
 
         return $count;
+    }
+
+
+    /**
+     * Giroconto “storico” dei movimenti selezionati: crea la copia sul conto di destinazione e
+     * marca l'originale come girocontato (escluso dai conteggi, non modificabile).
+     *
+     * @param list<int> $ids
+     * @return array{ok:bool,count?:int,error?:string}
+     */
+    public function transferSelected(array $ids, string $targetAccount, string $ip, ?int $userId = null): array
+    {
+        $target = self::normalizeAccount($targetAccount);
+        if ($target === '' || !$this->accountExists($target) || !$this->accountIsActive($target)) {
+            return ['ok' => false, 'error' => __('treasury.account_required')];
+        }
+        $ids = array_values(array_unique(array_filter(array_map('intval', $ids), static fn (int $id): bool => $id > 0)));
+        if ($ids === []) {
+            return ['ok' => false, 'error' => __('treasury.bulk_none')];
+        }
+        $rows = $this->db->fetchAll(
+            'SELECT * FROM treasury_movements WHERE id IN (' . implode(',', $ids) . ')'
+        );
+        if (count($rows) !== count($ids)) {
+            return ['ok' => false, 'error' => __('errors.404')];
+        }
+        $source = '';
+        foreach ($rows as $row) {
+            if (trim((string) ($row['superseded_at'] ?? '')) !== '') {
+                return ['ok' => false, 'error' => __('treasury.transfer_already')];
+            }
+            $account = self::normalizeAccount((string) ($row['account'] ?? ''));
+            if ($source === '') {
+                $source = $account;
+            } elseif ($account !== $source) {
+                return ['ok' => false, 'error' => __('treasury.transfer_mixed')];
+            }
+        }
+        if ($source === $target) {
+            return ['ok' => false, 'error' => __('treasury.transfer_same')];
+        }
+        $count = 0;
+        foreach ($rows as $row) {
+            $copy = $row;
+            unset($copy['id'], $copy['created_at'], $copy['updated_at'], $copy['row_version'], $copy['creator_name']);
+            $copy['account'] = $target;
+            $copy['transfer_origin_id'] = (int) $row['id'];
+            $copy['superseded_at'] = null;
+            $copy['superseded_account'] = null;
+            $copy['superseded_note'] = null;
+            $copy['superseded_by_id'] = null;
+            $newId = $this->db->insert('treasury_movements', array_filter(
+                $copy,
+                static fn (string $key): bool => !str_starts_with($key, 'first_name') && !str_starts_with($key, 'last_name'),
+                ARRAY_FILTER_USE_KEY
+            ));
+            $note = __('treasury.superseded_note', [
+                'account' => (string) ($this->accountLabel($target) ?: $target),
+                'date' => date('d/m/Y'),
+            ]);
+            $this->db->update('treasury_movements', [
+                'superseded_at' => date('Y-m-d H:i:s'),
+                'superseded_account' => $target,
+                'superseded_note' => mb_substr($note, 0, 190),
+                'superseded_by_id' => $userId,
+            ], 'id = :id', ['id' => (int) $row['id']]);
+            $count++;
+            $this->audit->log('treasury.transferred', 'treasury', (string) $row['id'], null, [
+                'to' => $target,
+                'new_id' => $newId,
+            ], $ip);
+        }
+
+        return ['ok' => true, 'count' => $count];
     }
 
     /** @param list<int> $ids @return int Number of approved movements */

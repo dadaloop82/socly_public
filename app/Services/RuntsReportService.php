@@ -243,7 +243,7 @@ final class RuntsReportService
         $rows = $this->db->fetchAll(
             'SELECT DISTINCT YEAR(movement_date) AS y
              FROM treasury_movements
-             WHERE approved_at IS NOT NULL
+             WHERE approved_at IS NOT NULL AND superseded_at IS NULL
              ORDER BY y DESC'
         );
         $out = [];
@@ -262,7 +262,7 @@ final class RuntsReportService
         $row = $this->db->fetch(
             "SELECT COALESCE(SUM(amount), 0) AS total
              FROM treasury_movements
-             WHERE approved_at IS NOT NULL
+             WHERE approved_at IS NOT NULL AND superseded_at IS NULL
                AND direction = 'income'
                AND YEAR(movement_date) = :y",
             ['y' => $year]
@@ -286,7 +286,7 @@ final class RuntsReportService
         $movements = $this->db->fetchAll(
             'SELECT direction, category, runts_line, account, transfer_account, amount, movement_date
              FROM treasury_movements
-             WHERE approved_at IS NOT NULL AND YEAR(movement_date) = :y
+             WHERE approved_at IS NOT NULL AND superseded_at IS NULL AND YEAR(movement_date) = :y
              ORDER BY movement_date ASC, id ASC',
             ['y' => $year]
         );
@@ -377,7 +377,7 @@ final class RuntsReportService
         $rows = $this->db->fetchAll(
             'SELECT account, transfer_account, direction, amount
              FROM treasury_movements
-             WHERE approved_at IS NOT NULL AND ' . $where,
+             WHERE approved_at IS NOT NULL AND superseded_at IS NULL AND ' . $where,
             ['y' => $year]
         );
         $balances = [];
