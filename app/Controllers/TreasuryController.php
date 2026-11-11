@@ -305,11 +305,25 @@ final class TreasuryController extends BaseController
             return;
         }
         $data = $request->all();
-        $fieldsToApply = array_values(array_filter([
-            trim((string) ($data['category'] ?? '')) !== '' && (string) $data['category'] !== '__new__' ? 'category' : '',
-            trim((string) ($data['runts_line'] ?? '')) !== '' ? 'runts_line' : '',
-            (int) ($data['budget_item_id'] ?? 0) > 0 ? 'budget_item_id' : '',
-        ]));
+        // Campi che l'utente ha davvero modificato (inviati dal client): quelli non toccati non
+        // filtrano i simili e non compaiono nel riepilogo.
+        $fieldsToApply = [];
+        $rawApplying = $data['applying'] ?? null;
+        if (is_array($rawApplying)) {
+            foreach ($rawApplying as $field) {
+                if (in_array($field, ['category', 'runts_line', 'budget_item_id'], true)) {
+                    $fieldsToApply[$field] = (string) $field;
+                }
+            }
+            $fieldsToApply = array_values($fieldsToApply);
+        }
+        if ($fieldsToApply === []) {
+            $fieldsToApply = array_values(array_filter([
+                trim((string) ($data['category'] ?? '')) !== '' && (string) $data['category'] !== '__new__' ? 'category' : '',
+                trim((string) ($data['runts_line'] ?? '')) !== '' ? 'runts_line' : '',
+                    (int) ($data['budget_item_id'] ?? 0) > 0 ? 'budget_item_id' : '',
+            ]));
+        }
 
         $result = $this->treasury->similarMovements([
             'direction' => (string) ($data['direction'] ?? ''),
@@ -323,7 +337,7 @@ final class TreasuryController extends BaseController
             'skipped' => (int) ($result['skipped'] ?? 0),
             'ids' => $result['ids'],
             'matches' => $result['matches'],
-            'changes' => $this->describeClassification($data),
+            'changes' => $this->describeClassification($data, $fieldsToApply),
         ]);
     }
 
@@ -369,19 +383,20 @@ final class TreasuryController extends BaseController
      * @param array<string,mixed> $data
      * @return list<array{field:string,label:string,value:string}>
      */
-    private function describeClassification(array $data): array
+    private function describeClassification(array $data, array $only = []): array
     {
         $changes = [];
+        $wanted = static fn (string $field): bool => $only === [] || in_array($field, $only, true);
         $category = trim((string) ($data['category'] ?? ''));
-        if ($category !== '' && $category !== '__new__') {
+        if ($category !== '' && $category !== '__new__' && $wanted('category')) {
             $changes[] = ['field' => 'category', 'label' => (string) __('treasury.category'), 'value' => $this->treasury->categoryLabel($category)];
         }
         $runtsLine = strtoupper(trim((string) ($data['runts_line'] ?? '')));
-        if ($runtsLine !== '') {
+        if ($runtsLine !== '' && $wanted('runts_line')) {
             $changes[] = ['field' => 'runts_line', 'label' => (string) __('runts.line_label'), 'value' => \Socly\Services\RuntsReportService::lineLabel($runtsLine)];
         }
         $budgetItemId = (int) ($data['budget_item_id'] ?? 0);
-        if ($budgetItemId > 0) {
+        if ($budgetItemId > 0 && $wanted('budget_item_id')) {
             $budgetLabel = $this->treasury->budgetItemLabel($budgetItemId);
             if ($budgetLabel !== '') {
                 $changes[] = ['field' => 'budget_item_id', 'label' => (string) __('treasury.budget_item'), 'value' => $budgetLabel];

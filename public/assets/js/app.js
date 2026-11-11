@@ -1637,6 +1637,23 @@ function initTreasurySimilar() {
   const hasClassification = (data) =>
     (data.category !== '' && data.category !== '__new__') || data.runts_line !== '' || data.budget_item_id !== '';
 
+  // Campi davvero modificati rispetto al record aperto: quelli già valorizzati e non toccati
+  // non devono filtrare i movimenti simili (altrimenti “Incasso quota associativa” non trova nulla).
+  const original = {
+    category: form.getAttribute('data-original-category') || '',
+    runts_line: form.getAttribute('data-original-runts-line') || '',
+    budget_item_id: form.getAttribute('data-original-budget-item') || '0',
+  };
+  const appliedFields = (data) => {
+    const fields = [];
+    if (data.category !== '' && data.category !== '__new__' && data.category !== original.category) fields.push('category');
+    if (data.runts_line !== '' && data.runts_line !== original.runts_line) fields.push('runts_line');
+    if (data.budget_item_id !== '' && Number(data.budget_item_id) > 0 && data.budget_item_id !== original.budget_item_id) {
+      fields.push('budget_item_id');
+    }
+    return fields;
+  };
+
   const hide = () => {
     panel.hidden = true;
     panel.textContent = '';
@@ -1644,12 +1661,15 @@ function initTreasurySimilar() {
 
   const refresh = async () => {
     const data = payload();
-    if (!hasClassification(data) || data.description.trim().length < 3) {
+    const applying = appliedFields(data);
+    if (applying.length === 0 || data.description.trim().length < 3) {
       hide();
       return;
     }
     lastPayload = data;
     try {
+      const body = new URLSearchParams({ ...data, _token: token });
+      applying.forEach((field) => body.append('applying[]', field));
       const res = await fetch(url, {
         method: 'POST',
         headers: {
@@ -1657,7 +1677,7 @@ function initTreasurySimilar() {
           'Content-Type': 'application/x-www-form-urlencoded',
           'X-Requested-With': 'XMLHttpRequest',
         },
-        body: new URLSearchParams({ ...data, _token: token }),
+        body,
       });
       if (!res.ok) return;
       render(await res.json());
