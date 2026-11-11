@@ -193,6 +193,7 @@ document.addEventListener('DOMContentLoaded', () => {
   initLogoFilePickers(document);
   initPlaceSuggest(document);
   initDashboardTabs();
+  initDashboardMoreToggles();
   initDashboardCharts();
   initStatisticsTabs();
   initStatisticsCharts();
@@ -215,6 +216,7 @@ document.addEventListener('DOMContentLoaded', () => {
   initFieldsSortable(document);
   initComponentCards(document);
   initDemoLoginNotice();
+  initDemoBannerCompact();
   initAuthNewsWidget();
   initAuthUpdateCheck();
   initTermsDialogs();
@@ -11097,33 +11099,58 @@ function initAuthNewsWidget() {
   };
 
   // Broken/tiny images are never shown: only real covers (>= 480px) become the
-  // <img> hero. The promise is cached so concurrent/rotating renders reuse the
-  // same probe instead of downloading the cover twice.
-  /** @type {Map<string, Promise<boolean>>} */
+  // <img> hero, and only when the full image fits the available column height.
+  /** @type {Map<string, Promise<{ok:boolean, width:number, height:number}>>} */
   const heroCache = new Map();
   const heroAvailable = (url) => {
-    if (!url) return Promise.resolve(false);
+    if (!url) return Promise.resolve({ ok: false, width: 0, height: 0 });
     const key = String(url);
     if (heroCache.has(key)) return heroCache.get(key);
     const pending = new Promise((resolve) => {
       const probe = new Image();
-      probe.onload = () => resolve(probe.naturalWidth >= 480);
-      probe.onerror = () => resolve(false);
+      probe.onload = () => resolve({
+        ok: probe.naturalWidth >= 480,
+        width: probe.naturalWidth,
+        height: probe.naturalHeight,
+      });
+      probe.onerror = () => resolve({ ok: false, width: 0, height: 0 });
       probe.src = key;
     });
     heroCache.set(key, pending);
     return pending;
   };
 
+  const heroFits = (slot, card, meta) => {
+    const brand = slot.closest('.auth-brand');
+    if (!brand || !meta.ok || meta.width <= 0 || meta.height <= 0) return false;
+    const inner = brand.querySelector('.auth-brand-inner');
+    const cs = getComputedStyle(brand);
+    const padTop = Number.parseFloat(cs.paddingTop) || 0;
+    const padBottom = Number.parseFloat(cs.paddingBottom) || 0;
+    const gap = Number.parseFloat(cs.rowGap || cs.gap) || 0;
+    const available = brand.clientHeight - padTop - padBottom - (inner ? inner.offsetHeight : 0) - gap;
+    const existing = card.querySelector('.auth-news-hero');
+    const base = card.offsetHeight - (existing ? existing.offsetHeight : 0);
+    const heroHeight = card.clientWidth * meta.height / meta.width;
+    return base + heroHeight + 2 <= available;
+  };
+
   const applyHero = (item) => {
     if (!item.image) return;
     const token = newsToken(item);
-    void heroAvailable(item.image).then((ok) => {
-      if (!ok) return;
+    void heroAvailable(item.image).then((meta) => {
       slots.forEach((slot) => {
-        if (isCompact(slot) || slot.hidden) return;
+        if (isCompact(slot) || slot.hidden || slot.getClientRects().length === 0) return;
         const card = slot.querySelector('.auth-news-card');
-        if (!card || card.dataset.newsId !== token || card.querySelector('.auth-news-hero')) return;
+        if (!card || card.dataset.newsId !== token) return;
+        const existing = card.querySelector('.auth-news-hero');
+        // No room for the real image: show the text-only card (never a crop or
+        // a letterboxed thumbnail).
+        if (!heroFits(slot, card, meta)) {
+          existing?.remove();
+          return;
+        }
+        if (existing) return;
         const hero = document.createElement('img');
         hero.className = 'auth-news-hero';
         hero.src = String(item.image);
@@ -11198,7 +11225,9 @@ function initAuthNewsWidget() {
   };
 
   const startRotation = () => {
-    if (newsItems.length < 2 || reducedMotion.matches) return;
+    // Keep cycling also when the OS asks for reduced motion: the swap is simply
+    // instant (no slide) instead of stopping the carousel.
+    if (newsItems.length < 2) return;
     const restartTimer = () => {
       window.clearInterval(rotateTimer);
       rotateTimer = window.setInterval(rotateNews, ROTATE_MS);
@@ -11254,6 +11283,15 @@ function initAuthNewsWidget() {
       currentIndex = 0;
       renderItem(newsItems[0], true);
       startRotation();
+      // Re-evaluate the cover when the window is resized (fit / no-fit).
+      let resizeTimer = null;
+      window.addEventListener('resize', () => {
+        window.clearTimeout(resizeTimer);
+        resizeTimer = window.setTimeout(() => {
+          const item = newsItems[currentIndex];
+          if (item) applyHero(item);
+        }, 140);
+      }, { passive: true });
     })
     .catch((err) => {
       const detail = err && typeof err.message === 'string' && err.message
@@ -12650,6 +12688,54 @@ function initSettingsNav() {
   window.addEventListener('hashchange', () => syncFromHash(false));
 }
 
+function initDemoBannerCompact() {
+  const banner = document.querySelector('[data-demo-banner]');
+  if (!(banner instanceof HTMLElement)) return;
+  const sync = () => {
+    banner.classList.toggle('is-compact', window.scrollY > 24);
+  };
+  sync();
+  window.addEventListener('scroll', sync, { passive: true });
+}
+
+function initDashboardMoreToggles() {
+  const container = document.querySelector('.dashboard-tabs');
+  if (!(container instanceof HTMLElement)) return;
+  const labels = {
+    statsShow: container.dataset.msgStatsShow || 'Show all statistics',
+    statsLess: container.dataset.msgStatsLess || 'Show fewer statistics',
+    chartsShow: container.dataset.msgChartsShow || 'Show all charts',
+    chartsLess: container.dataset.msgChartsLess || 'Show fewer charts',
+  };
+  const bind = (group, showLabel, lessLabel, hiddenSelector) => {
+    if (!(group instanceof HTMLElement) || group.dataset.moreToggleBound === '1') return;
+    if (!group.querySelector(hiddenSelector)) return;
+    group.dataset.moreToggleBound = '1';
+    group.classList.add('is-collapsible');
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'dashboard-more-toggle';
+    btn.setAttribute('aria-expanded', 'false');
+    btn.textContent = showLabel;
+    btn.addEventListener('click', () => {
+      const expanded = group.classList.toggle('is-expanded');
+      btn.setAttribute('aria-expanded', expanded ? 'true' : 'false');
+      btn.textContent = expanded ? lessLabel : showLabel;
+      // Charts hidden with display:none need a resize once revealed.
+      if (expanded) {
+        window.setTimeout(() => window.dispatchEvent(new Event('resize')), 80);
+      }
+    });
+    group.insertAdjacentElement('afterend', btn);
+  };
+  container.querySelectorAll('.stats').forEach((group) => {
+    bind(group, labels.statsShow, labels.statsLess, '.stat:nth-child(n + 4)');
+  });
+  container.querySelectorAll('.charts').forEach((group) => {
+    bind(group, labels.chartsShow, labels.chartsLess, '.chart-panel:not(.chart-panel-primary)');
+  });
+}
+
 function initDashboardTabs() {
   const root = document.querySelector('[data-dashboard-tabs]');
   if (!root) {
@@ -12674,8 +12760,8 @@ function initDashboardTabs() {
     }
     const maxScroll = Math.max(0, tablist.scrollWidth - tablist.clientWidth);
     const canScroll = maxScroll > 4;
-    const atStart = tablist.scrollLeft <= 2;
-    const atEnd = tablist.scrollLeft >= maxScroll - 2;
+    const atStart = tablist.scrollLeft <= 10;
+    const atEnd = tablist.scrollLeft >= maxScroll - 10;
     tablistWrap.classList.toggle('is-scrollable', canScroll);
     tablistWrap.classList.toggle('is-fade-start', canScroll && !atStart);
     tablistWrap.classList.toggle('is-fade-end', canScroll && !atEnd);
@@ -12714,8 +12800,19 @@ function initDashboardTabs() {
       const selected = tab.getAttribute('data-dashboard-tab') === id;
       tab.setAttribute('aria-selected', selected ? 'true' : 'false');
       tab.tabIndex = selected ? 0 : -1;
-      if (selected && typeof tab.scrollIntoView === 'function') {
-        tab.scrollIntoView({ inline: 'center', block: 'nearest', behavior: 'smooth' });
+      if (selected) {
+        // Scroll only when the tab is actually cut off: this keeps the first
+        // item (“Soci”) fully visible at scrollLeft 0 on mobile.
+        const pad = 18;
+        const tabRect = tab.getBoundingClientRect();
+        const listRect = tablist ? tablist.getBoundingClientRect() : null;
+        if (listRect) {
+          if (tabRect.left < listRect.left + pad) {
+            tablist.scrollBy({ left: tabRect.left - listRect.left - pad, behavior: 'smooth' });
+          } else if (tabRect.right > listRect.right - pad) {
+            tablist.scrollBy({ left: tabRect.right - listRect.right + pad, behavior: 'smooth' });
+          }
+        }
       }
     });
     panels.forEach((panel) => {

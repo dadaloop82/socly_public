@@ -117,7 +117,7 @@ try {
 } catch (\Throwable) {
 }
 $updateInfo = null;
-if ($user && app()->isInstalled() && !$temporaryInstance && can('settings.manage')) {
+if ($user && app()->isInstalled() && !$temporaryInstance && can_manage_updates()) {
     try {
         $updateInfo = app(\Socly\Services\UpdateService::class)->check();
     } catch (\Throwable) {

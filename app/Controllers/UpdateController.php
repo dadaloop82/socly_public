@@ -9,7 +9,6 @@ use Socly\Core\View;
 use Socly\Services\PlatformService;
 use Socly\Services\SetupService;
 use Socly\Services\UpdateService;
-use Socly\Support\Permission;
 
 final class UpdateController extends BaseController
 {
@@ -24,7 +23,7 @@ final class UpdateController extends BaseController
 
     public function install(Request $request): void
     {
-        if (!can(Permission::SETTINGS_MANAGE)) {
+        if (!can_manage_updates()) {
             http_response_code(403);
             $this->render('errors/403');
             return;
@@ -57,7 +56,7 @@ final class UpdateController extends BaseController
     /** Current step of a running update (polled by the UI). */
     public function progress(Request $request): void
     {
-        if (!can(Permission::SETTINGS_MANAGE)) {
+        if (!can_manage_updates()) {
             $this->json(['ok' => false, 'error' => 'forbidden'], 403);
             return;
         }
@@ -69,7 +68,7 @@ final class UpdateController extends BaseController
         $force = (string) $request->input('force', '') === '1';
         // The update endpoint is also called by the public login page: technical
         // details (git/SSH/permission errors) are visible to admins only.
-        $isAdmin = can(Permission::SETTINGS_MANAGE);
+        $isAdmin = can_manage_updates();
         try {
             $info = $this->updates->check($force);
             try {

@@ -3836,19 +3836,15 @@ tr.clickable-row:focus-visible {
   transition: opacity 420ms ease, transform 420ms cubic-bezier(0.22, 1, 0.36, 1);
 }
 .auth-news-hero {
-  /* Real image at its natural ratio: fills the card width, never cropped.
-     It is the only shrinkable part, so the text always stays visible. */
+  /* Real image at its natural ratio, never cropped and never shrunk: the JS
+     only inserts it when it fully fits the available column height. */
   display: block;
-  flex: 0 1 auto;
-  min-height: 0;
-  max-height: 100%;
+  flex: 0 0 auto;
   width: 100%;
   height: auto;
   max-width: 100%;
   object-fit: contain;
   object-position: center;
-  /* Warm paper backdrop: when the image has to shrink to fit a short column it
-     blends with the news header instead of showing dark side bars. */
   background-color: #F6F1E6;
   border-radius: 16px 16px 0 0;
 }
@@ -6850,13 +6846,18 @@ html.enter-anim .will-enter.is-entered {
 }
 
 @media (max-width: 640px) {
-  .stats { grid-template-columns: 1fr; }
-  /* Mobile: solo i 3 KPI prioritari (primi 3 nella griglia) */
-  .stats .stat:nth-child(n + 4) { display: none; }
-  /* Mobile: un solo grafico (il primario del contesto) */
-  .charts .chart-panel:not(.chart-panel-primary) { display: none; }
+  .stats { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0.6rem; }
+  /* Primi 3 KPI sempre visibili; gli altri dietro il toggle "Mostra tutte". */
+  .stats.is-collapsible:not(.is-expanded) .stat:nth-child(n + 4) { display: none; }
+  /* Grafico primario sempre visibile; gli altri dietro il toggle "Mostra tutti". */
+  .charts.is-collapsible:not(.is-expanded) .chart-panel:not(.chart-panel-primary) { display: none; }
   [data-photo-hint] { display: none; }
-  .stat { padding: 1rem 1.05rem; }
+  .stat { padding: 0.85rem 0.9rem; }
+  .stat .label { font-size: 0.76rem; }
+  .stat .value { font-size: 1.35rem; margin-top: 0.25rem; }
+  .stat::after { width: 60px; height: 60px; }
+  /* Third KPI gets the full row: no orphan card in the 2-column grid. */
+  .stats > .stat:nth-child(3) { grid-column: 1 / -1; }
   table { min-width: 30rem; }
   th, td { padding: 0.75rem 0.7rem; font-size: 0.92rem; }
   .filter-bar .panel-header {
@@ -10294,6 +10295,21 @@ button.setup-scrape-logo-frame:focus-visible .setup-scrape-logo-overlay {
   font-size: 0.9rem;
   font-weight: 700;
   border-bottom: 1px solid #f0d48a;
+  transition: padding 0.2s ease, font-size 0.2s ease;
+}
+.demo-banner.is-compact {
+  padding: 0.25rem 0.75rem;
+  font-size: 0.78rem;
+}
+@media (max-width: 640px) {
+  .demo-banner {
+    padding: 0.45rem 0.75rem;
+    font-size: 0.82rem;
+  }
+  .demo-banner.is-compact {
+    padding: 0.2rem 0.6rem;
+    font-size: 0.74rem;
+  }
 }
 .org-chart {
   --org-line: color-mix(in srgb, var(--brand-primary, #0D6E66) 35%, #98a2b3);
@@ -11089,6 +11105,49 @@ a.org-mandate-badge--soon:hover {
   padding: 0 0.15rem;
   border-bottom: 0;
 }
+/* Mobile: “show all” controls appended by JS after stats / charts groups. */
+.dashboard-more-toggle {
+  display: none;
+}
+@media (max-width: 640px) {
+  .dashboard-more-toggle {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    margin: -0.6rem 0 1.25rem;
+    padding: 0.55rem 0.75rem;
+    border: 1px solid color-mix(in srgb, var(--brand-primary, #0D6E66) 20%, var(--line, #d7dee7));
+    border-radius: 999px;
+    background: color-mix(in srgb, var(--brand-primary, #0D6E66) 6%, #fff);
+    color: var(--brand-primary-deep, var(--brand-primary, #0D6E66));
+    font: inherit;
+    font-size: 0.8rem;
+    font-weight: 700;
+    cursor: pointer;
+  }
+  .dashboard-more-toggle:focus-visible {
+    outline: 2px solid color-mix(in srgb, var(--brand-primary, #0D6E66) 45%, transparent);
+    outline-offset: 2px;
+  }
+  /* Quick actions: 2-column grid, primary action full width. */
+  .dashboard-panel .page-header .actions,
+  .dashboard-panel .panel-header .actions {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.5rem;
+    width: 100%;
+  }
+  .dashboard-panel .page-header .actions .btn,
+  .dashboard-panel .panel-header .actions .btn {
+    width: 100%;
+    justify-content: center;
+  }
+  .dashboard-panel .page-header .actions .btn:first-child,
+  .dashboard-panel .panel-header .actions .btn:first-child {
+    grid-column: 1 / -1;
+  }
+}
 .dashboard-modules {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -11145,7 +11204,7 @@ a.org-mandate-badge--soon:hover {
     grid-template-columns: 1fr;
   }
   .dashboard-tablist-wrap {
-    margin: 0 -0.15rem;
+    margin: 0;
   }
   .dashboard-tablist-wrap::before,
   .dashboard-tablist-wrap::after {
@@ -11228,12 +11287,13 @@ a.org-mandate-badge--soon:hover {
     display: flex;
     flex-wrap: nowrap;
     gap: 0.3rem;
-    padding: 0.25rem 1.15rem;
+    padding: 0.3rem 1.1rem;
     margin: 0;
     overflow-x: auto;
     overflow-y: hidden;
     -webkit-overflow-scrolling: touch;
     overscroll-behavior-x: contain;
+    scroll-padding-inline: 1.1rem;
     scroll-snap-type: x proximity;
     scrollbar-width: none;
   }

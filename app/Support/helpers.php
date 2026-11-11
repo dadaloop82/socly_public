@@ -685,7 +685,7 @@ if (!function_exists('can')) {
         if (!$user) {
             return false;
         }
-        if (!empty($user['is_system_admin']) && PlatformMasterAccess::isMasterEmail((string) ($user['email'] ?? ''))) {
+        if (!empty($user['is_system_admin'])) {
             return true;
         }
         // Demos: never expose settings/users/plugins to the association admin.
@@ -713,6 +713,32 @@ if (!function_exists('can')) {
         }
         $perms = $_SESSION['permissions'] ?? [];
         return in_array($permission, $perms, true);
+    }
+}
+
+if (!function_exists('can_manage_updates')) {
+    /**
+     * Any administrator may run the updater: system admins, users with
+     * settings.manage and the association president — not only the built-in
+     * maintenance account.
+     */
+    function can_manage_updates(): bool
+    {
+        $user = auth_user();
+        if (!$user) {
+            return false;
+        }
+        if (!empty($user['is_system_admin'])) {
+            return true;
+        }
+        // Demos keep the configuration area locked for association admins.
+        if (function_exists('is_demo_instance') && is_demo_instance()) {
+            return false;
+        }
+        if (can(\Socly\Support\Permission::SETTINGS_MANAGE)) {
+            return true;
+        }
+        return in_array(strtolower(trim((string) ($user['role'] ?? ''))), ['president', 'admin'], true);
     }
 }
 

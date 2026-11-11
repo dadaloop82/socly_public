@@ -94,7 +94,11 @@ $defaultTab = $tabs[0]['id'] ?? '';
     </div>
 <?php else: ?>
 
-<div class="dashboard-tabs" data-dashboard-tabs data-default-tab="<?= e($defaultTab) ?>">
+<div class="dashboard-tabs" data-dashboard-tabs data-default-tab="<?= e($defaultTab) ?>"
+    data-msg-stats-show="<?= e(__('dashboard.stats_show_all')) ?>"
+    data-msg-stats-less="<?= e(__('dashboard.stats_show_less')) ?>"
+    data-msg-charts-show="<?= e(__('dashboard.charts_show_all')) ?>"
+    data-msg-charts-less="<?= e(__('dashboard.charts_show_less')) ?>">
     <div class="dashboard-tablist-wrap" data-dashboard-tablist-wrap>
         <button type="button" class="dashboard-tablist-nav dashboard-tablist-nav-prev" data-dashboard-tablist-prev hidden aria-label="<?= e(__('dashboard.tabs_scroll_prev')) ?>">
             <span aria-hidden="true"></span>
