@@ -71,6 +71,8 @@ $rowPartial = static fn (?array $row, string $sectionKey): string => view_partia
     data-msg-autosave-saving="<?= e(__('budget.autosave_saving')) ?>"
     data-msg-autosave-saved="<?= e(__('budget.autosave_saved')) ?>"
     data-msg-autosave-error="<?= e(__('budget.autosave_error')) ?>"
+    data-category-rename-url="<?= e(url('/treasury/categories/rename')) ?>"
+    data-msg-category-rename="<?= e(__('budget.category_rename_prompt')) ?>"
     <?php if ($canManage): ?><?= version_attrs('budget', ['id' => $budgetId, 'row_version' => (int) ($budget_version ?? ($budget['row_version'] ?? 0))]) ?><?php endif; ?>
 >
     <?= csrf_field() ?>
@@ -90,8 +92,9 @@ $rowPartial = static fn (?array $row, string $sectionKey): string => view_partia
             $sectionId = (int) ($section['id'] ?? 0);
             $sectionItems = is_array($section['items'] ?? null) ? $section['items'] : [];
             ?>
-            <section class="budget-section" data-budget-section data-section-key="<?= e($sectionKey) ?>">
+            <section class="budget-section" data-budget-section data-section-key="<?= e($sectionKey) ?>" draggable="true">
                 <header class="budget-section-head">
+                    <span class="budget-section-drag" data-budget-section-drag title="<?= e(__('budget.section_drag_hint')) ?>" aria-hidden="true">⠿</span>
                     <span class="budget-section-index" aria-hidden="true"></span>
                     <input
                         type="text"
@@ -144,8 +147,9 @@ $rowPartial = static fn (?array $row, string $sectionKey): string => view_partia
     </div>
 
     <template data-budget-section-template>
-        <section class="budget-section" data-budget-section data-section-key="__KEY__">
+        <section class="budget-section" data-budget-section data-section-key="__KEY__" draggable="true">
             <header class="budget-section-head">
+                <span class="budget-section-drag" data-budget-section-drag aria-hidden="true">⠿</span>
                 <span class="budget-section-index" aria-hidden="true"></span>
                 <input type="text" class="budget-section-title" name="section_title[]" value="" maxlength="190" placeholder="<?= e(__('budget.section_title_placeholder')) ?>" aria-label="<?= e(__('budget.section_title')) ?>">
                 <span class="budget-section-total">

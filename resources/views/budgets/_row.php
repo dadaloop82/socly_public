@@ -23,6 +23,7 @@ if ($category !== '' && !in_array($category, $categoryKeys, true)) {
     }
 }
 $showUnknownCategory = $category !== '' && !in_array($category, $categoryKeys, true);
+$categoryIsBuiltin = in_array($category, \Socly\Services\TreasuryService::BUILTIN_CATEGORIES, true);
 $kind = \Socly\Services\BudgetService::normalizeKind(
     (string) ($row['kind'] ?? ''),
     (string) ($row['direction'] ?? 'expense')
@@ -31,6 +32,16 @@ $amount = $row !== null ? number_format((float) ($row['amount'] ?? 0), 2, ',', '
 ?>
 <tr class="budget-row" data-budget-row>
     <td class="budget-cell-category">
+        <div class="budget-category-row">
+        <?php if ($category !== '' && !$categoryIsBuiltin): ?>
+            <button type="button" class="budget-category-rename" data-budget-category-rename="<?= e($category) ?>"
+                    aria-label="<?= e(__('budget.category_rename')) ?>" title="<?= e(__('budget.category_rename')) ?>">
+                <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"
+                     stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/>
+                </svg>
+            </button>
+        <?php endif; ?>
         <input type="hidden" name="item_id[]" value="<?= e((string) $rowId) ?>">
         <input type="hidden" name="item_section[]" value="<?= e($sectionKey) ?>" data-budget-item-section>
         <input type="hidden" name="item_notes[]" value="<?= e((string) ($row['notes'] ?? '')) ?>">
@@ -72,6 +83,7 @@ $amount = $row !== null ? number_format((float) ($row['amount'] ?? 0), 2, ',', '
             data-budget-new-category
             hidden
         >
+        </div>
     </td>
     <td class="budget-cell-label">
         <input

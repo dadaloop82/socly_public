@@ -208,6 +208,8 @@ document.addEventListener('DOMContentLoaded', () => {
   initPresence();
   initFreshnessGuard();
   initTreasuryRecurring();
+  initBudgetSectionSort();
+  initBudgetCategoryRename();
   restoreFilterFocus();
   initPlatformConsents(document);
   initResetUserData();
@@ -1464,6 +1466,120 @@ function initTreasuryRecurring() {
   };
   toggle.addEventListener('change', sync);
   sync();
+}
+
+/**
+ * Preventivo: sezioni riordinabili con drag&drop. I numeri sono un contatore CSS, quindi si
+ * aggiornano da soli; il nuovo ordine viene salvato dall'autosave già presente nella griglia.
+ */
+function initBudgetSectionSort() {
+  const grid = document.querySelector('.budget-grid');
+  if (!grid) return;
+  const form = grid.closest('form');
+  let dragged = null;
+
+  const clearMarks = () => {
+    grid.querySelectorAll('[data-budget-section]').forEach((section) => {
+      section.classList.remove('is-dragging', 'is-drop-target');
+    });
+  };
+
+  const bind = (section) => {
+    if (section.dataset.sortBound === '1') return;
+    section.dataset.sortBound = '1';
+    section.addEventListener('dragstart', (event) => {
+      dragged = section;
+      section.classList.add('is-dragging');
+      if (event.dataTransfer) {
+        event.dataTransfer.effectAllowed = 'move';
+        try {
+          event.dataTransfer.setData('text/plain', section.getAttribute('data-section-key') || '');
+        } catch (err) {
+          // alcuni browser richiedono solo l'effetto
+        }
+      }
+    });
+    section.addEventListener('dragend', () => {
+      const moved = dragged !== null;
+      dragged = null;
+      clearMarks();
+      if (moved && form instanceof HTMLFormElement) {
+        form.dispatchEvent(new Event('input', { bubbles: true }));
+      }
+    });
+    section.addEventListener('dragover', (event) => {
+      if (!dragged || dragged === section) return;
+      event.preventDefault();
+      if (event.dataTransfer) event.dataTransfer.dropEffect = 'move';
+      const rect = section.getBoundingClientRect();
+      const after = event.clientY > rect.top + rect.height / 2;
+      const reference = after ? section.nextElementSibling : section;
+      section.classList.add('is-drop-target');
+      if (dragged.parentElement === grid && reference !== dragged) {
+        grid.insertBefore(dragged, reference);
+      }
+    });
+    section.addEventListener('dragleave', () => section.classList.remove('is-drop-target'));
+  };
+
+  grid.querySelectorAll('[data-budget-section]').forEach(bind);
+  // Nuove sezioni aggiunte dalla griglia.
+  new MutationObserver((records) => {
+    records.forEach((record) => {
+      record.addedNodes.forEach((node) => {
+        if (node instanceof Element) {
+          if (node.matches('[data-budget-section]')) bind(node);
+          node.querySelectorAll('[data-budget-section]').forEach(bind);
+        }
+      });
+    });
+  }).observe(grid, { childList: true });
+}
+
+/** Matita accanto alla tipologia: rinomina la categoria condivisa e aggiorna le tendine. */
+function initBudgetCategoryRename() {
+  const grid = document.querySelector('[data-budget-grid]');
+  const url = grid?.getAttribute('data-category-rename-url') || '';
+  if (!grid || url === '') return;
+  const promptLabel = grid.getAttribute('data-msg-category-rename') || 'Name';
+
+  document.addEventListener('click', async (event) => {
+    const button = event.target instanceof Element ? event.target.closest('[data-budget-category-rename]') : null;
+    if (!button) return;
+    event.preventDefault();
+    event.stopPropagation();
+    const slug = button.getAttribute('data-budget-category-rename') || '';
+    if (slug === '') return;
+    const row = button.closest('[data-budget-row]');
+    const select = row ? row.querySelector('select[name="item_category[]"]') : null;
+    const current = select && select.selectedIndex >= 0 ? String(select.options[select.selectedIndex].textContent || '').trim() : slug;
+    const answer = window.prompt(promptLabel, current);
+    if (answer === null) return;
+    const label = answer.trim();
+    if (label === '' || label === current) return;
+    const token = document.querySelector('meta[name="csrf-token"]')?.content || '';
+    try {
+      const res = await fetch(url, {
+        method: 'POST',
+        headers: {
+          Accept: 'application/json',
+          'Content-Type': 'application/x-www-form-urlencoded',
+          'X-Requested-With': 'XMLHttpRequest',
+        },
+        body: new URLSearchParams({ slug, label, _token: token }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || !data.ok) {
+        window.alert(String(data.error || 'Error'));
+        return;
+      }
+      document.querySelectorAll(`option[value="${slug}"]`).forEach((option) => {
+        option.textContent = String(data.label || label);
+      });
+    } catch (err) {
+      window.alert('Network error');
+    }
+  });
 }
 
 function initSessionHeartbeat() {

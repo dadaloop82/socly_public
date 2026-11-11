@@ -12499,6 +12499,42 @@ tr.doc-row-editable:focus-visible {
   .tmf-grid--2,
   .tmf-grid--3 { grid-template-columns: minmax(0, 1fr); }
 }
+/* ── Preventivo: sezioni trascinabili + rinomina tipologia ─────────────────── */
+.budget-section-drag {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.4rem;
+  height: 1.4rem;
+  margin-right: 0.15rem;
+  border-radius: 6px;
+  color: color-mix(in srgb, var(--ink) 42%, transparent);
+  cursor: grab;
+  user-select: none;
+  font-size: 0.95rem;
+  line-height: 1;
+}
+.budget-section-drag:hover { background: color-mix(in srgb, var(--ink) 8%, transparent); color: var(--ink); }
+.budget-section.is-dragging { opacity: 0.55; }
+.budget-section.is-drop-target { outline: 2px dashed color-mix(in srgb, var(--brand-primary) 45%, transparent); outline-offset: 2px; }
+.budget-category-row { display: flex; align-items: center; gap: 0.35rem; min-width: 0; }
+.budget-category-row .budget-select { min-width: 0; flex: 1 1 auto; }
+.budget-category-rename {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.5rem;
+  height: 1.5rem;
+  padding: 0;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: #fff;
+  color: color-mix(in srgb, var(--ink) 60%, transparent);
+  cursor: pointer;
+}
+.budget-category-rename:hover { color: var(--brand-primary-deep); border-color: color-mix(in srgb, var(--brand-primary) 35%, var(--line)); }
+
 /* ── Operazioni ricorrenti: elenco in prima nota ───────────────────────────── */
 .treasury-recurring { margin: 0 0 1.1rem; }
 .treasury-recurring-title {

@@ -248,6 +248,28 @@ final class BudgetController extends BaseController
         redirect('/budgets');
     }
 
+    /**
+     * Rinomina una tipologia condivisa (matita nella griglia del preventivo).
+     * Response JSON: {ok, label} oppure {ok:false, error}.
+     */
+    public function renameCategory(Request $request): void
+    {
+        require_component('treasury');
+        if (!can('treasury.manage')) {
+            $this->jsonResponse(['ok' => false, 'error' => __('errors.403')], 403);
+            return;
+        }
+        $result = $this->treasury->renameCategory(
+            (string) $request->input('slug', ''),
+            (string) $request->input('label', '')
+        );
+        if (empty($result['ok'])) {
+            $this->jsonResponse(['ok' => false, 'error' => (string) ($result['error'] ?? __('validation.required'))], 422);
+            return;
+        }
+        $this->jsonResponse(['ok' => true, 'label' => (string) ($result['label'] ?? '')]);
+    }
+
     public function compare(Request $request, string $id): void
     {
         require_component('treasury');
@@ -260,6 +282,7 @@ final class BudgetController extends BaseController
         $this->render('budgets/compare', [
             'title' => __('budget.compare_title', ['year' => (string) $comparison['budget']['fiscal_year']]),
             'comparison' => $comparison,
+            'category_labels' => $this->treasury->categoryMap(),
             'currency' => $this->currency,
         ]);
     }

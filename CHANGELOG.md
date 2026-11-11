@@ -10,6 +10,11 @@ every 100 patches bump the series, and each bump is published to this repository
 
 ### Added
 
+- Budget macro-categories can be reordered by drag & drop in the forecast grid: the numbers follow the
+  new order and the change is saved by the existing autosave.
+- Custom types (categories) can be renamed from the pencil next to the type select in the forecast
+  grid; the taxonomy is shared, so movements and reports follow the new name. System types stay
+  locked (create a new one instead).
 - Recurring first-note entries: enable “Recurring entry” on a movement, choose how often (weekly,
   monthly, every 3/6 months, yearly), the day of the month, the first due date, an optional end date
   and whether the amount is fixed or variable. When due, Socly creates the entry: cash accounts are
@@ -65,6 +70,9 @@ every 100 patches bump the series, and each bump is published to this repository
 
 ### Fixed
 
+- The planned-vs-actual view showed the raw type key under each line (`rent`, `utilities`,
+  `personnel`): it now shows the translated type name (also for older rows imported with foreign
+  names).
 - Association logo returned HTTP 500 on some installations: a controller declared `jsonResponse()`
   with a stricter visibility than the base controller (fatal error in PHP 8). The endpoint is also
   hardened now: missing file, unreadable file or a missing `fileinfo` extension return 404 instead

@@ -17,6 +17,26 @@ $statusLabels = [
     'over' => __('budget.status_over'),
 ];
 $percentLabel = static fn (float $value): string => number_format($value, 0, ',', '.') . '%';
+// La tipologia salvata nel preventivo è una chiave (rent, utilities, …): va mostrata tradotta.
+$categoryLabels = is_array($category_labels ?? null) ? $category_labels : [];
+$categoryText = static function (string $key) use ($categoryLabels): string {
+    $key = trim($key);
+    if ($key === '') {
+        return '';
+    }
+    if (isset($categoryLabels[$key])) {
+        return (string) $categoryLabels[$key];
+    }
+    try {
+        $resolved = app(\Socly\Services\TreasuryService::class)->resolveCategoryFromLabel($key);
+        if ($resolved !== null && isset($categoryLabels[$resolved])) {
+            return (string) $categoryLabels[$resolved];
+        }
+    } catch (\Throwable) {
+        // etichetta libera: si mostra così com'è
+    }
+    return str_replace('_', ' ', $key);
+};
 ?>
 <div class="page-header">
     <div class="titles">
@@ -113,7 +133,7 @@ $percentLabel = static fn (float $value): string => number_format($value, 0, ','
                         <td>
                             <span class="budget-compare-label"><?= e((string) $item['label']) ?></span>
                             <?php if ((string) ($item['category'] ?? '') !== ''): ?>
-                                <span class="budget-compare-category muted"><?= e($item['category']) ?></span>
+                                <span class="budget-compare-category muted"><?= e($categoryText((string) $item['category'])) ?></span>
                             <?php endif; ?>
                         </td>
                         <td class="budget-th-amount"><?= e($currency->format((float) $item['planned'])) ?></td>

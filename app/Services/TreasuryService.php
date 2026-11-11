@@ -1712,6 +1712,42 @@ final class TreasuryService
         return array_keys($out);
     }
 
+    /**
+     * Rinomina una tipologia personalizzata (la tassonomia è condivisa: movimenti e preventivi
+     * seguono il nuovo nome). Le categorie di sistema non si rinominano.
+     *
+     * @return array{ok:bool,error?:string,label?:string}
+     */
+    public function renameCategory(string $slug, string $label): array
+    {
+        $slug = $this->slugifyCategory($slug);
+        $label = trim(preg_replace('/\s+/', ' ', $label) ?? $label);
+        if ($slug === '' || $label === '') {
+            return ['ok' => false, 'error' => __('validation.required')];
+        }
+        if (in_array($slug, self::BUILTIN_CATEGORIES, true)) {
+            return ['ok' => false, 'error' => __('treasury.category_system_locked')];
+        }
+        $label = mb_substr(sentence_case($label), 0, 80);
+        $cfg = $this->components->config('treasury', ['auto_from_payments' => true, 'default_category' => 'membership_fee']);
+        $list = $this->customCategories();
+        $found = false;
+        foreach ($list as $index => $row) {
+            if ($row['slug'] === $slug) {
+                $list[$index]['label'] = $label;
+                $found = true;
+                break;
+            }
+        }
+        if (!$found) {
+            return ['ok' => false, 'error' => __('errors.404')];
+        }
+        $cfg['custom_categories'] = $list;
+        $this->components->saveConfig('treasury', $cfg);
+
+        return ['ok' => true, 'label' => $label];
+    }
+
     private function ensureCustomCategory(string $slug, string $label): void
     {
         $cfg = $this->components->config('treasury', ['auto_from_payments' => true, 'default_category' => 'membership_fee']);
