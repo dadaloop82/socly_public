@@ -8,7 +8,16 @@ every 100 patches bump the series, and each bump is published to this repository
 
 ## [Unreleased]
 
-Nothing yet — entries are added here while a release is in progress.
+### Added
+
+- Dashboard, Statistics and treasury charts: drag a card to reorder it while the three-column grid
+  shows the available slots, resize it to one third, two thirds or the full row (width button or the
+  bottom-right handle) and hide the cards you do not need; the layout is saved per user.
+
+### Fixed
+
+- The chart grid now packs cards densely, so a resized card sits next to its neighbours instead of
+  leaving an empty column.
 
 ## [1.5.41] - 2026-11-10
 

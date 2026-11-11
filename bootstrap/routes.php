@@ -197,6 +197,7 @@ $router->post('/settings/people', [SettingsController::class, 'savePeople'], 'se
 $router->post('/settings/officers', [SettingsController::class, 'savePeople'], 'settings.manage', ['mw.locale', 'mw.install', 'mw.auth', 'mw.csrf']);
 $router->post('/settings/legal', [SettingsController::class, 'saveLegal'], 'settings.manage', ['mw.locale', 'mw.install', 'mw.auth', 'mw.csrf']);
 $router->post('/settings/types', [SettingsController::class, 'saveType'], 'settings.manage', ['mw.locale', 'mw.install', 'mw.auth', 'mw.csrf']);
+$router->post('/settings/types/recalculate', [SettingsController::class, 'recalculateTypeBalances'], 'settings.manage', ['mw.locale', 'mw.install', 'mw.auth', 'mw.csrf']);
 $router->post('/settings/periods', [SettingsController::class, 'savePeriod'], 'settings.manage', ['mw.locale', 'mw.install', 'mw.auth', 'mw.csrf']);
 $router->post('/settings/fields', [SettingsController::class, 'saveFields'], 'settings.manage', ['mw.locale', 'mw.install', 'mw.auth', 'mw.csrf']);
 $router->post('/settings/fields/autosave', [SettingsController::class, 'autosaveFields'], 'settings.manage', ['mw.locale', 'mw.install', 'mw.auth', 'mw.csrf']);

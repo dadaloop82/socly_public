@@ -105,6 +105,17 @@ foreach ($memberOptions as $memberOption) {
             ]) ?>
         </div>
         <p class="muted org-member-hint"><?= e(__('org.member_select_lede')) ?></p>
+        <?= field('search', [
+            'name' => 'member_search',
+            'label' => (string) __('org.member_search'),
+            'placeholder' => (string) __('org.member_search_placeholder'),
+            'context' => 'inline',
+            'attrs' => [
+                'data-org-member-search' => true,
+                'autocomplete' => 'off',
+            ],
+            'wrapper_class' => 'org-member-search',
+        ]) ?>
     </div>
 
     <div class="member-profile-block" data-org-copy-fields>

@@ -10733,6 +10733,38 @@ function formatTreasuryConfirmMessage(form, template) {
 function initOrgPersonForm(form) {
   const roleSelect = form.querySelector('[data-org-role-select]');
   const memberSelect = form.querySelector('[data-org-member-select]');
+  const memberSearch = form.querySelector('[data-org-member-search]');
+  const memberOptions = memberSelect instanceof HTMLSelectElement
+    ? Array.from(memberSelect.options).map((option) => ({
+        value: option.value,
+        label: option.textContent || '',
+      }))
+    : [];
+  const filterMemberOptions = () => {
+    if (!(memberSelect instanceof HTMLSelectElement) || !(memberSearch instanceof HTMLInputElement)) {
+      return;
+    }
+    const query = memberSearch.value.trim().toLowerCase();
+    const selected = memberSelect.value;
+    memberSelect.innerHTML = '';
+    memberOptions.forEach((item) => {
+      if (query !== '' && item.value !== selected && !item.label.toLowerCase().includes(query)) {
+        return;
+      }
+      const option = document.createElement('option');
+      option.value = item.value;
+      option.textContent = item.label;
+      option.selected = item.value === selected;
+      memberSelect.add(option);
+    });
+  };
+  memberSearch?.addEventListener('input', filterMemberOptions);
+  memberSearch?.addEventListener('keydown', (event) => {
+    if (event.key === 'Enter') {
+      event.preventDefault();
+      filterMemberOptions();
+    }
+  });
   const residenceWrap = form.querySelector('[data-org-residence-fields]');
   const replaceInput = form.querySelector('[data-org-replace-unique]');
   const profileUrlTemplate = form.dataset.orgMemberProfileUrl || '';
@@ -12730,6 +12762,21 @@ function initWidgetLayouts() {
       if (!order.includes(id)) order.push(id);
     });
     const hidden = new Set((Array.isArray(layout.hidden) ? layout.hidden : []).filter((id) => panels.has(id)));
+    // Saved grid width per widget: 1, 2 or 3 columns of the charts grid.
+    const sizes = {};
+    const savedSizes = layout && typeof layout.sizes === 'object' && layout.sizes !== null ? layout.sizes : {};
+    Object.keys(savedSizes).forEach((id) => {
+      const value = Number.parseInt(String(savedSizes[id]), 10);
+      if (panels.has(id) && Number.isFinite(value) && value >= 1 && value <= 3) {
+        sizes[id] = value;
+      }
+    });
+
+    const defaultSize = (id) => {
+      const panel = panels.get(id);
+      return panel instanceof HTMLElement && panel.classList.contains('chart-panel-wide') ? 3 : 1;
+    };
+    const sizeOf = (id) => sizes[id] || defaultSize(id);
 
     const apply = () => {
       order.forEach((id, index) => {
@@ -12737,12 +12784,18 @@ function initWidgetLayouts() {
         if (panel) {
           panel.style.order = String(index);
           panel.hidden = hidden.has(id);
+          const size = sizeOf(id);
+          panel.dataset.chartSize = String(size);
+          const widthBtn = panel.querySelector('[data-chart-width]');
+          if (widthBtn instanceof HTMLElement) widthBtn.textContent = `${size}/3`;
         }
         const li = itemsById.get(id);
         if (li) {
           list.appendChild(li);
           const cb = li.querySelector('[data-widget-visible]');
           if (cb instanceof HTMLInputElement) cb.checked = !hidden.has(id);
+          const widthBtn = li.querySelector('[data-widget-width]');
+          if (widthBtn instanceof HTMLElement) widthBtn.textContent = `${sizeOf(id)}/3`;
         }
       });
       // Non-widget panels (e.g. the “top months” table) stay after the charts.
@@ -12757,11 +12810,24 @@ function initWidgetLayouts() {
     };
     // apply() is called after the in-card controls are mounted.
 
+    const setSize = (id, size) => {
+      const next = Math.max(1, Math.min(3, size));
+      if (next === defaultSize(id)) {
+        delete sizes[id];
+      } else {
+        sizes[id] = next;
+      }
+      apply();
+      // Chart.js re-measures the canvas once the card has its new width.
+      window.setTimeout(() => window.dispatchEvent(new Event('resize')), 60);
+    };
+
     const save = () => {
       const body = new URLSearchParams();
       body.set('context', context);
       order.forEach((id) => body.append('order[]', id));
       [...hidden].forEach((id) => body.append('hidden[]', id));
+      Object.keys(sizes).forEach((id) => body.set(`sizes[${id}]`, String(sizes[id])));
       fetch(group.getAttribute('data-widget-save-url') || '/api/widgets/layout', {
         method: 'POST',
         credentials: 'same-origin',
@@ -12810,6 +12876,7 @@ function initWidgetLayouts() {
       hide: manager.dataset.msgHide || 'Hide chart',
       up: manager.dataset.msgUp || 'Move up',
       down: manager.dataset.msgDown || 'Move down',
+      width: manager.dataset.msgWidth || 'Chart width',
     };
     const iconDrag = '<svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><circle cx="7" cy="4" r="1.4"/><circle cx="13" cy="4" r="1.4"/><circle cx="7" cy="10" r="1.4"/><circle cx="13" cy="10" r="1.4"/><circle cx="7" cy="16" r="1.4"/><circle cx="13" cy="16" r="1.4"/></svg>';
     const iconUp = '<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12l5-5 5 5"/></svg>';
@@ -12821,6 +12888,41 @@ function initWidgetLayouts() {
       <button type="button" class="chart-widget-btn" data-chart-down aria-label="${escapeHtml(labels.down)}" title="${escapeHtml(labels.down)}">${iconDown}</button>
       <button type="button" class="chart-widget-btn" data-chart-hide aria-label="${escapeHtml(labels.hide)}" title="${escapeHtml(labels.hide)}">${iconHide}</button>`;
 
+    // Number of columns the charts grid currently shows (3 desktop, 2 medium, 1 mobile).
+    const gridColumnCount = () => {
+      const columns = (window.getComputedStyle(group).gridTemplateColumns || '').trim();
+      if (columns === '' || columns === 'none') return 1;
+      return Math.max(1, Math.min(3, columns.split(/\s+/).length));
+    };
+
+    let draggingId = '';
+    let dragChanged = false;
+    const clearDragState = () => {
+      group.classList.remove('is-grid-active');
+      group.querySelectorAll('.chart-panel').forEach((panel) => {
+        panel.classList.remove('is-dragging', 'is-drop-target');
+      });
+    };
+    // Live reorder while dragging: the grid shows the result before the drop.
+    const moveTo = (dragged, target, after) => {
+      const from = order.indexOf(dragged);
+      if (from < 0 || dragged === target) return;
+      const [current] = order.splice(from, 1);
+      const targetIndex = order.indexOf(target);
+      if (targetIndex < 0) {
+        order.splice(from, 0, current);
+        return;
+      }
+      const to = after ? targetIndex + 1 : targetIndex;
+      if (to === from) {
+        order.splice(from, 0, current);
+        return;
+      }
+      order.splice(to, 0, current);
+      dragChanged = true;
+      apply();
+    };
+
     panels.forEach((panel, id) => {
       if (!(panel instanceof HTMLElement) || panel.dataset.chartControls === '1') return;
       panel.dataset.chartControls = '1';
@@ -12828,13 +12930,59 @@ function initWidgetLayouts() {
       controls.className = 'chart-widget-controls';
       controls.innerHTML = controlsHtml;
       panel.appendChild(controls);
+      // Bottom-right tools: grid width (1/3 - 2/3 - 3/3) and the drag-to-resize handle.
+      const resizeTools = document.createElement('div');
+      resizeTools.className = 'chart-widget-resize-tools';
+      resizeTools.innerHTML = `
+        <button type="button" class="chart-widget-btn chart-widget-width" data-chart-width aria-label="${escapeHtml(labels.width)}" title="${escapeHtml(labels.width)}">1/3</button>
+        <span class="chart-widget-resize" data-chart-resize aria-hidden="true"></span>`;
+      panel.appendChild(resizeTools);
       controls.querySelector('[data-chart-hide]')?.addEventListener('click', () => setHidden(id, false));
       controls.querySelector('[data-chart-up]')?.addEventListener('click', () => move(id, -1));
       controls.querySelector('[data-chart-down]')?.addEventListener('click', () => move(id, 1));
+      resizeTools.querySelector('[data-chart-width]')?.addEventListener('click', () => {
+        setSize(id, sizeOf(id) >= 3 ? 1 : sizeOf(id) + 1);
+        queueSave();
+      });
+
+      const resizeHandle = resizeTools.querySelector('[data-chart-resize]');
+      resizeHandle?.addEventListener('pointerdown', (event) => {
+        if (!(event instanceof PointerEvent) || event.button !== 0) return;
+        event.preventDefault();
+        const columns = gridColumnCount();
+        const styles = window.getComputedStyle(group);
+        const gap = Number.parseFloat(styles.columnGap || styles.gap || '0') || 0;
+        const groupWidth = group.getBoundingClientRect().width;
+        const columnStep = (groupWidth - gap * (columns - 1)) / columns + gap;
+        const startX = event.clientX;
+        const startSize = sizeOf(id);
+        panel.classList.add('is-resizing');
+        group.classList.add('is-grid-active');
+        if (resizeHandle instanceof HTMLElement) resizeHandle.setPointerCapture(event.pointerId);
+        const onMove = (moveEvent) => {
+          const steps = Math.round((moveEvent.clientX - startX) / Math.max(1, columnStep));
+          const next = Math.max(1, Math.min(3, startSize + steps));
+          if (next !== sizeOf(id)) setSize(id, next);
+        };
+        const onEnd = () => {
+          resizeHandle.removeEventListener('pointermove', onMove);
+          resizeHandle.removeEventListener('pointerup', onEnd);
+          resizeHandle.removeEventListener('pointercancel', onEnd);
+          panel.classList.remove('is-resizing');
+          group.classList.remove('is-grid-active');
+          queueSave();
+        };
+        resizeHandle.addEventListener('pointermove', onMove);
+        resizeHandle.addEventListener('pointerup', onEnd);
+        resizeHandle.addEventListener('pointercancel', onEnd);
+      });
       const handle = controls.querySelector('[data-chart-drag]');
       handle?.addEventListener('dragstart', (event) => {
         if (!(event instanceof DragEvent) || !event.dataTransfer) return;
+        draggingId = id;
+        dragChanged = false;
         panel.classList.add('is-dragging');
+        group.classList.add('is-grid-active');
         event.dataTransfer.effectAllowed = 'move';
         event.dataTransfer.setData('text/plain', id);
         try {
@@ -12843,24 +12991,30 @@ function initWidgetLayouts() {
           // Some browsers refuse custom drag images: the default is fine.
         }
       });
-      handle?.addEventListener('dragend', () => panel.classList.remove('is-dragging'));
+      handle?.addEventListener('dragend', () => {
+        clearDragState();
+        draggingId = '';
+        if (dragChanged) {
+          dragChanged = false;
+          queueSave();
+        }
+      });
       panel.addEventListener('dragover', (event) => {
         event.preventDefault();
+        if (!draggingId || draggingId === id) return;
         panel.classList.add('is-drop-target');
+        const rect = panel.getBoundingClientRect();
+        moveTo(draggingId, id, event.clientX > rect.left + rect.width / 2);
       });
       panel.addEventListener('dragleave', () => panel.classList.remove('is-drop-target'));
       panel.addEventListener('drop', (event) => {
         if (!(event instanceof DragEvent) || !event.dataTransfer) return;
         event.preventDefault();
         panel.classList.remove('is-drop-target');
-        const dragged = event.dataTransfer.getData('text/plain') || '';
-        const from = order.indexOf(dragged);
-        const to = order.indexOf(id);
-        if (!dragged || dragged === id || from < 0 || to < 0) return;
-        order.splice(from, 1);
-        order.splice(to, 0, dragged);
-        apply();
-        queueSave();
+        if (dragChanged) {
+          dragChanged = false;
+          queueSave();
+        }
       });
     });
 
@@ -12875,6 +13029,10 @@ function initWidgetLayouts() {
       }
       li.querySelector('[data-widget-up]')?.addEventListener('click', () => move(id, -1));
       li.querySelector('[data-widget-down]')?.addEventListener('click', () => move(id, 1));
+      li.querySelector('[data-widget-width]')?.addEventListener('click', () => {
+        setSize(id, sizeOf(id) >= 3 ? 1 : sizeOf(id) + 1);
+        queueSave();
+      });
       li.addEventListener('dragstart', (event) => {
         if (!(event instanceof DragEvent) || !event.dataTransfer) return;
         li.classList.add('is-dragging');

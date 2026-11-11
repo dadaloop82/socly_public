@@ -623,6 +623,11 @@
         <?= view_partial('partials/member_types_editor', ['types' => $types]) ?>
         <p class="settings-autosave-status muted" data-settings-autosave-status aria-live="polite"></p>
     </form>
+    <form class="form-actions" method="post" action="<?= e(url('/settings/types/recalculate')) ?>" data-confirm="<?= e(__('settings.recalculate_balances_confirm')) ?>">
+        <?= csrf_field() ?>
+        <button type="submit" class="btn btn-ghost btn-sm"><?= e(__('settings.recalculate_balances')) ?></button>
+        <p class="muted"><?= e(__('settings.recalculate_balances_hint')) ?></p>
+    </form>
     </div>
 </details>
 

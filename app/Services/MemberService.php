@@ -963,6 +963,9 @@ final class MemberService
                 'de' => $nameDe !== '' ? $nameDe : $nameIt,
                 'en' => $nameEn !== '' ? $nameEn : $nameIt,
             ];
+            $currentType = $this->db->fetch('SELECT price FROM member_types WHERE id = :id', ['id' => $id]);
+            $oldPrice = (float) ($currentType['price'] ?? 0);
+            $newPrice = (float) $priceRaw;
             $allTypes = $this->types(false);
             $isActive = !empty($row['is_active']) ? 1 : 0;
             if (count($allTypes) === 1) {
@@ -970,9 +973,26 @@ final class MemberService
             }
             $this->db->update('member_types', [
                 'name_json' => json_encode($names, JSON_UNESCAPED_UNICODE),
-                'price' => (float) $priceRaw,
+                'price' => $newPrice,
                 'is_active' => $isActive,
             ], 'id = :id', ['id' => $id]);
+            if (abs($newPrice - $oldPrice) >= 0.005) {
+                // Keep open balances aligned with the new fee, preserving what was already paid
+                // and any extra debt recorded on the member.
+                $delta = $newPrice - $oldPrice;
+                $stmt = $this->db->query(
+                    "UPDATE members SET balance_due = GREATEST(0, balance_due + :delta)
+                     WHERE member_type_id = :id AND balance_due > 0 AND status <> 'cancelled'",
+                    ['delta' => $delta, 'id' => $id]
+                );
+                $this->audit->log('member_type.price_changed', 'member_type', (string) $id, [
+                    'price' => $oldPrice,
+                ], [
+                    'price' => $newPrice,
+                    'delta' => $delta,
+                    'members_updated' => $stmt->rowCount(),
+                ]);
+            }
         }
 
         $newTypes = $input['new_types'] ?? null;
@@ -1024,6 +1044,41 @@ final class MemberService
         }
 
         return ['ok' => true];
+    }
+
+    /**
+     * Align open balances with the current type price and recorded payments.
+     * Repairs balances left behind by a fee change made before the automatic delta update.
+     *
+     * @return array{updated:int}
+     */
+    public function recalculateBalances(string $ip): array
+    {
+        $rows = $this->db->fetchAll(
+            "SELECT m.id, m.balance_due, mt.price,
+                    COALESCE((SELECT SUM(p.amount) FROM payments p WHERE p.member_id = m.id), 0) AS paid_total
+             FROM members m
+             INNER JOIN member_types mt ON mt.id = m.member_type_id
+             WHERE m.balance_due > 0 AND m.status <> 'cancelled'"
+        );
+        $updated = 0;
+        foreach ($rows as $row) {
+            $expected = max(0, (float) ($row['price'] ?? 0) - (float) ($row['paid_total'] ?? 0));
+            if (abs($expected - (float) ($row['balance_due'] ?? 0)) < 0.005) {
+                continue;
+            }
+            $this->db->update(
+                'members',
+                ['balance_due' => $expected],
+                'id = :id',
+                ['id' => (int) ($row['id'] ?? 0)]
+            );
+            $updated++;
+        }
+        if ($updated > 0) {
+            $this->audit->log('member.balances_recalculated', 'members', null, null, ['updated' => $updated], $ip);
+        }
+        return ['updated' => $updated];
     }
 
     /** @return list<array<string,mixed>> */
@@ -1944,14 +1999,25 @@ final class MemberService
         if (!empty($guardianResolved['errors'])) {
             return ['ok' => false, 'errors' => $guardianResolved['errors']];
         }
-        $this->db->update('members', [
+        $newTypeId = (int) $data['member_type_id'];
+        $updateData = [
             'member_number' => $data['member_number'],
-            'member_type_id' => (int) $data['member_type_id'],
+            'member_type_id' => $newTypeId,
             'guardian_member_id' => $guardianResolved['id'],
             'membership_period_id' => (int) $data['membership_period_id'],
             'status' => $data['status'],
             'notes' => $data['notes'] ?? null,
-        ], 'id = :id', ['id' => $id]);
+        ];
+        if ($newTypeId !== (int) ($before['member_type_id'] ?? 0)) {
+            $newType = $this->db->fetch('SELECT price FROM member_types WHERE id = :id', ['id' => $newTypeId]);
+            if ($newType) {
+                // Move the open balance by the price difference, so a type change updates the fee
+                // due without touching the amount already paid.
+                $delta = (float) $newType['price'] - (float) ($before['type_price'] ?? 0);
+                $updateData['balance_due'] = max(0, (float) ($before['balance_due'] ?? 0) + $delta);
+            }
+        }
+        $this->db->update('members', $updateData, 'id = :id', ['id' => $id]);
         $this->syncAdmittedAt($id, (string) ($before['status'] ?? ''), (string) $data['status'], $before['admitted_at'] ?? null);
         $this->saveFieldValues($id, $fieldData);
         $after = $this->find($id);
@@ -2547,13 +2613,14 @@ final class MemberService
     /**
      * Members for org-chart assignment: everyone (eligible ones first) with a status suffix, so a
      * suspended member or an unpaid fee is visible instead of silently missing from the list.
+     * The label shows how long the person has been a member instead of the registry number.
      *
      * @return list<array{id:int,member_number:string,first_name:string,last_name:string,display_name:string,eligible:bool}>
      */
     public function listForOrgSelect(): array
     {
         $rows = $this->db->fetchAll(
-            "SELECT m.id, m.member_number, m.status, m.balance_due,
+            "SELECT m.id, m.member_number, m.status, m.balance_due, m.admitted_at, m.created_at,
                     COALESCE((
                         SELECT v.value FROM member_field_values v
                         INNER JOIN member_field_definitions d ON d.id = v.field_definition_id AND d.`key` = 'last_name'
@@ -2572,15 +2639,24 @@ final class MemberService
             $name = trim((string) (($row['last_name'] ?? '') . ' ' . ($row['first_name'] ?? '')));
             $num = trim((string) ($row['member_number'] ?? ''));
             $base = $name !== ''
-                ? ($num !== '' ? $name . ' (' . $num . ')' : $name)
+                ? $name
                 : ($num !== '' ? $num : '#' . (string) ($row['id'] ?? ''));
+            $sinceRaw = trim((string) ($row['admitted_at'] ?? ''));
+            if ($sinceRaw === '') {
+                $sinceRaw = (string) ($row['created_at'] ?? '');
+            }
+            $since = $this->membershipSinceLabel($sinceRaw);
+            if ($since === '') {
+                $since = $this->membershipSinceLabel((string) ($row['created_at'] ?? ''));
+            }
             $suffix = '';
             if ((string) ($row['status'] ?? '') !== 'active') {
                 $suffix = ' — ' . __('org.option_inactive');
             } elseif ((float) ($row['balance_due'] ?? 0) > 0) {
                 $suffix = ' — ' . __('org.option_fee_due');
             }
-            $row['display_name'] = $base . $suffix;
+            $row['display_name'] = $base . ($since !== '' ? ' (' . $since . ')' : '') . $suffix;
+            $row['member_since'] = $since;
             $row['eligible'] = $suffix === '';
         }
         unset($row);
@@ -2588,8 +2664,42 @@ final class MemberService
     }
 
     /**
-     * Active members grouped by membership type, capped per type so the org
-     * chart can show “e altri N” instead of listing everybody.
+     * Compact "member since" label used in the org-chart member picker.
+     */
+    private function membershipSinceLabel(string $admittedAt): string
+    {
+        $raw = trim($admittedAt);
+        if ($raw === '' || preg_match('/^\d{4}-\d{2}-\d{2}/', $raw) !== 1) {
+            return '';
+        }
+        try {
+            $start = new \DateTimeImmutable(substr($raw, 0, 10));
+        } catch (\Throwable) {
+            return '';
+        }
+        $today = new \DateTimeImmutable('today');
+        if ($start > $today) {
+            return '';
+        }
+        $diff = $start->diff($today);
+        $months = ((int) $diff->y * 12) + (int) $diff->m;
+        if ($months < 1) {
+            return (string) __('org.member_since_new');
+        }
+        if ($months < 12) {
+            return $months === 1
+                ? (string) __('org.member_since_one_month')
+                : (string) __('org.member_since_months', ['count' => (string) $months]);
+        }
+        $years = intdiv($months, 12);
+        return $years === 1
+            ? (string) __('org.member_since_one_year')
+            : (string) __('org.member_since_years', ['count' => (string) $years]);
+    }
+
+    /**
+     * Active members grouped by membership type. The caller decides how many rows to load;
+     * the org chart shows the first six and expands the rest on demand.
      *
      * @return list<array{id:int,name:string,count:int,members:list<array{id:int,name:string,number:string}>,more:int}>
      */

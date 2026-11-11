@@ -336,18 +336,29 @@ $votingMembersCount = (int) ($votingMembersCount ?? 0);
                                     <span class="org-type-count"><?= e((string) (int) $typeItem['count']) ?></span>
                                 </a>
                                 <?php if ($typeItem['members'] !== []): ?>
+                                    <?php
+                                    $visibleMembers = array_slice($typeItem['members'], 0, 6);
+                                    $moreMembers = array_slice($typeItem['members'], 6);
+                                    ?>
                                     <ul class="org-type-list">
-                                        <?php foreach ($typeItem['members'] as $typeMember): ?>
+                                        <?php foreach ($visibleMembers as $typeMember): ?>
                                             <li>
                                                 <a href="<?= e(url('/members/' . (int) $typeMember['id'])) ?>"><?= e((string) $typeMember['name']) ?></a>
                                             </li>
                                         <?php endforeach; ?>
                                     </ul>
-                                <?php endif; ?>
-                                <?php if ((int) $typeItem['more'] > 0): ?>
-                                    <p class="org-type-more">
-                                        <a href="<?= e($typeUrl) ?>"><?= e(__('org.type_more', ['count' => (string) (int) $typeItem['more']])) ?></a>
-                                    </p>
+                                    <?php if ($moreMembers !== []): ?>
+                                        <details class="org-type-more">
+                                            <summary><?= e(__('org.type_more', ['count' => (string) count($moreMembers)])) ?></summary>
+                                            <ul class="org-type-list org-type-list--more">
+                                                <?php foreach ($moreMembers as $typeMember): ?>
+                                                    <li>
+                                                        <a href="<?= e(url('/members/' . (int) $typeMember['id'])) ?>"><?= e((string) $typeMember['name']) ?></a>
+                                                    </li>
+                                                <?php endforeach; ?>
+                                            </ul>
+                                        </details>
+                                    <?php endif; ?>
                                 <?php endif; ?>
                             </article>
                         <?php endforeach; ?>

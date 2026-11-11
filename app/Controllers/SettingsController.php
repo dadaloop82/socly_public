@@ -504,6 +504,15 @@ final class SettingsController extends BaseController
         $this->settingsFinish($request, 'types');
     }
 
+    public function recalculateTypeBalances(Request $request): void
+    {
+        $result = $this->members->recalculateBalances($request->ip());
+        $this->flash('success', __('settings.recalculate_balances_done', [
+            'count' => (string) (int) ($result['updated'] ?? 0),
+        ]));
+        redirect('/settings#types');
+    }
+
     public function savePeriod(Request $request): void
     {
         $result = $this->members->persistPeriodsConfig($request->all());

@@ -27,11 +27,13 @@ final class WidgetController extends BaseController
         }
         $order = $request->input('order', []);
         $hidden = $request->input('hidden', []);
+        $sizes = $request->input('sizes', []);
         $result = $this->widgets->save(
             (int) ($user['id'] ?? 0),
             (string) $request->input('context', ''),
             is_array($order) ? $order : [],
             is_array($hidden) ? $hidden : [],
+            is_array($sizes) ? $sizes : [],
             $request->ip()
         );
         $this->json($result, !empty($result['ok']) ? 200 : 422);

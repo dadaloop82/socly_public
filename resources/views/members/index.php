@@ -39,6 +39,7 @@ $totalPages = max(1, (int) ceil(((int) $result['total']) / max(1, $perPage)));
         <?php if ($canManage): ?>
             <a class="btn<?= empty($hasAnyMembers) ? ' is-first-cta' : '' ?>" href="<?= e(url('/members/create')) ?>"><?= e(__('members.create')) ?></a>
         <?php endif; ?>
+        <a class="btn btn-ghost" href="<?= e(url('/statistics')) ?>"><?= e(__('statistics.open')) ?></a>
         <a class="btn btn-ghost" href="<?= e(url('/members/export/registry?' . http_build_query(array_filter($filters)))) ?>" target="_blank" rel="noopener"><?= e(__('members.registry_export')) ?></a>
         <?php if ($canManage): ?>
             <a class="btn-action-icon" href="<?= e(url('/members/import')) ?>" aria-label="<?= e(__('members.import.button')) ?>" title="<?= e(__('members.import.button')) ?>">
