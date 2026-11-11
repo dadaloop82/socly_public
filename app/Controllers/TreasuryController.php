@@ -262,6 +262,24 @@ final class TreasuryController extends BaseController
             || strtoupper(trim((string) ($posted['runts_line'] ?? ''))) !== strtoupper(trim((string) ($before['runts_line'] ?? '')))
             || (int) ($posted['budget_item_id'] ?? 0) !== (int) ($before['budget_item_id'] ?? 0);
         if ($classificationChanged) {
+            $changedFields = [];
+            if (trim((string) ($posted['category'] ?? '')) !== trim((string) ($before['category'] ?? ''))) {
+                $changedFields[] = 'category';
+            }
+            if (strtoupper(trim((string) ($posted['runts_line'] ?? ''))) !== strtoupper(trim((string) ($before['runts_line'] ?? '')))) {
+                $changedFields[] = 'runts_line';
+            }
+            if ((int) ($posted['budget_item_id'] ?? 0) !== (int) ($before['budget_item_id'] ?? 0)) {
+                $changedFields[] = 'budget_item_id';
+            }
+            $_SESSION['_similar_probe'][(int) $id] = [
+                'fields' => $changedFields,
+                'originals' => [
+                    'category' => (string) ($before['category'] ?? ''),
+                    'runts_line' => (string) ($before['runts_line'] ?? ''),
+                    'budget_item_id' => (string) (int) ($before['budget_item_id'] ?? 0),
+                ],
+            ];
             redirect('/treasury?similar=' . (int) $id);
         }
         redirect('/treasury');
@@ -644,11 +662,19 @@ final class TreasuryController extends BaseController
             'runts_line' => (string) ($movement['runts_line'] ?? ''),
             'budget_item_id' => (string) (int) ($movement['budget_item_id'] ?? 0),
         ];
-        $fields = [];
-        foreach ($values as $field => $value) {
-            if ($field === 'budget_item_id' ? (int) $value > 0 : trim($value) !== '') {
-                $fields[] = $field;
+        $context = $_SESSION['_similar_probe'][$movementId] ?? null;
+        unset($_SESSION['_similar_probe'][$movementId]);
+        if (is_array($context)) {
+            $fields = array_values(array_intersect((array) ($context['fields'] ?? []), ['category', 'runts_line', 'budget_item_id']));
+            $originals = (array) ($context['originals'] ?? $values);
+        } else {
+            $fields = [];
+            foreach ($values as $field => $value) {
+                if ($field === 'budget_item_id' ? (int) $value > 0 : trim($value) !== '') {
+                    $fields[] = $field;
+                }
             }
+            $originals = $values;
         }
         if ($fields === []) {
             return null;
@@ -657,7 +683,7 @@ final class TreasuryController extends BaseController
             'direction' => (string) ($movement['direction'] ?? ''),
             'description' => (string) ($movement['description'] ?? ''),
             'beneficiary' => (string) ($movement['beneficiary'] ?? ''),
-        ], 3, $movementId, $fields, $values);
+        ], 3, $movementId, $fields, $originals);
         if (($result['total'] ?? 0) < 1) {
             return null;
         }

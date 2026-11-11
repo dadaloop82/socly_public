@@ -946,7 +946,7 @@ final class TreasuryService
         }
 
         $rows = $this->db->fetchAll(
-            "SELECT m.id, m.movement_date, m.description, m.beneficiary, m.amount, m.category,
+            "SELECT m.id, m.movement_date, m.description, m.beneficiary, m.amount, m.category, m.direction,
                     m.runts_line, m.budget_item_id, m.approved_at
              FROM treasury_movements m
              WHERE m.direction = :direction AND m.id <> :exclude
@@ -985,6 +985,14 @@ final class TreasuryService
                 // è ancora da classificare davvero, quindi entra nella proposta.
                 $original = trim((string) ($originals[$field] ?? ''));
                 $sameAsOriginal = $original !== '' && $current === $original;
+                if (!$sameAsOriginal && $field === 'runts_line' && $current !== '') {
+                    // Voce derivata in automatico dalla tipologia: ancora da classificare.
+                    $automatic = strtoupper(RuntsReportService::lineForCategory(
+                        (string) ($row['category'] ?? ''),
+                        (string) ($row['direction'] ?? 'expense')
+                    ));
+                    $sameAsOriginal = $automatic !== '' && strtoupper($current) === $automatic;
+                }
                 if (!$empty && !$sameAsOriginal) {
                     $blocked = true;
                     break;
@@ -1056,29 +1064,42 @@ final class TreasuryService
             if ($id < 1) {
                 continue;
             }
-            // Riempie solo i campi vuoti: un valore già presente non viene mai sovrascritto.
-            $sets = [];
-            $params = ['id' => $id];
+            $row = $this->db->fetch(
+                'SELECT id, direction, category, runts_line, budget_item_id FROM treasury_movements WHERE id = :id',
+                ['id' => $id]
+            );
+            if ($row === null) {
+                continue;
+            }
+            $update = [];
             if (isset($payload['category'])) {
-                $sets[] = "category = CASE WHEN category IS NULL OR category = '' OR category = :orig_category THEN :set_category ELSE category END";
-                $params['set_category'] = $payload['category'];
-                $params['orig_category'] = (string) ($originals['category'] ?? '');
+                $current = trim((string) ($row['category'] ?? ''));
+                $original = trim((string) ($originals['category'] ?? ''));
+                if ($current === '' || $current === $original) {
+                    $update['category'] = $payload['category'];
+                }
             }
             if (isset($payload['runts_line'])) {
-                $sets[] = "runts_line = CASE WHEN runts_line IS NULL OR runts_line = '' OR runts_line = :orig_runts THEN :set_runts ELSE runts_line END";
-                $params['set_runts'] = $payload['runts_line'];
-                $params['orig_runts'] = (string) ($originals['runts_line'] ?? '');
+                $current = strtoupper(trim((string) ($row['runts_line'] ?? '')));
+                $original = strtoupper(trim((string) ($originals['runts_line'] ?? '')));
+                // Valore derivato in automatico dalla tipologia: è ancora “da classificare”.
+                $automatic = strtoupper(RuntsReportService::lineForCategory(
+                    (string) ($row['category'] ?? ''),
+                    (string) ($row['direction'] ?? 'expense')
+                ));
+                if ($current === '' || $current === $original || ($automatic !== '' && $current === $automatic)) {
+                    $update['runts_line'] = $payload['runts_line'];
+                }
             }
             if (isset($payload['budget_item_id'])) {
-                $sets[] = 'budget_item_id = CASE WHEN budget_item_id IS NULL OR budget_item_id = :orig_budget THEN :set_budget ELSE budget_item_id END';
-                $params['set_budget'] = $payload['budget_item_id'];
-                $params['orig_budget'] = (int) ($originals['budget_item_id'] ?? 0);
+                $current = (int) ($row['budget_item_id'] ?? 0);
+                $original = (int) ($originals['budget_item_id'] ?? 0);
+                if ($current === 0 || $current === $original) {
+                    $update['budget_item_id'] = $payload['budget_item_id'];
+                }
             }
-            $stmt = $this->db->query(
-                'UPDATE treasury_movements SET ' . implode(', ', $sets) . ' WHERE id = :id',
-                $params
-            );
-            if ($stmt->rowCount() > 0) {
+            if ($update !== []) {
+                $this->db->update('treasury_movements', $update, 'id = :id', ['id' => $id]);
                 $updated++;
             }
         }
