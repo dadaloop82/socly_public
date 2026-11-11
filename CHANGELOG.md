@@ -25,6 +25,10 @@ every 100 patches bump the series, and each bump is published to this repository
   balances are a treasury matter and are ignored in the org chart, both in the picker and on save.
 - Budget: the CSV upload now uses the same drag-and-drop area as the other uploads, amounts keep
   the thousands separator and the currency symbol no longer overlaps the number.
+- Budget: creating a second budget for a year that already has one is no longer proposed, and while
+  a draft is open the page points to it (finish/approve or delete it) instead of offering a new one.
+- Budget lines can create a new treasury category on the spot (“+ Nuova categoria…”), no need to
+  fall back to “Other”.
 
 ## [1.5.41] - 2026-11-10
 

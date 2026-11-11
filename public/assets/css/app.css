@@ -12701,6 +12701,12 @@ tr.doc-row-editable:focus-visible {
 .budget-card-actions { display: flex; gap: 0.4rem; flex-wrap: wrap; }
 .budget-empty { padding: 1.1rem 1.25rem; display: grid; gap: 0.35rem; margin-bottom: 1.25rem; }
 .budget-create { padding: 1.1rem 1.25rem 1.25rem; }
+.budget-blocked-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-top: 0.35rem;
+}
 .budget-create-row {
   display: grid;
   grid-template-columns: minmax(0, 0.5fr) minmax(0, 1.2fr) minmax(0, 0.6fr);
@@ -12855,6 +12861,7 @@ tr.doc-row-editable:focus-visible {
   color: var(--muted, #667085);
 }
 .budget-add-row { margin-top: 0.4rem; }
+.budget-new-category { margin-top: 0.3rem; }
 .budget-grid-tools { display: flex; justify-content: flex-start; }
 .budget-summary {
   position: sticky;

@@ -3,11 +3,13 @@
  * Bilancio — elenco preventivi per anno sociale.
  *
  * @var list<array<string,mixed>> $budgets
+ * @var list<array<string,mixed>> $drafts
  * @var list<int> $years
  * @var int $default_year
  * @var \Socly\Services\CurrencyService $currency
  */
 $canManage = can('treasury.manage');
+$drafts = is_array($drafts ?? null) ? $drafts : [];
 ?>
 <div class="page-header">
     <div class="titles">
@@ -65,7 +67,7 @@ $canManage = can('treasury.manage');
     </div>
 <?php endif; ?>
 
-<?php if ($canManage): ?>
+<?php if ($canManage && $years !== [] && $drafts === []): ?>
     <section class="panel budget-create">
         <header class="panel-header">
             <div>
@@ -151,6 +153,33 @@ $canManage = can('treasury.manage');
                 <button class="btn" type="submit"><?= e(__('budget.create_submit')) ?></button>
             </div>
         </form>
+    </section>
+<?php elseif ($canManage): ?>
+    <?php
+    $hasOpenDraft = $drafts !== [];
+    $blockedTitle = $hasOpenDraft ? __('budget.create_blocked_draft_title') : __('budget.create_blocked_title');
+    $blockedText = $hasOpenDraft ? __('budget.create_blocked_draft_text') : __('budget.create_blocked_text');
+    $blockedBudgets = $hasOpenDraft ? $drafts : $budgets;
+    ?>
+    <section class="panel budget-create budget-create-blocked">
+        <header class="panel-header">
+            <div>
+                <h2 class="section-title"><?= e($blockedTitle) ?></h2>
+                <p class="section-lede"><?= e($blockedText) ?></p>
+            </div>
+        </header>
+        <div class="budget-blocked-links">
+            <?php foreach ($blockedBudgets as $row): ?>
+                <?php
+                $blockedId = (int) ($row['id'] ?? 0);
+                $blockedApproved = (string) ($row['status'] ?? '') === 'approved';
+                ?>
+                <a class="btn btn-ghost btn-sm" href="<?= e(url('/budgets/' . $blockedId)) ?>">
+                    <?= e((string) ($row['fiscal_year'] ?? '')) ?>
+                    · <?= e($blockedApproved ? __('budget.status_approved') : __('budget.status_draft')) ?>
+                </a>
+            <?php endforeach; ?>
+        </div>
     </section>
 <?php endif; ?>
 

@@ -1473,6 +1473,20 @@ final class TreasuryService
     }
 
     /**
+     * Resolve a category picked in a form (builtin, custom or a brand-new label) and register the
+     * new one when needed. Shared by treasury movements and budget lines.
+     *
+     * @return array{ok:bool,key?:string,error?:string}
+     */
+    public function resolveCategoryChoice(string $selected, string $newLabel = '', string $existingKey = ''): array
+    {
+        return $this->resolveCategory(
+            ['category' => $selected, 'new_category' => $newLabel],
+            ['category' => $existingKey]
+        );
+    }
+
+    /**
      * @param array<string,mixed> $input
      * @param array<string,mixed>|null $existing
      * @return array{ok:bool,key?:string,error?:string}

@@ -30,11 +30,21 @@ final class BudgetController extends BaseController
     {
         require_component('treasury');
         $currentYear = (int) date('Y');
+        $budgets = $this->budgets->listDocuments();
+        // One budget per social year, and one open draft at a time: until the existing draft is
+        // completed (approved) or deleted, the page does not propose creating another one.
+        $drafts = array_values(array_filter(
+            $budgets,
+            static fn (array $row): bool => (string) ($row['status'] ?? '') !== BudgetService::STATUS_APPROVED
+        ));
+        $years = $this->budgets->creatableYears();
+        $defaultYear = in_array($currentYear + 1, $years, true) ? $currentYear + 1 : ($years[0] ?? $currentYear + 1);
         $this->render('budgets/index', [
             'title' => __('budget.title'),
-            'budgets' => $this->budgets->listDocuments(),
-            'years' => $this->budgets->availableYears(),
-            'default_year' => $currentYear + 1,
+            'budgets' => $budgets,
+            'drafts' => $drafts,
+            'years' => $years,
+            'default_year' => $defaultYear,
             'currency' => $this->currency,
         ]);
     }
@@ -123,7 +133,8 @@ final class BudgetController extends BaseController
         require_component('treasury');
         $result = $this->budgets->saveGrid((int) $id, $request->all(), $request->ip());
         if (empty($result['ok'])) {
-            $this->flash('errors', ['budget' => __('budget.save_failed')]);
+            $message = trim((string) ($result['message'] ?? ''));
+            $this->flash('errors', ['budget' => $message !== '' ? $message : __('budget.save_failed')]);
         } else {
             $this->flash('success', __('budget.saved'));
         }

@@ -350,11 +350,11 @@ final class BudgetService
      *
      * Posted shape (flat arrays, so the grid can add/remove rows client-side):
      * section_key[], section_id[], section_title[];
-     * item_id[], item_section[], item_label[], item_category[], item_direction[],
-     * item_amount[], item_notes[].
+     * item_id[], item_section[], item_label[], item_category[], item_new_category[],
+     * item_direction[], item_amount[], item_notes[].
      *
      * @param array<string,mixed> $input
-     * @return array{ok:bool,error?:string}
+     * @return array{ok:bool,error?:string,message?:string}
      */
     public function saveGrid(int $id, array $input, string $ip): array
     {
@@ -378,9 +378,38 @@ final class BudgetService
         $itemSections = array_values((array) ($input['item_section'] ?? []));
         $itemLabels = array_values((array) ($input['item_label'] ?? []));
         $itemCategories = array_values((array) ($input['item_category'] ?? []));
+        $itemNewCategories = array_values((array) ($input['item_new_category'] ?? []));
         $itemDirections = array_values((array) ($input['item_direction'] ?? []));
         $itemAmounts = array_values((array) ($input['item_amount'] ?? []));
         $itemNotes = array_values((array) ($input['item_notes'] ?? []));
+
+        // Categories are resolved before the transaction: a new label registers a custom category,
+        // and an invalid one must not leave half-saved rows behind.
+        $existingCategories = [];
+        foreach ($budget['items'] as $item) {
+            $existingCategories[(int) $item['id']] = (string) ($item['category'] ?? '');
+        }
+        $resolvedCategories = [];
+        foreach ($itemIds as $index => $rawItemId) {
+            $rawCategory = trim((string) ($itemCategories[$index] ?? ''));
+            if ($rawCategory === '') {
+                $resolvedCategories[$index] = null;
+                continue;
+            }
+            $resolved = $this->treasury->resolveCategoryChoice(
+                $rawCategory,
+                (string) ($itemNewCategories[$index] ?? ''),
+                $existingCategories[(int) $rawItemId] ?? ''
+            );
+            if (empty($resolved['ok'])) {
+                return [
+                    'ok' => false,
+                    'error' => 'category',
+                    'message' => (string) ($resolved['error'] ?? __('validation.in')),
+                ];
+            }
+            $resolvedCategories[$index] = (string) ($resolved['key'] ?? '');
+        }
 
         $this->db->beginTransaction();
         try {
@@ -432,14 +461,14 @@ final class BudgetService
                 if (!in_array($direction, self::DIRECTIONS, true)) {
                     $direction = 'expense';
                 }
-                $category = trim((string) ($itemCategories[$index] ?? ''));
+                $category = $resolvedCategories[$index] ?? '';
                 $notes = mb_substr(trim((string) ($itemNotes[$index] ?? '')), 0, 500);
                 $payload = [
                     'section_id' => $sectionId,
                     'direction' => $direction,
                     'label' => $label !== '' ? $label : (string) __('budget.item_untitled'),
                     'amount' => $amount,
-                    'category' => $category !== '' ? $category : null,
+                    'category' => $category !== null && $category !== '' ? $category : null,
                     'notes' => $notes !== '' ? $notes : null,
                     'sort_order' => $orderBySection[$sectionKey],
                 ];
@@ -795,6 +824,24 @@ final class BudgetService
         $years = array_values(array_unique($years));
         sort($years);
         return $years;
+    }
+
+    /**
+     * Years that can still receive a budget: one document per social year, so the years that
+     * already have a draft or approved budget are excluded.
+     *
+     * @return list<int>
+     */
+    public function creatableYears(): array
+    {
+        $taken = [];
+        foreach ($this->listDocuments() as $row) {
+            $taken[(int) ($row['fiscal_year'] ?? 0)] = true;
+        }
+        return array_values(array_filter(
+            $this->availableYears(),
+            static fn (int $year): bool => !isset($taken[$year])
+        ));
     }
 
     /**

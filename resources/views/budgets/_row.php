@@ -10,6 +10,8 @@ $row = is_array($row ?? null) ? $row : null;
 $rowId = (int) ($row['id'] ?? 0);
 $direction = (string) ($row['direction'] ?? 'expense') === 'income' ? 'income' : 'expense';
 $category = (string) ($row['category'] ?? '');
+$categoryKeys = array_map(static fn (array $option): string => (string) ($option['key'] ?? ''), $categories);
+$showUnknownCategory = $category !== '' && !in_array($category, $categoryKeys, true);
 $amount = $row !== null ? number_format((float) ($row['amount'] ?? 0), 2, ',', '.') : '';
 ?>
 <tr class="budget-row" data-budget-row>
@@ -28,13 +30,28 @@ $amount = $row !== null ? number_format((float) ($row['amount'] ?? 0), 2, ',', '
         >
     </td>
     <td class="budget-cell-category">
-        <select class="budget-select" name="item_category[]" aria-label="<?= e(__('treasury.category')) ?>">
+        <select class="budget-select" name="item_category[]" data-budget-category aria-label="<?= e(__('treasury.category')) ?>">
             <option value=""><?= e(__('budget.category_none')) ?></option>
             <?php foreach ($categories as $option): ?>
                 <?php $optionKey = (string) ($option['key'] ?? ''); ?>
                 <option value="<?= e($optionKey) ?>" <?= $optionKey === $category ? 'selected' : '' ?>><?= e((string) ($option['label'] ?? $optionKey)) ?></option>
             <?php endforeach; ?>
+            <?php if ($showUnknownCategory): ?>
+                <option value="<?= e($category) ?>" selected><?= e($category) ?></option>
+            <?php endif; ?>
+            <option value="__new__"><?= e(__('treasury.category_new')) ?></option>
         </select>
+        <input
+            type="text"
+            class="budget-input budget-new-category"
+            name="item_new_category[]"
+            value=""
+            maxlength="80"
+            placeholder="<?= e(__('treasury.category_new_placeholder')) ?>"
+            aria-label="<?= e(__('treasury.category_new_label')) ?>"
+            data-budget-new-category
+            hidden
+        >
     </td>
     <td class="budget-cell-direction">
         <select class="budget-select" name="item_direction[]" data-budget-direction aria-label="<?= e(__('budget.direction')) ?>">

@@ -14717,10 +14717,34 @@ function initBudgetGrid(scope = document) {
       recalc();
     }
   });
+
+  // “+ Nuova categoria…”: mostra il campo nome e lo rende obbligatorio (salvato come categoria custom).
+  const syncNewCategory = (select, focus = false) => {
+    const row = select.closest('[data-budget-row]');
+    const input = row ? row.querySelector('[data-budget-new-category]') : null;
+    if (!(input instanceof HTMLInputElement)) return;
+    const isNew = select.value === '__new__';
+    input.hidden = !isNew;
+    input.required = isNew;
+    if (isNew) {
+      if (focus) input.focus();
+      return;
+    }
+    input.value = '';
+  };
+  form.querySelectorAll('[data-budget-category]').forEach((select) => {
+    if (select instanceof HTMLSelectElement) syncNewCategory(select);
+  });
+
   form.addEventListener('change', (event) => {
     const target = event.target;
+    if (!(target instanceof Element)) return;
     if (target instanceof HTMLSelectElement && target.matches('[data-budget-direction]')) {
       recalc();
+      return;
+    }
+    if (target instanceof HTMLSelectElement && target.matches('[data-budget-category]')) {
+      syncNewCategory(target, true);
     }
   });
 
