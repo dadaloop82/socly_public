@@ -75,7 +75,6 @@ $year = date('Y');
                     <p class="auth-desc auth-setup-prep-lede" data-i18n="auth.setup_prep_lede"><?= e(__('auth.setup_prep_lede')) ?></p>
                 <?php else: ?>
                     <p class="auth-motto" data-i18n-html="auth.motto"><?= with_auth_asterisk(e(__('auth.motto'))) ?></p>
-                    <p class="auth-desc" data-i18n-html="auth.product_description"><?= with_auth_asterisk(with_socly_word(__('auth.product_description'))) ?></p>
                 <?php endif; ?>
             </div>
             <?php if ($showSetupPrep): ?>
