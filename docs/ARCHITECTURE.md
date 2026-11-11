@@ -97,6 +97,11 @@ The grid is three columns wide (`data-chart-size` spans 1–3, dense packing). I
 dragging or resizing — and while the “manage charts” panel is open — so cards can be placed side by
 side, and the reorder previews live before the drop. Every change survives a reload.
 
+The bottom-right tools also export the card as a PNG (`copyChartToPng()`): the canvas is redrawn on a
+solid background with the card title, copied through the async clipboard when available and
+downloaded otherwise (plain-HTTP installs are not a secure context, so they always fall back to the
+file).
+
 ## Geocoding (statistics map)
 
 `GeoService` caches coordinates in `storage/cache/geo_city_coords.json`. Lookups happen

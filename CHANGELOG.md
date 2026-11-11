@@ -13,6 +13,8 @@ every 100 patches bump the series, and each bump is published to this repository
 - Dashboard, Statistics and treasury charts: drag a card to reorder it while the three-column grid
   shows the available slots, resize it to one third, two thirds or the full row (width button or the
   bottom-right handle) and hide the cards you do not need; the layout is saved per user.
+- Chart cards: copy the chart as a PNG from the bottom-right tools (clipboard when the browser allows
+  it, otherwise the image is downloaded) — the export keeps the card title and a solid background.
 - Budget lines can create a new treasury category on the spot (“+ New category…”), no need to fall
   back to “Other”; the label is then shared with movements, documents and deadlines.
 - Budget grid autosaves 5 seconds after the last change (also when adding/removing lines), with a

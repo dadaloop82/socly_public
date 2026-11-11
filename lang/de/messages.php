@@ -372,12 +372,16 @@ return [
     ],
     'widgets' => [
         'manage' => 'Diagramme verwalten',
-        'hint' => 'Nutzen Sie die Symbole oben rechts auf der Karte (oder diese Liste), um Diagramme zu verschieben, zu vergrößern und auszublenden. Beim Ziehen oder bei geöffneter Liste zeigt das Raster die freien Plätze. Die Einstellungen werden in Ihrem Profil gespeichert.',
+        'hint' => 'Nutzen Sie die Symbole oben rechts auf der Karte (oder diese Liste), um Diagramme zu verschieben, zu vergrößern und auszublenden. Unten rechts können Sie das Diagramm als PNG kopieren oder am Griff ziehen, um die Breite zu ändern. Beim Ziehen oder bei geöffneter Liste zeigt das Raster die freien Plätze. Die Einstellungen werden in Ihrem Profil gespeichert.',
         'move_up' => 'Nach oben',
         'move_down' => 'Nach unten',
         'drag' => 'Zum Verschieben ziehen',
         'hide' => 'Diagramm ausblenden',
         'width' => 'Diagrammbreite (1/3, 2/3 oder volle Zeile)',
+        'copy_png' => 'Diagramm als PNG kopieren',
+        'copied' => 'Diagramm kopiert',
+        'downloaded' => 'PNG heruntergeladen',
+        'copy_failed' => 'Kopieren fehlgeschlagen',
     ],
     'email_templates' => [
         'intro' => 'Jede Vorlage hat IT / EN / DE. Platzhalter {{name}} und Bedingungen {{#flag}}…{{/flag}}.',

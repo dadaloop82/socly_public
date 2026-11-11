@@ -12731,6 +12731,71 @@ function initDemoBannerCompact() {
   window.addEventListener('scroll', sync, { passive: true });
 }
 
+/* Copy a chart card as a PNG image: clipboard first, download as fallback (HTTP / old browsers). */
+async function copyChartToPng(panel, name) {
+  const canvas = panel.querySelector('.chart-frame canvas') || panel.querySelector('canvas');
+  if (!(canvas instanceof HTMLCanvasElement) || canvas.width === 0 || canvas.height === 0) {
+    return 'failed';
+  }
+  // Export at the canvas backing-store resolution (device pixel ratio included) on a solid
+  // background, with the card title on top so the image is self-explanatory once pasted.
+  const scale = canvas.clientWidth > 0 ? canvas.width / canvas.clientWidth : (window.devicePixelRatio || 1);
+  const padding = Math.round(14 * scale);
+  const titleEl = panel.querySelector('.section-title');
+  const title = titleEl instanceof HTMLElement ? (titleEl.textContent || '').trim() : '';
+  const titleStyle = titleEl instanceof HTMLElement ? window.getComputedStyle(titleEl) : null;
+  const titleSize = titleStyle ? Math.max(12, Math.round((Number.parseFloat(titleStyle.fontSize) || 16) * scale)) : 0;
+  const titleSpace = title !== '' ? titleSize + Math.round(10 * scale) : 0;
+
+  const image = document.createElement('canvas');
+  image.width = canvas.width + padding * 2;
+  image.height = canvas.height + padding * 2 + titleSpace;
+  const ctx = image.getContext('2d');
+  if (!ctx) return 'failed';
+
+  const panelStyle = window.getComputedStyle(panel);
+  const background = panelStyle.backgroundColor && panelStyle.backgroundColor !== 'rgba(0, 0, 0, 0)'
+    ? panelStyle.backgroundColor
+    : '#ffffff';
+  ctx.fillStyle = background;
+  ctx.fillRect(0, 0, image.width, image.height);
+  if (title !== '' && titleStyle) {
+    ctx.fillStyle = titleStyle.color || '#142a28';
+    ctx.font = `${titleStyle.fontWeight || 700} ${titleSize}px ${titleStyle.fontFamily || 'Manrope, sans-serif'}`;
+    ctx.textBaseline = 'top';
+    ctx.fillText(title, padding, padding, image.width - padding * 2);
+  }
+  ctx.drawImage(canvas, padding, padding + titleSpace);
+
+  let blob = null;
+  try {
+    blob = await new Promise((resolve) => image.toBlob(resolve, 'image/png'));
+  } catch {
+    // Tainted canvas (cross-origin pixels): nothing we can safely export.
+    blob = null;
+  }
+  if (!blob) return 'failed';
+
+  const clipboard = navigator.clipboard;
+  if (clipboard && typeof window.ClipboardItem === 'function' && typeof clipboard.write === 'function') {
+    try {
+      await clipboard.write([new ClipboardItem({ 'image/png': blob })]);
+      return 'copied';
+    } catch {
+      // Clipboard blocked or page not on HTTPS: fall back to a file download.
+    }
+  }
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = `${String(name || 'chart').replace(/[^a-z0-9]+/gi, '-').replace(/^-+|-+$/g, '').toLowerCase() || 'chart'}.png`;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  window.setTimeout(() => URL.revokeObjectURL(url), 2000);
+  return 'downloaded';
+}
+
 function initWidgetLayouts() {
   const groups = [...document.querySelectorAll('[data-widget-context]')];
   if (groups.length === 0) return;
@@ -12877,10 +12942,17 @@ function initWidgetLayouts() {
       up: manager.dataset.msgUp || 'Move up',
       down: manager.dataset.msgDown || 'Move down',
       width: manager.dataset.msgWidth || 'Chart width',
+      copy: manager.dataset.msgCopy || 'Copy chart as PNG',
+      copied: manager.dataset.msgCopied || 'Chart copied',
+      downloaded: manager.dataset.msgDownloaded || 'PNG downloaded',
+      copyFailed: manager.dataset.msgCopyFailed || 'Copy failed',
     };
     const iconDrag = '<svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><circle cx="7" cy="4" r="1.4"/><circle cx="13" cy="4" r="1.4"/><circle cx="7" cy="10" r="1.4"/><circle cx="13" cy="10" r="1.4"/><circle cx="7" cy="16" r="1.4"/><circle cx="13" cy="16" r="1.4"/></svg>';
     const iconUp = '<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12l5-5 5 5"/></svg>';
     const iconDown = '<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 8l5 5 5-5"/></svg>';
+    const iconCopy = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V6a2 2 0 0 1 2-2h9"/></svg>';
+    const iconCheck = '<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 10.5l4 4 8-8"/></svg>';
+    const iconAlert = '<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 5.5v6"/><circle cx="10" cy="15" r="1"/></svg>';
     const iconHide = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 3l18 18"/><path d="M10.6 5.1A11 11 0 0 1 12 5c5 0 9 4.5 9 7 0 .8-.5 1.9-1.4 3"/><path d="M6.2 6.2C3.8 7.8 2 10.2 2 12c0 2.5 4 7 10 7 1.5 0 2.9-.4 4.1-1"/><path d="M9.9 9.9a3 3 0 0 0 4.2 4.2"/></svg>';
     const controlsHtml = `
       <button type="button" class="chart-widget-btn chart-widget-drag" draggable="true" data-chart-drag aria-label="${escapeHtml(labels.drag)}" title="${escapeHtml(labels.drag)}">${iconDrag}</button>
@@ -12937,7 +13009,9 @@ function initWidgetLayouts() {
       // Bottom-right tools: grid width (1/3 - 2/3 - 3/3) and the drag-to-resize handle.
       const resizeTools = document.createElement('div');
       resizeTools.className = 'chart-widget-resize-tools';
+      const hasChartCanvas = panel.querySelector('canvas') instanceof HTMLCanvasElement;
       resizeTools.innerHTML = `
+        ${hasChartCanvas ? `<button type="button" class="chart-widget-btn" data-chart-copy aria-label="${escapeHtml(labels.copy)}" title="${escapeHtml(labels.copy)}">${iconCopy}</button>` : ''}
         <button type="button" class="chart-widget-btn chart-widget-width" data-chart-width aria-label="${escapeHtml(labels.width)}" title="${escapeHtml(labels.width)}">1/3</button>
         <span class="chart-widget-resize" data-chart-resize aria-hidden="true"></span>`;
       panel.appendChild(resizeTools);
@@ -12947,6 +13021,28 @@ function initWidgetLayouts() {
       resizeTools.querySelector('[data-chart-width]')?.addEventListener('click', () => {
         setSize(id, sizeOf(id) >= 3 ? 1 : sizeOf(id) + 1);
         queueSave();
+      });
+
+      // Copy the chart as PNG: the button flashes a check (copied/downloaded) or an alert.
+      const copyButton = resizeTools.querySelector('[data-chart-copy]');
+      copyButton?.addEventListener('click', async () => {
+        if (!(copyButton instanceof HTMLButtonElement) || copyButton.dataset.busy === '1') return;
+        copyButton.dataset.busy = '1';
+        const result = await copyChartToPng(panel, `${context}-${id}`);
+        const ok = result !== 'failed';
+        const label = result === 'copied' ? labels.copied : (result === 'downloaded' ? labels.downloaded : labels.copyFailed);
+        copyButton.classList.toggle('is-copied', ok);
+        copyButton.classList.toggle('is-failed', !ok);
+        copyButton.innerHTML = ok ? iconCheck : iconAlert;
+        copyButton.setAttribute('title', label);
+        copyButton.setAttribute('aria-label', label);
+        window.setTimeout(() => {
+          delete copyButton.dataset.busy;
+          copyButton.classList.remove('is-copied', 'is-failed');
+          copyButton.innerHTML = iconCopy;
+          copyButton.setAttribute('title', labels.copy);
+          copyButton.setAttribute('aria-label', labels.copy);
+        }, 1800);
       });
 
       const resizeHandle = resizeTools.querySelector('[data-chart-resize]');

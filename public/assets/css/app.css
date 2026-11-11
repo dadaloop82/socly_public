@@ -11280,6 +11280,15 @@ a.org-mandate-badge--soon:hover {
   background: color-mix(in srgb, var(--brand-primary, #0D6E66) 12%, #fff);
   color: var(--brand-primary-deep, var(--brand-primary, #0D6E66));
 }
+/* Feedback after “copy chart as PNG”. */
+.chart-widget-btn.is-copied {
+  color: #0f7b46;
+  border-color: color-mix(in srgb, #0f7b46 42%, var(--line));
+}
+.chart-widget-btn.is-failed {
+  color: #b42318;
+  border-color: color-mix(in srgb, #b42318 42%, var(--line));
+}
 .chart-widget-btn svg {
   width: 0.9rem;
   height: 0.9rem;

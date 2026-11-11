@@ -36,7 +36,11 @@ $sizeOf = static function (string $id) use ($sizes): int {
         data-msg-hide="<?= e(__('widgets.hide')) ?>"
         data-msg-up="<?= e(__('widgets.move_up')) ?>"
         data-msg-down="<?= e(__('widgets.move_down')) ?>"
-        data-msg-width="<?= e(__('widgets.width')) ?>">
+        data-msg-width="<?= e(__('widgets.width')) ?>"
+        data-msg-copy="<?= e(__('widgets.copy_png')) ?>"
+        data-msg-copied="<?= e(__('widgets.copied')) ?>"
+        data-msg-downloaded="<?= e(__('widgets.downloaded')) ?>"
+        data-msg-copy-failed="<?= e(__('widgets.copy_failed')) ?>">
         <summary class="widget-manager-summary"><?= e(__('widgets.manage')) ?></summary>
         <div class="widget-manager-body">
             <p class="setup-hint muted"><?= e(__('widgets.hint')) ?></p>

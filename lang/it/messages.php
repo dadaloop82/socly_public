@@ -374,12 +374,16 @@ return [
     ],
     'widgets' => [
         'manage' => 'Gestisci grafici',
-        'hint' => 'Usa le icone in alto a destra sulla card (o questo elenco) per spostare, ridimensionare e nascondere i grafici. Mentre trascini, o con questo elenco aperto, la griglia mostra gli spazi disponibili. Le preferenze sono salvate nel tuo profilo.',
+        'hint' => 'Usa le icone in alto a destra sulla card (o questo elenco) per spostare, ridimensionare e nascondere i grafici. In basso a destra puoi copiare il grafico in PNG o trascinarne l’angolo per cambiarne la larghezza. Mentre trascini, o con questo elenco aperto, la griglia mostra gli spazi disponibili. Le preferenze sono salvate nel tuo profilo.',
         'move_up' => 'Sposta su',
         'move_down' => 'Sposta giù',
         'drag' => 'Trascina per spostare',
         'hide' => 'Nascondi grafico',
         'width' => 'Larghezza del grafico (1/3, 2/3 o riga intera)',
+        'copy_png' => 'Copia il grafico in PNG',
+        'copied' => 'Grafico copiato',
+        'downloaded' => 'PNG scaricato',
+        'copy_failed' => 'Copia non riuscita',
     ],
     'email_templates' => [
         'intro' => 'Ogni template ha versione IT / EN / DE. Usa placeholder {{nome}} e blocchi condizionali {{#flag}}…{{/flag}}.',

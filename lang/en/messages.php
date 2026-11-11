@@ -372,12 +372,16 @@ return [
     ],
     'widgets' => [
         'manage' => 'Manage charts',
-        'hint' => 'Use the icons in the top-right corner of each card (or this list) to move, resize and hide charts. While dragging, or with this list open, the grid shows the available slots. Preferences are saved in your profile.',
+        'hint' => 'Use the icons in the top-right corner of each card (or this list) to move, resize and hide charts. In the bottom-right corner you can copy the chart as a PNG or drag its grip to change the width. While dragging, or with this list open, the grid shows the available slots. Preferences are saved in your profile.',
         'move_up' => 'Move up',
         'move_down' => 'Move down',
         'drag' => 'Drag to move',
         'hide' => 'Hide chart',
         'width' => 'Chart width (1/3, 2/3 or full row)',
+        'copy_png' => 'Copy the chart as PNG',
+        'copied' => 'Chart copied',
+        'downloaded' => 'PNG downloaded',
+        'copy_failed' => 'Copy failed',
     ],
     'email_templates' => [
         'intro' => 'Each template has IT / EN / DE versions. Use {{placeholders}} and conditional blocks {{#flag}}…{{/flag}}.',
