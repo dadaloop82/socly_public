@@ -75,6 +75,7 @@ use Socly\Services\SmtpDiscoveryService;
 use Socly\Services\PaymentService;
 use Socly\Services\PlatformService;
 use Socly\Services\PresenceService;
+use Socly\Services\RecurringService;
 use Socly\Services\VersionService;
 use Socly\Services\PluginAdminService;
 use Socly\Services\RateLimiter;
@@ -284,6 +285,11 @@ $app->bind(PresenceController::class, fn (App $a) => new PresenceController($a->
 $app->bind(PresenceService::class, fn (App $a) => new PresenceService($a->get(Database::class)));
 $app->bind(FreshnessController::class, fn (App $a) => new FreshnessController($a->get(View::class), $a->get(VersionService::class)));
 $app->bind(VersionService::class, fn (App $a) => new VersionService($a->get(Database::class)));
+$app->bind(RecurringService::class, fn (App $a) => new RecurringService(
+    $a->get(Database::class),
+    $a->get(Validator::class),
+    $a->get(AuditService::class)
+));
 $app->bind(SetupGate::class, fn (App $a) => new SetupGate($a->get(SetupService::class)));
 $app->bind('mw.setup', fn (App $a) => $a->get(SetupGate::class));
 $app->bind(SetupBootstrapMiddleware::class, fn (App $a) => new SetupBootstrapMiddleware($a->get(SetupService::class)));
@@ -496,7 +502,8 @@ $app->bind(TreasuryController::class, fn (App $a) => new TreasuryController(
     $a->get(ComponentService::class),
     $a->get(CurrencyService::class),
     $a->get(BudgetService::class),
-    $a->get(VersionService::class)
+    $a->get(VersionService::class),
+    $a->get(RecurringService::class)
 ));
 $app->bind(BudgetController::class, fn (App $a) => new BudgetController(
     $a->get(View::class),

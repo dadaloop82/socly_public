@@ -838,6 +838,33 @@ final class SettingsController extends BaseController
     public function saveTreasuryAccount(Request $request): void
     {
         $data = $request->all();
+
+        // Salvataggio unico dell'intera sezione “Conti finanziari”: il form invia liste parallele
+        // (account_id[] / account_label[] / account_active[]) invece di un form per riga.
+        $bulkIds = $data['account_id'] ?? null;
+        if (is_array($bulkIds) && $bulkIds !== []) {
+            $labels = is_array($data['account_label'] ?? null) ? array_values($data['account_label']) : [];
+            $activeMap = is_array($data['account_active'] ?? null) ? $data['account_active'] : [];
+            $errors = [];
+            foreach (array_values($bulkIds) as $index => $rawId) {
+                $accountId = (int) $rawId;
+                if ($accountId < 1) {
+                    continue;
+                }
+                $label = (string) ($labels[$index] ?? '');
+                $active = !empty($activeMap[$accountId]);
+                $result = $this->treasury->updateAccount($accountId, $label, $active, $request->ip(), auth_user()['id'] ?? null);
+                if (empty($result['ok'])) {
+                    $errors = array_merge($errors, $result['errors'] ?? ['account' => __('validation.required')]);
+                }
+            }
+            if ($errors !== []) {
+                $this->settingsFail($request, $errors, 'treasury-accounts');
+            }
+            $this->audit->log('settings.saved', 'settings', 'treasury_accounts', null, null, $request->ip());
+            $this->settingsFinish($request, 'treasury-accounts');
+        }
+
         $id = (int) ($data['id'] ?? 0);
         $label = (string) ($data['label'] ?? '');
         // The active flag is a plain checkbox: unchecked = deactivated.

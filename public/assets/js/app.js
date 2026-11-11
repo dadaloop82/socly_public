@@ -207,6 +207,7 @@ document.addEventListener('DOMContentLoaded', () => {
   initSessionHeartbeat();
   initPresence();
   initFreshnessGuard();
+  initTreasuryRecurring();
   restoreFilterFocus();
   initPlatformConsents(document);
   initResetUserData();
@@ -1450,6 +1451,19 @@ function initPresence() {
   });
   window.addEventListener('beforeunload', stop);
   start();
+}
+
+function initTreasuryRecurring() {
+  const card = document.querySelector('[data-treasury-recurring-card]');
+  if (!card) return;
+  const toggle = card.querySelector('[data-treasury-recurring-toggle]');
+  const fields = card.querySelector('[data-treasury-recurring-fields]');
+  if (!(toggle instanceof HTMLInputElement) || !(fields instanceof HTMLElement)) return;
+  const sync = () => {
+    fields.hidden = !toggle.checked;
+  };
+  toggle.addEventListener('change', sync);
+  sync();
 }
 
 function initSessionHeartbeat() {

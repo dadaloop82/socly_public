@@ -10,6 +10,11 @@ every 100 patches bump the series, and each bump is published to this repository
 
 ### Added
 
+- Recurring first-note entries: enable “Recurring entry” on a movement, choose how often (weekly,
+  monthly, every 3/6 months, yearly), the day of the month, the first due date, an optional end date
+  and whether the amount is fixed or variable. When due, Socly creates the entry: cash accounts are
+  approved immediately, bank and card accounts stay **to approve**. Recurrences are listed in the
+  first note with pause/resume and delete.
 - Safe concurrent editing: every editable record now carries a row version, and a save is **refused**
   (naming who saved last and when) when another operator changed the record after you opened it.
   Nothing is overwritten silently: the form reopens with your values and an explicit “Overwrite with
@@ -43,7 +48,9 @@ every 100 patches bump the series, and each bump is published to this repository
 ### Changed
 
 - The first-note entry form is now organised into cards — amount and date, account and method,
-  invoice, category and details, counterparty, document — with a sticky action bar.
+  invoice, category and details, recurrence, counterparty, document — with a sticky action bar.
+- The financial accounts section has a single “Save account changes” button instead of one save per
+  row (deleting an unused account stays a per-row action).
 - Approving a movement updates the balance, income and expense totals on the spot (no reload) and the
   “to approve” counter follows immediately.
 - RUNTS section titles are translated in the interface; the single Model D lines keep the official
@@ -58,6 +65,15 @@ every 100 patches bump the series, and each bump is published to this repository
 
 ### Fixed
 
+- Association logo returned HTTP 500 on some installations: a controller declared `jsonResponse()`
+  with a stricter visibility than the base controller (fatal error in PHP 8). The endpoint is also
+  hardened now: missing file, unreadable file or a missing `fileinfo` extension return 404 instead
+  of an error page.
+- The presence dots no longer take space in the layout: they float over the top-right corner.
+- Budget categories imported from CSV with foreign names (“rent”, “utilities”, …) are mapped to the
+  canonical category, so they appear translated.
+- Print enrollment form: “read the rest on the website” now links to the association website when
+  configured (falling back to the installation URL).
 - The members list search keeps the focus and the caret while the list filters itself: the field no
   longer “jumps away” after every keystroke.
 - Long labels inside a badge now wrap in a rounded rectangle instead of turning the badge into a

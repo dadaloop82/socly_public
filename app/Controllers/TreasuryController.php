@@ -10,6 +10,7 @@ use Socly\Services\BudgetService;
 use Socly\Services\ComponentService;
 use Socly\Services\CurrencyService;
 use Socly\Services\MemberService;
+use Socly\Services\RecurringService;
 use Socly\Services\TreasuryService;
 use Socly\Services\VersionService;
 
@@ -22,7 +23,8 @@ final class TreasuryController extends BaseController
         private readonly ComponentService $components,
         private readonly CurrencyService $currency,
         private readonly BudgetService $budgets,
-        private readonly VersionService $versions
+        private readonly VersionService $versions,
+        private readonly RecurringService $recurring
     ) {
         parent::__construct($view);
     }
@@ -30,6 +32,7 @@ final class TreasuryController extends BaseController
     public function index(Request $request): void
     {
         require_component('treasury');
+        $this->runRecurringDue($request);
         $query = trim((string) $request->input('q', ''));
         if (mb_strlen($query) > 120) {
             $query = mb_substr($query, 0, 120);
@@ -80,7 +83,57 @@ final class TreasuryController extends BaseController
             'pages' => $pages,
             'per_page' => $perPage,
             'total_rows' => $totalRows,
+            'recurring_rules' => $this->recurring->all(),
         ]);
+    }
+
+    /**
+     * Genera i movimenti delle operazioni ricorrenti scadute (al massimo ogni 15 minuti,
+     * così la prima nota non paga una query a ogni caricamento).
+     */
+    private function runRecurringDue(Request $request): void
+    {
+        try {
+            $marker = storage_path('cache/recurring_run.txt');
+            $last = is_file($marker) ? (int) filemtime($marker) : 0;
+            if ($last > 0 && (time() - $last) < 900) {
+                return;
+            }
+            @touch($marker);
+            $this->recurring->runDue($request->ip(), auth_user()['id'] ?? null);
+        } catch (\Throwable) {
+            // una regola rotta non deve bloccare la prima nota
+        }
+    }
+
+    /** Sospende o riattiva un'operazione ricorrente. */
+    public function toggleRecurring(Request $request, string $id): void
+    {
+        require_component('treasury');
+        if (!can('treasury.manage')) {
+            http_response_code(403);
+            $this->render('errors/403');
+            return;
+        }
+        $rule = $this->recurring->find((int) $id);
+        if ($rule !== null) {
+            $this->recurring->setActive((int) $id, empty($rule['is_active']), $request->ip());
+            $this->flash('success', empty($rule['is_active']) ? __('treasury.recurring_resumed') : __('treasury.recurring_paused'));
+        }
+        redirect('/treasury');
+    }
+
+    public function deleteRecurring(Request $request, string $id): void
+    {
+        require_component('treasury');
+        if (!can('treasury.manage')) {
+            http_response_code(403);
+            $this->render('errors/403');
+            return;
+        }
+        $this->recurring->delete((int) $id, $request->ip());
+        $this->flash('success', __('treasury.recurring_deleted'));
+        redirect('/treasury');
     }
 
     public function create(Request $request): void
@@ -212,6 +265,19 @@ final class TreasuryController extends BaseController
             $this->flash('errors', $result['errors'] ?? ['treasury' => __('validation.required')]);
             $this->rememberOld($request->all());
             redirect('/treasury/create');
+        }
+        // Operazione ricorrente: la regola parte dalla data del movimento appena salvato.
+        if (!empty($request->input('recurring'))) {
+            try {
+                $this->recurring->createFromInput(
+                    $request->all(),
+                    (string) ($request->input('movement_date', date('Y-m-d'))),
+                    auth_user()['id'] ?? null,
+                    $request->ip()
+                );
+            } catch (\Throwable) {
+                $this->flash('errors', ['recurring' => __('treasury.recurring_create_failed')]);
+            }
         }
         $this->flash('success', __('treasury.saved'));
         redirect('/treasury');

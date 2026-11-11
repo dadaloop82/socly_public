@@ -1002,6 +1002,10 @@ final class BudgetService
             }
             $itemOrder += 10;
             $category = mb_substr($this->csvCell($row, $headers, 'category'), 0, 80);
+            $resolvedCategory = $this->treasury->resolveCategoryFromLabel($category);
+            if ($resolvedCategory !== null) {
+                $category = $resolvedCategory;
+            }
             $rawType = $this->csvCell($row, $headers, 'type');
             $this->db->insert('budget_items', [
                 'budget_id' => $budgetId,

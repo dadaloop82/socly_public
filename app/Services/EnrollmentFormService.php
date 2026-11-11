@@ -62,6 +62,7 @@ final class EnrollmentFormService
                     ?: $this->settings->get('association.address', '')),
                 'email' => (string) $this->settings->get('association.email', ''),
                 'phone' => (string) $this->settings->get('association.phone', ''),
+                'website' => (string) $this->settings->get('association.website', ''),
             ],
             'fields' => $displayFields,
             'type_label' => localized($member['type_name_json'] ?? ''),

@@ -148,6 +148,8 @@ $router->get('/treasury/create', [TreasuryController::class, 'create'], 'treasur
 $router->get('/treasury/accounts/balances', [TreasuryController::class, 'accountBalances'], 'treasury.view', ['mw.locale', 'mw.install', 'mw.auth']);
 $router->post('/treasury/bulk', [TreasuryController::class, 'bulk'], 'treasury.manage', ['mw.locale', 'mw.install', 'mw.auth', 'mw.csrf']);
 $router->post('/treasury/{id}/approve', [TreasuryController::class, 'approve'], 'treasury.manage', ['mw.locale', 'mw.install', 'mw.auth', 'mw.csrf']);
+$router->post('/treasury/recurring/{id}/toggle', [TreasuryController::class, 'toggleRecurring'], 'treasury.manage', ['mw.locale', 'mw.install', 'mw.auth', 'mw.csrf']);
+$router->post('/treasury/recurring/{id}/delete', [TreasuryController::class, 'deleteRecurring'], 'treasury.manage', ['mw.locale', 'mw.install', 'mw.auth', 'mw.csrf']);
 $router->post('/treasury', [TreasuryController::class, 'store'], 'treasury.manage', ['mw.locale', 'mw.install', 'mw.auth', 'mw.csrf']);
 $router->get('/treasury/{id}/attachment', [TreasuryController::class, 'attachment'], 'treasury.view', ['mw.locale', 'mw.install', 'mw.auth']);
 $router->get('/treasury/{id}/edit', [TreasuryController::class, 'edit'], 'treasury.manage', ['mw.locale', 'mw.install', 'mw.auth']);

@@ -897,6 +897,58 @@ final class TreasuryService
         return $map[$key] ?? $this->humanizeSlug($key);
     }
 
+    /**
+     * Riconosce una categoria da un'etichetta libera (import CSV, testi scritti a mano):
+     * accetta lo slug, il nome inglese/italiano/tedesco delle categorie di sistema e le
+     * etichette personalizzate. Restituisce la chiave canonica o null se è davvero nuova.
+     */
+    public function resolveCategoryFromLabel(string $raw): ?string
+    {
+        $raw = trim($raw);
+        if ($raw === '') {
+            return null;
+        }
+        $slug = strtolower(preg_replace('/[^a-zA-Z0-9]+/', '_', $raw) ?? '');
+        $slug = trim($slug, '_');
+        if ($slug !== '' && in_array($slug, self::BUILTIN_CATEGORIES, true)) {
+            return $slug;
+        }
+        $normalize = static fn (string $value): string => strtolower(trim(preg_replace('/\s+/', ' ', $value) ?? $value));
+        $needle = $normalize($raw);
+        foreach (self::BUILTIN_CATEGORIES as $key) {
+            foreach (['it', 'en', 'de'] as $locale) {
+                $label = $normalize((string) (function_exists('__') ? $this->translate('treasury.category_' . $key, $locale) : ''));
+                if ($label !== '' && $label === $needle) {
+                    return $key;
+                }
+            }
+        }
+        foreach ($this->categoryOptions() as $option) {
+            if (empty($option['builtin']) && $normalize((string) $option['label']) === $needle) {
+                return (string) $option['key'];
+            }
+        }
+        return null;
+    }
+
+    /** Traduzione in una lingua specifica, senza cambiare la lingua della richiesta. */
+    private function translate(string $key, string $locale): string
+    {
+        static $cache = [];
+        if (!isset($cache[$locale])) {
+            $file = dirname(__DIR__, 2) . '/lang/' . $locale . '/messages.php';
+            $cache[$locale] = is_file($file) ? (array) require $file : [];
+        }
+        $messages = $cache[$locale];
+        foreach (explode('.', $key) as $segment) {
+            if (!is_array($messages) || !array_key_exists($segment, $messages)) {
+                return '';
+            }
+            $messages = $messages[$segment];
+        }
+        return is_string($messages) ? $messages : '';
+    }
+
     /** @return list<string> */
     public function beneficiaries(): array
     {

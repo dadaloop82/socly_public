@@ -247,6 +247,73 @@ foreach ($categories as $categoryOption) {
             <p class="section-lede"><?= e(__('treasury.ledger_lede')) ?></p>
         </div>
     </div>
+    <?php $recurringRules = is_array($recurring_rules ?? null) ? $recurring_rules : []; ?>
+    <?php if ($recurringRules !== []): ?>
+        <div class="treasury-recurring" data-treasury-recurring-list>
+            <h3 class="treasury-recurring-title"><?= e(__('treasury.recurring_title')) ?></h3>
+            <div class="table-wrap embedded">
+                <table class="data-table statistics-table">
+                    <thead>
+                    <tr>
+                        <th><?= e(__('treasury.description')) ?></th>
+                        <th><?= e(__('treasury.amount')) ?></th>
+                        <th><?= e(__('treasury.recurring_frequency')) ?></th>
+                        <th><?= e(__('treasury.recurring_next')) ?></th>
+                        <th><?= e(__('treasury.recurring_status')) ?></th>
+                        <th></th>
+                    </tr>
+                    </thead>
+                    <tbody>
+                    <?php foreach ($recurringRules as $rule): ?>
+                        <?php
+                        $ruleId = (int) ($rule['id'] ?? 0);
+                        $ruleActive = !empty($rule['is_active']);
+                        $ruleFreq = (string) ($rule['frequency'] ?? 'monthly');
+                        $ruleLabel = trim((string) ($rule['description'] ?? ''));
+                        if ($ruleLabel === '') {
+                            $ruleLabel = (string) __('treasury.recurring_default_description');
+                        }
+                        ?>
+                        <tr>
+                            <td>
+                                <?= e($ruleLabel) ?>
+                                <?php if (!empty($rule['amount_variable'])): ?>
+                                    <span class="badge badge-muted"><?= e(__('treasury.recurring_variable_badge')) ?></span>
+                                <?php endif; ?>
+                            </td>
+                            <td><?= e($currency->format((float) ($rule['amount'] ?? 0))) ?></td>
+                            <td><?= e(__('treasury.recurring_freq_' . $ruleFreq)) ?></td>
+                            <td><?= e(format_date($rule['next_run_date'] ?? null) ?: '—') ?></td>
+                            <td>
+                                <span class="badge <?= $ruleActive ? 'badge-ok' : 'badge-muted' ?>">
+                                    <?= e($ruleActive ? __('treasury.recurring_active') : __('treasury.recurring_paused')) ?>
+                                </span>
+                            </td>
+                            <td class="doc-row-actions">
+                                <?php if ($canManage): ?>
+                                    <?= row_actions([
+                                        [
+                                            'icon' => $ruleActive ? 'toggle' : 'renew',
+                                            'label' => $ruleActive ? __('treasury.recurring_pause') : __('treasury.recurring_resume'),
+                                            'form_action' => url('/treasury/recurring/' . $ruleId . '/toggle'),
+                                        ],
+                                        [
+                                            'icon' => 'delete',
+                                            'label' => __('treasury.recurring_delete'),
+                                            'danger' => true,
+                                            'form_action' => url('/treasury/recurring/' . $ruleId . '/delete'),
+                                            'form_attrs' => ['data-confirm' => __('treasury.recurring_delete_confirm')],
+                                        ],
+                                    ]) ?>
+                                <?php endif; ?>
+                            </td>
+                        </tr>
+                    <?php endforeach; ?>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    <?php endif; ?>
     <?php $pendingCount = (int) ($pending_count ?? 0); ?>
     <?php if ($pendingCount > 0): ?>
         <div class="alert alert-warn treasury-pending-banner" role="status" data-treasury-pending-banner>

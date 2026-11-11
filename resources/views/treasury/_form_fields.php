@@ -324,7 +324,7 @@ $invoiceActive = $selectedDirection === 'expense' && !empty($values['invoice_pay
     <header class="tmf-card-head">
         <h2 class="tmf-card-title"><?= e(__('treasury.form_section_details')) ?></h2>
     </header>
-    <div class="tmf-grid tmf-grid--2">
+    <div class="tmf-grid tmf-grid--2 tmf-grid--top">
     <div data-treasury-category-wrap <?= $isTransfer ? 'hidden' : '' ?>>
         <?= field('select', [
             'name' => 'category',
@@ -403,17 +403,74 @@ $invoiceActive = $selectedDirection === 'expense' && !empty($values['invoice_pay
             </div>
         <?php endif; ?>
     </div>
-    <div class="tmf-span-2">
+    <div class="tmf-details-side">
         <?= field('textarea', [
             'name' => 'description',
             'label' => (string) __('treasury.description'),
             'value' => (string) ($values['description'] ?? ''),
             'maxlength' => 500,
-            'rows' => 2,
+            'rows' => 6,
         ]) ?>
     </div>
     </div>
 </section>
+<?php if (empty($isEdit)): ?>
+<section class="tmf-card" data-treasury-recurring-card <?= $isTransfer ? 'hidden' : '' ?>>
+    <header class="tmf-card-head">
+        <h2 class="tmf-card-title"><?= e(__('treasury.form_section_recurring')) ?></h2>
+    </header>
+    <?= field('checkbox', [
+        'name' => 'recurring',
+        'label' => (string) __('treasury.recurring_enable'),
+        'hint' => (string) __('treasury.recurring_hint'),
+        'checked' => !empty($values['recurring']),
+        'label_class' => 'checkbox-row-lg',
+        'attrs' => ['data-treasury-recurring-toggle' => true],
+    ]) ?>
+    <div class="tmf-grid tmf-grid--3" data-treasury-recurring-fields <?= !empty($values['recurring']) ? '' : 'hidden' ?>>
+        <?= field('select', [
+            'name' => 'recurring_frequency',
+            'label' => (string) __('treasury.recurring_frequency'),
+            'value' => (string) ($values['recurring_frequency'] ?? 'monthly'),
+            'options' => [
+                'weekly' => (string) __('treasury.recurring_freq_weekly'),
+                'monthly' => (string) __('treasury.recurring_freq_monthly'),
+                'quarterly' => (string) __('treasury.recurring_freq_quarterly'),
+                'semiannual' => (string) __('treasury.recurring_freq_semiannual'),
+                'yearly' => (string) __('treasury.recurring_freq_yearly'),
+            ],
+        ]) ?>
+        <?= field('text', [
+            'name' => 'recurring_day',
+            'label' => (string) __('treasury.recurring_day'),
+            'value' => (string) ($values['recurring_day'] ?? '1'),
+            'inputmode' => 'numeric',
+            'attrs' => ['min' => '1', 'max' => '31', 'type' => 'number'],
+            'hint' => (string) __('treasury.recurring_day_hint'),
+        ]) ?>
+        <?= field('date', [
+            'name' => 'recurring_start',
+            'label' => (string) __('treasury.recurring_start'),
+            'value' => (string) ($values['recurring_start'] ?? ($values['movement_date'] ?? $today)),
+        ]) ?>
+        <?= field('date', [
+            'name' => 'recurring_ends',
+            'label' => (string) __('treasury.recurring_ends'),
+            'value' => (string) ($values['recurring_ends'] ?? ''),
+        ]) ?>
+        <div class="tmf-span-2">
+            <?= field('checkbox', [
+                'name' => 'recurring_variable',
+                'label' => (string) __('treasury.recurring_variable'),
+                'hint' => (string) __('treasury.recurring_variable_hint'),
+                'checked' => !empty($values['recurring_variable']),
+                'label_class' => 'checkbox-row',
+            ]) ?>
+        </div>
+    </div>
+    <p class="setup-hint muted"><?= e(__('treasury.recurring_approval_hint')) ?></p>
+</section>
+<?php endif; ?>
 <section class="tmf-card">
     <header class="tmf-card-head">
         <h2 class="tmf-card-title"><?= e(__('treasury.form_section_party')) ?></h2>

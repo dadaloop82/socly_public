@@ -19,14 +19,50 @@ final class BrandingController extends BaseController
 
     public function logo(Request $request): void
     {
-        $path = $this->branding->logoAbsolutePath();
-        if ($path === null) {
+        // Endpoint pubblico e sempre richiesto dall'header: qualunque problema (file mancante,
+        // permessi, estensione `fileinfo` assente, impostazioni corrotte) deve dare 404, mai 500.
+        $path = null;
+        try {
+            $path = $this->branding->logoAbsolutePath();
+        } catch (\Throwable $e) {
+            try {
+                app('logger')->error('branding.logo_failed', ['message' => $e->getMessage()]);
+            } catch (\Throwable) {
+                // il logger non deve rompere la risposta
+            }
+        }
+        if ($path === null || !is_file($path) || !is_readable($path)) {
             http_response_code(404);
+            header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
             return;
         }
-        $finfo = new \finfo(FILEINFO_MIME_TYPE);
-        $mime = $finfo->file($path) ?: 'application/octet-stream';
+        $mime = 'application/octet-stream';
+        if (class_exists(\finfo::class)) {
+            try {
+                $detected = (new \finfo(FILEINFO_MIME_TYPE))->file($path);
+                if (is_string($detected) && $detected !== '') {
+                    $mime = $detected;
+                }
+            } catch (\Throwable) {
+                // fallback sull'estensione
+            }
+        }
+        if ($mime === 'application/octet-stream') {
+            $mime = match (strtolower((string) pathinfo($path, PATHINFO_EXTENSION))) {
+                'png' => 'image/png',
+                'jpg', 'jpeg' => 'image/jpeg',
+                'svg' => 'image/svg+xml',
+                'webp' => 'image/webp',
+                'gif' => 'image/gif',
+                'ico' => 'image/x-icon',
+                default => 'application/octet-stream',
+            };
+        }
+        $size = @filesize($path);
         header('Content-Type: ' . $mime);
+        if (is_int($size)) {
+            header('Content-Length: ' . (string) $size);
+        }
         header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
         header('Pragma: no-cache');
         readfile($path);
@@ -67,13 +103,5 @@ final class BrandingController extends BaseController
             ];
         }
         $this->jsonResponse($result);
-    }
-
-    /** @param array<string,mixed> $payload */
-    private function jsonResponse(array $payload, int $status = 200): void
-    {
-        http_response_code($status);
-        header('Content-Type: application/json; charset=utf-8');
-        echo json_encode($payload, JSON_UNESCAPED_UNICODE);
     }
 }

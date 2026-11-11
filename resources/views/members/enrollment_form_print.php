@@ -1,6 +1,6 @@
 <?php
 /** @var array<string,mixed> $member */
-/** @var array{name:string,fiscal_code:string,vat_number:string,address:string,email:string,phone:string} $association */
+/** @var array{name:string,fiscal_code:string,vat_number:string,address:string,email:string,phone:string,website?:string} $association */
 /** @var list<array{label:string,value:string}> $fields */
 /** @var string $type_label */
 /** @var string $period_label */
@@ -11,8 +11,15 @@ $memberName = trim(
     trim((string) ($member['fields']['first_name'] ?? '')) . ' ' . trim((string) ($member['fields']['last_name'] ?? ''))
 );
 // Statuto e informativa possono essere lunghissimi: nel modulo stampato si mostrano al massimo
-// 10 righe, poi “leggi il seguito sul sito web”.
-$siteUrl = trim((string) config('app.url', ''));
+// 10 righe, poi “leggi il seguito sul sito web”. Si usa il sito dell'associazione se configurato,
+// altrimenti l'indirizzo dell'installazione.
+$siteUrl = trim((string) ($association['website'] ?? ''));
+if ($siteUrl !== '' && !preg_match('#^https?://#i', $siteUrl)) {
+    $siteUrl = 'https://' . ltrim($siteUrl, '/');
+}
+if ($siteUrl === '') {
+    $siteUrl = trim((string) config('app.url', ''));
+}
 if ($siteUrl === '') {
     $siteUrl = rtrim((string) url('/'), '/');
 }

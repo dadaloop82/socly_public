@@ -221,11 +221,14 @@ a:hover { text-decoration: underline; color: var(--brand-primary-deep); }
 .topbar-brand { display: none; }
 .topbar-spacer { flex: 1; min-width: 0; pointer-events: none; }
 
-/* ── Presenza operatori: pallini con iniziali + avviso di ingresso ───────────── */
+/* ── Presenza operatori: pallini flottanti (non occupano spazio nel flusso) ─── */
 .presence {
+  position: absolute;
+  top: 0.45rem;
+  right: clamp(0.7rem, 2.5vw, 1.6rem);
+  z-index: 30;
   display: none;
   align-items: flex-end;
-  padding: 0.45rem clamp(1.25rem, 3vw, 2.25rem) 0;
   pointer-events: none;
 }
 .presence.is-visible {
@@ -12352,6 +12355,12 @@ tr.doc-row-editable:focus-visible {
 }
 /* ── Impostazioni → Conti finanziari ── */
 .accounts-admin { display: grid; gap: 0.55rem; margin-bottom: 1rem; }
+.accounts-admin-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.5rem;
+  padding-top: 0.35rem;
+}
 .accounts-admin-row {
   display: flex;
   align-items: flex-start;
@@ -12360,6 +12369,13 @@ tr.doc-row-editable:focus-visible {
   border: 1px solid color-mix(in srgb, var(--ink) 12%, transparent);
   border-radius: 14px;
   background: color-mix(in srgb, var(--surface, #fff) 96%, var(--ink) 4%);
+}
+/* Riga del form unico: identità, etichetta, attivo, azioni. */
+.accounts-admin > .accounts-admin-row {
+  display: grid;
+  grid-template-columns: minmax(120px, 0.7fr) minmax(160px, 1.4fr) auto auto;
+  align-items: end;
+  gap: 0.6rem 0.85rem;
 }
 .accounts-admin-row.is-inactive { opacity: 0.65; }
 .accounts-admin-form {
@@ -12455,6 +12471,10 @@ tr.doc-row-editable:focus-visible {
 }
 .tmf-grid--2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 .tmf-grid--3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.tmf-grid--top { align-items: start; }
+.tmf-details-side { min-width: 0; }
+.tmf-details-side .sf-field,
+.tmf-details-side textarea { height: 100%; }
 .tmf-span-2 { grid-column: 1 / -1; }
 .tmf .treasury-amount-field input {
   font-family: var(--font-display);
@@ -12479,6 +12499,18 @@ tr.doc-row-editable:focus-visible {
   .tmf-grid--2,
   .tmf-grid--3 { grid-template-columns: minmax(0, 1fr); }
 }
+/* ── Operazioni ricorrenti: elenco in prima nota ───────────────────────────── */
+.treasury-recurring { margin: 0 0 1.1rem; }
+.treasury-recurring-title {
+  margin: 0 0 0.5rem;
+  font-size: 0.78rem;
+  font-weight: 800;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: color-mix(in srgb, var(--ink) 58%, transparent);
+}
+.treasury-recurring .badge { margin-left: 0.35rem; vertical-align: middle; }
+
 /* ── Concorrenza: avvisi di modifica in contemporanea ───────────────────────── */
 .record-conflict,
 .record-stale {
