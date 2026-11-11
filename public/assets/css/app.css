@@ -12821,9 +12821,9 @@ tr.doc-row-editable:focus-visible {
   background: #fff;
 }
 .budget-input:focus, .budget-select:focus { outline: 2px solid color-mix(in srgb, var(--brand-primary, #2563eb) 45%, transparent); border-color: var(--brand-primary, #2563eb); }
-.budget-cell-category { width: 22%; }
-.budget-cell-direction { width: 12%; }
-.budget-cell-amount { width: 18%; }
+.budget-cell-category { width: 24%; }
+.budget-cell-kind { width: 17%; }
+.budget-cell-amount { width: 17%; }
 .budget-cell-actions { width: 2.2rem; text-align: right; }
 /* Importo: input + suffisso valuta in un unico controllo (niente simbolo sovrapposto). */
 .budget-amount-wrap {

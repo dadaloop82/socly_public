@@ -31,6 +31,11 @@ every 100 patches bump the series, and each bump is published to this repository
   fall back to “Other”.
 - Budget grid autosaves 5 seconds after the last change (also when adding/removing lines), with a
   discreet status next to “Save draft” and a background flush when leaving mid-edit.
+- Budget lines are now **Tipologia di spesa / entrata** (treasury category), **Descrizione** (free
+  text) and **Tipo**, with new types for associations: Spesa, Spesa d’investimento, Spesa per
+  progetto/attività, Entrata, Contributo/entrata vincolata (the type sets the accounting sign, so
+  totals and the comparison with the cash book stay correct). The section is labelled
+  **Macrocategoria**.
 
 ## [1.5.41] - 2026-11-10
 

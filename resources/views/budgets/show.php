@@ -103,8 +103,8 @@ $rowPartial = static fn (?array $row, string $sectionKey): string => view_partia
                     <table class="budget-table">
                         <thead>
                         <tr>
+                            <th><?= e(__('budget.category_label')) ?></th>
                             <th><?= e(__('budget.item_label')) ?></th>
-                            <th><?= e(__('treasury.category')) ?></th>
                             <th><?= e(__('budget.direction')) ?></th>
                             <th class="budget-th-amount"><?= e(__('budget.amount')) ?></th>
                             <th></th>
@@ -149,8 +149,8 @@ $rowPartial = static fn (?array $row, string $sectionKey): string => view_partia
                 <table class="budget-table">
                     <thead>
                     <tr>
+                        <th><?= e(__('budget.category_label')) ?></th>
                         <th><?= e(__('budget.item_label')) ?></th>
-                        <th><?= e(__('treasury.category')) ?></th>
                         <th><?= e(__('budget.direction')) ?></th>
                         <th class="budget-th-amount"><?= e(__('budget.amount')) ?></th>
                         <th></th>

@@ -21,6 +21,15 @@ final class BudgetService
     /** @var list<string> */
     public const TEMPLATES = ['empty', 'previous_budget', 'previous_actual', 'public_grant_model'];
 
+    /**
+     * Nature of a budget line (“tipo”). The accounting sign stays in `direction`, so a type only
+     * says what kind of post it is: a purchase of equipment is still an expense, a restricted
+     * grant is still income.
+     *
+     * @var list<string>
+     */
+    public const KINDS = ['expense', 'investment', 'project', 'income', 'grant'];
+
     /** @var list<string> */
     private const DIRECTIONS = ['income', 'expense'];
 
@@ -153,6 +162,28 @@ final class BudgetService
         return $total;
     }
 
+    /** Accounting sign implied by a line type (investment is still an expense, grants are income). */
+    public static function kindDirection(string $kind): string
+    {
+        return in_array($kind, ['income', 'grant'], true) ? 'income' : 'expense';
+    }
+
+    /** Normalize a stored/posted type, falling back to the accounting direction. */
+    public static function normalizeKind(string $kind, string $direction = 'expense'): string
+    {
+        $kind = strtolower(trim($kind));
+        if (in_array($kind, self::KINDS, true)) {
+            return $kind;
+        }
+        return in_array($direction, self::DIRECTIONS, true) ? $direction : 'expense';
+    }
+
+    /** Translated label of a line type. */
+    public static function kindLabel(string $kind): string
+    {
+        return (string) __('budget.kind_' . self::normalizeKind($kind));
+    }
+
     /**
      * Create the year budget and optionally pre-load it from a template.
      *
@@ -223,10 +254,12 @@ final class BudgetService
             ]);
             foreach ($items as $item) {
                 $itemOrder += 10;
+                $direction = in_array((string) $item['direction'], self::DIRECTIONS, true) ? (string) $item['direction'] : 'expense';
                 $this->db->insert('budget_items', [
                     'budget_id' => $budgetId,
                     'section_id' => $sectionId,
-                    'direction' => in_array((string) $item['direction'], self::DIRECTIONS, true) ? (string) $item['direction'] : 'expense',
+                    'direction' => $direction,
+                    'kind' => self::normalizeKind((string) ($item['kind'] ?? ''), $direction),
                     'label' => mb_substr((string) $item['label'], 0, 190),
                     'amount' => round(((float) $item['amount']) * $factor, 2),
                     'category' => (string) ($item['category'] ?? '') !== '' ? (string) $item['category'] : null,
@@ -281,6 +314,7 @@ final class BudgetService
                     'budget_id' => $budgetId,
                     'section_id' => $sectionId,
                     'direction' => $direction,
+                    'kind' => $direction,
                     'label' => mb_substr(
                         $category !== '' ? $this->treasury->categoryLabel($category) : (string) __('treasury.category_other'),
                         0,
@@ -335,6 +369,7 @@ final class BudgetService
                     'budget_id' => $budgetId,
                     'section_id' => $sectionId,
                     'direction' => $direction,
+                    'kind' => $category === 'public_grants' ? 'grant' : $direction,
                     'label' => (string) __($labelKey),
                     'amount' => 0,
                     'category' => $category,
@@ -350,8 +385,8 @@ final class BudgetService
      *
      * Posted shape (flat arrays, so the grid can add/remove rows client-side):
      * section_key[], section_id[], section_title[];
-     * item_id[], item_section[], item_label[], item_category[], item_new_category[],
-     * item_direction[], item_amount[], item_notes[].
+     * item_id[], item_section[], item_category[], item_new_category[], item_kind[],
+     * item_direction[] (legacy fallback), item_amount[], item_notes[].
      *
      * @param array<string,mixed> $input
      * @return array{ok:bool,error?:string,message?:string,sections?:array<string,int>,items?:array<int,int>}
@@ -379,6 +414,7 @@ final class BudgetService
         $itemLabels = array_values((array) ($input['item_label'] ?? []));
         $itemCategories = array_values((array) ($input['item_category'] ?? []));
         $itemNewCategories = array_values((array) ($input['item_new_category'] ?? []));
+        $itemKinds = array_values((array) ($input['item_kind'] ?? []));
         $itemDirections = array_values((array) ($input['item_direction'] ?? []));
         $itemAmounts = array_values((array) ($input['item_amount'] ?? []));
         $itemNotes = array_values((array) ($input['item_notes'] ?? []));
@@ -458,15 +494,17 @@ final class BudgetService
                 $sectionKey = trim((string) ($itemSections[$index] ?? ''));
                 $sectionId = $keyToSectionId[$sectionKey] ?? null;
                 $orderBySection[$sectionKey] = ($orderBySection[$sectionKey] ?? 0) + 10;
-                $direction = (string) ($itemDirections[$index] ?? 'expense');
-                if (!in_array($direction, self::DIRECTIONS, true)) {
-                    $direction = 'expense';
-                }
+                $kind = self::normalizeKind(
+                    (string) ($itemKinds[$index] ?? ''),
+                    (string) ($itemDirections[$index] ?? 'expense')
+                );
+                $direction = self::kindDirection($kind);
                 $category = $resolvedCategories[$index] ?? '';
                 $notes = mb_substr(trim((string) ($itemNotes[$index] ?? '')), 0, 500);
                 $payload = [
                     'section_id' => $sectionId,
                     'direction' => $direction,
+                    'kind' => $kind,
                     'label' => $label !== '' ? $label : (string) __('budget.item_untitled'),
                     'amount' => $amount,
                     'category' => $category !== null && $category !== '' ? $category : null,
@@ -643,6 +681,7 @@ final class BudgetService
                     'id' => (int) $item['id'],
                     'label' => (string) $item['label'],
                     'category' => (string) ($item['category'] ?? ''),
+                    'kind' => self::normalizeKind((string) ($item['kind'] ?? ''), $direction),
                     'notes' => (string) ($item['notes'] ?? ''),
                     'direction' => $direction,
                     'planned' => $planned,
@@ -949,10 +988,12 @@ final class BudgetService
             }
             $itemOrder += 10;
             $category = mb_substr($this->csvCell($row, $headers, 'category'), 0, 80);
+            $rawType = $this->csvCell($row, $headers, 'type');
             $this->db->insert('budget_items', [
                 'budget_id' => $budgetId,
                 'section_id' => $sectionIds[$sectionTitle],
                 'direction' => $direction,
+                'kind' => $this->csvKind($rawType, $direction),
                 'label' => mb_substr($label !== '' ? $label : (string) __('budget.item_untitled'), 0, 190),
                 'amount' => $amount,
                 'category' => $category !== '' ? $category : null,
@@ -1029,6 +1070,25 @@ final class BudgetService
             }
         }
         return 'expense';
+    }
+
+    /** Map the CSV “tipo” column to a line type, falling back to the accounting sign. */
+    private function csvKind(string $raw, string $direction): string
+    {
+        $raw = strtolower(trim($raw));
+        $map = [
+            'investment' => ['investiment', 'investment', 'investition', 'conto capitale'],
+            'project' => ['progett', 'project', 'projekt', 'attivit'],
+            'grant' => ['contribut', 'grant', 'zuschuss', 'fondo perduto'],
+        ];
+        foreach ($map as $kind => $needles) {
+            foreach ($needles as $needle) {
+                if ($raw !== '' && str_contains($raw, $needle)) {
+                    return self::kindDirection($kind) === $direction ? $kind : $direction;
+                }
+            }
+        }
+        return $direction;
     }
 }
 

@@ -14630,9 +14630,11 @@ function initBudgetGrid(scope = document) {
       let sectionIncome = 0;
       section.querySelectorAll('[data-budget-row]').forEach((row) => {
         const amountInput = row.querySelector('[data-budget-amount]');
-        const directionSelect = row.querySelector('[data-budget-direction]');
+        const kindSelect = row.querySelector('[data-budget-kind]');
         const amount = parseAmount(amountInput ? amountInput.value : '');
-        if (directionSelect && directionSelect.value === 'income') {
+        // The sign comes from the selected kind (e.g. investment → expense, grant → income).
+        const sign = kindSelect?.selectedOptions?.[0]?.dataset?.sign || 'expense';
+        if (sign === 'income') {
           sectionIncome += amount;
         } else {
           sectionExpense += amount;
@@ -14739,7 +14741,7 @@ function initBudgetGrid(scope = document) {
   form.addEventListener('change', (event) => {
     const target = event.target;
     if (!(target instanceof Element)) return;
-    if (target instanceof HTMLSelectElement && target.matches('[data-budget-direction]')) {
+    if (target instanceof HTMLSelectElement && target.matches('[data-budget-kind]')) {
       recalc();
       return;
     }

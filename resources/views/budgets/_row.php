@@ -8,29 +8,21 @@
  */
 $row = is_array($row ?? null) ? $row : null;
 $rowId = (int) ($row['id'] ?? 0);
-$direction = (string) ($row['direction'] ?? 'expense') === 'income' ? 'income' : 'expense';
 $category = (string) ($row['category'] ?? '');
 $categoryKeys = array_map(static fn (array $option): string => (string) ($option['key'] ?? ''), $categories);
 $showUnknownCategory = $category !== '' && !in_array($category, $categoryKeys, true);
+$kind = \Socly\Services\BudgetService::normalizeKind(
+    (string) ($row['kind'] ?? ''),
+    (string) ($row['direction'] ?? 'expense')
+);
 $amount = $row !== null ? number_format((float) ($row['amount'] ?? 0), 2, ',', '.') : '';
 ?>
 <tr class="budget-row" data-budget-row>
-    <td class="budget-cell-label">
+    <td class="budget-cell-category">
         <input type="hidden" name="item_id[]" value="<?= e((string) $rowId) ?>">
         <input type="hidden" name="item_section[]" value="<?= e($sectionKey) ?>" data-budget-item-section>
         <input type="hidden" name="item_notes[]" value="<?= e((string) ($row['notes'] ?? '')) ?>">
-        <input
-            type="text"
-            class="budget-input"
-            name="item_label[]"
-            value="<?= e((string) ($row['label'] ?? '')) ?>"
-            maxlength="190"
-            placeholder="<?= e(__('budget.item_label_placeholder')) ?>"
-            aria-label="<?= e(__('budget.item_label')) ?>"
-        >
-    </td>
-    <td class="budget-cell-category">
-        <select class="budget-select" name="item_category[]" data-budget-category aria-label="<?= e(__('treasury.category')) ?>">
+        <select class="budget-select" name="item_category[]" data-budget-category aria-label="<?= e(__('budget.category_label')) ?>">
             <option value=""><?= e(__('budget.category_none')) ?></option>
             <?php foreach ($categories as $option): ?>
                 <?php $optionKey = (string) ($option['key'] ?? ''); ?>
@@ -53,10 +45,26 @@ $amount = $row !== null ? number_format((float) ($row['amount'] ?? 0), 2, ',', '
             hidden
         >
     </td>
-    <td class="budget-cell-direction">
-        <select class="budget-select" name="item_direction[]" data-budget-direction aria-label="<?= e(__('budget.direction')) ?>">
-            <option value="expense" <?= $direction === 'expense' ? 'selected' : '' ?>><?= e(__('budget.direction_expense')) ?></option>
-            <option value="income" <?= $direction === 'income' ? 'selected' : '' ?>><?= e(__('budget.direction_income')) ?></option>
+    <td class="budget-cell-label">
+        <input
+            type="text"
+            class="budget-input"
+            name="item_label[]"
+            value="<?= e((string) ($row['label'] ?? '')) ?>"
+            maxlength="190"
+            placeholder="<?= e(__('budget.item_label_placeholder')) ?>"
+            aria-label="<?= e(__('budget.item_label')) ?>"
+        >
+    </td>
+    <td class="budget-cell-kind">
+        <select class="budget-select" name="item_kind[]" data-budget-kind aria-label="<?= e(__('budget.direction')) ?>">
+            <?php foreach (\Socly\Services\BudgetService::KINDS as $kindKey): ?>
+                <option value="<?= e($kindKey) ?>"
+                    data-sign="<?= e(\Socly\Services\BudgetService::kindDirection($kindKey)) ?>"
+                    <?= $kind === $kindKey ? 'selected' : '' ?>>
+                    <?= e(\Socly\Services\BudgetService::kindLabel($kindKey)) ?>
+                </option>
+            <?php endforeach; ?>
         </select>
     </td>
     <td class="budget-cell-amount">
