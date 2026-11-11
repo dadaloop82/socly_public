@@ -290,6 +290,54 @@ foreach ($categories as $categoryOption) {
 </form>
 <?php endif; ?>
 
+<?php $probe = is_array($similar_probe ?? null) ? $similar_probe : null; ?>
+<?php if ($probe !== null): ?>
+    <section class="panel tmf-similar-probe" data-similar-probe>
+        <strong class="tmf-similar-title">
+            <?= e(__('treasury.similar_title', ['count' => (string) (int) ($probe['total'] ?? 0)])) ?>
+        </strong>
+        <p class="tmf-similar-hint"><?= e(__('treasury.similar_hint')) ?></p>
+        <ul class="tmf-similar-list">
+            <?php foreach (($probe['matches'] ?? []) as $match): ?>
+                <li>
+                    <span class="tmf-similar-date"><?= e((string) ($match['date_formatted'] ?? '')) ?></span>
+                    <span class="tmf-similar-text"><?= e((string) ($match['description'] ?? '')) ?></span>
+                    <span class="tmf-similar-amount"><?= e((string) ($match['amount_formatted'] ?? '')) ?></span>
+                </li>
+            <?php endforeach; ?>
+        </ul>
+        <?php if ((int) ($probe['skipped'] ?? 0) > 0): ?>
+            <p class="tmf-similar-skipped">
+                <?= e(__('treasury.similar_skipped', ['count' => (string) (int) $probe['skipped']])) ?>
+            </p>
+        <?php endif; ?>
+        <p class="tmf-similar-changes">
+            <?= e(__('treasury.similar_changes')) ?>:
+            <?php
+            $changeParts = [];
+            foreach (($probe['changes'] ?? []) as $change) {
+                $changeParts[] = $change['label'] . ': ' . $change['value'];
+            }
+            echo e(implode(' · ', $changeParts));
+            ?>
+        </p>
+        <form method="post" action="<?= e(url('/treasury/similar/apply-form')) ?>" class="tmf-similar-actions">
+            <?= csrf_field() ?>
+            <?= field('hidden', ['name' => 'movement_id', 'value' => (string) (int) ($probe['movement']['id'] ?? 0)]) ?>
+            <?php foreach (($probe['ids'] ?? []) as $probeId): ?>
+                <?= field('hidden', ['name' => 'ids[]', 'value' => (string) (int) $probeId]) ?>
+            <?php endforeach; ?>
+            <?= field('hidden', ['name' => 'category', 'value' => (string) ($probe['movement']['category'] ?? '')]) ?>
+            <?= field('hidden', ['name' => 'runts_line', 'value' => (string) ($probe['movement']['runts_line'] ?? '')]) ?>
+            <?= field('hidden', ['name' => 'budget_item_id', 'value' => (string) (int) ($probe['movement']['budget_item_id'] ?? 0)]) ?>
+            <button class="btn btn-sm" type="submit">
+                <?= e(__('treasury.similar_apply', ['count' => (string) (int) ($probe['total'] ?? 0)])) ?>
+            </button>
+            <a class="btn btn-ghost btn-sm" href="<?= e(url('/treasury')) ?>"><?= e(__('treasury.similar_dismiss')) ?></a>
+        </form>
+    </section>
+<?php endif; ?>
+
 <div class="panel" data-treasury-list>
     <div class="panel-header">
         <div>

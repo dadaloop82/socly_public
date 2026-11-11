@@ -51,6 +51,9 @@ final class TreasuryController extends BaseController
         $offset = ($page - 1) * $perPage;
         $ledger = $this->treasury->ledger($perPage, $query, $sort, $filters, $offset);
         $config = $this->components->config('treasury', ['auto_from_payments' => true]);
+        // Dopo un salvataggio con classificazione: proposta “applica ai movimenti simili”
+        // calcolata lato server (nessun JS, nessun ricaricamento della scheda).
+        $similarProbe = $this->similarProbe((int) $request->input('similar', 0));
         // Only the enabled wallets (+ deactivated ones with movements) are listed.
         $wallets = $this->treasury->overviewWallets();
         $this->render('treasury/index', [
@@ -87,6 +90,7 @@ final class TreasuryController extends BaseController
             'per_page' => $perPage,
             'total_rows' => $totalRows,
             'recurring_rules' => $this->recurring->all(),
+            'similar_probe' => $similarProbe,
         ]);
     }
 
@@ -258,7 +262,7 @@ final class TreasuryController extends BaseController
             || strtoupper(trim((string) ($posted['runts_line'] ?? ''))) !== strtoupper(trim((string) ($before['runts_line'] ?? '')))
             || (int) ($posted['budget_item_id'] ?? 0) !== (int) ($before['budget_item_id'] ?? 0);
         if ($classificationChanged) {
-            redirect('/treasury/' . (int) $id . '/edit?similar=1');
+            redirect('/treasury?similar=' . (int) $id);
         }
         redirect('/treasury');
     }
@@ -305,7 +309,7 @@ final class TreasuryController extends BaseController
             || (int) $request->input('budget_item_id', 0) > 0;
         $newId = (int) ($result['id'] ?? 0);
         if ($classified && $newId > 0) {
-            redirect('/treasury/' . $newId . '/edit?similar=1');
+            redirect('/treasury?similar=' . $newId);
         }
         redirect('/treasury');
     }
@@ -618,6 +622,93 @@ final class TreasuryController extends BaseController
         }
 
         return $count;
+    }
+
+
+    /**
+     * Proposta “applica anche ai movimenti simili” calcolata lato server per un movimento.
+     *
+     * @return array<string,mixed>|null
+     */
+    private function similarProbe(int $movementId): ?array
+    {
+        if ($movementId < 1 || !can('treasury.manage')) {
+            return null;
+        }
+        $movement = $this->treasury->find($movementId);
+        if ($movement === null) {
+            return null;
+        }
+        $values = [
+            'category' => (string) ($movement['category'] ?? ''),
+            'runts_line' => (string) ($movement['runts_line'] ?? ''),
+            'budget_item_id' => (string) (int) ($movement['budget_item_id'] ?? 0),
+        ];
+        $fields = [];
+        foreach ($values as $field => $value) {
+            if ($field === 'budget_item_id' ? (int) $value > 0 : trim($value) !== '') {
+                $fields[] = $field;
+            }
+        }
+        if ($fields === []) {
+            return null;
+        }
+        $result = $this->treasury->similarMovements([
+            'direction' => (string) ($movement['direction'] ?? ''),
+            'description' => (string) ($movement['description'] ?? ''),
+            'beneficiary' => (string) ($movement['beneficiary'] ?? ''),
+        ], 3, $movementId, $fields, $values);
+        if (($result['total'] ?? 0) < 1) {
+            return null;
+        }
+
+        return [
+            'movement' => $movement,
+            'ids' => $result['ids'],
+            'matches' => $result['matches'],
+            'total' => (int) $result['total'],
+            'skipped' => (int) ($result['skipped'] ?? 0),
+            'changes' => $this->describeClassification([
+                'category' => $values['category'],
+                'runts_line' => $values['runts_line'],
+                'budget_item_id' => $values['budget_item_id'],
+            ], $fields),
+        ];
+    }
+
+    /** Applica la classificazione proposta (form classico, senza JS). */
+    public function applySimilarForm(Request $request): void
+    {
+        require_component('treasury');
+        if (!can('treasury.manage')) {
+            http_response_code(403);
+            $this->render('errors/403');
+            return;
+        }
+        $ids = [];
+        foreach ((array) $request->input('ids', []) as $value) {
+            $id = (int) $value;
+            if ($id > 0) {
+                $ids[$id] = $id;
+            }
+        }
+        $movementId = (int) $request->input('movement_id', 0);
+        $originals = [];
+        $movement = $movementId > 0 ? $this->treasury->find($movementId) : null;
+        if ($movement !== null) {
+            $originals = [
+                'category' => (string) ($movement['category'] ?? ''),
+                'runts_line' => (string) ($movement['runts_line'] ?? ''),
+                'budget_item_id' => (string) (int) ($movement['budget_item_id'] ?? 0),
+            ];
+        }
+        $updated = $this->treasury->applyClassification(array_values($ids), [
+            'category' => (string) $request->input('category', ''),
+            'runts_line' => (string) $request->input('runts_line', ''),
+            'budget_item_id' => (string) $request->input('budget_item_id', ''),
+        ], $request->ip(), $originals);
+        $this->flash('success', __('treasury.similar_applied', ['count' => (string) $updated]));
+        redirect('/treasury');
     }
 
     private function ledgerFilters(Request $request): array
