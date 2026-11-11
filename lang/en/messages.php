@@ -2097,6 +2097,8 @@ return [
         'tpl_csv' => 'Import from Excel / CSV',
         'tpl_csv_lede' => 'Upload the sheet exported as CSV: SOCLY recognises the columns and creates sections and lines.',
         'csv_file' => 'CSV file',
+        'csv_drop' => 'Drag the CSV file here or click to choose it',
+        'csv_none' => 'No file selected',
         'csv_hint' => 'Columns: section; line; amount; type (expense/income); category. Headers are recognised in Italian, German and English; without headers the column order applies.',
         'csv_imported' => ':count lines imported from the CSV.',
         'csv_error' => 'Import failed: check that the file is a CSV with at least the line and amount columns.',

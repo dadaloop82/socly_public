@@ -2095,6 +2095,8 @@ return [
         'tpl_csv' => 'Aus Excel / CSV importieren',
         'tpl_csv_lede' => 'Lade die als CSV exportierte Tabelle: SOCLY erkennt die Spalten und erstellt Abschnitte und Posten.',
         'csv_file' => 'CSV-Datei',
+        'csv_drop' => 'CSV-Datei hierher ziehen oder anklicken zum Auswählen',
+        'csv_none' => 'Keine Datei ausgewählt',
         'csv_hint' => 'Spalten: Abschnitt; Posten; Betrag; Art (Ausgabe/Einnahme); Kategorie. Überschriften auf Deutsch, Italienisch und Englisch werden erkannt; ohne Überschriften gilt die Spaltenreihenfolge.',
         'csv_imported' => ':count Posten aus der CSV importiert.',
         'csv_error' => 'Import fehlgeschlagen: Prüfe, ob die CSV mindestens die Spalten Posten und Betrag enthält.',

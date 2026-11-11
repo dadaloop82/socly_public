@@ -10,7 +10,7 @@ $row = is_array($row ?? null) ? $row : null;
 $rowId = (int) ($row['id'] ?? 0);
 $direction = (string) ($row['direction'] ?? 'expense') === 'income' ? 'income' : 'expense';
 $category = (string) ($row['category'] ?? '');
-$amount = $row !== null ? number_format((float) ($row['amount'] ?? 0), 2, ',', '') : '';
+$amount = $row !== null ? number_format((float) ($row['amount'] ?? 0), 2, ',', '.') : '';
 ?>
 <tr class="budget-row" data-budget-row>
     <td class="budget-cell-label">

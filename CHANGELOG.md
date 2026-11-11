@@ -23,6 +23,8 @@ every 100 patches bump the series, and each bump is published to this repository
   (the command stays available as an optional bulk warm-up).
 - Appointing someone to an association body no longer requires a settled membership fee: open
   balances are a treasury matter and are ignored in the org chart, both in the picker and on save.
+- Budget: the CSV upload now uses the same drag-and-drop area as the other uploads, amounts keep
+  the thousands separator and the currency symbol no longer overlaps the number.
 
 ## [1.5.41] - 2026-11-10
 

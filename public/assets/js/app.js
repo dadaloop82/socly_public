@@ -14507,17 +14507,66 @@ function initFieldsSortable(scope = document) {
   });
 }
 
-/* ── Bilancio: selezionando un CSV si attiva il modello "Importa" ────────── */
+/* ── Bilancio: dropzone CSV come gli altri upload + attiva il modello "Importa" ── */
 function initBudgetCreateForm(scope = document) {
   const form = scope.querySelector('[data-budget-create]');
   if (!form || form.dataset.budgetCreateBound === '1') return;
   form.dataset.budgetCreateBound = '1';
   const input = form.querySelector('[data-budget-csv-input]');
-  if (!input) return;
-  input.addEventListener('change', () => {
-    if (!input.files || input.files.length === 0) return;
+  if (!(input instanceof HTMLInputElement)) return;
+  const dropzone = form.querySelector('[data-budget-dropzone]');
+  const nameEl = form.querySelector('[data-budget-file-name]');
+  const emptyLabel = nameEl instanceof HTMLElement ? nameEl.textContent || '' : '';
+
+  const selectImportTemplate = () => {
     const radio = form.querySelector('input[name="template"][value="csv_import"]');
     if (radio instanceof HTMLInputElement) radio.checked = true;
+  };
+  const showFileName = () => {
+    if (!(nameEl instanceof HTMLElement)) return;
+    const file = input.files && input.files.length > 0 ? input.files[0] : null;
+    nameEl.textContent = file ? file.name : emptyLabel;
+  };
+
+  input.addEventListener('change', () => {
+    if (input.files && input.files.length > 0) selectImportTemplate();
+    showFileName();
+  });
+
+  if (!(dropzone instanceof HTMLElement)) return;
+  dropzone.addEventListener('click', (event) => {
+    if (event.target === input) return;
+    input.click();
+  });
+  dropzone.addEventListener('keydown', (event) => {
+    if (event.key !== 'Enter' && event.key !== ' ') return;
+    event.preventDefault();
+    input.click();
+  });
+  ['dragenter', 'dragover'].forEach((name) => {
+    dropzone.addEventListener(name, (event) => {
+      event.preventDefault();
+      dropzone.classList.add('is-dragging');
+    });
+  });
+  ['dragleave', 'dragend'].forEach((name) => {
+    dropzone.addEventListener(name, () => dropzone.classList.remove('is-dragging'));
+  });
+  dropzone.addEventListener('drop', (event) => {
+    event.preventDefault();
+    dropzone.classList.remove('is-dragging');
+    if (!(event instanceof DragEvent) || !event.dataTransfer) return;
+    const files = event.dataTransfer.files;
+    if (!files || files.length === 0) return;
+    try {
+      const transfer = new DataTransfer();
+      transfer.items.add(files[0]);
+      input.files = transfer.files;
+    } catch {
+      // Browser senza DataTransfer: resta disponibile il selettore file.
+      return;
+    }
+    input.dispatchEvent(new Event('change', { bubbles: true }));
   });
 }
 
@@ -14551,11 +14600,15 @@ function initBudgetGrid(scope = document) {
 
   const symbol = form.dataset.currencySymbol || '';
   const locale = (document.documentElement.lang || 'it').slice(0, 2);
-  const localeMap = { it: 'it-IT', de: 'de-DE', en: 'en-GB' };
-  const numberFormatter = new Intl.NumberFormat(localeMap[locale] || 'it-IT', {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  });
+  // Stessa formattazione del server (CurrencyService::format): 9.000,00 €.
+  // Non usiamo Intl: in alcuni ambienti ICU non raggruppa le migliaia.
+  const separators = locale === 'en' ? { group: ',', decimal: '.' } : { group: '.', decimal: ',' };
+  const formatNumber = (value) => {
+    const rounded = Math.round((Number(value) || 0) * 100) / 100;
+    const [whole, decimals] = Math.abs(rounded).toFixed(2).split('.');
+    const grouped = whole.replace(/\B(?=(\d{3})+(?!\d))/g, separators.group);
+    return `${rounded < 0 ? '-' : ''}${grouped}${separators.decimal}${decimals}`;
+  };
   let sectionCounter = 0;
 
   const parseAmount = (raw) => {
@@ -14567,7 +14620,7 @@ function initBudgetGrid(scope = document) {
     const parsed = Number(value);
     return Number.isFinite(parsed) ? parsed : 0;
   };
-  const format = (value) => `${numberFormatter.format(value)} ${symbol}`.trim();
+  const format = (value) => `${formatNumber(value)} ${symbol}`.trim();
 
   const recalc = () => {
     let grandExpense = 0;

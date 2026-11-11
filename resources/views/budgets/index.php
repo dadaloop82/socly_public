@@ -129,8 +129,22 @@ $canManage = can('treasury.manage');
                 </div>
             </fieldset>
             <div class="budget-csv-field" data-budget-csv-field>
-                <label class="setup-field-label" for="budget-csv-file"><?= e(__('budget.csv_file')) ?></label>
-                <input type="file" id="budget-csv-file" name="csv_file" accept=".csv,text/csv,text/plain" class="budget-csv-input" data-budget-csv-input>
+                <span class="field-label sf-field__label"><?= e(__('budget.csv_file')) ?></span>
+                <div class="doc-dropzone budget-dropzone" data-budget-dropzone role="button" tabindex="0">
+                    <span class="field-icon doc-dropzone-icon" data-icon="upload" aria-hidden="true"></span>
+                    <div class="doc-dropzone-text">
+                        <span class="doc-dropzone-title"><?= e(__('budget.csv_drop')) ?></span>
+                        <span class="doc-dropzone-meta" data-budget-file-name><?= e(__('budget.csv_none')) ?></span>
+                    </div>
+                    <?= field('file', [
+                        'label' => '',
+                        'name' => 'csv_file',
+                        'as_button' => false,
+                        'input_class' => 'visually-hidden',
+                        'accept' => '.csv,text/csv,text/plain',
+                        'attrs' => ['data-budget-csv-input' => true],
+                    ]) ?>
+                </div>
                 <p class="setup-hint muted"><?= e(__('budget.csv_hint')) ?></p>
             </div>
             <div class="actions form-actions form-actions-end">

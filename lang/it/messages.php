@@ -2698,6 +2698,8 @@ return [
         'tpl_csv' => 'Importa da Excel / CSV',
         'tpl_csv_lede' => 'Carica il foglio esportato in CSV: Socly riconosce le colonne e crea sezioni e voci.',
         'csv_file' => 'File CSV',
+        'csv_drop' => 'Trascina qui il file CSV oppure clicca per sceglierlo',
+        'csv_none' => 'Nessun file selezionato',
         'csv_hint' => 'Colonne: sezione; voce; importo; tipo (spesa/entrata); categoria. Intestazioni riconosciute in italiano, tedesco e inglese; senza intestazioni vale l’ordine delle colonne.',
         'csv_imported' => 'Importate :count voci dal CSV.',
         'csv_error' => 'Import non riuscito: controlla che il file sia un CSV con almeno le colonne voce e importo.',
