@@ -7,10 +7,10 @@ namespace Socly\Services;
 use Socly\Core\Database;
 
 /**
- * Concorrenza fra operatori: versioni di riga e “chi ha modificato cosa”.
+ * Concurrency between operators: row versions and “who changed what”.
  *
- * Le tabelle modificabili hanno `row_version`; `Database::updateVersioned()` incrementa la versione
- * e fallisce se nel frattempo qualcun altro ha salvato. Qui stanno la mappa entità → tabella, la
+ * Editable tables carry `row_version`; `Database::updateVersioned()` bumps it and
+ * fails when someone else saved meanwhile. Here live the entity → table map, the
  * descrizione dell'ultimo autore (dall'audit log) e il confronto usato dai form.
  */
 final class VersionService

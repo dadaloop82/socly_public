@@ -10,10 +10,10 @@ use Socly\Core\Validator;
 /**
  * Operazioni ricorrenti della prima nota.
  *
- * La regola vive in `treasury_recurring`; alla scadenza `runDue()` crea il movimento del periodo.
+ * The rule lives in `treasury_recurring`; when due, `runDue()` creates the entry for that period.
  * L'importo può essere fisso o variabile (in quel caso è un promemoria da completare).
- * Regola di approvazione: i movimenti automatici su banca/carta restano **da approvare**, quelli
- * sul conto cassa sono già certi e vengono approvati subito.
+ * Approval rule: automatic entries on bank/card stay **to approve**, while cash ones
+ * are certain and get approved immediately.
  */
 final class RecurringService
 {
@@ -106,7 +106,7 @@ final class RecurringService
     }
 
     /**
-     * Genera i movimenti scaduti. Restituisce il numero di movimenti creati.
+     * Generate the due entries; returns how many were created.
      */
     public function runDue(string $ip = 'system', ?int $userId = null, ?string $today = null): int
     {
@@ -145,7 +145,7 @@ final class RecurringService
     }
 
     /**
-     * Movimento generato: approvato subito solo per la cassa; banca/carta restano da approvare.
+     * Generated entry: approved at once only for cash; bank/card stay to approve.
      *
      * @param array<string,mixed> $rule
      */

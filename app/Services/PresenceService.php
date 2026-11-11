@@ -7,8 +7,8 @@ namespace Socly\Services;
 use Socly\Core\Database;
 
 /**
- * Presenza degli operatori collegati: una riga per sessione aperta, aggiornata dal polling del
- * client. Alimenta i pallini con le iniziali nell'header e l'avviso “X si è appena collegato”.
+ * Presence of connected operators: one row per open session, refreshed by the client
+ * polling. It feeds the initials dots in the header and the “X just connected” toast.
  */
 final class PresenceService
 {
@@ -43,7 +43,7 @@ final class PresenceService
                 'eid' => $entity !== null && $editingId !== null && $editingId > 0 ? $editingId : null,
             ]
         );
-        // Pulizia: righe vecchie di oltre un giorno.
+        // Housekeeping: drop rows older than a day.
         $this->db->query('DELETE FROM user_presence WHERE last_seen < (NOW() - INTERVAL 1 DAY)');
     }
 
@@ -61,7 +61,7 @@ final class PresenceService
     }
 
     /**
-     * Utenti collegati (una voce per persona, anche con più sessioni aperte).
+     * Connected users (one entry per person, even with several open sessions).
      *
      * @return array{users:list<array<string,mixed>>,online:int,new:list<array<string,mixed>>,now:int}
      */
@@ -144,7 +144,7 @@ final class PresenceService
     }
 
     /**
-     * Nome visibile: nome/cognome dell'operatore, altrimenti il socio collegato,
+     * Display name: operator first/last name, otherwise the linked member,
      * altrimenti “Utente Sconosciuto”.
      *
      * @param array<string,mixed> $row
@@ -163,7 +163,7 @@ final class PresenceService
             if ($name === '') {
                 return ['name' => (string) __('presence.unknown_user'), 'initials' => '?'];
             }
-            // Il campo storico `name` contiene già “Nome Cognome”.
+            // The legacy `name` column already holds “First Last”.
             $parts = preg_split('/\s+/', $name) ?: [];
             $first = (string) ($parts[0] ?? '');
             $last = count($parts) > 1 ? (string) end($parts) : '';

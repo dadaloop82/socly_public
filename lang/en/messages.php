@@ -2094,6 +2094,7 @@ return [
         'pager_info' => 'Page :page of :pages',
         'cancel' => 'Cancel',
         'close' => 'Close',
+        'error_generic' => 'The operation failed. Please try again.',
         'back' => 'Back',
         'edit' => 'Edit',
         'delete' => 'Delete',

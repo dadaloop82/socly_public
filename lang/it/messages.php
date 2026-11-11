@@ -2743,6 +2743,7 @@ return [
         'pager_info' => 'Pagina :page di :pages',
         'cancel' => 'Annulla',
         'close' => 'Chiudi',
+        'error_generic' => 'Operazione non riuscita. Riprova.',
         'back' => 'Indietro',
         'edit' => 'Modifica',
         'delete' => 'Elimina',

@@ -1544,6 +1544,7 @@ function initBudgetCategoryRename() {
   const url = grid?.getAttribute('data-category-rename-url') || '';
   if (!grid || url === '') return;
   const promptLabel = grid.getAttribute('data-msg-category-rename') || 'Name';
+  const genericError = grid.getAttribute('data-msg-generic-error') || '';
 
   document.addEventListener('click', async (event) => {
     const button = event.target instanceof Element ? event.target.closest('[data-budget-category-rename]') : null;
@@ -1572,14 +1573,14 @@ function initBudgetCategoryRename() {
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok || !data.ok) {
-        window.alert(String(data.error || 'Error'));
+        window.alert(String(data.error || genericError));
         return;
       }
       document.querySelectorAll(`option[value="${slug}"]`).forEach((option) => {
         option.textContent = String(data.label || label);
       });
     } catch (err) {
-      window.alert('Network error');
+      window.alert(genericError);
     }
   });
 }

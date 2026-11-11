@@ -2092,6 +2092,7 @@ return [
         'pager_info' => 'Seite :page von :pages',
         'cancel' => 'Abbrechen',
         'close' => 'Schließen',
+        'error_generic' => 'Die Operation ist fehlgeschlagen. Bitte erneut versuchen.',
         'back' => 'Zurück',
         'edit' => 'Bearbeiten',
         'delete' => 'Löschen',

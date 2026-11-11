@@ -73,6 +73,7 @@ $rowPartial = static fn (?array $row, string $sectionKey): string => view_partia
     data-msg-autosave-error="<?= e(__('budget.autosave_error')) ?>"
     data-category-rename-url="<?= e(url('/treasury/categories/rename')) ?>"
     data-msg-category-rename="<?= e(__('budget.category_rename_prompt')) ?>"
+    data-msg-generic-error="<?= e(__('common.error_generic')) ?>"
     <?php if ($canManage): ?><?= version_attrs('budget', ['id' => $budgetId, 'row_version' => (int) ($budget_version ?? ($budget['row_version'] ?? 0))]) ?><?php endif; ?>
 >
     <?= csrf_field() ?>

@@ -9,8 +9,8 @@ use Socly\Core\View;
 use Socly\Services\VersionService;
 
 /**
- * Controllo di freschezza: dice se il record aperto nel form è stato modificato da qualcun altro
- * dopo il caricamento della pagina (il client aggiorna il banner senza toccare i dati digitati).
+ * Freshness check: tells whether the record open in the form was changed by someone else
+ * after the page loaded (the client shows a banner without touching the typed values).
  */
 final class FreshnessController extends BaseController
 {

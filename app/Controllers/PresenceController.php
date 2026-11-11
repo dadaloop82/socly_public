@@ -9,7 +9,7 @@ use Socly\Core\View;
 use Socly\Services\PresenceService;
 
 /**
- * Presenza degli operatori: il client interroga questo endpoint in polling, che rinfresca la
+ * Operator presence: the client polls this endpoint, which refreshes the current session and
  * sessione corrente e restituisce chi è collegato (pallini, inattivi, nuovi arrivi).
  */
 final class PresenceController extends BaseController
@@ -28,7 +28,7 @@ final class PresenceController extends BaseController
         try {
             $this->presence->touch($editingEntity !== '' ? $editingEntity : null, $editingId > 0 ? $editingId : null);
         } catch (\Throwable) {
-            // la presenza non deve mai bloccare l'interfaccia
+            // presence must never break the UI
         }
         try {
             $data = $this->presence->snapshot(
