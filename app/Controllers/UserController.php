@@ -79,6 +79,7 @@ final class UserController extends BaseController
         $this->render('users/form', [
             'title' => __('users.edit'),
             'user' => $user,
+            'memberOptions' => $this->users->memberOptions(),
             'returnTo' => (string) $request->input('return', ''),
             'mailReady' => $this->mail->isReady(),
         ]);

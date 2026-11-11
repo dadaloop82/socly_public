@@ -555,6 +555,8 @@ final class SetupService
 
         if ($type === 'admin_account') {
             return [
+                'first_name' => '',
+                'last_name' => '',
                 'name' => '',
                 'email' => (string) $this->readValue('association.email', 'ASSOCIATION_EMAIL', ''),
                 'locale' => (string) $this->readValue('app.locale', 'APP_LOCALE', 'it'),
@@ -3452,7 +3454,12 @@ final class SetupService
         }
 
         $email = strtolower(trim((string) ($input['email'] ?? '')));
+        $firstName = trim((string) ($input['first_name'] ?? ''));
+        $lastName = trim((string) ($input['last_name'] ?? ''));
         $name = trim((string) ($input['name'] ?? ''));
+        if ($name === '') {
+            $name = trim($firstName . ' ' . $lastName);
+        }
         if ($name === '' && $email !== '') {
             $local = str_contains($email, '@') ? strstr($email, '@', true) : $email;
             $name = is_string($local) && $local !== '' ? ucfirst($local) : 'Admin';
@@ -3460,6 +3467,8 @@ final class SetupService
 
         $result = $this->users->createAssociationAdmin([
             'name' => $name,
+            'first_name' => $firstName,
+            'last_name' => $lastName,
             'email' => $email,
             'password' => (string) ($input['password'] ?? ''),
             'password_confirmation' => (string) ($input['password_confirmation'] ?? ''),

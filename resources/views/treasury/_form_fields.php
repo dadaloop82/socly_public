@@ -174,7 +174,7 @@ foreach ($members as $member) {
     'label' => (string) __('treasury.direction_sign'),
     'value' => $selectedDirection,
     'required' => true,
-    'wrapper_class' => 'treasury-direction-field',
+    'wrapper_class' => 'treasury-direction-field tmf-direction',
     'cards_class' => 'treasury-direction-cards',
     'options' => [
         [
@@ -202,23 +202,35 @@ foreach ($members as $member) {
     'name' => 'amount_currency',
     'value' => $baseCurrency,
 ]) ?>
-<div class="treasury-form-row treasury-form-row--economy">
-    <div class="treasury-amount-field">
-        <?= field('text', [
-            'name' => 'amount',
-            'label' => (string) __('treasury.amount'),
-            'value' => $displayAmount,
+<div class="tmf">
+<section class="tmf-card tmf-card--economy">
+    <header class="tmf-card-head">
+        <h2 class="tmf-card-title"><?= e(__('treasury.form_section_economy')) ?></h2>
+    </header>
+    <div class="tmf-grid tmf-grid--2">
+        <div class="treasury-amount-field">
+            <?= field('text', [
+                'name' => 'amount',
+                'label' => (string) __('treasury.amount'),
+                'value' => $displayAmount,
+                'required' => true,
+                'placeholder' => '0,00',
+                'attrs' => ['data-treasury-amount' => true, 'inputmode' => 'decimal'],
+            ]) ?>
+        </div>
+        <?= field('date', [
+            'name' => 'movement_date',
+            'label' => (string) __('treasury.operation_date'),
+            'value' => (string) ($values['movement_date'] ?? $today),
             'required' => true,
-            'placeholder' => '0,00',
-            'attrs' => ['data-treasury-amount' => true, 'inputmode' => 'decimal'],
         ]) ?>
     </div>
-    <?= field('date', [
-        'name' => 'movement_date',
-        'label' => (string) __('treasury.operation_date'),
-        'value' => (string) ($values['movement_date'] ?? $today),
-        'required' => true,
-    ]) ?>
+</section>
+<section class="tmf-card">
+    <header class="tmf-card-head">
+        <h2 class="tmf-card-title"><?= e(__('treasury.form_section_accounts')) ?></h2>
+    </header>
+    <div class="tmf-grid tmf-grid--3">
     <div data-treasury-account-wrap>
         <?= field('select', [
             'name' => 'account',
@@ -260,15 +272,18 @@ foreach ($members as $member) {
         ]) ?>
         <p class="treasury-transfer-notice" data-treasury-transfer-notice hidden><?= e(__('treasury.transfer_same_account')) ?></p>
     </div>
-</div>
+    </div>
+</section>
 <?php
 // Uscita + "Pagamento fattura": the invoice data live inside the block (complete and
 // self-contained). Without the flag the paper invoice details stay in the doc row.
 $invoiceActive = $selectedDirection === 'expense' && !empty($values['invoice_payment']);
 ?>
-<div data-treasury-expense-fields <?= $selectedDirection === 'expense' ? '' : 'hidden' ?>>
-    <div class="treasury-form-row treasury-form-row--single">
-        <div class="treasury-invoice-block">
+<section class="tmf-card" data-treasury-expense-fields <?= $selectedDirection === 'expense' ? '' : 'hidden' ?>>
+    <header class="tmf-card-head">
+        <h2 class="tmf-card-title"><?= e(__('treasury.form_section_invoice')) ?></h2>
+    </header>
+    <div class="treasury-invoice-block">
             <?= field('checkbox', [
                 'name' => 'invoice_payment',
                 'label' => (string) __('treasury.invoice_payment'),
@@ -303,10 +318,13 @@ $invoiceActive = $selectedDirection === 'expense' && !empty($values['invoice_pay
                     'value' => (string) ($values['invoice_due_date'] ?? ''),
                 ]) ?>
             </div>
-        </div>
     </div>
-</div>
-<div class="treasury-form-row treasury-form-row--docs" data-treasury-docs-row <?= $isTransfer ? 'hidden' : '' ?>>
+</section>
+<section class="tmf-card" data-treasury-docs-row <?= $isTransfer ? 'hidden' : '' ?>>
+    <header class="tmf-card-head">
+        <h2 class="tmf-card-title"><?= e(__('treasury.form_section_details')) ?></h2>
+    </header>
+    <div class="tmf-grid tmf-grid--2">
     <div data-treasury-category-wrap <?= $isTransfer ? 'hidden' : '' ?>>
         <?= field('select', [
             'name' => 'category',
@@ -385,18 +403,21 @@ $invoiceActive = $selectedDirection === 'expense' && !empty($values['invoice_pay
             </div>
         <?php endif; ?>
     </div>
-    <?php // Invoice number/date live only inside the invoice block (no duplicates). ?>
-</div>
-<div class="treasury-form-row treasury-form-row--single">
-    <?= field('textarea', [
-        'name' => 'description',
-        'label' => (string) __('treasury.description'),
-        'value' => (string) ($values['description'] ?? ''),
-        'maxlength' => 500,
-        'rows' => 2,
-    ]) ?>
-</div>
-<div class="treasury-form-row treasury-form-row--single">
+    <div class="tmf-span-2">
+        <?= field('textarea', [
+            'name' => 'description',
+            'label' => (string) __('treasury.description'),
+            'value' => (string) ($values['description'] ?? ''),
+            'maxlength' => 500,
+            'rows' => 2,
+        ]) ?>
+    </div>
+    </div>
+</section>
+<section class="tmf-card">
+    <header class="tmf-card-head">
+        <h2 class="tmf-card-title"><?= e(__('treasury.form_section_party')) ?></h2>
+    </header>
     <div class="treasury-soggetto-fields">
         <?= field('checkbox', [
             'name' => 'member_involved',
@@ -436,8 +457,11 @@ $invoiceActive = $selectedDirection === 'expense' && !empty($values['invoice_pay
             ]) ?>
         </div>
     </div>
-</div>
-<div class="treasury-form-row treasury-form-row--single">
+</section>
+<section class="tmf-card">
+    <header class="tmf-card-head">
+        <h2 class="tmf-card-title"><?= e(__('treasury.form_section_attachment')) ?></h2>
+    </header>
     <div class="treasury-attach-fields">
         <p class="section-lede treasury-attach-lede"><?= e(__('treasury.attachment_lede')) ?></p>
             <div class="doc-file-field<?= $fileReady ? ' is-uploaded' : '' ?>" data-treasury-doc-field>
@@ -482,6 +506,7 @@ $invoiceActive = $selectedDirection === 'expense' && !empty($values['invoice_pay
                 </div>
             </div>
     </div>
+</section>
 </div>
 <?php if (!empty($config['auto_from_payments'])): ?>
     <p class="muted"><?= e(__('treasury.auto_hint')) ?></p>

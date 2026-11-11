@@ -2112,6 +2112,26 @@ $showNameDe = !empty($showNameDe);
                 <?php elseif ($stepType === 'admin_account'): ?>
                     <div class="setup-admin-account" data-setup-line>
                         <p class="setup-hint muted"><?= e(__('setup.admin_access_hint')) ?></p>
+                        <div class="setup-equal-row">
+                            <?= field('text', [
+                                'name' => 'first_name',
+                                'label' => (string) __('users.first_name'),
+                                'value' => (string) ($value['first_name'] ?? ''),
+                                'required' => true,
+                                'maxlength' => 80,
+                                'context' => 'setup',
+                                'autocomplete' => 'given-name',
+                            ]) ?>
+                            <?= field('text', [
+                                'name' => 'last_name',
+                                'label' => (string) __('users.last_name'),
+                                'value' => (string) ($value['last_name'] ?? ''),
+                                'required' => true,
+                                'maxlength' => 80,
+                                'context' => 'setup',
+                                'autocomplete' => 'family-name',
+                            ]) ?>
+                        </div>
                         <?= field('email', [
                             'name' => 'email',
                             'label' => (string) __('setup.field_admin_email'),

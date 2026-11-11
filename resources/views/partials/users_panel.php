@@ -12,6 +12,7 @@ $panelUsers = is_array($panelUsers ?? null) ? $panelUsers : [];
         <table>
             <thead>
                 <tr>
+                    <th><?= e(__('users.name_column')) ?></th>
                     <th><?= e(__('users.email')) ?></th>
                     <th><?= e(__('users.role')) ?></th>
                     <th><?= e(__('users.locale')) ?></th>
@@ -21,7 +22,16 @@ $panelUsers = is_array($panelUsers ?? null) ? $panelUsers : [];
             </thead>
             <tbody>
                 <?php foreach ($panelUsers as $u): ?>
+                    <?php
+                    $panelFirst = trim((string) ($u['first_name'] ?? ''));
+                    $panelLast = trim((string) ($u['last_name'] ?? ''));
+                    $panelName = trim($panelFirst . ' ' . $panelLast);
+                    if ($panelName === '') {
+                        $panelName = trim((string) ($u['name'] ?? ''));
+                    }
+                    ?>
                     <tr>
+                        <td><?= e($panelName !== '' ? $panelName : (string) __('presence.unknown_user')) ?></td>
                         <td><?= e((string) ($u['email'] ?? '')) ?></td>
                         <td><?= e(\Socly\Services\UserService::roleLabel($u['role'] ?? null) ?: __('users.role_custom')) ?></td>
                         <td><?= e(strtoupper((string) ($u['locale'] ?? 'it'))) ?></td>
@@ -50,6 +60,34 @@ $panelUsers = is_array($panelUsers ?? null) ? $panelUsers : [];
     <form method="post" action="<?= e(url('/users')) ?>" data-leave-guard data-user-create-form>
         <?= csrf_field() ?>
         <?= field('hidden', ['name' => 'return', 'value' => 'settings']) ?>
+        <div class="setup-equal-row">
+            <?= field('text', [
+                'name' => 'first_name',
+                'label' => (string) __('users.first_name'),
+                'value' => (string) old('first_name'),
+                'maxlength' => 80,
+                'autocomplete' => 'given-name',
+                'context' => 'setup',
+            ]) ?>
+            <?= field('text', [
+                'name' => 'last_name',
+                'label' => (string) __('users.last_name'),
+                'value' => (string) old('last_name'),
+                'maxlength' => 80,
+                'autocomplete' => 'family-name',
+                'context' => 'setup',
+            ]) ?>
+        </div>
+        <?= field('select', [
+            'name' => 'member_id',
+            'label' => (string) __('users.member_link'),
+            'hint' => (string) __('users.member_link_hint'),
+            'value' => (string) old('member_id'),
+            'include_empty' => true,
+            'empty_label' => (string) __('users.member_link_none'),
+            'options' => $memberOptions ?? [],
+            'context' => 'setup',
+        ]) ?>
         <?= field('email', [
             'name' => 'email',
             'label' => (string) __('users.email'),

@@ -87,11 +87,11 @@ $accountFilterUrl = static function (string $accountKey) use ($ledgerParams): st
     <div class="treasury-overview-head">
         <div class="treasury-overview-balance">
             <span class="treasury-overview-label"><?= e(__('treasury.balance')) ?></span>
-            <strong class="treasury-overview-value<?= (float) $ledger['balance'] < 0 ? ' is-negative' : '' ?>"><?= e($currency->format((float) $ledger['balance'])) ?></strong>
+            <strong class="treasury-overview-value<?= (float) $ledger['balance'] < 0 ? ' is-negative' : '' ?>" data-treasury-kpi="balance"><?= e($currency->format((float) $ledger['balance'])) ?></strong>
         </div>
         <div class="treasury-overview-flows">
-            <span class="is-income"><span aria-hidden="true">↓</span> <?= e($currency->format((float) $ledger['income'])) ?></span>
-            <span class="is-expense"><span aria-hidden="true">↑</span> <?= e($currency->format((float) $ledger['expense'])) ?></span>
+            <span class="is-income" data-treasury-kpi="income"><span aria-hidden="true">↓</span> <?= e($currency->format((float) $ledger['income'])) ?></span>
+            <span class="is-expense" data-treasury-kpi="expense"><span aria-hidden="true">↑</span> <?= e($currency->format((float) $ledger['expense'])) ?></span>
         </div>
         <div class="treasury-overview-actions">
             <?php if ($canManage): ?>

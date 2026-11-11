@@ -10,6 +10,33 @@
 $memberName = trim(
     trim((string) ($member['fields']['first_name'] ?? '')) . ' ' . trim((string) ($member['fields']['last_name'] ?? ''))
 );
+// Statuto e informativa possono essere lunghissimi: nel modulo stampato si mostrano al massimo
+// 10 righe, poi “leggi il seguito sul sito web”.
+$siteUrl = trim((string) config('app.url', ''));
+if ($siteUrl === '') {
+    $siteUrl = rtrim((string) url('/'), '/');
+}
+$clipText = static function (string $text, int $maxLines = 10) use ($siteUrl): array {
+    $text = trim(str_replace(["\r\n", "\r"], "\n", $text));
+    if ($text === '') {
+        return ['text' => '', 'truncated' => false];
+    }
+    $text = (string) (preg_replace("/\n{3,}/", "\n\n", $text) ?? $text);
+    $perLine = 92;
+    $limit = $maxLines * $perLine;
+    $lines = count(explode("\n", $text));
+    if (mb_strlen($text) <= $limit && $lines <= $maxLines) {
+        return ['text' => $text, 'truncated' => false];
+    }
+    $cut = mb_substr($text, 0, $limit);
+    $space = mb_strrpos($cut, ' ');
+    if ($space !== false && $space > (int) ($limit * 0.6)) {
+        $cut = mb_substr($cut, 0, $space);
+    }
+    return ['text' => rtrim($cut) . '…', 'truncated' => true];
+};
+$statuteBlock = $clipText((string) ($statute_text ?? ''));
+$privacyBlock = $clipText((string) ($privacy_text ?? ''));
 ?>
 <!DOCTYPE html>
 <html lang="<?= e(app_locale()) ?>">
@@ -93,6 +120,13 @@ $memberName = trim(
             margin-top: 3rem;
         }
         .sign-label { font-size: 0.85rem; color: #444; }
+        .declaration-more {
+            margin: 0.5rem 0 0;
+            font-size: 0.85rem;
+            font-weight: 600;
+            color: #444;
+            word-break: break-word;
+        }
         .meta { color: #666; font-size: 0.85rem; margin-top: 1.5rem; }
         @media print {
             .toolbar { display: none; }
@@ -150,16 +184,22 @@ $memberName = trim(
     </table>
 
     <h2><?= e(__('members.enrollment_form_declarations')) ?></h2>
-    <?php if ($statute_text !== ''): ?>
+    <?php if ($statuteBlock['text'] !== ''): ?>
         <div class="declaration">
             <strong><?= e(__('members.enrollment_form_statute_ack')) ?></strong>
-            <p style="margin:0.5rem 0 0;white-space:pre-wrap"><?= e($statute_text) ?></p>
+            <p style="margin:0.5rem 0 0;white-space:pre-wrap"><?= e($statuteBlock['text']) ?></p>
+            <?php if (!empty($statuteBlock['truncated'])): ?>
+                <p class="declaration-more"><?= e(__('members.enrollment_form_read_more', ['url' => $siteUrl])) ?></p>
+            <?php endif; ?>
         </div>
     <?php endif; ?>
-    <?php if ($privacy_text !== ''): ?>
+    <?php if ($privacyBlock['text'] !== ''): ?>
         <div class="declaration">
             <strong><?= e(__('members.enrollment_form_privacy_ack')) ?></strong>
-            <p style="margin:0.5rem 0 0;white-space:pre-wrap"><?= e($privacy_text) ?></p>
+            <p style="margin:0.5rem 0 0;white-space:pre-wrap"><?= e($privacyBlock['text']) ?></p>
+            <?php if (!empty($privacyBlock['truncated'])): ?>
+                <p class="declaration-more"><?= e(__('members.enrollment_form_read_more', ['url' => $siteUrl])) ?></p>
+            <?php endif; ?>
         </div>
     <?php endif; ?>
     <p><?= e(__('members.enrollment_form_declaration_body')) ?></p>

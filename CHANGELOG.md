@@ -10,6 +10,13 @@ every 100 patches bump the series, and each bump is published to this repository
 
 ### Added
 
+- Concurrent operators: every user works in their own PHP session (per-session file, no shared lock),
+  and user accounts now carry a **first name / last name** or a **link to a member record** (same idea
+  as association roles). A presence strip shows the initials of everyone connected with a stable
+  colour per person, announces “Daniel Stimpfl just connected to Socly” for a few seconds, fades the
+  dots of people idle for more than five minutes and animates the exit of those who disconnect;
+  accounts without a name appear as “Unknown user”. The strip only appears when at least two people
+  are online.
 - Dashboard, Statistics and treasury charts: drag a card to reorder it while the three-column grid
   shows the available slots, resize it to one third, two thirds or the full row (width button or the
   bottom-right handle) and hide the cards you do not need; the layout is saved per user.
@@ -29,6 +36,12 @@ every 100 patches bump the series, and each bump is published to this repository
 
 ### Changed
 
+- The first-note entry form is now organised into cards — amount and date, account and method,
+  invoice, category and details, counterparty, document — with a sticky action bar.
+- Approving a movement updates the balance, income and expense totals on the spot (no reload) and the
+  “to approve” counter follows immediately.
+- RUNTS section titles are translated in the interface; the single Model D lines keep the official
+  Italian wording required by the form.
 - The year-end report is no longer a separate menu item: `/rendiconto` redirects to the **Consuntivo**
   tab of the Bilanci page and the active tab is kept in the URL hash (`#bil-consuntivo`), so links and
   bookmarks keep working.
@@ -39,6 +52,12 @@ every 100 patches bump the series, and each bump is published to this repository
 
 ### Fixed
 
+- The members list search keeps the focus and the caret while the list filters itself: the field no
+  longer “jumps away” after every keystroke.
+- Long labels inside a badge now wrap in a rounded rectangle instead of turning the badge into a
+  circle.
+- Print enrollment form: statute and privacy texts longer than ten lines are clipped with an ellipsis
+  and a “read the rest on the website <url>” line, so the sheet stays printable.
 - The chart grid now packs cards densely, so a resized card sits next to its neighbours instead of
   leaving an empty column.
 - The statistics map completes itself: new or changed places are geocoded automatically after a

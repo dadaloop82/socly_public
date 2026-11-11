@@ -19,6 +19,11 @@ final class SessionController extends BaseController
     {
         $_SESSION['last_activity'] = time();
         try {
+            app(\Socly\Services\PresenceService::class)->touch();
+        } catch (\Throwable) {
+            // never block session ping
+        }
+        try {
             $this->platform->maybeSendTelemetry();
         } catch (\Throwable) {
             // never block session ping

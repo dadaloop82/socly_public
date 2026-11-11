@@ -223,6 +223,7 @@ $topIncome = is_array($statistics['categories']['income'] ?? null) ? $statistics
 
     <section class="dashboard-panel" id="budget-panel-consuntivo" role="tabpanel" data-budget-panel="consuntivo" hidden>
         <p class="setup-hint muted"><?= e(__('runts.lede')) ?></p>
+        <p class="setup-hint muted"><?= e(__('runts.official_wording_note')) ?></p>
         <p class="setup-hint muted"><?= e(__('runts.limit_hint', ['limit' => $currency->format($runtsLimit)])) ?></p>
         <?php if ($rendicontoYears === []): ?>
             <div class="panel">

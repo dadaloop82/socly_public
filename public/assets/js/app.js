@@ -205,6 +205,8 @@ document.addEventListener('DOMContentLoaded', () => {
   syncBrandReadableColors();
   initBrokenImageGuards();
   initSessionHeartbeat();
+  initPresence();
+  restoreFilterFocus();
   initPlatformConsents(document);
   initResetUserData();
   initReportProblem();
@@ -319,12 +321,13 @@ function initLiveFilterForm(form) {
   form.dataset.liveFilterBound = '1';
 
   const submitNow = () => {
+    rememberFilterFocus(form);
     if (typeof form.requestSubmit === 'function') form.requestSubmit();
     else form.submit();
   };
   const submitLive = debounce(() => {
     submitNow();
-  }, 320);
+  }, 450);
 
   form.querySelectorAll('select, input[type="checkbox"], input[type="radio"]').forEach((el) => {
     el.addEventListener('change', () => {
@@ -335,6 +338,48 @@ function initLiveFilterForm(form) {
   form.querySelectorAll('input[type="search"], input[type="text"]').forEach((el) => {
     el.addEventListener('input', submitLive);
   });
+}
+
+/**
+ * Il filtro live invia il form (GET) a ogni pausa di digitazione: prima del reload si ricorda
+ * quale campo aveva il focus e la posizione del cursore, così la ricerca non “salta” via.
+ */
+const FILTER_FOCUS_KEY = 'socly.filter.focus';
+
+function rememberFilterFocus(form) {
+  const el = document.activeElement;
+  if (!(el instanceof HTMLElement) || !form.contains(el)) return;
+  const name = el.getAttribute('name') || '';
+  if (name === '') return;
+  let pos = null;
+  if (typeof el.selectionStart === 'number') pos = el.selectionStart;
+  try {
+    sessionStorage.setItem(FILTER_FOCUS_KEY, JSON.stringify({ name, pos }));
+  } catch (err) {
+    // storage non disponibile: si perde solo il focus
+  }
+}
+
+function restoreFilterFocus() {
+  let saved = null;
+  try {
+    saved = JSON.parse(sessionStorage.getItem(FILTER_FOCUS_KEY) || 'null');
+    sessionStorage.removeItem(FILTER_FOCUS_KEY);
+  } catch (err) {
+    return;
+  }
+  if (!saved || !saved.name) return;
+  const form = document.querySelector('[data-members-filter], [data-treasury-filter], [data-live-filter]');
+  const el = form ? form.querySelector(`[name="${saved.name}"]`) : null;
+  if (!(el instanceof HTMLElement)) return;
+  el.focus({ preventScroll: true });
+  if (saved.pos !== null && typeof el.setSelectionRange === 'function') {
+    try {
+      el.setSelectionRange(saved.pos, saved.pos);
+    } catch (err) {
+      // input senza selezione (es. select): niente da ripristinare
+    }
+  }
 }
 
 /**
@@ -1207,6 +1252,108 @@ function initPlatformConsents(scope) {
     });
     sync();
   });
+}
+
+/**
+ * Presenza: pallini con le iniziali delle persone collegate e avviso quando qualcuno entra.
+ * Visibile solo quando ci sono almeno due operatori online; inattivo da oltre 5 minuti → opaco.
+ */
+function initPresence() {
+  const root = document.querySelector('[data-presence-root]');
+  if (!root) return;
+  const url = root.getAttribute('data-presence-url') || '';
+  const avatars = root.querySelector('[data-presence-avatars]');
+  const toasts = root.querySelector('[data-presence-toasts]');
+  if (!url || !avatars) return;
+
+  const POLL_MS = 12000;
+  let since = 0;
+  let timer = null;
+
+  const toast = (name, template) => {
+    if (!toasts || name === '') return;
+    const el = document.createElement('div');
+    el.className = 'presence-toast';
+    el.textContent = String(template || ':name').replace(':name', name);
+    toasts.appendChild(el);
+    window.setTimeout(() => el.classList.add('is-leaving'), 4200);
+    window.setTimeout(() => el.remove(), 4800);
+  };
+
+  const render = (data) => {
+    const users = Array.isArray(data.users) ? data.users : [];
+    const seen = new Set();
+    users.forEach((user) => {
+      const id = String(user.id ?? '');
+      if (id === '') return;
+      seen.add(id);
+      let dot = avatars.querySelector(`[data-presence-user="${id}"]`);
+      if (!dot) {
+        dot = document.createElement('span');
+        dot.className = 'presence-dot is-enter';
+        dot.setAttribute('data-presence-user', id);
+        const initials = document.createElement('span');
+        initials.className = 'presence-initials';
+        dot.appendChild(initials);
+        avatars.appendChild(dot);
+        window.setTimeout(() => dot.classList.remove('is-enter'), 420);
+      }
+      const initials = dot.querySelector('.presence-initials');
+      if (initials) initials.textContent = String(user.initials || '?');
+      dot.style.setProperty('--presence-hue', String(user.hue ?? 210));
+      dot.title = String(user.name || '');
+      dot.setAttribute('aria-label', String(user.name || ''));
+      dot.classList.toggle('is-self', !!user.self);
+      dot.classList.toggle('is-idle', !!user.idle);
+    });
+    avatars.querySelectorAll('[data-presence-user]').forEach((dot) => {
+      if (seen.has(String(dot.getAttribute('data-presence-user')))) return;
+      if (dot.classList.contains('is-leaving')) return;
+      dot.classList.add('is-leaving');
+      window.setTimeout(() => dot.remove(), 420);
+    });
+    // Il gruppo compare solo quando c'è più di una persona collegata.
+    root.classList.toggle('is-visible', users.length > 1);
+  };
+
+  const poll = async () => {
+    try {
+      const target = new URL(url, window.location.origin);
+      if (since > 0) target.searchParams.set('since', String(since));
+      const res = await fetch(target.toString(), {
+        headers: { Accept: 'application/json' },
+        credentials: 'same-origin',
+        cache: 'no-store',
+      });
+      if (!res.ok) return;
+      const data = await res.json();
+      render(data);
+      if (Array.isArray(data.new) && since > 0) {
+        data.new.forEach((user) => toast(String(user.name || ''), data.messages?.connected));
+      }
+      if (Number(data.now) > 0) since = Number(data.now);
+    } catch (err) {
+      // rete assente: si riprova al prossimo giro
+    }
+  };
+
+  const start = () => {
+    if (timer) return;
+    poll();
+    timer = window.setInterval(poll, POLL_MS);
+  };
+  const stop = () => {
+    if (!timer) return;
+    window.clearInterval(timer);
+    timer = null;
+  };
+
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'hidden') stop();
+    else start();
+  });
+  window.addEventListener('beforeunload', stop);
+  start();
 }
 
 function initSessionHeartbeat() {
@@ -2616,6 +2763,22 @@ function initTreasuryBulk() {
     row.querySelector('[data-treasury-approve]')?.remove();
   };
 
+  // Dopo un'approvazione i totali (saldo, entrate, uscite) cambiano: si aggiornano subito.
+  const applyTotals = (totals) => {
+    if (!totals || typeof totals !== 'object') return;
+    const set = (key, text) => {
+      const el = document.querySelector(`[data-treasury-kpi="${key}"]`);
+      if (!el || typeof text !== 'string' || text === '') return;
+      const icon = el.querySelector('span[aria-hidden="true"]');
+      el.textContent = icon ? `${icon.outerHTML} ${text}` : text;
+    };
+    set('balance', totals.balance);
+    set('income', totals.income);
+    set('expense', totals.expense);
+    const balanceEl = document.querySelector('[data-treasury-kpi="balance"]');
+    if (balanceEl) balanceEl.classList.toggle('is-negative', !!totals.balance_negative);
+  };
+
   // Approve one movement in place: no reload, filters and scroll position stay untouched.
   root.querySelectorAll('[data-treasury-approve]').forEach((approveForm) => {
     approveForm.addEventListener('submit', async (event) => {
@@ -2637,6 +2800,7 @@ function initTreasuryBulk() {
           return;
         }
         approveRow(id);
+        applyTotals(data.totals);
         dropPending(1);
       } catch (err) {
         if (button) button.disabled = false;
@@ -2674,6 +2838,7 @@ function initTreasuryBulk() {
           ids.forEach((id) => {
             approveRow(id);
           });
+          applyTotals(data.totals);
           dropPending(ids.length);
         } else if (action === 'delete') {
           ids.forEach((id) => {

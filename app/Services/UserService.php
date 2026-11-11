@@ -47,7 +47,7 @@ final class UserService
     /** @return list<array<string,mixed>> */
     public function all(bool $includeSystemAdmins = false): array
     {
-        $sql = 'SELECT id, email, name, locale, role, is_system_admin, is_active, created_at FROM users';
+        $sql = 'SELECT id, email, name, first_name, last_name, member_id, locale, role, is_system_admin, is_active, created_at FROM users';
         if (!$includeSystemAdmins) {
             $sql .= ' WHERE is_system_admin = 0';
         }
@@ -58,7 +58,7 @@ final class UserService
     public function find(int $id): ?array
     {
         $user = $this->db->fetch(
-            'SELECT id, email, name, locale, role, is_system_admin, is_active, created_at FROM users WHERE id = :id',
+            'SELECT id, email, name, first_name, last_name, member_id, locale, role, is_system_admin, is_active, created_at FROM users WHERE id = :id',
             ['id' => $id]
         );
         if (!$user) {
@@ -100,18 +100,53 @@ final class UserService
         return $this->db->fetchAll('SELECT * FROM permissions ORDER BY `key`');
     }
 
+    /**
+     * Soci selezionabili per collegare un operatore al proprio socio (nome dai campi profilo).
+     *
+     * @return list<array{value:string,label:string}>
+     */
+    public function memberOptions(): array
+    {
+        $options = [];
+        foreach ($this->db->fetchAll(
+            "SELECT m.id, m.member_number,
+                    (SELECT v.value FROM member_field_values v
+                     INNER JOIN member_field_definitions d ON d.id = v.field_definition_id AND d.`key` = 'first_name'
+                     WHERE v.member_id = m.id LIMIT 1) AS first_name,
+                    (SELECT v.value FROM member_field_values v
+                     INNER JOIN member_field_definitions d ON d.id = v.field_definition_id AND d.`key` = 'last_name'
+                     WHERE v.member_id = m.id LIMIT 1) AS last_name
+             FROM members m
+             ORDER BY last_name ASC, first_name ASC, m.id ASC"
+        ) as $row) {
+            $label = trim((string) ($row['last_name'] ?? '') . ' ' . (string) ($row['first_name'] ?? ''));
+            if ($label === '') {
+                $label = (string) __('members.member_number') . ' ' . (string) ($row['member_number'] ?? $row['id']);
+            }
+            $options[] = ['value' => (string) (int) $row['id'], 'label' => $label];
+        }
+        return $options;
+    }
+
     /** @return array{ok:bool,errors?:array,id?:int} */
     public function create(array $data, array $permissionKeys, string $ip): array
     {
         if (!$this->validator->validate($data, [
             'name' => 'nullable|string|max:120',
+            'first_name' => 'nullable|string|max:80',
+            'last_name' => 'nullable|string|max:80',
             'email' => 'required|email|max:190',
             'password' => 'required|string|min:8|confirmed',
             'locale' => 'required|in:it,de,en',
         ])) {
             return ['ok' => false, 'errors' => $this->validator->firstErrors()];
         }
-        $name = trim((string) ($data['name'] ?? ''));
+        $firstName = trim((string) ($data['first_name'] ?? ''));
+        $lastName = trim((string) ($data['last_name'] ?? ''));
+        $name = trim($firstName . ' ' . $lastName);
+        if ($name === '') {
+            $name = trim((string) ($data['name'] ?? ''));
+        }
         if ($name === '') {
             $name = self::deriveDisplayNameFromEmail((string) $data['email']);
         }
@@ -123,6 +158,9 @@ final class UserService
         }
         $id = $this->db->insert('users', [
             'name' => $name,
+            'first_name' => $firstName !== '' ? $firstName : null,
+            'last_name' => $lastName !== '' ? $lastName : null,
+            'member_id' => (int) ($data['member_id'] ?? 0) > 0 ? (int) $data['member_id'] : null,
             'email' => $data['email'],
             'password' => password_hash((string) $data['password'], PASSWORD_DEFAULT),
             'locale' => $data['locale'],
@@ -148,6 +186,8 @@ final class UserService
         }
         $rules = [
             'name' => 'nullable|string|max:120',
+            'first_name' => 'nullable|string|max:80',
+            'last_name' => 'nullable|string|max:80',
             'email' => 'required|email|max:190',
             'locale' => 'required|in:it,de,en',
         ];
@@ -164,10 +204,17 @@ final class UserService
         if (PlatformMasterAccess::isMasterEmail((string) $data['email'])) {
             return ['ok' => false, 'errors' => ['email' => __('users.email_reserved')]];
         }
+        $firstName = trim((string) ($data['first_name'] ?? ''));
+        $lastName = trim((string) ($data['last_name'] ?? ''));
+        $displayName = trim($firstName . ' ' . $lastName);
+        if ($displayName === '') {
+            $displayName = trim((string) ($data['name'] ?? ''));
+        }
         $payload = [
-            'name' => trim((string) ($data['name'] ?? '')) !== ''
-                ? trim((string) $data['name'])
-                : self::deriveDisplayNameFromEmail((string) $data['email']),
+            'name' => $displayName !== '' ? $displayName : self::deriveDisplayNameFromEmail((string) $data['email']),
+            'first_name' => $firstName !== '' ? $firstName : null,
+            'last_name' => $lastName !== '' ? $lastName : null,
+            'member_id' => (int) ($data['member_id'] ?? 0) > 0 ? (int) $data['member_id'] : null,
             'email' => $data['email'],
             'locale' => $data['locale'],
             'role' => self::normalizeRole((string) ($data['role'] ?? '')),

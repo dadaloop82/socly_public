@@ -159,6 +159,11 @@ final class AuthController extends BaseController
     public function logout(Request $request): void
     {
         $preview = $this->previewSession?->isPreviewActive() ?? false;
+        try {
+            app(\Socly\Services\PresenceService::class)->leave();
+        } catch (\Throwable) {
+            // presence is best-effort: never block logout
+        }
         $this->auth->logout($request->ip());
         if ($preview) {
             $this->previewSession?->endPreview($request->ip());

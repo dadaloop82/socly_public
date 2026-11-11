@@ -8,7 +8,9 @@
 | id | PK |
 | email | unique |
 | password | `password_hash` |
-| name | display name |
+| name | display name (composed from `first_name` + `last_name` when present) |
+| first_name, last_name | operator identity shown in the presence dots |
+| member_id | optional link to the member record (`members.id`, FK) used to derive the display name |
 | locale | `it` / `de` / `en` |
 | role | operator role label (`president`, `treasurer`, `secretary`, `board`, `volunteer`) — NULL = custom permissions |
 | is_system_admin | immutable admin flag; only the hardcoded maintenance account may have it |
@@ -17,6 +19,17 @@
 
 ### permissions / user_permissions
 Named permission keys (e.g. `members.view`, `members.manage`, `payments.manage`, `settings.manage`, `users.manage`, `plugins.manage`). System admin implicitly has all.
+
+### user_presence
+One row per open session, refreshed by the presence polling.
+
+| Column | Notes |
+|--------|-------|
+| session_id | PK — PHP session id |
+| user_id | FK `users.id` ON DELETE CASCADE |
+| connected_at | first heartbeat of the session |
+| last_seen | last heartbeat; older than 5 minutes ⇒ shown as idle, older than 15 ⇒ offline |
+| ended_at | set on logout; non-NULL rows are never shown |
 
 ### settings
 | Column | Notes |

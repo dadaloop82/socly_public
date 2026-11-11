@@ -132,6 +132,7 @@ final class SettingsController extends BaseController
             'treasuryAccountUsage' => $this->treasury->accountUsage(),
             'treasuryAccountBalances' => $this->treasury->accountBalances(),
             'panelUsers' => $this->users->panelUsers(),
+            'memberOptions' => $this->users->memberOptions(),
             'emailTemplates' => $this->emailTemplates->all(),
             'workflowRules' => $this->workflow->all(),
             'editingTemplate' => $this->resolveEditingTemplate($request),

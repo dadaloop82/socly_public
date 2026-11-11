@@ -134,6 +134,20 @@ inactivity (and flushes with `keepalive` when leaving mid-edit):
 - one document per year and one open draft at a time are enforced by the controller: the create form
   lists only the free years and links the open draft until it is approved or deleted.
 
+## Presence and concurrent operators
+
+Every operator has its own PHP session file (`storage/sessions`), so concurrent users never wait on
+each other; long tasks (geocoding, presence) call `session_write_close()` before background work so
+the user's next click is not blocked.
+
+`PresenceService` keeps a row per open session in `user_presence` (session id, user, `connected_at`,
+`last_seen`, `ended_at`). `GET /presence/state` is polled by `initPresence()` every 12 s: it touches
+the current session and returns the connected people (one entry per person, merged across tabs) with
+name, initials, a stable hue (`(user_id * 137) % 360`), an `idle` flag (`last_seen` older than 5
+minutes) and the `new` arrivals since the previous poll (used for the “X just connected” toast).
+`/logout` marks the session as ended. The identity is `users.first_name`/`users.last_name`, else the
+linked `users.member_id` profile name, else “Unknown user”.
+
 ## Budgets
 
 `/budgets` (menu **Bilanci**) hosts three tabs — `data-budget-tabs` in the markup, active tab kept in

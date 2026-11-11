@@ -208,6 +208,7 @@ final class TreasuryController extends BaseController
                 'ok' => $ok,
                 'id' => (int) $id,
                 'message' => $ok ? (string) __('treasury.approved') : (string) ($result['message'] ?? __('validation.required')),
+                'totals' => $ok ? $this->totalsPayload() : null,
             ], JSON_UNESCAPED_UNICODE);
             return;
         }
@@ -269,6 +270,7 @@ final class TreasuryController extends BaseController
                 'action' => $action,
                 'count' => $count,
                 'ids' => array_values($ids),
+                'totals' => $action === 'approve' ? $this->totalsPayload() : null,
             ], JSON_UNESCAPED_UNICODE);
             return;
         }
@@ -278,6 +280,24 @@ final class TreasuryController extends BaseController
             $this->flash('success', __('treasury.bulk_deleted', ['count' => (string) $count]));
         }
         redirect('/treasury');
+    }
+
+    /**
+     * Totali aggiornati (saldo, entrate, uscite, da approvare) per l'aggiornamento in place
+     * dopo un'approvazione: la pagina non deve ricaricarsi per mostrarli.
+     *
+     * @return array{balance:string,income:string,expense:string,balance_negative:bool,pending:int}
+     */
+    private function totalsPayload(): array
+    {
+        $ledger = $this->treasury->ledger(1);
+        return [
+            'balance' => $this->currency->format((float) $ledger['balance']),
+            'income' => $this->currency->format((float) $ledger['income']),
+            'expense' => $this->currency->format((float) $ledger['expense']),
+            'balance_negative' => (float) $ledger['balance'] < 0,
+            'pending' => $this->treasury->pendingCount(),
+        ];
     }
 
     /**

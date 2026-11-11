@@ -13,6 +13,34 @@
     <?php if ($returnTo !== ''): ?>
         <?= field('hidden', ['name' => 'return', 'value' => $returnTo]) ?>
     <?php endif; ?>
+    <div class="setup-equal-row">
+        <?= field('text', [
+            'name' => 'first_name',
+            'label' => (string) __('users.first_name'),
+            'value' => (string) old('first_name', $user['first_name'] ?? ''),
+            'maxlength' => 80,
+            'autocomplete' => 'given-name',
+            'context' => 'setup',
+        ]) ?>
+        <?= field('text', [
+            'name' => 'last_name',
+            'label' => (string) __('users.last_name'),
+            'value' => (string) old('last_name', $user['last_name'] ?? ''),
+            'maxlength' => 80,
+            'autocomplete' => 'family-name',
+            'context' => 'setup',
+        ]) ?>
+    </div>
+    <?= field('select', [
+        'name' => 'member_id',
+        'label' => (string) __('users.member_link'),
+        'hint' => (string) __('users.member_link_hint'),
+        'value' => (string) old('member_id', $user['member_id'] ?? ''),
+        'include_empty' => true,
+        'empty_label' => (string) __('users.member_link_none'),
+        'options' => $memberOptions ?? [],
+        'context' => 'setup',
+    ]) ?>
     <?= field('email', [
         'name' => 'email',
         'label' => (string) __('users.email'),

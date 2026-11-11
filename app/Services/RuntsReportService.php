@@ -142,6 +142,18 @@ final class RuntsReportService
     }
 
     /**
+     * Etichetta tradotta della sezione (A–E); il testo ufficiale del Modello D resta il fallback.
+     */
+    public static function sectionLabel(string $letter): string
+    {
+        $letter = strtoupper($letter);
+        $fallback = (string) (self::SECTIONS[$letter]['label'] ?? '');
+        $key = 'runts.section_' . strtolower($letter);
+        $translated = (string) __($key);
+        return $translated !== $key && $translated !== '' ? $translated : $fallback;
+    }
+
+    /**
      * Voci del Modello D raggruppate per sezione, per i select del form movimenti.
      *
      * @return list<array{label:string,options:list<array{value:string,label:string}>}>
@@ -150,13 +162,13 @@ final class RuntsReportService
     {
         $direction = $direction === 'income' ? 'income' : 'expense';
         $groups = [];
-        foreach (self::SECTIONS as $section) {
+        foreach (self::SECTIONS as $letter => $section) {
             $options = [];
             foreach ($section[$direction] as $key => $label) {
                 $options[] = ['value' => $key, 'label' => $label];
             }
             if ($options !== []) {
-                $groups[] = ['label' => $section['label'], 'options' => $options];
+                $groups[] = ['label' => self::sectionLabel((string) $letter), 'options' => $options];
             }
         }
         return $groups;
@@ -260,7 +272,7 @@ final class RuntsReportService
         $sections = [];
         foreach (self::SECTIONS as $letter => $section) {
             $sections[$letter] = [
-                'label' => $section['label'],
+                'label' => self::sectionLabel((string) $letter),
                 'expense' => $section['expense'],
                 'income' => $section['income'],
                 'totals' => ['expense' => 0.0, 'income' => 0.0],
