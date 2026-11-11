@@ -1661,7 +1661,14 @@ function initTreasurySimilar() {
 
   const refresh = async () => {
     const data = payload();
-    const applying = appliedFields(data);
+    // Se non hai cambiato nulla, si propaga comunque la classificazione attuale del record
+    // verso i simili che hanno gli stessi valori “automatici” o i campi vuoti.
+    let applying = appliedFields(data);
+    if (applying.length === 0) {
+      if (data.category !== '' && data.category !== '__new__') applying.push('category');
+      if (data.runts_line !== '') applying.push('runts_line');
+      if (Number(data.budget_item_id) > 0) applying.push('budget_item_id');
+    }
     if (applying.length === 0 || data.description.trim().length < 3) {
       hide();
       return;
@@ -1669,6 +1676,9 @@ function initTreasurySimilar() {
     lastPayload = data;
     try {
       const body = new URLSearchParams({ ...data, _token: token });
+      body.set('original_category', original.category);
+      body.set('original_runts_line', original.runts_line);
+      body.set('original_budget_item_id', original.budget_item_id);
       applying.forEach((field) => body.append('applying[]', field));
       const res = await fetch(url, {
         method: 'POST',

@@ -923,7 +923,7 @@ final class TreasuryService
      * @param array{direction?:string,description?:string,beneficiary?:string} $criteria
      * @return array{count:int,total:int,ids:list<int>,matches:list<array<string,mixed>>,score_min:float}
      */
-    public function similarMovements(array $criteria, int $limit = 3, int $excludeId = 0, array $applying = []): array
+    public function similarMovements(array $criteria, int $limit = 3, int $excludeId = 0, array $applying = [], array $originals = []): array
     {
         $empty = ['count' => 0, 'total' => 0, 'skipped' => 0, 'ids' => [], 'matches' => [], 'score_min' => 0.45];
         // Campi che stiamo applicando: una riga entra nella proposta se QUEI campi sono vuoti.
@@ -978,14 +978,17 @@ final class TreasuryService
         $skipped = 0;
         foreach ($scored as $row) {
             $blocked = false;
-            if (in_array('category', $fields, true) && trim((string) ($row['category'] ?? '')) !== '') {
-                $blocked = true;
-            }
-            if (!$blocked && in_array('runts_line', $fields, true) && trim((string) ($row['runts_line'] ?? '')) !== '') {
-                $blocked = true;
-            }
-            if (!$blocked && in_array('budget_item_id', $fields, true) && (int) ($row['budget_item_id'] ?? 0) > 0) {
-                $blocked = true;
+            foreach ($fields as $field) {
+                $current = trim((string) ($row[$field] ?? ''));
+                $empty = $field === 'budget_item_id' ? (int) $current === 0 : $current === '';
+                // Valore “automatico” = identico a quello del movimento che stai modificando:
+                // è ancora da classificare davvero, quindi entra nella proposta.
+                $original = trim((string) ($originals[$field] ?? ''));
+                $sameAsOriginal = $original !== '' && $current === $original;
+                if (!$empty && !$sameAsOriginal) {
+                    $blocked = true;
+                    break;
+                }
             }
             if ($blocked) {
                 $skipped++;
@@ -1030,7 +1033,7 @@ final class TreasuryService
      * @param list<int> $ids
      * @param array{category?:string,runts_line?:string,budget_item_id?:string} $changes
      */
-    public function applyClassification(array $ids, array $changes, string $ip): int
+    public function applyClassification(array $ids, array $changes, string $ip, array $originals = []): int
     {
         $payload = [];
         $category = trim((string) ($changes['category'] ?? ''));
@@ -1057,16 +1060,19 @@ final class TreasuryService
             $sets = [];
             $params = ['id' => $id];
             if (isset($payload['category'])) {
-                $sets[] = "category = CASE WHEN category IS NULL OR category = '' THEN :set_category ELSE category END";
+                $sets[] = "category = CASE WHEN category IS NULL OR category = '' OR category = :orig_category THEN :set_category ELSE category END";
                 $params['set_category'] = $payload['category'];
+                $params['orig_category'] = (string) ($originals['category'] ?? '');
             }
             if (isset($payload['runts_line'])) {
-                $sets[] = "runts_line = CASE WHEN runts_line IS NULL OR runts_line = '' THEN :set_runts ELSE runts_line END";
+                $sets[] = "runts_line = CASE WHEN runts_line IS NULL OR runts_line = '' OR runts_line = :orig_runts THEN :set_runts ELSE runts_line END";
                 $params['set_runts'] = $payload['runts_line'];
+                $params['orig_runts'] = (string) ($originals['runts_line'] ?? '');
             }
             if (isset($payload['budget_item_id'])) {
-                $sets[] = 'budget_item_id = CASE WHEN budget_item_id IS NULL THEN :set_budget ELSE budget_item_id END';
+                $sets[] = 'budget_item_id = CASE WHEN budget_item_id IS NULL OR budget_item_id = :orig_budget THEN :set_budget ELSE budget_item_id END';
                 $params['set_budget'] = $payload['budget_item_id'];
+                $params['orig_budget'] = (int) ($originals['budget_item_id'] ?? 0);
             }
             $stmt = $this->db->query(
                 'UPDATE treasury_movements SET ' . implode(', ', $sets) . ' WHERE id = :id',

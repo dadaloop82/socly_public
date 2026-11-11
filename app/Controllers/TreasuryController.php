@@ -329,7 +329,7 @@ final class TreasuryController extends BaseController
             'direction' => (string) ($data['direction'] ?? ''),
             'description' => (string) ($data['description'] ?? ''),
             'beneficiary' => (string) ($data['beneficiary'] ?? ''),
-        ], 3, (int) ($data['exclude_id'] ?? 0), $fieldsToApply);
+        ], 3, (int) ($data['exclude_id'] ?? 0), $fieldsToApply, $this->originals($data));
 
         $this->jsonResponse([
             'ok' => true,
@@ -368,13 +368,29 @@ final class TreasuryController extends BaseController
             'category' => (string) ($data['category'] ?? ''),
             'runts_line' => (string) ($data['runts_line'] ?? ''),
             'budget_item_id' => (string) ($data['budget_item_id'] ?? ''),
-        ], $request->ip());
+        ], $request->ip(), $this->originals($data));
 
         $this->jsonResponse([
             'ok' => true,
             'updated' => $updated,
             'message' => (string) __('treasury.similar_applied', ['count' => (string) $updated]),
         ]);
+    }
+
+    /**
+     * Valori originali del record (inviati dal form): servono a capire quali valori sono
+     * “automatici” e quindi ancora aggiornabili.
+     *
+     * @param array<string,mixed> $data
+     * @return array<string,string>
+     */
+    private function originals(array $data): array
+    {
+        return [
+            'category' => trim((string) ($data['original_category'] ?? '')),
+            'runts_line' => strtoupper(trim((string) ($data['original_runts_line'] ?? ''))),
+            'budget_item_id' => (string) (int) ($data['original_budget_item_id'] ?? 0),
+        ];
     }
 
     /**
