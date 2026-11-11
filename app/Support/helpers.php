@@ -1571,3 +1571,36 @@ if (!function_exists('row_actions')) {
     }
 }
 
+
+if (!function_exists('version_field')) {
+    /**
+     * Hidden input con la versione di riga: il salvataggio viene rifiutato (con avviso) se nel
+     * frattempo un altro operatore ha modificato lo stesso record.
+     *
+     * @param array<string,mixed>|null $row
+     */
+    function version_field(?array $row): string
+    {
+        return '<input type="hidden" name="row_version" value="' . (int) ($row['row_version'] ?? 0) . '">';
+    }
+}
+
+if (!function_exists('version_attrs')) {
+    /**
+     * Attributi sul <form> che attivano il controllo di freschezza e la presenza “sta modificando”.
+     *
+     * @param array<string,mixed>|null $row
+     */
+    function version_attrs(string $entity, ?array $row): string
+    {
+        $id = (int) ($row['id'] ?? 0);
+        if ($id < 1) {
+            return '';
+        }
+        return ' data-freshness-entity="' . e($entity) . '"'
+            . ' data-freshness-id="' . $id . '"'
+            . ' data-freshness-version="' . (int) ($row['row_version'] ?? 0) . '"'
+            . ' data-freshness-url="' . e(url('/freshness')) . '"';
+    }
+}
+

@@ -16,6 +16,7 @@ use Socly\Controllers\OrgController;
 use Socly\Controllers\ApiController;
 use Socly\Controllers\PluginController;
 use Socly\Controllers\PresenceController;
+use Socly\Controllers\FreshnessController;
 use Socly\Controllers\SessionController;
 use Socly\Controllers\SettingsController;
 use Socly\Controllers\SetupController;
@@ -68,6 +69,7 @@ if (is_file($privateRoutes)) {
 $router->post('/logout', [AuthController::class, 'logout'], null, ['mw.locale', 'mw.install', 'mw.auth', 'mw.csrf']);
 $router->post('/session/ping', [SessionController::class, 'ping'], null, ['mw.locale', 'mw.install', 'mw.auth', 'mw.csrf']);
 $router->get('/presence/state', [PresenceController::class, 'state'], null, ['mw.locale', 'mw.install', 'mw.auth']);
+$router->get('/freshness', [FreshnessController::class, 'state'], null, ['mw.locale', 'mw.install', 'mw.auth']);
 $router->get('/password/forgot', [AuthController::class, 'showForgot'], null, ['mw.locale', 'mw.install', 'mw.guest']);
 $router->post('/password/forgot', [AuthController::class, 'sendForgot'], null, ['mw.locale', 'mw.install', 'mw.guest', 'mw.csrf']);
 $router->get('/password/reset', [AuthController::class, 'showReset'], null, ['mw.locale', 'mw.install', 'mw.guest']);

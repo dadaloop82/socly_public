@@ -127,6 +127,46 @@ final class Database
         $this->query($sql, $data + $whereParams);
     }
 
+    /**
+     * UPDATE ottimistico: incrementa `row_version` e tocca la riga solo se la versione attesa
+     * corrisponde ancora. Restituisce false quando un altro utente ha salvato nel frattempo
+     * (o la riga non esiste più), così il chiamante può avvisare senza sovrascrivere.
+     *
+     * @param array<string,mixed> $data
+     */
+    public function updateVersioned(
+        string $table,
+        array $data,
+        string $keyColumn,
+        int $id,
+        int $expectedVersion
+    ): bool {
+        $sets = [];
+        $params = $data;
+        foreach (array_keys($data) as $col) {
+            $sets[] = "`{$col}` = :{$col}";
+        }
+        $sets[] = '`row_version` = `row_version` + 1';
+        $where = "`{$keyColumn}` = :__lock_id";
+        $params['__lock_id'] = $id;
+        if ($expectedVersion > 0) {
+            $where .= ' AND `row_version` = :__lock_version';
+            $params['__lock_version'] = $expectedVersion;
+        }
+        $sql = sprintf('UPDATE `%s` SET %s WHERE %s', $table, implode(', ', $sets), $where);
+        return $this->query($sql, $params)->rowCount() > 0;
+    }
+
+    /** Versione corrente della riga (0 quando la tabella non ha `row_version` o la riga manca). */
+    public function rowVersion(string $table, string $keyColumn, int $id): int
+    {
+        $row = $this->fetch(
+            sprintf('SELECT `row_version` FROM `%s` WHERE `%s` = :id', $table, $keyColumn),
+            ['id' => $id]
+        );
+        return (int) ($row['row_version'] ?? 0);
+    }
+
     public function beginTransaction(): void
     {
         $this->pdo()->beginTransaction();

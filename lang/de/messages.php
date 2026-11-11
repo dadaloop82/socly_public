@@ -2899,4 +2899,16 @@ return [
         'connected_toast' => ':name ist gerade Socly beigetreten',
         'idle' => 'Inaktiv',
     ],
+    'concurrency' => [
+        'conflict_title' => 'Gleichzeitige Änderungen',
+        'conflict_text' => ':user hat diesen Datensatz um :at gespeichert, nachdem du ihn geöffnet hattest. Deine Änderungen wurden nicht gespeichert.',
+        'conflict_hint' => 'Prüfe die Felder: erneut speichern überschreibt, oder lade die aktualisierten Daten.',
+        'reload' => 'Aktualisierte Daten laden',
+        'overwrite' => 'Mit meinen Daten überschreiben',
+        'conflict_flash' => 'Achtung: :user hat diesen Datensatz um :at gespeichert, während du ihn bearbeitet hast. Deine Daten wurden nicht gespeichert.',
+        'stale_title' => 'Datensatz zwischenzeitlich geändert',
+        'stale_text' => ':user hat diesen Datensatz während deiner Bearbeitung geändert. Lade neu, um die aktuellen Daten zu sehen: nicht gespeicherte Änderungen gehen verloren.',
+        'deleted' => 'Dieser Datensatz wurde von einem anderen Operator gelöscht.',
+        'editing_now' => ':name bearbeitet gerade diesen Datensatz',
+    ],
 ];

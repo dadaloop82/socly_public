@@ -65,7 +65,8 @@ final class TreasuryService
         private readonly Validator $validator,
         private readonly ComponentService $components,
         private readonly DocumentService $documents,
-        private readonly CurrencyService $currency
+        private readonly CurrencyService $currency,
+        private readonly VersionService $versions
     ) {
     }
 
@@ -995,11 +996,24 @@ final class TreasuryService
     }
 
     /** @param array<string,mixed> $input */
-    public function update(int $id, array $input, ?array $file, string $ip, ?int $userId = null): array
+    public function update(int $id, array $input, ?array $file, string $ip, ?int $userId = null, ?int $expectedVersion = null, bool $force = false): array
     {
         $existing = $this->find($id);
         if ($existing === null) {
             return ['ok' => false, 'errors' => ['id' => __('errors.404')]];
+        }
+        $expected = (int) ($expectedVersion ?? 0);
+        if (!$force && $expected > 0) {
+            $current = $this->versions->current('treasury', $id);
+            if ($current !== null && $current !== $expected) {
+                return [
+                    'ok' => false,
+                    'conflict' => true,
+                    'current_version' => $current,
+                    'editor' => $this->versions->lastEditor('treasury', $id),
+                    'errors' => [],
+                ];
+            }
         }
         $parsed = $this->parseInput($input, $existing);
         if (empty($parsed['ok'])) {
@@ -1019,7 +1033,16 @@ final class TreasuryService
             $data['attachment_path'] = $attachment['path'] ?? ($existing['attachment_path'] ?? null);
             $data['document_id'] = $attachment['document_id'] ?? ($existing['document_id'] ?? null);
         }
-        $this->db->update('treasury_movements', $data, 'id = :id', ['id' => $id]);
+        $stored = $this->db->updateVersioned('treasury_movements', $data, 'id', $id, $force ? 0 : $expected);
+        if (!$stored) {
+            return [
+                'ok' => false,
+                'conflict' => true,
+                'current_version' => $this->versions->current('treasury', $id) ?? 0,
+                'editor' => $this->versions->lastEditor('treasury', $id),
+                'errors' => [],
+            ];
+        }
         $this->audit->log('treasury.updated', 'treasury', (string) $id, [
             'direction' => $existing['direction'] ?? null,
             'amount' => $existing['amount'] ?? null,

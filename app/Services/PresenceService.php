@@ -23,18 +23,25 @@ final class PresenceService
     }
 
     /** Registra/rinfresca la sessione corrente (chiamato dal polling). */
-    public function touch(): void
+    public function touch(?string $editingEntity = null, ?int $editingId = null): void
     {
         $userId = (int) (auth_user()['id'] ?? 0);
         $sessionId = session_id();
         if ($userId < 1 || $sessionId === '') {
             return;
         }
+        $entity = $editingEntity !== null && VersionService::tableFor($editingEntity) !== null ? $editingEntity : null;
         $this->db->query(
-            'INSERT INTO user_presence (session_id, user_id, connected_at, last_seen, ended_at)
-             VALUES (:sid, :uid, NOW(), NOW(), NULL)
-             ON DUPLICATE KEY UPDATE user_id = VALUES(user_id), last_seen = NOW(), ended_at = NULL',
-            ['sid' => $sessionId, 'uid' => $userId]
+            'INSERT INTO user_presence (session_id, user_id, connected_at, last_seen, ended_at, editing_entity, editing_id)
+             VALUES (:sid, :uid, NOW(), NOW(), NULL, :entity, :eid)
+             ON DUPLICATE KEY UPDATE user_id = VALUES(user_id), last_seen = NOW(), ended_at = NULL,
+                 editing_entity = VALUES(editing_entity), editing_id = VALUES(editing_id)',
+            [
+                'sid' => $sessionId,
+                'uid' => $userId,
+                'entity' => $entity,
+                'eid' => $entity !== null && $editingId !== null && $editingId > 0 ? $editingId : null,
+            ]
         );
         // Pulizia: righe vecchie di oltre un giorno.
         $this->db->query('DELETE FROM user_presence WHERE last_seen < (NOW() - INTERVAL 1 DAY)');
@@ -58,11 +65,11 @@ final class PresenceService
      *
      * @return array{users:list<array<string,mixed>>,online:int,new:list<array<string,mixed>>,now:int}
      */
-    public function snapshot(int $since = 0): array
+    public function snapshot(int $since = 0, array $editing = []): array
     {
         $window = self::ONLINE_WINDOW;
         $rows = $this->db->fetchAll(
-            "SELECT p.session_id, p.user_id, p.connected_at, p.last_seen,
+            "SELECT p.session_id, p.user_id, p.connected_at, p.last_seen, p.editing_entity, p.editing_id,
                     u.email, u.first_name, u.last_name, u.name, u.member_id,
                     (SELECT v.value FROM member_field_values v
                      INNER JOIN member_field_definitions d ON d.id = v.field_definition_id AND d.`key` = 'first_name'
@@ -81,6 +88,9 @@ final class PresenceService
 
         $currentId = (int) (auth_user()['id'] ?? 0);
         $users = [];
+        $editors = [];
+        $editEntity = (string) ($editing['entity'] ?? '');
+        $editId = (int) ($editing['id'] ?? 0);
         foreach ($rows as $row) {
             $userId = (int) $row['user_id'];
             if ($userId < 1 || (string) ($row['name'] ?? '') === 'SOCLY Platform') {
@@ -88,6 +98,17 @@ final class PresenceService
             }
             $identity = $this->identity($row);
             $idle = (int) ($row['idle_seconds'] ?? 0) >= self::IDLE_SECONDS;
+            if ($editEntity !== '' && $editId > 0 && !$idle
+                && (string) ($row['editing_entity'] ?? '') === $editEntity
+                && (int) ($row['editing_id'] ?? 0) === $editId
+                && $userId !== $currentId) {
+                $editors[] = [
+                    'id' => $userId,
+                    'name' => $identity['name'],
+                    'initials' => $identity['initials'],
+                    'hue' => $this->hue($userId),
+                ];
+            }
             if (isset($users[$userId])) {
                 $users[$userId]['sessions']++;
                 $users[$userId]['idle'] = $users[$userId]['idle'] && $idle;
@@ -117,6 +138,7 @@ final class PresenceService
             'users' => array_values($users),
             'online' => count($users),
             'new' => $new,
+            'editors' => $editors,
             'now' => time(),
         ];
     }

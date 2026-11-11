@@ -30,6 +30,12 @@ One row per open session, refreshed by the presence polling.
 | connected_at | first heartbeat of the session |
 | last_seen | last heartbeat; older than 5 minutes ⇒ shown as idle, older than 15 ⇒ offline |
 | ended_at | set on logout; non-NULL rows are never shown |
+| editing_entity / editing_id | record the operator is editing right now (presence “X is editing”) |
+
+### row_version (members, treasury_movements, budgets, budget_items, association_documents, deadline_items, association_people)
+`INT UNSIGNED NOT NULL DEFAULT 1`, incremented by `Database::updateVersioned()`. A save posted with a
+stale version is refused (HTTP 409 on JSON endpoints) and the form is reopened with the conflict
+banner; `force=1` overwrites deliberately.
 
 ### settings
 | Column | Notes |

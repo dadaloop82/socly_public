@@ -2904,4 +2904,16 @@ return [
         'connected_toast' => ':name si è appena collegato a Socly',
         'idle' => 'Inattivo',
     ],
+    'concurrency' => [
+        'conflict_title' => 'Modifiche in contemporanea',
+        'conflict_text' => ':user ha salvato questa scheda alle :at, dopo che l\'avevi aperta. Le tue modifiche non sono state salvate.',
+        'conflict_hint' => 'Controlla i campi: puoi salvare di nuovo per sovrascrivere, oppure ricaricare i dati aggiornati.',
+        'reload' => 'Ricarica i dati aggiornati',
+        'overwrite' => 'Sovrascrivi con i miei dati',
+        'conflict_flash' => 'Attenzione: :user ha salvato questa scheda alle :at mentre la stavi modificando. I tuoi dati non sono stati salvati.',
+        'stale_title' => 'Scheda aggiornata nel frattempo',
+        'stale_text' => ':user ha modificato questo record mentre stavi compilando. Ricarica per vedere i dati aggiornati: le modifiche non salvate andranno perse.',
+        'deleted' => 'Questo record è stato eliminato da un altro operatore.',
+        'editing_now' => ':name sta modificando questa scheda',
+    ],
 ];

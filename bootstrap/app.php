@@ -50,6 +50,7 @@ use Socly\Middleware\InstanceExpiredMiddleware;
 use Socly\Middleware\SecurityHeadersMiddleware;
 use Socly\Controllers\SessionController;
 use Socly\Controllers\PresenceController;
+use Socly\Controllers\FreshnessController;
 use Socly\Services\AssociationPeopleService;
 use Socly\Services\AssociationWebsiteScrapeService;
 use Socly\Services\AuditService;
@@ -74,6 +75,7 @@ use Socly\Services\SmtpDiscoveryService;
 use Socly\Services\PaymentService;
 use Socly\Services\PlatformService;
 use Socly\Services\PresenceService;
+use Socly\Services\VersionService;
 use Socly\Services\PluginAdminService;
 use Socly\Services\RateLimiter;
 use Socly\Services\PdfTextExtractor;
@@ -217,7 +219,8 @@ $app->bind(MemberService::class, fn (App $a) => new MemberService(
     $a->get(AuditService::class),
     $a->get(Validator::class),
     $a->get(PluginManager::class),
-    $a->get(TreasuryService::class)
+    $a->get(TreasuryService::class),
+    $a->get(VersionService::class)
 ));
 $app->bind(PaymentService::class, fn (App $a) => new PaymentService(
     $a->get(Database::class),
@@ -279,6 +282,8 @@ $app->bind('mw.instance_expired', fn (App $a) => $a->get(InstanceExpiredMiddlewa
 $app->bind(SessionController::class, fn (App $a) => new SessionController($a->get(View::class), $a->get(PlatformService::class)));
 $app->bind(PresenceController::class, fn (App $a) => new PresenceController($a->get(View::class), $a->get(PresenceService::class)));
 $app->bind(PresenceService::class, fn (App $a) => new PresenceService($a->get(Database::class)));
+$app->bind(FreshnessController::class, fn (App $a) => new FreshnessController($a->get(View::class), $a->get(VersionService::class)));
+$app->bind(VersionService::class, fn (App $a) => new VersionService($a->get(Database::class)));
 $app->bind(SetupGate::class, fn (App $a) => new SetupGate($a->get(SetupService::class)));
 $app->bind('mw.setup', fn (App $a) => $a->get(SetupGate::class));
 $app->bind(SetupBootstrapMiddleware::class, fn (App $a) => new SetupBootstrapMiddleware($a->get(SetupService::class)));
@@ -336,12 +341,14 @@ $app->bind(TreasuryService::class, fn (App $a) => new TreasuryService(
     $a->get(Validator::class),
     $a->get(ComponentService::class),
     $a->get(DocumentService::class),
-    $a->get(CurrencyService::class)
+    $a->get(CurrencyService::class),
+    $a->get(VersionService::class)
 ));
 $app->bind(BudgetService::class, fn (App $a) => new BudgetService(
     $a->get(Database::class),
     $a->get(AuditService::class),
-    $a->get(TreasuryService::class)
+    $a->get(TreasuryService::class),
+    $a->get(VersionService::class)
 ));
 $app->bind(DeadlineService::class, fn (App $a) => new DeadlineService(
     $a->get(Database::class),
@@ -453,7 +460,8 @@ $app->bind(MemberController::class, fn (App $a) => new MemberController(
     $a->get(EnrollmentFormService::class),
     $a->get(MemberRegistryService::class),
     $a->get(MemberActionService::class),
-    $a->get(MailService::class)
+    $a->get(MailService::class),
+    $a->get(VersionService::class)
 ));
 $app->bind(MemberImportController::class, fn (App $a) => new MemberImportController(
     $a->get(View::class),
@@ -487,7 +495,8 @@ $app->bind(TreasuryController::class, fn (App $a) => new TreasuryController(
     $a->get(MemberService::class),
     $a->get(ComponentService::class),
     $a->get(CurrencyService::class),
-    $a->get(BudgetService::class)
+    $a->get(BudgetService::class),
+    $a->get(VersionService::class)
 ));
 $app->bind(BudgetController::class, fn (App $a) => new BudgetController(
     $a->get(View::class),
@@ -495,7 +504,8 @@ $app->bind(BudgetController::class, fn (App $a) => new BudgetController(
     $a->get(TreasuryService::class),
     $a->get(CurrencyService::class),
     $a->get(SettingsService::class),
-    $a->get(RuntsReportService::class)
+    $a->get(RuntsReportService::class),
+    $a->get(VersionService::class)
 ));
 $app->bind(RuntsReportService::class, fn (App $a) => new RuntsReportService($a->get(Database::class)));
 $app->bind(RendicontoController::class, fn (App $a) => new RendicontoController(

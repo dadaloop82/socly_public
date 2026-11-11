@@ -10,6 +10,12 @@ every 100 patches bump the series, and each bump is published to this repository
 
 ### Added
 
+- Safe concurrent editing: every editable record now carries a row version, and a save is **refused**
+  (naming who saved last and when) when another operator changed the record after you opened it.
+  Nothing is overwritten silently: the form reopens with your values and an explicit “Overwrite with
+  my data” / “Reload updated data” choice. While a form is open, a banner appears as soon as the
+  record changes and a notice shows when a colleague is editing the same record. Wired for members,
+  first-note movements and forecast budgets (the 5 s autosave stops instead of overwriting).
 - Concurrent operators: every user works in their own PHP session (per-session file, no shared lock),
   and user accounts now carry a **first name / last name** or a **link to a member record** (same idea
   as association roles). A presence strip shows the initials of everyone connected with a stable

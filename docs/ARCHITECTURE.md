@@ -134,6 +134,24 @@ inactivity (and flushes with `keepalive` when leaving mid-edit):
 - one document per year and one open draft at a time are enforced by the controller: the create form
   lists only the free years and links the open draft until it is approved or deleted.
 
+## Concurrent editing (optimistic locking)
+
+Editable records carry `row_version`. Every form posts it in the hidden `row_version` field
+(`version_field()` / `version_attrs()` helpers + `partials/record_lock_notice.php`), and the service
+writes with `Database::updateVersioned()`: the `UPDATE` only succeeds when the version still matches,
+so two operators can never silently overwrite each other.
+
+- **On save conflict**: nothing is written. The controller reopens the form with the submitted values
+  (`rememberOld`) and a banner naming who saved last and when (from `audit_logs`), with “Reload
+  updated data” (fresh record) and “Overwrite with my data” (`force=1`, which bumps the version).
+- **While editing**: `GET /freshness?entity=&id=&version=` is polled every 15 s (`initFreshnessGuard`);
+  when the version moved, an inline banner offers a reload without touching the typed values.
+- **Who is editing**: the presence heartbeat carries `editing=entity:id`; `/presence/state` returns
+  `editors` for that record and the form shows “X is editing this record”.
+- **Wired entities**: members, first-note movements and forecast budgets (including the 5 s autosave,
+  which returns the new `row_version` and stops on HTTP 409 instead of overwriting). The version
+  column and the endpoint are already in place for documents, deadlines and association people.
+
 ## Presence and concurrent operators
 
 Every operator has its own PHP session file (`storage/sessions`), so concurrent users never wait on

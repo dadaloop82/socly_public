@@ -353,7 +353,8 @@ final class MemberService
         private readonly AuditService $audit,
         private readonly Validator $validator,
         private readonly PluginManager $plugins,
-        private readonly TreasuryService $treasury
+        private readonly TreasuryService $treasury,
+        private readonly VersionService $versions
     ) {
     }
 
@@ -1944,11 +1945,26 @@ final class MemberService
      * @param array{name:string,type:string,tmp_name:string,error:int,size:int}|null $photoFile
      * @return array{ok:bool,errors?:array}
      */
-    public function update(int $id, array $data, array $fieldData, string $ip, ?array $photoFile = null): array
+    public function update(int $id, array $data, array $fieldData, string $ip, ?array $photoFile = null, ?int $expectedVersion = null, bool $force = false): array
     {
         $before = $this->find($id);
         if (!$before) {
             return ['ok' => false, 'errors' => ['id' => __('validation.required')]];
+        }
+        // Concorrenza: se un altro operatore ha salvato dopo l'apertura della scheda, non si
+        // sovrascrive nulla; il controller riapre il form con l'avviso e i dati digitati.
+        $expected = (int) ($expectedVersion ?? 0);
+        if (!$force && $expected > 0) {
+            $current = $this->versions->current('member', $id);
+            if ($current !== null && $current !== $expected) {
+                return [
+                    'ok' => false,
+                    'conflict' => true,
+                    'current_version' => $current,
+                    'editor' => $this->versions->lastEditor('member', $id),
+                    'errors' => [],
+                ];
+            }
         }
         $fieldData = $this->normalizePersonNameFields($fieldData);
         $fieldErrors = $this->validateFields($fieldData);
@@ -2017,7 +2033,17 @@ final class MemberService
                 $updateData['balance_due'] = max(0, (float) ($before['balance_due'] ?? 0) + $delta);
             }
         }
-        $this->db->update('members', $updateData, 'id = :id', ['id' => $id]);
+        $stored = $this->db->updateVersioned('members', $updateData, 'id', $id, $force ? 0 : $expected);
+        if (!$stored) {
+            // Perdita della corsa fra controllo e scrittura (o record sparito nel frattempo).
+            return [
+                'ok' => false,
+                'conflict' => true,
+                'current_version' => $this->versions->current('member', $id) ?? 0,
+                'editor' => $this->versions->lastEditor('member', $id),
+                'errors' => [],
+            ];
+        }
         $this->syncAdmittedAt($id, (string) ($before['status'] ?? ''), (string) $data['status'], $before['admitted_at'] ?? null);
         $this->saveFieldValues($id, $fieldData);
         $after = $this->find($id);

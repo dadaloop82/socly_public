@@ -12479,6 +12479,53 @@ tr.doc-row-editable:focus-visible {
   .tmf-grid--2,
   .tmf-grid--3 { grid-template-columns: minmax(0, 1fr); }
 }
+/* ── Concorrenza: avvisi di modifica in contemporanea ───────────────────────── */
+.record-conflict,
+.record-stale {
+  margin: 0 0 1rem;
+  border-radius: 14px;
+}
+.record-conflict strong,
+.record-stale strong { display: block; margin-bottom: 0.25rem; }
+.record-conflict p,
+.record-stale p { margin: 0 0 0.35rem; line-height: 1.45; }
+.record-conflict-hint { font-size: 0.9rem; color: color-mix(in srgb, var(--ink) 62%, transparent); }
+.record-conflict-actions,
+.record-stale-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-top: 0.45rem;
+}
+.record-editing {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  margin: 0 0 0.9rem;
+  padding: 0.4rem 0.75rem;
+  border-radius: 12px;
+  font-size: 0.86rem;
+  font-weight: 600;
+  color: var(--brand-primary-deep);
+  background: color-mix(in srgb, var(--brand-primary) 10%, #fff);
+  border: 1px solid color-mix(in srgb, var(--brand-primary) 22%, var(--line));
+}
+.record-editing::before {
+  content: "";
+  width: 0.5rem;
+  height: 0.5rem;
+  border-radius: 50%;
+  background: var(--brand-primary);
+  animation: record-editing-pulse 1.6s ease-in-out infinite;
+}
+@keyframes record-editing-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.35; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .record-editing::before { animation: none; }
+}
+
 /* ── Entrata / Uscita: pulsanti grandi con stato attivo inequivocabile ── */
 .treasury-direction-field {
   margin-bottom: 1.1rem;

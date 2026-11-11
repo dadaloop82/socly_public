@@ -541,9 +541,19 @@ $paymentExtraHtml = $buildProfileFieldsHtml($paymentExtraFields, \Socly\Services
     data-enrollment-method="<?= e($enrollmentMethod) ?>"
     data-otp-url="<?= e(url('/members/enrollment/otp')) ?>"
     data-treasury-enabled="<?= $treasuryEnabled ? '1' : '0' ?>"
+    <?php if ($isEdit): ?><?= version_attrs('member', ['id' => (int) $member['id'], 'row_version' => (int) ($memberVersion ?? ($member['row_version'] ?? 0))]) ?><?php endif; ?>
     autocomplete="off"
 >
     <?= csrf_field() ?>
+    <?php if ($isEdit): ?>
+        <?= view_partial('partials/record_lock_notice', [
+            'entity' => 'member',
+            'row' => $member,
+            'recordId' => (int) $member['id'],
+            'version' => (int) ($memberVersion ?? ($member['row_version'] ?? 0)),
+            'conflict' => $memberConflict ?? null,
+        ]) ?>
+    <?php endif; ?>
     <?php if (!$isEdit && $treasuryEnabled): ?>
         <?= field('hidden', ['name' => 'treasury_skip', 'value' => '', 'attrs' => ['data-treasury-skip' => true]]) ?>
         <?= field('hidden', ['name' => 'treasury_register', 'value' => '', 'attrs' => ['data-treasury-register' => true]]) ?>

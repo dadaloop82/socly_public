@@ -36,7 +36,8 @@ final class BudgetService
     public function __construct(
         private readonly Database $db,
         private readonly AuditService $audit,
-        private readonly TreasuryService $treasury
+        private readonly TreasuryService $treasury,
+        private readonly VersionService $versions
     ) {
     }
 
@@ -391,11 +392,21 @@ final class BudgetService
      * @param array<string,mixed> $input
      * @return array{ok:bool,error?:string,message?:string,sections?:array<string,int>,items?:array<int,int>}
      */
-    public function saveGrid(int $id, array $input, string $ip): array
+    public function saveGrid(int $id, array $input, string $ip, ?int $expectedVersion = null, bool $force = false): array
     {
         $budget = $this->find($id);
         if ($budget === null) {
             return ['ok' => false, 'error' => 'not_found'];
+        }
+        // Concorrenza: due operatori sulla stessa griglia non si sovrascrivono a vicenda.
+        $expected = (int) ($expectedVersion ?? 0);
+        if (!$force && $expected > 0 && (int) ($budget['row_version'] ?? 0) !== $expected) {
+            return [
+                'ok' => false,
+                'conflict' => true,
+                'current_version' => (int) ($budget['row_version'] ?? 0),
+                'editor' => $this->versions->lastEditor('budget', $id),
+            ];
         }
         $existingSections = [];
         foreach ($this->db->fetchAll('SELECT id FROM budget_sections WHERE budget_id = :id', ['id' => $id]) as $row) {
@@ -534,12 +545,15 @@ final class BudgetService
             'sections' => count($keptSections),
             'items' => count($keptItems),
         ], $ip);
+        // La griglia è salvata: si avanza la versione del documento (autosave compreso).
+        $this->db->updateVersioned('budgets', [], 'id', $id, 0);
         return [
             'ok' => true,
             // Row/section ids for the AJAX autosave: the page keeps posting item_id[] values,
             // so freshly inserted rows must receive their new id to avoid duplicates.
             'sections' => $keyToSectionId,
             'items' => $savedItemIds,
+            'row_version' => $this->db->rowVersion('budgets', 'id', $id),
         ];
     }
 

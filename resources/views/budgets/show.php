@@ -71,8 +71,18 @@ $rowPartial = static fn (?array $row, string $sectionKey): string => view_partia
     data-msg-autosave-saving="<?= e(__('budget.autosave_saving')) ?>"
     data-msg-autosave-saved="<?= e(__('budget.autosave_saved')) ?>"
     data-msg-autosave-error="<?= e(__('budget.autosave_error')) ?>"
+    <?php if ($canManage): ?><?= version_attrs('budget', ['id' => $budgetId, 'row_version' => (int) ($budget_version ?? ($budget['row_version'] ?? 0))]) ?><?php endif; ?>
 >
     <?= csrf_field() ?>
+    <?php if ($canManage): ?>
+        <?= view_partial('partials/record_lock_notice', [
+            'entity' => 'budget',
+            'row' => $budget,
+            'recordId' => $budgetId,
+            'version' => (int) ($budget_version ?? ($budget['row_version'] ?? 0)),
+            'conflict' => $budget_conflict ?? null,
+        ]) ?>
+    <?php endif; ?>
     <div class="budget-grid">
         <?php foreach ($sections as $sectionIndex => $section): ?>
             <?php

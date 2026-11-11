@@ -106,6 +106,7 @@ $submitLabel = $isEdit ? __('treasury.update') : __('treasury.submit');
 </div>
 
 <form id="treasury-form" class="panel treasury-movement-form" method="post" action="<?= e($action) ?>" enctype="multipart/form-data"
+      <?php if (!empty($isEdit)): ?><?= version_attrs('treasury', ['id' => (int) ($movement['id'] ?? 0), 'row_version' => (int) ($movement_version ?? ($movement['row_version'] ?? 0))]) ?><?php endif; ?>
       data-treasury-form data-leave-guard data-confirm-template="<?= e(__('treasury.confirm_summary')) ?>"
       data-base-currency="<?= e($currency->code()) ?>"
       data-account-balances-url="<?= e(url('/treasury/accounts/balances')) ?>"
@@ -116,6 +117,15 @@ $submitLabel = $isEdit ? __('treasury.update') : __('treasury.submit');
       data-max-upload-bytes="<?= (int) upload_limit_bytes() ?>"
       data-msg-upload-too-large="<?= e(__('documents.upload_too_large', ['max' => upload_max_mb()])) ?>">
     <?= csrf_field() ?>
+    <?php if (!empty($isEdit)): ?>
+        <?= view_partial('partials/record_lock_notice', [
+            'entity' => 'treasury',
+            'row' => $movement ?? null,
+            'recordId' => (int) ($movement['id'] ?? 0),
+            'version' => (int) ($movement_version ?? ($movement['row_version'] ?? 0)),
+            'conflict' => $movement_conflict ?? null,
+        ]) ?>
+    <?php endif; ?>
     <?php require __DIR__ . '/_form_fields.php'; ?>
     <div class="form-actions form-actions-end">
         <a class="btn btn-ghost" href="<?= e(url('/treasury')) ?>"><?= e(__('common.back')) ?></a>

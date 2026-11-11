@@ -11,6 +11,7 @@ use Socly\Services\CurrencyService;
 use Socly\Services\RuntsReportService;
 use Socly\Services\SettingsService;
 use Socly\Services\TreasuryService;
+use Socly\Services\VersionService;
 
 /**
  * Bilancio preventivo dell'anno sociale + confronto con il consuntivo di cassa.
@@ -23,7 +24,8 @@ final class BudgetController extends BaseController
         private readonly TreasuryService $treasury,
         private readonly CurrencyService $currency,
         private readonly SettingsService $settings,
-        private readonly RuntsReportService $runts
+        private readonly RuntsReportService $runts,
+        private readonly VersionService $versions
     ) {
         parent::__construct($view);
     }
@@ -133,9 +135,23 @@ final class BudgetController extends BaseController
             $this->render('errors/404');
             return;
         }
+        $conflictVersion = (int) $request->input('v', 0);
+        $conflictActive = (string) $request->input('conflict', '') !== '' && $conflictVersion > 0;
+        $conflict = null;
+        if ($conflictActive) {
+            $editor = $this->versions->lastEditor('budget', (int) $budget['id']);
+            $conflict = [
+                'user' => $editor['name'],
+                'at' => $editor['at'],
+                'current' => $conflictVersion,
+                'reload_url' => url('/budgets/' . (int) $budget['id']),
+            ];
+        }
         $this->render('budgets/show', [
             'title' => __('budget.title_year', ['year' => (string) $budget['fiscal_year']]),
             'budget' => $budget,
+            'budget_version' => $conflictActive ? $conflictVersion : (int) ($budget['row_version'] ?? 0),
+            'budget_conflict' => $conflict,
             'categories' => $this->treasury->categoryOptions(),
             // Stessa tassonomia dei movimenti (Entrate / Uscite / Finanziarie / Personalizzate).
             'category_groups' => $this->treasury->categorySelectGroups(false),
@@ -147,10 +163,39 @@ final class BudgetController extends BaseController
     public function save(Request $request, string $id): void
     {
         require_component('treasury');
-        $result = $this->budgets->saveGrid((int) $id, $request->all(), $request->ip());
+        $posted = $request->all();
+        $result = $this->budgets->saveGrid(
+            (int) $id,
+            $posted,
+            $request->ip(),
+            (int) ($posted['row_version'] ?? 0),
+            !empty($posted['force'])
+        );
         $wantsJson = strtolower((string) $request->header('X-Requested-With')) === 'xmlhttprequest'
             || str_contains(strtolower((string) $request->header('Accept')), 'application/json');
         if (empty($result['ok'])) {
+            if (!empty($result['conflict'])) {
+                $payload = [
+                    'ok' => false,
+                    'conflict' => true,
+                    'version' => (int) ($result['current_version'] ?? 0),
+                    'editor' => $result['editor'] ?? ['name' => '', 'at' => ''],
+                    'message' => (string) __('concurrency.conflict_flash', [
+                        'user' => (string) ($result['editor']['name'] ?? ''),
+                        'at' => (string) ($result['editor']['at'] ?? ''),
+                    ]),
+                    'messages' => [
+                        'stale_title' => (string) __('concurrency.stale_title'),
+                        'reload' => (string) __('concurrency.reload'),
+                    ],
+                ];
+                if ($wantsJson) {
+                    $this->jsonResponse($payload, 409);
+                    return;
+                }
+                $this->flash('errors', ['budget' => $payload['message']]);
+                redirect('/budgets/' . (int) $id . '?conflict=1&v=' . (int) ($result['current_version'] ?? 0));
+            }
             $message = trim((string) ($result['message'] ?? ''));
             $message = $message !== '' ? $message : (string) __('budget.save_failed');
             if ($wantsJson) {
@@ -166,6 +211,7 @@ final class BudgetController extends BaseController
                 'message' => (string) __('budget.saved'),
                 'sections' => $result['sections'] ?? [],
                 'items' => $result['items'] ?? [],
+                'row_version' => (int) ($result['row_version'] ?? 0),
             ]);
             return;
         } else {

@@ -10,6 +10,7 @@ use Socly\Services\ComponentService;
 use Socly\Services\EnrollmentFormService;
 use Socly\Services\EnrollmentService;
 use Socly\Services\MailService;
+use Socly\Services\VersionService;
 use Socly\Services\MemberActionService;
 use Socly\Services\MemberRegistryService;
 use Socly\Services\MemberService;
@@ -28,7 +29,8 @@ final class MemberController extends BaseController
         private readonly EnrollmentFormService $enrollmentForms,
         private readonly MemberRegistryService $registry,
         private readonly MemberActionService $memberActions,
-        private readonly MailService $mail
+        private readonly MailService $mail,
+        private readonly VersionService $versions
     ) {
         parent::__construct($view);
     }
@@ -236,9 +238,23 @@ final class MemberController extends BaseController
         if (empty($_SESSION['_flash']['errors'])) {
             $this->clearOld();
         }
+        $conflictVersion = (int) $request->input('v', 0);
+        $conflictActive = (string) $request->input('conflict', '') !== '' && $conflictVersion > 0;
+        $conflict = null;
+        if ($conflictActive) {
+            $editor = $this->versions->lastEditor('member', (int) $id);
+            $conflict = [
+                'user' => $editor['name'],
+                'at' => $editor['at'],
+                'current' => $conflictVersion,
+                'reload_url' => url('/members/' . (int) $id . '/edit'),
+            ];
+        }
         $this->render('members/form', [
             'title' => __('members.edit'),
             'member' => $member,
+            'memberVersion' => $conflictActive ? $conflictVersion : (int) ($member['row_version'] ?? 0),
+            'memberConflict' => $conflict,
             'fields' => $this->members->fieldDefinitions(true),
             'formSteps' => $this->members->formSteps(),
             'types' => $this->members->types(),
@@ -272,8 +288,24 @@ final class MemberController extends BaseController
                 redirect('/members/' . $id . '/edit');
             }
         }
-        $result = $this->members->update($memberId, $data, $fieldData, $request->ip(), $request->nestedFile('fields', 'photo'));
+        $result = $this->members->update(
+            $memberId,
+            $data,
+            $fieldData,
+            $request->ip(),
+            $request->nestedFile('fields', 'photo'),
+            (int) ($data['row_version'] ?? 0),
+            !empty($data['force'])
+        );
         if (!$result['ok']) {
+            if (!empty($result['conflict'])) {
+                // Concorrenza: nessuna scrittura, si riapre il form con i dati digitati e l'avviso.
+                $this->flash('errors', ['concurrency' => __('concurrency.conflict_flash', [
+                    'user' => (string) ($result['editor']['name'] ?? ''),
+                    'at' => (string) ($result['editor']['at'] ?? ''),
+                ])]);
+                redirect('/members/' . $id . '/edit?conflict=1&v=' . (int) ($result['current_version'] ?? 0));
+            }
             $this->flash('errors', $result['errors']);
             redirect('/members/' . $id . '/edit');
         }

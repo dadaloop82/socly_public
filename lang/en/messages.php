@@ -2901,4 +2901,16 @@ return [
         'connected_toast' => ':name just connected to Socly',
         'idle' => 'Idle',
     ],
+    'concurrency' => [
+        'conflict_title' => 'Concurrent changes',
+        'conflict_text' => ':user saved this record at :at, after you opened it. Your changes were not saved.',
+        'conflict_hint' => 'Check the fields: save again to overwrite, or reload the updated data.',
+        'reload' => 'Reload updated data',
+        'overwrite' => 'Overwrite with my data',
+        'conflict_flash' => 'Warning: :user saved this record at :at while you were editing it. Your data was not saved.',
+        'stale_title' => 'Record updated meanwhile',
+        'stale_text' => ':user changed this record while you were editing. Reload to see the updated data: unsaved changes will be lost.',
+        'deleted' => 'This record was deleted by another operator.',
+        'editing_now' => ':name is editing this record',
+    ],
 ];

@@ -206,6 +206,7 @@ document.addEventListener('DOMContentLoaded', () => {
   initBrokenImageGuards();
   initSessionHeartbeat();
   initPresence();
+  initFreshnessGuard();
   restoreFilterFocus();
   initPlatformConsents(document);
   initResetUserData();
@@ -337,6 +338,83 @@ function initLiveFilterForm(form) {
   });
   form.querySelectorAll('input[type="search"], input[type="text"]').forEach((el) => {
     el.addEventListener('input', submitLive);
+  });
+}
+
+/**
+ * Freschezza del record aperto: se un altro operatore salva nel frattempo, compare un avviso
+ * con “Ricarica” (i dati digitati non vengono toccati: decide l'utente).
+ */
+function initFreshnessGuard() {
+  const form = document.querySelector('form[data-freshness-entity][data-freshness-id][data-freshness-url]');
+  if (!form) return;
+  const url = form.getAttribute('data-freshness-url') || '';
+  const entity = form.getAttribute('data-freshness-entity') || '';
+  const id = form.getAttribute('data-freshness-id') || '';
+  const banner = form.querySelector('[data-freshness-banner]');
+  const versionInput = form.querySelector('input[name="row_version"]');
+  if (!url || !entity || !id || !banner) return;
+
+  let known = Number(form.getAttribute('data-freshness-version') || (versionInput ? versionInput.value : 0) || 0);
+  let busy = false;
+  let shown = false;
+
+  const showBanner = (data) => {
+    if (shown) return;
+    shown = true;
+    const editor = String(data.editor?.name || '');
+    const text = String(data.messages?.stale_text || '').replace(':user', editor).replace(':at', String(data.editor?.at || ''));
+    banner.textContent = '';
+    const title = document.createElement('strong');
+    title.textContent = String(data.messages?.stale_title || '');
+    const body = document.createElement('p');
+    body.textContent = text;
+    const actions = document.createElement('div');
+    actions.className = 'record-stale-actions';
+    const reload = document.createElement('button');
+    reload.type = 'button';
+    reload.className = 'btn btn-sm';
+    reload.textContent = String(data.messages?.reload || '');
+    reload.addEventListener('click', () => window.location.reload());
+    actions.appendChild(reload);
+    banner.append(title, body, actions);
+    banner.hidden = false;
+  };
+
+  const check = async () => {
+    if (busy || document.visibilityState === 'hidden') return;
+    busy = true;
+    try {
+      const target = new URL(url, window.location.origin);
+      target.searchParams.set('entity', entity);
+      target.searchParams.set('id', id);
+      target.searchParams.set('version', String(known));
+      const res = await fetch(target.toString(), {
+        headers: { Accept: 'application/json' },
+        credentials: 'same-origin',
+        cache: 'no-store',
+      });
+      if (!res.ok) return;
+      const data = await res.json();
+      if (!data.ok) return;
+      if (data.deleted) {
+        banner.textContent = String(data.messages?.deleted || '');
+        banner.hidden = false;
+        return;
+      }
+      if (!data.changed) return;
+      known = Number(data.version || known);
+      showBanner(data);
+    } catch (err) {
+      // rete assente: si riprova al prossimo giro
+    } finally {
+      busy = false;
+    }
+  };
+
+  window.setInterval(check, 15000);
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible') check();
   });
 }
 
@@ -1269,6 +1347,22 @@ function initPresence() {
   const POLL_MS = 12000;
   let since = 0;
   let timer = null;
+  const editingForm = document.querySelector('form[data-freshness-entity][data-freshness-id]');
+  const editingChip = editingForm ? `${editingForm.getAttribute('data-freshness-entity')}:${editingForm.getAttribute('data-freshness-id')}` : '';
+  const editingNotice = editingForm ? editingForm.querySelector('[data-editing-notice]') : null;
+
+  const renderEditors = (data) => {
+    if (!editingNotice) return;
+    const names = Array.isArray(data.editors) ? data.editors.map((u) => String(u.name || '')).filter((n) => n !== '') : [];
+    if (names.length === 0) {
+      editingNotice.hidden = true;
+      editingNotice.textContent = '';
+      return;
+    }
+    const template = String(data.messages?.editing || ':name');
+    editingNotice.hidden = false;
+    editingNotice.textContent = template.replace(':name', names.join(', '));
+  };
 
   const toast = (name, template) => {
     if (!toasts || name === '') return;
@@ -1320,6 +1414,7 @@ function initPresence() {
     try {
       const target = new URL(url, window.location.origin);
       if (since > 0) target.searchParams.set('since', String(since));
+      if (editingChip !== '') target.searchParams.set('editing', editingChip);
       const res = await fetch(target.toString(), {
         headers: { Accept: 'application/json' },
         credentials: 'same-origin',
@@ -1328,6 +1423,7 @@ function initPresence() {
       if (!res.ok) return;
       const data = await res.json();
       render(data);
+      renderEditors(data);
       if (Array.isArray(data.new) && since > 0) {
         data.new.forEach((user) => toast(String(user.name || ''), data.messages?.connected));
       }
@@ -15088,6 +15184,14 @@ function initBudgetGrid(scope = document) {
   // The server returns the ids of the rows/sections it created, so the next save updates them
   // instead of inserting them again.
   const applySavedIds = (payload) => {
+    // La versione del documento avanza a ogni salvataggio (anche autosave): senza questo update
+    // il salvataggio successivo risulterebbe in conflitto con se stesso.
+    const nextVersion = payload && payload.row_version !== undefined ? String(payload.row_version) : '';
+    if (nextVersion !== '') {
+      const versionInput = form.querySelector('input[name="row_version"]');
+      if (versionInput instanceof HTMLInputElement) versionInput.value = nextVersion;
+      form.setAttribute('data-freshness-version', nextVersion);
+    }
     const items = payload && typeof payload.items === 'object' && payload.items !== null ? payload.items : {};
     const rows = [...grid.querySelectorAll('[data-budget-row]')];
     Object.keys(items).forEach((index) => {
@@ -15105,6 +15209,22 @@ function initBudgetGrid(scope = document) {
         input.value = String(sections[key]);
       }
     });
+  };
+
+  const showStale = (payload) => {
+    const banner = form.querySelector('[data-freshness-banner]');
+    if (!(banner instanceof HTMLElement)) return;
+    banner.textContent = String(payload && payload.message ? payload.message : autosaveLabels.error);
+    const actions = document.createElement('div');
+    actions.className = 'record-stale-actions';
+    const reload = document.createElement('button');
+    reload.type = 'button';
+    reload.className = 'btn btn-sm';
+    reload.textContent = String(payload && payload.messages && payload.messages.reload ? payload.messages.reload : '');
+    reload.addEventListener('click', () => window.location.reload());
+    actions.appendChild(reload);
+    banner.appendChild(actions);
+    banner.hidden = false;
   };
 
   const autosave = async () => {
@@ -15129,6 +15249,14 @@ function initBudgetGrid(scope = document) {
         body: new FormData(form),
       });
       const payload = await response.json().catch(() => null);
+      if (response.status === 409 && payload && payload.conflict) {
+        // Un altro operatore ha salvato la stessa griglia: si interrompe l'autosave.
+        autosaveDirty = false;
+        autosaveQueued = false;
+        showStale(payload);
+        setAutosaveStatus('error', String(payload.message || autosaveLabels.error));
+        return;
+      }
       if (!response.ok || !payload || payload.ok !== true) {
         throw new Error(payload && payload.message ? String(payload.message) : autosaveLabels.error);
       }

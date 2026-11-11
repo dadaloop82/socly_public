@@ -11,6 +11,7 @@ use Socly\Services\ComponentService;
 use Socly\Services\CurrencyService;
 use Socly\Services\MemberService;
 use Socly\Services\TreasuryService;
+use Socly\Services\VersionService;
 
 final class TreasuryController extends BaseController
 {
@@ -20,7 +21,8 @@ final class TreasuryController extends BaseController
         private readonly MemberService $members,
         private readonly ComponentService $components,
         private readonly CurrencyService $currency,
-        private readonly BudgetService $budgets
+        private readonly BudgetService $budgets,
+        private readonly VersionService $versions
     ) {
         parent::__construct($view);
     }
@@ -121,11 +123,25 @@ final class TreasuryController extends BaseController
                 'builtin' => false,
             ];
         }
+        $conflictVersion = (int) $request->input('v', 0);
+        $conflictActive = (string) $request->input('conflict', '') !== '' && $conflictVersion > 0;
+        $conflict = null;
+        if ($conflictActive) {
+            $editor = $this->versions->lastEditor('treasury', (int) $movement['id']);
+            $conflict = [
+                'user' => $editor['name'],
+                'at' => $editor['at'],
+                'current' => $conflictVersion,
+                'reload_url' => url('/treasury/' . (int) $movement['id'] . '/edit'),
+            ];
+        }
         $this->render('treasury/form', [
             'title' => __('treasury.edit'),
             'isEdit' => true,
             'action' => url('/treasury/' . (int) $movement['id']),
             'movement' => $movement,
+            'movement_version' => $conflictActive ? $conflictVersion : (int) ($movement['row_version'] ?? 0),
+            'movement_conflict' => $conflict,
             'default_category' => (string) ($movement['category'] ?? 'membership_fee'),
             'categories' => $categories,
             'category_groups' => $this->treasury->categoryGroups(),
@@ -150,16 +166,26 @@ final class TreasuryController extends BaseController
             $this->rememberOld($request->all());
             redirect('/treasury/' . (int) $id . '/edit');
         }
+        $posted = $request->all();
         $result = $this->treasury->update(
             (int) $id,
-            $request->all(),
+            $posted,
             $request->file('invoice_pdf'),
             $request->ip(),
-            auth_user()['id'] ?? null
+            auth_user()['id'] ?? null,
+            (int) ($posted['row_version'] ?? 0),
+            !empty($posted['force'])
         );
         if (empty($result['ok'])) {
+            $this->rememberOld($posted);
+            if (!empty($result['conflict'])) {
+                $this->flash('errors', ['concurrency' => __('concurrency.conflict_flash', [
+                    'user' => (string) ($result['editor']['name'] ?? ''),
+                    'at' => (string) ($result['editor']['at'] ?? ''),
+                ])]);
+                redirect('/treasury/' . (int) $id . '/edit?conflict=1&v=' . (int) ($result['current_version'] ?? 0));
+            }
             $this->flash('errors', $result['errors'] ?? []);
-            $this->rememberOld($request->all());
             redirect('/treasury/' . (int) $id . '/edit');
         }
         $this->flash('success', __('treasury.updated'));
