@@ -6,6 +6,7 @@ use Dotenv\Dotenv;
 use Socly\Controllers\AuthController;
 use Socly\Controllers\BrandingController;
 use Socly\Controllers\BudgetController;
+use Socly\Controllers\RendicontoController;
 use Socly\Controllers\DashboardController;
 use Socly\Controllers\DeadlinesController;
 use Socly\Controllers\DocumentsController;
@@ -76,6 +77,7 @@ use Socly\Services\RateLimiter;
 use Socly\Services\PdfTextExtractor;
 use Socly\Services\RuntsDetailScrapeService;
 use Socly\Services\RuntsLookupService;
+use Socly\Services\RuntsReportService;
 use Socly\Services\SettingsService;
 use Socly\Services\SetupService;
 use Socly\Services\StatisticsService;
@@ -487,6 +489,13 @@ $app->bind(BudgetController::class, fn (App $a) => new BudgetController(
     $a->get(View::class),
     $a->get(BudgetService::class),
     $a->get(TreasuryService::class),
+    $a->get(CurrencyService::class),
+    $a->get(SettingsService::class)
+));
+$app->bind(RuntsReportService::class, fn (App $a) => new RuntsReportService($a->get(Database::class)));
+$app->bind(RendicontoController::class, fn (App $a) => new RendicontoController(
+    $a->get(View::class),
+    $a->get(RuntsReportService::class),
     $a->get(CurrencyService::class),
     $a->get(SettingsService::class)
 ));

@@ -15,6 +15,12 @@ every 100 patches bump the series, and each bump is published to this repository
   bottom-right handle) and hide the cards you do not need; the layout is saved per user.
 - Chart cards: copy the chart as a PNG from the bottom-right tools (clipboard when the browser allows
   it, otherwise the image is downloaded) — the export keeps the card title and a solid background.
+- Bilancio consuntivo: the “Bilancio” menu is now split into **Bilancio preventivo** and **Bilancio
+  consuntivo**. The new page generates the RUNTS cash report (**Model D**, Italian DM 18/04/2020)
+  from the approved cash-book movements: sections A–E, totals, cash and bank statement, optional
+  figurative section, signature block and print/PDF. Every movement is tagged with its Model D line
+  (automatic from the treasury category, overridable). Above the **€220,000** income threshold the
+  page states that the accrual statements (Models A, B and C) must be prepared manually.
 - Budget lines can create a new treasury category on the spot (“+ New category…”), no need to fall
   back to “Other”; the label is then shared with movements, documents and deadlines.
 - Budget grid autosaves 5 seconds after the last change (also when adding/removing lines), with a

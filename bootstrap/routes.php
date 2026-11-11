@@ -5,6 +5,7 @@ declare(strict_types=1);
 use Socly\Controllers\AuthController;
 use Socly\Controllers\BrandingController;
 use Socly\Controllers\BudgetController;
+use Socly\Controllers\RendicontoController;
 use Socly\Controllers\DashboardController;
 use Socly\Controllers\DeadlinesController;
 use Socly\Controllers\DocumentsController;
@@ -157,6 +158,10 @@ $router->post('/budgets/{id}/reopen', [BudgetController::class, 'reopen'], 'trea
 $router->post('/budgets/{id}/delete', [BudgetController::class, 'destroy'], 'treasury.manage', ['mw.locale', 'mw.install', 'mw.auth', 'mw.csrf']);
 $router->get('/budgets/{id}/compare', [BudgetController::class, 'compare'], 'treasury.view', ['mw.locale', 'mw.install', 'mw.auth']);
 $router->get('/budgets/{id}/rendiconto', [BudgetController::class, 'rendiconto'], 'treasury.view', ['mw.locale', 'mw.install', 'mw.auth']);
+
+// Bilancio consuntivo — RUNTS Modello D (rendiconto per cassa).
+$router->get('/rendiconto', [RendicontoController::class, 'index'], 'treasury.view', ['mw.locale', 'mw.install', 'mw.auth']);
+$router->get('/rendiconto/{year}', [RendicontoController::class, 'show'], 'treasury.view', ['mw.locale', 'mw.install', 'mw.auth']);
 
 $router->get('/deadlines', [DeadlinesController::class, 'index'], 'deadlines.view', ['mw.locale', 'mw.install', 'mw.auth']);
 $router->get('/deadlines/create', [DeadlinesController::class, 'create'], 'deadlines.manage', ['mw.locale', 'mw.install', 'mw.auth']);

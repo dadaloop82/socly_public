@@ -1157,6 +1157,12 @@ final class TreasuryService
         if (empty($categoryResult['ok'])) {
             return ['ok' => false, 'errors' => ['category' => (string) ($categoryResult['error'] ?? __('validation.required'))]];
         }
+        // Voce RUNTS (Modello D) del movimento: scelta esplicita, altrimenti suggerita dalla categoria.
+        $runtsLine = RuntsReportService::normalizeLine(
+            (string) ($input['runts_line'] ?? ''),
+            (string) ($categoryResult['key'] ?? ''),
+            $direction
+        );
         // "Conto" (wallet: where the money sits) and "metodo" (how it moved) are
         // two different things and therefore two different columns.
         $account = self::normalizeAccount((string) ($input['account'] ?? ''));
@@ -1248,6 +1254,7 @@ final class TreasuryService
                 'movement_date' => $date,
                 'direction' => $direction,
                 'category' => (string) $categoryResult['key'],
+                'runts_line' => $runtsLine,
                 'budget_item_id' => $budgetItemId > 0 ? $budgetItemId : null,
                 'amount' => $amount,
                 'amount_entered' => $amountEntered,

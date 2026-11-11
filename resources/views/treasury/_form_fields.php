@@ -329,6 +329,29 @@ $invoiceActive = $selectedDirection === 'expense' && !empty($values['invoice_pay
             ]) ?>
         </div>
         <?php
+        // Voce del Modello D (RUNTS): le voci di uscita e di entrata restano tutte disponibili,
+        // il servizio riallinea la scelta alla direzione del movimento.
+        $runtsGroups = [];
+        foreach (['expense' => 'runts.expenses', 'income' => 'runts.incomes'] as $runtsDirection => $runtsHeading) {
+            foreach (\Socly\Services\RuntsReportService::selectGroups($runtsDirection) as $runtsGroup) {
+                $runtsGroups[] = [
+                    'label' => (string) __($runtsHeading) . ' · ' . (string) ($runtsGroup['label'] ?? ''),
+                    'options' => $runtsGroup['options'] ?? [],
+                ];
+            }
+        }
+        ?>
+        <?= field('select', [
+            'name' => 'runts_line',
+            'label' => (string) __('runts.line_label'),
+            'value' => (string) ($values['runts_line'] ?? ''),
+            'include_empty' => true,
+            'empty_label' => (string) __('runts.line_auto'),
+            'groups' => $runtsGroups,
+            'hint' => (string) __('runts.line_hint'),
+            'attrs' => ['data-treasury-runts' => true],
+        ]) ?>
+        <?php
         $budgetItemGroups = [];
         foreach (($budget_items ?? []) as $budgetGroup) {
             $budgetOptions = [];

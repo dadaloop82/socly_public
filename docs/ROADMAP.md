@@ -21,6 +21,7 @@
 - [x] Treasury cash book (approvals, wallets, budget imputation) and yearly forecast budget compared with the actuals
 - [x] Statistics page with charts, per-user widget layout (order, visibility, three-column width) and members map with automatic geocoding
 - [x] Organization chart with association bodies, roles and compatibility checks
+- [x] Bilancio consuntivo: RUNTS cash report (Model D) generated from the cash book, with the €220,000 threshold for the accrual statements
 
 ## Planned plugins (sold separately)
 

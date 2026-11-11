@@ -134,6 +134,22 @@ inactivity (and flushes with `keepalive` when leaving mid-edit):
 - one document per year and one open draft at a time are enforced by the controller: the create form
   lists only the free years and links the open draft until it is approved or deleted.
 
+## Year-end report (RUNTS — Model D)
+
+`/rendiconto` is the **Bilancio consuntivo**, a distinct page from the forecast budget (`/budgets`).
+`RuntsReportService` rebuilds the ministerial **Rendiconto per cassa (Model D, DM 18 April 2020)**
+from the approved cash-book movements: sections A–E with their official rows, totals, the cash and
+bank statement (opening + year balance = closing) and the optional figurative block; the sheet is
+printed with the browser (legal header, place/date and signature line).
+
+- Each movement carries `runts_line` (automatic from the treasury category, overridable in the form);
+  internal movements (transfers, deposits/withdrawals) are excluded from the statements but still
+  count in the cash balances.
+- The legal threshold is **€ 220,000** of income per year (`RuntsReportService::CASH_LIMIT`). Below it
+  the Model D is generated; at or above it the page states that the accrual statements (Models A/B/C)
+  must be prepared manually — Socly does not generate them yet.
+- The old “Rendiconto” link of a budget is now labelled **Piano finanziario** (forecast vs actuals).
+
 ## Design principles
 
 - One installation = one association.
