@@ -1706,6 +1706,10 @@ function initTreasurySimilar() {
   });
   if (description) description.addEventListener('input', queue);
   form.querySelectorAll('[data-treasury-direction]').forEach((el) => el.addEventListener('change', queue));
+  // Dopo il salvataggio la scheda si apre con ?similar=1: mostra subito la proposta.
+  if (new URLSearchParams(window.location.search).has('similar')) {
+    window.setTimeout(() => { void refresh(); }, 250);
+  }
 
   function render(data) {
     if (!data || !Array.isArray(data.matches) || data.matches.length === 0 || !Array.isArray(data.changes) || data.changes.length === 0) {

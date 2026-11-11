@@ -185,19 +185,18 @@ foreach ($categories as $categoryOption) {
                 <?= e(__('treasury.filters_button')) ?>
                 <?php if ($advancedCount > 0): ?><span class="treasury-filter-count"><?= $advancedCount ?></span><?php endif; ?>
             </button>
-            <label class="treasury-group-toggle" title="<?= e(__('treasury.group_toggle')) ?>">
-                <span class="visually-hidden"><?= e(__('treasury.group_toggle')) ?></span>
+            <div class="treasury-group-toggle">
                 <?= field('hidden', ['name' => 'group', 'value' => '0']) ?>
                 <?= field('checkbox', [
                     'name' => 'group',
                     'id' => 'treasury-group',
-                    'label' => '',
+                    'label' => (string) __('treasury.group_toggle'),
                     'value' => !empty($group_by_category) ? '1' : '',
                     'check_value' => '1',
                     'context' => 'inline',
+                    'label_class' => 'treasury-group-toggle-text',
                 ]) ?>
-                <span class="treasury-group-toggle-text"><?= e(__('treasury.group_toggle')) ?></span>
-            </label>
+            </div>
             <?php if ($hasActiveFilters): ?>
                 <a class="btn btn-ghost btn-sm treasury-filter-reset" href="<?= e(url('/treasury')) ?>"><?= e(__('treasury.filter_reset')) ?></a>
             <?php endif; ?>

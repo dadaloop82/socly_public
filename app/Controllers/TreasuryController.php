@@ -291,6 +291,14 @@ final class TreasuryController extends BaseController
         }
         $this->clearOld();
         $this->flash('success', __('treasury.saved'));
+        // Movimento classificato: si riapre la scheda con la proposta “applica anche ai simili”.
+        $classified = trim((string) $request->input('category', '')) !== ''
+            || trim((string) $request->input('runts_line', '')) !== ''
+            || (int) $request->input('budget_item_id', 0) > 0;
+        $newId = (int) ($result['id'] ?? 0);
+        if ($classified && $newId > 0) {
+            redirect('/treasury/' . $newId . '/edit?similar=1');
+        }
         redirect('/treasury');
     }
 
