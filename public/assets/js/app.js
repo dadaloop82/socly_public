@@ -195,7 +195,7 @@ document.addEventListener('DOMContentLoaded', () => {
   initDashboardTabs();
   initDashboardMoreToggles();
   initDashboardCharts();
-  initDashboardChartWidgets();
+  initWidgetLayouts();
   initStatisticsTabs();
   initStatisticsCharts();
   initUpdateProgress();
@@ -12699,54 +12699,143 @@ function initDemoBannerCompact() {
   window.addEventListener('scroll', sync, { passive: true });
 }
 
-function initDashboardChartWidgets() {
-  const config = document.querySelector('[data-charts-user]');
-  if (!(config instanceof HTMLElement)) return;
-  const checkboxes = [...config.querySelectorAll('[data-chart-toggle]')];
-  if (checkboxes.length === 0) return;
-  const key = 'socly.dashboardCharts.' + (config.dataset.chartsUser || '0');
-  const panels = new Map([...document.querySelectorAll('[data-chart-widget]')]
-    .map((el) => [el.getAttribute('data-chart-widget'), el]));
-  let state = {};
-  try {
-    state = JSON.parse(localStorage.getItem(key) || '{}') || {};
-  } catch {
-    state = {};
-  }
-  const apply = () => {
-    let revealed = false;
-    checkboxes.forEach((cb) => {
-      if (!(cb instanceof HTMLInputElement)) return;
-      const id = cb.getAttribute('data-chart-toggle');
-      const on = state[id] !== false;
-      cb.checked = on;
-      const panel = panels.get(id);
-      if (!panel) return;
-      const wasHidden = panel.hidden;
-      panel.hidden = !on;
-      if (wasHidden && on) revealed = true;
-    });
-    if (revealed) {
-      window.setTimeout(() => window.dispatchEvent(new Event('resize')), 60);
+function initWidgetLayouts() {
+  const groups = [...document.querySelectorAll('[data-widget-context]')];
+  if (groups.length === 0) return;
+  const csrf = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
+  const managers = new Map([...document.querySelectorAll('[data-widget-manager]')]
+    .map((el) => [el.getAttribute('data-widget-manager'), el]));
+
+  groups.forEach((group) => {
+    if (!(group instanceof HTMLElement)) return;
+    const context = group.getAttribute('data-widget-context') || '';
+    const manager = managers.get(context);
+    if (context === '' || !(manager instanceof HTMLElement)) return;
+    const list = manager.querySelector('[data-widget-list]');
+    const items = list ? [...list.querySelectorAll('[data-widget-item]')] : [];
+    if (!list || items.length === 0) return;
+    const panels = new Map([...group.querySelectorAll('[data-chart-widget]')]
+      .map((el) => [el.getAttribute('data-chart-widget'), el]));
+    let layout = {};
+    try {
+      layout = JSON.parse(group.getAttribute('data-widget-layout') || '{}') || {};
+    } catch {
+      layout = {};
     }
-  };
-  apply();
-  checkboxes.forEach((cb) => {
-    cb.addEventListener('change', () => {
-      if (!(cb instanceof HTMLInputElement)) return;
-      state[cb.getAttribute('data-chart-toggle')] = cb.checked;
-      try {
-        localStorage.setItem(key, JSON.stringify(state));
-      } catch {
-        // Storage disabled: the choice still applies for this page view.
+    const ids = items.map((li) => li.getAttribute('data-widget-item') || '');
+    const savedOrder = Array.isArray(layout.order) ? layout.order : [];
+    let order = savedOrder.filter((id) => ids.includes(id) && panels.has(id));
+    ids.forEach((id) => {
+      if (!order.includes(id)) order.push(id);
+    });
+    const hidden = new Set((Array.isArray(layout.hidden) ? layout.hidden : []).filter((id) => panels.has(id)));
+
+    const apply = () => {
+      order.forEach((id, index) => {
+        const panel = panels.get(id);
+        if (panel) {
+          panel.style.order = String(index);
+          panel.hidden = hidden.has(id);
+        }
+        const li = items.find((el) => el.getAttribute('data-widget-item') === id);
+        if (li) list.appendChild(li);
+      });
+      // Non-widget panels (e.g. the “top months” table) stay after the charts.
+      const tail = order.length + 1;
+      [...group.children].forEach((child, index) => {
+        if (child instanceof HTMLElement
+          && child.classList.contains('chart-panel')
+          && !child.hasAttribute('data-chart-widget')) {
+          child.style.order = String(tail + index);
+        }
+      });
+    };
+    apply();
+
+    let saveTimer = null;
+    const save = () => {
+      window.clearTimeout(saveTimer);
+      saveTimer = window.setTimeout(() => {
+        const body = new URLSearchParams();
+        body.set('context', context);
+        order.forEach((id) => body.append('order[]', id));
+        [...hidden].forEach((id) => body.append('hidden[]', id));
+        fetch(group.getAttribute('data-widget-save-url') || '/api/widgets/layout', {
+          method: 'POST',
+          credentials: 'same-origin',
+          headers: {
+            Accept: 'application/json',
+            'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8',
+            'X-Requested-With': 'XMLHttpRequest',
+            'X-CSRF-Token': csrf,
+          },
+          body: body.toString(),
+        }).catch(() => {
+          // Offline/expired session: the layout already applied in this page.
+        });
+      }, 350);
+    };
+
+    items.forEach((li) => {
+      const id = li.getAttribute('data-widget-item') || '';
+      const cb = li.querySelector('[data-widget-visible]');
+      if (cb instanceof HTMLInputElement) {
+        cb.checked = !hidden.has(id);
+        cb.addEventListener('change', () => {
+          if (cb.checked) {
+            hidden.delete(id);
+          } else {
+            hidden.add(id);
+          }
+          apply();
+          save();
+          if (cb.checked) {
+            window.setTimeout(() => window.dispatchEvent(new Event('resize')), 60);
+          }
+        });
       }
-      apply();
+      const move = (direction) => {
+        const index = order.indexOf(id);
+        const target = index + direction;
+        if (index < 0 || target < 0 || target >= order.length) return;
+        [order[index], order[target]] = [order[target], order[index]];
+        apply();
+        save();
+      };
+      li.querySelector('[data-widget-up]')?.addEventListener('click', () => move(-1));
+      li.querySelector('[data-widget-down]')?.addEventListener('click', () => move(1));
+      li.addEventListener('dragstart', (event) => {
+        if (!(event instanceof DragEvent) || !event.dataTransfer) return;
+        li.classList.add('is-dragging');
+        event.dataTransfer.effectAllowed = 'move';
+        event.dataTransfer.setData('text/plain', id);
+      });
+      li.addEventListener('dragend', () => li.classList.remove('is-dragging'));
+      li.addEventListener('dragover', (event) => {
+        event.preventDefault();
+        li.classList.add('is-drop-target');
+      });
+      li.addEventListener('dragleave', () => li.classList.remove('is-drop-target'));
+      li.addEventListener('drop', (event) => {
+        if (!(event instanceof DragEvent) || !event.dataTransfer) return;
+        event.preventDefault();
+        li.classList.remove('is-drop-target');
+        const dragged = event.dataTransfer.getData('text/plain') || '';
+        const from = order.indexOf(dragged);
+        const to = order.indexOf(id);
+        if (!dragged || dragged === id || from < 0 || to < 0) return;
+        order.splice(from, 1);
+        order.splice(to, 0, dragged);
+        apply();
+        save();
+      });
     });
-  });
-  document.addEventListener('click', (event) => {
-    if (config.open && event.target instanceof Node && !config.contains(event.target)) {
-      config.open = false;
-    }
+
+    document.addEventListener('click', (event) => {
+      if (manager.open && event.target instanceof Node && !manager.contains(event.target)) {
+        manager.open = false;
+      }
+    });
   });
 }
 

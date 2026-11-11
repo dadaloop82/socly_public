@@ -373,6 +373,12 @@ return [
         'documents_empty_text' => 'Inizia inserendo il tuo primo documento!',
         'documents_empty_create' => 'Inserisci nuovo documento',
     ],
+    'widgets' => [
+        'manage' => 'Gestisci grafici',
+        'hint' => 'Trascina o usa le frecce per riordinare; deseleziona per nascondere. Le preferenze sono salvate nel tuo profilo.',
+        'move_up' => 'Sposta su',
+        'move_down' => 'Sposta giù',
+    ],
     'email_templates' => [
         'intro' => 'Ogni template ha versione IT / EN / DE. Usa placeholder {{nome}} e blocchi condizionali {{#flag}}…{{/flag}}.',
         'placeholders' => 'Variabili disponibili',

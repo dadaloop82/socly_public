@@ -9,6 +9,7 @@ use Socly\Core\View;
 use Socly\Services\ComponentService;
 use Socly\Services\CurrencyService;
 use Socly\Services\StatisticsService;
+use Socly\Services\WidgetLayoutService;
 use Socly\Support\Permission;
 
 /** Read-only statistics page (members, cards, registrations, money). */
@@ -18,7 +19,8 @@ final class StatisticsController extends BaseController
         View $view,
         private readonly StatisticsService $statistics,
         private readonly ComponentService $components,
-        private readonly CurrencyService $currency
+        private readonly CurrencyService $currency,
+        private readonly WidgetLayoutService $widgetLayouts
     ) {
         parent::__construct($view);
     }
@@ -37,6 +39,13 @@ final class StatisticsController extends BaseController
         $cards = $this->statistics->cards();
         $finances = $this->statistics->finances();
         $cityMap = $this->statistics->cityMap();
+        $userId = (int) (auth_user()['id'] ?? 0);
+        $chartLayouts = [
+            'statistics.demographics' => $this->widgetLayouts->forUser($userId, 'statistics.demographics'),
+            'statistics.registrations' => $this->widgetLayouts->forUser($userId, 'statistics.registrations'),
+            'statistics.cards' => $this->widgetLayouts->forUser($userId, 'statistics.cards'),
+            'statistics.finance' => $this->widgetLayouts->forUser($userId, 'statistics.finance'),
+        ];
 
         // Generic chart payload: the view renders one canvas per key and app.js feeds Chart.js.
         $charts = [
@@ -112,6 +121,7 @@ final class StatisticsController extends BaseController
             'cityMap' => $cityMap,
             'italySvg' => \Socly\Support\ItalyMap::svg(),
             'currency' => $this->currency,
+            'chartLayouts' => $chartLayouts,
             'chartsJson' => json_encode(
                 ['charts' => $charts],
                 JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR

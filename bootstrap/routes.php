@@ -21,6 +21,7 @@ use Socly\Controllers\StatisticsController;
 use Socly\Controllers\TreasuryController;
 use Socly\Controllers\UpdateController;
 use Socly\Controllers\UserController;
+use Socly\Controllers\WidgetController;
 use Socly\Core\Http\Router;
 use Socly\Controllers\I18nController;
 
@@ -84,6 +85,8 @@ $router->post('/setup/fields/autosave', [SetupController::class, 'autosaveFields
 $router->post('/setup/logo', [SetupController::class, 'uploadLogo'], null, ['mw.locale', 'mw.install', 'mw.setup_open', 'mw.csrf']);
 $router->post('/setup/legal-pdf', [SetupController::class, 'extractLegalPdf'], null, ['mw.locale', 'mw.install', 'mw.setup_open', 'mw.csrf']);
 $router->post('/setup', [SetupController::class, 'save'], null, ['mw.locale', 'mw.install', 'mw.setup_open', 'mw.csrf']);
+
+$router->post('/api/widgets/layout', [WidgetController::class, 'save'], null, ['mw.locale', 'mw.install', 'mw.auth', 'mw.csrf']);
 
 $router->post('/updates/install', [UpdateController::class, 'install'], null, ['mw.locale', 'mw.install', 'mw.auth', 'mw.csrf']);
 $router->get('/api/updates/check', [UpdateController::class, 'check'], null, ['mw.locale', 'mw.install']);

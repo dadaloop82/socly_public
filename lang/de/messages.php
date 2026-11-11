@@ -371,6 +371,12 @@ return [
         'documents_empty_text' => 'Fügen Sie Ihr erstes Dokument hinzu!',
         'documents_empty_create' => 'Neues Dokument einfügen',
     ],
+    'widgets' => [
+        'manage' => 'Diagramme verwalten',
+        'hint' => 'Ziehen oder Pfeile zum Sortieren; abwählen zum Ausblenden. Die Einstellungen werden in Ihrem Profil gespeichert.',
+        'move_up' => 'Nach oben',
+        'move_down' => 'Nach unten',
+    ],
     'email_templates' => [
         'intro' => 'Jede Vorlage hat IT / EN / DE. Platzhalter {{name}} und Bedingungen {{#flag}}…{{/flag}}.',
         'placeholders' => 'Verfügbare Variablen',

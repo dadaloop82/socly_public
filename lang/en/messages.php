@@ -371,6 +371,12 @@ return [
         'documents_empty_text' => 'Start by adding your first document!',
         'documents_empty_create' => 'Add new document',
     ],
+    'widgets' => [
+        'manage' => 'Manage charts',
+        'hint' => 'Drag or use the arrows to reorder; uncheck to hide. Preferences are saved in your profile.',
+        'move_up' => 'Move up',
+        'move_down' => 'Move down',
+    ],
     'email_templates' => [
         'intro' => 'Each template has IT / EN / DE versions. Use {{placeholders}} and conditional blocks {{#flag}}…{{/flag}}.',
         'placeholders' => 'Available variables',

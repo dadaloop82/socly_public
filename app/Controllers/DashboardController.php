@@ -13,6 +13,7 @@ use Socly\Services\DeadlineService;
 use Socly\Services\DocumentService;
 use Socly\Services\MemberService;
 use Socly\Services\TreasuryService;
+use Socly\Services\WidgetLayoutService;
 use Socly\Support\Permission;
 
 final class DashboardController extends BaseController
@@ -25,7 +26,8 @@ final class DashboardController extends BaseController
         private readonly DeadlineService $deadlines,
         private readonly DocumentService $documents,
         private readonly AssociationPeopleService $people,
-        private readonly CurrencyService $currency
+        private readonly CurrencyService $currency,
+        private readonly WidgetLayoutService $widgetLayouts
     ) {
         parent::__construct($view);
     }
@@ -37,6 +39,12 @@ final class DashboardController extends BaseController
         $showDeadlines = $this->components->isEnabled('deadlines') && can(Permission::DEADLINES_VIEW);
         $showDocuments = $this->components->isEnabled('documents') && can(Permission::DOCUMENTS_VIEW);
         $showOrg = $this->components->isEnabled('org_roles') && can(Permission::ORG_VIEW);
+
+        $userId = (int) (auth_user()['id'] ?? 0);
+        $chartLayouts = [
+            'dashboard.members' => $this->widgetLayouts->forUser($userId, 'dashboard.members'),
+            'dashboard.treasury' => $this->widgetLayouts->forUser($userId, 'dashboard.treasury'),
+        ];
 
         $stats = $showMembers
             ? $this->members->dashboardStats()
@@ -129,6 +137,7 @@ final class DashboardController extends BaseController
             ],
             'currency' => $this->currency,
             'chartsJson' => json_encode($stats['charts'], JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR),
+            'chartLayouts' => $chartLayouts,
             'chartI18n' => json_encode([
                 'collected' => __('dashboard.chart_collected_series'),
                 'newMembers' => __('dashboard.chart_new_members_series'),

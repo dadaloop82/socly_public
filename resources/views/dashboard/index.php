@@ -9,6 +9,7 @@
  * @var string $treasuryChartI18n
  */
 $charts = $stats['charts'] ?? [];
+$chartLayouts = is_array($chartLayouts ?? null) ? $chartLayouts : [];
 $enabled = $enabled ?? [
     'members' => false,
     'treasury' => false,
@@ -218,21 +219,12 @@ $defaultTab = $tabs[0]['id'] ?? '';
                     'pending' => __('dashboard.chart_pending_title'),
                 ];
                 ?>
-                <div class="dashboard-charts-toolbar">
-                    <details class="dashboard-charts-config" data-charts-user="<?= (int) (auth_user()['id'] ?? 0) ?>">
-                        <summary class="dashboard-charts-manage" data-i18n="dashboard.charts_manage"><?= e(__('dashboard.charts_manage')) ?></summary>
-                        <div class="dashboard-charts-config-body">
-                            <p class="setup-hint muted"><?= e(__('dashboard.charts_manage_hint')) ?></p>
-                            <?php foreach ($chartToggles as $chartId => $chartLabel): ?>
-                                <label class="dashboard-charts-option">
-                                    <input type="checkbox" data-chart-toggle="<?= e($chartId) ?>" checked>
-                                    <span><?= e($chartLabel) ?></span>
-                                </label>
-                            <?php endforeach; ?>
-                        </div>
-                    </details>
-                </div>
-                <div class="charts" data-dashboard-charts="<?= e($chartsJson) ?>" data-chart-i18n="<?= e($chartI18n) ?>">
+                <?= view_partial('partials/widget_manager', [
+                    'context' => 'dashboard.members',
+                    'widgets' => $chartToggles,
+                    'layout' => $chartLayouts['dashboard.members'] ?? [],
+                ]) ?>
+                <div class="charts" data-widget-context="dashboard.members" data-widget-save-url="<?= e(url('/api/widgets/layout')) ?>" data-widget-layout="<?= e(json_encode($chartLayouts['dashboard.members'] ?? [])) ?>" data-dashboard-charts="<?= e($chartsJson) ?>" data-chart-i18n="<?= e($chartI18n) ?>">
                     <div class="panel chart-panel chart-panel-wide chart-panel-primary" data-chart-widget="collections">
                         <div class="panel-header">
                             <div>
@@ -377,12 +369,27 @@ $defaultTab = $tabs[0]['id'] ?? '';
                 </div>
             </div>
 
+            <?php
+            $treasuryWidgets = [
+                'flow' => __('dashboard.treasury_chart_flow_title'),
+                'expense' => __('dashboard.treasury_chart_expense_title'),
+                'income' => __('dashboard.treasury_chart_income_title'),
+            ];
+            ?>
+            <?= view_partial('partials/widget_manager', [
+                'context' => 'dashboard.treasury',
+                'widgets' => $treasuryWidgets,
+                'layout' => $chartLayouts['dashboard.treasury'] ?? [],
+            ]) ?>
             <div
                 class="charts charts-treasury"
+                data-widget-context="dashboard.treasury"
+                data-widget-save-url="<?= e(url('/api/widgets/layout')) ?>"
+                data-widget-layout="<?= e(json_encode($chartLayouts['dashboard.treasury'] ?? [])) ?>"
                 data-treasury-charts="<?= e($treasuryChartsJson ?? '{}') ?>"
                 data-treasury-chart-i18n="<?= e($treasuryChartI18n ?? '{}') ?>"
             >
-                <div class="panel chart-panel chart-panel-primary">
+                <div class="panel chart-panel chart-panel-primary" data-chart-widget="flow">
                     <div class="panel-header">
                         <div>
                             <h3 class="section-title"><?= e(__('dashboard.treasury_chart_flow_title')) ?></h3>
@@ -398,7 +405,7 @@ $defaultTab = $tabs[0]['id'] ?? '';
                     <?php endif; ?>
                 </div>
 
-                <div class="panel chart-panel">
+                <div class="panel chart-panel" data-chart-widget="expense">
                     <div class="panel-header">
                         <div>
                             <h3 class="section-title"><?= e(__('dashboard.treasury_chart_expense_title')) ?></h3>
@@ -414,7 +421,7 @@ $defaultTab = $tabs[0]['id'] ?? '';
                     <?php endif; ?>
                 </div>
 
-                <div class="panel chart-panel">
+                <div class="panel chart-panel" data-chart-widget="income">
                     <div class="panel-header">
                         <div>
                             <h3 class="section-title"><?= e(__('dashboard.treasury_chart_income_title')) ?></h3>

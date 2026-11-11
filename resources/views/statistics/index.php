@@ -19,11 +19,24 @@ $cardsActivePct = $cardsTotal > 0 ? round($cardsActive * 100 / $cardsTotal, 1) :
 $settled = (int) ($overview['members_settled'] ?? 0);
 $settledPct = $membersTotal > 0 ? round($settled * 100 / $membersTotal, 1) : 0.0;
 $hasMembers = $membersTotal > 0;
+$chartLayouts = is_array($chartLayouts ?? null) ? $chartLayouts : [];
+$widgetAttrs = static function (string $context) use ($chartLayouts): string {
+    return 'data-widget-context="' . e($context) . '"'
+        . ' data-widget-save-url="' . e(url('/api/widgets/layout')) . '"'
+        . ' data-widget-layout="' . e((string) json_encode($chartLayouts[$context] ?? [])) . '"';
+};
+$widgetManager = static function (string $context, array $widgets) use ($chartLayouts): string {
+    return view_partial('partials/widget_manager', [
+        'context' => $context,
+        'widgets' => $widgets,
+        'layout' => $chartLayouts[$context] ?? [],
+    ]);
+};
 $topMonths = $registrations['top_months'] ?? ['labels' => [], 'values' => [], 'percents' => []];
 // Shared chart card renderer: one canvas per chart key, fed by chartsJson.
 $chartCard = static function (string $id, string $titleKey, string $ledeKey, bool $donut = true, bool $wide = false): void {
     ?>
-    <div class="panel chart-panel<?= $wide ? ' chart-panel-wide chart-panel-primary' : '' ?>">
+    <div class="panel chart-panel<?= $wide ? ' chart-panel-wide chart-panel-primary' : '' ?>" data-chart-widget="<?= e($id) ?>">
         <div class="panel-header">
             <div>
                 <h2 class="section-title"><?= e(__($titleKey)) ?></h2>
@@ -148,7 +161,11 @@ $chartCard = static function (string $id, string $titleKey, string $ledeKey, boo
 
     <section class="dashboard-panel" id="statistics-panel-demographics" role="tabpanel"
         data-statistics-panel="demographics" aria-labelledby="statistics-tab-demographics">
-        <div class="charts" data-statistics-charts="<?= e($chartsJson) ?>">
+        <?= $widgetManager('statistics.demographics', [
+            'gender' => __('statistics.chart_gender'),
+            'age_bands' => __('statistics.chart_age'),
+        ]) ?>
+        <div class="charts" <?= $widgetAttrs('statistics.demographics') ?> data-statistics-charts="<?= e($chartsJson) ?>">
             <?php
             $chartCard('gender', 'statistics.chart_gender', 'statistics.chart_gender_lede');
             $chartCard('age_bands', 'statistics.chart_age', 'statistics.chart_age_lede', false);
@@ -237,7 +254,12 @@ $chartCard = static function (string $id, string $titleKey, string $ledeKey, boo
 
     <section class="dashboard-panel" id="statistics-panel-registrations" role="tabpanel"
         data-statistics-panel="registrations" aria-labelledby="statistics-tab-registrations" hidden>
-        <div class="charts">
+        <?= $widgetManager('statistics.registrations', [
+            'registrations_monthly' => __('statistics.chart_monthly'),
+            'seasons' => __('statistics.chart_seasons'),
+            'registrations_weekday' => __('statistics.chart_weekday'),
+        ]) ?>
+        <div class="charts" <?= $widgetAttrs('statistics.registrations') ?>>
             <?php
             $chartCard('registrations_monthly', 'statistics.chart_monthly', 'statistics.chart_monthly_lede', false, true);
             $chartCard('seasons', 'statistics.chart_seasons', 'statistics.chart_seasons_lede');
@@ -298,7 +320,12 @@ $chartCard = static function (string $id, string $titleKey, string $ledeKey, boo
 
     <section class="dashboard-panel" id="statistics-panel-cards" role="tabpanel"
         data-statistics-panel="cards" aria-labelledby="statistics-tab-cards" hidden>
-        <div class="charts" data-statistics-charts>
+        <?= $widgetManager('statistics.cards', [
+            'cards_status' => __('statistics.chart_cards_status'),
+            'cards_type' => __('statistics.chart_cards_type'),
+            'cards_year' => __('statistics.chart_cards_year'),
+        ]) ?>
+        <div class="charts" <?= $widgetAttrs('statistics.cards') ?> data-statistics-charts>
             <?php
             $chartCard('cards_status', 'statistics.chart_cards_status', 'statistics.chart_cards_status_lede');
             $chartCard('cards_type', 'statistics.chart_cards_type', 'statistics.chart_cards_type_lede');
@@ -327,7 +354,12 @@ $chartCard = static function (string $id, string $titleKey, string $ledeKey, boo
 
     <section class="dashboard-panel" id="statistics-panel-finance" role="tabpanel"
         data-statistics-panel="finance" aria-labelledby="statistics-tab-finance" hidden>
-        <div class="charts" data-statistics-charts>
+        <?= $widgetManager('statistics.finance', [
+            'finance_monthly' => __('statistics.chart_finance_monthly'),
+            'finance_method' => __('statistics.chart_finance_method'),
+            'finance_type' => __('statistics.chart_finance_type'),
+        ]) ?>
+        <div class="charts" <?= $widgetAttrs('statistics.finance') ?> data-statistics-charts>
             <?php
             $chartCard('finance_monthly', 'statistics.chart_finance_monthly', 'statistics.chart_finance_monthly_lede', false, true);
             $chartCard('finance_method', 'statistics.chart_finance_method', 'statistics.chart_finance_method_lede');

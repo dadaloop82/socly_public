@@ -22,6 +22,7 @@ use Socly\Controllers\StatisticsController;
 use Socly\Controllers\TreasuryController;
 use Socly\Controllers\UpdateController;
 use Socly\Controllers\UserController;
+use Socly\Controllers\WidgetController;
 use Socly\Core\App;
 use Socly\Core\Csrf;
 use Socly\Core\Database;
@@ -82,6 +83,7 @@ use Socly\Services\TreasuryService;
 use Socly\Services\GitHubIssueService;
 use Socly\Services\UpdateService;
 use Socly\Services\UserService;
+use Socly\Services\WidgetLayoutService;
 use Socly\Services\WorkflowService;
 use Socly\Support\EnvWriter;
 
@@ -380,6 +382,10 @@ if (!is_file($privateBindings) && defined('SOCLY_PRIVATE_PATH')) {
 if (is_file($privateBindings)) {
     require $privateBindings;
 }
+$app->bind(WidgetLayoutService::class, fn (App $a) => new WidgetLayoutService(
+    $a->get(Database::class),
+    $a->get(AuditService::class)
+));
 $app->bind(DashboardController::class, fn (App $a) => new DashboardController(
     $a->get(View::class),
     $a->get(MemberService::class),
@@ -388,7 +394,8 @@ $app->bind(DashboardController::class, fn (App $a) => new DashboardController(
     $a->get(DeadlineService::class),
     $a->get(DocumentService::class),
     $a->get(AssociationPeopleService::class),
-    $a->get(CurrencyService::class)
+    $a->get(CurrencyService::class),
+    $a->get(WidgetLayoutService::class)
 ));
 $app->bind(StatisticsService::class, fn (App $a) => new StatisticsService(
     $a->get(Database::class),
@@ -398,7 +405,12 @@ $app->bind(StatisticsController::class, fn (App $a) => new StatisticsController(
     $a->get(View::class),
     $a->get(StatisticsService::class),
     $a->get(ComponentService::class),
-    $a->get(CurrencyService::class)
+    $a->get(CurrencyService::class),
+    $a->get(WidgetLayoutService::class)
+));
+$app->bind(WidgetController::class, fn (App $a) => new WidgetController(
+    $a->get(View::class),
+    $a->get(WidgetLayoutService::class)
 ));
 $app->bind(MemberActionService::class, fn (App $a) => new MemberActionService(
     $a->get(Database::class),
