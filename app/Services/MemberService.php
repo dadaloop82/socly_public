@@ -2618,17 +2618,17 @@ final class MemberService
     }
 
     /**
-     * Members for org-chart assignment: everyone, active members first, with a status suffix so a
-     * suspended member is visible instead of silently missing from the list.
-     * Outstanding fees are a treasury matter and never filter or flag the list here.
-     * The label shows how long the person has been a member instead of the registry number.
+     * Members for org-chart assignment: everyone, active members first, with the position they
+     * already hold (e.g. “Presidente”) and a status suffix so a suspended member is visible
+     * instead of silently missing from the list. Outstanding fees are a treasury matter and never
+     * filter or flag the list here.
      *
-     * @return list<array{id:int,member_number:string,first_name:string,last_name:string,display_name:string,eligible:bool}>
+     * @return list<array{id:int,member_number:string,first_name:string,last_name:string,display_name:string,current_roles:list<string>,eligible:bool}>
      */
     public function listForOrgSelect(): array
     {
         $rows = $this->db->fetchAll(
-            "SELECT m.id, m.member_number, m.status, m.admitted_at, m.created_at,
+            "SELECT m.id, m.member_number, m.status,
                     COALESCE((
                         SELECT v.value FROM member_field_values v
                         INNER JOIN member_field_definitions d ON d.id = v.field_definition_id AND d.`key` = 'last_name'
@@ -2643,24 +2643,27 @@ final class MemberService
              ORDER BY (m.status = 'active') DESC, last_name ASC, first_name ASC, m.id ASC
              LIMIT 2000"
         );
+        $rolesByMember = $this->orgRolesByMember();
         foreach ($rows as &$row) {
             $name = trim((string) (($row['last_name'] ?? '') . ' ' . ($row['first_name'] ?? '')));
             $num = trim((string) ($row['member_number'] ?? ''));
             $base = $name !== ''
                 ? $name
                 : ($num !== '' ? $num : '#' . (string) ($row['id'] ?? ''));
-            $sinceRaw = trim((string) ($row['admitted_at'] ?? ''));
-            if ($sinceRaw === '') {
-                $sinceRaw = (string) ($row['created_at'] ?? '');
-            }
-            $since = $this->membershipSinceLabel($sinceRaw);
-            if ($since === '') {
-                $since = $this->membershipSinceLabel((string) ($row['created_at'] ?? ''));
-            }
+            $roles = $rolesByMember[(int) ($row['id'] ?? 0)] ?? [];
+            $position = $roles !== [] ? implode(', ', $roles) : '';
             $isActive = (string) ($row['status'] ?? '') === 'active';
-            $suffix = $isActive ? '' : ' — ' . __('org.option_inactive');
-            $row['display_name'] = $base . ($since !== '' ? ' (' . $since . ')' : '') . $suffix;
-            $row['member_since'] = $since;
+            // “Mario Rossi — Presidente (legale rappresentante) — non attivo”: the role label can
+            // already contain parentheses, so the em dash keeps the option readable.
+            $parts = [$base];
+            if ($position !== '') {
+                $parts[] = $position;
+            }
+            if (!$isActive) {
+                $parts[] = (string) __('org.option_inactive');
+            }
+            $row['display_name'] = implode(' — ', $parts);
+            $row['current_roles'] = $roles;
             $row['eligible'] = $isActive;
         }
         unset($row);
@@ -2668,37 +2671,35 @@ final class MemberService
     }
 
     /**
-     * Compact "member since" label used in the org-chart member picker.
+     * Active positions held by each member in the org chart, ordered by role hierarchy so the
+     * picker can show “Presidente” before “Consigliere”.
+     *
+     * @return array<int,list<string>>
      */
-    private function membershipSinceLabel(string $admittedAt): string
+    private function orgRolesByMember(): array
     {
-        $raw = trim($admittedAt);
-        if ($raw === '' || preg_match('/^\d{4}-\d{2}-\d{2}/', $raw) !== 1) {
-            return '';
+        $rows = $this->db->fetchAll(
+            "SELECT p.member_id, r.label_key, r.custom_label
+             FROM association_people p
+             INNER JOIN association_roles r ON r.`key` = p.role_key
+             WHERE p.is_active = 1 AND p.member_id IS NOT NULL AND p.member_id > 0
+             ORDER BY r.hierarchy_level ASC, r.sort_order ASC, p.id ASC"
+        );
+        $out = [];
+        foreach ($rows as $row) {
+            $memberId = (int) ($row['member_id'] ?? 0);
+            if ($memberId < 1) {
+                continue;
+            }
+            $custom = trim((string) ($row['custom_label'] ?? ''));
+            $labelKey = trim((string) ($row['label_key'] ?? ''));
+            $label = $custom !== '' ? $custom : ($labelKey !== '' ? (string) __($labelKey) : '');
+            if ($label === '' || in_array($label, $out[$memberId] ?? [], true)) {
+                continue;
+            }
+            $out[$memberId][] = $label;
         }
-        try {
-            $start = new \DateTimeImmutable(substr($raw, 0, 10));
-        } catch (\Throwable) {
-            return '';
-        }
-        $today = new \DateTimeImmutable('today');
-        if ($start > $today) {
-            return '';
-        }
-        $diff = $start->diff($today);
-        $months = ((int) $diff->y * 12) + (int) $diff->m;
-        if ($months < 1) {
-            return (string) __('org.member_since_new');
-        }
-        if ($months < 12) {
-            return $months === 1
-                ? (string) __('org.member_since_one_month')
-                : (string) __('org.member_since_months', ['count' => (string) $months]);
-        }
-        $years = intdiv($months, 12);
-        return $years === 1
-            ? (string) __('org.member_since_one_year')
-            : (string) __('org.member_since_years', ['count' => (string) $years]);
+        return $out;
     }
 
     /**

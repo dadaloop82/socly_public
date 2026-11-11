@@ -45,6 +45,9 @@ every 100 patches bump the series, and each bump is published to this repository
 - Saving an org-chart appointment no longer hangs for minutes (the background geocoding used to keep
   the PHP session locked, so the next click waited for it): the deferred pass now releases the session
   first, and the save button shows “Saving…” while it ignores double clicks.
+- Org chart: the member picker now shows the position a member already holds (e.g. “Mario Rossi —
+  Presidente”) instead of the “member since …” note, so you never assign the same person twice by
+  mistake.
 
 ## [1.5.41] - 2026-11-10
 
