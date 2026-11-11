@@ -3,12 +3,14 @@
 declare(strict_types=1);
 
 /**
- * Warm the coordinates cache used by the statistics map.
+ * Optional bulk warm-up of the coordinates cache used by the statistics map.
  *
  * Usage:
  *   php bin/geo-warm.php              # geocode every place of birth / residence
  *   php bin/geo-warm.php --force      # ignore already cached entries
  *
+ * Not required for normal use: new or changed places are geocoded automatically after member
+ * saves and statistics visits (see GeoService::deferWarm() / deferPendingWarm()).
  * Places are geocoded once (Photon, Nominatim fallback) and stored in
  * storage/cache/geo_city_coords.json, so the map renders instantly and works offline afterwards.
  */
@@ -44,9 +46,7 @@ foreach ($rows as $row) {
     if ($place === '') {
         continue;
     }
-    $place = (string) preg_replace('/\s*\([^)]*\)\s*/u', ' ', $place);
-    $place = (string) preg_replace('/\s+/u', ' ', $place);
-    $place = trim($place);
+    $place = \Socly\Services\GeoService::cleanPlaceName($place);
     if ($place === '' || \Socly\Services\StatisticsService::isForeignPlace($place)) {
         continue;
     }
@@ -67,11 +67,11 @@ $ok = 0;
 $missing = 0;
 foreach ($places as $index => $place) {
     $key = mb_strtolower($place);
-    if (!$force && array_key_exists($key, $cache) && is_array($cache[$key])) {
+    if (!$force && isset($cache[$key]['lat'], $cache[$key]['lon'])) {
         $ok++;
         continue;
     }
-    $coords = $geo->cityCoordinates($place);
+    $coords = $geo->cityCoordinates($place, $force);
     if ($coords === null) {
         $missing++;
         printf("  [%d/%d] %s → non trovato\n", $index + 1, count($places), $place);

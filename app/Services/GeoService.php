@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Socly\Services;
 
+use Socly\Core\Database;
 use Socly\Support\FiscalCode;
 use Socly\Support\ItalianProvinces;
 
@@ -14,6 +15,23 @@ final class GeoService
 
     /** @var array<string, string|null> Short-lived HTTP response cache (same PHP request / worker). */
     private static array $httpCache = [];
+
+    /** @var list<callable> Geolocation jobs queued to run after the response has been flushed. */
+    private static array $deferredTasks = [];
+
+    private static bool $deferredRegistered = false;
+
+    /** Three failed lookups in a row mean the geocoder is unreachable for this request. */
+    private static bool $providerDown = false;
+
+    private static int $nullStreak = 0;
+
+    /** A failed lookup is retried after a week, so a geocoder outage heals itself. */
+    private const MISS_RETRY_SECONDS = 604800;
+
+    public function __construct(private readonly ?Database $db = null)
+    {
+    }
 
     /** @return list<array{label:string,city:string,belfiore:string,provincia:string,cap:string}> */
     public function searchComuni(string $query, int $limit = 12): array
@@ -135,15 +153,13 @@ final class GeoService
      * provider is unreachable the lookups stop for the rest of the request instead of timing out
      * once per city.
      *
+     * @param bool $refreshMiss Retry a city that is cached as “not found” (stale misses).
      * @return array{lat:float,lon:float}|null
      */
-    public function cityCoordinates(string $city): ?array
+    public function cityCoordinates(string $city, bool $refreshMiss = false): ?array
     {
-        static $providerDown = false;
-        static $nullStreak = 0;
-
         $city = trim($city);
-        if ($city === '' || $providerDown) {
+        if ($city === '' || self::$providerDown) {
             return null;
         }
         $key = mb_strtolower($city);
@@ -151,22 +167,25 @@ final class GeoService
         $cache = $this->coordinatesCache($cachePath);
         if (array_key_exists($key, $cache)) {
             $row = $cache[$key];
-            return is_array($row) && isset($row['lat'], $row['lon'])
-                ? ['lat' => (float) $row['lat'], 'lon' => (float) $row['lon']]
-                : null;
+            if (is_array($row) && isset($row['lat'], $row['lon'])) {
+                return ['lat' => (float) $row['lat'], 'lon' => (float) $row['lon']];
+            }
+            if (!$refreshMiss) {
+                return null;
+            }
         }
 
         $coords = $this->geocodeCity($city);
         // Three misses in a row mean the provider is unreachable: stop trying in this request.
         if ($coords === null) {
-            $nullStreak++;
-            if ($nullStreak >= 3) {
-                $providerDown = true;
+            self::$nullStreak++;
+            if (self::$nullStreak >= 3) {
+                self::$providerDown = true;
             }
         } else {
-            $nullStreak = 0;
+            self::$nullStreak = 0;
         }
-        $cache[$key] = $coords;
+        $cache[$key] = $coords ?? ['failed_at' => time()];
         if ($cachePath !== '') {
             $dir = dirname($cachePath);
             if (!is_dir($dir)) {
@@ -194,6 +213,171 @@ final class GeoService
             $cache = $this->coordinatesCache($path);
         }
         return array_key_exists(mb_strtolower($city), $cache);
+    }
+
+    /**
+     * Queue places for geocoding once the response has been sent: the statistics map completes
+     * itself as members are created or updated, without any CLI command.
+     *
+     * @param array<int,string|null> $places
+     */
+    public static function deferWarm(array $places): void
+    {
+        $clean = [];
+        foreach ($places as $place) {
+            $name = self::cleanPlaceName((string) $place);
+            if ($name === '' || StatisticsService::isForeignPlace($name)) {
+                continue;
+            }
+            $clean[mb_strtolower($name)] = $name;
+        }
+        if ($clean === []) {
+            return;
+        }
+        self::defer(static function () use ($clean): void {
+            $geo = app(GeoService::class);
+            foreach ($clean as $place) {
+                $geo->cityCoordinates($place);
+            }
+        });
+    }
+
+    /**
+     * Queue a background pass over the member places still missing from the coordinates cache,
+     * so an existing archive fills the map visit after visit.
+     */
+    public static function deferPendingWarm(int $limit = 25): void
+    {
+        self::defer(static function () use ($limit): void {
+            app(GeoService::class)->warmPending($limit);
+        });
+    }
+
+    /**
+     * Geocode member places that have no cache entry yet (city, else place of birth) and retry
+     * lookups that failed long ago, so the map heals itself after a geocoder outage.
+     *
+     * @return int Number of lookups performed.
+     */
+    public function warmPending(int $limit = 25): int
+    {
+        if ($limit < 1 || $this->db === null || !$this->acquireWarmLock()) {
+            return 0;
+        }
+        try {
+            $rows = $this->db->fetchAll(
+                "SELECT v.value AS place
+                 FROM member_field_values v
+                 INNER JOIN member_field_definitions d ON d.id = v.field_definition_id
+                 WHERE d.`key` IN ('birth_place', 'city') AND v.value IS NOT NULL AND v.value <> ''"
+            );
+        } catch (\Throwable) {
+            return 0;
+        }
+        $places = [];
+        foreach ($rows as $row) {
+            $place = self::cleanPlaceName((string) ($row['place'] ?? ''));
+            if ($place === '' || StatisticsService::isForeignPlace($place)) {
+                continue;
+            }
+            $places[mb_strtolower($place)] = $place;
+        }
+        if ($places === []) {
+            return 0;
+        }
+
+        $cachePath = function_exists('storage_path') ? storage_path('cache/geo_city_coords.json') : '';
+        $cache = $this->coordinatesCache($cachePath);
+        $retryBefore = time() - self::MISS_RETRY_SECONDS;
+        $queue = [];
+        foreach ($places as $key => $place) {
+            if (!array_key_exists($key, $cache)) {
+                $queue[] = $place;
+                continue;
+            }
+            $entry = $cache[$key];
+            $failedAt = is_array($entry) && !isset($entry['lat']) ? (int) ($entry['failed_at'] ?? 0) : 0;
+            if (is_array($entry) && isset($entry['lat'])) {
+                continue;
+            }
+            // Legacy misses (stored as null) and old failures are worth another try.
+            if ($failedAt === 0 || $failedAt < $retryBefore) {
+                $queue[] = $place;
+            }
+        }
+
+        $lookups = 0;
+        foreach ($queue as $place) {
+            if ($lookups >= $limit) {
+                break;
+            }
+            $coords = $this->cityCoordinates($place, true);
+            $lookups++;
+            if ($coords === null && self::$providerDown) {
+                // The geocoder is unreachable: the remaining places stay queued for the next pass.
+                break;
+            }
+        }
+        return $lookups;
+    }
+
+    /**
+     * Strip province suffixes/parentheses so “Bolzano (BZ)” geocodes as “Bolzano”.
+     */
+    public static function cleanPlaceName(string $place): string
+    {
+        $place = trim($place);
+        if ($place === '') {
+            return '';
+        }
+        $place = (string) preg_replace('/\s*\([^)]*\)\s*/u', ' ', $place);
+        $place = (string) preg_replace('/\s+/u', ' ', $place);
+        return trim($place);
+    }
+
+    /** Run a job after the response has been flushed, so nobody waits for the geocoder. */
+    private static function defer(callable $task): void
+    {
+        self::$deferredTasks[] = $task;
+        if (self::$deferredRegistered) {
+            return;
+        }
+        self::$deferredRegistered = true;
+        register_shutdown_function(static function (): void {
+            if (function_exists('fastcgi_finish_request')) {
+                fastcgi_finish_request();
+            } elseif (function_exists('litespeed_finish_request')) {
+                litespeed_finish_request();
+            }
+            foreach (self::$deferredTasks as $job) {
+                try {
+                    $job();
+                } catch (\Throwable) {
+                    // Geolocation is best effort: never break the request shutdown.
+                }
+            }
+        });
+    }
+
+    /** Cheap throttle so concurrent visits cannot hammer the public geocoder. */
+    private function acquireWarmLock(int $seconds = 30): bool
+    {
+        if (!function_exists('storage_path')) {
+            return true;
+        }
+        $dir = storage_path('cache');
+        if (!is_dir($dir)) {
+            mkdir($dir, 0775, true);
+        }
+        if (!is_dir($dir) || !is_writable($dir)) {
+            return true;
+        }
+        $lock = $dir . '/geo_warm.lock';
+        if (is_file($lock) && (time() - (int) filemtime($lock)) < $seconds) {
+            return false;
+        }
+        touch($lock);
+        return true;
     }
 
     /** @return array{lat:float,lon:float}|null */

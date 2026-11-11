@@ -8,6 +8,7 @@ use Socly\Core\Http\Request;
 use Socly\Core\View;
 use Socly\Services\ComponentService;
 use Socly\Services\CurrencyService;
+use Socly\Services\GeoService;
 use Socly\Services\StatisticsService;
 use Socly\Services\WidgetLayoutService;
 use Socly\Support\Permission;
@@ -39,6 +40,9 @@ final class StatisticsController extends BaseController
         $cards = $this->statistics->cards();
         $finances = $this->statistics->finances();
         $cityMap = $this->statistics->cityMap();
+        // Finish the map in the background: remaining places are geocoded after the response,
+        // so the page never waits for the geocoder and nobody has to run a CLI command.
+        GeoService::deferPendingWarm(25);
         $userId = (int) (auth_user()['id'] ?? 0);
         $chartLayouts = [
             'statistics.demographics' => $this->widgetLayouts->forUser($userId, 'statistics.demographics'),

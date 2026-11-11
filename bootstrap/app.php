@@ -357,7 +357,7 @@ $app->bind(UpdateService::class, fn (App $a) => new UpdateService(
 
 $app->bind(BrandingService::class, fn (App $a) => new BrandingService($a->get(SettingsService::class)));
 $app->bind(BrandingController::class, fn (App $a) => new BrandingController($a->get(View::class), $a->get(BrandingService::class)));
-$app->bind(GeoService::class, fn () => new GeoService());
+$app->bind(GeoService::class, fn (App $a) => new GeoService($a->get(Database::class)));
 $app->bind(GitHubIssueService::class, fn (App $a) => new GitHubIssueService($a->get(RateLimiter::class)));
 $app->bind(ApiController::class, fn (App $a) => new ApiController(
     $a->get(View::class),

@@ -2240,6 +2240,13 @@ final class MemberService
                 ]);
             }
         }
+
+        // Keep the statistics map complete without a CLI command: new or changed places are
+        // geocoded right after the response has been flushed.
+        GeoService::deferWarm([
+            (string) ($fieldData['city'] ?? ''),
+            (string) ($fieldData['birth_place'] ?? ''),
+        ]);
     }
 
     /** @param array{name:string,type:string,tmp_name:string,error:int,size:int} $file */
@@ -2611,8 +2618,9 @@ final class MemberService
     }
 
     /**
-     * Members for org-chart assignment: everyone (eligible ones first) with a status suffix, so a
-     * suspended member or an unpaid fee is visible instead of silently missing from the list.
+     * Members for org-chart assignment: everyone, active members first, with a status suffix so a
+     * suspended member is visible instead of silently missing from the list.
+     * Outstanding fees are a treasury matter and never filter or flag the list here.
      * The label shows how long the person has been a member instead of the registry number.
      *
      * @return list<array{id:int,member_number:string,first_name:string,last_name:string,display_name:string,eligible:bool}>
@@ -2620,7 +2628,7 @@ final class MemberService
     public function listForOrgSelect(): array
     {
         $rows = $this->db->fetchAll(
-            "SELECT m.id, m.member_number, m.status, m.balance_due, m.admitted_at, m.created_at,
+            "SELECT m.id, m.member_number, m.status, m.admitted_at, m.created_at,
                     COALESCE((
                         SELECT v.value FROM member_field_values v
                         INNER JOIN member_field_definitions d ON d.id = v.field_definition_id AND d.`key` = 'last_name'
@@ -2632,7 +2640,7 @@ final class MemberService
                         WHERE v.member_id = m.id LIMIT 1
                     ), '') AS first_name
              FROM members m
-             ORDER BY (m.status = 'active' AND m.balance_due <= 0) DESC, last_name ASC, first_name ASC, m.id ASC
+             ORDER BY (m.status = 'active') DESC, last_name ASC, first_name ASC, m.id ASC
              LIMIT 2000"
         );
         foreach ($rows as &$row) {
@@ -2649,15 +2657,11 @@ final class MemberService
             if ($since === '') {
                 $since = $this->membershipSinceLabel((string) ($row['created_at'] ?? ''));
             }
-            $suffix = '';
-            if ((string) ($row['status'] ?? '') !== 'active') {
-                $suffix = ' — ' . __('org.option_inactive');
-            } elseif ((float) ($row['balance_due'] ?? 0) > 0) {
-                $suffix = ' — ' . __('org.option_fee_due');
-            }
+            $isActive = (string) ($row['status'] ?? '') === 'active';
+            $suffix = $isActive ? '' : ' — ' . __('org.option_inactive');
             $row['display_name'] = $base . ($since !== '' ? ' (' . $since . ')' : '') . $suffix;
             $row['member_since'] = $since;
-            $row['eligible'] = $suffix === '';
+            $row['eligible'] = $isActive;
         }
         unset($row);
         return $rows;
@@ -2777,6 +2781,9 @@ final class MemberService
     }
 
     /**
+     * Org-chart eligibility: only the membership status matters. An open balance is a treasury
+     * matter and must never block appointing someone to an association body.
+     *
      * @return array{ok:bool,message?:string}
      */
     public function orgEligibility(int $memberId): array
@@ -2785,7 +2792,7 @@ final class MemberService
             return ['ok' => false, 'message' => __('org.member_required')];
         }
         $member = $this->db->fetch(
-            'SELECT id, status, balance_due FROM members WHERE id = :id LIMIT 1',
+            'SELECT id, status FROM members WHERE id = :id LIMIT 1',
             ['id' => $memberId]
         );
         if (!$member) {
@@ -2793,9 +2800,6 @@ final class MemberService
         }
         if ((string) ($member['status'] ?? '') !== 'active') {
             return ['ok' => false, 'message' => __('org.member_not_active')];
-        }
-        if ((float) ($member['balance_due'] ?? 0) > 0) {
-            return ['ok' => false, 'message' => __('org.member_fee_due')];
         }
         return ['ok' => true];
     }

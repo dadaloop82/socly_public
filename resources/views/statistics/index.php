@@ -182,11 +182,7 @@ $chartCard = static function (string $id, string $titleKey, string $ledeKey, boo
                     ])) ?></p>
                 </div>
             </div>
-            <?php if ((int) ($cityMap['pending'] ?? 0) > 0): ?>
-                <p class="statistics-map-pending">
-                    <?= e(__('statistics.map_pending', ['count' => (string) (int) $cityMap['pending']])) ?>
-                </p>
-            <?php elseif ((int) ($cityMap['unresolved'] ?? 0) > 0): ?>
+            <?php if ((int) ($cityMap['unresolved'] ?? 0) > 0): ?>
                 <p class="statistics-map-pending">
                     <?= e(__('statistics.map_unresolved', ['count' => (string) (int) $cityMap['unresolved']])) ?>
                 </p>

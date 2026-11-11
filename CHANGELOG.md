@@ -18,6 +18,11 @@ every 100 patches bump the series, and each bump is published to this repository
 
 - The chart grid now packs cards densely, so a resized card sits next to its neighbours instead of
   leaving an empty column.
+- The statistics map completes itself: new or changed places are geocoded automatically after a
+  member save and during statistics visits, so the “run `php bin/geo-warm.php`” notice is gone
+  (the command stays available as an optional bulk warm-up).
+- Appointing someone to an association body no longer requires a settled membership fee: open
+  balances are a treasury matter and are ignored in the org chart, both in the picker and on save.
 
 ## [1.5.41] - 2026-11-10
 
