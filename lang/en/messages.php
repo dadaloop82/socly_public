@@ -3255,6 +3255,8 @@ return [
         'unknown_user' => 'Unknown user',
         'connected_toast' => ':name just connected to Socly',
         'editing_field' => ':name is working in this field',
+        'field_locked' => ':name is editing this field: please wait until they are done.',
+        'field_value' => ':name is typing: “:value”',
         'idle' => 'Idle',
     ],
     'concurrency' => [

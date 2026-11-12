@@ -10,6 +10,11 @@ every 100 patches bump the series, and each bump is published to this repository
 
 ### Added
 
+- The field held by another operator is now **locked** for you (read-only for text fields, blocked for
+  selects and checkboxes, in the person's colour) until they leave it, and their **draft value** is
+  shown live under the field, so you see the change as they type it. 45 seconds of silence (closed
+  tab, crash) release the field; the server keeps refusing stale saves, so the lock is a courtesy,
+  not the safety net.
 - The “Documento” box of a movement is now behind a flag (“This movement has a document”): hidden by
   default, it opens when the operator asks for it and starts open when the record already has a
   document (type, number, date, subject, attachment, invoice payment). Turning the flag off clears

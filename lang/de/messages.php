@@ -3255,6 +3255,8 @@ return [
         'unknown_user' => 'Unbekannter Benutzer',
         'connected_toast' => ':name ist gerade Socly beigetreten',
         'editing_field' => ':name arbeitet in diesem Feld',
+        'field_locked' => ':name bearbeitet gerade dieses Feld: bitte warten, bis es fertig ist.',
+        'field_value' => ':name schreibt: «:value»',
         'idle' => 'Inaktiv',
     ],
     'concurrency' => [

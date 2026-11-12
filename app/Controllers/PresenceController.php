@@ -25,13 +25,16 @@ final class PresenceController extends BaseController
         $parts = $entity !== '' ? explode(':', $entity, 2) : [];
         $editingEntity = (string) ($parts[0] ?? '');
         $editingId = (int) ($parts[1] ?? 0);
-        // Field the operator is working in (field-level presence): a plain name, validated server-side.
+        // Field the operator is working in and the draft value (field-level presence): plain field
+        // name + short text, both validated server-side.
         $editingField = (string) $request->input('field', '');
+        $editingValue = (string) $request->input('value', '');
         try {
             $this->presence->touch(
                 $editingEntity !== '' ? $editingEntity : null,
                 $editingId > 0 ? $editingId : null,
-                $editingField
+                $editingField,
+                $editingValue
             );
         } catch (\Throwable) {
             // presence must never break the UI
@@ -58,6 +61,8 @@ final class PresenceController extends BaseController
                 'unknown' => (string) __('presence.unknown_user'),
                 'editing' => (string) __('concurrency.editing_now', ['name' => ':name']),
                 'editing_field' => (string) __('presence.editing_field', ['name' => ':name']),
+                'field_locked' => (string) __('presence.field_locked', ['name' => ':name']),
+                'field_value' => (string) __('presence.field_value', ['name' => ':name', 'value' => ':value']),
             ],
         ], JSON_UNESCAPED_UNICODE);
     }

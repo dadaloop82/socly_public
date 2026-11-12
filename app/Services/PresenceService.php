@@ -18,6 +18,12 @@ final class PresenceService
     public const IDLE_SECONDS = 300;
 
     /**
+     * A field held by another operator is released much sooner than the operator dot: a closed tab
+     * (or a crash) must not keep a field locked for minutes.
+     */
+    public const FIELD_TTL_SECONDS = 45;
+
+    /**
      * Session considered closed after this silence (aligned to SessionIdleMiddleware).
      */
     public const ONLINE_WINDOW = 900;
@@ -29,10 +35,10 @@ final class PresenceService
     /**
      * Record/refresh the current session (called by polling).
      *
-     * `$editingField` is the form field the operator is working in: it lets everyone else outline
-     * that field with the operator's colour (field-level presence), not just the whole record.
+     * `$editingField` is the form field the operator is working in and `$editingValue` the draft they
+     * are typing: together they let everyone else outline and lock that field and see the changes live.
      */
-    public function touch(?string $editingEntity = null, ?int $editingId = null, string $editingField = ''): void
+    public function touch(?string $editingEntity = null, ?int $editingId = null, string $editingField = '', string $editingValue = ''): void
     {
         $userId = (int) (auth_user()['id'] ?? 0);
         $sessionId = session_id();
@@ -42,18 +48,20 @@ final class PresenceService
         $entity = $editingEntity !== null && VersionService::tableFor($editingEntity) !== null ? $editingEntity : null;
         $hasRecord = $entity !== null && $editingId !== null && $editingId > 0;
         $field = $hasRecord ? self::normalizeFieldName($editingField) : '';
+        $value = $field !== '' ? self::normalizeFieldValue($editingValue) : '';
         $this->db->query(
-            'INSERT INTO user_presence (session_id, user_id, connected_at, last_seen, ended_at, editing_entity, editing_id, editing_field)
-             VALUES (:sid, :uid, NOW(), NOW(), NULL, :entity, :eid, :field)
+            'INSERT INTO user_presence (session_id, user_id, connected_at, last_seen, ended_at, editing_entity, editing_id, editing_field, editing_value)
+             VALUES (:sid, :uid, NOW(), NOW(), NULL, :entity, :eid, :field, :value)
              ON DUPLICATE KEY UPDATE user_id = VALUES(user_id), last_seen = NOW(), ended_at = NULL,
                  editing_entity = VALUES(editing_entity), editing_id = VALUES(editing_id),
-                 editing_field = VALUES(editing_field)',
+                 editing_field = VALUES(editing_field), editing_value = VALUES(editing_value)',
             [
                 'sid' => $sessionId,
                 'uid' => $userId,
                 'entity' => $entity,
                 'eid' => $hasRecord ? $editingId : null,
                 'field' => $field !== '' ? $field : null,
+                'value' => $value !== '' ? $value : null,
             ]
         );
         // Housekeeping: drop rows older than a day.
@@ -69,6 +77,23 @@ final class PresenceService
         }
 
         return $field;
+    }
+
+    /**
+     * Draft preview of the value being typed: short, single-spaced, no control characters. It is
+     * rendered as text by the client, so it is never interpreted as markup.
+     */
+    public static function normalizeFieldValue(string $value): string
+    {
+        $value = str_replace(["\r\n", "\r"], "\n", $value);
+        $value = preg_replace('/[\x00-\x09\x0B\x0C\x0E-\x1F\x7F]/u', '', $value) ?? $value;
+        $value = preg_replace('/[ \t]+/u', ' ', $value) ?? $value;
+        $value = trim($value);
+        if ($value === '') {
+            return '';
+        }
+
+        return mb_substr($value, 0, 300);
     }
 
     /** Closes the current presence (logout). */
@@ -93,7 +118,7 @@ final class PresenceService
     {
         $window = self::ONLINE_WINDOW;
         $rows = $this->db->fetchAll(
-            "SELECT p.session_id, p.user_id, p.connected_at, p.last_seen, p.editing_entity, p.editing_id, p.editing_field,
+            "SELECT p.session_id, p.user_id, p.connected_at, p.last_seen, p.editing_entity, p.editing_id, p.editing_field, p.editing_value,
                     u.email, u.first_name, u.last_name, u.name, u.member_id,
                     (SELECT v.value FROM member_field_values v
                      INNER JOIN member_field_definitions d ON d.id = v.field_definition_id AND d.`key` = 'first_name'
@@ -132,8 +157,14 @@ final class PresenceService
                     'initials' => $identity['initials'],
                     'hue' => $this->hue($userId),
                     // Field the operator is working in ('' when the record is open but no field has
-                    // focus yet): the client outlines it with the same colour as the badge.
-                    'field' => self::normalizeFieldName((string) ($row['editing_field'] ?? '')),
+                    // focus yet) and the draft being typed: the client outlines and locks the field
+                    // and shows the live value. A stale heartbeat releases the field quickly.
+                    'field' => (int) ($row['idle_seconds'] ?? 0) <= self::FIELD_TTL_SECONDS
+                        ? self::normalizeFieldName((string) ($row['editing_field'] ?? ''))
+                        : '',
+                    'value' => (int) ($row['idle_seconds'] ?? 0) <= self::FIELD_TTL_SECONDS
+                        ? self::normalizeFieldValue((string) ($row['editing_value'] ?? ''))
+                        : '',
                 ];
             }
             if (isset($users[$userId])) {

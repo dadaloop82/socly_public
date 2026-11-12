@@ -3261,6 +3261,8 @@ return [
         'connected_toast' => ':name si è appena collegato a Socly',
         'idle' => 'Inattivo',
         'editing_field' => ':name sta lavorando in questo campo',
+        'field_locked' => ':name sta modificando questo campo: attendi che abbia finito.',
+        'field_value' => ':name sta scrivendo: «:value»',
     ],
     'concurrency' => [
         'conflict_title' => 'Modifiche in contemporanea',

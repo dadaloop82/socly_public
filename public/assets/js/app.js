@@ -1450,53 +1450,116 @@ function initPresence() {
   };
 
   // ── Field-level presence ────────────────────────────────────────────────────────────────
-  // The field being worked in travels with the heartbeat; the fields the other operators are in are
-  // outlined with the same colour as their badge and labelled with their name.
+  // The field being worked in (and the draft being typed) travels with the heartbeat: the other
+  // operators see that field outlined in the person's colour, locked — they cannot type in it until
+  // it is released — and with the live text underneath.
   let currentField = '';
+  let currentValue = '';
+  let lastSentValue = null;
   let fieldBlurTimer = null;
   let immediatePollTimer = null;
-  const scheduleImmediatePoll = () => {
+  let valuePollTimer = null;
+  const scheduleImmediatePoll = (delayMs = 300) => {
     window.clearTimeout(immediatePollTimer);
     immediatePollTimer = window.setTimeout(() => {
       void poll();
-    }, 300);
+    }, delayMs);
+  };
+  const scheduleValuePoll = () => {
+    window.clearTimeout(valuePollTimer);
+    valuePollTimer = window.setTimeout(() => {
+      void poll();
+    }, 900);
   };
   const fieldInputs = (name) => (editingForm
     ? Array.from(editingForm.querySelectorAll('[name]')).filter((el) => el.name === name)
     : []);
+  // Draft shown to the others: only text-like controls (never selects, checkboxes or files).
+  const editableValueOf = (el) => {
+    if (el instanceof HTMLTextAreaElement) return el.value;
+    if (el instanceof HTMLInputElement) {
+      const type = String(el.type || 'text').toLowerCase();
+      if (['password', 'file', 'checkbox', 'radio', 'hidden', 'button', 'submit'].includes(type)) return '';
+      return el.value;
+    }
+    return '';
+  };
+  const applyRemoteLock = (control, locked) => {
+    if (!(control instanceof Element)) return;
+    control.classList.toggle('is-remote-locked', locked);
+    if (locked) control.setAttribute('aria-disabled', 'true');
+    else control.removeAttribute('aria-disabled');
+    const textual = control instanceof HTMLTextAreaElement
+      || (control instanceof HTMLInputElement
+        && !['checkbox', 'radio', 'file', 'button', 'submit', 'hidden'].includes(String(control.type || '').toLowerCase()));
+    if (!textual) return; // select / checkbox: blocked by CSS + the keydown guard below
+    if (locked) {
+      if (control.dataset.remoteReadonly === undefined) {
+        control.dataset.remoteReadonly = control.readOnly ? '1' : '0';
+      }
+      control.readOnly = true;
+      return;
+    }
+    if (control.dataset.remoteReadonly !== undefined) {
+      control.readOnly = control.dataset.remoteReadonly === '1';
+      delete control.dataset.remoteReadonly;
+    }
+  };
+  const remoteControls = (wrap) => (wrap.matches('input, select, textarea')
+    ? [wrap]
+    : Array.from(wrap.querySelectorAll('input, select, textarea')));
   const clearRemoteField = (wrap) => {
+    remoteControls(wrap).forEach((control) => applyRemoteLock(control, false));
+    wrap.querySelectorAll('[data-remote-value]').forEach((note) => note.remove());
     wrap.classList.remove('is-remote-edit');
     wrap.removeAttribute('data-remote-field');
     wrap.removeAttribute('data-remote-editor');
     wrap.style.removeProperty('--remote-hue');
-    const tag = wrap.tagName;
-    if (tag !== 'INPUT' && tag !== 'SELECT' && tag !== 'TEXTAREA') {
-      wrap.removeAttribute('title');
-    }
+    if (!wrap.matches('input, select, textarea')) wrap.removeAttribute('title');
   };
   const paintRemoteFields = (data) => {
     if (!editingForm) return;
     const editors = Array.isArray(data.editors) ? data.editors : [];
-    const template = String(data.messages?.editing_field || ':name');
+    const templates = {
+      locked: String(data.messages?.field_locked || ':name'),
+      value: String(data.messages?.field_value || ':name: :value'),
+    };
     const wanted = new Map();
     editors.forEach((editor) => {
       const field = String(editor.field || '');
       if (field === '') return;
-      wanted.set(field, { hue: String(editor.hue ?? 210), name: String(editor.name || '') });
+      wanted.set(field, {
+        hue: String(editor.hue ?? 210),
+        name: String(editor.name || ''),
+        value: String(editor.value || ''),
+      });
     });
     editingForm.querySelectorAll('[data-remote-field]').forEach((wrap) => {
-      if (!wanted.has(String(wrap.getAttribute('data-remote-field')))) {
-        clearRemoteField(wrap);
-      }
+      if (!wanted.has(String(wrap.getAttribute('data-remote-field')))) clearRemoteField(wrap);
     });
     wanted.forEach((info, field) => {
       fieldInputs(field).forEach((input) => {
         const wrap = input.closest('.sf-field') || input;
+        const bare = wrap.matches('input, select, textarea');
         wrap.classList.add('is-remote-edit');
         wrap.setAttribute('data-remote-field', field);
         wrap.setAttribute('data-remote-editor', info.name);
         wrap.style.setProperty('--remote-hue', info.hue);
-        wrap.setAttribute('title', template.replace(':name', info.name));
+        if (!bare) wrap.setAttribute('title', templates.locked.replace(':name', info.name));
+        applyRemoteLock(input, true);
+        if (bare) return;
+        let note = wrap.querySelector('[data-remote-value]');
+        if (info.value === '') {
+          if (note) note.remove();
+          return;
+        }
+        if (!note) {
+          note = document.createElement('div');
+          note.className = 'field-remote-value';
+          note.setAttribute('data-remote-value', '1');
+          wrap.appendChild(note);
+        }
+        note.textContent = templates.value.replace(':name', info.name).replace(':value', info.value);
       });
     });
   };
@@ -1506,17 +1569,36 @@ function initPresence() {
       const name = target instanceof HTMLElement && target.name ? String(target.name) : '';
       if (name === currentField) return;
       currentField = name;
+      currentValue = target instanceof Element ? editableValueOf(target) : '';
       window.clearTimeout(fieldBlurTimer);
-      scheduleImmediatePoll();
+      scheduleImmediatePoll(300);
+    });
+    editingForm.addEventListener('input', (event) => {
+      const target = event.target;
+      if (!(target instanceof HTMLElement) || String(target.name || '') !== currentField) return;
+      currentValue = editableValueOf(target);
+      if (currentValue === lastSentValue) return;
+      scheduleValuePoll();
     });
     editingForm.addEventListener('focusout', () => {
       // Keep the last field for a moment: jumping between fields must not make the outline blink.
       window.clearTimeout(fieldBlurTimer);
+      window.clearTimeout(valuePollTimer);
       fieldBlurTimer = window.setTimeout(() => {
         currentField = '';
-        scheduleImmediatePoll();
+        currentValue = '';
+        scheduleImmediatePoll(300);
       }, 2500);
     });
+    // The lock is advisory (the server still refuses stale saves): block the keyboard on the controls
+    // that cannot be made read-only.
+    editingForm.addEventListener('keydown', (event) => {
+      const target = event.target;
+      if (!(target instanceof Element) || !target.classList.contains('is-remote-locked')) return;
+      const isSelect = target instanceof HTMLSelectElement;
+      const isChoice = target instanceof HTMLInputElement && (target.type === 'checkbox' || target.type === 'radio');
+      if (isSelect || isChoice) event.preventDefault();
+    }, true);
   }
 
   const toast = (name, template) => {
@@ -1570,7 +1652,12 @@ function initPresence() {
       const target = new URL(url, window.location.origin);
       if (since > 0) target.searchParams.set('since', String(since));
       if (editingChip !== '') target.searchParams.set('editing', editingChip);
-      if (editingChip !== '' && currentField !== '') target.searchParams.set('field', currentField);
+      if (editingChip !== '' && currentField !== '') {
+        target.searchParams.set('field', currentField);
+        // The draft value travels too: the others see it live and the field stays locked meanwhile.
+        target.searchParams.set('value', currentValue);
+        lastSentValue = currentValue;
+      }
       const res = await fetch(target.toString(), {
         headers: { Accept: 'application/json' },
         credentials: 'same-origin',
@@ -1598,6 +1685,7 @@ function initPresence() {
   const stop = () => {
     window.clearTimeout(immediatePollTimer);
     window.clearTimeout(fieldBlurTimer);
+    window.clearTimeout(valuePollTimer);
     if (!timer) return;
     window.clearInterval(timer);
     timer = null;
