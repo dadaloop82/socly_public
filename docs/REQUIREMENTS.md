@@ -22,8 +22,9 @@
 13. **Organization chart** — association bodies and appointments (members or external people) with role compatibility checks; outstanding membership fees never block an appointment.
 14. **Documents, deadlines, treasury** — modular components: document archive with categories,
     deadlines, cash book with approvals, wallet balances and budget imputation. A cost centre always
-    reads “section · line” (the year prefixes the ledger filter), the description (“causale”) is stored
-    capitalised and the document block of a movement sits behind a per-movement flag.
+    reads “section · line” and the ledger filter groups the lines by budget and section (like the
+    Model D line filter), the description (“causale”) is stored capitalised and the document block of a
+    movement sits behind a per-movement flag.
 15. **Forecast budget** — one document per fiscal year, inline grid with autosave, expense/income types, custom categories, comparison with the cash actuals and a printable rendiconto; the year-end RUNTS report and the budget statistics live in the same **Bilanci** page (Preventivo / Consuntivo / Statistiche tabs).
 16. **Concurrent editing & presence** — optimistic locking on every versioned record; the field another
     operator is working in is locked and their draft is shown live; a click on their presence badge

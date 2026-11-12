@@ -322,12 +322,11 @@ if ($filterYear !== '' && !isset($yearFilterOptions[$filterYear])) {
             'options' => [],
         ]) ?>
         <?php
-        $budgetFilterOptions = is_array($budget_filter_options ?? null) ? $budget_filter_options : [];
-        $budgetFilterFlat = [];
-        foreach ($budgetFilterOptions as $option) {
-            $budgetFilterFlat[(string) $option['value']] = (string) $option['label'];
-        }
-        $budgetFilterFlat['__none__'] = (string) __('treasury.filter_none');
+        // Cost centre: grouped like the “Voce del bilancio consuntivo (Modello D)” filter — one
+        // optgroup per budget and section, the lines inside.
+        $budgetFilterGroups = is_array($budget_filter_groups ?? null) ? $budget_filter_groups : [];
+        $budgetNoneGroup = [['label' => (string) __('treasury.filter_none_group'), 'options' => [['value' => '__none__', 'label' => (string) __('treasury.filter_none')]]]];
+        $budgetGroupsForFilter = array_merge([], $budgetFilterGroups, $budgetNoneGroup);
         ?>
         <?= field('select', [
             'name' => 'budget_item_id',
@@ -336,7 +335,8 @@ if ($filterYear !== '' && !isset($yearFilterOptions[$filterYear])) {
             'value' => (string) ($filters['budget_item_id'] ?? ''),
             'context' => 'filter',
             'empty_label' => (string) __('treasury.filter_all'),
-            'options' => $budgetFilterFlat,
+            'groups' => $budgetGroupsForFilter,
+            'options' => [],
         ]) ?>
         <?= field('select', [
             'name' => 'account',

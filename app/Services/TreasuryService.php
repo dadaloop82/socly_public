@@ -1241,15 +1241,16 @@ final class TreasuryService
     }
 
     /**
-     * Budget lines for the ledger filter: “2026 · Personnel · Salaries”. The section always comes
-     * before the line: two sections can repeat the same wording, so a bare line would be ambiguous
-     * (same rule as the cost-centre select of the movement form).
+     * Cost-centre filter, grouped exactly like the “Voce del bilancio consuntivo (Modello D)” select:
+     * one optgroup per budget and section (“2026 · Personnel”) with the lines inside. The section is
+     * read before the line and the collapsed control shows the line alone — the group carries the
+     * context — so two sections repeating a wording stay distinguishable without a long label.
      *
-     * @return list<array{value:string,label:string}>
+     * @return list<array{label:string,options:list<array{value:string,label:string}>}>
      */
-    public function budgetItemFilterOptions(): array
+    public function budgetItemFilterGroups(): array
     {
-        $options = [];
+        $groups = [];
         foreach ($this->db->fetchAll(
             "SELECT i.id, b.fiscal_year, i.label, s.title AS section_title
              FROM budget_items i
@@ -1258,17 +1259,23 @@ final class TreasuryService
              ORDER BY b.fiscal_year DESC, s.sort_order ASC, i.sort_order ASC, i.id ASC"
         ) as $row) {
             $item = mb_substr(trim((string) $row['label']), 0, 90);
-            $parts = array_filter(
-                [(string) $row['fiscal_year'], trim((string) ($row['section_title'] ?? '')), $item],
+            if ($item === '') {
+                continue;
+            }
+            $groupLabel = implode(' · ', array_filter(
+                [(string) $row['fiscal_year'], trim((string) ($row['section_title'] ?? ''))],
                 static fn (string $part): bool => $part !== ''
-            );
-            $options[] = [
+            ));
+            if (!isset($groups[$groupLabel])) {
+                $groups[$groupLabel] = ['label' => $groupLabel, 'options' => []];
+            }
+            $groups[$groupLabel]['options'][] = [
                 'value' => (string) (int) $row['id'],
-                'label' => implode(' · ', $parts),
+                'label' => $item,
             ];
         }
 
-        return $options;
+        return array_values($groups);
     }
 
     /**

@@ -18,8 +18,9 @@ every 100 patches bump the series, and each bump is published to this repository
 - The badge of another operator now opens **exactly the record they are working in**: the link is
   built server-side (same component flag and permission as the page, so no link when you could not
   open it anyway), travels with the heartbeat and a click (or Enter) jumps there.
-- The ledger filter and every summary now read “year · **section** · line” for the cost centre, like
-  the select of the movement form: two sections repeating the same wording can no longer be confused.
+- The ledger cost-centre filter now groups the lines by budget and section (“2026 · Personnel”) exactly
+  like the “Voce del bilancio consuntivo (Modello D)” filter, so two sections repeating a wording can no
+  longer be confused; the summaries keep reading “year · section · line”.
 - The free-text description (“causale”) of a movement is stored **capitalised** — first letter upper
   case, the rest lower case — whatever the operator typed, so the ledger, the CSV export and the
   reports read consistently.
@@ -127,6 +128,10 @@ every 100 patches bump the series, and each bump is published to this repository
 
 ### Fixed
 
+- Dashboard charts were broken by the cards card: its legend options read an undefined variable and the
+  exception aborted the whole chart init (every later chart stayed empty, then a second pass threw
+  “Canvas is already in use”). The options now come from the dataset and a re-init destroys the chart a
+  canvas still owns before mounting a new one.
 - The “Documento” box of a movement is really hidden when the flag is off: the block is a grid and the
   component rule was winning over the `hidden` attribute, so the fields stayed on screen (and were
   only disabled) after unticking “This movement has a document”.

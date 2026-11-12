@@ -13094,8 +13094,8 @@ function initTreasuryCategory(root = document) {
     initLiveFilterForm(filterForm);
   }
 
-  // The cost-centre filter reads “year · section · line”, wider than the control itself: the full
-  // text stays reachable as a tooltip, like the select of the movement form.
+  // The cost-centre filter lists one optgroup per budget/section; a line can still be wider than the
+  // control, so the full selected text stays reachable as a tooltip (like the movement form select).
   const budgetFilter = document.getElementById('treasury-budget-filter');
   if (budgetFilter instanceof HTMLSelectElement) {
     const syncBudgetFilterTitle = () => {
@@ -14509,6 +14509,13 @@ function initDashboardCharts() {
     return;
   }
 
+  // A previous pass may have stopped halfway (an error): never mount a second chart on a canvas that
+  // still owns one, or Chart.js throws “Canvas is already in use”.
+  root.querySelectorAll('canvas').forEach((canvas) => {
+    const mounted = Chart.getChart(canvas);
+    if (mounted) mounted.destroy();
+  });
+
   let data;
   let i18n;
   try {
@@ -14732,7 +14739,7 @@ function initDashboardCharts() {
           hoverOffset: 6,
         }],
       },
-      options: donutOptions(values.length),
+      options: donutOptions((data.cards_distribution?.values || []).length),
     });
   }
 
@@ -15131,6 +15138,13 @@ function initTreasuryCharts() {
     });
     return;
   }
+
+  // A previous pass may have stopped halfway (an error): never mount a second chart on a canvas that
+  // still owns one, or Chart.js throws “Canvas is already in use”.
+  root.querySelectorAll('canvas').forEach((canvas) => {
+    const mounted = Chart.getChart(canvas);
+    if (mounted) mounted.destroy();
+  });
 
   let data;
   let i18n;

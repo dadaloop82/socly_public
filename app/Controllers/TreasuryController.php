@@ -83,7 +83,7 @@ final class TreasuryController extends BaseController
             'currency' => $this->currency,
             'hasAnyMovements' => $this->treasury->movementCount() > 0,
             'runts_filter_groups' => $this->runtsFilterGroups(),
-            'budget_filter_options' => $this->treasury->budgetItemFilterOptions(),
+            'budget_filter_groups' => $this->treasury->budgetItemFilterGroups(),
             'filter_years' => $this->treasury->movementYears(),
             'advanced_filters_count' => $this->advancedFilterCount($filters),
             'pending_count' => $this->treasury->pendingCount(),
