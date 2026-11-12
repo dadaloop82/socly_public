@@ -67,6 +67,9 @@ $submitLabel = $isEdit ? __('documents.update') : __('documents.submit');
     <div class="titles">
         <h1 class="page-title"><?= e($pageTitle) ?></h1>
         <p class="page-lede"><?= e($pageLede) ?></p>
+        <?php if ($isEdit && (int) ($document['id'] ?? 0) > 0): ?>
+            <?= view_partial('partials/record_trail', ['entity' => 'document', 'id' => (int) $document['id']]) ?>
+        <?php endif; ?>
     </div>
 </div>
 

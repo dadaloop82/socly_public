@@ -3,6 +3,9 @@
     <div class="titles">
         <h1 class="page-title"><?= e($title) ?></h1>
         <p class="page-lede"><?= e(__('users.form_lede')) ?></p>
+        <?php if ($isEdit && (int) ($user['id'] ?? 0) > 0): ?>
+            <?= view_partial('partials/record_trail', ['entity' => 'user', 'id' => (int) $user['id']]) ?>
+        <?php endif; ?>
     </div>
     <div class="actions">
         <a class="btn btn-ghost" href="<?= e($returnTo === 'settings' ? url('/settings#users') : url('/users')) ?>"><?= e(__('common.back')) ?></a>

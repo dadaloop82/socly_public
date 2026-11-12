@@ -1023,6 +1023,7 @@
         <?= view_partial('partials/users_panel', [
             'panelUsers' => $panelUsers ?? [],
             'mailReady' => !empty($mailReady),
+            'memberOptions' => $memberOptions ?? [],
         ]) ?>
     </div>
 </details>

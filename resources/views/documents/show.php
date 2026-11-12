@@ -9,6 +9,9 @@ $languageLabel = $language !== '' ? __('documents.language_' . $language) : '—
     <div class="titles">
         <h1 class="page-title"><?= e((string) ($document['title'] ?? __('documents.title'))) ?></h1>
         <p class="page-lede"><?= e(__('documents.detail_lede')) ?></p>
+        <?php if ($docId > 0): ?>
+            <?= view_partial('partials/record_trail', ['entity' => 'document', 'id' => $docId]) ?>
+        <?php endif; ?>
     </div>
     <div class="actions">
         <a class="btn btn-ghost" href="<?= e(url('/documents')) ?>"><?= e(__('common.back')) ?></a>

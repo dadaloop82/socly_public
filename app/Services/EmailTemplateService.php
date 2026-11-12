@@ -15,7 +15,8 @@ final class EmailTemplateService
     public function __construct(
         private readonly Database $db,
         private readonly Validator $validator,
-        private readonly SettingsService $settings
+        private readonly SettingsService $settings,
+        private readonly AuditService $audit
     ) {
     }
 
@@ -336,10 +337,12 @@ final class EmailTemplateService
         try {
             if ($id > 0) {
                 $this->db->update('email_templates', $payload, 'id = :id', ['id' => $id]);
+                $this->audit->log('email_template.updated', 'email_template', (string) $id, $existing, $payload);
                 return ['ok' => true, 'id' => $id];
             }
             $payload['created_at'] = date('Y-m-d H:i:s');
             $newId = $this->db->insert('email_templates', $payload);
+            $this->audit->log('email_template.created', 'email_template', (string) $newId, null, $payload);
             return ['ok' => true, 'id' => $newId];
         } catch (\Throwable) {
             return ['ok' => false, 'errors' => ['slug' => __('email_templates.save_failed')]];
@@ -364,6 +367,7 @@ final class EmailTemplateService
             return ['ok' => false, 'error' => __('email_templates.cannot_delete_in_use')];
         }
         $this->db->query('DELETE FROM email_templates WHERE id = :id', ['id' => $id]);
+        $this->audit->log('email_template.deleted', 'email_template', (string) $id, $tpl, null);
         return ['ok' => true];
     }
 

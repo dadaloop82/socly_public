@@ -201,6 +201,9 @@ $nextMemberId = isset($adjacentMembers['next']) ? (int) $adjacentMembers['next']
     <div class="titles">
         <h1 class="page-title"><?= e(__('members.scheda')) ?></h1>
         <p class="page-lede"><?= e($displayName !== '' ? $displayName : __('members.show_lede')) ?></p>
+        <?php if ((int) ($member['id'] ?? 0) > 0): ?>
+            <?= view_partial('partials/record_trail', ['entity' => 'member', 'id' => (int) $member['id']]) ?>
+        <?php endif; ?>
     </div>
     <div class="actions">
         <div class="member-nav" role="group" aria-label="<?= e(__('members.nav_label')) ?>">

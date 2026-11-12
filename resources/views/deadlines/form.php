@@ -49,6 +49,9 @@ $submitLabel = $isEdit ? __('deadlines.update') : __('deadlines.submit');
     <div class="titles">
         <h1 class="page-title"><?= e($pageTitle) ?></h1>
         <p class="page-lede"><?= e($pageLede) ?></p>
+        <?php if ($isEdit && (int) ($deadline['id'] ?? 0) > 0): ?>
+            <?= view_partial('partials/record_trail', ['entity' => 'deadline', 'id' => (int) $deadline['id']]) ?>
+        <?php endif; ?>
     </div>
 </div>
 

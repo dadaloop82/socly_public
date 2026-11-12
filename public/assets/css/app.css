@@ -13875,6 +13875,18 @@ tr.doc-row-editable:focus-visible {
 .th-sort a:hover { color: var(--brand-primary); }
 .th-sort-icon { font-size: 0.78em; opacity: 0.55; }
 .th-sort.is-sorted .th-sort-icon { opacity: 1; color: var(--brand-primary); }
+/* “Creato da … / Modificato da …” trail under editable panels */
+.record-trail {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.2rem 1rem;
+  margin: 0.4rem 0 0;
+  font-size: 0.8rem;
+  line-height: 1.35;
+}
+.record-trail-item { display: inline-flex; align-items: center; gap: 0.35rem; }
+.record-trail svg { width: 0.95em; height: 0.95em; opacity: 0.75; flex: 0 0 auto; }
 .member-birthday { display: inline-flex; vertical-align: -2px; margin-left: 0.3rem; color: var(--brand-accent); }
 .members-type-expiry { font-size: 0.78rem; line-height: 1.3; margin-top: 0.1rem; }
 .btn.is-danger {

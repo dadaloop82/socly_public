@@ -55,6 +55,9 @@ foreach ($memberOptions as $memberOption) {
     <div class="titles">
         <h1 class="page-title"><?= e($isEdit ? __('org.edit_person') : __('org.add_person')) ?></h1>
         <p class="page-lede"><?= e(__('org.person_form_lede')) ?></p>
+        <?php if ($isEdit && (int) ($person['id'] ?? 0) > 0): ?>
+            <?= view_partial('partials/record_trail', ['entity' => 'person', 'id' => (int) $person['id']]) ?>
+        <?php endif; ?>
     </div>
 </div>
 

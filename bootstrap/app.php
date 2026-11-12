@@ -304,7 +304,8 @@ $app->bind('mw.setup_or_auth', fn (App $a) => $a->get(SetupOrAuthMiddleware::cla
 
 $app->bind(AssociationPeopleService::class, fn (App $a) => new AssociationPeopleService(
     $a->get(Database::class),
-    $a->get(MemberService::class)
+    $a->get(MemberService::class),
+    $a->get(AuditService::class)
 ));
 $app->bind(AssociationWebsiteScrapeService::class, fn () => new AssociationWebsiteScrapeService());
 $app->bind(RuntsLookupService::class, fn () => new RuntsLookupService());
@@ -314,7 +315,8 @@ $app->bind(MailService::class, fn (App $a) => new MailService($a->get(SettingsSe
 $app->bind(EmailTemplateService::class, fn (App $a) => new EmailTemplateService(
     $a->get(Database::class),
     $a->get(Validator::class),
-    $a->get(SettingsService::class)
+    $a->get(SettingsService::class),
+    $a->get(AuditService::class)
 ));
 $app->bind(WorkflowService::class, fn (App $a) => new WorkflowService(
     $a->get(Database::class),

@@ -27,6 +27,23 @@ final class VersionService
         'person' => 'association_people',
     ];
 
+    /**
+     * Entities with a printable author trail: wider than TABLES because users, payments and member
+     * types are not versioned but still show “created / modified by”.
+     */
+    private const TRAIL_TABLES = [
+        'member' => 'members',
+        'treasury' => 'treasury_movements',
+        'budget' => 'budgets',
+        'budget_item' => 'budget_items',
+        'document' => 'association_documents',
+        'deadline' => 'deadline_items',
+        'person' => 'association_people',
+        'user' => 'users',
+        'payment' => 'payments',
+        'member_type' => 'member_types',
+    ];
+
     public function __construct(private readonly Database $db)
     {
     }
@@ -74,6 +91,91 @@ final class VersionService
         if ($row === null) {
             return ['name' => '', 'at' => ''];
         }
+
+        return $this->auditAuthor($row);
+    }
+
+    /**
+     * “Created by … on …” / “Modified by … on …” of a record: taken from the audit log, with the row
+     * timestamps as fallback for data saved before the audit existed.
+     *
+     * @return array{created:array{name:string,at:string}|null,updated:array{name:string,at:string}|null}
+     */
+    public function trail(string $entity, int $id): array
+    {
+        $table = self::TRAIL_TABLES[$entity] ?? null;
+        if ($table === null || $id < 1) {
+            return ['created' => null, 'updated' => null];
+        }
+        $params = ['type' => $entity, 'id' => (string) $id];
+        $createdRow = $this->db->fetch(
+            "SELECT a.id, a.created_at, u.first_name, u.last_name, u.name, u.email
+             FROM audit_logs a
+             LEFT JOIN users u ON u.id = a.user_id
+             WHERE a.entity_type = :type AND a.entity_id = :id AND a.action LIKE '%created%'
+             ORDER BY a.id ASC
+             LIMIT 1",
+            $params
+        );
+        $lastRow = $this->db->fetch(
+            "SELECT a.id, a.created_at, u.first_name, u.last_name, u.name, u.email
+             FROM audit_logs a
+             LEFT JOIN users u ON u.id = a.user_id
+             WHERE a.entity_type = :type AND a.entity_id = :id
+             ORDER BY a.id DESC
+             LIMIT 1",
+            $params
+        );
+        $created = $createdRow === null ? null : $this->auditAuthor($createdRow);
+        $updated = null;
+        if ($lastRow !== null
+            && ($createdRow === null || (int) ($lastRow['id'] ?? 0) !== (int) ($createdRow['id'] ?? 0))) {
+            $updated = $this->auditAuthor($lastRow);
+        }
+        if ($created !== null && $updated !== null) {
+            return ['created' => $created, 'updated' => $updated];
+        }
+        // Fallback: the row timestamps (and author) for data saved before the audit existed.
+        try {
+            $row = $this->db->fetch(
+                sprintf('SELECT created_at, updated_at, created_by FROM `%s` WHERE id = :id', $table),
+                ['id' => $id]
+            );
+        } catch (\Throwable) {
+            try {
+                $row = $this->db->fetch(
+                    sprintf('SELECT created_at, updated_at FROM `%s` WHERE id = :id', $table),
+                    ['id' => $id]
+                );
+            } catch (\Throwable) {
+                $row = null;
+            }
+        }
+        if ($row !== null) {
+            $createdAt = trim((string) ($row['created_at'] ?? ''));
+            $updatedAt = trim((string) ($row['updated_at'] ?? ''));
+            if ($created === null && $createdAt !== '') {
+                $created = [
+                    'name' => (int) ($row['created_by'] ?? 0) > 0 ? $this->userName((int) $row['created_by']) : '',
+                    'at' => (string) (format_datetime($createdAt) ?: $createdAt),
+                ];
+            }
+            if ($updated === null && $updatedAt !== '' && $updatedAt !== $createdAt) {
+                $updated = ['name' => '', 'at' => (string) (format_datetime($updatedAt) ?: $updatedAt)];
+            }
+        }
+
+        return ['created' => $created, 'updated' => $updated];
+    }
+
+    /**
+     * Name and moment of an audit row (user names, then the legacy `name`, then the email).
+     *
+     * @param array<string,mixed> $row
+     * @return array{name:string,at:string}
+     */
+    private function auditAuthor(array $row): array
+    {
         $first = trim((string) ($row['first_name'] ?? ''));
         $last = trim((string) ($row['last_name'] ?? ''));
         $name = trim($first . ' ' . $last);
@@ -84,10 +186,31 @@ final class VersionService
             $name = (string) ($row['email'] ?? '');
         }
         $at = trim((string) ($row['created_at'] ?? ''));
+
         return [
             'name' => $name !== '' ? $name : (string) __('presence.unknown_user'),
             'at' => $at !== '' ? (string) (format_datetime($at) ?: $at) : '',
         ];
+    }
+
+    /**
+     * Display name of a user (empty when it cannot be resolved).
+     */
+    private function userName(int $id): string
+    {
+        if ($id < 1) {
+            return '';
+        }
+        try {
+            $row = $this->db->fetch(
+                'SELECT first_name, last_name, name, email FROM users WHERE id = :id LIMIT 1',
+                ['id' => $id]
+            );
+        } catch (\Throwable) {
+            return '';
+        }
+
+        return $row === null ? '' : (string) ($this->auditAuthor($row)['name'] ?? '');
     }
 
     /**

@@ -55,7 +55,8 @@ final class AssociationPeopleService
 
     public function __construct(
         private readonly Database $db,
-        private readonly MemberService $members
+        private readonly MemberService $members,
+        private readonly AuditService $audit
     ) {
     }
 
@@ -159,7 +160,7 @@ final class AssociationPeopleService
         $max = $this->db->fetch('SELECT COALESCE(MAX(hierarchy_level), 60) AS m FROM association_roles');
         $level = max(70, ((int) ($max['m'] ?? 60)) + 10);
         $sort = $this->db->fetch('SELECT COALESCE(MAX(sort_order), 60) AS m FROM association_roles');
-        $this->db->insert('association_roles', [
+        $roleId = $this->db->insert('association_roles', [
             'key' => $key,
             'label_key' => 'association.role_custom',
             'custom_label' => mb_substr($label, 0, 120),
@@ -171,6 +172,7 @@ final class AssociationPeopleService
             'is_active' => 1,
             'is_system' => 0,
         ]);
+        $this->audit->log('org_role.created', 'org_role', (string) $roleId, null, ['key' => $key, 'label' => $label]);
         return ['ok' => true, 'key' => $key];
     }
 
@@ -188,6 +190,7 @@ final class AssociationPeopleService
             return ['ok' => false, 'errors' => ['organ' => __('org.organ_not_empty')]];
         }
         $this->db->query('DELETE FROM association_roles WHERE `key` = :k AND is_system = 0', ['k' => $key]);
+        $this->audit->log('org_role.deleted', 'org_role', $key, ['label' => $this->roleLabel($role)], null);
         return ['ok' => true];
     }
 
@@ -404,6 +407,7 @@ final class AssociationPeopleService
                 }
                 unset($row['is_active']);
                 $this->db->update('association_people', $row, 'id = :id', ['id' => $id]);
+                $this->audit->log('person.updated', 'person', (string) $id, $current, $row);
                 return ['ok' => true, 'id' => $id];
             }
 
@@ -413,6 +417,7 @@ final class AssociationPeopleService
             );
             $row['sort_order'] = ((int) ($maxOrder['m'] ?? -1)) + 1;
             $newId = $this->db->insert('association_people', $row);
+            $this->audit->log('person.created', 'person', (string) $newId, null, $row);
             return ['ok' => true, 'id' => $newId];
         } catch (\Throwable) {
             return ['ok' => false, 'errors' => ['form' => __('org.save_failed')]];
@@ -436,6 +441,7 @@ final class AssociationPeopleService
             'is_active' => 0,
             'mandate_ends_at' => $person['mandate_ends_at'] ?? date('Y-m-d'),
         ], 'id = :id', ['id' => $id]);
+        $this->audit->log('person.deleted', 'person', (string) $id, $person, ['is_active' => 0]);
         return ['ok' => true];
     }
 

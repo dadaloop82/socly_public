@@ -1584,6 +1584,29 @@ if (!function_exists('version_field')) {
     }
 }
 
+if (!function_exists('record_trail')) {
+    /**
+     * “Created by … on …” / “Modified by … on …” of a record (audit log, row timestamps as fallback).
+     * Cached per request: the same panel can be rendered more than once.
+     *
+     * @return array{created:array{name:string,at:string}|null,updated:array{name:string,at:string}|null}
+     */
+    function record_trail(string $entity, int $id): array
+    {
+        static $cache = [];
+        $key = $entity . ':' . $id;
+        if (!isset($cache[$key])) {
+            try {
+                $cache[$key] = app(\Socly\Services\VersionService::class)->trail($entity, $id);
+            } catch (\Throwable) {
+                $cache[$key] = ['created' => null, 'updated' => null];
+            }
+        }
+
+        return $cache[$key];
+    }
+}
+
 if (!function_exists('version_attrs')) {
     /**
      * Attributes on the <form> that enable freshness control and “is editing” presence.

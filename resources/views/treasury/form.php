@@ -91,24 +91,7 @@ $submitLabel = $isEdit ? __('treasury.update') : __('treasury.submit');
         <h1 class="page-title"><?= e($pageTitle) ?></h1>
         <p class="page-lede"><?= e($pageLede) ?></p>
         <?php if ($isEdit): ?>
-            <?php
-            $auditCreated = format_datetime($movement['created_at'] ?? null);
-            $auditUpdated = format_datetime($movement['updated_at'] ?? null);
-            $auditUser = trim((string) ($movement['creator_name'] ?? ''));
-            ?>
-            <?php if ($auditCreated !== '' || $auditUpdated !== ''): ?>
-                <p class="muted treasury-audit">
-                    <?php if ($auditCreated !== ''): ?>
-                        <?= e(__('treasury.audit_created', [
-                            'date' => $auditCreated,
-                            'user' => $auditUser !== '' ? $auditUser : (string) __('treasury.none'),
-                        ])) ?>
-                    <?php endif; ?>
-                    <?php if ($auditUpdated !== '' && $auditUpdated !== $auditCreated): ?>
-                        · <?= e(__('treasury.audit_updated', ['date' => $auditUpdated])) ?>
-                    <?php endif; ?>
-                </p>
-            <?php endif; ?>
+            <?= view_partial('partials/record_trail', ['entity' => 'treasury', 'id' => (int) ($movement['id'] ?? 0)]) ?>
         <?php endif; ?>
     </div>
 </div>

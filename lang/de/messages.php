@@ -2084,6 +2084,12 @@ return [
         'type_photo' => 'Foto',
         'type_photo_desc' => 'Profilbild (Upload oder Aufnahme).',
     ],
+    'audit' => [
+        'created_by' => 'Erstellt von :user am :date',
+        'updated_by' => 'Geändert von :user am :date',
+        'created_on' => 'Erstellt am :date',
+        'updated_on' => 'Geändert am :date',
+    ],
     'common' => [
         'save' => 'Speichern',
         'pager_aria' => 'Seiten',

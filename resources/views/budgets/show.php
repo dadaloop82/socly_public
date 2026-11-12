@@ -34,6 +34,9 @@ $rowPartial = static fn (?array $row, string $sectionKey): string => view_partia
         <?php if ($isApproved && $approvedAt !== ''): ?>
             <p class="setup-hint muted"><?= e(__('budget.approved_meta', ['date' => format_datetime($approvedAt), 'name' => $approvedBy])) ?></p>
         <?php endif; ?>
+        <?php if ($budgetId > 0): ?>
+            <?= view_partial('partials/record_trail', ['entity' => 'budget', 'id' => $budgetId]) ?>
+        <?php endif; ?>
     </div>
     <div class="actions budget-header-actions">
         <a class="btn btn-ghost btn-sm" href="<?= e(url('/budgets')) ?>"><?= e(__('budget.all_budgets')) ?></a>

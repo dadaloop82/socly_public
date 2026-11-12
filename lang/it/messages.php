@@ -3008,6 +3008,12 @@ return [
         'role_volunteer' => 'Volontario',
         'role_volunteer_desc' => 'Accesso limitato a scadenze e panoramica.',
     ],
+    'audit' => [
+        'created_by' => 'Creato da :user il :date',
+        'updated_by' => 'Modificato da :user il :date',
+        'created_on' => 'Creato il :date',
+        'updated_on' => 'Modificato il :date',
+    ],
     'common' => [
         'save' => 'Salva',
         'pager_aria' => 'Pagine',

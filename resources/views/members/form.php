@@ -514,6 +514,9 @@ $paymentExtraHtml = $buildProfileFieldsHtml($paymentExtraFields, \Socly\Services
         ?>
             <p class="page-lede"><?= e($pageLede) ?></p>
         <?php endif; ?>
+        <?php if ($isEdit && (int) ($member['id'] ?? 0) > 0): ?>
+            <?= view_partial('partials/record_trail', ['entity' => 'member', 'id' => (int) $member['id']]) ?>
+        <?php endif; ?>
     </div>
 </div>
 
