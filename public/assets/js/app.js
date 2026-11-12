@@ -1474,8 +1474,17 @@ function initPresence() {
   const fieldInputs = (name) => (editingForm
     ? Array.from(editingForm.querySelectorAll('[name]')).filter((el) => el.name === name)
     : []);
-  // Draft shown to the others: only text-like controls (never selects, checkboxes or files).
+  // Draft shown to the others: text-like controls and the label of the chosen option. A <select> is
+  // published as its visible label (not the raw value) so the other operator reads something
+  // meaningful; passwords, checkboxes and files never travel.
   const editableValueOf = (el) => {
+    if (el instanceof HTMLSelectElement) {
+      const option = el.selectedOptions && el.selectedOptions.length > 0 ? el.selectedOptions[0] : null;
+      if (option) return String(option.textContent || '').trim();
+      return el.options && el.selectedIndex >= 0 && el.options[el.selectedIndex]
+        ? String(el.options[el.selectedIndex].textContent || '').trim()
+        : '';
+    }
     if (el instanceof HTMLTextAreaElement) return el.value;
     if (el instanceof HTMLInputElement) {
       const type = String(el.type || 'text').toLowerCase();
@@ -1508,8 +1517,35 @@ function initPresence() {
   const remoteControls = (wrap) => (wrap.matches('input, select, textarea')
     ? [wrap]
     : Array.from(wrap.querySelectorAll('input, select, textarea')));
+  // A <select> has no draft to preview: the other operator's choice is actually selected (so the
+  // change is visible live) and the previous one is remembered to be restored on release.
+  const previewRemoteChoice = (select, label) => {
+    const wantedText = label.trim().toLowerCase();
+    if (wantedText === '') return;
+    const option = Array.from(select.options)
+      .find((opt) => String(opt.textContent || '').trim().toLowerCase() === wantedText);
+    if (!option) return;
+    if (select.dataset.remoteChoice === undefined) {
+      select.dataset.remoteChoice = select.value;
+    }
+    if (select.value === option.value) return;
+    select.value = option.value;
+    select.classList.remove('is-remote-choice');
+    void select.offsetWidth; // restart the flash animation on every new choice
+    select.classList.add('is-remote-choice');
+  };
+  const restoreRemoteChoice = (select) => {
+    if (select.dataset.remoteChoice !== undefined) {
+      select.value = select.dataset.remoteChoice;
+      delete select.dataset.remoteChoice;
+    }
+    select.classList.remove('is-remote-choice');
+  };
   const clearRemoteField = (wrap) => {
-    remoteControls(wrap).forEach((control) => applyRemoteLock(control, false));
+    remoteControls(wrap).forEach((control) => {
+      if (control instanceof HTMLSelectElement) restoreRemoteChoice(control);
+      applyRemoteLock(control, false);
+    });
     wrap.querySelectorAll('[data-remote-value]').forEach((note) => note.remove());
     wrap.classList.remove('is-remote-edit');
     wrap.removeAttribute('data-remote-field');
@@ -1547,6 +1583,7 @@ function initPresence() {
         wrap.style.setProperty('--remote-hue', info.hue);
         if (!bare) wrap.setAttribute('title', templates.locked.replace(':name', info.name));
         applyRemoteLock(input, true);
+        if (input instanceof HTMLSelectElement) previewRemoteChoice(input, info.value);
         if (bare) return;
         let note = wrap.querySelector('[data-remote-value]');
         if (info.value === '') {
@@ -1576,9 +1613,22 @@ function initPresence() {
     editingForm.addEventListener('input', (event) => {
       const target = event.target;
       if (!(target instanceof HTMLElement) || String(target.name || '') !== currentField) return;
+      if (target instanceof HTMLSelectElement) return; // a choice is published by 'change'
       currentValue = editableValueOf(target);
       if (currentValue === lastSentValue) return;
       scheduleValuePoll();
+    });
+    // A <select> is a discrete choice: publish it right away (no typing to debounce) and take it as
+    // the current field even when the browser did not report a focus event first.
+    editingForm.addEventListener('change', (event) => {
+      const target = event.target;
+      if (!(target instanceof HTMLSelectElement)) return;
+      const name = String(target.name || '');
+      if (name === '') return;
+      currentField = name;
+      currentValue = editableValueOf(target);
+      if (currentValue === lastSentValue) return;
+      scheduleImmediatePoll(200);
     });
     editingForm.addEventListener('focusout', () => {
       // Keep the last field for a moment: jumping between fields must not make the outline blink.
@@ -1590,6 +1640,13 @@ function initPresence() {
         scheduleImmediatePoll(300);
       }, 2500);
     });
+    // A choice that is only being previewed must never be saved by the operator who is watching it:
+    // the local selection is restored right before the form is submitted.
+    editingForm.addEventListener('submit', () => {
+      editingForm.querySelectorAll('select[data-remote-choice]').forEach((select) => {
+        if (select instanceof HTMLSelectElement) restoreRemoteChoice(select);
+      });
+    }, true);
     // The lock is advisory (the server still refuses stale saves): block the keyboard on the controls
     // that cannot be made read-only.
     editingForm.addEventListener('keydown', (event) => {

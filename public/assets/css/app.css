@@ -12879,6 +12879,19 @@ input[type="radio"].is-remote-locked { pointer-events: none; opacity: 0.72; }
 .sf-field.is-remote-edit textarea[readonly] {
   background: color-mix(in srgb, hsl(var(--remote-hue, 210) 62% 45%) 5%, #fff);
 }
+/* A choice picked by another operator is applied to the <select> itself: flash it so the change is
+   noticed even while reading another part of the form. */
+select.is-remote-choice {
+  animation: remote-choice-flash 1.4s ease-out 1;
+}
+@keyframes remote-choice-flash {
+  0% { background-color: hsl(var(--remote-hue, 210) 62% 45% / 0.28); }
+  60% { background-color: hsl(var(--remote-hue, 210) 62% 45% / 0.14); }
+  100% { background-color: transparent; }
+}
+@media (prefers-reduced-motion: reduce) {
+  select.is-remote-choice { animation: none; }
+}
 .field-remote-value {
   margin-top: 0.15rem;
   font-size: 0.78rem;
