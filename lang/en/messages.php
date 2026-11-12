@@ -1299,7 +1299,6 @@ return [
         'treasury_account_builtin_hint' => 'Empty = translated default name.',
         'treasury_account_builtin_placeholder' => 'Default name',
         'treasury_account_active' => 'Active',
-        'treasury_account_meta' => 'Key: :slug · :count entries',
         'treasury_account_delete' => 'Delete',
         'treasury_account_delete_confirm' => 'Delete the account «:name»? This cannot be undone.',
         'treasury_account_locked' => 'Cannot delete: :count recorded entries.',

@@ -1299,7 +1299,6 @@ return [
         'treasury_account_builtin_hint' => 'Leer = übersetzter Standardname.',
         'treasury_account_builtin_placeholder' => 'Standardname',
         'treasury_account_active' => 'Aktiv',
-        'treasury_account_meta' => 'Schlüssel: :slug · :count Bewegungen',
         'treasury_account_delete' => 'Löschen',
         'treasury_account_delete_confirm' => 'Konto «:name» löschen? Der Vorgang ist nicht umkehrbar.',
         'treasury_account_locked' => 'Nicht löschbar: :count erfasste Bewegungen.',

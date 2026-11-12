@@ -1221,10 +1221,6 @@
                     ?>
                     <article class="accounts-admin-row<?= $accountActive ? '' : ' is-inactive' ?>">
                         <?= field('hidden', ['name' => 'account_id[]', 'value' => (string) $accountId]) ?>
-                        <div class="accounts-admin-identity">
-                            <span class="accounts-admin-slug"><?= e($accountSlug) ?></span>
-                            <span class="accounts-admin-meta muted"><?= e(__('settings.treasury_account_meta', ['slug' => $accountSlug, 'count' => (string) $accountMovements])) ?></span>
-                        </div>
                         <?= field('text', [
                             'name' => 'account_label[]',
                             'label' => (string) __('settings.treasury_account_label'),
@@ -1234,16 +1230,18 @@
                             'wrapper_class' => 'accounts-admin-label',
                             'placeholder' => $accountBuiltin ? (string) __('settings.treasury_account_builtin_placeholder') : '',
                         ]) ?>
-                        <?= field('checkbox', [
-                            'name' => 'account_active[' . $accountId . ']',
-                            'label' => (string) __('settings.treasury_account_active'),
-                            'checked' => $accountActive,
-                            'context' => 'inline',
-                            'value' => '1',
-                            'check_value' => '1',
-                            'label_class' => 'checkbox-row',
-                            'wrapper_class' => 'accounts-admin-toggle',
-                        ]) ?>
+                        <div class="accounts-admin-toggle-cell">
+                            <?= field('checkbox', [
+                                'name' => 'account_active[' . $accountId . ']',
+                                'label' => (string) __('settings.treasury_account_active'),
+                                'checked' => $accountActive,
+                                'context' => 'inline',
+                                'value' => '1',
+                                'check_value' => '1',
+                                'label_class' => 'checkbox-row',
+                                'wrapper_class' => 'accounts-admin-toggle',
+                            ]) ?>
+                        </div>
                         <div class="accounts-admin-side">
                             <?php if ($accountMovements === 0): ?>
                                 <button class="btn btn-ghost btn-sm" type="submit" form="account-delete-<?= $accountId ?>"><?= e(__('settings.treasury_account_delete')) ?></button>
@@ -1288,16 +1286,18 @@
                         'placeholder' => (string) __('settings.treasury_account_new_placeholder'),
                     ]) ?>
                 </div>
-                <?= field('checkbox', [
-                    'name' => 'is_active',
-                    'label' => (string) __('settings.treasury_account_active'),
-                    'checked' => true,
-                    'context' => 'inline',
-                    'value' => '1',
-                    'check_value' => '1',
-                    'label_class' => 'checkbox-row',
-                    'wrapper_class' => 'accounts-admin-toggle',
-                ]) ?>
+                <div class="accounts-admin-toggle-cell">
+                    <?= field('checkbox', [
+                        'name' => 'is_active',
+                        'label' => (string) __('settings.treasury_account_active'),
+                        'checked' => true,
+                        'context' => 'inline',
+                        'value' => '1',
+                        'check_value' => '1',
+                        'label_class' => 'checkbox-row',
+                        'wrapper_class' => 'accounts-admin-toggle',
+                    ]) ?>
+                </div>
                 <button class="btn" type="submit"><?= e(__('settings.treasury_account_add')) ?></button>
             </form>
         <?php endif; ?>

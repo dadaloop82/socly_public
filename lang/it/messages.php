@@ -1303,7 +1303,6 @@ return [
         'treasury_account_builtin_hint' => 'Vuoto = nome predefinito tradotto.',
         'treasury_account_builtin_placeholder' => 'Nome predefinito',
         'treasury_account_active' => 'Attivo',
-        'treasury_account_meta' => 'Chiave: :slug · :count movimenti',
         'treasury_account_delete' => 'Elimina',
         'treasury_account_delete_confirm' => 'Eliminare il conto «:name»? L’operazione non è reversibile.',
         'treasury_account_locked' => 'Non eliminabile: :count movimenti registrati.',

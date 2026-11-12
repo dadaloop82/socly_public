@@ -106,6 +106,10 @@ every 100 patches bump the series, and each bump is published to this repository
 
 ### Fixed
 
+- Settings → Financial accounts: the rows are aligned again — the accordion rhythm rule turned their
+  forms into plain columns — and the **internal slug of each wallet** (`cash`, `carta_di_credito`) is
+  no longer shown: only the name, the “active” toggle and what prevents deletion. The “new account”
+  row is a proper row (name, active, button) instead of a floating block.
 - Confirming an update no longer throws you back to the ledger: the card stays open with the saved
   values and the confirmation message, and the “similar movements” proposal now appears above the
   form (applying it keeps you on the card). “Back” still returns to the filtered ledger.
