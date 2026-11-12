@@ -2190,6 +2190,99 @@ final class TreasuryService
         return $count;
     }
 
+    /**
+     * Bulk classification (“Modifica selezionati”): apply the same account / category / Model D line /
+     * cost centre / notes to the selected movements. Every field is optional — an empty value keeps the
+     * current one, `__none__` clears it — and the overwrite is explicit: what is set replaces what was
+     * there. Internal transfers only take account and notes (their category and imputation are
+     * meaningless) and historical (superseded) rows are never touched.
+     *
+     * @param list<int> $ids
+     * @param array{account?:string,category?:string,runts_line?:string,budget_item_id?:string,notes?:string,notes_action?:string} $changes
+     * @return array{count:int,skipped:int}
+     */
+    public function updateMany(array $ids, array $changes, string $ip): array
+    {
+        $payload = [];
+        $account = self::normalizeAccount(trim((string) ($changes['account'] ?? '')));
+        if ($account !== '' && $this->accountExists($account) && $this->accountIsActive($account)) {
+            $payload['account'] = $account;
+        }
+        $category = trim((string) ($changes['category'] ?? ''));
+        if ($category !== '' && isset($this->categoryMap()[$category])) {
+            $payload['category'] = $category;
+        }
+        $runts = trim((string) ($changes['runts_line'] ?? ''));
+        if ($runts === '__none__') {
+            $payload['runts_line'] = null;
+        } elseif ($runts !== '') {
+            $line = strtoupper($runts);
+            if (RuntsReportService::lineLabel($line) !== '') {
+                $payload['runts_line'] = $line;
+            }
+        }
+        $budget = trim((string) ($changes['budget_item_id'] ?? ''));
+        if ($budget === '__none__') {
+            $payload['budget_item_id'] = null;
+        } elseif ($budget !== '') {
+            $budgetId = (int) $budget;
+            if ($budgetId > 0 && $this->db->fetch('SELECT id FROM budget_items WHERE id = :id', ['id' => $budgetId]) !== null) {
+                $payload['budget_item_id'] = $budgetId;
+            }
+        }
+        if ((string) ($changes['notes_action'] ?? '') === 'replace') {
+            $notes = trim((string) ($changes['notes'] ?? ''));
+            $payload['notes'] = $notes !== '' ? mb_substr($notes, 0, self::NOTES_MAX_LENGTH) : null;
+        }
+        if ($payload === []) {
+            return ['count' => 0, 'skipped' => 0];
+        }
+
+        $count = 0;
+        $skipped = 0;
+        foreach (array_unique(array_map('intval', $ids)) as $id) {
+            if ($id < 1) {
+                continue;
+            }
+            $row = $this->db->fetch('SELECT * FROM treasury_movements WHERE id = :id', ['id' => $id]);
+            if ($row === null || trim((string) ($row['superseded_at'] ?? '')) !== '') {
+                $skipped++;
+                continue;
+            }
+            $isTransfer = (string) ($row['direction'] ?? '') === 'transfer';
+            $update = [];
+            foreach ($payload as $field => $value) {
+                if ($isTransfer && in_array($field, ['category', 'runts_line', 'budget_item_id'], true)) {
+                    continue;
+                }
+                $update[$field] = $value;
+            }
+            if ($update === []) {
+                $skipped++;
+                continue;
+            }
+            $sets = [];
+            $params = ['id' => $id];
+            $before = [];
+            $after = [];
+            foreach ($update as $field => $value) {
+                $sets[] = '`' . $field . '` = :' . $field;
+                $params[$field] = $value;
+                $before[$field] = $row[$field] ?? null;
+                $after[$field] = $value;
+            }
+            $this->db->query(
+                'UPDATE treasury_movements SET ' . implode(', ', $sets) . ', row_version = row_version + 1 WHERE id = :id',
+                $params
+            );
+            // One audit row per movement: the “modified by” trail and the freshness banner keep working.
+            $this->audit->log('treasury.bulk_updated', 'treasury', (string) $id, $before, $after, $ip);
+            $count++;
+        }
+
+        return ['count' => $count, 'skipped' => $skipped];
+    }
+
     /** @param list<int> $ids @return int Number of deleted movements */
     public function deleteMany(array $ids, string $ip): int
     {

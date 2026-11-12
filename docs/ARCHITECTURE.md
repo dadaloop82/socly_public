@@ -154,6 +154,18 @@ and keeps everything above 0.45. The form shows up to three examples, the summar
 one-click `POST /treasury/similar/apply`, which updates the chosen rows through
 `applyClassification()` (audit `treasury.classified_bulk`). No external service, fully deterministic.
 
+## Bulk edit of the selection
+
+`POST /treasury/bulk` with `action=update` reclassifies every selected movement at once
+(`TreasuryService::updateMany()`): financial account, type, Model D line, cost centre and notes. Each
+field carries a “keep” value (`''`), so only the chosen ones overwrite what was there; `__none__`
+clears the Model D line or the cost centre, and the notes are replaced only when their checkbox is
+ticked. The dialog summarises the changes and the number of movements before sending the request; the
+service skips historical (`superseded_at`) rows, applies only account/notes to internal transfers and
+writes one `treasury.bulk_updated` audit row per movement (before/after), so the “modified by” trail
+and the freshness banner keep working. Row versions are bumped: a form left open elsewhere reopens on
+the conflict banner instead of overwriting.
+
 ## Concurrent editing (optimistic locking)
 Editable records carry `row_version`. Every form posts it in the hidden `row_version` field
 (`version_field()` / `version_attrs()` helpers + `partials/record_lock_notice.php`), and the service

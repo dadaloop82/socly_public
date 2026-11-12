@@ -577,6 +577,8 @@ final class TreasuryController extends BaseController
         }
         $action = (string) $request->input('action', '');
         $isAjax = (string) $request->input('ajax', '') === '1';
+        $count = 0;
+        $skipped = 0;
         if ($action === 'transfer') {
             $transfer = $this->treasury->transferSelected(array_values($ids), (string) $request->input('target_account', ''), $request->ip(), auth_user()['id'] ?? null);
             if (empty($transfer['ok'])) {
@@ -602,6 +604,19 @@ final class TreasuryController extends BaseController
             $count = $this->treasury->approveMany(array_values($ids), $request->ip(), auth_user()['id'] ?? null);
         } elseif ($action === 'delete') {
             $count = $this->treasury->deleteMany(array_values($ids), $request->ip());
+        } elseif ($action === 'update') {
+            // Bulk classification: only the fields left on “keep” stay untouched, everything else
+            // overwrites the current value (explicit confirmation in the UI).
+            $result = $this->treasury->updateMany(array_values($ids), [
+                'account' => (string) $request->input('account', ''),
+                'category' => (string) $request->input('category', ''),
+                'runts_line' => (string) $request->input('runts_line', ''),
+                'budget_item_id' => (string) $request->input('budget_item_id', ''),
+                'notes' => (string) $request->input('notes', ''),
+                'notes_action' => (string) $request->input('notes_action', ''),
+            ], $request->ip());
+            $count = (int) ($result['count'] ?? 0);
+            $skipped = (int) ($result['skipped'] ?? 0);
         } else {
             if ($isAjax) {
                 header('Content-Type: application/json; charset=utf-8');
@@ -617,7 +632,13 @@ final class TreasuryController extends BaseController
                 'ok' => true,
                 'action' => $action,
                 'count' => $count,
+                'skipped' => $skipped,
                 'ids' => array_values($ids),
+                'message' => $action === 'update' && $count > 0
+                    ? ($skipped > 0
+                        ? __('treasury.bulk_edit_done_skipped', ['count' => (string) $count, 'skipped' => (string) $skipped])
+                        : __('treasury.bulk_edit_done', ['count' => (string) $count]))
+                    : null,
                 'totals' => $action === 'approve' ? $this->totalsPayload() : null,
             ], JSON_UNESCAPED_UNICODE);
             return;
@@ -626,6 +647,10 @@ final class TreasuryController extends BaseController
             $this->flash('success', __('treasury.bulk_unapproved', ['count' => (string) $count]));
         } elseif ($action === 'approve') {
             $this->flash('success', __('treasury.bulk_approved', ['count' => (string) $count]));
+        } elseif ($action === 'update') {
+            $this->flash('success', $skipped > 0
+                ? __('treasury.bulk_edit_done_skipped', ['count' => (string) $count, 'skipped' => (string) $skipped])
+                : __('treasury.bulk_edit_done', ['count' => (string) $count]));
         } else {
             $this->flash('success', __('treasury.bulk_deleted', ['count' => (string) $count]));
         }

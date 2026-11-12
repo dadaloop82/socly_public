@@ -24,7 +24,8 @@
     deadlines, cash book with approvals, wallet balances and budget imputation. A cost centre always
     reads “section · line” and the ledger filter groups the lines by budget and section (like the
     Model D line filter), the description (“causale”) is stored capitalised and the document block of a
-    movement sits behind a per-movement flag.
+    movement sits behind a per-movement flag. The ledger selection can be reclassified in bulk
+    (account, type, Model D line, cost centre, notes) with an explicit confirmation and per-row audit.
 15. **Forecast budget** — one document per fiscal year, inline grid with autosave, expense/income types, custom categories, comparison with the cash actuals and a printable rendiconto; the year-end RUNTS report and the budget statistics live in the same **Bilanci** page (Preventivo / Consuntivo / Statistiche tabs).
 16. **Concurrent editing & presence** — optimistic locking on every versioned record; the field another
     operator is working in is locked and their draft is shown live; a click on their presence badge

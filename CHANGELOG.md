@@ -21,6 +21,11 @@ every 100 patches bump the series, and each bump is published to this repository
   record is open the badge opens the **screen they are on** (list, dashboard, chosen tab): the
   heartbeat now reports the current path + fragment, the query string is always stripped and the
   link is rebuilt server-side.
+- The first-note list can now **edit the selection in bulk**: select the movements, press “Edit” and set
+  only the fields you want — financial account, type, Model D line, cost centre and notes (with
+  “replace the notes”); anything left on “keep” stays as it is. A confirmation summarises what will be
+  applied and to how many movements before overwriting them. Internal transfers take account and notes
+  only, historical rows are never touched, and every row keeps its “modified by” trail.
 - The ledger cost-centre filter now groups the lines by budget and section (“2026 · Personnel”) exactly
   like the “Voce del bilancio consuntivo (Modello D)” filter, so two sections repeating a wording can no
   longer be confused; the summaries keep reading “year · section · line”.

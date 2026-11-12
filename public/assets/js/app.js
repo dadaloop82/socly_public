@@ -3710,6 +3710,7 @@ function initTreasuryBulk() {
       const ids = selectedIds();
       if (ids.length === 0 || !form || !actionInput || !idHost) return;
       const action = btn.getAttribute('data-treasury-bulk-action') || '';
+      if (action === 'edit') return; // handled by the classification dialog below
       let message = btn.dataset.confirm || '';
       if (action === 'transfer') {
         // Account transfer: mandatory account + explicit confirmation with account and number of
@@ -3817,6 +3818,140 @@ function initTreasuryBulk() {
       }
     });
   });
+
+  // ── Bulk classification (“Modifica selezionati”) ────────────────────────────────────────────
+  // The sheet mirrors the movement form for the fields that make sense in bulk. An empty value
+  // means “keep”, `__none__` clears the field, and the overwrite is confirmed with a summary of
+  // what is about to change and how many movements it touches.
+  const editDialog = document.querySelector('[data-treasury-bulk-edit-dialog]');
+  if (editDialog instanceof HTMLDialogElement && form instanceof HTMLFormElement) {
+    const summary = editDialog.querySelector('[data-treasury-bulk-edit-summary]');
+    const accountSelect = editDialog.querySelector('[data-treasury-bulk-edit-account]');
+    const categorySelect = editDialog.querySelector('[data-treasury-bulk-edit-category]');
+    const runtsSelect = editDialog.querySelector('[data-treasury-bulk-edit-runts]');
+    const budgetSelect = editDialog.querySelector('[data-treasury-bulk-edit-budget]');
+    const notesToggle = editDialog.querySelector('[data-treasury-bulk-edit-notes-toggle]');
+    const notesField = editDialog.querySelector('[data-treasury-bulk-edit-notes]');
+    const applyBtn = editDialog.querySelector('[data-treasury-bulk-edit-apply]');
+    const msg = (key) => editDialog.getAttribute(key) || '';
+    const selectLabel = (select) => {
+      if (!(select instanceof HTMLSelectElement) || select.value === '') return '';
+      return (select.selectedOptions[0]?.textContent || '').trim();
+    };
+    const reset = () => {
+      [accountSelect, categorySelect, runtsSelect, budgetSelect].forEach((select) => {
+        if (select instanceof HTMLSelectElement) select.value = '';
+      });
+      if (notesToggle instanceof HTMLInputElement) notesToggle.checked = false;
+      if (notesField instanceof HTMLTextAreaElement) {
+        notesField.value = '';
+        notesField.disabled = true;
+      }
+      if (applyBtn instanceof HTMLButtonElement) applyBtn.disabled = false;
+    };
+    bar.querySelector('[data-treasury-bulk-action="edit"]')?.addEventListener('click', () => {
+      const ids = selectedIds();
+      if (ids.length === 0) return;
+      reset();
+      if (summary instanceof HTMLElement) {
+        summary.textContent = msg('data-msg-summary').replace(':count', String(ids.length));
+      }
+      editDialog.showModal();
+    });
+    editDialog.querySelector('[data-treasury-bulk-edit-cancel]')?.addEventListener('click', () => editDialog.close());
+    notesToggle?.addEventListener('change', () => {
+      if (!(notesToggle instanceof HTMLInputElement)) return;
+      if (notesField instanceof HTMLTextAreaElement) notesField.disabled = !notesToggle.checked;
+      if (notesToggle.checked && notesField instanceof HTMLTextAreaElement) notesField.focus();
+    });
+    applyBtn?.addEventListener('click', async () => {
+      const ids = selectedIds();
+      if (ids.length === 0) {
+        editDialog.close();
+        return;
+      }
+      const chosen = [];
+      const push = (label, value) => {
+        if (label !== '' && value !== '') chosen.push(`${label}: ${value}`);
+      };
+      push(msg('data-msg-account'), selectLabel(accountSelect));
+      push(msg('data-msg-category'), selectLabel(categorySelect));
+      push(msg('data-msg-runts'), selectLabel(runtsSelect));
+      push(msg('data-msg-budget'), selectLabel(budgetSelect));
+      const notes = notesToggle instanceof HTMLInputElement && notesToggle.checked
+        && notesField instanceof HTMLTextAreaElement
+        ? notesField.value.trim()
+        : '';
+      if (notesToggle instanceof HTMLInputElement && notesToggle.checked) {
+        push(msg('data-msg-notes'), notes !== '' ? notes : '—');
+      }
+      if (chosen.length === 0) {
+        const none = msg('data-msg-none');
+        if (none !== '') {
+          if (typeof appConfirm === 'function') await appConfirm(none, { alert: true });
+          else window.alert(none);
+        }
+        return;
+      }
+      const message = msg('data-msg-confirm')
+        .replace(':changes', chosen.join(' · '))
+        .replace(':count', String(ids.length));
+      const ok = typeof appConfirm === 'function' ? await appConfirm(message) : window.confirm(message);
+      if (!ok) return;
+
+      const body = new FormData(form);
+      body.set('action', 'update');
+      body.append('ajax', '1');
+      ids.forEach((id) => body.append('movement_ids[]', id));
+      const setValue = (key, select) => {
+        body.set(key, select instanceof HTMLSelectElement ? select.value : '');
+      };
+      setValue('account', accountSelect);
+      setValue('category', categorySelect);
+      setValue('runts_line', runtsSelect);
+      setValue('budget_item_id', budgetSelect);
+      body.set('notes', notes);
+      body.set('notes_action', notesToggle instanceof HTMLInputElement && notesToggle.checked ? 'replace' : 'keep');
+      if (applyBtn instanceof HTMLButtonElement) applyBtn.disabled = true;
+      try {
+        const res = await fetch(form.getAttribute('action') || '', {
+          method: 'POST',
+          headers: { 'X-Requested-With': 'XMLHttpRequest' },
+          body,
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok || !data.ok) {
+          if (applyBtn instanceof HTMLButtonElement) applyBtn.disabled = false;
+          const error = data && typeof data.message === 'string' ? data.message : '';
+          if (error !== '') {
+            if (typeof appConfirm === 'function') await appConfirm(error, { alert: true });
+            else window.alert(error);
+            return;
+          }
+          throw new Error('bulk update failed');
+        }
+        if (Number(data.count || 0) === 0) {
+          if (applyBtn instanceof HTMLButtonElement) applyBtn.disabled = false;
+          const none = msg('data-msg-none');
+          if (none !== '') {
+            if (typeof appConfirm === 'function') await appConfirm(none, { alert: true });
+            else window.alert(none);
+          }
+          return;
+        }
+        editDialog.close();
+        // Many rows changed at once: a reload keeps the ledger, the totals and the badges honest.
+        window.location.reload();
+      } catch (err) {
+        if (applyBtn instanceof HTMLButtonElement) applyBtn.disabled = false;
+        const fallback = msg('data-msg-none');
+        if (fallback !== '') {
+          if (typeof appConfirm === 'function') await appConfirm(fallback, { alert: true });
+          else window.alert(fallback);
+        }
+      }
+    });
+  }
 }
 
 function initMembersList() {

@@ -512,6 +512,11 @@ if ($filterYear !== '' && !isset($yearFilterOptions[$filterYear])) {
                     </button>
                     <span class="muted treasury-transfer-hint" data-treasury-transfer-hint hidden></span>
                     <span class="treasury-bulk-divider" aria-hidden="true"></span>
+                    <button type="button" class="btn btn-sm btn-ghost" data-treasury-bulk-action="edit">
+                        <?= row_action_icon_svg('edit') ?>
+                        <span><?= e(__('treasury.bulk_edit')) ?></span>
+                    </button>
+                    <span class="treasury-bulk-divider" aria-hidden="true"></span>
                     <button type="button" class="btn btn-sm btn-ghost is-danger" data-treasury-bulk-action="delete" data-confirm="<?= e(__('treasury.bulk_delete_confirm')) ?>">
                         <?= row_action_icon_svg('delete') ?>
                         <span><?= e(__('treasury.bulk_delete')) ?></span>
@@ -528,6 +533,98 @@ if ($filterYear !== '' && !isset($yearFilterOptions[$filterYear])) {
             <input type="hidden" name="target_account" value="" data-treasury-transfer-hidden>
             <span data-treasury-bulk-id-host></span>
         </form>
+        <?php
+        // Bulk classification sheet: the same fields the operator would set one by one, each with a
+        // “keep” default so only the chosen ones overwrite the current value.
+        $bulkAccountOptions = [];
+        foreach (($accounts ?? []) as $accountOption) {
+            if (empty($accountOption['active'])) {
+                continue;
+            }
+            $bulkAccountOptions[(string) $accountOption['key']] = (string) $accountOption['label'];
+        }
+        $bulkCategoryOptions = [];
+        foreach (($categories ?? []) as $categoryOption) {
+            $categoryKey = (string) ($categoryOption['key'] ?? '');
+            if ($categoryKey === '' || $categoryKey === '__new__') {
+                continue;
+            }
+            $bulkCategoryOptions[$categoryKey] = (string) ($categoryOption['label'] ?? '');
+        }
+        $bulkNoneGroup = [['label' => (string) __('treasury.filter_none_group'), 'options' => [['value' => '__none__', 'label' => (string) __('treasury.filter_none')]]]];
+        $bulkRuntsGroups = array_merge(is_array($runts_filter_groups ?? null) ? $runts_filter_groups : [], $bulkNoneGroup);
+        $bulkBudgetGroups = array_merge(is_array($budget_filter_groups ?? null) ? $budget_filter_groups : [], $bulkNoneGroup);
+        ?>
+        <dialog
+            class="member-bulk-email-dialog"
+            data-treasury-bulk-edit-dialog
+            data-msg-summary="<?= e(__('treasury.bulk_edit_summary', ['count' => ':count'])) ?>"
+            data-msg-account="<?= e(__('treasury.account')) ?>"
+            data-msg-category="<?= e(__('treasury.category')) ?>"
+            data-msg-runts="<?= e(__('runts.line_label')) ?>"
+            data-msg-budget="<?= e(__('treasury.budget_item')) ?>"
+            data-msg-notes="<?= e(__('treasury.notes')) ?>"
+            data-msg-confirm="<?= e(__('treasury.bulk_edit_confirm', ['changes' => ':changes', 'count' => ':count'])) ?>"
+            data-msg-none="<?= e(__('treasury.bulk_edit_none')) ?>"
+        >
+            <div class="member-leave-shell">
+                <h3 class="section-title"><?= e(__('treasury.bulk_edit_title')) ?></h3>
+                <p class="muted" data-treasury-bulk-edit-summary></p>
+                <p class="setup-hint muted"><?= e(__('treasury.bulk_edit_lede')) ?></p>
+                <?= field('select', [
+                    'name' => '',
+                    'label' => (string) __('treasury.account'),
+                    'include_empty' => true,
+                    'empty_label' => (string) __('treasury.bulk_edit_keep'),
+                    'options' => $bulkAccountOptions,
+                    'attrs' => ['data-treasury-bulk-edit-account' => true],
+                ]) ?>
+                <?= field('select', [
+                    'name' => '',
+                    'label' => (string) __('treasury.category'),
+                    'include_empty' => true,
+                    'empty_label' => (string) __('treasury.bulk_edit_keep'),
+                    'options' => $bulkCategoryOptions,
+                    'attrs' => ['data-treasury-bulk-edit-category' => true],
+                ]) ?>
+                <?= field('select', [
+                    'name' => '',
+                    'label' => (string) __('runts.line_label'),
+                    'include_empty' => true,
+                    'empty_label' => (string) __('treasury.bulk_edit_keep'),
+                    'groups' => $bulkRuntsGroups,
+                    'options' => [],
+                    'attrs' => ['data-treasury-bulk-edit-runts' => true],
+                ]) ?>
+                <?= field('select', [
+                    'name' => '',
+                    'label' => (string) __('treasury.budget_item'),
+                    'include_empty' => true,
+                    'empty_label' => (string) __('treasury.bulk_edit_keep'),
+                    'groups' => $bulkBudgetGroups,
+                    'options' => [],
+                    'attrs' => ['data-treasury-bulk-edit-budget' => true],
+                ]) ?>
+                <?= field('checkbox', [
+                    'name' => '',
+                    'label' => (string) __('treasury.bulk_edit_notes_replace'),
+                    'label_class' => 'checkbox-row-lg',
+                    'checked' => false,
+                    'attrs' => ['data-treasury-bulk-edit-notes-toggle' => true],
+                ]) ?>
+                <?= field('textarea', [
+                    'name' => '',
+                    'label' => (string) __('treasury.notes'),
+                    'rows' => 3,
+                    'maxlength' => 2000,
+                    'attrs' => ['data-treasury-bulk-edit-notes' => true],
+                ]) ?>
+                <div class="member-leave-actions">
+                    <button type="button" class="btn btn-ghost" data-treasury-bulk-edit-cancel><?= e(__('common.cancel')) ?></button>
+                    <button type="button" class="btn" data-treasury-bulk-edit-apply><?= e(__('treasury.bulk_edit_apply')) ?></button>
+                </div>
+            </div>
+        </dialog>
     <?php endif; ?>
     <?php if ($movement_groups === []): ?>
         <div class="empty-state">
