@@ -13062,20 +13062,18 @@ textarea.is-remote-edit {
   align-content: start;
 }
 /* Fixed € inside the amount control (associations work in EUR). */
-.treasury-amount-field {
-  position: relative;
-}
 .treasury-amount-field input {
-  padding-right: 2.1rem;
-}
-.treasury-amount-field::after {
-  content: '€';
-  position: absolute;
-  right: 0.8rem;
-  bottom: 0.72rem;
-  font-weight: 700;
-  color: color-mix(in srgb, var(--ink) 55%, transparent);
-  pointer-events: none;
+  padding-right: 2.2rem;
+  /*
+   * The € lives inside the control as a background glyph, so it stays vertically centred whatever
+   * the height of the input (it used to be a ::after anchored to the bottom of the wrapper, which
+   * drifted below the text on the taller amount field). The baseline is placed by hand (y=18 in a
+   * 24-unit box) instead of relying on dominant-baseline, which not every SVG engine honours.
+   */
+  background-image: url("data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%2024%2024'%3E%3Ctext%20x='12'%20y='18'%20text-anchor='middle'%20font-family='Manrope,%20system-ui,%20sans-serif'%20font-size='18'%20font-weight='700'%20fill='%235a6f6c'%3E%E2%82%AC%3C/text%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 0.8rem center;
+  background-size: 1.1rem 1.1rem;
 }
 .treasury-attach-lede {
   margin: 0;

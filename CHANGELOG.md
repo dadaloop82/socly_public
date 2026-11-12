@@ -92,6 +92,8 @@ every 100 patches bump the series, and each bump is published to this repository
 
 ### Fixed
 
+- The € of the amount field is centred inside the control again: it was anchored to the bottom of the
+  wrapper and slid to the lower edge of the taller amount input.
 - The cost centre is no longer missing on some movements: when the movement year has no budget the
   closest one is offered (labelled with its year) instead of hiding the field, and a cost centre
   already assigned from another budget stays selectable. In the movement page the “Document” box now
