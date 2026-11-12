@@ -1626,3 +1626,38 @@ if (!function_exists('version_attrs')) {
     }
 }
 
+if (!function_exists('treasury_account_label')) {
+    /**
+     * Readable name of a financial account (wallet) from its slug: a custom wallet carries its own
+     * label, a built-in one uses the translation, anything else (legacy or imported slug) is
+     * humanised — the raw slug (`carta_di_credito`) must never reach the UI.
+     *
+     * @param array<string,string> $labels optional slug → label map for the current screen
+     */
+    function treasury_account_label(string $key, array $labels = []): string
+    {
+        $key = \Socly\Services\TreasuryService::normalizeAccount($key);
+        if ($key === '') {
+            return '';
+        }
+        $label = trim((string) ($labels[$key] ?? ''));
+        if ($label !== '') {
+            return $label;
+        }
+        try {
+            $label = trim((string) app(\Socly\Services\TreasuryService::class)->accountLabel($key));
+            if ($label !== '') {
+                return $label;
+            }
+        } catch (\Throwable) {
+            // Fall through to the translated/humanised label below.
+        }
+        $translated = (string) __('treasury.account_' . $key);
+
+        return $translated !== 'treasury.account_' . $key
+            ? $translated
+            : sentence_case(str_replace('_', ' ', $key));
+    }
+}
+
+

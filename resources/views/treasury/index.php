@@ -635,21 +635,12 @@ if ($filterYear !== '' && !isset($yearFilterOptions[$filterYear])) {
                                 $supersededAccountLabel = '';
                                 $supersededAccountRaw = trim((string) ($row['superseded_account'] ?? ''));
                                 if ($supersededAccountRaw !== '') {
-                                    $supersededAccountKey = \Socly\Services\TreasuryService::normalizeAccount($supersededAccountRaw);
-                                    $supersededAccountLabel = $supersededAccountKey !== ''
-                                        ? (string) __('treasury.account_' . $supersededAccountKey)
-                                        : $supersededAccountRaw;
-                                    if ($supersededAccountKey !== ''
-                                        && $supersededAccountLabel === 'treasury.account_' . $supersededAccountKey) {
-                                        $supersededAccountLabel = $supersededAccountKey;
-                                    }
+                                    // Custom wallets carry their own name: never show the slug.
+                                    $supersededAccountLabel = treasury_account_label($supersededAccountRaw);
                                 }
                                 $editUrl = $canManage ? url('/treasury/' . $rowId . '/edit') . $retSuffix : '';
                                 $accountKey = \Socly\Services\TreasuryService::normalizeAccount((string) ($row['account'] ?? ''));
-                                $accountLabel = $accountKey !== '' ? (string) __('treasury.account_' . $accountKey) : '';
-                                if ($accountKey !== '' && $accountLabel === 'treasury.account_' . $accountKey) {
-                                    $accountLabel = $accountKey;
-                                }
+                                $accountLabel = $accountKey !== '' ? treasury_account_label($accountKey) : '';
                                 $methodRaw = trim((string) ($row['payment_method'] ?? ''));
                                 $methodKey = $methodRaw !== '' ? \Socly\Services\TreasuryService::normalizePaymentMethod($methodRaw) : '';
                                 $methodLabel = $methodKey !== '' ? (string) __('treasury.method_' . $methodKey) : '';
@@ -664,11 +655,7 @@ if ($filterYear !== '' && !isset($yearFilterOptions[$filterYear])) {
                                 $transferLabel = '';
                                 $transferRaw = trim((string) ($row['transfer_account'] ?? ''));
                                 if ($isTransfer && $transferRaw !== '') {
-                                    $transferKey = \Socly\Services\TreasuryService::normalizeAccount($transferRaw);
-                                    $transferLabel = $transferKey !== '' ? (string) __('treasury.account_' . $transferKey) : $transferRaw;
-                                    if ($transferKey !== '' && $transferLabel === 'treasury.account_' . $transferKey) {
-                                        $transferLabel = $transferKey;
-                                    }
+                                    $transferLabel = treasury_account_label($transferRaw);
                                 }
                                 ?>
                                 <tr
@@ -721,8 +708,7 @@ if ($filterYear !== '' && !isset($yearFilterOptions[$filterYear])) {
                                         <?php endif; ?>
                                         <?php $originAccount = trim((string) ($row['transfer_origin_account'] ?? '')); ?>
                                         <?php if ($originAccount !== ''): ?>
-                                            <?php $originKey = \Socly\Services\TreasuryService::normalizeAccount($originAccount); ?>
-                                            <?php $originLabel = $originKey !== '' ? (string) __('treasury.account_' . $originKey) : $originAccount; ?>
+                                            <?php $originLabel = treasury_account_label($originAccount); ?>
                                             <span class="badge badge-ok treasury-superseded-badge"><?= e(__('treasury.transfer_origin_badge')) ?></span>
                                             <div class="muted treasury-superseded-note"><?= e(__('treasury.transfer_origin_note', [
                                                 'account' => $originLabel,

@@ -368,7 +368,8 @@ final class TreasuryService
                 return $this->accountRowLabel($row);
             }
         }
-        return $this->humanizeSlug($key);
+        // A slug without a wallet row (legacy or imported value) still has to read as a name.
+        return sentence_case(str_replace('_', ' ', $key));
     }
 
     public function accountExists(string $key): bool
@@ -1132,44 +1133,63 @@ final class TreasuryService
      *
      * @return array{prev:array{id:int,date:string}|null,next:array{id:int,date:string}|null}
      */
-    public function adjacentMovements(int $id): array
-    {
-        if ($id < 1) {
+    /**
+     * Previous/next movement **in the order of the ledger the operator is looking at**: the same
+     * filters, the same sort (date, description, method, amount, grouped by type) and therefore the
+     * same sequence the list shows, page after page.
+     *
+     * The row position comes from a window function over the ledger ordering, so every sort key is
+     * supported without duplicating the comparison per column.
+     *
+     * @param array<string,mixed> $filters ledger filters (see ledgerConditions)
+     * @return array{prev:array{id:int,date:string}|null,next:array{id:int,date:string}|null}
+     */
+    public function adjacentMovements(
+        int $id,
+        string $sort = 'date_desc',
+        array $filters = [],
+        string $query = '',
+        bool $groupByCategory = false
+    ): array {
+        if ($id < 1 || !in_array($sort, self::SORTS, true)) {
             return ['prev' => null, 'next' => null];
         }
+        [$where, $params] = $this->ledgerConditions($query, $filters);
+        $whereSql = $where === [] ? '' : ' WHERE ' . implode(' AND ', $where);
+        $ordered = 'SELECT m.id, m.movement_date, ROW_NUMBER() OVER (ORDER BY '
+            . $this->ledgerOrder($sort, $groupByCategory) . ') AS rn'
+            . ' FROM treasury_movements m' . $whereSql;
         $current = $this->db->fetch(
-            'SELECT id, movement_date FROM treasury_movements WHERE id = :id LIMIT 1',
-            ['id' => $id]
+            'SELECT t.rn FROM (' . $ordered . ') t WHERE t.id = ' . $id,
+            $params
         );
-        if ($current === null) {
+        $position = (int) ($current['rn'] ?? 0);
+        if ($position < 1) {
             return ['prev' => null, 'next' => null];
         }
-        $date = (string) ($current['movement_date'] ?? '');
-        $prev = $this->db->fetch(
-            'SELECT id, movement_date FROM treasury_movements
-             WHERE movement_date < :d1 OR (movement_date = :d2 AND id < :id)
-             ORDER BY movement_date DESC, id DESC
-             LIMIT 1',
-            ['d1' => $date, 'd2' => $date, 'id' => $id]
+        // Integer literals (already cast) keep the outer query free of bound parameters, so the
+        // filter parameters of the inner query are never reused ambiguously.
+        $rows = $this->db->fetchAll(
+            'SELECT t.id, t.movement_date, t.rn FROM (' . $ordered . ') t'
+            . ' WHERE t.rn IN (' . max(1, $position - 1) . ', ' . ($position + 1) . ')',
+            $params
         );
-        $next = $this->db->fetch(
-            'SELECT id, movement_date FROM treasury_movements
-             WHERE movement_date > :d1 OR (movement_date = :d2 AND id > :id)
-             ORDER BY movement_date ASC, id ASC
-             LIMIT 1',
-            ['d1' => $date, 'd2' => $date, 'id' => $id]
-        );
+        $prev = null;
+        $next = null;
+        foreach ($rows as $row) {
+            $entry = [
+                'id' => (int) ($row['id'] ?? 0),
+                'date' => (string) ($row['movement_date'] ?? ''),
+            ];
+            if ((int) ($row['rn'] ?? 0) === $position - 1) {
+                $prev = $entry;
+            }
+            if ((int) ($row['rn'] ?? 0) === $position + 1) {
+                $next = $entry;
+            }
+        }
 
-        return [
-            'prev' => $prev === null ? null : [
-                'id' => (int) ($prev['id'] ?? 0),
-                'date' => (string) ($prev['movement_date'] ?? ''),
-            ],
-            'next' => $next === null ? null : [
-                'id' => (int) ($next['id'] ?? 0),
-                'date' => (string) ($next['movement_date'] ?? ''),
-            ],
-        ];
+        return ['prev' => $prev, 'next' => $next];
     }
 
     /**

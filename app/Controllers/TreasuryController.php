@@ -197,6 +197,21 @@ final class TreasuryController extends BaseController
         $conflictVersion = (int) $request->input('v', 0);
         $conflictActive = (string) $request->input('conflict', '') !== '' && $conflictVersion > 0;
         $returnPath = $this->listReturnPath($request);
+        // The previous/next arrows follow the ledger the operator came from: same sort, filters,
+        // search and grouping — not a fixed date order.
+        $returnQuery = $this->listReturnQuery($request);
+        $listSort = (string) ($returnQuery['sort'] ?? 'date_desc');
+        if (!in_array($listSort, TreasuryService::SORTS, true)) {
+            $listSort = 'date_desc';
+        }
+        $listRequest = new Request('GET', '/treasury', $returnQuery, [], [], []);
+        $adjacent = $this->treasury->adjacentMovements(
+            (int) $movement['id'],
+            $listSort,
+            $this->ledgerFilters($listRequest),
+            (string) ($returnQuery['q'] ?? ''),
+            ($returnQuery['group'] ?? '') === '1'
+        );
         $conflict = null;
         if ($conflictActive) {
             $editor = $this->versions->lastEditor('treasury', (int) $movement['id']);
@@ -216,7 +231,7 @@ final class TreasuryController extends BaseController
             'movement' => $movement,
             'movement_version' => $conflictActive ? $conflictVersion : (int) ($movement['row_version'] ?? 0),
             'movement_conflict' => $conflict,
-            'adjacent' => $this->treasury->adjacentMovements((int) $movement['id']),
+            'adjacent' => $adjacent,
             'default_category' => (string) ($movement['category'] ?? 'membership_fee'),
             'categories' => $categories,
             'category_groups' => $this->treasury->categoryGroups(),
@@ -877,21 +892,26 @@ final class TreasuryController extends BaseController
      * Only a *relative* `/treasury` path carrying the ledger keys is accepted: an external host,
      * another screen, a fragment or an unknown parameter are dropped (no open redirect).
      */
-    private function listReturnPath(Request $request): string
+    /**
+     * Ledger state carried by the `ret` parameter, cleaned (only a relative `/treasury` path with the
+     * ledger keys survives; no external host, scheme, fragment, backslash or unknown parameter).
+     *
+     * @return array<string,string>
+     */
+    private function listReturnQuery(Request $request): array
     {
-        $fallback = '/treasury';
         $raw = trim((string) $request->input('ret', ''));
         if ($raw === '' || mb_strlen($raw) > 2000 || preg_match('/[\x00-\x1f\x7f\\\\]/', $raw) === 1) {
-            return $fallback;
+            return [];
         }
         $parts = parse_url($raw);
         if (!is_array($parts)
             || isset($parts['scheme']) || isset($parts['host']) || isset($parts['user'])
             || isset($parts['pass']) || isset($parts['port']) || isset($parts['fragment'])) {
-            return $fallback;
+            return [];
         }
         if (rtrim((string) ($parts['path'] ?? ''), '/') !== '/treasury') {
-            return $fallback;
+            return [];
         }
         $query = is_string($parts['query'] ?? null) ? $parts['query'] : '';
         $parsed = [];
@@ -924,6 +944,13 @@ final class TreasuryController extends BaseController
                 $clean['page'] = (string) $page;
             }
         }
+
+        return $clean;
+    }
+
+    private function listReturnPath(Request $request): string
+    {
+        $clean = $this->listReturnQuery($request);
 
         return '/treasury' . ($clean === [] ? '' : '?' . http_build_query($clean));
     }

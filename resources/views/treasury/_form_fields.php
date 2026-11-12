@@ -141,7 +141,7 @@ foreach (($accounts ?? []) as $accountOption) {
 }
 if ($accountOptions === []) {
     foreach (\Socly\Services\TreasuryService::BUILTIN_ACCOUNTS as $accountKey) {
-        $plainLabel = (string) __('treasury.account_' . $accountKey);
+        $plainLabel = treasury_account_label($accountKey);
         $accountOptions[] = [
             'value' => $accountKey,
             'label' => $accountLabelWithBalance($plainLabel, $accountKey),

@@ -88,6 +88,12 @@ every 100 patches bump the series, and each bump is published to this repository
 
 ### Fixed
 
+- The previous/next arrows of a movement now follow the order of the list you are reading: same
+  filters, same search, same sort (date, description, method, amount, grouped by type) and therefore
+  the same sequence of the ledger, page after page.
+- A financial account is always shown with its name: a custom wallet (“Carta di credito”) is no
+  longer displayed with its internal slug (`carta_di_credito`) in the ledger, in the superseded /
+  transfer notes and in the account pickers; a legacy slug without a wallet still reads as a name.
 - The ledger keeps its filters, its sort and the page when you open a movement, create a new one and
   come back: the “Back” button, the previous/next arrows, a retry after a validation error and the
   redirect after the save all return to the same filtered view (the state is handed to the “apply to
