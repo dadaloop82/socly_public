@@ -79,7 +79,7 @@ $brandStyle = brand_root_style_decls($brandPrimary ?? null, $brandAccent ?? null
         tr.section-total td { background: #faf8f7; font-weight: 600; }
         tr.grand-total td { background: color-mix(in srgb, var(--brand-primary) 10%, #fff); font-weight: 700; }
         .evidence { font-size: 0.78rem; color: #444; }
-        .evidence span { display: block; }
+        .evidence span { display: block; white-space: nowrap; }
         .sign { margin-top: 2.2rem; display: flex; justify-content: space-between; gap: 2rem; }
         .sign div { flex: 1; border-top: 1px solid #333; padding-top: 0.4rem; font-size: 0.82rem; }
         .doc-note { margin-top: 1.2rem; font-size: 0.72rem; color: #666; }
@@ -134,16 +134,19 @@ $brandStyle = brand_root_style_decls($brandPrimary ?? null, $brandAccent ?? null
                             <span>—</span>
                         <?php else: ?>
                             <?php foreach ($rows as $row): ?>
-                                <span>
-                                    <?= e(format_date((string) ($row['movement_date'] ?? '')) ?: (string) ($row['movement_date'] ?? '')) ?>
-                                    <?php if ((string) ($row['invoice_number'] ?? '') !== ''): ?>
-                                        · <?= e(__('treasury.invoice_number')) ?> <?= e((string) $row['invoice_number']) ?>
-                                    <?php endif; ?>
-                                    <?php if ((string) ($row['beneficiary'] ?? '') !== ''): ?>
-                                        · <?= e((string) $row['beneficiary']) ?>
-                                    <?php endif; ?>
-                                    · <?= e($currency->format((float) ($row['amount'] ?? 0))) ?>
-                                </span>
+                                <?php
+                                // Just the reference of the receipt: date · invoice number · amount.
+                                // The counterparty and the wording “Numero fattura” are left out so a
+                                // document stays on one line in the printed statement.
+                                $evidenceParts = [
+                                    format_date((string) ($row['movement_date'] ?? '')) ?: (string) ($row['movement_date'] ?? ''),
+                                ];
+                                if ((string) ($row['invoice_number'] ?? '') !== '') {
+                                    $evidenceParts[] = (string) $row['invoice_number'];
+                                }
+                                $evidenceParts[] = $currency->format((float) ($row['amount'] ?? 0));
+                                ?>
+                                <span><?= e(implode(' · ', array_filter($evidenceParts, static fn (string $part): bool => $part !== ''))) ?></span>
                             <?php endforeach; ?>
                         <?php endif; ?>
                     </td>

@@ -1008,6 +1008,13 @@ final class BudgetService
      *
      * @return array<int,list<array<string,mixed>>>
      */
+    /**
+     * Receipts (“pezze giustificative”) of an approved budget, grouped by cost centre.
+     *
+     * Only what the printed statement shows is selected: date, invoice number and amount.
+     *
+     * @return array<int,list<array<string,mixed>>>
+     */
     public function evidence(int $id): array
     {
         $budget = $this->find($id);
@@ -1018,7 +1025,7 @@ final class BudgetService
         $in = implode(', ', array_map('intval', $ids));
         $out = [];
         foreach ($this->db->fetchAll(
-            "SELECT budget_item_id, movement_date, direction, amount, description, invoice_number, invoice_date, beneficiary
+            "SELECT budget_item_id, movement_date, amount, invoice_number
              FROM treasury_movements
              WHERE approved_at IS NOT NULL AND superseded_at IS NULL AND budget_item_id IN (" . $in . ")
              ORDER BY movement_date ASC, id ASC"
