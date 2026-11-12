@@ -468,10 +468,16 @@ if ($filterYear !== '' && !isset($yearFilterOptions[$filterYear])) {
         </div>
     <?php endif; ?>
     <?php if ($canManage): ?>
-        <div class="members-bulk-bar" data-treasury-bulk-bar aria-hidden="true">
+        <div class="members-bulk-bar" data-treasury-bulk-bar aria-hidden="true"
+             data-currency-display="<?= e($currency->display()) ?>"
+             data-msg-total-income="<?= e(__('treasury.bulk_total_income')) ?>"
+             data-msg-total-expense="<?= e(__('treasury.bulk_total_expense')) ?>"
+             data-msg-total-net="<?= e(__('treasury.bulk_total_net')) ?>"
+             data-msg-total-transfers="<?= e(__('treasury.bulk_total_transfers')) ?>">
             <div class="members-bulk-bar-inner">
                 <span class="members-bulk-count" data-treasury-bulk-count>0</span>
                 <span class="muted"><?= e(__('treasury.bulk_selected')) ?></span>
+                <span class="treasury-bulk-total" data-treasury-bulk-total hidden></span>
                 <div class="members-bulk-actions">
                     <button type="button" class="btn btn-sm btn-ghost" data-treasury-bulk-action="approve"><?= e(__('treasury.bulk_approve')) ?></button>
                     <button type="button" class="btn btn-sm btn-ghost" data-treasury-bulk-action="unapprove"><?= e(__('treasury.bulk_unapprove')) ?></button>
@@ -617,6 +623,8 @@ if ($filterYear !== '' && !isset($yearFilterOptions[$filterYear])) {
                                 <tr
                                     class="treasury-row treasury-row-<?= $isTransfer ? 'transfer' : ($isIncome ? 'income' : 'expense') ?><?= $canManage && !$isSuperseded ? ' doc-row-editable' : '' ?><?= $isSuperseded ? ' is-superseded' : '' ?>"
                                     data-treasury-row="<?= $rowId ?>" data-treasury-approved="<?= $isPending ? '0' : '1' ?>" data-treasury-account="<?= e($accountKey) ?>"
+                                    data-treasury-amount="<?= e(number_format($amount, 2, '.', '')) ?>"
+                                    data-treasury-direction="<?= $isTransfer ? 'transfer' : ($isIncome ? 'income' : 'expense') ?>"
                                     <?php if ($canManage && !$isSuperseded): ?>
                                         data-href="<?= e($editUrl) ?>"
                                         tabindex="0"

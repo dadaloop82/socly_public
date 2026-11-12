@@ -3201,6 +3201,43 @@ function initTreasuryBulk() {
 
   const selectedIds = () => checkboxes.filter((cb) => cb.checked).map((cb) => cb.value);
 
+  // Totals of the selected movements: incomes and expenses are summed separately, the balance is
+  // their difference; internal transfers move liquidity and are shown on their own.
+  const totalsEl = bar.querySelector('[data-treasury-bulk-total]');
+  const currencyDisplay = bar.getAttribute('data-currency-display') || '';
+  const moneyTemplate = (key) => bar.getAttribute(key) || '';
+  const formatMoney = (value) => {
+    const [integer, decimals] = Math.abs(value).toFixed(2).split('.');
+    return `${integer.replace(/\B(?=(\d{3})+(?!\d))/g, '.')},${decimals} ${currencyDisplay}`.trim();
+  };
+  const withAmount = (template, amount) => template.replace(':amount', amount);
+  const renderTotals = (ids) => {
+    if (!(totalsEl instanceof HTMLElement)) return;
+    let income = 0;
+    let expense = 0;
+    let transfers = 0;
+    ids.forEach((id) => {
+      const row = root.querySelector(`[data-treasury-row="${id}"]`);
+      if (!row) return;
+      const amount = Math.abs(Number(row.getAttribute('data-treasury-amount') || '0')) || 0;
+      const direction = row.getAttribute('data-treasury-direction') || '';
+      if (direction === 'income') income += amount;
+      else if (direction === 'expense') expense += amount;
+      else if (direction === 'transfer') transfers += amount;
+    });
+    const parts = [];
+    if (income > 0) parts.push(withAmount(moneyTemplate('data-msg-total-income'), formatMoney(income)));
+    if (expense > 0) parts.push(withAmount(moneyTemplate('data-msg-total-expense'), formatMoney(expense)));
+    if (income > 0 && expense > 0) {
+      const net = income - expense;
+      const netAmount = net === 0 ? formatMoney(net) : `${net < 0 ? '−' : '+'}${formatMoney(net)}`;
+      parts.push(withAmount(moneyTemplate('data-msg-total-net'), netAmount));
+    }
+    if (transfers > 0) parts.push(withAmount(moneyTemplate('data-msg-total-transfers'), formatMoney(transfers)));
+    totalsEl.textContent = parts.length > 0 ? `(${parts.join(' · ')})` : '';
+    totalsEl.hidden = parts.length === 0;
+  };
+
   const approveBtn = bar.querySelector('[data-treasury-bulk-action="approve"]');
   const unapproveBtn = bar.querySelector('[data-treasury-bulk-action="unapprove"]');
 
@@ -3236,6 +3273,7 @@ function initTreasuryBulk() {
     bar.classList.toggle('is-open', open);
     bar.setAttribute('aria-hidden', open ? 'false' : 'true');
     if (count) count.textContent = String(ids.length);
+    renderTotals(ids);
   };
 
   checkboxes.forEach((cb) => cb.addEventListener('change', sync));
