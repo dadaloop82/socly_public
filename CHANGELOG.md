@@ -84,6 +84,11 @@ every 100 patches bump the series, and each bump is published to this repository
 
 ### Changed
 
+- The **Cost centre / project** field of a movement now names the budget **section first and then the
+  line** (“Spese di gestione e funzionamento · Affitto della Sede”, with the year in front when the
+  line comes from another budget), so the chosen value keeps its context even when the field is
+  collapsed; the full text stays available as a tooltip and the automatic imputation by category is
+  unchanged.
 - First-note filters are now a compact bar: search, period and type stay visible, while a **Filters**
   button (with the number of active filters) opens type, Model D line, cost centre, account, approval
   and sorting. The three classification filters include **“Not assigned”**, and “Group by category”

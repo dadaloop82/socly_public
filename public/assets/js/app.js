@@ -15803,12 +15803,23 @@ function initTreasuryBudgetImpute(scope = document) {
   const select = form.querySelector('[data-treasury-budget-item]');
   const category = form.querySelector('[data-treasury-category]');
   if (!select || !category) return;
+  // The option label carries “section · line”, which can be wider than the control: keep the full
+  // text reachable as a tooltip instead of losing it to the clipping.
+  const syncTitle = () => {
+    const option = select.options[select.selectedIndex];
+    const label = option ? String(option.textContent || '').trim() : '';
+    if (label === '') select.removeAttribute('title');
+    else select.setAttribute('title', label);
+  };
+  select.addEventListener('change', syncTitle);
+  syncTitle();
   category.addEventListener('change', () => {
     if (select.value) return; // never override a manual choice
     const match = Array.from(select.options).find(
       (option) => option.dataset.category && option.dataset.category === category.value
     );
     if (match) select.value = match.value;
+    syncTitle();
   });
 }
 

@@ -354,32 +354,41 @@ if (array_key_exists('has_document', $values)) {
             'attrs' => ['data-treasury-runts' => true],
         ]) ?>
         <?php
-        $budgetItemGroups = [];
+        // Cost centre / project: a flat list whose label always starts with the budget section and
+        // then the line, so the chosen value keeps its context even when the field is collapsed
+        // (“2027 · Spese di gestione e funzionamento · Affitto della Sede”). Sections stay contiguous,
+        // and each option keeps the category/direction used by the automatic imputation.
+        $budgetItemOptions = [];
         foreach (($budget_items ?? []) as $budgetGroup) {
-            $budgetOptions = [];
+            $budgetSection = trim((string) ($budgetGroup['label'] ?? ''));
             foreach (($budgetGroup['options'] ?? []) as $budgetOption) {
-                $budgetOptions[] = [
+                $budgetItemLabel = trim((string) ($budgetOption['label'] ?? ''));
+                $budgetLabel = $budgetSection !== '' && $budgetItemLabel !== ''
+                    ? $budgetSection . ' · ' . $budgetItemLabel
+                    : ($budgetItemLabel !== '' ? $budgetItemLabel : $budgetSection);
+                if ($budgetLabel === '') {
+                    continue;
+                }
+                $budgetItemOptions[] = [
                     'value' => (string) ($budgetOption['value'] ?? ''),
-                    'label' => (string) ($budgetOption['label'] ?? ''),
+                    'label' => $budgetLabel,
                     'attrs' => [
                         'data-category' => (string) ($budgetOption['category'] ?? ''),
                         'data-direction' => (string) ($budgetOption['direction'] ?? ''),
+                        'data-section' => $budgetSection,
                     ],
                 ];
             }
-            if ($budgetOptions !== []) {
-                $budgetItemGroups[] = ['label' => (string) ($budgetGroup['label'] ?? ''), 'options' => $budgetOptions];
-            }
         }
         ?>
-        <?php if ($budgetItemGroups !== []): ?>
+        <?php if ($budgetItemOptions !== []): ?>
             <div class="budget-impute-field" data-treasury-budget-field>
                 <?= field('select', [
                     'name' => 'budget_item_id',
                     'label' => (string) __('treasury.budget_item'),
                     'value' => (string) ($values['budget_item_id'] ?? ''),
                     'empty_label' => (string) __('treasury.budget_item_none'),
-                    'groups' => $budgetItemGroups,
+                    'options' => $budgetItemOptions,
                     'hint' => (string) __('treasury.budget_item_hint'),
                     'attrs' => ['data-treasury-budget-item' => true],
                 ]) ?>
