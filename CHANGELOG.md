@@ -88,6 +88,11 @@ every 100 patches bump the series, and each bump is published to this repository
 
 ### Fixed
 
+- The ledger keeps its filters, its sort and the page when you open a movement, create a new one and
+  come back: the “Back” button, the previous/next arrows, a retry after a validation error and the
+  redirect after the save all return to the same filtered view (the state is handed to the “apply to
+  similar” action too). Only internal `/treasury` URLs are accepted, so the parameter cannot be used
+  to redirect somewhere else.
 - Dates with an impossible year (0026, 0206, …) are no longer stored: the movement date, the
   document date and due date, the archive document date/expiry, the deadline date, the enrolment
   periods and the recurring series dates show the accepted range (1900 … current year + 5) and ask

@@ -95,6 +95,11 @@ $adjacentLabel = static function (array $entry, string $key): string {
 
     return (string) __($key, ['date' => $date !== '' ? $date : (string) ($entry['date'] ?? '')]);
 };
+// Ledger state to come back to: “Back”, the prev/next arrows and the redirect after the save keep
+// the filters, the sort and the page the operator was reading.
+$returnPath = (string) ($return_path ?? '/treasury');
+$returnUrl = (string) ($return_url ?? url('/treasury'));
+$retSuffix = $returnPath === '/treasury' ? '' : '?ret=' . rawurlencode($returnPath);
 ?>
 <div class="page-header">
     <div class="titles">
@@ -105,7 +110,7 @@ $adjacentLabel = static function (array $entry, string $key): string {
         <?php if ($isEdit): ?>
             <div class="record-nav" role="group" aria-label="<?= e(__('treasury.nav_label')) ?>">
                 <?php if ($adjacentPrev !== null && (int) ($adjacentPrev['id'] ?? 0) > 0): ?>
-                    <a class="btn btn-ghost btn-sm record-nav-btn" href="<?= e(url('/treasury/' . (int) $adjacentPrev['id'] . '/edit')) ?>"
+                    <a class="btn btn-ghost btn-sm record-nav-btn" href="<?= e(url('/treasury/' . (int) $adjacentPrev['id'] . '/edit') . $retSuffix) ?>"
                        title="<?= e($adjacentLabel($adjacentPrev, 'treasury.nav_prev_title')) ?>"
                        aria-label="<?= e($adjacentLabel($adjacentPrev, 'treasury.nav_prev_title')) ?>">‹</a>
                 <?php else: ?>
@@ -113,7 +118,7 @@ $adjacentLabel = static function (array $entry, string $key): string {
                           title="<?= e(__('treasury.nav_prev_none')) ?>">‹</span>
                 <?php endif; ?>
                 <?php if ($adjacentNext !== null && (int) ($adjacentNext['id'] ?? 0) > 0): ?>
-                    <a class="btn btn-ghost btn-sm record-nav-btn" href="<?= e(url('/treasury/' . (int) $adjacentNext['id'] . '/edit')) ?>"
+                    <a class="btn btn-ghost btn-sm record-nav-btn" href="<?= e(url('/treasury/' . (int) $adjacentNext['id'] . '/edit') . $retSuffix) ?>"
                        title="<?= e($adjacentLabel($adjacentNext, 'treasury.nav_next_title')) ?>"
                        aria-label="<?= e($adjacentLabel($adjacentNext, 'treasury.nav_next_title')) ?>">›</a>
                 <?php else: ?>
@@ -122,7 +127,7 @@ $adjacentLabel = static function (array $entry, string $key): string {
                 <?php endif; ?>
             </div>
         <?php endif; ?>
-        <a class="btn btn-ghost" href="<?= e(url('/treasury')) ?>"><?= e(__('common.back')) ?></a>
+        <a class="btn btn-ghost" href="<?= e($returnUrl) ?>"><?= e(__('common.back')) ?></a>
     </div>
 </div>
 
@@ -160,8 +165,9 @@ $adjacentLabel = static function (array $entry, string $key): string {
         ]) ?>
     <?php endif; ?>
     <?php require __DIR__ . '/_form_fields.php'; ?>
+    <?= field('hidden', ['name' => 'ret', 'value' => $returnPath]) ?>
     <div class="form-actions form-actions-end">
-        <a class="btn btn-ghost" href="<?= e(url('/treasury')) ?>"><?= e(__('common.back')) ?></a>
+        <a class="btn btn-ghost" href="<?= e($returnUrl) ?>"><?= e(__('common.back')) ?></a>
         <button class="btn" type="submit"><?= e($submitLabel) ?></button>
     </div>
     <?php if ($isEdit): ?>

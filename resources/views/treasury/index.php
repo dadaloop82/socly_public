@@ -45,6 +45,14 @@ $pagerQuery = array_filter([
 $currentPage = (int) ($page ?? 1);
 $totalPages = (int) ($pages ?? 1);
 $pageUrl = static fn (int $p): string => url('/treasury?' . http_build_query(array_merge($pagerQuery, ['page' => $p])));
+// “ret”: the ledger state (filters, sort, page) handed to the create/edit pages, so “Back”, a retry
+// after a validation error and the redirect after a save come back to the same view.
+$listQuery = $pagerQuery;
+if ($currentPage > 1) {
+    $listQuery['page'] = (string) $currentPage;
+}
+$listPath = '/treasury' . ($listQuery === [] ? '' : '?' . http_build_query($listQuery));
+$retSuffix = '?ret=' . rawurlencode($listPath);
 $pageWindow = $totalPages > 1 ? range(max(1, $currentPage - 2), min($totalPages, $currentPage + 2)) : [];
 // Sortable column headers: the ledger keeps the order in a single `sort` key (`<column>_asc|_desc`),
 // so a click on the active column flips the direction and a click on another column starts over.
@@ -114,7 +122,7 @@ $accountFilterUrl = static function (string $accountKey) use ($ledgerParams): st
     </div>
     <div class="actions">
         <?php if ($canManage): ?>
-            <a class="btn<?= empty($hasAnyMovements) ? ' is-first-cta' : '' ?>" href="<?= e(url('/treasury/create')) ?>"><?= e(__('treasury.add_movement')) ?></a>
+            <a class="btn<?= empty($hasAnyMovements) ? ' is-first-cta' : '' ?>" href="<?= e(url('/treasury/create') . $retSuffix) ?>"><?= e(__('treasury.add_movement')) ?></a>
             <a class="btn-action-icon" href="<?= e(url('/treasury/import')) ?>" aria-label="<?= e(__('treasury.csv_import_button')) ?>" title="<?= e(__('treasury.csv_import_button')) ?>">
                 <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path fill="currentColor" d="M12 3l5 5h-3v6h-4V8H7l5-5zM5 19h14v2H5v-2z"/></svg>
             </a>
@@ -420,10 +428,11 @@ if ($filterYear !== '' && !isset($yearFilterOptions[$filterYear])) {
             <?= field('hidden', ['name' => 'category', 'value' => (string) ($probe['movement']['category'] ?? '')]) ?>
             <?= field('hidden', ['name' => 'runts_line', 'value' => (string) ($probe['movement']['runts_line'] ?? '')]) ?>
             <?= field('hidden', ['name' => 'budget_item_id', 'value' => (string) (int) ($probe['movement']['budget_item_id'] ?? 0)]) ?>
+            <?= field('hidden', ['name' => 'ret', 'value' => $listPath]) ?>
             <button class="btn btn-sm" type="submit">
                 <?= e(__('treasury.similar_apply', ['count' => (string) (int) ($probe['total'] ?? 0)])) ?>
             </button>
-            <a class="btn btn-ghost btn-sm" href="<?= e(url('/treasury')) ?>"><?= e(__('treasury.similar_dismiss')) ?></a>
+            <a class="btn btn-ghost btn-sm" href="<?= e(url($listPath)) ?>"><?= e(__('treasury.similar_dismiss')) ?></a>
         </form>
     </section>
 <?php endif; ?>
@@ -635,7 +644,7 @@ if ($filterYear !== '' && !isset($yearFilterOptions[$filterYear])) {
                                         $supersededAccountLabel = $supersededAccountKey;
                                     }
                                 }
-                                $editUrl = $canManage ? url('/treasury/' . $rowId . '/edit') : '';
+                                $editUrl = $canManage ? url('/treasury/' . $rowId . '/edit') . $retSuffix : '';
                                 $accountKey = \Socly\Services\TreasuryService::normalizeAccount((string) ($row['account'] ?? ''));
                                 $accountLabel = $accountKey !== '' ? (string) __('treasury.account_' . $accountKey) : '';
                                 if ($accountKey !== '' && $accountLabel === 'treasury.account_' . $accountKey) {

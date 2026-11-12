@@ -151,10 +151,13 @@ final class TreasuryController extends BaseController
         if ((string) $request->input('retry', '') !== '1') {
             $this->clearOld();
         }
+        $returnPath = $this->listReturnPath($request);
         $this->render('treasury/form', [
             'title' => __('treasury.add_movement'),
             'isEdit' => false,
             'action' => url('/treasury'),
+            'return_url' => url($returnPath),
+            'return_path' => $returnPath,
             'movement' => null,
             'default_category' => $this->treasury->defaultCategory(),
             'categories' => $this->treasury->categoryOptions(),
@@ -193,6 +196,7 @@ final class TreasuryController extends BaseController
         }
         $conflictVersion = (int) $request->input('v', 0);
         $conflictActive = (string) $request->input('conflict', '') !== '' && $conflictVersion > 0;
+        $returnPath = $this->listReturnPath($request);
         $conflict = null;
         if ($conflictActive) {
             $editor = $this->versions->lastEditor('treasury', (int) $movement['id']);
@@ -200,13 +204,15 @@ final class TreasuryController extends BaseController
                 'user' => $editor['name'],
                 'at' => $editor['at'],
                 'current' => $conflictVersion,
-                'reload_url' => url('/treasury/' . (int) $movement['id'] . '/edit'),
+                'reload_url' => url(self::withQuery('/treasury/' . (int) $movement['id'] . '/edit', ['ret' => $returnPath])),
             ];
         }
         $this->render('treasury/form', [
             'title' => __('treasury.edit'),
             'isEdit' => true,
             'action' => url('/treasury/' . (int) $movement['id']),
+            'return_url' => url($returnPath),
+            'return_path' => $returnPath,
             'movement' => $movement,
             'movement_version' => $conflictActive ? $conflictVersion : (int) ($movement['row_version'] ?? 0),
             'movement_conflict' => $conflict,
@@ -228,12 +234,15 @@ final class TreasuryController extends BaseController
     public function update(Request $request, string $id): void
     {
         require_component('treasury');
+        // Ledger state to come back to (filters, sort, page) after the save or a validation error.
+        $returnPath = $this->listReturnPath($request);
+        $editPath = '/treasury/' . (int) $id . '/edit';
         if (upload_post_too_large()) {
             $this->flash('errors', [
                 'invoice_pdf' => __('documents.upload_too_large', ['max' => upload_max_mb()]),
             ]);
             $this->rememberOld($request->all());
-            redirect('/treasury/' . (int) $id . '/edit?retry=1');
+            redirect(self::withQuery($editPath, ['retry' => '1', 'ret' => $returnPath]));
         }
         $posted = $request->all();
         $before = $this->treasury->find((int) $id);
@@ -253,10 +262,15 @@ final class TreasuryController extends BaseController
                     'user' => (string) ($result['editor']['name'] ?? ''),
                     'at' => (string) ($result['editor']['at'] ?? ''),
                 ])]);
-                redirect('/treasury/' . (int) $id . '/edit?retry=1&conflict=1&v=' . (int) ($result['current_version'] ?? 0));
+                redirect(self::withQuery($editPath, [
+                    'retry' => '1',
+                    'conflict' => '1',
+                    'v' => (string) (int) ($result['current_version'] ?? 0),
+                    'ret' => $returnPath,
+                ]));
             }
             $this->flash('errors', $result['errors'] ?? []);
-            redirect('/treasury/' . (int) $id . '/edit?retry=1');
+            redirect(self::withQuery($editPath, ['retry' => '1', 'ret' => $returnPath]));
         }
         $this->clearOld();
         $this->flash('success', __('treasury.updated'));
@@ -294,20 +308,22 @@ final class TreasuryController extends BaseController
                     'budget_item_id' => (string) (int) ($before['budget_item_id'] ?? 0),
                 ],
             ];
-            redirect('/treasury?similar=' . (int) $id);
+            redirect(self::withQuery($returnPath, ['similar' => (string) (int) $id]));
         }
-        redirect('/treasury');
+        redirect($returnPath);
     }
 
     public function store(Request $request): void
     {
         require_component('treasury');
+        // Ledger state to come back to (filters, sort, page) after the save or a validation error.
+        $returnPath = $this->listReturnPath($request);
         if (upload_post_too_large()) {
             $this->flash('errors', [
                 'invoice_pdf' => __('documents.upload_too_large', ['max' => upload_max_mb()]),
             ]);
             $this->rememberOld($request->all());
-            redirect('/treasury/create?retry=1');
+            redirect(self::withQuery('/treasury/create', ['retry' => '1', 'ret' => $returnPath]));
         }
         $result = $this->treasury->create(
             $request->all(),
@@ -318,7 +334,7 @@ final class TreasuryController extends BaseController
         if (empty($result['ok'])) {
             $this->flash('errors', $result['errors'] ?? ['treasury' => __('validation.required')]);
             $this->rememberOld($request->all());
-            redirect('/treasury/create?retry=1');
+            redirect(self::withQuery('/treasury/create', ['retry' => '1', 'ret' => $returnPath]));
         }
         // Recurring operation: the rule starts from the date of the just saved movement.
         if (!empty($request->input('recurring'))) {
@@ -341,9 +357,9 @@ final class TreasuryController extends BaseController
             || (int) $request->input('budget_item_id', 0) > 0;
         $newId = (int) ($result['id'] ?? 0);
         if ($classified && $newId > 0) {
-            redirect('/treasury?similar=' . $newId);
+            redirect(self::withQuery($returnPath, ['similar' => (string) $newId]));
         }
-        redirect('/treasury');
+        redirect($returnPath);
     }
 
     /**
@@ -775,7 +791,7 @@ final class TreasuryController extends BaseController
             'budget_item_id' => (string) $request->input('budget_item_id', ''),
         ], $request->ip(), $originals);
         $this->flash('success', __('treasury.similar_applied', ['count' => (string) $updated]));
-        redirect('/treasury');
+        redirect($this->listReturnPath($request));
     }
 
     private function ledgerFilters(Request $request): array
@@ -852,5 +868,78 @@ final class TreasuryController extends BaseController
     {
         $value = trim($value);
         return preg_match('/^\d{4}-\d{2}-\d{2}$/', $value) === 1 ? $value : '';
+    }
+
+    /**
+     * Ledger state the operator came from ("/treasury?q=…&sort=…&page=2"), so “Back”, a retry after
+     * a validation error and the redirect after a save land on the same filters, sort and page.
+     *
+     * Only a *relative* `/treasury` path carrying the ledger keys is accepted: an external host,
+     * another screen, a fragment or an unknown parameter are dropped (no open redirect).
+     */
+    private function listReturnPath(Request $request): string
+    {
+        $fallback = '/treasury';
+        $raw = trim((string) $request->input('ret', ''));
+        if ($raw === '' || mb_strlen($raw) > 2000 || preg_match('/[\x00-\x1f\x7f\\\\]/', $raw) === 1) {
+            return $fallback;
+        }
+        $parts = parse_url($raw);
+        if (!is_array($parts)
+            || isset($parts['scheme']) || isset($parts['host']) || isset($parts['user'])
+            || isset($parts['pass']) || isset($parts['port']) || isset($parts['fragment'])) {
+            return $fallback;
+        }
+        if (rtrim((string) ($parts['path'] ?? ''), '/') !== '/treasury') {
+            return $fallback;
+        }
+        $query = is_string($parts['query'] ?? null) ? $parts['query'] : '';
+        $parsed = [];
+        if ($query !== '') {
+            parse_str($query, $parsed);
+        }
+        $clean = [];
+        foreach (['q', 'period', 'direction', 'category', 'account', 'approval', 'month', 'year', 'sort', 'group', 'page'] as $key) {
+            $value = $parsed[$key] ?? null;
+            if (!is_scalar($value)) {
+                continue;
+            }
+            $value = trim((string) $value);
+            if ($value === '' || mb_strlen($value) > 120) {
+                continue;
+            }
+            $clean[$key] = $value;
+        }
+        if (isset($clean['sort']) && !in_array($clean['sort'], TreasuryService::SORTS, true)) {
+            unset($clean['sort']);
+        }
+        if (isset($clean['group']) && $clean['group'] !== '1') {
+            unset($clean['group']);
+        }
+        if (isset($clean['page'])) {
+            $page = (int) $clean['page'];
+            if ($page < 2) {
+                unset($clean['page']);
+            } else {
+                $clean['page'] = (string) $page;
+            }
+        }
+
+        return '/treasury' . ($clean === [] ? '' : '?' . http_build_query($clean));
+    }
+
+    /**
+     * Append parameters to a relative path, keeping the existing query string.
+     *
+     * @param array<string,string> $params
+     */
+    private static function withQuery(string $path, array $params): string
+    {
+        $params = array_filter($params, static fn (string $value): bool => $value !== '');
+        if ($params === []) {
+            return $path;
+        }
+
+        return $path . (str_contains($path, '?') ? '&' : '?') . http_build_query($params);
     }
 }
