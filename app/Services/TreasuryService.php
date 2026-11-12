@@ -6,6 +6,7 @@ namespace Socly\Services;
 
 use Socly\Core\Database;
 use Socly\Core\Validator;
+use Socly\Support\PlausibleDate;
 
 final class TreasuryService
 {
@@ -56,7 +57,7 @@ final class TreasuryService
      * Earliest plausible year for an operation date: a typo like 0206 would otherwise pollute the
      * period filters and the totals.
      */
-    public const MIN_MOVEMENT_YEAR = 1900;
+    public const MIN_MOVEMENT_YEAR = PlausibleDate::MIN_YEAR;
 
     /**
      * Cap of the free-text annotations (`notes`): a memo, not a second description.
@@ -274,7 +275,7 @@ final class TreasuryService
      */
     public static function maxMovementYear(): int
     {
-        return (int) date('Y') + 5;
+        return PlausibleDate::maxYear();
     }
 
     /**
@@ -283,7 +284,7 @@ final class TreasuryService
      */
     public static function isPlausibleMovementYear(int $year): bool
     {
-        return $year >= self::MIN_MOVEMENT_YEAR && $year <= self::maxMovementYear();
+        return PlausibleDate::isPlausibleYear($year);
     }
 
     /**
@@ -2066,6 +2067,14 @@ final class TreasuryService
             if (!$this->validator->validate(['invoice_date' => $invoiceDateRaw], ['invoice_date' => 'date'])) {
                 return ['ok' => false, 'errors' => ['invoice_date' => __('validation.date')]];
             }
+            // A document dated 0026/0206 is a typo: ask for the correction instead of storing it.
+            if (!PlausibleDate::isPlausible($invoiceDateRaw)) {
+                return ['ok' => false, 'errors' => ['invoice_date' => __('treasury.date_out_of_range', [
+                    'date' => $invoiceDateRaw,
+                    'min' => (string) PlausibleDate::MIN_YEAR,
+                    'max' => (string) PlausibleDate::maxYear(),
+                ])]];
+            }
             $invoiceDate = $invoiceDateRaw;
         }
         if ($isInvoice) {
@@ -2073,6 +2082,13 @@ final class TreasuryService
             if ($invoiceDueRaw !== '') {
                 if (!$this->validator->validate(['invoice_due_date' => $invoiceDueRaw], ['invoice_due_date' => 'date'])) {
                     return ['ok' => false, 'errors' => ['invoice_due_date' => __('validation.date')]];
+                }
+                if (!PlausibleDate::isPlausible($invoiceDueRaw)) {
+                    return ['ok' => false, 'errors' => ['invoice_due_date' => __('treasury.date_out_of_range', [
+                        'date' => $invoiceDueRaw,
+                        'min' => (string) PlausibleDate::MIN_YEAR,
+                        'max' => (string) PlausibleDate::maxYear(),
+                    ])]];
                 }
                 $invoiceDueDate = $invoiceDueRaw;
             }

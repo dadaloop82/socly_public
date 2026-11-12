@@ -9,6 +9,7 @@ use Socly\Core\Plugin\PluginManager;
 use Socly\Support\CsvReader;
 use Socly\Support\ImportValueNormalizer as N;
 use Socly\Support\MemberFieldTypes;
+use Socly\Support\PlausibleDate;
 
 /**
  * Import members from CSV: analysis, column mapping and transactional writing.
@@ -1042,6 +1043,16 @@ final class MemberImportService
             ]);
             return null;
         }
+        if (($type === 'date' || $type === 'birth_date') && $value !== null && !PlausibleDate::isPlausible((string) $value)) {
+            // A year such as 0026/0206 is a broken value, not a record: report it and leave the field
+            // empty instead of writing it into the archive.
+            $warnings[] = (string) __('members.import.warn_date_range', [
+                'value' => $raw,
+                'min' => (string) PlausibleDate::MIN_YEAR,
+                'max' => (string) PlausibleDate::maxYear(),
+            ]);
+            return null;
+        }
         if ($type === 'fiscal_code' && $value !== null && strlen((string) $value) === 16
             && !$this->validator->isValidFiscalCode((string) $value)) {
             $warnings[] = (string) __('members.import.warn_fiscal_code', ['value' => (string) $value]);
@@ -1092,6 +1103,16 @@ final class MemberImportService
         $date = N::toDate($raw);
         if ($date === null) {
             $warnings[] = (string) __('members.import.warn_date', ['value' => $raw]);
+            return null;
+        }
+        if (!PlausibleDate::isPlausible($date)) {
+            // Admission or card date in year 0026/0206: report it and keep the field empty.
+            $warnings[] = (string) __('members.import.warn_date_range', [
+                'value' => $raw,
+                'min' => (string) PlausibleDate::MIN_YEAR,
+                'max' => (string) PlausibleDate::maxYear(),
+            ]);
+            return null;
         }
         return $date;
     }

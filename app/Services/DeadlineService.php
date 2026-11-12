@@ -6,6 +6,7 @@ namespace Socly\Services;
 
 use Socly\Core\Database;
 use Socly\Core\Validator;
+use Socly\Support\PlausibleDate;
 
 final class DeadlineService
 {
@@ -658,6 +659,12 @@ final class DeadlineService
         $due = trim((string) ($input['due_date'] ?? ''));
         if (!$this->validator->validate(['due_date' => $due], ['due_date' => 'required|date'])) {
             return ['ok' => false, 'errors' => ['due_date' => __('validation.date')]];
+        }
+        if (!PlausibleDate::isPlausible($due)) {
+            return ['ok' => false, 'errors' => ['due_date' => __('validation.year_out_of_range', [
+                'min' => (string) PlausibleDate::MIN_YEAR,
+                'max' => (string) PlausibleDate::maxYear(),
+            ])]];
         }
 
         $categoryResult = $this->resolveCategory($input, $existing);

@@ -6,6 +6,7 @@ namespace Socly\Services;
 
 use Socly\Core\Database;
 use Socly\Core\Validator;
+use Socly\Support\PlausibleDate;
 
 /**
  * Recurring journal entry operations.
@@ -57,11 +58,15 @@ final class RecurringService
         }
         $day = max(1, min(31, (int) ($input['recurring_day'] ?? 1)));
         $start = trim((string) ($input['recurring_start'] ?? ''));
-        if ($start === '' || !$this->validator->validate(['d' => $start], ['d' => 'date'])) {
+        if ($start === '' || !$this->validator->validate(['d' => $start], ['d' => 'date'])
+            || !PlausibleDate::isPlausible($start)) {
+            // An impossible date (0206-01-01) would schedule a rule that never fires: fall back to
+            // the movement date instead of storing it.
             $start = $anchorDate;
         }
         $endsOn = trim((string) ($input['recurring_ends'] ?? ''));
-        if ($endsOn !== '' && !$this->validator->validate(['d' => $endsOn], ['d' => 'date'])) {
+        if ($endsOn !== '' && (!$this->validator->validate(['d' => $endsOn], ['d' => 'date'])
+            || !PlausibleDate::isPlausible($endsOn))) {
             $endsOn = '';
         }
         $next = $this->nextDate($start, $frequency, $day, true);

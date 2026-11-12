@@ -106,8 +106,13 @@ final class Validator
                 }
                 break;
             case 'date':
-                if ($value !== null && $value !== '' && !preg_match('/^\d{4}-\d{2}-\d{2}$/', (string) $value)) {
-                    $fail(__('validation.date'));
+                // A real calendar date, not just the shape: 2026-13-01 or 2026-02-31 are typos.
+                if ($value !== null && $value !== '') {
+                    $raw = (string) $value;
+                    if (preg_match('/^(\d{4})-(\d{2})-(\d{2})$/', $raw, $dateParts) !== 1
+                        || !checkdate((int) $dateParts[2], (int) $dateParts[3], (int) $dateParts[1])) {
+                        $fail(__('validation.date'));
+                    }
                 }
                 break;
             case 'adult_birth_date':

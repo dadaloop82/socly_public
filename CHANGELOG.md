@@ -88,6 +88,12 @@ every 100 patches bump the series, and each bump is published to this repository
 
 ### Fixed
 
+- Dates with an impossible year (0026, 0206, …) are no longer stored: the movement date, the
+  document date and due date, the archive document date/expiry, the deadline date, the enrolment
+  periods and the recurring series dates show the accepted range (1900 … current year + 5) and ask
+  for a correction; the first-note import flags the row in the dry run, where the date can be typed
+  again, and the member import reports the value in the warnings instead of writing it. The date
+  check also rejects calendar days that do not exist (31 February, month 13) everywhere.
 - Sorting the first note while “Group by type” is on now applies to the **whole** list, not just the
   visible page: the category is part of the database order, so pages keep the group blocks
   contiguous and the chosen column (date, description, method, amount) sorts every row of the

@@ -8,6 +8,7 @@ use Socly\Core\Database;
 use Socly\Core\Plugin\PluginManager;
 use Socly\Core\Validator;
 use Socly\Support\MemberFieldTypes;
+use Socly\Support\PlausibleDate;
 
 final class MemberService
 {
@@ -1271,7 +1272,12 @@ final class MemberService
 
     private function isValidPeriodDate(string $date): bool
     {
-        return (bool) preg_match('/^\d{4}-\d{2}-\d{2}$/', $date);
+        // A real calendar date with a plausible year: “2026-13-01” and “0026-01-01” are typos.
+        if (preg_match('/^(\d{4})-(\d{2})-(\d{2})$/', $date, $parts) !== 1) {
+            return false;
+        }
+
+        return checkdate((int) $parts[2], (int) $parts[3], (int) $parts[1]) && PlausibleDate::isPlausible($date);
     }
 
     /**

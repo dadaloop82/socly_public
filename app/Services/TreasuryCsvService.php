@@ -7,6 +7,7 @@ namespace Socly\Services;
 use Socly\Core\Database;
 use Socly\Support\CsvReader;
 use Socly\Support\ImportValueNormalizer;
+use Socly\Support\PlausibleDate;
 
 /**
  * Import/export CSV of the first note.
@@ -1392,6 +1393,15 @@ final class TreasuryCsvService
                     $errors[] = (string) __('treasury.import.error_document_date', [
                         'line' => (string) $line,
                         'value' => $invoiceDateRaw,
+                    ]);
+                } elseif (!PlausibleDate::isPlausible($invoiceDate)) {
+                    // Same guard as the movement date: a document dated 0026/0206 is fixed here,
+                    // in the dry run, instead of being imported.
+                    $errors[] = (string) __('treasury.import.error_document_date_range', [
+                        'line' => (string) $line,
+                        'value' => $invoiceDate,
+                        'min' => (string) PlausibleDate::MIN_YEAR,
+                        'max' => (string) PlausibleDate::maxYear(),
                     ]);
                 }
             }

@@ -6,6 +6,7 @@ namespace Socly\Services;
 
 use Socly\Core\Database;
 use Socly\Core\Validator;
+use Socly\Support\PlausibleDate;
 
 final class DocumentService
 {
@@ -530,6 +531,12 @@ final class DocumentService
         if ($docDate !== '' && !$this->validator->validate(['document_date' => $docDate], ['document_date' => 'date'])) {
             return ['ok' => false, 'errors' => ['document_date' => __('validation.date')]];
         }
+        if ($docDate !== '' && !PlausibleDate::isPlausible($docDate)) {
+            return ['ok' => false, 'errors' => ['document_date' => __('validation.year_out_of_range', [
+                'min' => (string) PlausibleDate::MIN_YEAR,
+                'max' => (string) PlausibleDate::maxYear(),
+            ])]];
+        }
 
         $categoryResult = $this->resolveCategory($input, $existing);
         if (empty($categoryResult['ok'])) {
@@ -558,6 +565,12 @@ final class DocumentService
         $expiresAt = trim((string) ($input['expires_at'] ?? ''));
         if ($expiresAt !== '' && !$this->validator->validate(['expires_at' => $expiresAt], ['expires_at' => 'date'])) {
             return ['ok' => false, 'errors' => ['expires_at' => __('validation.date')]];
+        }
+        if ($expiresAt !== '' && !PlausibleDate::isPlausible($expiresAt)) {
+            return ['ok' => false, 'errors' => ['expires_at' => __('validation.year_out_of_range', [
+                'min' => (string) PlausibleDate::MIN_YEAR,
+                'max' => (string) PlausibleDate::maxYear(),
+            ])]];
         }
 
         $memberId = trim((string) ($input['member_id'] ?? ''));
