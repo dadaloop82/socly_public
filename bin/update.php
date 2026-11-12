@@ -4,7 +4,7 @@
 declare(strict_types=1);
 
 /**
- * Update helper (CLI) — same engine as the admin “Aggiorna” button.
+ * Update helper (CLI) — same engine as the admin “Update” button.
  *
  * Usage:
  *   php bin/update.php            # only check, prints installed vs online

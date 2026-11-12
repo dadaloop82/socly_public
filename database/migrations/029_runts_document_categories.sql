@@ -1,5 +1,5 @@
--- RUNTS import: riclassifica i documenti gia' importati (atto costitutivo, provvedimenti)
--- mantenendo intatti marcatore e nome file nella sintesi (servono alla deduplica e al re-download).
+-- RUNTS import: reclassifies the documents already imported (deed of incorporation, provisions) keeping the
+-- marker and file name intact in the summary (they are used for deduplication and re-download).
 
 UPDATE association_documents
 SET category = 'constitutive_act'

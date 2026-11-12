@@ -43,13 +43,15 @@ final class DeadlineService
     /** @var list<string> */
     public const STATUSES = ['open', 'done', 'dismissed'];
 
-    /** Un solo sync automatico per richiesta (dashboard: counts + elenco). */
+    /**
+     * Only one automatic sync per request (dashboard: counts + list).
+     */
     private bool $systemSyncedThisRequest = false;
 
     /**
-     * Quanti giorni prima della fine del periodo compare il promemoria
-     * aggregato «tessere da rinnovare» (poi resta finché ci sono soci da
-     * rinnovare). Le tessere scadono alla fine del periodo di tesseramento.
+     * How many days before the end of the period does the aggregate reminder "memberships to be
+     * renewed" appear (then it remains as long as there are members to be renewed). Cards expire at
+     * the end of the membership period.
      */
     private const CARD_RENEWAL_LEAD_DAYS = 120;
 
@@ -103,7 +105,7 @@ final class DeadlineService
             $params['bucket_today'] = $today;
             $params['bucket_soon'] = $soon;
         } elseif ($bucket === 'open') {
-            // "Aperte" = tutte le scadenze aperte (nessun filtro data).
+            // "Open" = all open deadlines (no date filter).
         }
         if ($untilDate !== null && preg_match('/^\d{4}-\d{2}-\d{2}$/', $untilDate)) {
             $where[] = 'd.due_date <= :until_date';
@@ -166,8 +168,8 @@ final class DeadlineService
     }
 
     /**
-     * Sync automatico una volta per richiesta: le pagine che leggono l'elenco e i
-     * contatori non devono ricalcolare due volte le stesse scadenze di sistema.
+     * Automatic sync once per request: Pages that read the list and counters do not have to
+     * recalculate the same system deadlines twice.
      */
     private function ensureSystemSynced(): void
     {
@@ -191,10 +193,9 @@ final class DeadlineService
             $periodLabel = (string) ($period['label'] ?? '');
             $endsOn = (string) $period['ends_on'];
 
-            // Tessere: una sola voce per periodo con il numero delle tessere
-            // ancora da rinnovare. Il conteggio scende da solo man mano che i soci
-            // passano al periodo successivo e la voce sparisce quando hanno
-            // rinnovato tutti.
+            // Cards: only one entry per period with the number of cards still to be renewed. The count goes
+            // down on its own as members move on to the next period and the item disappears when they have
+            // all renewed.
             $pendingCards = $this->pendingCardRenewals($periodId);
             $withinRenewalWindow = $endsOn <= $leadDate;
             $periodEnded = $endsOn < $today;
@@ -219,8 +220,8 @@ final class DeadlineService
                 ]);
             }
 
-            // Voce informativa sul periodo: niente doppioni quando c'è già il
-            // promemoria tessere, e nessun residuo per periodi chiusi e svuotati.
+            // Information item on the period: no duplicates when the card reminder is already there, and no
+            // residue for closed and emptied periods.
             if (!$showCardsItem && !($periodEnded && $pendingCards === 0)) {
                 $source = 'system:membership_period:' . $periodId;
                 $sources[] = $source;
@@ -351,13 +352,13 @@ final class DeadlineService
             return null;
         }
         $thresholds = array_values(array_unique($thresholds));
-        // Dal più stretto al più ampio: l'avviso attivo è il primo che "contiene" oggi
-        // (es. con 5 giorni residui e [30, 7, 0] l'avviso attivo è quello a 7 giorni).
+        // From narrowest to widest: the active alert is the first that "contains" today (e.g. with 5 days
+        // remaining and [30, 7, 0] the active alert is the one with 7 days left).
         sort($thresholds);
         $today = $today !== null && $today !== '' ? $today : date('Y-m-d');
         $daysLeft = (int) floor((strtotime($due) - strtotime($today)) / 86400);
         if ($daysLeft < 0) {
-            return null; // già scaduta: l'avviso è lo stato "Scaduta", non un promemoria
+            return null; // already expired: The warning is the "Expired" status, not a reminder
         }
         foreach ($thresholds as $threshold) {
             if ($daysLeft <= $threshold) {
@@ -367,7 +368,9 @@ final class DeadlineService
         return null;
     }
 
-    /** Finestra di avviso più ampia configurata (per il blocco scadenze della barra laterale). */
+    /**
+     * Configured larger alert window (for sidebar deadline block).
+     */
     public function maxNotifyDays(int $fallback = 7, int $max = 180): int
     {
         $rows = $this->db->fetchAll(
@@ -868,9 +871,9 @@ final class DeadlineService
 
     /** @param array<string,mixed> $data */
     /**
-     * Tessere ancora da rinnovare per un periodo: conta le tessere attive dei
-     * soci ancora iscritti a quel periodo. Chi passa al periodo successivo esce
-     * dal conteggio, quindi il promemoria si aggiorna da solo.
+     * Cards still to be renewed for a period: counts the active cards of members still registered
+     * in that period. Anyone who moves on to the next period is no longer counted, so the reminder
+     * updates automatically.
      */
     private function pendingCardRenewals(int $periodId): int
     {
@@ -888,7 +891,7 @@ final class DeadlineService
                 ['pid' => $periodId]
             );
         } catch (\Throwable) {
-            // Installazioni vecchie senza tabella tessere: nessun promemoria.
+            // Old installations without a card table: no reminder.
             return 0;
         }
         return (int) ($row['c'] ?? 0);

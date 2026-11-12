@@ -167,7 +167,7 @@ final class UpdateService
     {
         $cacheFile = storage_path('cache/update_check.json');
 
-        // Risposta in cache (vale anche per le istanze di prova).
+        // Cached response (also applies to test instances).
         if (!$force && is_file($cacheFile)) {
             $cached = json_decode((string) file_get_contents($cacheFile), true);
             if (is_array($cached)
@@ -188,8 +188,8 @@ final class UpdateService
             $result['source'] = 'demo';
             $result['install_available'] = false;
 
-            // Un'istanza di prova non si aggiorna da sola, ma deve comunque
-            // accorgersi se esiste una versione pubblica più recente.
+            // A test instance does not update itself, but it still needs to notice if a newer public version
+            // exists.
             if ($this->notifyEnabled()) {
                 try {
                     $manifest = $this->fetchManifest();
@@ -205,7 +205,7 @@ final class UpdateService
                     $result['released_at'] = (string) ($manifest['released_at'] ?? '');
                     $result['repository_url'] = (string) ($manifest['repository_url'] ?? '');
                 } catch (\Throwable) {
-                    // Nessuna rete/manifest: resta "nessun aggiornamento".
+                    // No network/manifest: it stays "no update".
                 }
             }
 

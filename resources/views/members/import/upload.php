@@ -1,6 +1,6 @@
 <?php
 /**
- * Import soci — step 1: caricamento del file CSV.
+ * Import members — step 1: uploading the CSV file.
  *
  * @var array<string,mixed>|null $state
  * @var int $maxMegabytes

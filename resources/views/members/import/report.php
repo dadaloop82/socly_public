@@ -1,6 +1,6 @@
 <?php
 /**
- * Import soci — step 5: report finale della run.
+ * Import members — step 5: final report of the run.
  *
  * @var array<string,mixed> $report
  */

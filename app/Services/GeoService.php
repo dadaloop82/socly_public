@@ -56,7 +56,7 @@ final class GeoService
             } else {
                 $score = 50 - min(40, mb_strlen($name));
             }
-            // Capitals / province seats (often shorter CAP lists) get a tiny boost when tied.
+            // Capitals / province seats (often shorter postcode lists) get a tiny boost when tied.
             if (($row['provincia'] ?? '') !== '' && str_starts_with($name, $q)) {
                 $score += 5;
             }
@@ -102,7 +102,7 @@ final class GeoService
     }
 
     /**
-     * Resolve a typed CAP on blur (local registry).
+     * Resolve a typed postcode on blur (local registry).
      *
      * @return array{action:'none'|'apply'|'confirm'|'not_found',item?:array<string,mixed>,label?:string}
      */
@@ -148,8 +148,7 @@ final class GeoService
 
     /**
      * Latitude/longitude for a city name, cached on disk (statistics map).
-     *
-     * One HTTP lookup per unknown city, then the answer is reused across requests. When the
+     * One HTTP lookup for unknown city, then the answer is reused across requests. When the
      * provider is unreachable the lookups stop for the rest of the request instead of timing out
      * once per city.
      *
@@ -523,7 +522,7 @@ final class GeoService
 
     /**
      * The street field is often filled with the whole address ("Piazza Matteotti
-     * a Bolzano 39100") although city and CAP have their own fields: drop the
+     * a Bolzano 39100") although city and postcode have their own fields: drop the
      * trailing city (+ CAP) before searching. Only explicit separators count, so
      * "Via Roma" in Rome is never truncated to "Via".
      */
@@ -538,7 +537,7 @@ final class GeoService
         $patterns = [
             // "…, Bolzano", "… - Bolzano", "… a Bolzano", "… in Bolzano"
             '/(?:\s*[,\-–]\s*|\s+(?:a|in|di)\s+)' . $needle . '(?:\s*,?\s*\d{5})?\s*$/iu',
-            // "… Bolzano 39100" (CAP makes the intent explicit)
+            // "… Bolzano 39100" (postcode makes the intent explicit)
             '/\s+' . $needle . '\s*,?\s*\d{5}\s*$/iu',
         ];
         foreach ($patterns as $pattern) {
@@ -610,8 +609,8 @@ final class GeoService
             ));
             $lat = isset($coords[1]) ? (float) $coords[1] : 0.0;
             $lon = isset($coords[0]) ? (float) $coords[0] : 0.0;
-            // Match city on Photon locality fields only — never on the road label
-            // (e.g. "Via Policoro" in another comune must not pass).
+            // Match city on Photon locality fields only — never on the road label (e.g. "Via Policoro" in
+            // another municipality must not pass).
             $cityOk = $this->addressMatchesCity($cityNeedle, $cityName, '', $props);
             if (!$cityOk || !$this->roadSuggestMatches($query, $road)) {
                 continue;
@@ -875,7 +874,7 @@ final class GeoService
     }
 
     /**
-     * Resolve a typed city/comune on blur (local registry + optional geocoder fallback).
+     * Resolve a typed city/municipality on blur (local registry + optional geocoder fallback).
      *
      * @return array{action:'none'|'apply'|'confirm'|'not_found',item?:array<string,mixed>,label?:string}
      */
@@ -1077,7 +1076,7 @@ final class GeoService
         return false;
     }
 
-    /** When a comune maps to exactly one CAP in the registry, return it (for auto-fill). */
+    /** When a municipality maps to exactly one postcode in the registry, return it (for auto-fill). */
     public function uniqueCapForComune(string $name): ?string
     {
         $norm = $this->normalizePlace(trim($name));
@@ -1214,7 +1213,7 @@ final class GeoService
     }
 
     /**
-     * Check city / CAP / province coherence against the Italian comuni registry.
+     * Check city / postcode / province coherence against the Italian municipalities registry.
      *
      * @return array{ok:bool,error?:string,field?:string,expected_province?:string,expected_cap?:string}
      */
@@ -1258,7 +1257,7 @@ final class GeoService
                 }
             }
             if (!$capMatchesCity && $expectedCap !== '' && $postalCode !== $expectedCap) {
-                // Fallback: registry primary CAP for the comune.
+                // Fallback: registry primary postcode for the municipality.
                 return [
                     'ok' => false,
                     'field' => 'postal_code',
@@ -1313,7 +1312,7 @@ final class GeoService
             return [];
         }
         $variants = [$query];
-        // OSM often stores only the main road: "Via Roma - Secondo Tronco" → "Via Roma"
+        // OSM often stores only the main road: "Example Road - Second Section" → "Example Road"
         $withoutBranch = trim((string) preg_replace('/\s*[-–—,]\s+.+$/u', '', $query));
         if ($withoutBranch !== '' && mb_strtolower($withoutBranch) !== mb_strtolower($query)) {
             $variants[] = $withoutBranch;

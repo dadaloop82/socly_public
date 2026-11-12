@@ -1,6 +1,6 @@
 <?php
 /**
- * Campi del form scadenza (usati da deadlines/form.php).
+ * Deadline form fields (used by deadlines/form.php).
  *
  * @var array<string,mixed> $values
  * @var list<array{key:string,label:string,builtin?:bool}> $categories
@@ -53,8 +53,8 @@ foreach ($members as $member) {
 
 $memberLinked = trim((string) ($values['member_id'] ?? '')) !== '';
 
-// Preavvisi: pillole invece di numeri separati da virgola. I valori non standard
-// già salvati restano visibili (e modificabili), così non si perde nulla.
+// Warnings: pills instead of numbers separated by commas. Non-standard values ​​already saved remain visible
+// (and editable), so nothing is lost.
 $notifySelected = [];
 foreach (preg_split('/[^\d]+/', (string) ($values['notify_days'] ?? '')) ?: [] as $chunk) {
     $chunk = trim((string) $chunk);
@@ -80,7 +80,7 @@ $notifyUnit = static function (int $day): string {
         : (string) __('deadlines.notify_unit_days');
 };
 
-// Prossima ricorrenza annuale di una data fissa (es. 30/04 o 30/06).
+// Next annual anniversary of a fixed date (e.g. 30/04 or 30/06).
 $nextAnnualDate = static function (string $monthDay): string {
     [$day, $month] = array_pad(explode('/', $monthDay), 2, '1');
     $year = (int) date('Y');
@@ -92,7 +92,7 @@ $nextAnnualDate = static function (string $monthDay): string {
 ?>
 <?php if (!empty($show_templates)): ?>
     <?php
-    // Scadenze tipiche del Terzo Settore: un clic precompila il form.
+    // Typical Third Sector deadlines: one click pre-fills the form.
     $deadlineTemplates = [
         [
             'label' => (string) __('deadlines.template_balance_approval'),

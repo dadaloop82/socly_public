@@ -1,5 +1,5 @@
--- Tessere associative: numero, QR, emissione, validità e tipologia.
--- Nasce con l'import CSV (ID socio = ID tessera) e resta disponibile per la gestione tessere.
+-- Membership cards: number, QR, issue, validity and type. It was created with the CSV import (member ID =
+-- card ID) and remains available for card management.
 
 CREATE TABLE IF NOT EXISTS membership_cards (
     id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,

@@ -1072,8 +1072,8 @@ if (!function_exists('with_socly_word')) {
 
 if (!function_exists('with_auth_asterisk')) {
     /**
-     * Mark free-plan asterisks as muted (for login brand copy / license footnote).
-     * Expects already-escaped HTML (e.g. from with_socly_word / e()).
+     * Mark free-plan asterisks as muted (for login brand copy / license footnote). Expects
+     * already-escaped HTML (e.g. from with_socly_word / e()).
      */
     function with_auth_asterisk(string $html): string
     {
@@ -1122,9 +1122,8 @@ if (!function_exists('assoc_logo_img')) {
             $branding = app()->branding();
             $alt = trim((string) ($branding['name'] ?? 'SOCLY'));
         }
-        // L'elemento resta sempre nel DOM (nascosto se non c'è logo): così
-        // l'upload dalla pagina impostazioni aggiorna subito anche la sidebar,
-        // senza dover ricaricare.
+        // The element always remains in the DOM (hidden if there is no logo): so uploading from the settings
+        // page also immediately updates the sidebar, without having to reload.
         $attrs = ' class="' . e($class) . '" data-assoc-logo alt="' . e($alt) . '" decoding="async"';
         if ($url !== null) {
             $attrs .= ' src="' . e($url) . '"';
@@ -1503,8 +1502,8 @@ if (!function_exists('row_icon_action')) {
 
 if (!function_exists('document_summary_display')) {
     /**
-     * Sintesi leggibile: nasconde i marcatori tecnici dell'import RUNTS
-     * ("Marcatore: …", "File originale: …") che restano nel valore salvato.
+     * Readable summary: hides the technical markers of the RUNTS import ("Marker: …", "Original
+     * file: …") which remain in the saved value.
      */
     function document_summary_display(?string $summary): string
     {
@@ -1574,8 +1573,8 @@ if (!function_exists('row_actions')) {
 
 if (!function_exists('version_field')) {
     /**
-     * Hidden input con la versione di riga: il salvataggio viene rifiutato (con avviso) se nel
-     * frattempo un altro operatore ha modificato lo stesso record.
+     * Hidden input with row version: saving is rejected (with warning) if in the meantime another
+     * operator has modified the same record.
      *
      * @param array<string,mixed>|null $row
      */
@@ -1587,7 +1586,7 @@ if (!function_exists('version_field')) {
 
 if (!function_exists('version_attrs')) {
     /**
-     * Attributi sul <form> che attivano il controllo di freschezza e la presenza “sta modificando”.
+     * Attributes on the <form> that enable freshness control and “is editing” presence.
      *
      * @param array<string,mixed>|null $row
      */

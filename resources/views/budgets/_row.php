@@ -10,8 +10,8 @@ $row = is_array($row ?? null) ? $row : null;
 $rowId = (int) ($row['id'] ?? 0);
 $category = (string) ($row['category'] ?? '');
 $categoryKeys = array_map(static fn (array $option): string => (string) ($option['key'] ?? ''), $categories);
-// Etichette arrivate da import CSV in un'altra lingua: se riconosciamo la categoria di sistema
-// usiamo la chiave canonica, così il nome compare tradotto nella lingua dell'utente.
+// Labels arrived from CSV import in another language: if we recognize the system category we use the
+// canonical key, so the name appears translated into the user's language.
 if ($category !== '' && !in_array($category, $categoryKeys, true)) {
     try {
         $resolved = app(\Socly\Services\TreasuryService::class)->resolveCategoryFromLabel($category);
@@ -19,7 +19,7 @@ if ($category !== '' && !in_array($category, $categoryKeys, true)) {
             $category = $resolved;
         }
     } catch (\Throwable) {
-        // nessuna mappatura: resta il testo salvato
+        // no mapping: the saved text is kept
     }
 }
 $showUnknownCategory = $category !== '' && !in_array($category, $categoryKeys, true);

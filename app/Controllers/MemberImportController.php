@@ -11,7 +11,7 @@ use Socly\Services\MemberService;
 use Socly\Support\MemberFieldTypes;
 
 /**
- * Import soci da CSV: upload → mappatura → anteprima → riferimenti mancanti → report.
+ * Import members from CSV: upload → mapping → preview → missing references → report.
  */
 final class MemberImportController extends BaseController
 {

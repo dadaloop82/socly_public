@@ -7,22 +7,28 @@ namespace Socly\Services;
 use Socly\Core\Database;
 
 /**
- * Presence of connected operators: one row per open session, refreshed by the client
- * polling. It feeds the initials dots in the header and the “X just connected” toast.
+ * Presence of connected operators: one row per open session, refreshed by the client polling. It
+ * feeds the initial dots in the header and the “X just connected” toast.
  */
 final class PresenceService
 {
-    /** Oltre questo silenzio l'utente è mostrato come inattivo (pallino semitrasparente). */
+    /**
+     * Beyond this silence the user is shown as inactive (semi-transparent dot).
+     */
     public const IDLE_SECONDS = 300;
 
-    /** Sessione considerata chiusa dopo questo silenzio (allineato a SessionIdleMiddleware). */
+    /**
+     * Session considered closed after this silence (aligned to SessionIdleMiddleware).
+     */
     public const ONLINE_WINDOW = 900;
 
     public function __construct(private readonly Database $db)
     {
     }
 
-    /** Registra/rinfresca la sessione corrente (chiamato dal polling). */
+    /**
+     * Record/refresh the current session (called by polling).
+     */
     public function touch(?string $editingEntity = null, ?int $editingId = null): void
     {
         $userId = (int) (auth_user()['id'] ?? 0);
@@ -47,7 +53,7 @@ final class PresenceService
         $this->db->query('DELETE FROM user_presence WHERE last_seen < (NOW() - INTERVAL 1 DAY)');
     }
 
-    /** Chiude la presenza corrente (logout). */
+    /** Closes the current presence (logout). */
     public function leave(): void
     {
         $sessionId = session_id();
@@ -145,7 +151,7 @@ final class PresenceService
 
     /**
      * Display name: operator first/last name, otherwise the linked member,
-     * altrimenti “Utente Sconosciuto”.
+     * otherwise “Unknown user”.
      *
      * @param array<string,mixed> $row
      * @return array{name:string,initials:string}
@@ -177,7 +183,9 @@ final class PresenceService
         return ['name' => $name !== '' ? $name : (string) __('presence.unknown_user'), 'initials' => $initials !== '' ? $initials : '?'];
     }
 
-    /** Tonalità stabile per utente: stessa persona, stesso colore. */
+    /**
+     * Stable shade per user: same person, same color.
+     */
     private function hue(int $userId): int
     {
         return (int) (($userId * 137) % 360);

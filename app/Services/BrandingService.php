@@ -7,9 +7,13 @@ namespace Socly\Services;
 final class BrandingService
 {
     private const MAX_LOGO_BYTES = 3 * 1024 * 1024;
-    /** Lato più lungo minimo: i loghi orizzontali (es. 600×80) sono normali. */
+    /**
+     * Minimum longest side: horizontal logos (e.g. 600×80) are normal.
+     */
     private const MIN_LOGO_PX = 100;
-    /** Lato più corto minimo, solo per scartare immagini degeneri (righe di 1 px). */
+    /**
+     * Minimum shortest side, only to discard degenerate images (1 px rows).
+     */
     private const MIN_LOGO_SHORT_PX = 20;
     /** @var list<string> */
     private const ALLOWED_MIMES = ['image/jpeg', 'image/png', 'image/webp', 'image/gif', 'image/svg+xml'];
@@ -401,7 +405,7 @@ final class BrandingService
             $info = @getimagesizefromstring($raw);
             $width = is_array($info) ? (int) ($info[0] ?? 0) : 0;
             $height = is_array($info) ? (int) ($info[1] ?? 0) : 0;
-            // Un logo può essere orizzontale o verticale: conta il lato lungo.
+            // A logo can be horizontal or vertical: the long side counts.
             if (max($width, $height) < self::MIN_LOGO_PX || min($width, $height) < self::MIN_LOGO_SHORT_PX) {
                 return ['ok' => false, 'error' => __('setup.logo_error_small')];
             }

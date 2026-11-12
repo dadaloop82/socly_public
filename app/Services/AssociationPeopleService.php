@@ -21,7 +21,9 @@ final class AssociationPeopleService
     /** Sentinel posted by the member select when the person is not in the member archive. */
     public const MEMBER_EXTERNAL = 'external';
 
-    /** @var list<string> Consiglio direttivo (incompatibile con organi di controllo). */
+    /**
+     * @var list<string> Board of directors (incompatible with control bodies).
+     */
     public const DIRECTOR_ROLE_KEYS = [
         self::ROLE_PRESIDENT,
         self::ROLE_VICE_PRESIDENT,
@@ -30,7 +32,9 @@ final class AssociationPeopleService
         self::ROLE_BOARD,
     ];
 
-    /** @var list<string> Organi di controllo indipendenti (incompatibili con il CD). */
+    /**
+     * @var list<string> Independent control bodies (incompatible with the board).
+     */
     public const CONTROL_ROLE_KEYS = [
         self::ROLE_AUDITOR,
         'ombudsman',

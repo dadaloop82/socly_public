@@ -1,6 +1,6 @@
 <?php
 /**
- * Rendiconto per cassa — Modello D (DM 18 aprile 2020), foglio stampabile (stampa browser → PDF).
+ * Cash flow statement - Model D (DM 18 April 2020), printable sheet (print browser → PDF).
  *
  * @var array<string,mixed>|null $report
  * @var int $year

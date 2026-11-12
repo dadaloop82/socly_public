@@ -1,6 +1,6 @@
--- Prima cassa: separa il "Conto finanziario" (dove stanno i soldi: cassa, banca,
--- conto postale…) dal "Metodo di pagamento" (come si sono mossi: bonifico, POS…).
--- `transfer_method` (conto di arrivo, introdotto in 026) diventa `transfer_account`.
+-- Cash book register: separate the "Financial account" (where the money is: cash register, bank, postal
+-- account...) from the "Payment method" (how it moved: bank transfer, POS...). `transfer_method` (arrival
+-- account, introduced in 026) becomes `transfer_account`.
 ALTER TABLE treasury_movements
     ADD COLUMN account VARCHAR(40) NULL AFTER payment_method,
     ADD INDEX idx_treasury_account (account);
@@ -8,7 +8,7 @@ ALTER TABLE treasury_movements
 ALTER TABLE treasury_movements
     CHANGE COLUMN transfer_method transfer_account VARCHAR(40) NULL;
 
--- Backfill: i vecchi valori "conto/metodo" finiscono nel conto finanziario giusto.
+-- Backfill: Old "account/method" values ​​end up in the right financial account.
 UPDATE treasury_movements
    SET account = CASE
         WHEN payment_method = 'cash' THEN 'cash'
@@ -29,8 +29,8 @@ UPDATE treasury_movements
        END
  WHERE transfer_account IS NOT NULL AND transfer_account <> '';
 
--- I movimenti "interni" non sono più un metodo di pagamento: il giroconto ha ora
--- la sua direzione dedicata, quindi questi valori legacy diventano "altro".
+-- "Internal" movements are no longer a payment method: the transfer now has its own dedicated direction, so
+-- these legacy values ​​become "other".
 UPDATE treasury_movements
    SET payment_method = 'other'
  WHERE payment_method IN ('internal_transfer', 'offset_compensation');

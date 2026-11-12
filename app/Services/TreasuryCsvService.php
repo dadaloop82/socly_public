@@ -5,18 +5,54 @@ declare(strict_types=1);
 namespace Socly\Services;
 
 use Socly\Core\Database;
+use Socly\Support\CsvReader;
+use Socly\Support\ImportValueNormalizer;
 
 /**
- * Import/export CSV della prima nota: stesse colonne nei due versi, etichette tradotte in export
- * e riconoscimento flessibile in import (chiave, etichetta IT/EN/DE, importi con virgola).
+ * Import/export CSV of the first note.
+ * The export produces the same columns the import understands (translated labels). The import
+ * follows the member import flow: upload → column mapping → value normalisation → dry run →
+ * final report. The file stays in `storage/uploads` and nothing is written to the first note
+ * before the explicit confirmation.
  */
 final class TreasuryCsvService
 {
-    /** Colonne gestite (chiave interna). */
+    /**
+     * Managed columns (internal key).
+     */
     public const COLUMNS = [
-        'movement_date', 'direction', 'amount', 'account', 'payment_method', 'category',
-        'runts_line', 'budget_item', 'description', 'beneficiary', 'member', 'approved',
+        'movement_date', 'direction', 'amount', 'account', 'transfer_account', 'payment_method', 'category',
+        'runts_line', 'budget_item', 'description', 'invoice_number', 'invoice_date', 'beneficiary', 'member', 'approved',
     ];
+
+    /**
+     * First-note fields a CSV column can be mapped to.
+     */
+    public const IMPORT_TARGETS = self::COLUMNS;
+
+    /**
+     * Fields whose CSV values can be normalised (raw CSV value → program value).
+     */
+    private const NORMALIZATION_FIELDS = [
+        'direction', 'approved', 'account', 'transfer_account', 'payment_method',
+        'category', 'runts_line', 'budget_item', 'member',
+    ];
+
+    private const SESSION_KEY = '_treasury_csv_import';
+    private const REPORT_KEY = '_treasury_csv_import_report';
+    private const MAX_BYTES = 5 * 1024 * 1024;
+    private const MAX_ROWS = 20000;
+    /**
+     * Rows shown in preview (statistics always cover entire file).
+     */
+    private const PREVIEW_ROWS = 200;
+    private const SAMPLE_ROWS = 40;
+
+    /** @var array{by_key:array<string,int>,labels:array<int,string>}|null */
+    private ?array $memberLookupCache = null;
+
+    /** @var array<string,array<string,string>>|null */
+    private ?array $valueMapCache = null;
 
     public function __construct(
         private readonly Database $db,
@@ -24,7 +60,7 @@ final class TreasuryCsvService
     ) {
     }
 
-    /** @return array<string,string> chiave => intestazione localizzata */
+    /** @return array<string,string> key => localized header */
     public function headers(): array
     {
         $labels = [];
@@ -56,7 +92,13 @@ final class TreasuryCsvService
 
         $out = [];
         foreach ($rows as $row) {
+            if (trim((string) ($row['superseded_at'] ?? '')) !== '') {
+                // The transferred originals remain in the history but are not re-exported: the copy on the
+                // destination account is the valid line.
+                continue;
+            }
             $account = TreasuryService::normalizeAccount((string) ($row['account'] ?? ''));
+            $transferAccount = TreasuryService::normalizeAccount((string) ($row['transfer_account'] ?? ''));
             $method = TreasuryService::normalizePaymentMethod((string) ($row['payment_method'] ?? ''));
             $categoryKey = trim((string) ($row['category'] ?? ''));
             $runtsLine = strtoupper(trim((string) ($row['runts_line'] ?? '')));
@@ -66,11 +108,14 @@ final class TreasuryCsvService
                 'direction' => (string) ($row['direction'] ?? ''),
                 'amount' => number_format((float) ($row['amount'] ?? 0), 2, ',', ''),
                 'account' => $account !== '' ? $this->treasury->accountLabel($account) : '',
+                'transfer_account' => $transferAccount !== '' ? $this->treasury->accountLabel($transferAccount) : '',
                 'payment_method' => $method !== '' ? (string) __('treasury.method_' . $method) : '',
                 'category' => $categoryKey !== '' ? $this->treasury->categoryLabel($categoryKey) : '',
                 'runts_line' => $runtsLine !== '' ? RuntsReportService::lineLabel($runtsLine) : '',
                 'budget_item' => !empty($row['budget_item_label']) ? (string) $row['budget_item_label'] : '',
                 'description' => (string) ($row['description'] ?? ''),
+                'invoice_number' => (string) ($row['invoice_number'] ?? ''),
+                'invoice_date' => (string) ($row['invoice_date'] ?? ''),
                 'beneficiary' => (string) ($row['beneficiary'] ?? ''),
                 'member' => $memberName,
                 'approved' => trim((string) ($row['approved_at'] ?? '')) !== '' ? '1' : '0',
@@ -107,7 +152,9 @@ final class TreasuryCsvService
         return $csv;
     }
 
-    /** CSV di esempio (intestazioni + una riga) per l'import. */
+    /**
+     * Sample CSV (headers + one line) for import.
+     */
     public function templateCsv(): string
     {
         $accounts = $this->treasury->accountOptions();
@@ -116,219 +163,1293 @@ final class TreasuryCsvService
             'direction' => 'expense',
             'amount' => '123,45',
             'account' => (string) ($accounts[0]['label'] ?? ''),
+            'transfer_account' => '',
             'payment_method' => (string) __('treasury.method_bank_transfer'),
             'category' => $this->treasury->categoryLabel('utilities'),
             'runts_line' => RuntsReportService::lineLabel('A-E2'),
             'budget_item' => '',
             'description' => (string) __('treasury.csv_example_description'),
+            'invoice_number' => '',
+            'invoice_date' => '',
             'beneficiary' => '',
             'member' => '',
             'approved' => '1',
         ]]);
     }
 
-    /**
-     * @return array{headers:list<string>,rows:list<array<string,string>>,map:array<string,string>,unmapped:list<string>}
-     */
-    public function parse(string $path): array
+    // ── Import: wizard status ─────────────────────── ───────────────────────
+
+    /** @return array<string,mixed>|null */
+    public function state(): ?array
     {
-        $handle = fopen($path, 'r');
-        if ($handle === false) {
-            return ['headers' => [], 'rows' => [], 'map' => [], 'unmapped' => []];
+        $state = $_SESSION[self::SESSION_KEY] ?? null;
+        if (!is_array($state)) {
+            return null;
         }
-        $firstLine = (string) fgets($handle);
-        $delimiter = substr_count($firstLine, ',') > substr_count($firstLine, ';') ? ',' : ';';
-        rewind($handle);
-        $headers = [];
-        $rows = [];
-        $index = 0;
-        while (($cells = fgetcsv($handle, 8192, $delimiter)) !== false) {
-            $cells = array_map(static fn ($cell): string => trim(str_replace("\u{FEFF}", '', (string) $cell)), $cells);
-            if ($index === 0) {
-                $headers = $cells;
-                $index++;
-                continue;
-            }
-            if (array_filter($cells, static fn (string $cell): bool => $cell !== '') === []) {
-                continue;
-            }
-            $row = [];
-            foreach ($headers as $position => $header) {
-                $row[$header] = $cells[$position] ?? '';
-            }
-            $rows[] = $row;
-            $index++;
-        }
-        fclose($handle);
-
-        $map = [];
-        $unmapped = [];
-        foreach ($headers as $header) {
-            $field = $this->guessField($header);
-            if ($field !== '' && !in_array($field, $map, true)) {
-                $map[$header] = $field;
-            } else {
-                $unmapped[] = $header;
-            }
+        $path = $this->absolutePath((string) ($state['file'] ?? ''));
+        if ($path === null || !is_file($path)) {
+            unset($_SESSION[self::SESSION_KEY]);
+            return null;
         }
 
-        return ['headers' => $headers, 'rows' => $rows, 'map' => $map, 'unmapped' => $unmapped];
+        return $state;
     }
 
-    /** Riconosce il campo dal nome della colonna (IT/EN/DE). */
-    public function guessField(string $header): string
+    /** @param array<string,mixed> $state */
+    private function saveState(array $state): void
     {
-        $key = mb_strtolower(trim($header));
-        if (function_exists('iconv')) {
-            $trans = @iconv('UTF-8', 'ASCII//TRANSLIT//IGNORE', $key);
-            if (is_string($trans) && $trans !== '') {
-                $key = $trans;
+        $_SESSION[self::SESSION_KEY] = $state;
+    }
+
+    public function reset(bool $clearReport = true): void
+    {
+        $this->valueMapCache = null;
+        $state = $this->state();
+        if ($state !== null) {
+            $path = $this->absolutePath((string) ($state['file'] ?? ''));
+            if ($path !== null && is_file($path)) {
+                unlink($path);
             }
         }
-        $haystack = ' ' . (string) preg_replace('/[^a-z0-9]+/', ' ', $key) . ' ';
-        $rules = [
-            'movement_date' => ['data', 'date', 'datum'],
-            'direction' => ['tipo', 'segno', 'direction', 'typ', 'entrata', 'uscita'],
-            'amount' => ['importo', 'amount', 'betrag', 'somma'],
-            'account' => ['conto', 'account', 'konto', 'cassa', 'banca'],
-            'payment_method' => ['metodo', 'pagamento', 'method', 'zahlungsart'],
-            'category' => ['tipologia', 'categoria', 'category', 'kategorie'],
-            'runts_line' => ['voce', 'modello', 'runts', 'position'],
-            'budget_item' => ['centro', 'costo', 'progetto', 'budget', 'kostenstelle'],
-            'description' => ['descrizione', 'causale', 'description', 'beschreibung'],
-            'beneficiary' => ['beneficiario', 'fornitore', 'beneficiary', 'empfanger'],
-            'member' => ['socio', 'member', 'mitglied'],
-            'approved' => ['approvato', 'approval', 'freigegeben', 'stato'],
+        unset($_SESSION[self::SESSION_KEY]);
+        if ($clearReport) {
+            unset($_SESSION[self::REPORT_KEY]);
+        }
+    }
+
+    /**
+     * “First line contains headers” switch.
+     */
+    public function setHasHeader(bool $hasHeader): void
+    {
+        $state = $this->state();
+        if ($state === null) {
+            return;
+        }
+        $state['has_header'] = $hasHeader;
+        $this->saveState($state);
+    }
+
+    private function absolutePath(string $relative): ?string
+    {
+        $relative = ltrim(str_replace('\\', '/', $relative), '/');
+        if ($relative === '' || str_contains($relative, '..')) {
+            return null;
+        }
+
+        return storage_path('uploads/' . $relative);
+    }
+
+    private function reader(): ?CsvReader
+    {
+        $state = $this->state();
+        $path = $this->absolutePath((string) ($state['file'] ?? ''));
+        if ($path === null || !is_file($path)) {
+            return null;
+        }
+
+        return new CsvReader($path);
+    }
+
+    /**
+     * Saves the loaded CSV to storage and keeps only the references in session.
+     *
+     * @param array{name?:string,type?:string,tmp_name?:string,error?:int,size?:int}|null $file
+     * @return array{ok:bool,error?:string}
+     */
+    public function startFromUpload(?array $file): array
+    {
+        if ($file === null || (int) ($file['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_OK) {
+            return ['ok' => false, 'error' => 'treasury.import.error_missing'];
+        }
+        if ((int) ($file['size'] ?? 0) <= 0) {
+            return ['ok' => false, 'error' => 'treasury.import.error_empty'];
+        }
+        if ((int) ($file['size'] ?? 0) > self::MAX_BYTES) {
+            return ['ok' => false, 'error' => 'treasury.import.error_too_large'];
+        }
+        $extension = strtolower(pathinfo((string) ($file['name'] ?? ''), PATHINFO_EXTENSION));
+        if (!in_array($extension, ['csv', 'txt', 'tsv', 'dat'], true)) {
+            return ['ok' => false, 'error' => 'treasury.import.error_extension'];
+        }
+        $tmp = (string) ($file['tmp_name'] ?? '');
+        if ($tmp === '' || !is_file($tmp)) {
+            return ['ok' => false, 'error' => 'treasury.import.error_missing'];
+        }
+
+        $paths = user_upload_paths('treasury-import');
+        if (!is_dir($paths['absolute']) || !is_writable($paths['absolute'])) {
+            $fallback = 'treasury-import';
+            $fallbackDir = storage_path('uploads/' . $fallback);
+            ensure_directory($fallbackDir);
+            if (!is_writable($fallbackDir)) {
+                return ['ok' => false, 'error' => 'treasury.import.error_store'];
+            }
+            $paths = ['absolute' => $fallbackDir, 'relative' => $fallback];
+        }
+        $filename = bin2hex(random_bytes(12)) . '.csv';
+        $target = $paths['absolute'] . '/' . $filename;
+        $stored = false;
+        try {
+            if (is_uploaded_file($tmp)) {
+                $stored = move_uploaded_file($tmp, $target);
+            } elseif (PHP_SAPI === 'cli' && is_file($tmp)) {
+                $stored = copy($tmp, $target);
+            }
+        } catch (\Throwable $e) {
+            try {
+                app('logger')->error('treasury.import.upload_failed', ['error' => $e->getMessage()]);
+            } catch (\Throwable) {
+            }
+            $stored = false;
+        }
+        if (!$stored) {
+            return ['ok' => false, 'error' => 'treasury.import.error_store'];
+        }
+
+        $reader = new CsvReader($target);
+        $rows = $reader->rows(self::MAX_ROWS + 1);
+        if ($rows === []) {
+            unlink($target);
+            return ['ok' => false, 'error' => 'treasury.import.error_empty'];
+        }
+        if (count($rows) > self::MAX_ROWS) {
+            unlink($target);
+            return ['ok' => false, 'error' => 'treasury.import.error_too_many_rows'];
+        }
+
+        $this->reset();
+        $this->saveState([
+            'file' => $paths['relative'] . '/' . $filename,
+            'source_name' => mb_substr((string) ($file['name'] ?? 'prima-nota.csv'), 0, 200),
+            'delimiter' => $reader->delimiter(),
+            'encoding' => $reader->encoding(),
+            'has_header' => $reader->hasHeader($rows),
+            'map' => [],
+            'options' => $this->normalizeOptions([]),
+            'created_at' => date('c'),
+        ]);
+
+        return ['ok' => true];
+    }
+
+    /**
+     * Table read from CSV (headers + data rows).
+     *
+     * @return array{ok:bool,error?:string,headers:list<string>,rows:list<array{line:int,cells:list<string>}>,has_header:bool,delimiter:string,encoding:string,delimiter_label:string}
+     */
+    public function table(): array
+    {
+        $state = $this->state();
+        $reader = $this->reader();
+        if ($state === null || $reader === null) {
+            return [
+                'ok' => false,
+                'error' => 'treasury.import.error_no_file',
+                'headers' => [],
+                'rows' => [],
+                'has_header' => false,
+                'delimiter' => '',
+                'encoding' => '',
+                'delimiter_label' => '',
+            ];
+        }
+        $raw = $reader->rows(self::MAX_ROWS + 1);
+        $hasHeader = !empty($state['has_header']);
+        $headers = [];
+        $rows = $raw;
+        if ($hasHeader && $raw !== []) {
+            $headers = array_values(array_map('strval', (array) ($raw[0]['cells'] ?? [])));
+            $rows = array_slice($raw, 1);
+        }
+        if ($headers === []) {
+            $width = 0;
+            foreach (array_slice($raw, 0, self::SAMPLE_ROWS) as $row) {
+                $width = max($width, count($row['cells']));
+            }
+            for ($i = 0; $i < $width; $i++) {
+                $headers[] = (string) __('treasury.import.column_n', ['n' => (string) ($i + 1)]);
+            }
+        }
+        $width = count($headers);
+        $rows = array_map(
+            static function (array $row) use ($width): array {
+                $cells = array_slice(array_pad($row['cells'], $width, ''), 0, $width);
+                return ['line' => (int) ($row['line'] ?? 0), 'cells' => array_map('strval', $cells)];
+            },
+            $rows
+        );
+
+        return [
+            'ok' => true,
+            'headers' => $headers,
+            'rows' => $rows,
+            'has_header' => $hasHeader,
+            'delimiter' => $reader->delimiter(),
+            'encoding' => $reader->encoding(),
+            'delimiter_label' => $reader->delimiterLabel(),
         ];
-        foreach ($rules as $field => $needles) {
-            foreach ($needles as $needle) {
-                // Corrispondenza su parola intera: “Tipologia” non deve finire in “Tipo”.
-                if (str_contains($haystack, ' ' . $needle . ' ') || str_contains($haystack, ' ' . $needle)) {
-                    if (str_contains($haystack, ' ' . $needle . ' ')) {
-                        return $field;
+    }
+
+    /**
+     * One entry per CSV column: data type, example and suggested field.
+     *
+     * @param array{headers:list<string>,rows:list<array{line:int,cells:list<string>}>,has_header:bool} $table
+     * @return list<array{index:int,header:string,suggested:string,sample:string,kind:string,filled:int,rows:int}>
+     */
+    public function columns(array $table): array
+    {
+        $columns = [];
+        $used = [];
+        foreach (array_values($table['headers']) as $index => $header) {
+            $values = [];
+            foreach ($table['rows'] as $row) {
+                $values[] = (string) ($row['cells'][$index] ?? '');
+            }
+            $sample = '';
+            $filled = 0;
+            foreach ($values as $value) {
+                if (trim($value) === '') {
+                    continue;
+                }
+                $filled++;
+                if ($sample === '') {
+                    $sample = mb_strimwidth(ImportValueNormalizer::text($value), 0, 60, '…');
+                }
+            }
+            $suggested = !empty($table['has_header']) ? $this->guessField((string) $header) : '';
+            if ($suggested !== '' && isset($used[$suggested])) {
+                $suggested = '';
+            }
+            if ($suggested !== '') {
+                $used[$suggested] = true;
+            }
+            $columns[] = [
+                'index' => (int) $index,
+                'header' => (string) $header,
+                'suggested' => $suggested,
+                'sample' => $sample,
+                'kind' => ImportValueNormalizer::detectColumnKind($values),
+                'filled' => $filled,
+                'rows' => count($values),
+            ];
+        }
+
+        return $columns;
+    }
+
+    /**
+     * First note fields grouped for the matching menu.
+     *
+     * @return list<array{label:string,options:list<array{value:string,label:string}>}>
+     */
+    public function targetGroups(): array
+    {
+        $labels = $this->headers();
+        $group = static function (array $keys) use ($labels): array {
+            $options = [];
+            foreach ($keys as $key) {
+                $options[] = ['value' => $key, 'label' => (string) ($labels[$key] ?? $key)];
+            }
+            return $options;
+        };
+
+        return [
+            [
+                'label' => (string) __('treasury.import.group_movement'),
+                'options' => $group(['movement_date', 'direction', 'amount', 'approved']),
+            ],
+            [
+                'label' => (string) __('treasury.import.group_wallet'),
+                'options' => $group(['account', 'transfer_account', 'payment_method']),
+            ],
+            [
+                'label' => (string) __('treasury.import.group_classification'),
+                'options' => $group(['category', 'runts_line', 'budget_item']),
+            ],
+            [
+                'label' => (string) __('treasury.import.group_details'),
+                'options' => $group(['description', 'invoice_number', 'invoice_date', 'beneficiary', 'member']),
+            ],
+        ];
+    }
+
+    /** @return array<int,string> column index => selected field */
+    public function mappedTargets(): array
+    {
+        $state = $this->state();
+        $map = is_array($state['map'] ?? null) ? $state['map'] : [];
+        $out = [];
+        foreach ($map as $index => $target) {
+            $out[(int) $index] = (string) $target;
+        }
+
+        return $out;
+    }
+
+    /**
+     * Save the columns → fields pairing and the import options.
+     *
+     * @param array<string|int,mixed> $rawMap
+     * @param array<string,mixed> $rawOptions
+     * @return array{ok:bool,error?:string,field?:string}
+     */
+    public function saveMapping(array $rawMap, array $rawOptions): array
+    {
+        $state = $this->state();
+        if ($state === null) {
+            return ['ok' => false, 'error' => 'treasury.import.error_no_file'];
+        }
+        $labels = $this->headers();
+        $map = [];
+        $used = [];
+        foreach ($rawMap as $index => $target) {
+            $index = (int) $index;
+            $target = trim((string) $target);
+            if ($target === '' || $target === ImportValueNormalizer::TARGET_IGNORE) {
+                // We save the explicit ignoring: upon reload the column remains at "Ignore".
+                $map[$index] = ImportValueNormalizer::TARGET_IGNORE;
+                continue;
+            }
+            if (!in_array($target, self::IMPORT_TARGETS, true)) {
+                continue;
+            }
+            if (isset($used[$target])) {
+                return [
+                    'ok' => false,
+                    'error' => 'treasury.import.error_duplicate_target',
+                    'field' => (string) ($labels[$target] ?? $target),
+                ];
+            }
+            $used[$target] = true;
+            $map[$index] = $target;
+        }
+        foreach (['movement_date', 'amount'] as $required) {
+            if (!in_array($required, $map, true)) {
+                return [
+                    'ok' => false,
+                    'error' => 'treasury.import.error_need_field',
+                    'field' => (string) ($labels[$required] ?? $required),
+                ];
+            }
+        }
+        $previousMap = is_array($state['map'] ?? null) ? $state['map'] : [];
+        $state['map'] = $map;
+        $state['options'] = $this->normalizeOptions($rawOptions);
+        // A changed mapping invalidates the previous value normalisation.
+        if ($previousMap !== $map) {
+            $state['value_map'] = [];
+            $this->valueMapCache = null;
+        }
+        $this->saveState($state);
+
+        return ['ok' => true];
+    }
+
+    /**
+     * Default values used when a column is not in the file.
+     *
+     * @return array{default_direction:string,default_account:string,default_category:string,default_payment_method:string,approve:string,skip_duplicates:string}
+     */
+    public function options(): array
+    {
+        $state = $this->state();
+        $raw = is_array($state['options'] ?? null) ? $state['options'] : [];
+
+        return $this->normalizeOptions($raw);
+    }
+
+    /**
+     * @param array<string,mixed> $raw
+     * @return array{default_direction:string,default_account:string,default_category:string,default_payment_method:string,approve:string,skip_duplicates:string}
+     */
+    private function normalizeOptions(array $raw): array
+    {
+        $accounts = $this->treasury->accountOptions(false);
+        $activeAccounts = array_values(array_filter($accounts, static fn (array $account): bool => !empty($account['active'])));
+        $validAccounts = array_map(static fn (array $account): string => (string) $account['key'], $activeAccounts);
+        $activeAccount = (string) ($activeAccounts[0]['key'] ?? '');
+        $account = TreasuryService::normalizeAccount((string) ($raw['default_account'] ?? ''));
+        if ($account === '' || !in_array($account, $validAccounts, true)) {
+            $account = $activeAccount;
+        }
+        $category = trim((string) ($raw['default_category'] ?? ''));
+        if (!in_array($category, array_column($this->treasury->categoryOptions(), 'key'), true)) {
+            $category = 'other';
+        }
+        $direction = (string) ($raw['default_direction'] ?? '');
+        if (!in_array($direction, ['income', 'expense'], true)) {
+            $direction = 'expense';
+        }
+
+        return [
+            'default_direction' => $direction,
+            'default_account' => $account,
+            'default_category' => $category,
+            'default_payment_method' => $this->matchMethod((string) ($raw['default_payment_method'] ?? '')),
+            'approve' => array_key_exists('approve', $raw) && (string) $raw['approve'] === '0' ? '0' : '1',
+            'skip_duplicates' => array_key_exists('skip_duplicates', $raw) && (string) $raw['skip_duplicates'] === '0' ? '0' : '1',
+        ];
+    }
+
+    /**
+     * Raw-value → program-value map saved in the wizard state.
+     *
+     * @return array<string,array<string,string>>
+     */
+    public function valueMap(): array
+    {
+        if ($this->valueMapCache !== null) {
+            return $this->valueMapCache;
+        }
+        $state = $this->state();
+        $map = is_array($state['value_map'] ?? null) ? $state['value_map'] : [];
+        $out = [];
+        foreach ($map as $field => $pairs) {
+            if (!is_array($pairs)) {
+                continue;
+            }
+            foreach ($pairs as $raw => $target) {
+                $out[(string) $field][(string) $raw] = (string) $target;
+            }
+        }
+
+        return $this->valueMapCache = $out;
+    }
+
+    /**
+     * Unique CSV values for every mapped field, with the program options and a suggested match.
+     *
+     * @return array{ok:bool,error?:string,fields:list<array{field:string,label:string,values:list<array{index:int,raw:string,count:int,suggested:string,options:list<array{value:string,label:string}>}>}>}
+     */
+    public function normalization(): array
+    {
+        $result = ['ok' => false, 'fields' => []];
+        $state = $this->state();
+        $table = $this->table();
+        if ($state === null || empty($table['ok'])) {
+            $result['error'] = (string) ($table['error'] ?? 'treasury.import.error_no_file');
+            return $result;
+        }
+        $map = is_array($state['map'] ?? null) ? $state['map'] : [];
+        if ($map === []) {
+            $result['error'] = 'treasury.import.error_no_mapping';
+            return $result;
+        }
+
+        $labels = $this->headers();
+        foreach (self::NORMALIZATION_FIELDS as $field) {
+            $index = array_search($field, $map, true);
+            if ($index === false) {
+                continue;
+            }
+            $counts = [];
+            foreach ($table['rows'] as $row) {
+                $raw = trim((string) ($row['cells'][(int) $index] ?? ''));
+                if ($raw === '') {
+                    continue;
+                }
+                $counts[$raw] = (int) ($counts[$raw] ?? 0) + 1;
+            }
+            if ($counts === []) {
+                continue;
+            }
+            arsort($counts, SORT_NUMERIC);
+            $baseOptions = $field === 'member' ? [] : $this->valueOptions($field);
+            $noneLabel = $this->valueNoneLabel($field);
+            $includeNone = $field !== 'approved';
+            $values = [];
+            $entry = 0;
+            foreach ($counts as $raw => $count) {
+                $raw = (string) $raw;
+                $options = $baseOptions;
+                if ($includeNone) {
+                    array_unshift($options, ['value' => '__none__', 'label' => $noneLabel]);
+                }
+                if ($field === 'category') {
+                    $options[] = [
+                        'value' => '__new__',
+                        'label' => (string) __('treasury.import.value_new_category', ['label' => $raw]),
+                    ];
+                }
+                $values[] = [
+                    'index' => $entry,
+                    'raw' => $raw,
+                    'count' => (int) $count,
+                    'suggested' => $this->valueSuggestion($field, $raw),
+                    'options' => $options,
+                ];
+                $entry++;
+            }
+            $result['fields'][] = [
+                'field' => $field,
+                'label' => (string) ($labels[$field] ?? $field),
+                'values' => $values,
+            ];
+        }
+        $result['ok'] = true;
+
+        return $result;
+    }
+
+    // @@VALUE_HELPERS@@
+
+    /** @return list<array{value:string,label:string}> */
+    private function valueOptions(string $field): array
+    {
+        $out = [];
+        switch ($field) {
+            case 'direction':
+                return [
+                    ['value' => 'income', 'label' => (string) __('treasury.direction_sign_income')],
+                    ['value' => 'expense', 'label' => (string) __('treasury.direction_sign_expense')],
+                    ['value' => 'transfer', 'label' => (string) __('treasury.direction_sign_transfer')],
+                ];
+            case 'approved':
+                return [
+                    ['value' => '1', 'label' => (string) __('treasury.import.value_yes')],
+                    ['value' => '0', 'label' => (string) __('treasury.import.value_no')],
+                ];
+            case 'account':
+            case 'transfer_account':
+                foreach ($this->treasury->accountOptions(true) as $account) {
+                    $out[] = ['value' => (string) $account['key'], 'label' => (string) $account['label']];
+                }
+                return $out;
+            case 'payment_method':
+                foreach ($this->treasury->paymentMethodGroups() as $group) {
+                    foreach ((array) ($group['keys'] ?? []) as $method) {
+                        $out[] = ['value' => (string) $method, 'label' => (string) __('treasury.method_' . $method)];
                     }
+                }
+                return $out;
+            case 'category':
+                foreach ($this->treasury->categoryOptions() as $category) {
+                    $out[] = ['value' => (string) $category['key'], 'label' => (string) $category['label']];
+                }
+                return $out;
+            case 'runts_line':
+                $seen = [];
+                foreach (['expense', 'income'] as $direction) {
+                    foreach (RuntsReportService::selectGroups($direction) as $group) {
+                        foreach ((array) ($group['options'] ?? []) as $option) {
+                            $value = (string) ($option['value'] ?? '');
+                            if ($value === '' || isset($seen[$value])) {
+                                continue;
+                            }
+                            $seen[$value] = true;
+                            $out[] = ['value' => $value, 'label' => (string) ($option['label'] ?? $value)];
+                        }
+                    }
+                }
+                return $out;
+            case 'budget_item':
+                foreach ($this->treasury->budgetItemFilterOptions() as $option) {
+                    $out[] = ['value' => (string) $option['value'], 'label' => (string) $option['label']];
+                }
+                return $out;
+            case 'member':
+                return $this->memberChoices();
+        }
+
+        return [];
+    }
+
+    private function valueNoneLabel(string $field): string
+    {
+        return match ($field) {
+            'account' => (string) __('treasury.import.value_default_account'),
+            'transfer_account' => (string) __('treasury.import.value_no_transfer_account'),
+            'payment_method' => (string) __('treasury.import.value_no_method'),
+            'category' => (string) __('treasury.import.value_default_category'),
+            'runts_line' => (string) __('treasury.import.value_derive_runts'),
+            'budget_item' => (string) __('treasury.import.value_no_budget'),
+            'member' => (string) __('treasury.import.value_no_member'),
+            'direction' => (string) __('treasury.import.value_default_direction'),
+            default => (string) __('treasury.import.value_none'),
+        };
+    }
+
+    // @@VALUE_SAVE@@
+
+    /**
+     * Save the raw-value normalisation (field → raw → program value).
+     *
+     * @param array<string,mixed> $rawValues
+     * @param array<string,mixed> $targets
+     * @return array{ok:bool,error?:string}
+     */
+    public function saveNormalization(array $rawValues, array $targets): array
+    {
+        $state = $this->state();
+        if ($state === null) {
+            return ['ok' => false, 'error' => 'treasury.import.error_no_file'];
+        }
+        $allowed = [];
+        foreach (self::NORMALIZATION_FIELDS as $field) {
+            $allowed[$field] = array_map(
+                static fn (array $option): string => (string) $option['value'],
+                $this->valueOptions($field)
+            );
+        }
+        $map = [];
+        foreach ($rawValues as $field => $list) {
+            $field = (string) $field;
+            if (!in_array($field, self::NORMALIZATION_FIELDS, true) || !is_array($list)) {
+                continue;
+            }
+            foreach ($list as $index => $raw) {
+                $raw = trim((string) $raw);
+                if ($raw === '') {
+                    continue;
+                }
+                $target = trim((string) ($targets[$field][$index] ?? ''));
+                if ($target === '') {
+                    $target = $field === 'member' ? '__none__' : $this->valueSuggestion($field, $raw);
+                }
+                if ($field === 'member' && $target !== '__none__') {
+                    $lookup = $this->memberLookup();
+                    $memberId = (int) ($lookup['by_key'][mb_strtolower($target)] ?? 0);
+                    if ($memberId < 1 && ctype_digit($target) && isset($lookup['labels'][(int) $target])) {
+                        $memberId = (int) $target;
+                    }
+                    $target = $memberId > 0 ? (string) $memberId : '__none__';
+                }
+                $valid = $target === '__none__'
+                    || ($field === 'category' && $target === '__new__')
+                    || in_array($target, $allowed[$field], true);
+                if ($valid) {
+                    $map[$field][$raw] = $target;
                 }
             }
         }
+        $state['value_map'] = $map;
+        $this->valueMapCache = $map;
+        $this->saveState($state);
 
-        return '';
+        return ['ok' => true];
     }
 
     /**
-     * Importa le righe già mappate. Ogni riga passa da TreasuryService::create(), quindi valgono
-     * le stesse regole della prima nota (conti, tipologie, voce Modello D, importi).
-     *
-     * @param list<array<string,string>> $rows
-     * @param array<string,string> $map colonna CSV => campo
-     * @return array{created:int,skipped:int,errors:list<string>}
+     * @return array{value:string,none:bool,new:bool}
      */
-    public function importRows(array $rows, array $map, string $ip, ?int $userId = null): array
+    private function mappedValue(string $field, string $raw): array
     {
+        if ($raw === '') {
+            return ['value' => '', 'none' => false, 'new' => false];
+        }
+        $map = $this->valueMap()[$field] ?? [];
+        $target = $map[$raw] ?? $map[mb_strtolower($raw)] ?? null;
+        if ($target === null) {
+            return ['value' => '', 'none' => false, 'new' => false];
+        }
+        if ($target === '__none__') {
+            return ['value' => '', 'none' => true, 'new' => false];
+        }
+        if ($target === '__new__') {
+            return ['value' => $raw, 'none' => false, 'new' => true];
+        }
+
+        return ['value' => $target, 'none' => false, 'new' => false];
+    }
+
+    /** Suggested program value for a raw CSV value. */
+    private function valueSuggestion(string $field, string $raw): string
+    {
+        $raw = trim($raw);
+        switch ($field) {
+            case 'direction':
+                $parsed = $this->parseDirection($raw);
+                return $parsed !== '' ? $parsed : '__none__';
+            case 'approved':
+                $bool = ImportValueNormalizer::toBool($raw);
+                if ($bool === null) {
+                    return (string) $this->options()['approve'];
+                }
+                return $bool ? '1' : '0';
+            case 'account':
+            case 'transfer_account':
+                $key = $this->matchAccount($raw, $this->treasury->accountOptions(false));
+                if ($key === '') {
+                    return '__none__';
+                }
+                foreach ($this->treasury->accountOptions(true) as $account) {
+                    if ((string) $account['key'] === $key) {
+                        return $key;
+                    }
+                }
+                return '__none__';
+            case 'payment_method':
+                $method = $this->matchMethod($raw);
+                if ($method === '') {
+                    return '__none__';
+                }
+                $supported = array_map(
+                    static fn (array $option): string => (string) $option['value'],
+                    $this->valueOptions('payment_method')
+                );
+                return in_array($method, $supported, true) ? $method : '__none__';
+            case 'category':
+                $key = $this->resolveCategoryKey($raw);
+                return $key ?? '__new__';
+            case 'runts_line':
+                $line = $this->matchRuntsLine($raw);
+                if ($line === '') {
+                    return '__none__';
+                }
+                $supported = array_map(
+                    static fn (array $option): string => (string) $option['value'],
+                    $this->valueOptions('runts_line')
+                );
+                return in_array($line, $supported, true) ? $line : '__none__';
+            case 'budget_item':
+                $id = $this->matchBudgetItem($raw, $this->treasury->budgetItemFilterOptions());
+                return $id > 0 ? (string) $id : '__none__';
+            case 'member':
+                $id = (int) ($this->memberLookup()['by_key'][mb_strtolower($raw)] ?? 0);
+                return $id > 0 ? (string) $id : '__none__';
+        }
+
+        return '__none__';
+    }
+
+    /** @return list<array{value:string,label:string}> */
+    public function memberChoices(): array
+    {
+        $choices = [];
+        foreach ($this->memberLookup()['labels'] as $id => $label) {
+            if ($label === '') {
+                continue;
+            }
+            $choices[] = ['value' => (string) $id, 'label' => $label];
+        }
+        usort($choices, static fn (array $a, array $b): int => strcasecmp($a['label'], $b['label']));
+
+        return $choices;
+    }
+
+    /**
+     * Parse the file without writing anything: each line becomes “new”, “skip” or “error”.
+     *
+     * @return array{ok:bool,error?:string,stats:array{total:int,create:int,skip:int,error:int},rows:list<array<string,mixed>>,shown:int,total_rows:int}
+     */
+    public function analyze(int $limit = self::PREVIEW_ROWS): array
+    {
+        $result = [
+            'ok' => false,
+            'stats' => ['total' => 0, 'create' => 0, 'skip' => 0, 'error' => 0],
+            'rows' => [],
+            'shown' => 0,
+            'total_rows' => 0,
+        ];
+        $state = $this->state();
+        $table = $this->table();
+        if ($state === null || empty($table['ok'])) {
+            $result['error'] = (string) ($table['error'] ?? 'treasury.import.error_no_file');
+            return $result;
+        }
+        $map = is_array($state['map'] ?? null) ? $state['map'] : [];
+        if ($map === []) {
+            $result['error'] = 'treasury.import.error_no_mapping';
+            return $result;
+        }
+
+        $options = $this->options();
+        $accounts = $this->treasury->accountOptions(false);
+        $accountKeys = array_map(static fn (array $account): string => (string) $account['key'], $accounts);
+        $activeKeys = [];
+        $accountLabels = [];
+        foreach ($accounts as $account) {
+            $accountLabels[(string) $account['key']] = (string) $account['label'];
+            if (!empty($account['active'])) {
+                $activeKeys[] = (string) $account['key'];
+            }
+        }
+        $categories = $this->treasury->categoryMap();
+        $budgetOptions = $this->treasury->budgetItemFilterOptions();
+        $members = $this->memberLookup();
+        $existing = $options['skip_duplicates'] === '1' ? $this->existingFingerprints() : [];
+        $batchSeen = [];
+
+        $result['ok'] = true;
+        foreach ($table['rows'] as $raw) {
+            $values = [];
+            foreach ($map as $index => $target) {
+                if ((string) $target === ImportValueNormalizer::TARGET_IGNORE) {
+                    continue;
+                }
+                $values[(string) $target] = trim((string) ($raw['cells'][(int) $index] ?? ''));
+            }
+            $line = (int) ($raw['line'] ?? 0);
+            $errors = [];
+            $warnings = [];
+
+            $date = ImportValueNormalizer::toDate((string) ($values['movement_date'] ?? '')) ?? '';
+            if ($date === '') {
+                $errors[] = (string) __('treasury.import.error_date', ['line' => (string) $line]);
+            }
+
+            $directionRaw = (string) ($values['direction'] ?? '');
+            $mappedDirection = $this->mappedValue('direction', $directionRaw);
+            if ($mappedDirection['value'] !== '') {
+                $direction = $mappedDirection['value'];
+            } elseif ($mappedDirection['none'] || $directionRaw === '') {
+                $direction = (string) $options['default_direction'];
+            } else {
+                $direction = $this->parseDirection($directionRaw);
+            }
+            if (!in_array($direction, TreasuryService::DIRECTIONS, true)) {
+                $direction = '';
+                $errors[] = (string) __('treasury.import.error_direction', ['line' => (string) $line]);
+            }
+
+            $amountRaw = (string) ($values['amount'] ?? '');
+            $amount = ImportValueNormalizer::toAmount($amountRaw);
+            if ($amount === null || $amount <= 0) {
+                $errors[] = (string) __('treasury.import.error_amount', [
+                    'line' => (string) $line,
+                    'value' => $amountRaw !== '' ? $amountRaw : '—',
+                ]);
+            }
+
+            $accountRaw = (string) ($values['account'] ?? '');
+            $mappedAccount = $this->mappedValue('account', $accountRaw);
+            if ($mappedAccount['value'] !== '') {
+                $account = $mappedAccount['value'];
+            } elseif ($mappedAccount['none']) {
+                $account = '';
+            } else {
+                $account = $accountRaw !== '' ? $this->matchAccount($accountRaw, $accounts) : '';
+            }
+            if ($account !== '' && (!in_array($account, $accountKeys, true) || !in_array($account, $activeKeys, true))) {
+                $warnings[] = (string) __('treasury.import.warning_account_fallback', [
+                    'label' => $accountRaw,
+                    'account' => (string) ($accountLabels[(string) $options['default_account']] ?? $options['default_account']),
+                ]);
+                $account = '';
+            }
+            if ($account === '') {
+                $account = (string) $options['default_account'];
+            }
+            if ($account === '') {
+                $errors[] = (string) __('treasury.import.error_account', ['line' => (string) $line]);
+            }
+
+            $methodRaw = (string) ($values['payment_method'] ?? '');
+            $mappedMethod = $this->mappedValue('payment_method', $methodRaw);
+            if ($mappedMethod['value'] !== '') {
+                $method = $mappedMethod['value'];
+            } elseif ($mappedMethod['none']) {
+                $method = '';
+            } else {
+                $method = $this->matchMethod($methodRaw);
+                if ($method === '') {
+                    $method = (string) $options['default_payment_method'];
+                }
+            }
+
+            // Transfer account: the destination account (dedicated column) is needed, different from the
+            // departure one.
+            $transferAccount = '';
+            if ($direction === 'transfer') {
+                $transferRaw = (string) ($values['transfer_account'] ?? '');
+                $mappedTransfer = $this->mappedValue('transfer_account', $transferRaw);
+                if ($mappedTransfer['value'] !== '') {
+                    $candidate = $mappedTransfer['value'];
+                } elseif ($mappedTransfer['none']) {
+                    $candidate = '';
+                } else {
+                    $candidate = $transferRaw !== '' ? $this->matchAccount($transferRaw, $accounts) : '';
+                }
+                if ($candidate === '' || !in_array($candidate, $accountKeys, true)
+                    || !in_array($candidate, $activeKeys, true) || $candidate === $account) {
+                    $errors[] = (string) __('treasury.import.error_transfer', ['line' => (string) $line]);
+                } else {
+                    $transferAccount = $candidate;
+                }
+                $method = '';
+            }
+
+            $categoryRaw = (string) ($values['category'] ?? '');
+            $categoryKey = (string) $options['default_category'];
+            $newCategory = '';
+            $mappedCategory = $this->mappedValue('category', $categoryRaw);
+            if ($direction === 'transfer') {
+                // A transfer does not have its own economic category.
+                $categoryKey = 'internal_transfer';
+            } elseif ($mappedCategory['new']) {
+                $categoryKey = '__new__';
+                $newCategory = mb_substr($categoryRaw, 0, 80);
+                $warnings[] = (string) __('treasury.import.warning_new_category', ['label' => $newCategory]);
+            } elseif ($mappedCategory['none']) {
+                $categoryKey = (string) $options['default_category'];
+            } elseif ($mappedCategory['value'] !== '') {
+                $categoryKey = $mappedCategory['value'];
+            } elseif ($categoryRaw !== '') {
+                $resolved = $this->resolveCategoryKey($categoryRaw);
+                if ($resolved !== null) {
+                    $categoryKey = $resolved;
+                } else {
+                    $categoryKey = '__new__';
+                    $newCategory = mb_substr($categoryRaw, 0, 80);
+                    $warnings[] = (string) __('treasury.import.warning_new_category', ['label' => $newCategory]);
+                }
+            }
+            $categoryLabel = $categoryKey === '__new__'
+                ? $newCategory
+                : (string) ($categories[$categoryKey] ?? $this->treasury->categoryLabel($categoryKey));
+
+            $runtsLine = '';
+            if ($direction === 'income' || $direction === 'expense') {
+                $runtsRaw = (string) ($values['runts_line'] ?? '');
+                $mappedRunts = $this->mappedValue('runts_line', $runtsRaw);
+                if ($mappedRunts['value'] !== '') {
+                    $manualRunts = $mappedRunts['value'];
+                } elseif ($mappedRunts['none']) {
+                    $manualRunts = '';
+                } else {
+                    $manualRunts = $this->matchRuntsLine($runtsRaw);
+                }
+                $runtsLine = RuntsReportService::normalizeLine(
+                    $manualRunts,
+                    $categoryKey === '__new__' ? 'other' : $categoryKey,
+                    $direction
+                );
+            }
+
+            $budgetRaw = (string) ($values['budget_item'] ?? '');
+            $mappedBudget = $this->mappedValue('budget_item', $budgetRaw);
+            if ($mappedBudget['value'] !== '') {
+                $budgetItemId = max(0, (int) $mappedBudget['value']);
+            } elseif ($mappedBudget['none']) {
+                $budgetItemId = 0;
+            } else {
+                $budgetItemId = $this->matchBudgetItem($budgetRaw, $budgetOptions);
+            }
+
+            $memberRaw = (string) ($values['member'] ?? '');
+            $memberId = 0;
+            $memberLabel = '';
+            $mappedMember = $this->mappedValue('member', $memberRaw);
+            if ($mappedMember['value'] !== '') {
+                $memberId = max(0, (int) $mappedMember['value']);
+            } elseif ($mappedMember['none']) {
+                $memberId = 0;
+            } elseif ($memberRaw !== '') {
+                $memberId = (int) ($members['by_key'][mb_strtolower($memberRaw)] ?? 0);
+            }
+            if ($memberId > 0 && !isset($members['labels'][$memberId])) {
+                $memberId = 0;
+            }
+            if ($memberId > 0) {
+                $memberLabel = (string) ($members['labels'][$memberId] ?? $memberRaw);
+            } elseif ($memberRaw !== '' && !$mappedMember['none']) {
+                $warnings[] = (string) __('treasury.import.warning_member', ['name' => $memberRaw]);
+            }
+
+            $approved = (string) $options['approve'] === '1';
+            $approvedRaw = (string) ($values['approved'] ?? '');
+            $mappedApproved = $this->mappedValue('approved', $approvedRaw);
+            if ($mappedApproved['value'] !== '') {
+                $approved = $mappedApproved['value'] === '1';
+            } elseif ($approvedRaw !== '') {
+                $bool = ImportValueNormalizer::toBool($approvedRaw);
+                if ($bool !== null) {
+                    $approved = $bool;
+                }
+            }
+            $description = ImportValueNormalizer::text((string) ($values['description'] ?? ''));
+            $beneficiary = ImportValueNormalizer::text((string) ($values['beneficiary'] ?? ''));
+            $invoiceNumber = mb_substr(trim((string) ($values['invoice_number'] ?? '')), 0, 120);
+            $invoiceDate = '';
+            $invoiceDateRaw = trim((string) ($values['invoice_date'] ?? ''));
+            if ($invoiceDateRaw !== '') {
+                $invoiceDate = ImportValueNormalizer::toDate($invoiceDateRaw) ?? '';
+                if ($invoiceDate === '') {
+                    $errors[] = (string) __('treasury.import.error_document_date', [
+                        'line' => (string) $line,
+                        'value' => $invoiceDateRaw,
+                    ]);
+                }
+            }
+            if ($direction === 'transfer') {
+                $invoiceNumber = '';
+                $invoiceDate = '';
+            }
+            $invoicePayment = $direction === 'expense' && ($invoiceNumber !== '' || $invoiceDate !== '') ? '1' : '';
+            $action = 'create';
+            if ($errors !== []) {
+                $action = 'error';
+            } else {
+                $fingerprint = $this->fingerprint($date, $direction, (float) $amount, $account, $description);
+                if (isset($existing[$fingerprint]) || isset($batchSeen[$fingerprint])) {
+                    $action = 'skip';
+                    $warnings[] = (string) __('treasury.import.warning_duplicate');
+                } else {
+                    $batchSeen[$fingerprint] = true;
+                }
+            }
+
+            $result['stats']['total']++;
+            $result['stats'][$action]++;
+            if ($limit > 0 && count($result['rows']) >= $limit) {
+                continue;
+            }
+            $result['rows'][] = [
+                'line' => $line,
+                'action' => $action,
+                'date' => $date,
+                'direction' => $direction,
+                'amount' => (float) ($amount ?? 0),
+                'category' => $categoryLabel,
+                'account' => (string) ($accountLabels[$account] ?? $account),
+                'transfer_account' => $transferAccount !== '' ? (string) ($accountLabels[$transferAccount] ?? $transferAccount) : '',
+                'method' => $method !== '' ? (string) __('treasury.method_' . $method) : '',
+                'description' => $description,
+                'invoice_number' => $invoiceNumber,
+                'invoice_date' => $invoiceDate,
+                'beneficiary' => $beneficiary,
+                'member' => $memberLabel,
+                'approved' => $approved,
+                'errors' => $errors,
+                'warnings' => $warnings,
+                'payload' => [
+                    'direction' => $direction,
+                    'amount' => $amount !== null ? (string) $amount : '',
+                    'movement_date' => $date,
+                    'account' => $account,
+                    'transfer_account' => $transferAccount,
+                    'payment_method' => $method,
+                    'category' => $categoryKey,
+                    'new_category' => $newCategory,
+                    'runts_line' => $runtsLine,
+                    'budget_item_id' => $budgetItemId > 0 ? (string) $budgetItemId : '',
+                    'description' => $description,
+                    'invoice_number' => $invoiceNumber,
+                    'invoice_date' => $invoiceDate,
+                    'invoice_payment' => $invoicePayment,
+                    'beneficiary' => $beneficiary,
+                    'member_id' => $memberId > 0 ? (string) $memberId : '',
+                    'member_involved' => $memberId > 0 ? '1' : '',
+                ],
+            ];
+        }
+        $result['total_rows'] = $result['stats']['total'];
+        $result['shown'] = count($result['rows']);
+
+        return $result;
+    }
+
+    /**
+     * Writes only the valid rows to the first note, then prepares the run report.
+     *
+     * @return array{ok:bool,error?:string,report:array<string,mixed>}
+     */
+    public function commit(string $ip, ?int $userId = null): array
+    {
+        $analysis = $this->analyze(0);
+        if (empty($analysis['ok'])) {
+            return [
+                'ok' => false,
+                'error' => (string) ($analysis['error'] ?? 'treasury.import.error_no_mapping'),
+                'report' => [],
+            ];
+        }
+        $state = $this->state();
         $created = 0;
         $skipped = 0;
+        $failed = 0;
         $errors = [];
-        $accounts = $this->treasury->accountOptions();
-        $budgetOptions = $this->treasury->budgetItemFilterOptions();
-        $line = 1;
-        foreach ($rows as $row) {
-            $line++;
-            $get = static function (string $field) use ($row, $map): string {
-                foreach ($map as $column => $mapped) {
-                    if ($mapped === $field) {
-                        return trim((string) ($row[$column] ?? ''));
-                    }
-                }
-
-                return '';
-            };
-            $date = $this->parseDate($get('movement_date'));
-            $amount = $this->parseAmount($get('amount'));
-            $direction = $this->parseDirection($get('direction'));
-            if ($date === '' || $amount <= 0 || $direction === '') {
+        $newCategories = [];
+        foreach ($analysis['rows'] as $row) {
+            $action = (string) ($row['action'] ?? 'error');
+            if ($action === 'skip') {
                 $skipped++;
-                $errors[] = __('treasury.csv_error_row', ['row' => (string) $line]);
                 continue;
             }
-            $account = $this->matchAccount($get('account'), $accounts);
-            $method = $this->matchMethod($get('payment_method'));
-            $categoryRaw = $get('category');
-            $category = $categoryRaw !== '' ? ($this->treasury->resolveCategoryFromLabel($categoryRaw) ?? 'other') : 'membership_fee';
-            $runtsRaw = $get('runts_line');
-            $runtsLine = $this->matchRuntsLine($runtsRaw);
-            $budgetItemId = $this->matchBudgetItem($get('budget_item'), $budgetOptions);
-            $memberId = $this->matchMember($get('member'));
-            $result = $this->treasury->create([
-                'direction' => $direction,
-                'amount' => (string) $amount,
-                'movement_date' => $date,
-                'account' => $account,
-                'payment_method' => $method,
-                'category' => $category,
-                'new_category' => $category === 'other' && $categoryRaw !== '' ? $categoryRaw : '',
-                'runts_line' => $runtsLine,
-                'budget_item_id' => $budgetItemId > 0 ? (string) $budgetItemId : '',
-                'description' => $get('description'),
-                'beneficiary' => $get('beneficiary'),
-                'member_id' => $memberId > 0 ? (string) $memberId : '',
-                'member_involved' => $memberId > 0 ? '1' : '',
-            ], null, $ip, $userId);
+            if ($action !== 'create') {
+                $failed++;
+                $errors[] = [
+                    'line' => (int) ($row['line'] ?? 0),
+                    'description' => (string) ($row['description'] ?? ''),
+                    'message' => implode(' ', array_map('strval', (array) ($row['errors'] ?? []))),
+                ];
+                continue;
+            }
+            $payload = is_array($row['payload'] ?? null) ? $row['payload'] : [];
+            $result = $this->treasury->create($payload, null, $ip, $userId);
             if (empty($result['ok'])) {
-                $skipped++;
-                $reason = implode(' ', array_map('strval', (array) ($result['errors'] ?? [])));
-                $errors[] = __('treasury.csv_error_row_detail', ['row' => (string) $line, 'error' => $reason]);
+                $failed++;
+                $errors[] = [
+                    'line' => (int) ($row['line'] ?? 0),
+                    'description' => (string) ($row['description'] ?? ''),
+                    'message' => implode(' ', array_map('strval', (array) ($result['errors'] ?? []))),
+                ];
                 continue;
             }
-            $approved = mb_strtolower($get('approved'));
-            if (!in_array($approved, ['1', 'si', 'sì', 'yes', 'ja', 'true'], true)) {
-                $this->db->update('treasury_movements', ['approved_at' => null, 'approved_by' => null], 'id = :id', ['id' => (int) ($result['id'] ?? 0)]);
+            if (empty($row['approved'])) {
+                $this->db->update(
+                    'treasury_movements',
+                    ['approved_at' => null, 'approved_by' => null],
+                    'id = :id',
+                    ['id' => (int) ($result['id'] ?? 0)]
+                );
+            }
+            if ((string) ($payload['category'] ?? '') === '__new__') {
+                $label = trim((string) ($payload['new_category'] ?? ''));
+                if ($label !== '') {
+                    $newCategories[$label] = true;
+                }
             }
             $created++;
         }
-        if ($created > 0) {
-            app('logger')->info('treasury.csv_imported', ['created' => $created, 'skipped' => $skipped]);
-        }
+        $report = [
+            'run_id' => time(),
+            'at' => date('Y-m-d H:i:s'),
+            'source_name' => (string) ($state['source_name'] ?? ''),
+            'created' => $created,
+            'skipped' => $skipped,
+            'failed' => $failed,
+            'errors' => $errors,
+            'new_categories' => array_keys($newCategories),
+        ];
+        $_SESSION[self::REPORT_KEY] = $report;
+        $this->reset(false);
+        app('logger')->info('treasury.csv_imported', [
+            'created' => $created,
+            'skipped' => $skipped,
+            'failed' => $failed,
+        ]);
 
-        return ['created' => $created, 'skipped' => $skipped, 'errors' => $errors];
+        return ['ok' => true, 'report' => $report];
     }
 
-    private function parseDate(string $raw): string
+    /** @return array<string,mixed> */
+    public function lastReport(): array
+    {
+        $report = $_SESSION[self::REPORT_KEY] ?? [];
+
+        return is_array($report) ? $report : [];
+    }
+
+    /** @return list<array{line:int,description:string,message:string}> */
+    public function errorRows(): array
+    {
+        $report = $this->lastReport();
+        $errors = $report['errors'] ?? [];
+
+        return is_array($errors) ? array_values($errors) : [];
+    }
+
+    // ── Recognition of values ────────────────────── ───────────────────────
+
+    /**
+     * Type from a free label: first the exact comparison (slug, IT/EN/DE, customized categories),
+     * then a unique prefix (“Utilities” → “Utilities (electricity, gas…)”).
+     */
+    private function resolveCategoryKey(string $raw): ?string
     {
         $raw = trim($raw);
         if ($raw === '') {
+            return null;
+        }
+        $resolved = $this->treasury->resolveCategoryFromLabel($raw);
+        if ($resolved !== null) {
+            return $resolved;
+        }
+        $needle = ImportValueNormalizer::matchKey($raw);
+        if (mb_strlen($needle) < 3) {
+            return null;
+        }
+        $matches = [];
+        foreach ($this->treasury->categoryOptions() as $option) {
+            $key = (string) ($option['key'] ?? '');
+            $label = ImportValueNormalizer::matchKey((string) ($option['label'] ?? ''));
+            if ($key === '' || $label === '') {
+                continue;
+            }
+            if (str_starts_with($label, $needle) || str_starts_with($needle, $label)) {
+                $matches[$key] = true;
+            }
+        }
+
+        return count($matches) === 1 ? (string) array_key_first($matches) : null;
+    }
+
+    /**
+     * Recognizes the field from the column name (IT/EN/DE).
+     */
+    private function guessField(string $header): string
+    {
+        $key = ImportValueNormalizer::matchKey($header);
+        if ($key === '') {
             return '';
         }
-        foreach (['Y-m-d', 'd/m/Y', 'd.m.Y', 'd-m-Y'] as $format) {
-            $date = \DateTimeImmutable::createFromFormat($format, $raw);
-            if ($date instanceof \DateTimeImmutable) {
-                return $date->format('Y-m-d');
+        $aliases = [
+            'movement_date' => ['data', 'dataoperazione', 'datamovimento', 'date', 'datum', 'buchungsdatum', 'valuta', 'movementdate', 'operationdate'],
+            'direction' => ['tipo', 'tipomovimento', 'segno', 'direction', 'typ', 'entrata', 'uscita', 'einnahme', 'ausgabe', 'inout'],
+            'amount' => ['importo', 'importoeuro', 'amount', 'betrag', 'somma', 'value', 'summe'],
+            'transfer_account' => ['transferaccount', 'contodestinazione', 'contodidestinazione', 'acconto', 'aconto', 'targetaccount', 'zielkonto', 'destinationaccount'],
+            'account' => ['conto', 'contofinanziario', 'account', 'konto', 'cassa', 'banca', 'wallet'],
+            'payment_method' => ['metodo', 'metodopagamento', 'modalitapagamento', 'paymentmethod', 'zahlungsart', 'zahlungsmethode'],
+            'category' => ['tipologia', 'categoria', 'category', 'kategorie', 'rubrica'],
+            'runts_line' => ['vocemodellod', 'voce', 'modello', 'runts', 'position', 'vocerunts'],
+            'budget_item' => ['centro', 'centrodicosto', 'costo', 'progetto', 'budget', 'kostenstelle', 'vocepreventivo'],
+            'invoice_number' => ['numerodocumento', 'numerofattura', 'numerodoc', 'documentnumber', 'invoicenumber', 'rechnungsnummer', 'docnumber', 'beleg', 'belegnummer'],
+            'invoice_date' => ['datadocumento', 'datafattura', 'datadoc', 'documentdate', 'invoicedate', 'rechnungsdatum', 'docdate', 'datariferimento', 'belegdatum'],
+            'description' => ['descrizione', 'causale', 'description', 'beschreibung', 'note', 'memo'],
+            'beneficiary' => ['beneficiario', 'fornitore', 'beneficiary', 'empfanger', 'payee'],
+            'member' => ['socio', 'numerosocio', 'member', 'mitglied', 'socionumero'],
+            'approved' => ['approvato', 'approvazione', 'approval', 'freigegeben', 'stato', 'status'],
+        ];
+        foreach ($aliases as $field => $needles) {
+            if (in_array($key, $needles, true)) {
+                return $field;
+            }
+        }
+        foreach ($aliases as $field => $needles) {
+            foreach ($needles as $needle) {
+                if ($needle === '' || !str_contains($key, $needle)) {
+                    continue;
+                }
+                // “Typology” should not be mistaken for “Type”.
+                if ($field === 'direction' && str_contains($key, 'tipologia')) {
+                    continue;
+                }
+                return $field;
             }
         }
 
         return '';
-    }
-
-    private function parseAmount(string $raw): float
-    {
-        $raw = trim($raw);
-        $raw = str_replace(['€', 'EUR', ' '], '', $raw);
-        if (str_contains($raw, ',') && str_contains($raw, '.')) {
-            $raw = str_replace('.', '', $raw);
-        }
-        $raw = str_replace(',', '.', $raw);
-
-        return (float) $raw;
     }
 
     private function parseDirection(string $raw): string
     {
         $key = mb_strtolower(trim($raw));
-        $in = ['entrata', 'entrate', 'income', 'einnahme', 'einnahmen', '+', 'in'];
-        $out = ['uscita', 'uscite', 'expense', 'ausgabe', 'ausgaben', '-', 'out'];
-        if (in_array($key, $in, true)) {
+        if ($key === '') {
+            return '';
+        }
+        $income = ['entrata', 'entrate', 'income', 'einnahme', 'einnahmen', 'eingang', 'in', '+', '1', 'avere', 'credit', 'haben'];
+        $expense = ['uscita', 'uscite', 'expense', 'ausgabe', 'ausgaben', 'ausgang', 'out', '-', '0', 'dare', 'debit', 'soll'];
+        $transfer = ['giroconto', 'giroconti', 'transfer', 'umbuchung', 'interner transfer'];
+        if (in_array($key, $transfer, true)) {
+            return 'transfer';
+        }
+        if (in_array($key, $income, true)) {
             return 'income';
         }
-        if (in_array($key, $out, true)) {
+        if (in_array($key, $expense, true)) {
             return 'expense';
+        }
+        // Current localized labels (export of the same installation).
+        if ($key === mb_strtolower((string) __('treasury.direction_sign_income'))) {
+            return 'income';
+        }
+        if ($key === mb_strtolower((string) __('treasury.direction_sign_expense'))) {
+            return 'expense';
+        }
+        if ($key === mb_strtolower((string) __('treasury.direction_sign_transfer'))) {
+            return 'transfer';
         }
 
         return '';
@@ -345,15 +1466,15 @@ final class TreasuryCsvService
         foreach ($accounts as $account) {
             $key = TreasuryService::normalizeAccount((string) $account['key']);
             $label = mb_strtolower(trim((string) $account['label']));
-            if ($needle === mb_strtolower($key) || $needle === $label) {
+            if ($key !== '' && ($needle === $key || $needle === $label || $slug === $key)) {
                 return $key;
             }
         }
-        // “Banca”, “Contanti”, “Cassa”…: corrispondenza parziale sull'etichetta.
+        // “Bank”, “Cash”, “Cash”…: partial match on the label.
         foreach ($accounts as $account) {
             $key = TreasuryService::normalizeAccount((string) $account['key']);
             $label = mb_strtolower(trim((string) $account['label']));
-            if ($label !== '' && (str_contains($label, $needle) || str_contains($needle, $label))) {
+            if ($key !== '' && $label !== '' && (str_contains($label, $needle) || str_contains($needle, $label))) {
                 return $key;
             }
         }
@@ -363,21 +1484,74 @@ final class TreasuryCsvService
 
     private function matchMethod(string $raw): string
     {
-        $needle = mb_strtolower(trim($raw));
+        $needle = ImportValueNormalizer::text($raw);
         if ($needle === '') {
             return '';
         }
-        $slug = TreasuryService::normalizePaymentMethod($needle);
-        if ($slug !== '') {
-            return $slug;
-        }
+        $compacted = ImportValueNormalizer::matchKey($needle);
         foreach (TreasuryService::METHODS as $method) {
-            if ($needle === mb_strtolower((string) __('treasury.method_' . $method))) {
-                return $method;
+            if ($compacted === ImportValueNormalizer::matchKey($method)) {
+                return TreasuryService::normalizePaymentMethod($method);
+            }
+            foreach (['it', 'en', 'de'] as $locale) {
+                $label = $this->translate('treasury.method_' . $method, $locale);
+                if ($label !== '' && ImportValueNormalizer::matchKey($label) === $compacted) {
+                    return TreasuryService::normalizePaymentMethod($method);
+                }
             }
         }
+        $candidates = [];
+        foreach (TreasuryService::METHODS as $method) {
+            foreach (['it', 'en', 'de'] as $locale) {
+                $labelKey = ImportValueNormalizer::matchKey($this->translate('treasury.method_' . $method, $locale));
+                if ($labelKey !== '' && mb_strlen($compacted) >= 4
+                    && (str_contains($labelKey, $compacted) || str_contains($compacted, $labelKey))) {
+                    $candidates[$method] = true;
+                }
+            }
+        }
+        if (count($candidates) === 1) {
+            return (string) array_key_first($candidates);
+        }
+        if ($candidates !== []) {
+            $normalized = array_unique(array_map(
+                static fn (string $method): string => TreasuryService::normalizePaymentMethod($method),
+                array_keys($candidates)
+            ));
+            if (count($normalized) === 1) {
+                $normalizedTarget = (string) reset($normalized);
+                foreach ($this->treasury->paymentMethodGroups() as $group) {
+                    if (in_array($normalizedTarget, (array) ($group['keys'] ?? []), true)) {
+                        return $normalizedTarget;
+                    }
+                }
+                $methods = array_keys($candidates);
+                usort($methods, static function (string $a, string $b): int {
+                    $labelA = ImportValueNormalizer::matchKey((string) __('treasury.method_' . $a));
+                    $labelB = ImportValueNormalizer::matchKey((string) __('treasury.method_' . $b));
+                    return strlen($labelA) <=> strlen($labelB);
+                });
+                return (string) $methods[0];
+            }
+        }
+        $aliases = [
+            'bank' => 'bank_transfer',
+            'bonifico' => 'bank_transfer',
+            'bonificobancario' => 'bank_transfer',
+            'pos' => 'pos_card',
+            'creditcard' => 'pos_card',
+        ];
+        if (isset($aliases[$compacted])) {
+            return $aliases[$compacted];
+        }
+        $fallback = ImportValueNormalizer::toPaymentMethod($needle);
 
-        return '';
+        return match ($fallback) {
+            'cash' => 'cash',
+            'bank' => 'bank_transfer',
+            'other' => 'other',
+            default => '',
+        };
     }
 
     private function matchRuntsLine(string $raw): string
@@ -412,7 +1586,7 @@ final class TreasuryCsvService
         }
         foreach ($options as $option) {
             $label = mb_strtolower(trim((string) $option['label']));
-            if ($label === $needle || str_contains($label, $needle)) {
+            if ($label === $needle || ($label !== '' && str_contains($label, $needle))) {
                 return (int) $option['value'];
             }
         }
@@ -420,20 +1594,102 @@ final class TreasuryCsvService
         return 0;
     }
 
-    private function matchMember(string $raw): int
+    /**
+     * Translation into a specific language, without changing the language of the request.
+     */
+    private function translate(string $key, string $locale): string
     {
-        $needle = trim($raw);
-        if ($needle === '') {
-            return 0;
+        static $cache = [];
+        if (!isset($cache[$locale])) {
+            $file = dirname(__DIR__, 2) . '/lang/' . $locale . '/messages.php';
+            $cache[$locale] = is_file($file) ? (array) require $file : [];
         }
-        $row = $this->db->fetch(
-            'SELECT id FROM members WHERE member_number = :m LIMIT 1',
-            ['m' => $needle]
-        );
-        if ($row !== null) {
-            return (int) $row['id'];
+        $messages = $cache[$locale];
+        foreach (explode('.', $key) as $segment) {
+            if (!is_array($messages) || !array_key_exists($segment, $messages)) {
+                return '';
+            }
+            $messages = $messages[$segment];
         }
 
-        return 0;
+        return is_string($messages) ? $messages : '';
+    }
+
+    /**
+     * Member index: membership number and "Surname Name" (as in export).
+     *
+     * @return array{by_key:array<string,int>,labels:array<int,string>}
+     */
+    private function memberLookup(): array
+    {
+        if ($this->memberLookupCache !== null) {
+            return $this->memberLookupCache;
+        }
+        $byKey = [];
+        $labels = [];
+        $rows = $this->db->fetchAll(
+            "SELECT m.id, m.member_number,
+                    (SELECT v.value FROM member_field_values v
+                     INNER JOIN member_field_definitions d ON d.id = v.field_definition_id AND d.`key` = 'first_name'
+                     WHERE v.member_id = m.id LIMIT 1) AS first_name,
+                    (SELECT v.value FROM member_field_values v
+                     INNER JOIN member_field_definitions d ON d.id = v.field_definition_id AND d.`key` = 'last_name'
+                     WHERE v.member_id = m.id LIMIT 1) AS last_name
+             FROM members m"
+        );
+        foreach ($rows as $row) {
+            $id = (int) ($row['id'] ?? 0);
+            if ($id < 1) {
+                continue;
+            }
+            $first = trim((string) ($row['first_name'] ?? ''));
+            $last = trim((string) ($row['last_name'] ?? ''));
+            $label = trim($last . ' ' . $first);
+            $labels[$id] = $label;
+            $candidates = [
+                trim((string) ($row['member_number'] ?? '')),
+                $label,
+                trim($first . ' ' . $last),
+            ];
+            foreach ($candidates as $candidate) {
+                $candidate = mb_strtolower(trim($candidate));
+                if ($candidate !== '' && !isset($byKey[$candidate])) {
+                    $byKey[$candidate] = $id;
+                }
+            }
+        }
+
+        return $this->memberLookupCache = ['by_key' => $byKey, 'labels' => $labels];
+    }
+
+    /**
+     * Fingerprints of the movements already in the first note (only those not superseded): they are
+     * used to skip duplicates during the preview.
+     *
+     * @return array<string,true>
+     */
+    private function existingFingerprints(): array
+    {
+        $out = [];
+        foreach ($this->db->fetchAll(
+            'SELECT movement_date, direction, amount, account, description
+             FROM treasury_movements WHERE superseded_at IS NULL'
+        ) as $row) {
+            $out[$this->fingerprint(
+                (string) ($row['movement_date'] ?? ''),
+                (string) ($row['direction'] ?? ''),
+                (float) ($row['amount'] ?? 0),
+                TreasuryService::normalizeAccount((string) ($row['account'] ?? '')),
+                (string) ($row['description'] ?? '')
+            )] = true;
+        }
+
+        return $out;
+    }
+
+    private function fingerprint(string $date, string $direction, float $amount, string $account, string $description): string
+    {
+        return $date . '|' . $direction . '|' . number_format($amount, 2, '.', '') . '|' . $account . '|'
+            . mb_strtolower(trim($description));
     }
 }

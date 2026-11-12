@@ -11,12 +11,11 @@ use Socly\Support\ImportValueNormalizer as N;
 use Socly\Support\MemberFieldTypes;
 
 /**
- * Import soci da CSV: analisi, mappatura colonne e scrittura transazionale.
- *
- * Il servizio non riusa MemberService::create() perché l'import deve poter
- * scrivere saldi e pagamenti storici, accettare consensi già raccolti e
- * aggiornare soci esistenti campo per campo. Riusa invece le stesse tabelle,
- * le stesse definizioni di campo e la stessa logica di deduplica.
+ * Import members from CSV: analysis, column mapping and transactional writing.
+ * The service does not reuse MemberService::create() because the import must be able to write
+ * historical balances and payments, accept consents already collected and update existing members
+ * on a field-by-field basis. Instead, reuse the same tables, field definitions, and deduplication
+ * logic.
  */
 final class MemberImportService
 {
@@ -25,7 +24,7 @@ final class MemberImportService
     private const PROFILE_SETTING = 'members.import.profiles';
 
     /**
-     * Options remembered per file layout (same headers): behaviour and bookkeeping choices only —
+     * Options remembered per file layout (same headers): behavior and bookkeeping choices only —
      * period/type stay contextual. This is what makes a second identical import propose the
      * previous "register in treasury" (first note) choice again.
      *
@@ -45,9 +44,13 @@ final class MemberImportService
     ];
     private const MAX_BYTES = 5 * 1024 * 1024;
     private const MAX_ROWS = 20000;
-    /** Righe mostrate nell'anteprima quando c'è una ricerca attiva. */
+    /**
+     * Rows shown in preview when there is an active search.
+     */
     private const PREVIEW_ROWS = 200;
-    /** Righe mostrate nell'anteprima senza ricerca: solo un saggio. */
+    /**
+     * Rows shown in preview without research: just one essay.
+     */
     private const PREVIEW_DEFAULT_ROWS = 5;
     private const SAMPLE_ROWS = 40;
     private const BATCH_SIZE = 100;
@@ -119,16 +122,24 @@ final class MemberImportService
     /** @var array<string,true>|null existing profile field keys */
     private ?array $existingFieldKeyCache = null;
 
-    /** @var array<string,true> numeri tessera già presenti in archivio */
+    /**
+     * @var array<string,true> card numbers already in the archive
+     */
     private array $existingNumbers = [];
 
-    /** @var array<string,true> numeri tessera prenotati dalle righe del file */
+    /**
+     * @var array<string,true> card numbers reserved by the file rows
+     */
     private array $reservedNumbers = [];
 
-    /** @var array<string,true> numeri tessera già assegnati in questa importazione */
+    /**
+     * @var array<string,true> card numbers already assigned in this import
+     */
     private array $usedNumbers = [];
 
-    /** Contatore per i numeri tessera generati. */
+    /**
+     * Counter for generated card numbers.
+     */
     private int $numberCursor = 0;
 
     /** True when the current mapping comes from a saved profile. */
@@ -228,7 +239,7 @@ final class MemberImportService
             if (is_uploaded_file($tmp)) {
                 $stored = move_uploaded_file($tmp, $target);
             } elseif (PHP_SAPI === 'cli' && is_file($tmp)) {
-                // CLI (test e import batch): il file non arriva da un upload HTTP.
+                // CLI (test and batch import): The file does not arrive from an HTTP upload.
                 $stored = copy($tmp, $target);
             }
         } catch (\Throwable $e) {
@@ -262,8 +273,8 @@ final class MemberImportService
             );
             $remembered = $this->profileOptions($headers);
             if ($remembered !== []) {
-                // Same layout as a previous import: propose its choices again
-                // (e.g. “register in treasury”, payment method, update strategy).
+                // Same layout as a previous import: propose its choices again (e.g. “register in treasury”,
+                // payment method, update strategy).
                 $options = $this->normalizeOptions(array_merge($options, $remembered));
             }
         }
@@ -405,7 +416,7 @@ final class MemberImportService
                 if (str_starts_with($target, N::TARGET_FIELD_PREFIX)) {
                     $fieldKey = substr($target, strlen(N::TARGET_FIELD_PREFIX));
                     if (!isset($existing[$fieldKey])) {
-                        continue; // campo eliminato nel frattempo
+                        continue; // field eliminated in the meantime
                     }
                 }
                 if ($target !== '') {
@@ -637,7 +648,7 @@ final class MemberImportService
         $state['map'] = $map;
         $state['options'] = $this->normalizeOptions($rawOptions);
         $this->saveState($state);
-        // Ricorda le associazioni per i prossimi file con le stesse intestazioni.
+        // Remember the associations for next files with the same headers.
         $this->rememberMappingProfile($table['headers'], $map, $state['options'] ?? []);
         return ['ok' => true];
     }
@@ -793,10 +804,8 @@ final class MemberImportService
 
     /**
      * Full analysis of the mapped file: normalized rows, duplicates, gaps.
-     *
-     * Con `$query` valorizzata l'anteprima mostra solo le righe che
-     * corrispondono alla ricerca (nome, cognome, numero tessera, errori…):
-     * la ricerca lavora su tutte le righe del file, non solo su quelle mostrate.
+     * With `$query` enabled, the preview shows only the lines that match the search (name, surname,
+     * card number, errors...): the search works on all the lines of the file, not just those shown.
      *
      * @return array<string,mixed>
      */
@@ -840,8 +849,8 @@ final class MemberImportService
     }
 
     /**
-     * Righe dell'anteprima che corrispondono a tutti i termini cercati,
-     * senza distinzione fra maiuscole e accenti.
+     * Preview lines that match all search terms, without distinction between capitalization and
+     * accents.
      *
      * @param list<array<string,mixed>> $rows
      * @return list<array<string,mixed>>
@@ -1676,7 +1685,7 @@ final class MemberImportService
             if ($nameIt === '') {
                 return $this->failure((string) __('members.import.err_type_name'));
             }
-            // Accetta 0 / 0,00 (gratis), 10,50 e 10.50.
+            // Accepts 0 / 0.00 (free), 10.50 and 10.50.
             $price = $priceRaw === '' ? null : N::toAmount($priceRaw);
             if ($price === null || $price < 0) {
                 return $this->failure((string) __('members.import.err_type_price', ['type' => $nameIt]));
@@ -1837,9 +1846,8 @@ final class MemberImportService
 
     /**
      * Write a chunk of rows inside a transaction.
-     *
-     * Ogni riga è protetta da un SAVEPOINT: un errore su una riga non fa fallire
-     * le altre righe del blocco e il motivo reale finisce nel report.
+     * Each row is protected by a SAVEPOINT: an error on one row does not cause the other rows in
+     * the block to fail and the real reason ends up in the report.
      *
      * @param list<array<string,mixed>> $rows
      * @param array<string,array<string,mixed>> $fields
@@ -1865,7 +1873,7 @@ final class MemberImportService
             }
             $this->db->commit();
         } catch (\Throwable $e) {
-            // Errore di transazione (non della singola riga): il blocco non è recuperabile.
+            // Transaction error (not single row): The block is not recoverable.
             $this->db->rollBack();
             $this->logRowFailure($runId, ['line' => 0, 'member_label' => 'batch'], $e);
             $reason = $this->writeErrorReason($e);
@@ -1921,8 +1929,8 @@ final class MemberImportService
     }
 
     /**
-     * Prenota i numeri tessera: quelli già in archivio e quelli presenti nel file.
-     * Così due righe non possono ricevere lo stesso numero.
+     * Reserve card numbers: those already in the archive and those present in the file. Thus two
+     * lines cannot receive the same number.
      *
      * @param list<array<string,mixed>> $rows
      */
@@ -1957,8 +1965,8 @@ final class MemberImportService
     }
 
     /**
-     * Usa il numero del file se è libero, altrimenti ne genera uno nuovo
-     * (mai un numero prenotato da un'altra riga o già in archivio).
+     * Use the file number if it is free, otherwise it generates a new one (never a number reserved
+     * from another row or already in the archive).
      */
     private function allocateNumber(string $candidate): string
     {
@@ -1985,7 +1993,9 @@ final class MemberImportService
         return $number;
     }
 
-    /** Messaggio leggibile per un errore di scrittura. */
+    /**
+     * Readable message due to a typing error.
+     */
     private function writeErrorReason(\Throwable $e): string
     {
         $message = $e->getMessage();
@@ -2136,8 +2146,8 @@ final class MemberImportService
             }
         }
         if ($options['accept_consents'] === '1') {
-            // Consensi dichiarati già raccolti: valgono per i nuovi soci e
-            // completano quelli mancanti sui soci aggiornati (mai sovrascritti).
+            // Declared consents already collected: they are valid for new members and complete those missing
+            // for updated members (never overwritten).
             foreach (['privacy_ack', 'statute_ack'] as $consent) {
                 if (isset($fields[$consent])) {
                     $incoming[$consent] = '1';
@@ -2160,8 +2170,8 @@ final class MemberImportService
             if (!$isNew && $strategy === 'fill_empty' && N::text((string) ($current[$key] ?? '')) !== '') {
                 continue;
             }
-            // In "aggiorna i valori cambiati" una cella vuota del CSV non deve
-            // cancellare quello che l'associazione ha già registrato.
+            // In "update changed values" an empty cell of the CSV must not delete what the association has
+            // already recorded.
             if (!$isNew && $strategy === 'overwrite' && N::text($value) === '') {
                 continue;
             }
@@ -2184,8 +2194,8 @@ final class MemberImportService
             }
             $written[$key] = $value;
         }
-        // La cache riflette solo i valori realmente scritti (non quelli saltati
-        // dalla strategia), così le righe successive leggono dati coerenti.
+        // The cache reflects only the values ​​actually written (not those skipped by the strategy), so
+        // subsequent lines read consistent data.
         if ($written !== []) {
             $this->fieldValueCache[$memberId] = $this->mergeFieldCache($current, $written);
         }
@@ -2205,7 +2215,7 @@ final class MemberImportService
     }
 
     /**
-     * Create or refresh the membership card (ID socio = numero tessera).
+     * Create or refresh the membership card (member ID = card number).
      *
      * @param array<string,string> $values
      * @param array<string,mixed> $resolved
@@ -2270,7 +2280,7 @@ final class MemberImportService
         }
         $paidAt = (string) ($values['sys:paid_at'] ?? '');
         $admittedAt = (string) ($values['sys:admitted_at'] ?? '');
-        // Data del pagamento: quella del file, altrimenti la data di iscrizione (mai "oggi").
+        // Payment date: that of the file, otherwise the registration date (never "today").
         $paymentDate = $paidAt !== ''
             ? $paidAt
             : ($admittedAt !== '' ? $admittedAt . ' 00:00:00' : date('Y-m-d H:i:s'));
@@ -2283,9 +2293,9 @@ final class MemberImportService
             'created_by' => auth_user()['id'] ?? null,
             'created_at' => $paymentDate,
         ];
-        // Idempotenza: un solo pagamento "da import" per socio. Se il file cambia importo,
-        // metodo o data lo si aggiorna; il movimento di prima nota viene creato solo se manca
-        // e riallineato solo quando il pagamento è cambiato (mai movimenti doppi).
+        // Idempotence: only one "from import" payment per member. If the file changes amount, method or date,
+        // it is updated; the journal entry is created only if it is missing and realigned only when the
+        // payment has changed (never double entries).
         $existing = $this->importedPayment($memberId);
         if ($existing !== null) {
             $paymentId = (int) $existing['id'];
@@ -2315,7 +2325,7 @@ final class MemberImportService
             return $paymentId;
         }
 
-        // Fallback per pagamenti creati prima della tracciatura delle righe di import.
+        // Fallback for payments created before import lines are tracked.
         $duplicate = $this->db->fetch(
             "SELECT id FROM payments
              WHERE member_id = :member AND amount = :amount AND method = :method
@@ -2396,8 +2406,8 @@ final class MemberImportService
         if (($options['register_treasury'] ?? '0') !== '1') {
             return;
         }
-        // Data del movimento in prima cassa: quella del pagamento (predefinita).
-        // Se il file non ha la data di pagamento si usa l'iscrizione, mai “oggi”.
+        // Date of movement in the cash book register: that of payment (default). If the file does not have a
+        // payment date, registration is used, never “today”.
         $useRegistration = ($options['treasury_date_source'] ?? 'payment') === 'registration';
         $movementDate = $useRegistration && $admittedAt !== ''
             ? substr($admittedAt, 0, 10)

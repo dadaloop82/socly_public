@@ -1,7 +1,7 @@
 <?php
 /**
- * Rendiconto finale — foglio stampabile (stampa browser → PDF) sul formato del
- * piano finanziario provinciale: preventivato, liquidato, pezze giustificative.
+ * Final report — printable sheet (browser print → PDF) on the provincial
+ * financial plan layout: budgeted, settled, supporting documents.
  *
  * @var array<string,mixed> $comparison
  * @var array<int,list<array<string,mixed>>> $evidence

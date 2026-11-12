@@ -36,7 +36,7 @@ final class SetupService
     }
 
     /**
-     * Steps deferred with «Lo inserirò in seguito» that still lack real content.
+     * Steps deferred with «I'll add it later» that still lack real content.
      *
      * @return list<array{key:string,title:string,setup_url:string}>
      */
@@ -2560,7 +2560,7 @@ final class SetupService
                     }
                 }
                 $fiscal = strtoupper(preg_replace('/[\s.\-]/', '', (string) ($input['fiscal_code'] ?? '')) ?? '');
-                // P.IVA opzionale: può coincidere col CF ente (11 cifre).
+                // Optional VAT number: it can coincide with the organization's CF (11 digits).
                 if (!$this->isValidVat($value) && !($fiscal !== '' && $value === $fiscal && $this->isValidEntityFiscalCode($fiscal))) {
                     $errors[$key] = __('setup.validation_vat');
                     continue;
@@ -3275,7 +3275,7 @@ final class SetupService
 
     /**
      * Treasury accounts: activate the wallets and record any opening balance as
-     * the first income movement ("Saldo iniziale") — only on the first run, so
+     * the first income movement ("Opening balance") — only on the first run, so
      * re-entering the step never duplicates money.
      *
      * @param array<string, mixed> $input
@@ -3349,8 +3349,8 @@ final class SetupService
                 $createdMovementIds[] = (int) ($result['id'] ?? 0);
             }
 
-            // New wallets typed in the wizard ("Altri conti"): created on the fly,
-            // with their opening balance registered like the built-in ones.
+            // New wallets typed in the wizard ("Other accounts"): created on the fly, with their opening
+            // balance registered like the built-in ones.
             $newRows = is_array($input['accounts_new'] ?? null) ? (array) $input['accounts_new'] : [];
             foreach ($newRows as $row) {
                 if (!is_array($row)) {

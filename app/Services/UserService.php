@@ -101,7 +101,7 @@ final class UserService
     }
 
     /**
-     * Soci selezionabili per collegare un operatore al proprio socio (nome dai campi profilo).
+     * Selectable members to connect an operator to your member (name from the profile fields).
      *
      * @return list<array{value:string,label:string}>
      */

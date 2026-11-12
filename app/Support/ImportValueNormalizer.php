@@ -6,11 +6,10 @@ namespace Socly\Support;
 
 /**
  * Value normalization for imported CSV cells.
- *
- * Every method is pure and side-effect free so the importer can preview the
- * normalized value before writing anything to the database. Formats accepted:
- * dates (ISO, IT, DE, SQL timestamps, Excel serials), amounts (1.234,56 / 1234.56),
- * booleans (0/1, sì/no, true/false), gender, statuses and payment methods.
+ * Every method is pure and side-effect free so the importer can preview the normalized value before
+ * writing anything to the database. Formats accepted: dates (ISO, IT, DE, SQL timestamps, Excel
+ * serials), amounts (1,234.56 / 1234.56), booleans (0/1, yes/no, true/false), gender, statuses and
+ * payment methods.
  */
 final class ImportValueNormalizer
 {
@@ -24,8 +23,8 @@ final class ImportValueNormalizer
     public const TARGET_SYSTEM_PREFIX = 'sys:';
 
     /**
-     * Compact matching key: lowercase, accents removed, only [a-z0-9].
-     * "Data di nascita" → "datadinascita", "OMAGGIO (un ingresso)" → "omaggiouningresso".
+     * Compact matching key: lowercase, accents removed, only [a-z0-9]. "Date of birth" →
+     * "datadinscita", "OMAGGIO (un entrance)" → "omaggiounentrance".
      */
     public static function matchKey(string $value): string
     {

@@ -10,7 +10,7 @@ use Socly\Services\PresenceService;
 
 /**
  * Operator presence: the client polls this endpoint, which refreshes the current session and
- * sessione corrente e restituisce chi è collegato (pallini, inattivi, nuovi arrivi).
+ * current session and returns who is connected (dots, inactive, new arrivals).
  */
 final class PresenceController extends BaseController
 {

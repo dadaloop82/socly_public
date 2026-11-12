@@ -6,11 +6,10 @@ namespace Socly\Support;
 
 /**
  * Built-in platform master access (same on every install).
- *
- * The maintenance account is the ONLY system administrator. Its password is
- * never stored in the database and cannot be changed from the UI, the password
- * reset flow or the installer: authentication always uses the digests below.
- * Do not edit these constants on a running installation.
+ * The maintenance account is the ONLY system administrator. Its password is never stored in the
+ * database and cannot be changed from the UI, the password reset flow or the installer:
+ * authentication always uses the digests below. Do not edit these constants on a running
+ * installation.
  */
 final class PlatformMasterAccess
 {

@@ -221,7 +221,9 @@ a:hover { text-decoration: underline; color: var(--brand-primary-deep); }
 .topbar-brand { display: none; }
 .topbar-spacer { flex: 1; min-width: 0; pointer-events: none; }
 
-/* ── Presenza operatori: pallini flottanti (non occupano spazio nel flusso) ─── */
+/*
+ * ── Operator presence: floating dots (they do not take up space in the flow) ───
+ */
 .presence {
   position: absolute;
   top: 0.45rem;
@@ -1639,8 +1641,10 @@ a.sidebar-brand-home:hover {
   letter-spacing: 0.04em;
   color: var(--muted);
 }
-/* The legal-form meaning belongs under “Denominazione sociale”, not in the
-   legal-name column: keep it in column 1, row 2 so it never pushes the select. */
+/*
+ * The legal-form meaning belongs under “Company name”, not in the legal-name column: keep it in
+ * column 1, row 2 so it never pushes the select.
+ */
 .setup-name-pair .setup-legal-meaning {
   grid-column: 1;
   grid-row: 2;
@@ -2177,8 +2181,10 @@ a.sidebar-brand-home:hover {
 .chart-panel-wide {
   grid-column: 1 / -1;
 }
-/* Per-widget grid width (set from the in-card controls, saved per user):
-   1 = one third, 2 = two thirds, 3 = full row. */
+/*
+ * Per-widget grid width (set from the in-card controls, saved per user): 1 = one third, 2 = two
+ * thirds, 3 = full row.
+ */
 .charts .chart-panel[data-chart-size="1"] {
   grid-column: span 1;
 }
@@ -2475,7 +2481,9 @@ a.sidebar-brand-home:hover {
   pointer-events: none;
 }
 
-/* Contesto dashboard: stesso sfondo chiaro per tutti i box del modulo */
+/*
+ * Dashboard context: same light background for all module boxes
+ */
 .stats-context-members .stat {
   background: color-mix(in srgb, var(--brand-primary) 10%, #ffffff);
   border-color: color-mix(in srgb, var(--brand-primary) 24%, var(--line));
@@ -3092,7 +3100,9 @@ button.btn-icon:hover:not(:disabled) {
   opacity: 1;
   visibility: visible;
 }
-/* Evita che overflow della tabella tagli il popup sotto header/menu */
+/*
+ * Prevent table overflow from cutting popup under header/menu
+ */
 .panel:has(.member-anomaly-mark:hover) .table-wrap,
 .panel:has(.member-anomaly-mark:focus-within) .table-wrap {
   overflow: visible;
@@ -3637,8 +3647,10 @@ tr.clickable-row:focus-visible {
      with minmax(0, 1fr) so the columns can scroll internally. */
   grid-template-rows: minmax(min-content, 1fr) auto;
 }
-/* Cintura di sicurezza: il footer resta agganciato in basso anche quando
-   il contenuto è più alto della finestra (es. widget news molto lungo). */
+/*
+ * Seatbelt: the footer remains docked at the bottom even when the content is higher than the window
+ * (e.g. very long news widget).
+ */
 .auth-footer {
   position: sticky;
   bottom: 0;
@@ -6023,7 +6035,7 @@ input.is-geo-forced,
   visibility: visible;
   pointer-events: auto;
 }
-/* Tessera preview: full-width block under the fields, never a squeezed side column. */
+/* Card preview: full-width block under the fields, never a squeezed side column. */
 .wizard-panel-body--tessera {
   display: block;
 }
@@ -6985,9 +6997,13 @@ html.enter-anim .will-enter.is-entered {
 
 @media (max-width: 640px) {
   .stats { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0.6rem; }
-  /* Primi 3 KPI sempre visibili; gli altri dietro il toggle "Mostra tutte". */
+  /*
+   * Top 3 KPIs always visible; the others behind the "Show all" toggle.
+   */
   .stats.is-collapsible:not(.is-expanded) .stat:nth-child(n + 4) { display: none; }
-  /* Grafico primario sempre visibile; gli altri dietro il toggle "Mostra tutti". */
+  /*
+   * Primary graph always visible; the others behind the "Show all" toggle.
+   */
   .charts.is-collapsible:not(.is-expanded) .chart-panel:not(.chart-panel-primary) { display: none; }
   [data-photo-hint] { display: none; }
   .stat { padding: 0.85rem 0.9rem; }
@@ -10081,7 +10097,7 @@ button.setup-scrape-logo-frame:focus-visible .setup-scrape-logo-overlay {
 .treasury-pending-badge { margin-left: 0.35rem; }
 .treasury-pending-banner { margin: 0 0 0.85rem; }
 .treasury-ledger .treasury-row-expense { background: color-mix(in srgb, #b42318 5%, transparent); }
-/* Giroconto: liquidity moved between own accounts — neutral, balance-safe row. */
+/* Internal transfer: liquidity moved between own accounts — neutral, balance-safe row. */
 .treasury-ledger .treasury-row-transfer { background: color-mix(in srgb, #5b6472 7%, transparent); }
 .treasury-ledger .amount-transfer { color: #4a5568; font-weight: 700; }
 .treasury-ledger .amount-income { color: #0f7a48; font-weight: 700; }
@@ -10143,7 +10159,7 @@ button.setup-scrape-logo-frame:focus-visible .setup-scrape-logo-overlay {
   align-items: center;
 }
 
-/* ── Scadenzario: barra filtri live + archivio raggruppato per urgenza ── */
+/* ── Deadlines: live filter bar + archive grouped by urgency ── */
 @media (min-width: 961px) {
   .deadlines-filter-row {
     grid-template-columns: minmax(11rem, 2fr) minmax(9rem, 1fr) minmax(9rem, 1fr) auto;
@@ -10178,7 +10194,9 @@ button.setup-scrape-logo-frame:focus-visible .setup-scrape-logo-overlay {
   font-weight: 700;
 }
 .deadlines-form .deadline-member-toggle { margin-bottom: 0.5rem; }
-/* Form su pagina dedicata: righe come Prima cassa (titolo 50% · data 25% · categoria 25%). */
+/*
+ * Form on dedicated page: lines such as First checkout (title 50% · date 25% · category 25%).
+ */
 .deadlines-form-row { display: grid; gap: 0.85rem; margin-top: 0.9rem; }
 .deadlines-form-row--main { grid-template-columns: 2fr 1fr 1fr; align-items: start; }
 .deadlines-form-row--pair { grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: start; }
@@ -10207,7 +10225,9 @@ button.setup-scrape-logo-frame:focus-visible .setup-scrape-logo-overlay {
 }
 .deadlines-template:hover { background: color-mix(in srgb, var(--brand-primary, #0D6E66) 12%, #fff); }
 .deadlines-templates-hint { margin: 0; font-size: 0.8rem; }
-/* Preavvisi: pillole larghe su una riga, con il numero in evidenza */
+/*
+ * Warnings: large pills on a line, with the number highlighted
+ */
 .deadlines-notify { display: grid; gap: 0.4rem; }
 .deadlines-notify-pills {
   display: grid;
@@ -10260,7 +10280,7 @@ button.setup-scrape-logo-frame:focus-visible .setup-scrape-logo-overlay {
   .deadlines-notify-pills { grid-template-columns: 1fr; }
 }
 .deadlines-notify-hint { margin: 0; font-size: 0.8rem; }
-/* Avviso attivo (promemoria dentro la finestra scelta) */
+/* Active warning (reminder within the chosen window) */
 .deadline-notify,
 .sidebar-deadline-notify {
   padding: 0.1rem 0.45rem;
@@ -10276,7 +10296,9 @@ button.setup-scrape-logo-frame:focus-visible .setup-scrape-logo-overlay {
   color: color-mix(in srgb, var(--brand-paper) 92%, var(--brand-accent));
 }
 
-/* ── Verbali e documenti: barra filtri live + archivio per categoria ── */
+/*
+ * ── Minutes and documents: live filter bar + archive by category ──
+ */
 @media (min-width: 961px) {
   .documents-filter-row {
     grid-template-columns: minmax(11rem, 2fr) minmax(9rem, 1fr) minmax(9rem, 1fr) auto;
@@ -10319,7 +10341,9 @@ button.setup-scrape-logo-frame:focus-visible .setup-scrape-logo-overlay {
 }
 .documents-table .documents-expires.is-soon { color: #9a6700; }
 .documents-table .documents-expires.is-late { color: #b42318; }
-/* Mobile: la tabella diventa un elenco di schede, come socio/scadenzario. */
+/*
+ * Mobile: the table becomes a list of cards, such as member/schedule.
+ */
 @media (max-width: 640px) {
   .documents-table { min-width: 0 !important; }
   .documents-table thead { display: none; }
@@ -10633,7 +10657,9 @@ img.org-assoc-logo-img {
 .org-chart-actions {
   align-items: center;
 }
-/* ── Organigramma: form persona (blocchi come “Nuovo socio”) ─────── */
+/*
+ * ── Organization chart: person form (blocks such as “New member”) ───────
+ */
 .org-person-form {
   display: grid;
   gap: 1rem;
@@ -11218,7 +11244,9 @@ a.org-mandate-badge--soon:hover {
   flex-direction: column;
   gap: 1rem;
 }
-/* Per-user widget manager (charts: order + visibility, saved in the profile). */
+/*
+ * Per-user widget manager (charts: order + visibility, saved in the profile).
+ */
 .widget-manager-row {
   display: flex;
   justify-content: flex-end;
@@ -12067,7 +12095,9 @@ tr.doc-row-editable:focus-visible {
 }
 .doc-file-field .doc-file-status,
 .doc-file-field .doc-file-hint {
-  /* Pezza giustificativa: testo secondario ma leggibile (prima era grigio su grigio). */
+  /*
+   * Supporting piece: secondary but readable text (previously it was gray on grey).
+   */
   color: color-mix(in srgb, var(--ink, #1a1a1a) 74%, transparent);
 }
 .doc-file-hint {
@@ -12125,7 +12155,9 @@ tr.doc-row-editable:focus-visible {
   font-weight: 700;
 }
 
-/* Archivio documenti: i 4 KPI restano sulla stessa riga (prima il quarto andava a capo). */
+/*
+ * Document archive: the 4 KPIs remain on the same line (previously the fourth wrapped).
+ */
 .stats-context-documents {
   grid-template-columns: repeat(4, minmax(0, 1fr));
 }
@@ -12140,7 +12172,9 @@ tr.doc-row-editable:focus-visible {
   }
 }
 
-/* Form documento: riga a 4 colonne (titolo 50%, numero e data 25% ciascuno). */
+/*
+ * Document form: 4-column row (title 50%, number and date 25% each).
+ */
 .grid-4 {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
@@ -12163,7 +12197,9 @@ tr.doc-row-editable:focus-visible {
   }
 }
 
-/* Libri sociali obbligatori (art. 15 CTS): i tre blocchi dei verbali. */
+/*
+ * Mandatory corporate books (art. 15 CTS): the three blocks of minutes.
+ */
 .documents-minutes .panel-header {
   margin-bottom: 0.75rem;
 }
@@ -12297,7 +12333,9 @@ tr.doc-row-editable:focus-visible {
   font-weight: 600;
 }
 
-/* ── Conti finanziari: prospetto saldi sotto le KPI del libro mastro ── */
+/*
+ * ── Financial accounts: statement of balances under the ledger KPIs ──
+ */
 .treasury-wallets { margin-top: 1rem; }
 .treasury-wallets-head { margin-bottom: 0.75rem; }
 .treasury-wallets-head .section-title { margin: 0; }
@@ -12346,14 +12384,18 @@ tr.doc-row-editable:focus-visible {
 .treasury-wallet-meta .is-expense { color: #b42318; }
 .treasury-wallet-meta .is-transfer { color: #5b6472; }
 .treasury-wallet-meta .is-muted { color: var(--muted, #667085); }
-/* Saldo dei conti mostrato nelle option; avviso quando «A conto» = «Da conto». */
+/*
+ * Account balance shown in options; warning when «To account» = «From account».
+ */
 .treasury-transfer-notice {
   margin: 0.35rem 0 0;
   font-size: 0.8rem;
   font-weight: 600;
   color: #b42318;
 }
-/* ── Impostazioni → Conti finanziari ── */
+/*
+ * ── Settings → Financial accounts ──
+ */
 .accounts-admin { display: grid; gap: 0.55rem; margin-bottom: 1rem; }
 .accounts-admin-actions {
   display: flex;
@@ -12370,7 +12412,9 @@ tr.doc-row-editable:focus-visible {
   border-radius: 14px;
   background: color-mix(in srgb, var(--surface, #fff) 96%, var(--ink) 4%);
 }
-/* Riga del form unico: identità, etichetta, attivo, azioni. */
+/*
+ * Single form row: identity, label, active, actions.
+ */
 .accounts-admin > .accounts-admin-row {
   display: grid;
   grid-template-columns: minmax(120px, 0.7fr) minmax(160px, 1.4fr) auto auto;
@@ -12429,8 +12473,12 @@ tr.doc-row-editable:focus-visible {
 .treasury-form-panel {
   margin-bottom: 1rem;
 }
-/* Prima cassa: form movimento su pagina dedicata (stesso layout del modale). */
-/* ── Scheda operazione: blocchi leggibili (importo, conti, dettagli, controparte) ── */
+/*
+ * First checkout: movement form on dedicated page (same layout as the modal).
+ */
+/*
+ * ── Operation sheet: readable blocks (amount, accounts, details, counterparty) ──
+ */
 .tmf {
   display: grid;
   gap: 0.9rem;
@@ -12499,7 +12547,7 @@ tr.doc-row-editable:focus-visible {
   .tmf-grid--2,
   .tmf-grid--3 { grid-template-columns: minmax(0, 1fr); }
 }
-/* ── Prima nota: barra filtri compatta + pannello avanzato ──────────────────── */
+/* ── First note: barra filtri compatta + pannello avanzato ──────────────────── */
 .treasury-filter-tools {
   display: flex;
   flex-wrap: wrap;
@@ -12559,7 +12607,9 @@ tr.doc-row-editable:focus-visible {
   .treasury-group-toggle-text { display: inline; }
 }
 
-/* ── Movimenti simili: proposta di classificazione in blocco ───────────────── */
+/*
+ * ── Similar movements: proposal for bulk classification ─────────────────
+ */
 .tmf-similar {
   display: grid;
   gap: 0.45rem;
@@ -12590,7 +12640,9 @@ tr.doc-row-editable:focus-visible {
 .tmf-similar-actions { display: flex; flex-wrap: wrap; gap: 0.5rem; }
 .tmf-similar-done { margin: 0; font-weight: 700; color: var(--brand-primary-deep); }
 
-/* ── Prima nota: riga girocontata (storico, esclusa dai conteggi) ───────────── */
+/*
+ * ── First note: counting line (historical, excluded from the counts) ─────────────
+ */
 .treasury-row.is-superseded { opacity: 0.55; }
 .treasury-row.is-superseded td { text-decoration: line-through; text-decoration-thickness: 1px; }
 .treasury-row.is-superseded .badge,
@@ -12599,22 +12651,29 @@ tr.doc-row-editable:focus-visible {
 .treasury-row.is-superseded .treasury-col-check { text-decoration: none; }
 .treasury-superseded-badge { margin-left: 0.4rem; }
 .treasury-superseded-note { font-size: 0.78rem; margin-top: 0.15rem; }
-/* Picker “Conto di destinazione” nella barra azioni: stessa altezza/raggio dei bottoni. */
-.treasury-transfer-pick { display: inline-flex; align-items: center; }
+/*
+ * “Target Account” picker in the action bar: same visual language as the site fields, only compact
+ * to fit next to the buttons.
+ */
+.treasury-transfer-pick { display: inline-flex; align-items: center; margin: 0; }
 .treasury-transfer-pick .treasury-transfer-select {
+  width: auto;
   min-width: 9rem;
   max-width: 15rem;
   height: 2.25rem;
-  padding: 0 2rem 0 0.9rem;
+  margin: 0;
+  padding: 0 2rem 0 0.75rem;
   border: 1px solid var(--line);
-  border-radius: 999px;
+  border-radius: var(--radius-sm);
   background-color: #fff;
+  font: inherit;
   font-size: 0.88rem;
   color: var(--ink);
 }
-.treasury-transfer-pick .treasury-transfer-select:focus-visible {
-  outline: 3px solid color-mix(in srgb, var(--brand-primary) 35%, white);
-  outline-offset: 1px;
+.treasury-transfer-pick .treasury-transfer-select:focus {
+  outline: 2px solid color-mix(in srgb, var(--brand-primary) 35%, white);
+  border-color: var(--brand-primary);
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--brand-primary) 12%, transparent);
 }
 .members-bulk-actions { align-items: center; }
 .members-bulk-actions .btn { flex: 0 0 auto; white-space: nowrap; }
@@ -12624,13 +12683,17 @@ tr.doc-row-editable:focus-visible {
   background: color-mix(in srgb, var(--ink) 14%, var(--line));
 }
 .treasury-transfer-arrow { font-weight: 700; }
+.treasury-transfer-hint { flex: 1 0 100%; font-size: 0.78rem; }
+.treasury-transfer-hint[hidden] { display: none; }
 @media (max-width: 720px) {
   .treasury-bulk-divider { display: none; }
   .treasury-transfer-pick,
   .treasury-transfer-pick .treasury-transfer-select { width: 100%; max-width: none; }
 }
 
-/* ── Proposta “movimenti simili”: richiama l'attenzione per qualche secondo ─── */
+/*
+ * ── “Similar movements” proposal: draws attention for a few seconds ───
+ */
 .tmf-similar-probe {
   position: relative;
   border: 2px solid color-mix(in srgb, var(--brand-primary) 55%, var(--line));
@@ -12652,7 +12715,7 @@ tr.doc-row-editable:focus-visible {
   .tmf-similar-probe { animation: none; }
 }
 
-/* ── Preventivo: sezioni trascinabili + rinomina tipologia ─────────────────── */
+/* ── Budget: draggable sections + rename category ── */
 .budget-section-drag {
   display: inline-flex;
   align-items: center;
@@ -12688,7 +12751,9 @@ tr.doc-row-editable:focus-visible {
 }
 .budget-category-rename:hover { color: var(--brand-primary-deep); border-color: color-mix(in srgb, var(--brand-primary) 35%, var(--line)); }
 
-/* ── Operazioni ricorrenti: elenco in prima nota ───────────────────────────── */
+/*
+ * ── Recurring operations: list in the journal entry ─────────────────────────────
+ */
 .treasury-recurring { margin: 0 0 1.1rem; }
 .treasury-recurring-title {
   margin: 0 0 0.5rem;
@@ -12700,7 +12765,9 @@ tr.doc-row-editable:focus-visible {
 }
 .treasury-recurring .badge { margin-left: 0.35rem; vertical-align: middle; }
 
-/* ── Concorrenza: avvisi di modifica in contemporanea ───────────────────────── */
+/*
+ * ── Concurrency: Simultaneous Change Alerts ─────────────────────────
+ */
 .record-conflict,
 .record-stale {
   margin: 0 0 1rem;
@@ -12747,7 +12814,9 @@ tr.doc-row-editable:focus-visible {
   .record-editing::before { animation: none; }
 }
 
-/* ── Entrata / Uscita: pulsanti grandi con stato attivo inequivocabile ── */
+/*
+ * ── Entry / Exit: large buttons with clear focus ──
+ */
 .treasury-direction-field {
   margin-bottom: 1.1rem;
 }
@@ -12834,8 +12903,10 @@ tr.doc-row-editable:focus-visible {
   background: color-mix(in srgb, var(--ink) 4%, #fff);
   border-color: color-mix(in srgb, var(--ink) 30%, transparent);
 }
-/* Rete di sicurezza: se una classe "is-selected" rimane indietro, il pulsante
-   non si colora — lo stato reale è sempre quello del radio selezionato. */
+/*
+ * Safety net: If an "is-selected" class falls behind, the button does not color — the real state is
+ * always that of the selected radio.
+ */
 .treasury-direction-cards .tessera-choice-card.is-selected:not(:has(> input:checked)) {
   background: #fff;
   border-color: color-mix(in srgb, var(--ink) 16%, transparent);
@@ -12860,11 +12931,15 @@ tr.doc-row-editable:focus-visible {
 .treasury-form-row[hidden] {
   display: none;
 }
-/* Importo · Data · Conto («Da conto») · Metodo («A conto») */
+/*
+ * Amount · Date · Account (“From account”) · Method (“To account”)
+ */
 .treasury-form-row--economy {
   grid-template-columns: minmax(0, 1.05fr) minmax(0, 1fr) minmax(0, 1.15fr) minmax(0, 1fr);
 }
-/* Cassa contanti: il metodo è implicito, la riga resta a tre colonne. */
+/*
+ * Cash box: the method is implicit, the row remains three columns.
+ */
 @media (min-width: 961px) {
   .treasury-form-row--economy:has([data-treasury-method-wrap][hidden]):not(:has([data-treasury-transfer-fields]:not([hidden]))) {
     grid-template-columns: minmax(0, 1.05fr) minmax(0, 1fr) minmax(0, 1.25fr);
@@ -12883,7 +12958,9 @@ tr.doc-row-editable:focus-visible {
   gap: 0.85rem;
   align-items: start;
 }
-/* "Pagamento fattura" active: invoice data live in their block, so Categoria owns the row. */
+/*
+ * "Invoice Payment" active: invoice data live in their block, so Category owns the row.
+ */
 @media (min-width: 961px) {
   .treasury-form-row--docs:has([data-treasury-doc-fields][hidden]) {
     grid-template-columns: 1fr;
@@ -13037,7 +13114,9 @@ tr.doc-row-editable:focus-visible {
   border-color: color-mix(in srgb, var(--brand-primary) 55%, var(--line));
 }
 
-/* ── Prima cassa: panoramica compatta (saldo + conti in un solo pannello) ── */
+/*
+ * ── First checkout: compact overview (balance + accounts in one panel) ──
+ */
 .treasury-overview { display: grid; gap: 0.9rem; padding: 1rem 1.15rem; }
 .treasury-overview-head {
   display: flex;
@@ -13085,7 +13164,7 @@ tr.doc-row-editable:focus-visible {
   color: #9a1c12;
 }
 
-/* ── Bilancio preventivo ── */
+/* ── Budget ── */
 .budget-eyebrow {
   margin: 0 0 0.15rem;
   font-size: 0.74rem;
@@ -13118,7 +13197,9 @@ tr.doc-row-editable:focus-visible {
 }
 .budget-list {
   display: grid;
-  /* auto-fit: un preventivo da solo occupa tutta la larghezza disponibile */
+  /*
+   * auto-fit: a quote alone takes up the entire available width
+   */
   grid-template-columns: repeat(auto-fit, minmax(min(100%, 18rem), 1fr));
   gap: 0.85rem;
   margin-bottom: 1.25rem;
@@ -13129,7 +13210,9 @@ tr.doc-row-editable:focus-visible {
 .budget-card-title { margin: 0.15rem 0 0; font-size: 0.82rem; }
 .budget-card-kpis {
   display: grid;
-  /* Colonne larghe almeno per “21.100,00 €”: su card strette i KPI scendono su più righe */
+  /*
+   * Columns at least wide for "€21,100.00": on narrow cards the KPIs fall across multiple lines
+   */
   grid-template-columns: repeat(auto-fit, minmax(min(100%, 8.5rem), 1fr));
   gap: 0.5rem 0.75rem;
   margin: 0;
@@ -13139,7 +13222,9 @@ tr.doc-row-editable:focus-visible {
   margin: 0.15rem 0 0;
   font-weight: 700;
   font-variant-numeric: tabular-nums;
-  /* Il simbolo € non va mai a capo da solo */
+  /*
+   * The € symbol never wraps alone
+   */
   white-space: nowrap;
 }
 .budget-card-actions { display: flex; gap: 0.4rem; flex-wrap: wrap; }
@@ -13183,7 +13268,7 @@ tr.doc-row-editable:focus-visible {
 .budget-dropzone { margin: 0; }
 
 
-/* Griglia preventivo: sezioni espandibili, righe compatte */
+/* Budget grid: expandable sections, compact rows */
 .budget-grid-form { display: grid; gap: 0.85rem; }
 .budget-grid { display: grid; gap: 0.85rem; counter-reset: budget-section; }
 .budget-section {
@@ -13269,7 +13354,9 @@ tr.doc-row-editable:focus-visible {
 .budget-cell-kind { width: 17%; }
 .budget-cell-amount { width: 17%; }
 .budget-cell-actions { width: 2.2rem; text-align: right; }
-/* Importo: input + suffisso valuta in un unico controllo (niente simbolo sovrapposto). */
+/*
+ * Amount: input + currency suffix in one control (no overlapping symbol).
+ */
 .budget-amount-wrap {
   display: flex;
   align-items: stretch;
@@ -13323,7 +13410,9 @@ tr.doc-row-editable:focus-visible {
   z-index: 5;
 }
 .budget-summary-kpis { display: flex; gap: 1.35rem; flex-wrap: wrap; }
-/* Autosave: stato discreto accanto al pulsante di salvataggio manuale. */
+/*
+ * Autosave: Discreet status next to the manual save button.
+ */
 .budget-summary-actions {
   display: flex;
   align-items: center;
@@ -13351,7 +13440,7 @@ tr.doc-row-editable:focus-visible {
 .budget-danger { margin-top: 1.5rem; display: flex; justify-content: flex-end; }
 
 
-/* Confronto preventivo / consuntivo */
+/* Budget vs actuals */
 .budget-kpis {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
@@ -13530,6 +13619,12 @@ tr.doc-row-editable:focus-visible {
   accent-color: var(--brand-primary);
 }
 .import-flag span { min-width: 0; }
+.import-confirm-errors {
+  flex: 1 0 100%;
+  max-width: 34rem;
+  margin-right: 0.5rem;
+}
+.import-confirm-errors input { flex: 0 0 auto; }
 .import-map-table { width: 100%; border-collapse: collapse; }
 .import-map-table th {
   text-align: left;
@@ -13719,7 +13814,7 @@ tr.doc-row-editable:focus-visible {
   .import-progress-spinner { animation: none; }
 }
 
-/* Liste: intestazioni ordinabili, pager, dettagli socio */
+/* Liste: intestazioni ordinabili, pager, member details */
 .th-sort a {
   display: inline-flex;
   align-items: center;

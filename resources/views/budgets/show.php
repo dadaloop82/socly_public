@@ -1,6 +1,6 @@
 <?php
 /**
- * Bilancio preventivo — griglia inline editabile (sezioni + voci).
+ * Budget — inline-editable grid (sections + items).
  *
  * @var array<string,mixed> $budget
  * @var list<array{key:string,label:string,builtin?:bool}> $categories

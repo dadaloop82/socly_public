@@ -1,8 +1,8 @@
 <?php
 /**
- * Scadenzario — pagina elenco (stesso stile di Soci e Prima cassa):
- * intestazione con azione primaria, KPI cliccabili, barra filtri live e
- * archivio raggruppato per urgenza, con righe cliccabili e azioni rapide.
+ * Schedule — list page (same style as Members and First Cash): header with primary action,
+ * clickable KPIs, live filter bar and archive grouped by urgency, with clickable rows and quick
+ * actions.
  *
  * @var list<array> $deadline_items
  * @var array{overdue:int,due_soon:int,open:int} $counts
@@ -56,7 +56,7 @@ $statusFilterOptions = [
     'all' => (string) __('deadlines.status_all'),
 ];
 
-// Ogni voce finisce in un solo gruppo: l'elenco si legge dall'alto verso il basso.
+// Each entry ends up in only one group: the list is read from top to bottom.
 $groupLabels = [
     'overdue' => (string) __('deadlines.overdue'),
     'soon' => (string) __('deadlines.due_soon'),
@@ -214,8 +214,8 @@ foreach ($deadline_items as $item) {
                                 } elseif ($due !== '' && $due <= $soon) {
                                     $state = 'soon';
                                 }
-                                // Solo gli avvisi temporali meritano un badge: le scadenze
-                                // lontane restano neutre (senza etichetta).
+                                // Only time alerts deserve a badge: distant deadlines remain neutral
+                                // (unlabeled).
                                 $badgeLabel = match ($state) {
                                     'overdue' => (string) __('deadlines.badge_overdue'),
                                     'soon' => (string) __('deadlines.badge_soon'),
@@ -228,7 +228,8 @@ foreach ($deadline_items as $item) {
                                 }
                                 $memberLabel = trim((string) (($item['last_name'] ?? '') . ' ' . ($item['first_name'] ?? '')));
                                 if ($memberLabel === '') {
-                                    // Mandato in organigramma: la persona può non essere (ancora) un socio.
+                                    // Mandate in the organizational chart: the person may not be a member
+                                    // (yet).
                                     $memberLabel = trim((string) ($item['source_person_name'] ?? ''));
                                 }
                                 $source = (string) ($item['source'] ?? '');
@@ -242,7 +243,8 @@ foreach ($deadline_items as $item) {
                                 $recurrence = (string) ($item['recurrence'] ?? 'none');
                                 $assignee = trim((string) ($item['assignee_role'] ?? ''));
                                 $notifyAlert = \Socly\Services\DeadlineService::notifyAlert($item, $today);
-                                // Scadenze automatiche: azione contestuale verso il modulo che le genera.
+                                // Automatic deadlines: contextual action towards the module that generates
+                                // them.
                                 $sourceAction = [];
                                 if ($isSystem) {
                                     if (str_starts_with($source, 'system:mandate:')) {
@@ -353,7 +355,7 @@ foreach ($deadline_items as $item) {
                                                 'href' => $editUrl,
                                             ];
                                         }
-                                        // Scadenza automatica: vai al modulo che la genera.
+                                        // Automatic expiry: go to the module that generates it.
                                         if ($sourceAction !== []) {
                                             $actions[] = $sourceAction;
                                         }

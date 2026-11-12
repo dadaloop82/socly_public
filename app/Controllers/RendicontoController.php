@@ -11,11 +11,10 @@ use Socly\Services\RuntsReportService;
 use Socly\Services\SettingsService;
 
 /**
- * Bilancio consuntivo — Rendiconto per cassa (Modello D, DM 18 aprile 2020).
- *
- * Gli ETS sotto i 220.000 € di entrate redigono il rendiconto per cassa: la pagina genera il
- * modello ministeriale dai movimenti di prima cassa approvati. Sopra soglia i modelli per
- * competenza (A/B/C) non sono ancora generati: la pagina lo dice esplicitamente.
+ * Final balance sheet - Cash flow statement (Form D, Ministerial Decree 18 April 2020).
+ * ETSs under €220,000 in revenue draw up the cash flow statement: the page generates the
+ * ministerial model from the approved cash book movements. Above threshold the accrual models
+ * (A/B/C) are not yet generated: the page says so explicitly.
  */
 final class RendicontoController extends BaseController
 {
@@ -31,7 +30,7 @@ final class RendicontoController extends BaseController
     public function index(Request $request): void
     {
         require_component('treasury');
-        // Il consuntivo ora vive nella scheda “Consuntivo” della pagina Bilanci.
+        // The final balance now lives in the “Final” tab on the Financial Statements page.
         redirect('/budgets#bil-consuntivo');
     }
 

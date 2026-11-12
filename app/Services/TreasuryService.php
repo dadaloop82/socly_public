@@ -32,7 +32,7 @@ final class TreasuryService
     ];
 
     /**
-     * Stored directions. `transfer` is a giroconto between the association's own
+     * Stored directions. `transfer` is a internal transfer between the association's own
      * accounts: it moves liquidity without changing the cash book balance, so it
      * stays out of the income/expense aggregates.
      *
@@ -41,9 +41,8 @@ final class TreasuryService
     public const DIRECTIONS = ['income', 'expense', 'transfer'];
 
     /**
-     * Built-in wallets, seeded by migration 028. Custom wallets live in the
-     * `treasury_accounts` table (label, active flag, order) and are managed in
-     * Settings → Conti finanziari.
+     * Built-in wallets, seeded by migration 028. Custom wallets live in the `treasury_accounts`
+     * table (label, active flag, order) and are managed in Settings → Financial Accounts.
      *
      * @var list<string>
      */
@@ -178,8 +177,8 @@ final class TreasuryService
     }
 
     /**
-     * Categorie pronte per un <select>, con la stessa struttura in movimenti, preventivo e
-     * consuntivo: gruppi Entrate / Uscite / Movimenti finanziari / Personalizzate / Altro.
+     * Categories ready for a <select>, with the same structure in movements, estimate and final
+     * balance: Income / Expenses / Financial transactions / Custom / Other groups.
      *
      * @return list<array{label:string,options:list<array{value:string,label:string}>}>
      */
@@ -409,8 +408,8 @@ final class TreasuryService
         }
         $direction = (string) ($filters['direction'] ?? '');
         if ($direction === 'transfer') {
-            // “Giroconto” raccoglie i trasferimenti interni classici, gli originali
-            // storicizzati (barrati) e le copie generate sul conto di destinazione.
+            // “Internal transfer” collects the classic internal transfers, the superseded (struck
+            // through) originals and the copies generated on the destination account.
             $where[] = "(m.direction = 'transfer' OR m.superseded_at IS NOT NULL OR m.transfer_origin_id IS NOT NULL)";
         } elseif (in_array($direction, self::DIRECTIONS, true)) {
             $where[] = 'm.direction = :filter_direction';
@@ -419,7 +418,7 @@ final class TreasuryService
         $category = trim((string) ($filters['category'] ?? ''));
         if ($category !== '') {
             if ($category === '__none__') {
-                // “Non assegnato”: movimenti senza tipologia.
+                // “Not assigned”: movements without category.
                 $where[] = "(m.category IS NULL OR m.category = '')";
             } else {
                 $where[] = 'm.category = :filter_category';
@@ -454,7 +453,7 @@ final class TreasuryService
         }
         $account = self::normalizeAccount((string) ($filters['account'] ?? ''));
         if ($account !== '') {
-            // A wallet filter also matches the destination of a giroconto.
+            // A wallet filter also matches the destination of a internal transfer.
             $where[] = '(m.account = :filter_account OR m.transfer_account = :filter_account_to)';
             $params['filter_account'] = $account;
             $params['filter_account_to'] = $account;
@@ -509,9 +508,9 @@ final class TreasuryService
     }
 
     /**
-     * Net balance per wallet. The ledger stays unique, but every wallet is its own
-     * entity: a giroconto is an outflow from the source wallet and an inflow to the
-     * destination, while income/expense only touch one wallet.
+     * Net balance for wallets. The ledger stays unique, but every wallet is its own entity: a
+     * transfer is an outflow from the source wallet and an inflow to the destination, while
+     * income/expense only touch one wallet.
      *
      * @param array{from?:string,to?:string} $range
      * @return list<array{key:string,label:string,active:bool,income:float,expense:float,transfer_in:float,transfer_out:float,balance:float}>
@@ -603,15 +602,15 @@ final class TreasuryService
     }
 
     /**
-     * Wallets for the "Prima cassa" overview and its ledger filter: only the
-     * wallets the association has actually enabled, plus the deactivated ones
-     * that still carry movements (a closed account with a residual balance must
-     * stay visible, otherwise money would disappear from the summary).
+     * Wallets for the "Cash book" overview and its ledger filter: only the wallets the association
+     * has actually enabled, plus the deactivated ones that still carry movements (a closed account
+     * with a residual balance must remain visible, otherwise money would disappear from the
+     * summary).
      *
      * @param array{from?:string,to?:string} $range
      * @return array{
-     *     balances: list<array{key:string,label:string,active:bool,income:float,expense:float,transfer_in:float,transfer_out:float,balance:float}>,
-     *     accounts: list<array{id:int,key:string,label:string,builtin:bool,active:bool,sort_order:int}>
+     * balances: list<array{key:string,label:string,active:bool,income:float,expense:float,transfer_in:float,transfer_out:float,balance:float}>,
+     * accounts: list<array{id:int,key:string,label:string,builtin:bool,active:bool,sort_order:int}>
      * }
      */
     public function overviewWallets(array $range = []): array
@@ -884,7 +883,7 @@ final class TreasuryService
     }
 
     /**
-     * Righe di preventivo per il filtro del libro mastro: “2026 · Affitto sede”.
+     * Budget lines for the ledger filter: “2026 · Office Rental”.
      *
      * @return list<array{value:string,label:string}>
      */
@@ -907,7 +906,7 @@ final class TreasuryService
     }
 
     /**
-     * Etichetta “anno · voce” di una riga di preventivo (per i riepiloghi).
+     * “year · item” label of a budget line (for summaries).
      */
     public function budgetItemLabel(int $id): string
     {
@@ -925,8 +924,9 @@ final class TreasuryService
     }
 
     /**
-     * Movimenti “simili” a quello in compilazione: stessa direzione (entrata/uscita) e descrizione
-     * simile. Il punteggio è deterministico (somiglianza fra parole chiave), senza servizi esterni.
+     * Movements "similar" to the one being compiled: same direction (entry/exit) and similar
+     * description. The scoring is deterministic (similarity between keywords), without external
+     * services.
      *
      * @param array{direction?:string,description?:string,beneficiary?:string} $criteria
      * @return array{count:int,total:int,ids:list<int>,matches:list<array<string,mixed>>,score_min:float}
@@ -934,8 +934,8 @@ final class TreasuryService
     public function similarMovements(array $criteria, int $limit = 3, int $excludeId = 0, array $applying = [], array $originals = []): array
     {
         $empty = ['count' => 0, 'total' => 0, 'skipped' => 0, 'ids' => [], 'matches' => [], 'score_min' => 0.45];
-        // Campi che stiamo applicando: una riga entra nella proposta se QUEI campi sono vuoti.
-        // Gli altri campi (es. tipologia già impostata) non contano e non vengono toccati.
+        // Fields we are applying: A row enters the proposal if THOSE fields are empty. The other fields (e.g.
+        // type already set) do not count and are not touched.
         $fields = array_values(array_intersect($applying, ['category', 'runts_line', 'budget_item_id']));
         if ($fields === []) {
             $fields = ['category', 'runts_line', 'budget_item_id'];
@@ -980,8 +980,8 @@ final class TreasuryService
             ? strcmp((string) $b['movement_date'], (string) $a['movement_date'])
             : ($a['score'] < $b['score'] ? 1 : -1));
 
-        // Solo le righe in cui i campi che stiamo applicando sono ancora vuoti: un valore già
-        // presente non viene proposto e non viene mai sovrascritto.
+        // Only the rows in which the fields we are applying are still empty: a value already present is not
+        // proposed and is never overwritten.
         $open = [];
         $skipped = 0;
         foreach ($scored as $row) {
@@ -989,12 +989,12 @@ final class TreasuryService
             foreach ($fields as $field) {
                 $current = trim((string) ($row[$field] ?? ''));
                 $empty = $field === 'budget_item_id' ? (int) $current === 0 : $current === '';
-                // Valore “automatico” = identico a quello del movimento che stai modificando:
-                // è ancora da classificare davvero, quindi entra nella proposta.
+                // “Automatic” value = identical to that of the movement you are modifying: it still needs to
+                // be really classified, so it enters the proposal.
                 $original = trim((string) ($originals[$field] ?? ''));
                 $sameAsOriginal = $original !== '' && $current === $original;
                 if (!$sameAsOriginal && $field === 'runts_line' && $current !== '') {
-                    // Voce derivata in automatico dalla tipologia: ancora da classificare.
+                    // Item automatically derived from the category: still to be classified.
                     $automatic = strtoupper(RuntsReportService::lineForCategory(
                         (string) ($row['category'] ?? ''),
                         (string) ($row['direction'] ?? 'expense')
@@ -1044,7 +1044,7 @@ final class TreasuryService
     }
 
     /**
-     * Applica la stessa classificazione (tipologia, voce Modello D, centro di costo) a più movimenti.
+     * Apply the same classification (type, Model D item, cost center) to multiple transactions.
      *
      * @param list<int> $ids
      * @param array{category?:string,runts_line?:string,budget_item_id?:string} $changes
@@ -1090,7 +1090,7 @@ final class TreasuryService
             if (isset($payload['runts_line'])) {
                 $current = strtoupper(trim((string) ($row['runts_line'] ?? '')));
                 $original = strtoupper(trim((string) ($originals['runts_line'] ?? '')));
-                // Valore derivato in automatico dalla tipologia: è ancora “da classificare”.
+                // Value automatically derived from the category: it is still "to be classified".
                 $automatic = strtoupper(RuntsReportService::lineForCategory(
                     (string) ($row['category'] ?? ''),
                     (string) ($row['direction'] ?? 'expense')
@@ -1122,7 +1122,7 @@ final class TreasuryService
     }
 
     /**
-     * Parole chiave della descrizione: minuscole, senza accenti, senza parole vuote.
+     * Description keywords: lowercase, no accents, no blank words.
      *
      * @return list<string>
      */
@@ -1158,7 +1158,7 @@ final class TreasuryService
     }
 
     /**
-     * Somiglianza di Sørensen–Dice fra due insiemi di parole, con bonus di contenimento.
+     * Sørensen–Dice similarity between two sets of words, with containment bonus.
      *
      * @param list<string> $a
      * @param list<string> $b
@@ -1226,9 +1226,9 @@ final class TreasuryService
     }
 
     /**
-     * Riconosce una categoria da un'etichetta libera (import CSV, testi scritti a mano):
-     * accetta lo slug, il nome inglese/italiano/tedesco delle categorie di sistema e le
-     * etichette personalizzate. Restituisce la chiave canonica o null se è davvero nuova.
+     * Recognizes a category from a free label (CSV import, handwritten texts): accepts the slug,
+     * English/Italian/German name of system categories and custom labels. Returns the canonical key
+     * or null if it is truly new.
      */
     public function resolveCategoryFromLabel(string $raw): ?string
     {
@@ -1259,7 +1259,9 @@ final class TreasuryService
         return null;
     }
 
-    /** Traduzione in una lingua specifica, senza cambiare la lingua della richiesta. */
+    /**
+     * Translation into a specific language, without changing the language of the request.
+     */
     private function translate(string $key, string $locale): string
     {
         static $cache = [];
@@ -1462,7 +1464,7 @@ final class TreasuryService
 
 
     /**
-     * Rimuove l'approvazione (o la ripristina) su più movimenti in un colpo solo.
+     * Removes approval (or restores it) on multiple movements in one fell swoop.
      *
      * @param list<int> $ids
      */
@@ -1488,8 +1490,8 @@ final class TreasuryService
 
 
     /**
-     * Giroconto “storico” dei movimenti selezionati: crea la copia sul conto di destinazione e
-     * marca l'originale come girocontato (escluso dai conteggi, non modificabile).
+     * "Historical" transfer of the selected transactions: creates the copy on the destination
+     * account and marks the original as transfer transfer (excluded from the counts, not editable).
      *
      * @param list<int> $ids
      * @return array{ok:bool,count?:int,error?:string}
@@ -1697,7 +1699,7 @@ final class TreasuryService
             return ['ok' => false, 'errors' => ['movement_date' => __('validation.date')]];
         }
         if ($isTransfer) {
-            // A giroconto has no category of its own: it always moves liquidity internally.
+            // A internal transfer has no category of its own: it always moves liquidity internally.
             $categoryResult = ['ok' => true, 'key' => 'internal_transfer'];
         } else {
             $categoryResult = $this->resolveCategory($input, $existing);
@@ -1705,13 +1707,13 @@ final class TreasuryService
         if (empty($categoryResult['ok'])) {
             return ['ok' => false, 'errors' => ['category' => (string) ($categoryResult['error'] ?? __('validation.required'))]];
         }
-        // Voce RUNTS (Modello D) del movimento: scelta esplicita, altrimenti suggerita dalla categoria.
+        // RUNTS item (Model D) of the movement: explicit choice, otherwise suggested by the category.
         $runtsLine = RuntsReportService::normalizeLine(
             (string) ($input['runts_line'] ?? ''),
             (string) ($categoryResult['key'] ?? ''),
             $direction
         );
-        // "Conto" (wallet: where the money sits) and "metodo" (how it moved) are
+        // "Account" (wallet: where the money sits) and "method" (how it moved) are
         // two different things and therefore two different columns.
         $account = self::normalizeAccount((string) ($input['account'] ?? ''));
         $existingAccount = self::normalizeAccount((string) ($existing['account'] ?? ''));
@@ -1724,7 +1726,7 @@ final class TreasuryService
         $method = '';
         $transferAccount = null;
         if ($isTransfer) {
-            // A giroconto moves liquidity between two own wallets: no payment method.
+            // A internal transfer moves liquidity between two own wallets: no payment method.
             $transferRaw = trim((string) ($input['transfer_account'] ?? ''));
             $transferAccount = self::normalizeAccount($transferRaw);
             $existingTransfer = self::normalizeAccount((string) ($existing['transfer_account'] ?? ''));
@@ -1772,8 +1774,8 @@ final class TreasuryService
         $beneficiary = trim((string) preg_replace('/\s+/u', ' ', (string) ($input['beneficiary'] ?? '')));
         if ($beneficiary !== '') {
             $beneficiary = mb_substr($beneficiary, 0, 190);
-            // Reuse the canonical spelling already stored (ignoring case/spacing)
-            // so “Comune di Bolzano” and “comune di bolzano” never become duplicates.
+            // Reuse the canonical spelling already stored (ignoring case/spacing) so “Municipality of
+            // Bolzano” and “municipality of bolzano” never become duplicates.
             $existingName = $this->db->fetch(
                 "SELECT beneficiary FROM treasury_movements
                  WHERE beneficiary IS NOT NULL AND beneficiary <> ''
@@ -1961,7 +1963,7 @@ final class TreasuryService
             }
         }
 
-        // Wallets are searchable by label too ("banca", "cassa contanti", …).
+        // Wallets are searchable by label too ("bank", "cash office", ...).
         $accKeys = [];
         foreach ($this->accountOptions() as $opt) {
             $label = mb_strtolower((string) $opt['label']);
@@ -1984,7 +1986,7 @@ final class TreasuryService
             $parts[] = '(m.account IN (' . implode(', ', $in) . ') OR m.transfer_account IN (' . implode(', ', $inTransfer) . '))';
         }
 
-        // Payment methods are searchable by label too ("bonifico", "POS", …).
+        // Payment methods are searchable by label too ("bank transfer", "POS", …).
         $methodKeys = [];
         foreach ($this->paymentMethodGroups() as $group) {
             foreach ($group['keys'] as $methodKey) {
@@ -2098,8 +2100,8 @@ final class TreasuryService
             $seen[$slug] = true;
             $out[] = ['slug' => $slug, 'label' => mb_substr($label, 0, 80)];
         }
-        // Una categoria già usata da un movimento o da una voce di bilancio non può sparire:
-        // la teniamo in elenco anche se è stata tolta dalla configurazione (etichetta dallo slug).
+        // A category already used by a movement or a budget item cannot disappear: we keep it in the list
+        // even if it has been removed from the configuration (label from the slug).
         $known = [];
         foreach ($out as $row) {
             $known[$row['slug']] = true;
@@ -2115,7 +2117,7 @@ final class TreasuryService
     }
 
     /**
-     * Categorie referenziate da movimenti o voci di bilancio (per non perderle mai).
+     * Categories referenced by movements or budget items (so you never lose them).
      *
      * @return list<string>
      */
@@ -2141,8 +2143,8 @@ final class TreasuryService
     }
 
     /**
-     * Rinomina una tipologia personalizzata (la tassonomia è condivisa: movimenti e preventivi
-     * seguono il nuovo nome). Le categorie di sistema non si rinominano.
+     * Rename a custom type (the taxonomy is shared: movements and quotes follow the new name).
+     * System categories are not renamed.
      *
      * @return array{ok:bool,error?:string,label?:string}
      */

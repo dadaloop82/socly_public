@@ -3,7 +3,9 @@
 declare(strict_types=1);
 
 if (!function_exists('privacy_sample_draft')) {
-    /** @return non-empty-string */
+    /**
+     * @return non-empty-string
+     */
     function privacy_sample_draft(): string
     {
         $text = trim((string) __('setup.privacy_sample_draft'));

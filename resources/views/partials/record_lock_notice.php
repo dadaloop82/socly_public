@@ -1,7 +1,7 @@
 <?php
 /**
- * Concorrenza fra operatori: versione nascosta, avviso di conflitto al salvataggio,
- * banner “scheda aggiornata” (polling) e indicatore “sta modificando”.
+ * Competition between operators: hidden version, conflict warning when saving, "card updated"
+ * banner (polling) and "modifying" indicator.
  *
  * @var string $entity
  * @var array<string,mixed>|null $row

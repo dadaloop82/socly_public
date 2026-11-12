@@ -1041,8 +1041,8 @@ final class AssociationWebsiteScrapeService
     }
 
     /**
-     * Prefer contact emails that match the scraped site host and/or come from mailto:.
-     * Do not boost mere shared public suffixes (e.g. fss.bz.it vs dsg.bz.it).
+     * Prefer contact emails that match the scraped site host and/or come from mailto:. Do not boost
+     * mere shared public suffixes (e.g. fss.bz.it vs dsg.bz.it).
      */
     private function emailPreferScore(string $email, string $siteHost, bool $fromMailto): int
     {

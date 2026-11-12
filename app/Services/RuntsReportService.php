@@ -7,25 +7,28 @@ namespace Socly\Services;
 use Socly\Core\Database;
 
 /**
- * Rendiconto per cassa — Modello D del DM 18 aprile 2020 (RUNTS).
- *
- * Il modello ministeriale è in italiano per legge: le etichette ufficiali delle voci restano in
- * italiano, mentre l'interfaccia (titoli, pulsanti, note) passa dalle traduzioni.
- *
- * Gli importi arrivano dai movimenti di prima cassa approvati dell'anno: ogni movimento è
- * classificato nella sua voce (`treasury_movements.runts_line`), con fallback sulla categoria
- * tesoreria quando la voce esplicita manca.
+ * Cash flow statement - Form D of the Ministerial Decree of 18 April 2020 (RUNTS).
+ * The ministerial model is in Italian by law: the official labels of the items remain in Italian,
+ * while the interface (titles, buttons, notes) is translated.
+ * The amounts come from the approved cash book movements of the year: each movement is classified
+ * in its own item (`treasury_movements.runts_line`), with fallback to the treasury category when
+ * the explicit item is missing.
  */
 final class RuntsReportService
 {
-    /** Soglia di legge: sotto questa cifra di entrate si redige il rendiconto per cassa (Modello D). */
+    /**
+     * Legal threshold: the cash flow statement is drawn up below this revenue figure (Form D).
+     */
     public const CASH_LIMIT = 220000.0;
 
-    /** Voce tecnica: movimenti interni (giroconti, versamenti/prelievi) fuori dai prospetti A–E. */
+    /**
+     * Technical item: internal movements (account transfers, deposits/withdrawals) outside tables
+     * A–E.
+     */
     public const INTERNAL_LINE = 'X1';
 
     /**
-     * Struttura ufficiale del Modello D: sezioni A–E con le voci di uscita e di entrata.
+     * Official structure of Model D: sections A–E with exit and entry entries.
      *
      * @var array<string,array{label:string,expense:array<string,string>,income:array<string,string>}>
      */
@@ -103,8 +106,8 @@ final class RuntsReportService
     ];
 
     /**
-     * Categoria tesoreria ⇒ voce del Modello D. Direzione esplicita perché la stessa categoria
-     * può essere usata in entrata e in uscita.
+     * Treasury category ⇒ item of Model D. Explicit direction because the same category can be used
+     * for incoming and outgoing.
      *
      * @var array<string,array{expense?:string,income?:string}>
      */
@@ -142,7 +145,7 @@ final class RuntsReportService
     }
 
     /**
-     * Etichetta della voce di Modello D (per il riepilogo delle modifiche).
+     * Model D entry label (for summary of changes).
      */
     public static function lineLabel(string $line): string
     {
@@ -164,7 +167,7 @@ final class RuntsReportService
     }
 
     /**
-     * Etichetta della sezione (A–E); il testo ufficiale del Modello D resta il fallback.
+     * Section label (A–E); the official text of Model D remains the fallback.
      */
     public static function sectionLabel(string $letter): string
     {
@@ -176,7 +179,7 @@ final class RuntsReportService
     }
 
     /**
-     * Voci del Modello D raggruppate per sezione, per i select del form movimenti.
+     * Items of Model D grouped by section, for the selects of the movements form.
      *
      * @return list<array{label:string,options:list<array{value:string,label:string}>}>
      */
@@ -196,7 +199,9 @@ final class RuntsReportService
         return $groups;
     }
 
-    /** Voce scelta esplicitamente, altrimenti quella suggerita dalla categoria. */
+    /**
+     * Voice chosen explicitly, otherwise the one suggested by the category.
+     */
     public static function normalizeLine(string $line, string $category, string $direction): string
     {
         $line = strtoupper(trim($line));
@@ -206,7 +211,9 @@ final class RuntsReportService
         return $line;
     }
 
-    /** Voce del Modello D suggerita dalla categoria tesoreria. */
+    /**
+     * Model D item suggested by the treasury category.
+     */
     public static function lineForCategory(string $category, string $direction): string
     {
         $direction = $direction === 'income' ? 'income' : 'expense';
@@ -215,11 +222,13 @@ final class RuntsReportService
         if ($mapped !== '') {
             return $mapped;
         }
-        // Categorie personalizzate: finiscono tra gli “altri” della sezione A e restano modificabili.
+        // Custom categories: they end up among the "others" of section A and remain editable.
         return $direction === 'income' ? 'A-I8' : 'A-E5';
     }
 
-    /** True quando la voce appartiene alla direzione indicata (o è quella tecnica interna). */
+    /**
+     * True when the voice belongs to the indicated direction (or is the internal technical one).
+     */
     public static function isKnownLine(string $line, string $direction): bool
     {
         if ($line === self::INTERNAL_LINE) {
@@ -234,7 +243,7 @@ final class RuntsReportService
     }
 
     /**
-     * Anni con movimenti di cassa approvati.
+     * Years with approved cash flows.
      *
      * @return list<int>
      */
@@ -256,7 +265,9 @@ final class RuntsReportService
         return $out;
     }
 
-    /** Entrate dell'anno su base cassa (esclusi i movimenti interni). */
+    /**
+     * Revenue for the year on a cash basis (excluding internal movements).
+     */
     public function totalIncome(int $year): float
     {
         $row = $this->db->fetch(
@@ -270,14 +281,16 @@ final class RuntsReportService
         return round((float) ($row['total'] ?? 0), 2);
     }
 
-    /** Un anno si può redigere con il Modello D solo sotto la soglia di legge. */
+    /**
+     * One year can be drawn up with Form D only below the legal threshold.
+     */
     public function canGenerate(int $year): bool
     {
         return $this->totalIncome($year) < self::CASH_LIMIT;
     }
 
     /**
-     * Rendiconto per cassa dell'anno: sezioni A–E, totali, prospetto cassa/banche.
+     * Cash flow statement for the year: sections A–E, totals, cash/bank statement.
      *
      * @return array<string,mixed>
      */
@@ -342,7 +355,7 @@ final class RuntsReportService
                 }
                 continue;
             }
-            // Voce non riconosciuta (dato legacy o direzione cambiata): segnalata, non persa.
+            // Unrecognized entry (legacy data or direction changed): reported, not lost.
             $unclassified[] = [
                 'direction' => $direction,
                 'category' => $category,
@@ -368,7 +381,7 @@ final class RuntsReportService
     }
 
     /**
-     * Saldi per cassa e banche (dai movimenti approvati registrati).
+     * Cash and bank balances (from approved transactions recorded).
      *
      * @return array{cash:float,bank:float,total:float}
      */

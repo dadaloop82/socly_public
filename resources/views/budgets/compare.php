@@ -1,6 +1,6 @@
 <?php
 /**
- * Controllo budget — preventivo vs consuntivo con semafori di scostamento.
+ * Budget control - estimate vs final balance with deviation traffic lights.
  *
  * @var array<string,mixed> $comparison
  * @var \Socly\Services\CurrencyService $currency
@@ -17,7 +17,7 @@ $statusLabels = [
     'over' => __('budget.status_over'),
 ];
 $percentLabel = static fn (float $value): string => number_format($value, 0, ',', '.') . '%';
-// La tipologia salvata nel preventivo è una chiave (rent, utilities, …): va mostrata tradotta.
+// The type saved in the estimate is a key (rent, utilities, ...): it must be shown translated.
 $categoryLabels = is_array($category_labels ?? null) ? $category_labels : [];
 $categoryText = static function (string $key) use ($categoryLabels): string {
     $key = trim($key);
@@ -33,7 +33,7 @@ $categoryText = static function (string $key) use ($categoryLabels): string {
             return (string) $categoryLabels[$resolved];
         }
     } catch (\Throwable) {
-        // etichetta libera: si mostra così com'è
+        // free label: it shows itself as it is
     }
     return str_replace('_', ' ', $key);
 };

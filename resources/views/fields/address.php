@@ -1,6 +1,6 @@
 <?php
 /**
- * Full address block (city / CAP / province / street / house number).
+ * Full address block (city / postcode / province / street / house number).
  */
 $payload = [
     'names' => is_array($names ?? null) ? $names : [

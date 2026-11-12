@@ -47,7 +47,7 @@ final class DocumentsController extends BaseController
     public function create(Request $request): void
     {
         require_component('documents');
-        // La categoria può arrivare dal link "Carica verbale" del blocco Libri sociali.
+        // The category can come from the "Upload minutes" link in the Social Books block.
         $categories = $this->documents->categoryOptions();
         $category = trim((string) $request->input('category', ''));
         if ($category !== '' && !in_array($category, array_column($categories, 'key'), true)) {
@@ -205,7 +205,7 @@ final class DocumentsController extends BaseController
     }
 
     /**
-     * Archivio filters from the query string (validated).
+     * Archive filters from the query string (validated).
      *
      * @return array{status:string,category:string,expiring:bool}
      */

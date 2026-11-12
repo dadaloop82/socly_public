@@ -1,6 +1,6 @@
 <?php
 /**
- * Import soci — step 3: anteprima e analisi (nuovi, aggiornamenti, errori).
+ * Import members — step 3: preview and analysis (new, updates, errors).
  *
  * @var array<string,mixed> $analysis
  * @var string $previewQuery

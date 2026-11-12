@@ -5,11 +5,10 @@ declare(strict_types=1);
 namespace Socly\Support;
 
 /**
- * QR code in SVG lato server (nessuna estensione GD richiesta).
- *
- * L'encoder è di terze parti (Kazuhiko Arase, MIT) ed è vendored in
- * app/Support/QrCode/qrcode.php: qui c'è solo il wrapper che trasforma la
- * matrice di moduli in un SVG scalabile e pronto da stampare/scansionare.
+ * QR code in SVG server side (no GD extension required).
+ * The encoder is third-party (Kazuhiko Arase, MIT) and is vendored in
+ * app/Support/QrCode/qrcode.php: here there is only the wrapper that transforms the array of
+ * modules into a scalable SVG ready to print/scan.
  */
 final class QrCode
 {
@@ -20,11 +19,13 @@ final class QrCode
         'H' => 'QR_ERROR_CORRECT_LEVEL_H',
     ];
 
-    /** Oltre questa lunghezza il QR diventa troppo denso per essere utile. */
+    /**
+     * Beyond this length the QR becomes too dense to be useful.
+     */
     private const MAX_BYTES = 1200;
 
     /**
-     * SVG del QR che codifica $data (stringa vuota se non è possibile).
+     * SVG of the QR encoding $data (empty string if not possible).
      */
     public static function svg(
         string $data,

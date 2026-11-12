@@ -41,8 +41,8 @@ final class DocumentService
     ];
 
     /**
-     * Libri sociali obbligatori (art. 15 CTS): i verbali di assemblea, consiglio
-     * direttivo e organo di controllo.
+     * Mandatory corporate books (art. 15 CTS): the minutes of the assembly, board of directors and
+     * supervisory body.
      *
      * @var list<string>
      */
@@ -112,8 +112,8 @@ final class DocumentService
     }
 
     /**
-     * Libri sociali dell'anno corrente: quanti verbali ci sono per categoria e
-     * quando è stato caricato l'ultimo (per l'avviso "nessun verbale quest'anno").
+     * Company books of the current year: how many minutes there are per category and when the last
+     * one was uploaded (for the "no minutes this year" warning).
      *
      * @return list<array{key:string,label:string,total:int,current_year:int,year:int,last_date:?string}>
      */
@@ -144,9 +144,9 @@ final class DocumentService
     }
 
     /**
-     * Numeri suggeriti per i verbali: progressivo dell'anno corrente per categoria.
+     * Suggested numbers for the minutes: progressive number of the current year by category.
      *
-     * @return array<string,int> categoria => prossimo progressivo
+     * @return array<string,int> category => next progressive number
      */
     public function minutesProgressives(): array
     {

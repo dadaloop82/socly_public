@@ -1,6 +1,6 @@
 <?php
 /**
- * Import soci — step 4: creazione/mappatura dei dati di riferimento mancanti.
+ * Import members — step 4: creation/mapping of missing reference data.
  *
  * @var array<string,mixed> $analysis
  * @var list<array<string,mixed>> $types

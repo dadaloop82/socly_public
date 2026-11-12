@@ -1,6 +1,6 @@
 <?php
 /**
- * Indicatore degli step dell'import CSV (1 upload … 5 report).
+ * CSV import step indicator (1 upload … 5 report).
  *
  * @var int $current
  */

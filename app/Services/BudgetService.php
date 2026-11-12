@@ -7,11 +7,10 @@ namespace Socly\Services;
 use Socly\Core\Database;
 
 /**
- * Bilancio preventivo per anno sociale.
- *
- * Il consuntivo non viene duplicato in una tabella: è la somma dei movimenti di
- * prima cassa imputati alle voci (`treasury_movements.budget_item_id`), così il
- * confronto preventivo/consuntivo è sempre allineato al libro mastro.
+ * Budget estimate for financial year.
+ * The final balance is not duplicated in a table: it is the sum of the cash book movements
+ * attributed to the items (`treasury_movements.budget_item_id`), so the budget/final balance
+ * comparison is always aligned with the ledger.
  */
 final class BudgetService
 {
@@ -398,7 +397,7 @@ final class BudgetService
         if ($budget === null) {
             return ['ok' => false, 'error' => 'not_found'];
         }
-        // Concorrenza: due operatori sulla stessa griglia non si sovrascrivono a vicenda.
+        // Concurrency: Two operators on the same grid do not override each other.
         $expected = (int) ($expectedVersion ?? 0);
         if (!$force && $expected > 0 && (int) ($budget['row_version'] ?? 0) !== $expected) {
             return [
@@ -545,7 +544,7 @@ final class BudgetService
             'sections' => count($keptSections),
             'items' => count($keptItems),
         ], $ip);
-        // La griglia è salvata: si avanza la versione del documento (autosave compreso).
+        // The grid is saved: the version of the document is advanced (including autosave).
         $this->db->updateVersioned('budgets', [], 'id', $id, 0);
         return [
             'ok' => true,
@@ -642,12 +641,10 @@ final class BudgetService
 
 
     /**
-     * Preventivo vs consuntivo: per item, per section and global totals.
-     *
-     * `actual` counts only movements explicitly imputed to the item (any date:
-     * a 2026 invoice paid in 2027 still belongs to the 2026 plan). Movements of
-     * the fiscal year without imputation are listed separately, so totals always
-     * reconcile with the cash book.
+     * Budget vs actuals: per item, per section and global totals.
+     * `actual` counts only movements explicitly imputed to the item (any date: a 2026 invoice paid
+     * in 2027 still belongs to the 2026 plan). Movements of the fiscal year without attribution are
+     * listed separately, so totals always reconcile with the cash book.
      *
      * @return array<string,mixed>
      */
@@ -906,7 +903,7 @@ final class BudgetService
     }
 
     /**
-     * Pezze giustificative per item (used by the rendiconto print sheet).
+     * Supporting documents per item (used by the report print sheet).
      *
      * @return array<int,list<array<string,mixed>>>
      */
@@ -1110,8 +1107,8 @@ final class BudgetService
     }
 
     /**
-     * Statistiche utili all'associazione: pianificato vs consuntivo per anno, copertura delle
-     * spese, quota associativa sul totale entrate e principali categorie dell'ultimo esercizio.
+     * Statistics useful for the association: planned vs final balance per year, expense coverage,
+     * membership share on total revenue and main categories of the last financial year.
      *
      * @return array<string,mixed>
      */
@@ -1162,8 +1159,8 @@ final class BudgetService
             ];
         }
 
-        // Le statistiche per categoria guardano l'ultimo esercizio con movimenti reali,
-        // non l'anno del preventivo in bozza.
+        // The statistics by category look at the last financial year with real movements, not the year of the
+        // draft estimate.
         $latest = (int) date('Y');
         foreach (array_reverse($years) as $year) {
             if (!empty($actual[$year])) {

@@ -1,5 +1,5 @@
--- Identità dell'operatore: nome, cognome (per pallini/notifiche di presenza) e, in alternativa,
--- il collegamento al socio di riferimento (stesso schema usato dalle cariche sociali).
+-- Operator identity: name, surname (for dots/presence notifications) and, alternatively, the connection to
+-- the reference member (same scheme used by corporate officers).
 SET @fn_exists := (SELECT COUNT(*) FROM information_schema.columns
     WHERE table_schema = DATABASE() AND table_name = 'users' AND column_name = 'first_name');
 SET @fn_sql := IF(@fn_exists = 0,
@@ -21,8 +21,8 @@ SET @mid_sql := IF(@mid_exists = 0,
     'SELECT 1');
 PREPARE mid_stmt FROM @mid_sql; EXECUTE mid_stmt; DEALLOCATE PREPARE mid_stmt;
 
--- Presenza: una riga per sessione aperta. `ended_at` valorizzato al logout, `last_seen` aggiornato
--- dal polling del client: oltre 5 minuti senza heartbeat l'utente è mostrato come inattivo.
+-- Presence: one row per open session. `ended_at` valued at logout, `last_seen` updated by client polling:
+-- beyond 5 minutes without heartbeat the user is shown as inactive.
 CREATE TABLE IF NOT EXISTS user_presence (
     session_id VARCHAR(128) NOT NULL,
     user_id INT UNSIGNED NOT NULL,

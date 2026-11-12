@@ -124,8 +124,7 @@ final class AssociationLegalForms
     }
 
     /**
-     * Italian long form shown under the denomination, e.g.
-     * "Associazione di Promozione Sociale".
+     * Italian long form shown under the denomination, e.g. "Social Promotion Association".
      */
     public static function meaning(string $code): string
     {

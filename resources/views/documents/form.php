@@ -1,7 +1,7 @@
 <?php
 /**
- * Verbali e documenti — carica/modifica documento su pagina dedicata
- * (stesso stile di Soci, Prima cassa e Scadenzario).
+ * Minutes and documents — upload/edit document on dedicated page (same style as Members, Cash book
+ * register and Schedule).
  *
  * @var bool $isEdit
  * @var array<string,mixed>|null $document

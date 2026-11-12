@@ -239,7 +239,7 @@ $totalPages = max(1, (int) ceil(((int) $result['total']) / max(1, $perPage)));
                     };
                     $periodEndsOn = format_date((string) ($item['period_ends_on'] ?? ''));
                     $periodLabel = trim((string) ($item['period_label'] ?? ''));
-                    // Sotto il nome: sesso, età aggiornata e torta nel giorno del compleanno.
+                    // Under the name: gender, updated age and cake on the birthday.
                     $genderRaw = strtoupper(trim((string) ($item['fields']['gender'] ?? '')));
                     $genderLabel = match ($genderRaw) {
                         'M' => (string) __('members.gender_m'),
@@ -441,7 +441,7 @@ $totalPages = max(1, (int) ceil(((int) $result['total']) / max(1, $perPage)));
         </div>
         <?php if ($totalPages > 1): ?>
             <?php
-            // Pager: finestra di pagine attorno a quella corrente + prima/ultima.
+            // Pager: window of pages around the current one + first/last.
             $pageWindow = [];
             $pageWindow[] = 1;
             for ($p = max(2, $page - 1); $p <= min($totalPages - 1, $page + 1); $p++) {

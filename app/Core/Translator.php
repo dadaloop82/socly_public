@@ -32,7 +32,7 @@ final class Translator
             $value = $this->lookup('it', $key);
         }
         $value ??= $key;
-        // Prima i segnaposto più lunghi: ":pages" non deve essere spezzato da ":page".
+        // Longer placeholders first: ":pages" must not be broken by ":page".
         $placeholders = array_keys($replace);
         usort($placeholders, static fn ($a, $b): int => strlen((string) $b) <=> strlen((string) $a));
         foreach ($placeholders as $search) {

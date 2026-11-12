@@ -6,17 +6,17 @@ namespace Socly\Controllers;
 
 use Socly\Core\Http\Request;
 use Socly\Core\View;
+use Socly\Services\CurrencyService;
 use Socly\Services\TreasuryCsvService;
 use Socly\Services\TreasuryService;
 
 /**
- * Import/export CSV della prima nota (stesso impianto dell'import soci: upload, mappatura
- * automatica delle colonne, anteprima e conferma).
+ * Import/export CSV of the first note.
+ * The import follows the same flow as the member import: upload → column mapping → value
+ * normalisation → dry run → final report. Only the confirmation writes to the first note.
  */
 final class TreasuryCsvController extends BaseController
 {
-    private const SESSION_KEY = 'treasury_csv_import';
-
     public function __construct(
         View $view,
         private readonly TreasuryService $treasury,
@@ -27,10 +27,7 @@ final class TreasuryCsvController extends BaseController
 
     public function export(Request $request): void
     {
-        require_component('treasury');
-        if (!can('treasury.view')) {
-            http_response_code(403);
-            $this->render('errors/403');
+        if (!$this->ensureAccess('treasury.view')) {
             return;
         }
         $filters = [
@@ -54,10 +51,7 @@ final class TreasuryCsvController extends BaseController
 
     public function template(Request $request): void
     {
-        require_component('treasury');
-        if (!can('treasury.manage')) {
-            http_response_code(403);
-            $this->render('errors/403');
+        if (!$this->ensureAccess()) {
             return;
         }
         header('Content-Type: text/csv; charset=utf-8');
@@ -65,96 +59,280 @@ final class TreasuryCsvController extends BaseController
         echo $this->csv->templateCsv();
     }
 
-    public function importForm(Request $request): void
+    public function index(Request $request): void
     {
-        require_component('treasury');
-        if (!can('treasury.manage')) {
-            http_response_code(403);
-            $this->render('errors/403');
+        if (!$this->ensureAccess()) {
             return;
         }
-        $preview = null;
-        $state = $_SESSION[self::SESSION_KEY] ?? null;
-        if (is_array($state) && is_file((string) ($state['path'] ?? ''))) {
-            $parsed = $this->csv->parse((string) $state['path']);
-            $preview = [
-                'headers' => $parsed['headers'],
-                'map' => $parsed['map'],
-                'unmapped' => $parsed['unmapped'],
-                'rows' => array_slice($parsed['rows'], 0, 25),
-                'total' => count($parsed['rows']),
-            ];
-        }
-        $this->render('treasury/import', [
-            'title' => __('treasury.csv_import_title'),
-            'preview' => $preview,
-            'fields' => $this->csv->headers(),
+        $this->render('treasury/import/upload', [
+            'title' => __('treasury.import.title'),
+            'state' => $this->csv->state(),
+            'maxMegabytes' => 5,
         ]);
     }
 
     public function upload(Request $request): void
     {
-        require_component('treasury');
-        if (!can('treasury.manage')) {
-            http_response_code(403);
-            $this->render('errors/403');
+        if (!$this->ensureAccess()) {
             return;
         }
-        $file = $request->file('csv_file');
-        if ($file === null || (int) ($file['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_OK) {
-            $this->flash('errors', ['csv_file' => __('treasury.csv_error_upload')]);
+        $result = $this->csv->startFromUpload($request->file('csv_file'));
+        if (empty($result['ok'])) {
+            $this->flash('errors', ['csv_file' => __((string) ($result['error'] ?? 'treasury.import.error_missing'))]);
             redirect('/treasury/import');
         }
-        $extension = strtolower((string) pathinfo((string) ($file['name'] ?? ''), PATHINFO_EXTENSION));
-        if (!in_array($extension, ['csv', 'txt'], true)) {
-            $this->flash('errors', ['csv_file' => __('treasury.csv_error_type')]);
+        redirect('/treasury/import/map');
+    }
+
+    public function map(Request $request): void
+    {
+        if (!$this->ensureAccess()) {
+            return;
+        }
+        $table = $this->csv->table();
+        if (empty($table['ok'])) {
+            $this->flash('errors', ['csv_file' => __((string) ($table['error'] ?? 'treasury.import.error_no_file'))]);
             redirect('/treasury/import');
         }
-        $target = storage_path('cache/treasury_import_' . bin2hex(random_bytes(6)) . '.csv');
-        if (!move_uploaded_file((string) $file['tmp_name'], $target)) {
-            $this->flash('errors', ['csv_file' => __('treasury.csv_error_upload')]);
-            redirect('/treasury/import');
+        $state = $this->csv->state() ?? [];
+        $this->render('treasury/import/map', [
+            'title' => __('treasury.import.step_map_title'),
+            'table' => $table,
+            'columns' => $this->csv->columns($table),
+            'targetGroups' => $this->csv->targetGroups(),
+            'map' => $this->csv->mappedTargets(),
+            'options' => $this->csv->options(),
+            'accounts' => $this->treasury->accountOptions(false),
+            'categories' => $this->treasury->categoryOptions(),
+            'methodGroups' => $this->methodGroups(),
+            'sourceName' => (string) ($state['source_name'] ?? ''),
+        ]);
+    }
+
+    public function header(Request $request): void
+    {
+        if (!$this->ensureAccess()) {
+            return;
         }
-        unset($_SESSION[self::SESSION_KEY]);
-        $_SESSION[self::SESSION_KEY] = ['path' => $target, 'created_at' => time()];
-        redirect('/treasury/import');
+        $this->csv->setHasHeader((string) $request->input('has_header', '0') === '1');
+        redirect('/treasury/import/map');
+    }
+
+    public function saveMap(Request $request): void
+    {
+        if (!$this->ensureAccess()) {
+            return;
+        }
+        $rawMap = $request->input('map', []);
+        $result = $this->csv->saveMapping(is_array($rawMap) ? $rawMap : [], $request->all());
+        if (empty($result['ok'])) {
+            $errorKey = (string) ($result['error'] ?? 'treasury.import.error_need_field');
+            $this->flash('errors', ['map' => __($errorKey, ['field' => (string) ($result['field'] ?? '')])]);
+            redirect('/treasury/import/map');
+        }
+        redirect('/treasury/import/normalize');
+    }
+
+    public function normalize(Request $request): void
+    {
+        if (!$this->ensureAccess()) {
+            return;
+        }
+        $normalization = $this->csv->normalization();
+        if (empty($normalization['ok'])) {
+            $this->flash('errors', ['csv_file' => __((string) ($normalization['error'] ?? 'treasury.import.error_no_mapping'))]);
+            redirect('/treasury/import/map');
+        }
+        $state = $this->csv->state() ?? [];
+        $this->render('treasury/import/normalize', [
+            'title' => __('treasury.import.step_normalize_title'),
+            'fields' => $normalization['fields'],
+            'valueMap' => $this->csv->valueMap(),
+            'memberOptions' => $this->csv->memberChoices(),
+            'sourceName' => (string) ($state['source_name'] ?? ''),
+        ]);
+    }
+
+    public function saveNormalize(Request $request): void
+    {
+        if (!$this->ensureAccess()) {
+            return;
+        }
+        $rawValues = $request->input('value_raw', []);
+        $targets = $request->input('value_map', []);
+        $result = $this->csv->saveNormalization(
+            is_array($rawValues) ? $rawValues : [],
+            is_array($targets) ? $targets : []
+        );
+        if (empty($result['ok'])) {
+            $this->flash('errors', ['normalize' => __((string) ($result['error'] ?? 'treasury.import.error_no_mapping'))]);
+            redirect('/treasury/import/normalize');
+        }
+        redirect('/treasury/import/preview');
+    }
+
+    public function preview(Request $request): void
+    {
+        if (!$this->ensureAccess()) {
+            return;
+        }
+        $analysis = $this->csv->analyze();
+        if (empty($analysis['ok'])) {
+            $this->flash('errors', ['csv_file' => __((string) ($analysis['error'] ?? 'treasury.import.error_no_mapping'))]);
+            redirect('/treasury/import/map');
+        }
+        $state = $this->csv->state() ?? [];
+        $this->render('treasury/import/preview', [
+            'title' => __('treasury.import.step_preview_title'),
+            'analysis' => $analysis,
+            'sourceName' => (string) ($state['source_name'] ?? ''),
+            'currency' => app(CurrencyService::class),
+        ]);
+    }
+
+    public function check(Request $request): void
+    {
+        if (!$this->ensureAccess()) {
+            return;
+        }
+        $analysis = $this->csv->analyze(0);
+        if (empty($analysis['ok'])) {
+            $this->flash('errors', ['csv_file' => __((string) ($analysis['error'] ?? 'treasury.import.error_no_mapping'))]);
+            redirect('/treasury/import/map');
+        }
+        header('Content-Type: text/csv; charset=utf-8');
+        header('Content-Disposition: attachment; filename="prima-nota-test-' . date('Ymd') . '.csv"');
+        header('Cache-Control: no-store');
+        $out = fopen('php://output', 'w');
+        if ($out === false) {
+            return;
+        }
+        fputcsv($out, ['line', 'action', 'date', 'direction', 'amount', 'account', 'category', 'description', 'document_number', 'document_date', 'errors', 'warnings'], ';');
+        foreach (($analysis['rows'] ?? []) as $row) {
+            fputcsv($out, [
+                (int) ($row['line'] ?? 0),
+                (string) ($row['action'] ?? ''),
+                (string) ($row['date'] ?? ''),
+                (string) ($row['direction'] ?? ''),
+                number_format((float) ($row['amount'] ?? 0), 2, ',', ''),
+                (string) ($row['account'] ?? ''),
+                (string) ($row['category'] ?? ''),
+                (string) ($row['description'] ?? ''),
+                (string) ($row['invoice_number'] ?? ''),
+                (string) ($row['invoice_date'] ?? ''),
+                implode(' | ', array_map('strval', (array) ($row['errors'] ?? []))),
+                implode(' | ', array_map('strval', (array) ($row['warnings'] ?? []))),
+            ], ';');
+        }
+        fclose($out);
+        exit;
     }
 
     public function commit(Request $request): void
     {
-        require_component('treasury');
-        if (!can('treasury.manage')) {
-            http_response_code(403);
-            $this->render('errors/403');
+        if (!$this->ensureAccess()) {
             return;
         }
-        $state = $_SESSION[self::SESSION_KEY] ?? null;
-        if (!is_array($state) || !is_file((string) ($state['path'] ?? ''))) {
-            $this->flash('errors', ['csv_file' => __('treasury.csv_error_no_file')]);
-            redirect('/treasury/import');
+        $analysis = $this->csv->analyze(0);
+        if (empty($analysis['ok'])) {
+            $this->flash('errors', ['import' => __((string) ($analysis['error'] ?? 'treasury.import.error_no_mapping'))]);
+            redirect('/treasury/import/map');
         }
-        $parsed = $this->csv->parse((string) $state['path']);
-        $result = $this->csv->importRows($parsed['rows'], $parsed['map'], $request->ip(), auth_user()['id'] ?? null);
-        @unlink((string) $state['path']);
-        unset($_SESSION[self::SESSION_KEY]);
-        if ($result['errors'] !== []) {
-            $this->flash('errors', ['csv' => implode(' ', array_slice($result['errors'], 0, 5))]);
+        if ((int) ($analysis['stats']['error'] ?? 0) > 0 && (string) $request->input('confirm_errors', '0') !== '1') {
+            $this->flash('errors', ['import' => __('treasury.import.confirm_errors_required')]);
+            redirect('/treasury/import/preview');
         }
-        $this->flash('success', __('treasury.csv_import_done', [
-            'created' => (string) $result['created'],
-            'skipped' => (string) $result['skipped'],
+        $result = $this->csv->commit($request->ip(), auth_user()['id'] ?? null);
+        if (empty($result['ok'])) {
+            $this->flash('errors', ['import' => __((string) ($result['error'] ?? 'treasury.import.error_no_mapping'))]);
+            redirect('/treasury/import/map');
+        }
+        $report = is_array($result['report'] ?? null) ? $result['report'] : [];
+        $this->flash('success', __('treasury.import.done', [
+            'created' => (string) (int) ($report['created'] ?? 0),
+            'skipped' => (string) (int) ($report['skipped'] ?? 0),
+            'failed' => (string) (int) ($report['failed'] ?? 0),
         ]));
-        redirect('/treasury');
+        redirect('/treasury/import/report');
+    }
+
+    public function report(Request $request): void
+    {
+        if (!$this->ensureAccess()) {
+            return;
+        }
+        $report = $this->csv->lastReport();
+        if ($report === []) {
+            redirect('/treasury');
+        }
+        $this->render('treasury/import/report', [
+            'title' => __('treasury.import.report_title'),
+            'report' => $report,
+        ]);
+    }
+
+    public function errorsCsv(Request $request): void
+    {
+        if (!$this->ensureAccess()) {
+            return;
+        }
+        header('Content-Type: text/csv; charset=utf-8');
+        header('Content-Disposition: attachment; filename="prima-nota-errori-' . date('Ymd') . '.csv"');
+        header('Cache-Control: no-store');
+        $out = fopen('php://output', 'w');
+        if ($out === false) {
+            return;
+        }
+        fputcsv($out, ['line', 'description', 'message'], ';');
+        foreach ($this->csv->errorRows() as $row) {
+            fputcsv($out, [
+                (int) ($row['line'] ?? 0),
+                (string) ($row['description'] ?? ''),
+                (string) ($row['message'] ?? ''),
+            ], ';');
+        }
+        fclose($out);
+        exit;
     }
 
     public function cancel(Request $request): void
     {
-        require_component('treasury');
-        $state = $_SESSION[self::SESSION_KEY] ?? null;
-        if (is_array($state) && is_file((string) ($state['path'] ?? ''))) {
-            @unlink((string) $state['path']);
+        if (!$this->ensureAccess()) {
+            return;
         }
-        unset($_SESSION[self::SESSION_KEY]);
+        $this->csv->reset();
         redirect('/treasury/import');
+    }
+
+    /** @return list<array{label:string,options:list<array{value:string,label:string}>}> */
+    private function methodGroups(): array
+    {
+        $groups = [];
+        foreach ($this->treasury->paymentMethodGroups() as $group) {
+            $options = [];
+            foreach ((array) ($group['keys'] ?? []) as $key) {
+                $options[] = [
+                    'value' => (string) $key,
+                    'label' => (string) __('treasury.method_' . $key),
+                ];
+            }
+            if ($options !== []) {
+                $groups[] = ['label' => (string) ($group['label'] ?? ''), 'options' => $options];
+            }
+        }
+
+        return $groups;
+    }
+
+    private function ensureAccess(string $permission = 'treasury.manage'): bool
+    {
+        require_component('treasury');
+        if (!can($permission)) {
+            http_response_code(403);
+            $this->render('errors/403');
+            return false;
+        }
+
+        return true;
     }
 }

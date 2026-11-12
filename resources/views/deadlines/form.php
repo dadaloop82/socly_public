@@ -1,6 +1,6 @@
 <?php
 /**
- * Scadenzario — nuova/modifica scadenza su pagina dedicata (come Soci e Prima cassa).
+ * Deadline - new/modified deadline on dedicated page (such as Members and Cash book register).
  *
  * @var bool $isEdit
  * @var array<string,mixed>|null $deadline
@@ -57,7 +57,7 @@ $submitLabel = $isEdit ? __('deadlines.update') : __('deadlines.submit');
     <?= csrf_field() ?>
     <?php
     $show_status = $isEdit;
-    // I template legali servono solo alla creazione: in modifica sovrascriverebbero i dati.
+    // Legal templates are only used for creation: when modified they would overwrite the data.
     $show_templates = !$isEdit;
     require __DIR__ . '/_form_fields.php';
     ?>

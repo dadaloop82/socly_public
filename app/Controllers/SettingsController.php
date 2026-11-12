@@ -839,8 +839,8 @@ final class SettingsController extends BaseController
     {
         $data = $request->all();
 
-        // Salvataggio unico dell'intera sezione “Conti finanziari”: il form invia liste parallele
-        // (account_id[] / account_label[] / account_active[]) invece di un form per riga.
+        // Single saving of the entire “Financial Accounts” section: the form sends parallel lists
+        // (account_id[] / account_label[] / account_active[]) instead of one form per line.
         $bulkIds = $data['account_id'] ?? null;
         if (is_array($bulkIds) && $bulkIds !== []) {
             $labels = is_array($data['account_label'] ?? null) ? array_values($data['account_label']) : [];

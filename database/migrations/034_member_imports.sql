@@ -1,5 +1,5 @@
--- Tracciabilità degli import soci da CSV: una run per file e una riga per socio elaborato.
--- Serve al report finale, al download degli errori e all'audit dell'operazione.
+-- Traceability of member imports from CSV: one run per file and one line per member processed. It is used for
+-- the final report, for downloading errors and for auditing the operation.
 
 CREATE TABLE IF NOT EXISTS member_import_runs (
     id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,

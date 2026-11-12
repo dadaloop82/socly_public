@@ -39,7 +39,7 @@ $router->get('/', function () {
     try {
         $setup = app(\Socly\Services\SetupService::class);
         if (!$setup->isComplete()) {
-            // First-run (no association Admin yet): login with “Procedi alla configurazione”.
+            // First-run (no association Admin yet): login with “Continue setup”.
             if ($setup->allowsAnonymousSetup()) {
                 redirect('/login');
             }
@@ -115,7 +115,7 @@ $router->post('/settings/logo', [BrandingController::class, 'upload'], 'settings
 $router->get('/members', [MemberController::class, 'index'], 'members.view', ['mw.locale', 'mw.install', 'mw.auth']);
 $router->get('/members/export', [MemberController::class, 'export'], 'members.view', ['mw.locale', 'mw.install', 'mw.auth']);
 $router->get('/members/export/registry', [MemberController::class, 'exportRegistry'], 'members.view', ['mw.locale', 'mw.install', 'mw.auth']);
-// Import CSV: registrato prima di /members/{id} (il parametro catturerebbe "import").
+// Import CSV: Registered before /members/{id} (the parameter would catch "import").
 $router->get('/members/import', [MemberImportController::class, 'index'], 'members.manage', ['mw.locale', 'mw.install', 'mw.auth']);
 $router->post('/members/import/upload', [MemberImportController::class, 'upload'], 'members.manage', ['mw.locale', 'mw.install', 'mw.auth', 'mw.csrf']);
 $router->get('/members/import/map', [MemberImportController::class, 'map'], 'members.manage', ['mw.locale', 'mw.install', 'mw.auth']);
@@ -166,9 +166,18 @@ $router->post('/treasury/similar', [TreasuryController::class, 'similar'], 'trea
 $router->post('/treasury/similar/apply', [TreasuryController::class, 'applySimilar'], 'treasury.manage', ['mw.locale', 'mw.install', 'mw.auth', 'mw.csrf']);
 $router->post('/treasury/similar/apply-form', [TreasuryController::class, 'applySimilarForm'], 'treasury.manage', ['mw.locale', 'mw.install', 'mw.auth', 'mw.csrf']);
 $router->get('/treasury/export', [TreasuryCsvController::class, 'export'], 'treasury.view', ['mw.locale', 'mw.install', 'mw.auth']);
-$router->get('/treasury/import', [TreasuryCsvController::class, 'importForm'], 'treasury.manage', ['mw.locale', 'mw.install', 'mw.auth']);
+$router->get('/treasury/import', [TreasuryCsvController::class, 'index'], 'treasury.manage', ['mw.locale', 'mw.install', 'mw.auth']);
 $router->get('/treasury/import/template', [TreasuryCsvController::class, 'template'], 'treasury.manage', ['mw.locale', 'mw.install', 'mw.auth']);
+$router->get('/treasury/import/map', [TreasuryCsvController::class, 'map'], 'treasury.manage', ['mw.locale', 'mw.install', 'mw.auth']);
+$router->post('/treasury/import/header', [TreasuryCsvController::class, 'header'], 'treasury.manage', ['mw.locale', 'mw.install', 'mw.auth', 'mw.csrf']);
+$router->get('/treasury/import/preview', [TreasuryCsvController::class, 'preview'], 'treasury.manage', ['mw.locale', 'mw.install', 'mw.auth']);
+$router->get('/treasury/import/normalize', [TreasuryCsvController::class, 'normalize'], 'treasury.manage', ['mw.locale', 'mw.install', 'mw.auth']);
+$router->get('/treasury/import/check', [TreasuryCsvController::class, 'check'], 'treasury.manage', ['mw.locale', 'mw.install', 'mw.auth']);
+$router->post('/treasury/import/normalize', [TreasuryCsvController::class, 'saveNormalize'], 'treasury.manage', ['mw.locale', 'mw.install', 'mw.auth', 'mw.csrf']);
+$router->get('/treasury/import/report', [TreasuryCsvController::class, 'report'], 'treasury.manage', ['mw.locale', 'mw.install', 'mw.auth']);
+$router->get('/treasury/import/errors', [TreasuryCsvController::class, 'errorsCsv'], 'treasury.manage', ['mw.locale', 'mw.install', 'mw.auth']);
 $router->post('/treasury/import/upload', [TreasuryCsvController::class, 'upload'], 'treasury.manage', ['mw.locale', 'mw.install', 'mw.auth', 'mw.csrf']);
+$router->post('/treasury/import/map', [TreasuryCsvController::class, 'saveMap'], 'treasury.manage', ['mw.locale', 'mw.install', 'mw.auth', 'mw.csrf']);
 $router->post('/treasury/import/commit', [TreasuryCsvController::class, 'commit'], 'treasury.manage', ['mw.locale', 'mw.install', 'mw.auth', 'mw.csrf']);
 $router->post('/treasury/import/cancel', [TreasuryCsvController::class, 'cancel'], 'treasury.manage', ['mw.locale', 'mw.install', 'mw.auth', 'mw.csrf']);
 $router->post('/budgets/{id}/reopen', [BudgetController::class, 'reopen'], 'treasury.manage', ['mw.locale', 'mw.install', 'mw.auth', 'mw.csrf']);
@@ -176,7 +185,7 @@ $router->post('/budgets/{id}/delete', [BudgetController::class, 'destroy'], 'tre
 $router->get('/budgets/{id}/compare', [BudgetController::class, 'compare'], 'treasury.view', ['mw.locale', 'mw.install', 'mw.auth']);
 $router->get('/budgets/{id}/rendiconto', [BudgetController::class, 'rendiconto'], 'treasury.view', ['mw.locale', 'mw.install', 'mw.auth']);
 
-// Bilancio consuntivo — RUNTS Modello D (rendiconto per cassa).
+// Final balance sheet - RUNTS Model D (cash statement).
 $router->get('/rendiconto', [RendicontoController::class, 'index'], 'treasury.view', ['mw.locale', 'mw.install', 'mw.auth']);
 $router->get('/rendiconto/{year}', [RendicontoController::class, 'show'], 'treasury.view', ['mw.locale', 'mw.install', 'mw.auth']);
 

@@ -1,6 +1,6 @@
 <?php
 /**
- * Libro Soci — stampa / esportazione PDF (stessa veste della Dichiarazione cariche).
+ * Members' Book - print / PDF export (same format as the Declaration of Offices).
  *
  * @var array{name:string,fiscal_code:string,address:string,legal_code?:string,legal_label?:string} $association
  * @var list<array<string,mixed>> $rows

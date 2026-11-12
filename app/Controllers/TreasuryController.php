@@ -51,8 +51,8 @@ final class TreasuryController extends BaseController
         $offset = ($page - 1) * $perPage;
         $ledger = $this->treasury->ledger($perPage, $query, $sort, $filters, $offset);
         $config = $this->components->config('treasury', ['auto_from_payments' => true]);
-        // Dopo un salvataggio con classificazione: proposta “applica ai movimenti simili”
-        // calcolata lato server (nessun JS, nessun ricaricamento della scheda).
+        // After a classified save: “apply to similar movements” proposal calculated server-side (no JS, no
+        // card reload).
         $similarProbe = $this->similarProbe((int) $request->input('similar', 0));
         // Only the enabled wallets (+ deactivated ones with movements) are listed.
         $wallets = $this->treasury->overviewWallets();
@@ -95,8 +95,8 @@ final class TreasuryController extends BaseController
     }
 
     /**
-     * Genera i movimenti delle operazioni ricorrenti scadute (al massimo ogni 15 minuti,
-     * così la prima nota non paga una query a ogni caricamento).
+     * Generates entries for expired recurring operations (at most every 15 minutes, so the journal
+     * entry doesn't pay a query for each load).
      */
     private function runRecurringDue(Request $request): void
     {
@@ -109,7 +109,7 @@ final class TreasuryController extends BaseController
             @touch($marker);
             $this->recurring->runDue($request->ip(), auth_user()['id'] ?? null);
         } catch (\Throwable) {
-            // una regola rotta non deve bloccare la prima nota
+            // a broken rule does not have to block the first note
         }
     }
 
@@ -257,7 +257,7 @@ final class TreasuryController extends BaseController
         }
         $this->clearOld();
         $this->flash('success', __('treasury.updated'));
-        // Modifica con classificazione: si riapre la scheda con la proposta sui movimenti simili.
+        // Modification with classification: the tab with the proposal on similar movements reopens.
         $classificationChanged = trim((string) ($posted['category'] ?? '')) !== trim((string) ($before['category'] ?? ''))
             || strtoupper(trim((string) ($posted['runts_line'] ?? ''))) !== strtoupper(trim((string) ($before['runts_line'] ?? '')))
             || (int) ($posted['budget_item_id'] ?? 0) !== (int) ($before['budget_item_id'] ?? 0);
@@ -317,7 +317,7 @@ final class TreasuryController extends BaseController
             $this->rememberOld($request->all());
             redirect('/treasury/create?retry=1');
         }
-        // Operazione ricorrente: la regola parte dalla data del movimento appena salvato.
+        // Recurring operation: the rule starts from the date of the just saved movement.
         if (!empty($request->input('recurring'))) {
             try {
                 $this->recurring->createFromInput(
@@ -332,7 +332,7 @@ final class TreasuryController extends BaseController
         }
         $this->clearOld();
         $this->flash('success', __('treasury.saved'));
-        // Movimento classificato: si riapre la scheda con la proposta “applica anche ai simili”.
+        // Classified movement: the form reopens with the proposal "also applies to similar".
         $classified = trim((string) $request->input('category', '')) !== ''
             || trim((string) $request->input('runts_line', '')) !== ''
             || (int) $request->input('budget_item_id', 0) > 0;
@@ -344,7 +344,7 @@ final class TreasuryController extends BaseController
     }
 
     /**
-     * Movimenti simili al corrente: usato dal pannello “applica anche agli altri”.
+     * Moves similar to the current one: used by the “apply to others too” panel.
      */
     public function similar(Request $request): void
     {
@@ -354,8 +354,8 @@ final class TreasuryController extends BaseController
             return;
         }
         $data = $request->all();
-        // Campi che l'utente ha davvero modificato (inviati dal client): quelli non toccati non
-        // filtrano i simili e non compaiono nel riepilogo.
+        // Fields that the user actually changed (sent by the client): those not touched do not filter similar
+        // and do not appear in the summary.
         $fieldsToApply = [];
         $rawApplying = $data['applying'] ?? null;
         if (is_array($rawApplying)) {
@@ -390,7 +390,9 @@ final class TreasuryController extends BaseController
         ]);
     }
 
-    /** Applica tipologia / voce Modello D / centro di costo ai movimenti simili scelti. */
+    /**
+     * Apply type / item Model D / cost center to the similar movements chosen.
+     */
     public function applySimilar(Request $request): void
     {
         require_component('treasury');
@@ -427,8 +429,8 @@ final class TreasuryController extends BaseController
     }
 
     /**
-     * Valori originali del record (inviati dal form): servono a capire quali valori sono
-     * “automatici” e quindi ancora aggiornabili.
+     * Original values ​​of the record (sent by the form): they are used to understand which values
+     * ​​are "automatic" and therefore still updatable.
      *
      * @param array<string,mixed> $data
      * @return array<string,string>
@@ -443,7 +445,7 @@ final class TreasuryController extends BaseController
     }
 
     /**
-     * Riepilogo leggibile delle modifiche che verranno applicate.
+     * Readable summary of the changes that will be applied.
      *
      * @param array<string,mixed> $data
      * @return list<array{field:string,label:string,value:string}>
@@ -586,8 +588,8 @@ final class TreasuryController extends BaseController
     }
 
     /**
-     * Totali aggiornati (saldo, entrate, uscite, da approvare) per l'aggiornamento in place
-     * dopo un'approvazione: la pagina non deve ricaricarsi per mostrarli.
+     * Updated totals (balance, income, expenses, to be approved) for updating in place after an
+     * approval: the page does not need to reload to show them.
      *
      * @return array{balance:string,income:string,expense:string,balance_negative:bool,pending:int}
      */
@@ -604,7 +606,7 @@ final class TreasuryController extends BaseController
     }
 
     /**
-     * Live wallet balances for the movement form (the "Da conto" select).
+     * Live wallet balances for the movement form (the "From account" select).
      */
     public function accountBalances(Request $request): void
     {
@@ -644,7 +646,7 @@ final class TreasuryController extends BaseController
      * @return array{direction:string,category:string,account:string,from:string,to:string,period:string}
      */
     /**
-     * Voci del Modello D raggruppate (Uscite / Entrate) per il filtro avanzato.
+     * Grouped Model D entries (Expenses / Revenues) for advanced filtering.
      *
      * @return list<array{label:string,options:list<array{value:string,label:string}>}>
      */
@@ -663,7 +665,7 @@ final class TreasuryController extends BaseController
         return $groups;
     }
 
-    /** Quanti filtri “avanzati” sono attivi (mostrato sul bottone). */
+    /** How many “advanced” filters are active (shown on the button). */
     private function advancedFilterCount(array $filters): int
     {
         $count = 0;
@@ -678,7 +680,7 @@ final class TreasuryController extends BaseController
 
 
     /**
-     * Proposta “applica anche ai movimenti simili” calcolata lato server per un movimento.
+     * Proposal “also apply to similar movements” calculated server-side for a movement.
      *
      * @return array<string,mixed>|null
      */
@@ -736,7 +738,9 @@ final class TreasuryController extends BaseController
         ];
     }
 
-    /** Applica la classificazione proposta (form classico, senza JS). */
+    /**
+     * Apply the proposed classification (classic form, without JS).
+     */
     public function applySimilarForm(Request $request): void
     {
         require_component('treasury');

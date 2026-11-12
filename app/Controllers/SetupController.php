@@ -60,7 +60,7 @@ final class SetupController extends BaseController
         $localeChosen = !empty($_SESSION['setup_locale_chosen'])
             || ($localeStep !== null && $this->setup->stepIsConfigured($localeStep));
 
-        // Passo 0: lingua prima del benvenuto, così il greeting è già nella lingua scelta.
+        // Step 0: language before the welcome, so the greeting is already in the chosen language.
         if (!$localeChosen && $localeStep !== null) {
             $this->render('setup/wizard', [
                 'title' => __('setup.title'),
@@ -389,9 +389,9 @@ final class SetupController extends BaseController
 
     public function exitSetup(Request $request): void
     {
-        // "Continue later": the collected data stays in the settings, so coming
-        // back resumes at the first pending step. The session is closed because
-        // the wizard gate would otherwise pull the operator straight back in.
+        // "Continue later": the collected data stays in the settings, so coming back resumes at the first
+        // pending step. The session is closed because the wizard gate would otherwise pull the operator
+        // straight back in.
         unset($_SESSION['setup_greeted'], $_SESSION['setup_show_thanks']);
         $_SESSION['setup_dismissed'] = true;
         if (auth_user()) {
@@ -495,7 +495,7 @@ final class SetupController extends BaseController
 
         if (($step['key'] ?? '') === 'app.locale') {
             $_SESSION['setup_locale_chosen'] = true;
-            // Dopo la lingua: mostra il benvenuto (nella lingua appena scelta).
+            // After language: Show welcome (in the language you just chose).
             if (empty($_SESSION['setup_greeted'])) {
                 redirect('/setup');
             }
@@ -1023,9 +1023,8 @@ final class SetupController extends BaseController
         $_SESSION['_setup_logo_candidates'] = $candidates;
         $result['logo_candidates'] = $candidates;
 
-        // Se nessun logo è stato applicato automaticamente ma sono stati trovati
-        // candidati, usa il primo (quello con il punteggio più alto): l’utente
-        // potrà comunque sostituirlo dallo step dedicato al logo.
+        // If no logo has been automatically applied but candidates have been found, use the first one (the
+        // one with the highest score): the user can still replace it from the step dedicated to the logo.
         if (empty($result['logo_url']) && $candidates !== []) {
             try {
                 $this->setup->applyScrapedHints(['logo_url' => $candidates[0]]);
@@ -1042,7 +1041,7 @@ final class SetupController extends BaseController
                     $result['applied_count'] = count($applied);
                 }
             } catch (\Throwable) {
-                // Download fallito: restano i candidati per la scelta manuale.
+                // Download failed: candidates for manual selection remain.
             }
         }
 

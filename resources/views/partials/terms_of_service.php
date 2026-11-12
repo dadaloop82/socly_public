@@ -2,16 +2,14 @@
 
 /**
  * Terms of Service and General Conditions of Use (Socly legal document).
- *
- * Rendered inside the modal shell of partials/terms_dialog.php, but usable
- * standalone on any legal page. Texts come from the `terms.*` keys of the
- * language files; the `data-i18n` hooks keep the document in sync with the
- * live language switcher of the setup wizard / login page.
+ * Rendered inside the modal shell of partials/terms_dialog.php, but usable standalone on any legal
+ * page. Texts come from the `terms.*` keys of the language files; the `data-i18n` hooks keep the
+ * document in sync with the live language switcher of the setup wizard / login page.
  */
 
 $termsSections = ['s1', 's2', 's3', 's4', 's5', 's6'];
-// Extra paragraphs and bullet lists per section. Everything stays a plain
-// string key so the live language switcher keeps working through `data-i18n`.
+// Extra paragraphs and bullet lists per section. Everything stays a plain string key so the live language
+// switcher keeps working through `data-i18n`.
 $termsExtraParagraphs = [
     's2' => ['s2_text_2'],
     's5' => ['s5_text_2'],

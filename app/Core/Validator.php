@@ -198,7 +198,7 @@ final class Validator
         return $check === $code[15];
     }
 
-    /** Italian Partita IVA (11 digits). Accepts optional EU country prefix (IT, DE, …). */
+    /** Italian VAT number (11 digits). Accepts optional EU country prefix (IT, DE, …). */
     public function isValidVatNumber(string $vat): bool
     {
         $vat = strtoupper(preg_replace('/[\s.\-]/', '', $vat) ?? '');

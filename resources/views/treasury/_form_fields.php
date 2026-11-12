@@ -94,7 +94,7 @@ if ($selectedMethod !== '') {
 $selectedAccount = \Socly\Services\TreasuryService::normalizeAccount((string) ($values['account'] ?? ''));
 $selectedTransferAccount = \Socly\Services\TreasuryService::normalizeAccount((string) ($values['transfer_account'] ?? ''));
 
-// Il saldo di ogni conto viaggia dentro l'etichetta dell'option («Banca: 1.234,56 €»).
+// The balance of each account appears within the option label ("Bank: €1,234.56").
 $accountBalanceLabels = [];
 foreach (($account_balances ?? []) as $balanceRow) {
     $balanceKey = (string) ($balanceRow['key'] ?? '');
@@ -275,8 +275,8 @@ foreach ($members as $member) {
     </div>
 </section>
 <?php
-// Uscita + "Pagamento fattura": the invoice data live inside the block (complete and
-// self-contained). Without the flag the paper invoice details stay in the doc row.
+// Output + "Invoice payment": the invoice data live inside the block (complete and self-contained). Without
+// the flag the paper invoice details stay in the doc row.
 $invoiceActive = $selectedDirection === 'expense' && !empty($values['invoice_payment']);
 ?>
 <section class="tmf-card" data-treasury-expense-fields <?= $selectedDirection === 'expense' ? '' : 'hidden' ?>>
@@ -348,8 +348,8 @@ $invoiceActive = $selectedDirection === 'expense' && !empty($values['invoice_pay
         </div>
         <p class="setup-hint muted"><?= e(__('treasury.category_permanent')) ?></p>
         <?php
-        // Voce del Modello D (RUNTS): le voci di uscita e di entrata restano tutte disponibili,
-        // il servizio riallinea la scelta alla direzione del movimento.
+        // Model D entry (RUNTS): the exit and entry entries all remain available, the service realigns the
+        // choice to the direction of movement.
         $runtsGroups = [];
         foreach (['expense' => 'runts.expenses', 'income' => 'runts.incomes'] as $runtsDirection => $runtsHeading) {
             foreach (\Socly\Services\RuntsReportService::selectGroups($runtsDirection) as $runtsGroup) {

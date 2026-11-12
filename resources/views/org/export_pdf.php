@@ -1,6 +1,6 @@
 <?php
 /**
- * Dichiarazione delle cariche sociali — stampa / esportazione PDF.
+ * Officers declaration — print / PDF export.
  *
  * @var list<array{key:string,title:string,lede:string,rows:list<array{role:string,person:array<string,mixed>,missing:list<string>}>}> $groups
  * @var list<array{name:string,role:string,fields:list<string>}> $incomplete

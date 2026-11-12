@@ -7,7 +7,7 @@
  * @var bool $required
  * @var string $id
  * @var string $class
- * @var bool $foreign_toggle Show “Stato estero” (default true when not nested)
+ * @var bool $foreign_toggle Show “Foreign country” (default true when not nested)
  * @var bool $with_scope Wrap in data-geo-scope (default follows foreign_toggle)
  * @var string $flag_name Hidden flag input name
  * @var bool $foreign_inline Compact checkbox on the label row (right of title)

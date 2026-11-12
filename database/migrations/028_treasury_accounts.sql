@@ -1,7 +1,6 @@
--- Prima cassa: i conti finanziari diventano un'entità gestibile (aggiungi,
--- rinomina, disattiva, elimina finché non ha movimenti). Il libro mastro resta
--- unico: `treasury_movements.account` / `transfer_account` continuano a
--- contenere lo slug del conto.
+-- First Cash: Financial accounts become a manageable entity (add, rename, deactivate, delete until it has no
+-- entries). The ledger remains unique: `treasury_movements.account` / `transfer_account` continue to contain
+-- the account slug.
 CREATE TABLE IF NOT EXISTS treasury_accounts (
     id INT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
     slug VARCHAR(40) NOT NULL,
@@ -15,7 +14,7 @@ CREATE TABLE IF NOT EXISTS treasury_accounts (
     INDEX idx_treasury_account_active (is_active)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- Conti predefiniti (label NULL = etichetta tradotta dal file di lingua).
+-- Default accounts (label NULL = label translated from language file).
 INSERT IGNORE INTO treasury_accounts (slug, label, is_builtin, is_active, sort_order) VALUES
     ('cash', NULL, 1, 1, 10),
     ('bank', NULL, 1, 1, 20),

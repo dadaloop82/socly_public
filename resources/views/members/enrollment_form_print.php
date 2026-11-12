@@ -10,9 +10,9 @@
 $memberName = trim(
     trim((string) ($member['fields']['first_name'] ?? '')) . ' ' . trim((string) ($member['fields']['last_name'] ?? ''))
 );
-// Statuto e informativa possono essere lunghissimi: nel modulo stampato si mostrano al massimo
-// 10 righe, poi “leggi il seguito sul sito web”. Si usa il sito dell'associazione se configurato,
-// altrimenti l'indirizzo dell'installazione.
+// The statute and information can be very long: in the printed form a maximum of 10 lines are shown, then
+// "read more on the website". The association website is used if configured, otherwise the installation
+// address.
 $siteUrl = trim((string) ($association['website'] ?? ''));
 if ($siteUrl !== '' && !preg_match('#^https?://#i', $siteUrl)) {
     $siteUrl = 'https://' . ltrim($siteUrl, '/');

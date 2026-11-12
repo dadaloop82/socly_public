@@ -1,5 +1,5 @@
--- Operazioni ricorrenti della prima nota (affitto, utenze, quote rateizzate, …).
--- Alla scadenza il sistema crea il movimento: da approvare se il conto non è la cassa.
+-- Recurring operations of the first note (rent, utilities, installments, ...). Upon expiry, the system
+-- creates the movement: to be approved if the account is not cash.
 CREATE TABLE IF NOT EXISTS treasury_recurring (
     id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
     direction VARCHAR(16) NOT NULL,

@@ -19,8 +19,8 @@ final class BrandingController extends BaseController
 
     public function logo(Request $request): void
     {
-        // Endpoint pubblico e sempre richiesto dall'header: qualunque problema (file mancante,
-        // permessi, estensione `fileinfo` assente, impostazioni corrotte) deve dare 404, mai 500.
+        // Public endpoint and always requested by the header: any problem (missing file, permissions, missing
+        // `fileinfo` extension, corrupt settings) must give 404, never 500.
         $path = null;
         try {
             $path = $this->branding->logoAbsolutePath();
@@ -28,7 +28,7 @@ final class BrandingController extends BaseController
             try {
                 app('logger')->error('branding.logo_failed', ['message' => $e->getMessage()]);
             } catch (\Throwable) {
-                // il logger non deve rompere la risposta
+                // the logger must not break the response
             }
         }
         if ($path === null || !is_file($path) || !is_readable($path)) {
@@ -69,8 +69,8 @@ final class BrandingController extends BaseController
     }
 
     /**
-     * Upload/rimozione del logo dalle impostazioni: risposta JSON consumata da
-     * `initLogoFilePickers()` (anteprima + stato inline, senza ricaricare).
+     * Upload/remove logo from settings: JSON response consumed by `initLogoFilePickers()` (preview
+     * + inline state, without reloading).
      */
     public function upload(Request $request): void
     {
@@ -91,7 +91,7 @@ final class BrandingController extends BaseController
                 ], 422);
                 return;
             }
-            // Scelta manuale: lo scraper del sito non deve più sostituirlo.
+            // Manual choice: The site scraper no longer needs to replace it.
             $settings = app(\Socly\Services\SettingsService::class);
             $settings->set('branding.logo_source', 'user');
             $settings->set('branding.logo_configured', '1');

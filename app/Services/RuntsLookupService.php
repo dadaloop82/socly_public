@@ -8,7 +8,7 @@ use Socly\Setup\AssociationLegalForms;
 use ZipArchive;
 
 /**
- * Looks up an ETS by RUNTS repertory number in the official Ministero del Lavoro Excel lists.
+ * Looks up an ETS by RUNTS repertory number in the official Ministry of Labor Excel lists.
  */
 final class RuntsLookupService
 {

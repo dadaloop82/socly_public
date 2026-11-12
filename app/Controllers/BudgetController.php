@@ -14,7 +14,7 @@ use Socly\Services\TreasuryService;
 use Socly\Services\VersionService;
 
 /**
- * Bilancio preventivo dell'anno sociale + confronto con il consuntivo di cassa.
+ * Budget estimate for the financial year + comparison with the final cash balance.
  */
 final class BudgetController extends BaseController
 {
@@ -153,7 +153,7 @@ final class BudgetController extends BaseController
             'budget_version' => $conflictActive ? $conflictVersion : (int) ($budget['row_version'] ?? 0),
             'budget_conflict' => $conflict,
             'categories' => $this->treasury->categoryOptions(),
-            // Stessa tassonomia dei movimenti (Entrate / Uscite / Finanziarie / Personalizzate).
+            // Same taxonomy as movements (Income / Expenses / Financial / Custom).
             'category_groups' => $this->treasury->categorySelectGroups(false),
             'currency' => $this->currency,
             'canManage' => can('treasury.manage'),
@@ -249,8 +249,8 @@ final class BudgetController extends BaseController
     }
 
     /**
-     * Rinomina una tipologia condivisa (matita nella griglia del preventivo).
-     * Response JSON: {ok, label} oppure {ok:false, error}.
+     * Rename a shared category (pencil in budget grid). Response JSON: {ok, label} or {ok:false,
+     * error}.
      */
     public function renameCategory(Request $request): void
     {

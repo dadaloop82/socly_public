@@ -113,9 +113,9 @@ final class MemberActionService
     }
 
     /**
-     * Cancella i soci selezionati (il cestino della lista): ogni socio passa
-     * dalla stessa `MemberService::delete()` usata dalla scheda, quindi con
-     * audit log e pulizia di pagamenti, tessere e movimenti collegati.
+     * Delete the selected members (the list bin): each member goes through the same
+     * `MemberService::delete()` used by the card, therefore with audit log and cleaning of
+     * payments, cards and connected movements.
      *
      * @param list<int> $ids
      * @return array{ok:bool,processed?:int,skipped?:int,errors?:array<string,string>}

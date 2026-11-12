@@ -1,5 +1,5 @@
--- Giroconto “storico”: la riga originale non viene cancellata, resta tracciata ed esclusa
--- da ogni conteggio (saldo, entrate/uscite, RUNTS, statistiche, confronto preventivo/consuntivo).
+-- "Historical" transfer: the original line is not deleted, it remains tracked and excluded from any
+-- calculation (balance, income/expenses, RUNTS, statistics, budget/final comparison).
 SET @c := (SELECT COUNT(*) FROM information_schema.columns
     WHERE table_schema = DATABASE() AND table_name = 'treasury_movements' AND column_name = 'superseded_at');
 SET @s := IF(@c = 0,

@@ -16,7 +16,7 @@ $hasExistingFile = !empty($has_existing_file);
 $fileName = (string) ($values['uploaded_name'] ?? '');
 $fileReady = $hasExistingFile || trim((string) ($values['uploaded_path'] ?? '')) !== '';
 
-// Progressivo automatico per i verbali (libri sociali): "Verbale n. 01/2026".
+// Automatic progressive number for minutes (company books): "Minutes no. 01/2026".
 $suggestNumbers = (!empty($suggest_number) && is_array($minutes_progressives ?? null))
     ? $minutes_progressives
     : [];

@@ -128,9 +128,9 @@ final class Database
     }
 
     /**
-     * UPDATE ottimistico: incrementa `row_version` e tocca la riga solo se la versione attesa
-     * corrisponde ancora. Restituisce false quando un altro utente ha salvato nel frattempo
-     * (o la riga non esiste più), così il chiamante può avvisare senza sovrascrivere.
+     * Optimistic UPDATE: increment `row_version` and only touch the row if the expected version
+     * still matches. Returns false when another user has saved in the meantime (or the row no
+     * longer exists), so the caller can warn without overwriting.
      *
      * @param array<string,mixed> $data
      */
@@ -157,7 +157,9 @@ final class Database
         return $this->query($sql, $params)->rowCount() > 0;
     }
 
-    /** Versione corrente della riga (0 quando la tabella non ha `row_version` o la riga manca). */
+    /**
+     * Current version of the row (0 when the table has no `row_version` or the row is missing).
+     */
     public function rowVersion(string $table, string $keyColumn, int $id): int
     {
         $row = $this->fetch(

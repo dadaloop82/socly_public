@@ -8,18 +8,19 @@ use Socly\Core\Database;
 use Socly\Core\Validator;
 
 /**
- * Operazioni ricorrenti della prima nota.
- *
+ * Recurring journal entry operations.
  * The rule lives in `treasury_recurring`; when due, `runDue()` creates the entry for that period.
- * L'importo può essere fisso o variabile (in quel caso è un promemoria da completare).
- * Approval rule: automatic entries on bank/card stay **to approve**, while cash ones
- * are certain and get approved immediately.
+ * The amount can be fixed or variable (in which case it is a reminder to complete). Approval rule:
+ * automatic entries on bank/card stay **to approve**, while cash ones are certain and get approved
+ * immediately.
  */
 final class RecurringService
 {
     public const FREQUENCIES = ['weekly', 'monthly', 'quarterly', 'semiannual', 'yearly'];
 
-    /** Oltre questo numero di periodi arretrati non si generano movimenti a raffica. */
+    /**
+     * Beyond this number of backward periods, burst movements are not generated.
+     */
     private const MAX_CATCH_UP = 12;
 
     public function __construct(
@@ -43,7 +44,7 @@ final class RecurringService
     }
 
     /**
-     * Crea la regola a partire dai dati del movimento appena inserito.
+     * Create the rule starting from the data of the movement just inserted.
      *
      * @param array<string,mixed> $input
      * @return array{ok:bool,id?:int}
@@ -187,7 +188,9 @@ final class RecurringService
         ]);
     }
 
-    /** Prossima data dopo $from, allineata al giorno scelto (o +7 giorni per la cadenza settimanale). */
+    /**
+     * Next date after $from, aligned with the chosen day (or +7 days for the weekly frequency).
+     */
     public function nextDate(string $from, string $frequency, int $dayOfMonth, bool $strictlyAfter = true): string
     {
         $ts = strtotime($from) ?: time();

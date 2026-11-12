@@ -1,6 +1,6 @@
 <?php
 /**
- * Toggle foreign country for a geo scope (disables Italian CAP/comune checks).
+ * Toggle foreign country for a geo scope (disables Italian postcode/municipality checks).
  *
  * @var string|null $flag_name Hidden input name (default address_foreign)
  * @var string|null $hint Optional hint override

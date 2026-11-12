@@ -16,7 +16,7 @@ final class MemberService
     public const STEP_PAYMENT = 'payment';
 
     /**
-     * Identity data required by an official registry (Libro Soci). They are flagged even when
+     * Identity data required by an official registry (Members Register). They are flagged even when
      * the field is optional in the member form, so the list warning matches the registry export.
      *
      * @var list<string>
@@ -287,7 +287,7 @@ final class MemberService
     }
 
     /**
-     * Minimal parent/guardian member created from the tessera step "on the fly" fields.
+     * Minimal parent/guardian member created from the card step "on the fly" fields.
      *
      * @param array<string,mixed> $quick
      * @return array{ok:bool,id?:int,errors?:array<string,string>}
@@ -525,7 +525,7 @@ final class MemberService
         $this->replaceFormSteps(array_values($steps));
         // replaceFormSteps() always keeps at least "profile" when input is empty —
         // the return list must include that custom key, otherwise resolveFieldFormStep
-        // falls through to the first system step (tessera) and empties step 1.
+        // falls through to the first system step (card) and empties step 1.
         $customKeys = array_keys($steps);
         if ($customKeys === []) {
             $customKeys = ['profile'];
@@ -565,7 +565,7 @@ final class MemberService
 
     /**
      * If every custom wizard step has zero fields, move non-legal fields off system
-     * steps (usually a bad autosave that parked everything on tessera).
+     * steps (usually a bad autosave that parked everything on card).
      */
     public function repairEmptyCustomFormSteps(): void
     {
@@ -619,7 +619,7 @@ final class MemberService
         }
     }
 
-    /** Keep core anagrafica fields on a custom wizard step, not tessera/payment system steps. */
+    /** Keep core personal data fields on a custom wizard step, not card/payment system steps. */
     public function normalizeProfileFieldPlacement(): void
     {
         $profileKeys = [
@@ -659,7 +659,9 @@ final class MemberService
         }
     }
 
-    /** Keep core profile fields in standard Italian anagrafica order in lists/exports. */
+    /**
+     * Keep core profile fields in standard Italian registry order in lists/exports.
+     */
     public function normalizeProfileFieldSortOrder(): void
     {
         $orderMap = MemberFieldTypes::profileFormSortOrderMap();
@@ -1281,8 +1283,8 @@ final class MemberService
         $where = ['1=1'];
         $params = [];
         if (!empty($filters['q'])) {
-            // Placeholder distinti: con ATTR_EMULATE_PREPARES=false PDO non
-            // permette di riusare lo stesso segnaposto nella stessa query.
+            // Distinct placeholders: with ATTR_EMULATE_PREPARES=false PDO does not allow the same placeholder
+            // to be reused in the same query.
             $where[] = '(m.member_number LIKE :q1 OR m.notes LIKE :q2 OR EXISTS (
                 SELECT 1 FROM member_field_values v WHERE v.member_id = m.id AND v.value LIKE :q3
             ))';
@@ -1326,7 +1328,7 @@ final class MemberService
             "SELECT COUNT(*) AS c FROM members m INNER JOIN member_types mt ON mt.id = m.member_type_id WHERE {$whereSql}",
             $params
         )['c'];
-        // Ordinamento per colonna (whitelist): asc/desc su ogni intestazione lista.
+        // Sorting by column (whitelist): asc/desc on each list header.
         $sortKey = (string) ($filters['sort'] ?? 'member_number');
         $dir = strtolower((string) ($filters['dir'] ?? 'asc')) === 'desc' ? 'DESC' : 'ASC';
         $orderSql = match ($sortKey) {
@@ -1951,8 +1953,8 @@ final class MemberService
         if (!$before) {
             return ['ok' => false, 'errors' => ['id' => __('validation.required')]];
         }
-        // Concorrenza: se un altro operatore ha salvato dopo l'apertura della scheda, non si
-        // sovrascrive nulla; il controller riapre il form con l'avviso e i dati digitati.
+        // Competition: if another operator has saved after opening the tab, nothing is overwritten; the
+        // controller reopens the form with the warning and the data entered.
         $expected = (int) ($expectedVersion ?? 0);
         if (!$force && $expected > 0) {
             $current = $this->versions->current('member', $id);
@@ -2035,7 +2037,7 @@ final class MemberService
         }
         $stored = $this->db->updateVersioned('members', $updateData, 'id', $id, $force ? 0 : $expected);
         if (!$stored) {
-            // Perdita della corsa fra controllo e scrittura (o record sparito nel frattempo).
+            // Loss of race between check and write (or record disappeared in the meantime).
             return [
                 'ok' => false,
                 'conflict' => true,
@@ -2134,7 +2136,7 @@ final class MemberService
     }
 
     /**
-     * Reject incoherent Italian city / CAP / province on member forms.
+     * Reject incoherent Italian city / postcode / province on member forms.
      *
      * @param array<string,mixed> $fieldData
      * @param array<string,mixed> $data
@@ -2411,8 +2413,8 @@ final class MemberService
             $paymentsByMonth[$row['ym']] = (float) $row['total'];
         }
 
-        // Collections split by payment method (cash = cassa, bank = banca, other): the bar chart
-        // stacks them so each month shows how much came into each account.
+        // Collections split by payment method (cash = cash, bank = bank, other): the bar chart stacks them so
+        // each month shows how much came into each account.
         $methodRows = $this->db->fetchAll(
             "SELECT DATE_FORMAT(created_at, '%Y-%m') AS ym, method, COALESCE(SUM(amount), 0) AS total
              FROM payments
@@ -2645,7 +2647,7 @@ final class MemberService
 
     /**
      * Members for org-chart assignment: everyone, active members first, with the position they
-     * already hold (e.g. “Presidente”) and a status suffix so a suspended member is visible
+     * already hold (e.g. “President”) and a status suffix so a suspended member is visible
      * instead of silently missing from the list. Outstanding fees are a treasury matter and never
      * filter or flag the list here.
      *
@@ -2679,7 +2681,7 @@ final class MemberService
             $roles = $rolesByMember[(int) ($row['id'] ?? 0)] ?? [];
             $position = $roles !== [] ? implode(', ', $roles) : '';
             $isActive = (string) ($row['status'] ?? '') === 'active';
-            // “Mario Rossi — Presidente (legale rappresentante) — non attivo”: the role label can
+            // “Mario Rossi — President (legal representative) — inactive”: the role label can
             // already contain parentheses, so the em dash keeps the option readable.
             $parts = [$base];
             if ($position !== '') {
@@ -2698,7 +2700,7 @@ final class MemberService
 
     /**
      * Active positions held by each member in the org chart, ordered by role hierarchy so the
-     * picker can show “Presidente” before “Consigliere”.
+     * picker can show “President” before “Board member”.
      *
      * @return array<int,list<string>>
      */
@@ -2787,7 +2789,7 @@ final class MemberService
     }
 
     /**
-     * Tessera associativa del socio (numero, emissione, scadenza, QR).
+     * Member's membership card (number, issue, expiry, QR).
      *
      * @return array<string,mixed>|null
      */

@@ -28,7 +28,7 @@ $totalSteps = $fieldStepCount + 2 + ($needsEnrollment ? 1 : 0);
 $tesseraStep = $fieldStepCount + 1;
 $ackStep = $fieldStepCount + 2;
 $enrollmentStep = $needsEnrollment ? ($fieldStepCount + 3) : null;
-$paymentStep = null; // quota + stato pagamento sono nello step Tessera
+$paymentStep = null; // fee + payment status are in the Card step
 $oldPaymentStatus = (string) old('payment_status', 'unpaid');
 $oldPartialAmount = (string) old('partial_amount', '0');
 $oldPaymentMethod = (string) old('payment_method', 'cash');
@@ -325,7 +325,7 @@ $buildProfileFieldsHtml = function (array $list, ?string $stepKey = null) use (
             break;
         }
     }
-    // Keep photography with anagrafica (right column) even when the field lives on another step.
+    // Keep photography with personal data (right column) even when the field lives on another step.
     if ($hasBase && $photoField === null && isset($profileByKey['photo'])) {
         $photoField = $profileByKey['photo'];
     } elseif (!$hasBase && $photoField !== null && $profileHasBase) {

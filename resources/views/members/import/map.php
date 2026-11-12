@@ -1,6 +1,6 @@
 <?php
 /**
- * Import soci — step 2: mappatura colonne CSV → campi del programma.
+ * Import members — step 2: mapping CSV columns → program fields.
  *
  * @var array{headers:list<string>,rows:list<array{line:int,cells:list<string>}>,has_header:bool,delimiter:string,encoding:string} $table
  * @var list<array{index:int,header:string,suggested:string,sample:string,kind:string,filled:int,rows:int}> $columns

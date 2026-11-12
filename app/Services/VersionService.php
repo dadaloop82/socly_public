@@ -8,14 +8,15 @@ use Socly\Core\Database;
 
 /**
  * Concurrency between operators: row versions and “who changed what”.
- *
- * Editable tables carry `row_version`; `Database::updateVersioned()` bumps it and
- * fails when someone else saved meanwhile. Here live the entity → table map, the
- * descrizione dell'ultimo autore (dall'audit log) e il confronto usato dai form.
+ * Editable tables carry `row_version`; `Database::updateVersioned()` bumps it and fails when
+ * someone else saved meanwhile. Here live the entity → table map, the description of the last
+ * author (from the audit log) and the comparison used by the forms.
  */
 final class VersionService
 {
-    /** Entità ammesse al controllo (allowlist: mai nomi di tabella dal client). */
+    /**
+     * Entities admitted to control (allowlist: never table names from the client).
+     */
     public const TABLES = [
         'member' => 'members',
         'treasury' => 'treasury_movements',
@@ -35,7 +36,9 @@ final class VersionService
         return self::TABLES[$entity] ?? null;
     }
 
-    /** Versione corrente della riga; null se l'entità non è gestita o la riga non esiste. */
+    /**
+     * Current version of the line; null if the entity is unmanaged or the row does not exist.
+     */
     public function current(string $entity, int $id): ?int
     {
         $table = self::tableFor($entity);
@@ -50,7 +53,7 @@ final class VersionService
     }
 
     /**
-     * Ultimo autore della modifica (dall'audit log), per l'avviso “modificato da …”.
+     * Last author of the modification (from the audit log), for the “modified by …” notice.
      *
      * @return array{name:string,at:string}
      */
@@ -88,7 +91,7 @@ final class VersionService
     }
 
     /**
-     * Esito del confronto fra la versione inviata dal form e quella a database.
+     * Result of the comparison between the version sent by the form and the one in the database.
      *
      * @return array{ok:bool,current:int,editor:array{name:string,at:string}}
      */

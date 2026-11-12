@@ -77,15 +77,17 @@ $accountFilterUrl = static function (string $accountKey) use ($ledgerParams): st
         <h1 class="page-title"><?= e(__('treasury.title')) ?></h1>
         <p class="page-lede"><?= e(__('treasury.lede')) ?></p>
     </div>
-    <?php if ($canManage): ?>
-        <div class="actions">
-            <?php if ($canManage): ?>
-                <a class="btn btn-ghost btn-sm" href="<?= e(url('/treasury/import')) ?>"><?= e(__('treasury.csv_import_button')) ?></a>
-            <?php endif; ?>
-            <a class="btn btn-ghost btn-sm" href="<?= e(url('/treasury/export')) ?>"><?= e(__('treasury.csv_export_button')) ?></a>
+    <div class="actions">
+        <?php if ($canManage): ?>
             <a class="btn<?= empty($hasAnyMovements) ? ' is-first-cta' : '' ?>" href="<?= e(url('/treasury/create')) ?>"><?= e(__('treasury.add_movement')) ?></a>
-        </div>
-    <?php endif; ?>
+            <a class="btn-action-icon" href="<?= e(url('/treasury/import')) ?>" aria-label="<?= e(__('treasury.csv_import_button')) ?>" title="<?= e(__('treasury.csv_import_button')) ?>">
+                <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path fill="currentColor" d="M12 3l5 5h-3v6h-4V8H7l5-5zM5 19h14v2H5v-2z"/></svg>
+            </a>
+        <?php endif; ?>
+        <a class="btn-action-icon" href="<?= e(url('/treasury/export')) ?>" aria-label="<?= e(__('treasury.csv_export_button')) ?>" title="<?= e(__('treasury.csv_export_button')) ?>">
+            <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path fill="currentColor" d="M12 21l-5-5h3v-6h4v6h3l-5 5zM5 3h14v2H5V3z"/></svg>
+        </a>
+    </div>
 </div>
 
 <section class="panel treasury-overview">
@@ -442,6 +444,7 @@ foreach ($categories as $categoryOption) {
                         <span class="treasury-transfer-arrow" aria-hidden="true">↔</span>
                         <span><?= e(__('treasury.transfer_bulk')) ?></span>
                     </button>
+                    <span class="muted treasury-transfer-hint" data-treasury-transfer-hint hidden></span>
                     <span class="treasury-bulk-divider" aria-hidden="true"></span>
                     <button type="button" class="btn btn-sm btn-ghost is-danger" data-treasury-bulk-action="delete" data-confirm="<?= e(__('treasury.bulk_delete_confirm')) ?>">
                         <?= row_action_icon_svg('delete') ?>
@@ -456,6 +459,7 @@ foreach ($categories as $categoryOption) {
               data-msg-transfer-mixed="<?= e(__('treasury.transfer_mixed')) ?>">
             <?= csrf_field() ?>
             <input type="hidden" name="action" value="" data-treasury-bulk-action-input>
+            <input type="hidden" name="target_account" value="" data-treasury-transfer-hidden>
             <span data-treasury-bulk-id-host></span>
         </form>
     <?php endif; ?>
@@ -520,6 +524,18 @@ foreach ($categories as $categoryOption) {
                                 $isPending = trim((string) ($row['approved_at'] ?? '')) === '';
                                 $isSuperseded = trim((string) ($row['superseded_at'] ?? '')) !== '';
                                 $supersededNote = trim((string) ($row['superseded_note'] ?? ''));
+                                $supersededAccountLabel = '';
+                                $supersededAccountRaw = trim((string) ($row['superseded_account'] ?? ''));
+                                if ($supersededAccountRaw !== '') {
+                                    $supersededAccountKey = \Socly\Services\TreasuryService::normalizeAccount($supersededAccountRaw);
+                                    $supersededAccountLabel = $supersededAccountKey !== ''
+                                        ? (string) __('treasury.account_' . $supersededAccountKey)
+                                        : $supersededAccountRaw;
+                                    if ($supersededAccountKey !== ''
+                                        && $supersededAccountLabel === 'treasury.account_' . $supersededAccountKey) {
+                                        $supersededAccountLabel = $supersededAccountKey;
+                                    }
+                                }
                                 $editUrl = $canManage ? url('/treasury/' . $rowId . '/edit') : '';
                                 $accountKey = \Socly\Services\TreasuryService::normalizeAccount((string) ($row['account'] ?? ''));
                                 $accountLabel = $accountKey !== '' ? (string) __('treasury.account_' . $accountKey) : '';
@@ -532,7 +548,7 @@ foreach ($categories as $categoryOption) {
                                 if ($methodKey !== '' && $methodLabel === 'treasury.method_' . $methodKey) {
                                     $methodLabel = $methodKey;
                                 }
-                                // Wallet first, method second: cash (and giroconti) need no method.
+                                // Wallet first, method second: cash (and internal transfers) need no method.
                                 $methodCell = $accountLabel !== '' ? $accountLabel : $methodLabel;
                                 if ($accountLabel !== '' && $methodLabel !== '' && $methodKey !== 'cash') {
                                     $methodCell .= ' · ' . $methodLabel;
@@ -559,13 +575,15 @@ foreach ($categories as $categoryOption) {
                                 >
                                     <?php if ($canManage): ?>
                                         <td class="treasury-col-check" data-stop-row-nav>
-                                            <?= field('checkbox', [
-                                                'name' => 'treasury_pick_' . $rowId,
-                                                'check_value' => (string) $rowId,
-                                                'label' => '',
-                                                'context' => 'inline',
-                                                'attrs' => ['data-treasury-select' => true],
-                                            ]) ?>
+                                            <?php if (!$isSuperseded): ?>
+                                                <?= field('checkbox', [
+                                                    'name' => 'treasury_pick_' . $rowId,
+                                                    'check_value' => (string) $rowId,
+                                                    'label' => '',
+                                                    'context' => 'inline',
+                                                    'attrs' => ['data-treasury-select' => true],
+                                                ]) ?>
+                                            <?php endif; ?>
                                         </td>
                                     <?php endif; ?>
                                     <td>
@@ -577,7 +595,11 @@ foreach ($categories as $categoryOption) {
                                     <td>
                                         <?= e($desc !== '' ? $desc : '—') ?>
                                         <?php if ($isSuperseded): ?>
-                                            <span class="badge badge-muted treasury-superseded-badge"><?= e(__('treasury.superseded_badge')) ?></span>
+                                            <span class="badge badge-muted treasury-superseded-badge">
+                                                <?= e($supersededAccountLabel !== ''
+                                                    ? __('treasury.superseded_badge_to', ['account' => $supersededAccountLabel])
+                                                    : __('treasury.superseded_badge')) ?>
+                                            </span>
                                             <?php if ($supersededNote !== ''): ?>
                                                 <div class="muted treasury-superseded-note"><?= e($supersededNote) ?></div>
                                             <?php endif; ?>

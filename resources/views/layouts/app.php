@@ -212,7 +212,7 @@ if ($user && app()->isInstalled() && !$temporaryInstance && can_manage_updates()
                     '',
                     true,
                     '',
-                    // Finestra = preavviso più ampio configurato, così i promemoria a 30 giorni si vedono.
+                    // Window = larger notice configured, so 30 day reminders are visible.
                     date('Y-m-d', strtotime('+' . $deadlineService->maxNotifyDays() . ' days'))
                 );
             }

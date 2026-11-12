@@ -1,5 +1,5 @@
--- RUNTS (DM 18 aprile 2020): voce del Rendiconto per cassa (Modello D) a cui appartiene
--- il movimento di prima cassa, in aggiunta al capitolo interno del preventivo.
+-- RUNTS (DM 18 April 2020): item of the cash statement (Model D) to which the cash book movement belongs, in
+-- addition to the internal chapter of the estimate.
 SET @runts_exists := (
     SELECT COUNT(*) FROM information_schema.columns
     WHERE table_schema = DATABASE() AND table_name = 'treasury_movements' AND column_name = 'runts_line'

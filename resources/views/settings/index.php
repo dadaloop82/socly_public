@@ -25,8 +25,8 @@
             <p class="config-search-empty muted" data-settings-search-empty hidden><?= e(__('settings.search_empty')) ?></p>
         </div>
         <?php
-        // Indice a due livelli: voci (macro-aree) con le loro sottovoci.
-        // Ogni sottovoce punta all'id dell'accordion corrispondente qui sotto.
+        // Two-level index: entries (macro-areas) with their sub-entries. Each subentry points to the
+        // corresponding accordion ID below.
         $configNavGroups = [
             'assoc' => [
                 'title' => 'settings.nav_assoc',

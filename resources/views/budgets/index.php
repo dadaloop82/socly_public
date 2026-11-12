@@ -1,6 +1,6 @@
 <?php
 /**
- * Bilancio — elenco preventivi per anno sociale.
+ * Budget — list of estimates by financial year.
  *
  * @var list<array<string,mixed>> $budgets
  * @var list<array<string,mixed>> $drafts

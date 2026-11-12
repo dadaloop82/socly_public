@@ -299,7 +299,7 @@ final class MemberController extends BaseController
         );
         if (!$result['ok']) {
             if (!empty($result['conflict'])) {
-                // Concorrenza: nessuna scrittura, si riapre il form con i dati digitati e l'avviso.
+                // Concurrency: no writing, the form reopens with the data entered and the warning.
                 $this->flash('errors', ['concurrency' => __('concurrency.conflict_flash', [
                     'user' => (string) ($result['editor']['name'] ?? ''),
                     'at' => (string) ($result['editor']['at'] ?? ''),

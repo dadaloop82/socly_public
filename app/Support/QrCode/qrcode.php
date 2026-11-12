@@ -1,14 +1,14 @@
 <?php
 
 /**
- * QR code encoder — vendored, non modificare.
+ * QR code encoder — vendored, do not modify.
  *
- * Fonte: Kazuhiko Arase, "qrcode-generator" (php/qrcode.php), licenza MIT
+ * Source: Kazuhiko Arase, "qrcode-generator" (php/qrcode.php), MIT license
  *   https://github.com/kazuhikoarase/qrcode-generator
- * Licenza completa in app/Support/QrCode/LICENSE.
+ * Full license in app/Support/QrCode/LICENSE.
  *
- * Wrapper usato dal progetto: Socly\Support\QrCode::svg()
- * (include con require_once: le define() qui sotto girano una volta sola).
+ * Project wrapper: Socly\Support\QrCode::svg()
+ * (included with require_once: the define() calls below run only once).
  */
 
 //---------------------------------------------------------------

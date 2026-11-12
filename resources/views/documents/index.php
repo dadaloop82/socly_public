@@ -1,8 +1,8 @@
 <?php
 /**
- * Verbali e documenti — pagina elenco nello stile di Soci, Prima cassa e Scadenzario:
- * intestazione con azione primaria, KPI cliccabili, barra filtri live e archivio
- * raggruppato per categoria con righe cliccabili.
+ * Minutes and documents — list page in the style of Members, First Cash and Schedule: header with
+ * primary action, clickable KPIs, live filter bar and archive grouped by category with clickable
+ * rows.
  *
  * @var list<array> $documents
  * @var array{total:int,draft:int,approved:int,expiring:int} $counts
@@ -16,7 +16,7 @@ $query = trim((string) ($search_query ?? ''));
 $filterStatus = (string) ($filters['status'] ?? '');
 $filterCategory = (string) ($filters['category'] ?? '');
 $filterExpiring = !empty($filters['expiring']);
-// "In scadenza" è una voce dello stesso menu Stato (niente controllo volante).
+// “Expiring” is an item in the same Status menu (no steering wheel control).
 $statusParam = $filterExpiring ? 'expiring' : $filterStatus;
 $hasActiveFilters = $query !== '' || $statusParam !== '' || $filterCategory !== '';
 
@@ -59,7 +59,7 @@ $statusFilterOptions = [
     'expiring' => (string) __('documents.stats_expiring'),
 ];
 
-// Archivio raggruppato per categoria, nell'ordine delle categorie configurate.
+// Archive grouped by category, in the order of the configured categories.
 $groups = [];
 $groupOrder = [];
 foreach ($categories as $category) {

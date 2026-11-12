@@ -1,6 +1,6 @@
 <?php
 /**
- * Organigramma stampabile (nuova pagina, stampa → PDF).
+ * Organisation chart printable (new page, print → PDF).
  *
  * @var array{directors:list<array<string,mixed>>,control:list<array<string,mixed>>,commissions:list<array<string,mixed>>} $tiers
  * @var list<array{name:string,role:string,fields:list<string>}> $incomplete

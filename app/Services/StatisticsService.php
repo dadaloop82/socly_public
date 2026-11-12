@@ -17,8 +17,8 @@ use Socly\Support\ItalyMap;
 final class StatisticsService
 {
     /**
-     * Country names that must not be geocoded as Italian municipalities
-     * (e.g. "Argentina" is also a comune in Imperia, but it means the country here).
+     * Country names that must not be geocoded as Italian municipalities (e.g. "Argentina" is also a
+     * municipality in Imperia, but it means the country here).
      *
      * @var array<string, true>
      */

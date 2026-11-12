@@ -347,8 +347,8 @@ function initLiveFilterForm(form) {
 }
 
 /**
- * Freschezza del record aperto: se un altro operatore salva nel frattempo, compare un avviso
- * con “Ricarica” (i dati digitati non vengono toccati: decide l'utente).
+ * Freshness of the open record: if another operator saves in the meantime, a warning appears with
+ * “Reload” (the entered data is not touched: the user decides).
  */
 function initFreshnessGuard() {
   const form = document.querySelector('form[data-freshness-entity][data-freshness-id][data-freshness-url]');
@@ -411,7 +411,7 @@ function initFreshnessGuard() {
       known = Number(data.version || known);
       showBanner(data);
     } catch (err) {
-      // rete assente: si riprova al prossimo giro
+      // network unavailable: retry on the next round
     } finally {
       busy = false;
     }
@@ -424,8 +424,8 @@ function initFreshnessGuard() {
 }
 
 /**
- * Il filtro live invia il form (GET) a ogni pausa di digitazione: prima del reload si ricorda
- * quale campo aveva il focus e la posizione del cursore, così la ricerca non “salta” via.
+ * The live filter sends the form (GET) at every typing pause: before reloading it remembers which
+ * field had the focus and the cursor position, so the search does not "jump" away.
  */
 const FILTER_FOCUS_KEY = 'socly.filter.focus';
 
@@ -439,7 +439,7 @@ function rememberFilterFocus(form) {
   try {
     sessionStorage.setItem(FILTER_FOCUS_KEY, JSON.stringify({ name, pos }));
   } catch (err) {
-    // storage non disponibile: si perde solo il focus
+    // storage not available: you just lose focus
   }
 }
 
@@ -460,7 +460,7 @@ function restoreFilterFocus() {
     try {
       el.setSelectionRange(saved.pos, saved.pos);
     } catch (err) {
-      // input senza selezione (es. select): niente da ripristinare
+      // input without selection (e.g. select): nothing to restore
     }
   }
 }
@@ -1338,8 +1338,9 @@ function initPlatformConsents(scope) {
 }
 
 /**
- * Presenza: pallini con le iniziali delle persone collegate e avviso quando qualcuno entra.
- * Visibile solo quando ci sono almeno due operatori online; inattivo da oltre 5 minuti → opaco.
+ * Presence: dots with the initials of the people connected and notification when someone enters.
+ * Visible only when there are at least two operators online; inactive for more than 5 minutes →
+ * dull.
  */
 function initPresence() {
   const root = document.querySelector('[data-presence-root]');
@@ -1411,7 +1412,7 @@ function initPresence() {
       dot.classList.add('is-leaving');
       window.setTimeout(() => dot.remove(), 420);
     });
-    // Il gruppo compare solo quando c'è più di una persona collegata.
+    // The group only appears when there is more than one person connected.
     root.classList.toggle('is-visible', users.length > 1);
   };
 
@@ -1434,7 +1435,7 @@ function initPresence() {
       }
       if (Number(data.now) > 0) since = Number(data.now);
     } catch (err) {
-      // rete assente: si riprova al prossimo giro
+      // network unavailable: retry on the next round
     }
   };
 
@@ -1471,8 +1472,8 @@ function initTreasuryRecurring() {
 }
 
 /**
- * Preventivo: sezioni riordinabili con drag&drop. I numeri sono un contatore CSS, quindi si
- * aggiornano da soli; il nuovo ordine viene salvato dall'autosave già presente nella griglia.
+ * Budget items: sections reorderable with drag&drop. The numbers are a CSS counter, so they update
+ * themselves; the new order is saved by the autosave already present in the grid.
  */
 function initBudgetSectionSort() {
   const grid = document.querySelector('.budget-grid');
@@ -1497,7 +1498,7 @@ function initBudgetSectionSort() {
         try {
           event.dataTransfer.setData('text/plain', section.getAttribute('data-section-key') || '');
         } catch (err) {
-          // alcuni browser richiedono solo l'effetto
+          // some browsers only require the effect
         }
       }
     });
@@ -1525,7 +1526,7 @@ function initBudgetSectionSort() {
   };
 
   grid.querySelectorAll('[data-budget-section]').forEach(bind);
-  // Nuove sezioni aggiunte dalla griglia.
+  // New sections added from the grid.
   new MutationObserver((records) => {
     records.forEach((record) => {
       record.addedNodes.forEach((node) => {
@@ -1538,7 +1539,9 @@ function initBudgetSectionSort() {
   }).observe(grid, { childList: true });
 }
 
-/** Matita accanto alla tipologia: rinomina la categoria condivisa e aggiorna le tendine. */
+/**
+ * Pencil next to the type: rename the shared category and update the dropdowns.
+ */
 function initBudgetCategoryRename() {
   const grid = document.querySelector('[data-budget-grid]');
   const url = grid?.getAttribute('data-category-rename-url') || '';
@@ -1586,9 +1589,9 @@ function initBudgetCategoryRename() {
 }
 
 /**
- * Movimenti simili: quando classifichi un movimento (tipologia, voce Modello D, centro di costo)
- * il sistema cerca altri movimenti con descrizione simile e stesso segno, e propone di applicare
- * le stesse modifiche con un riepilogo.
+ * Similar movements: when you classify a movement (type, Model D item, cost center) the system
+ * searches for other movements with similar description and same sign, and proposes to apply the
+ * same changes with a summary.
  */
 function initTreasurySimilar() {
   const form = document.querySelector('form[data-treasury-form]');
@@ -1637,8 +1640,8 @@ function initTreasurySimilar() {
   const hasClassification = (data) =>
     (data.category !== '' && data.category !== '__new__') || data.runts_line !== '' || data.budget_item_id !== '';
 
-  // Campi davvero modificati rispetto al record aperto: quelli già valorizzati e non toccati
-  // non devono filtrare i movimenti simili (altrimenti “Incasso quota associativa” non trova nulla).
+  // Fields that have actually been modified compared to the open record: those already completed and not
+  // touched must not filter similar movements (otherwise "Membership fee collection" finds nothing).
   const original = {
     category: form.getAttribute('data-original-category') || '',
     runts_line: form.getAttribute('data-original-runts-line') || '',
@@ -1661,8 +1664,8 @@ function initTreasurySimilar() {
 
   const refresh = async () => {
     const data = payload();
-    // Se non hai cambiato nulla, si propaga comunque la classificazione attuale del record
-    // verso i simili che hanno gli stessi valori “automatici” o i campi vuoti.
+    // If you have not changed anything, the current classification of the record is still propagated towards
+    // similar ones that have the same "automatic" values ​​or empty fields.
     let applying = appliedFields(data);
     if (applying.length === 0) {
       if (data.category !== '' && data.category !== '__new__') applying.push('category');
@@ -1692,7 +1695,7 @@ function initTreasurySimilar() {
       if (!res.ok) return;
       render(await res.json());
     } catch (err) {
-      // rete assente: nessuna proposta
+      // network unavailable: no proposal
     }
   };
 
@@ -1706,7 +1709,7 @@ function initTreasurySimilar() {
   });
   if (description) description.addEventListener('input', queue);
   form.querySelectorAll('[data-treasury-direction]').forEach((el) => el.addEventListener('change', queue));
-  // Dopo il salvataggio la scheda si apre con ?similar=1: mostra subito la proposta.
+  // After saving, the form opens with ?similar=1: it immediately shows the proposal.
   if (new URLSearchParams(window.location.search).has('similar')) {
     window.setTimeout(() => { void refresh(); }, 250);
   }
@@ -1813,7 +1816,9 @@ function initTreasurySimilar() {
   }
 }
 
-/** Filtri avanzati della prima nota: pannello a scomparsa dietro il bottone “Filtri”. */
+/**
+ * Advanced first note filters: pop-up panel behind the “Filters” button.
+ */
 function initTreasuryAdvancedFilters() {
   const form = document.querySelector('form[data-treasury-filter]');
   if (!form) return;
@@ -2070,7 +2075,7 @@ function initAuthLoginI18nLive() {
     return 'it';
   };
 
-  // Rotazione “Scegli la lingua” (fade).
+  // Language selector rotation (fade).
   const rotator = document.querySelector('.auth-lang-rotate');
   const rotateItems = rotator ? [...rotator.querySelectorAll('[data-rotate-lang]')] : [];
   let rotateIndex = rotateItems.findIndex((x) => x.classList.contains('is-active'));
@@ -3112,7 +3117,7 @@ function initMemberWizard() {
       if (status === 'paid') paid = price;
       else if (status === 'partial') paid = Math.max(0, Number(partialAmountInput?.value || 0));
       if (paid > 0) {
-        // Cash payments go straight to Prima Cassa (backend auto-register).
+        // Cash payments go straight to Cash book (auto-register backend).
         if (method === 'cash') {
           form.dataset.treasuryResolved = '1';
           const skipInput = form.querySelector('[data-treasury-skip]');
@@ -3211,6 +3216,7 @@ function initTreasuryBulk() {
     }
     const transferBtn = bar.querySelector('[data-treasury-bulk-action="transfer"]');
     const transferPick = bar.querySelector('[data-treasury-transfer-target]');
+    const transferHint = bar.querySelector('[data-treasury-transfer-hint]');
     if (transferBtn) {
       const accounts = ids.map((id) => root.querySelector(`[data-treasury-row="${id}"]`)?.getAttribute('data-treasury-account') || '');
       const uniform = accounts.length > 0 && accounts.every((account) => account !== '' && account === accounts[0]);
@@ -3220,6 +3226,11 @@ function initTreasuryBulk() {
         [...transferPick.options].forEach((option) => {
           option.hidden = option.value !== '' && option.value === accounts[0];
         });
+      }
+      if (transferHint instanceof HTMLElement) {
+        const show = ids.length > 0 && !uniform;
+        transferHint.hidden = !show;
+        transferHint.textContent = show ? (form?.getAttribute('data-msg-transfer-mixed') || '') : '';
       }
     }
     bar.classList.toggle('is-open', open);
@@ -3262,7 +3273,7 @@ function initTreasuryBulk() {
     row.querySelector('[data-treasury-approve]')?.remove();
   };
 
-  // Dopo un'approvazione i totali (saldo, entrate, uscite) cambiano: si aggiornano subito.
+  // After an approval the totals (balance, income, expenses) change: they update immediately.
   const applyTotals = (totals) => {
     if (!totals || typeof totals !== 'object') return;
     const set = (key, text) => {
@@ -3314,7 +3325,8 @@ function initTreasuryBulk() {
       const action = btn.getAttribute('data-treasury-bulk-action') || '';
       let message = btn.dataset.confirm || '';
       if (action === 'transfer') {
-        // Giroconto: conto obbligatorio + conferma esplicita con conto e numero movimenti.
+        // Account transfer: mandatory account + explicit confirmation with account and number of
+        // transactions.
         const pick = bar.querySelector('[data-treasury-transfer-target]');
         const target = pick && pick.value !== '' && pick.selectedIndex >= 0
           ? (pick.options[pick.selectedIndex].textContent || '').trim()
@@ -3342,6 +3354,27 @@ function initTreasuryBulk() {
           : window.confirm(message);
         if (!ok) return;
       }
+      if (action === 'transfer') {
+        // Account transfer: classic submission of the form (no fetch), so the result is always shown in the
+        // first note with the outcome message.
+        const targetPick = bar.querySelector('[data-treasury-transfer-target]');
+        const targetHidden = form.querySelector('[data-treasury-transfer-hidden]');
+        if (targetPick instanceof HTMLSelectElement && targetHidden instanceof HTMLInputElement) {
+          targetHidden.value = targetPick.value;
+        }
+        actionInput.value = 'transfer';
+        idHost.replaceChildren();
+        ids.forEach((id) => {
+          const input = document.createElement('input');
+          input.type = 'hidden';
+          input.name = 'movement_ids[]';
+          input.value = id;
+          idHost.appendChild(input);
+        });
+        form.hidden = false;
+        form.requestSubmit();
+        return;
+      }
       const body = new FormData(form);
       body.set('action', action);
       body.append('ajax', '1');
@@ -3354,6 +3387,16 @@ function initTreasuryBulk() {
         });
         const data = await res.json().catch(() => ({}));
         if (!res.ok || !data.ok) {
+          // Server-side error (e.g. different accounts): show it without reloading the page.
+          const message = data && typeof data.message === 'string' ? data.message : '';
+          if (message !== '') {
+            if (typeof appConfirm === 'function') {
+              await appConfirm(message, { alert: true });
+            } else {
+              window.alert(message);
+            }
+            return;
+          }
           throw new Error('ajax failed');
         }
         if (action === 'approve') {
@@ -3366,10 +3409,6 @@ function initTreasuryBulk() {
           ids.forEach((id) => {
             root.querySelector(`[data-treasury-row="${id}"]`)?.remove();
           });
-        } else if (action === 'transfer') {
-          // Gli originali diventano storici e compaiono le copie: ricarica per riallineare la lista.
-          window.location.reload();
-          return;
         }
         checkboxes.forEach((cb) => {
           cb.checked = false;
@@ -4065,7 +4104,7 @@ function initLeaveGuards(scope = document) {
     // Close the guard before submitting: while a modal <dialog> is open the
     // form is inert, so a blocked submission (invalid required fields, or a
     // page handler cancelling it) would show no bubble and no focus — the
-    // "Salva" click would look like it does nothing.
+    // "Save" click would look like it does nothing.
     const submitAndLeave = () => {
       allowLeave = true;
       if (dialog.open) dialog.close();
@@ -4707,7 +4746,7 @@ function initPhotoCapture(form) {
       openNativeCamera();
       return;
     }
-    // API presente ma dispositivo senza fotocamera: nascondi il bottone
+    // API present but device without camera: hide the button
     if (openBtn) openBtn.hidden = true;
     captureInput?.remove();
   });
@@ -4827,8 +4866,8 @@ function initLogoFilePickers(scope = document) {
       } else {
         hidePreview();
       }
-      // Il logo cambia ovunque nella pagina (sidebar, layout ospite, organigramma):
-      // niente refresh manuale dopo il salvataggio.
+      // The logo changes everywhere on the page (sidebar, guest layout, organization chart): no manual
+      // refresh after saving.
       syncPageLogos(data.logo_url ? String(data.logo_url) : '');
       // A manual upload is the user's own choice: it can no longer be replaced
       // by the website scan, so the badge switches to “uploaded by you”.
@@ -5948,7 +5987,7 @@ function initSetupSmtp(root) {
     }
 
     const verified = statusEl === verifyStatus;
-    // Successful auto-discovery: reveal technical params + Verifica (smooth scroll).
+    // Successful auto-discovery: reveal technical params + Verify (smooth scroll).
     if (!verified && data.host) {
       applySmtpFields(data);
       setManualMode(true);
@@ -7305,7 +7344,7 @@ function setSetupFieldValidating(el, on) {
   }
 }
 
-/** Live validity icons inside inputs (✓ / ✕ / spinner) — no "Corretto" text under fields. */
+/** Live validity icons inside inputs (✓ / ✕ / spinner) — no "Correct" text under fields. */
 function initSetupFieldFeedback(root) {
   const form = root.querySelector('[data-setup-form]');
   if (!form) return;
@@ -7509,7 +7548,7 @@ function initSetupTaxIds(root) {
     const vat = stripCountry(raw);
     if (country === 'DE') return /^\d{9}$/.test(vat);
     if (country && country !== 'IT') return /^[A-Z0-9]{8,12}$/.test(vat);
-    // Italian optional P.IVA: 11 digits (check digit not enforced — optional field).
+    // Italian optional VAT number: 11 digits (check digit not enforced — optional field).
     return /^\d{11}$/.test(vat);
   };
 
@@ -7666,11 +7705,9 @@ function initSetupFormScrollHint(root) {
  * when Continua is pressed, so “false bottom” never hides validation.
  */
 /**
- * “Conti di cassa” step: add/remove extra wallets before saving the step.
- *
- * Each new row is a clone of the server-rendered <template> whose __INDEX__
- * placeholder becomes a unique index, so the POST arrives as
- * accounts_new[0][label], accounts_new[1][label], …
+ * “Cash Accounts” step: add/remove extra wallets before saving the step.
+ * Each new row is a clone of the server-rendered <template> whose __INDEX__ placeholder becomes a
+ * unique index, so the POST arrives as accounts_new[0][label], accounts_new[1][label], …
  */
 function initSetupAccounts(root = document) {
   root.querySelectorAll('[data-setup-accounts-new]').forEach((wrap) => {
@@ -9987,7 +10024,7 @@ function applyGeoComuneToScope(scope, item) {
   if (provinceInput instanceof HTMLInputElement) {
     const provinceName = String(item.provincia_name || item.name || '').trim();
     if (provinceName) {
-      // Always sync province from the selected comune — never keep a stale manual value.
+      // Always sync province from the selected municipality — never keep a stale manual value.
       provinceInput.value = provinceName;
       provinceInput.dataset.geoPicked = '1';
       clearGeoFieldError(provinceInput);
@@ -10482,7 +10519,7 @@ function initPlaceSuggest(root = document) {
         if (postalInput instanceof HTMLInputElement) {
           postalInput.setCustomValidity('');
         }
-        // City changed: previous expected CAP may belong to another comune.
+        // City changed: previous expected CAP may belong to another municipality.
         delete scope.dataset.geoExpectedCap;
       };
       cityInput.addEventListener('input', clearStaleCapCityError);
@@ -11050,7 +11087,7 @@ function initMobileNav() {
 }
 
 function initTopbarScroll() {
-  /* Topbar is mobile-only; desktop gear was removed in favour of sidebar Configurazione. */
+  /* Topbar is mobile-only; desktop gear was removed in favour of sidebar Settings. */
 }
 
 function dismissFlashAlert(alertEl) {
@@ -11110,7 +11147,7 @@ function initSidebarUpdate() {
 }
 
 function initDeadlineFilters(root = document) {
-  // Scadenzario filters (search + category + status) apply live, like the members list.
+  // Deadlines filters (search + category + status) apply live, like the members list.
   root.querySelectorAll('[data-deadlines-filter]').forEach((form) => {
     if (form instanceof HTMLFormElement) {
       initLiveFilterForm(form);
@@ -11119,7 +11156,7 @@ function initDeadlineFilters(root = document) {
 }
 
 function initDocumentFilters(root = document) {
-  // Archivio documenti: ricerca, categoria, stato e "in scadenza" filtrano dal vivo.
+  // Document archive: search, category, status and "expiring" filter live.
   root.querySelectorAll('[data-documents-filter]').forEach((form) => {
     if (form instanceof HTMLFormElement) {
       initLiveFilterForm(form);
@@ -11128,7 +11165,7 @@ function initDocumentFilters(root = document) {
 }
 
 function initDeadlineTemplates(root = document) {
-  // Scadenze tipiche ETS: un clic precompila il form di creazione.
+  // Typical ETS deadlines: one click pre-fills the creation form.
   root.querySelectorAll('[data-deadline-templates]').forEach((box) => {
     const form = box.closest('form');
     if (!(form instanceof HTMLFormElement)) return;
@@ -11160,7 +11197,7 @@ function initDeadlineTemplates(root = document) {
             }
           });
         }
-        // La categoria potrebbe richiedere il campo "nuova categoria": tienilo allineato.
+        // The category may require the "new category" field - keep it aligned.
         form.querySelector('[data-deadline-category]')?.dispatchEvent(new Event('change', { bubbles: true }));
         const title = form.querySelector('[name="title"]');
         if (title instanceof HTMLElement) title.focus();
@@ -11378,7 +11415,7 @@ function formatTreasuryConfirmMessage(form, template) {
     || (directionValue === 'expense' ? 'Uscita' : (directionValue === 'transfer' ? 'Giroconto' : 'Entrata'));
   let categoryLabel = '—';
   if (directionValue === 'transfer') {
-    // A giroconto is described by its two wallets, not by a category.
+    // A internal transfer is described by its two wallets, not by a category.
     const fromLabel = form.querySelector('[data-treasury-account]')?.selectedOptions?.[0]?.textContent?.trim() || '';
     const toLabel = form.querySelector('[data-treasury-transfer-account]')?.selectedOptions?.[0]?.textContent?.trim() || '';
     categoryLabel = fromLabel !== '' && toLabel !== '' ? `${fromLabel} → ${toLabel}` : (toLabel || fromLabel || '—');
@@ -12290,7 +12327,7 @@ async function resolvePendingGeoFields(form, options = {}) {
     }
   }
 
-  // Final coherence: city / CAP / province must belong together.
+  // Final coherence: city / postcode / province must belong together.
   const provinceMismatchTpl = document.body?.dataset?.msgGeoProvinceCityMismatch
     || 'La provincia «:province» non corrisponde a «:city» (attesa: :expected).';
   const capMismatchTpl = document.body?.dataset?.msgGeoCapCityMismatch
@@ -12775,16 +12812,16 @@ function initTreasuryCategory(root = document) {
       });
     };
     // The wallet decides whether a payment method still makes sense: a cash desk
-    // implies "contanti", while a giroconto has no method at all.
+    // implies "cash", while a internal transfer has no method at all.
     const syncAccount = () => {
       const isTransfer = currentDirection() === 'transfer';
       const isCash = accountSelect?.value === 'cash';
       setFieldsLocked(methodWrap, isTransfer || isCash);
     };
 
-    // "A conto" can never be the same wallet as "Da conto": the matching option is
-    // removed from the list and, if it was selected, the choice is cleared with a
-    // short inline notice (the server still validates it).
+    // "To account" can never be the same wallet as "From account": the matching option is removed from the
+    // list and, if it was selected, the choice is cleared with a short inline notice (the server still
+    // validates it).
     const transferNotice = form.querySelector('[data-treasury-transfer-notice]');
     const syncTransferOptions = () => {
       if (!transferSelect || !accountSelect) return;
@@ -12803,7 +12840,7 @@ function initTreasuryCategory(root = document) {
     };
     transferSelect?.addEventListener('change', syncTransferOptions);
 
-    // Wallet balances live inside the option labels ("Banca: 1.234,56 €"): the page
+    // Wallet balances live inside the option labels ("Bank: 1.234,56 €"): the page
     // renders them server-side and this refresh keeps the numbers up to date.
     const balancesUrl = form.dataset.accountBalancesUrl || '';
     const optionTemplate = form.dataset.msgAccountOption || '';
@@ -12842,7 +12879,7 @@ function initTreasuryCategory(root = document) {
       return;
     }
 
-    // "Cerca tra i soci" and the free-text counterparty are mutually exclusive.
+    // "Search among members" and the free-text counterparty are mutually exclusive.
     const syncMember = () => {
       const involved = !!memberToggle?.checked;
       setFieldsLocked(memberFields, !involved);
@@ -12912,9 +12949,8 @@ function initTreasuryCategory(root = document) {
       });
       // With an invoice payment the number/date live in the invoice block instead.
       setFieldsLocked(docFields, isInvoice || isTransfer);
-      // Giroconto: only liquidity between two own wallets — no category, no
-      // document row, no payment method; the account select becomes
-      // "Da conto" and a second "A conto" wallet shows up.
+      // Internal transfer: only liquidity between two own wallets — no category, no document row, no payment method;
+      // the account select becomes "From account" and a second "To account" wallet shows up.
       setFieldsLocked(docsRow, isTransfer);
       if (isTransfer && categorySelect.value !== 'internal_transfer') {
         categorySelect.value = 'internal_transfer';
@@ -13058,7 +13094,7 @@ function initDocumentUpload(root = document) {
   categorySelect?.addEventListener('change', syncCategory);
   syncCategory();
 
-  // Dropzone tratteggiata: trascina il file (stesso input di "Clicca per selezionare").
+  // Dotted Dropzone: Drag the file (same input as "Click to Select").
   const dropzone = form.querySelector('[data-doc-dropzone]');
   if (dropzone) {
     const setDragging = (on) => dropzone.classList.toggle('is-dragging', on);
@@ -13089,7 +13125,7 @@ function initDocumentUpload(root = document) {
     });
   }
 
-  // Progressivo automatico dei verbali: "Verbale n. 01/2026".
+  // Automatic minutes numbering: "Minutes No. 01/2026".
   const numberInput = form.querySelector('[data-doc-number]');
   const numberWrap = form.querySelector('[data-doc-category-wrap]');
   const numberPattern = numberWrap?.getAttribute('data-doc-number-pattern') || '';
@@ -13333,7 +13369,7 @@ function initSettingsNav() {
     return controls !== '' ? document.getElementById(controls) : null;
   };
 
-  // Voci: only one macro-area is open at a time (its sub-list is expanded).
+  // Items: only one macro-area is open at a time (its sub-list is expanded).
   const setActiveGroup = (group) => {
     groups.forEach((item) => {
       const on = String(item.getAttribute('data-settings-nav-item') || '') === group;
@@ -13978,7 +14014,7 @@ function initDashboardTabs() {
       tab.tabIndex = selected ? 0 : -1;
       if (selected) {
         // Scroll only when the tab is actually cut off: this keeps the first
-        // item (“Soci”) fully visible at scrollLeft 0 on mobile.
+        // item (“Members”) fully visible at scrollLeft 0 on mobile.
         const pad = 18;
         const tabRect = tab.getBoundingClientRect();
         const listRect = tablist ? tablist.getBoundingClientRect() : null;
@@ -15309,7 +15345,7 @@ function initFieldsSortable(scope = document) {
   });
 }
 
-/* ── Bilanci: schede Preventivo / Consuntivo / Statistiche ───────────────── */
+/* ── Financial statements: Budget / Actuals / Statistics tabs ── */
 function initBudgetTabs() {
   const root = document.querySelector('[data-budget-tabs]');
   if (!root) return;
@@ -15347,7 +15383,9 @@ function initBudgetTabs() {
   );
 }
 
-/* ── Bilancio: dropzone CSV come gli altri upload + attiva il modello "Importa" ── */
+/*
+ * ── Balance sheet: dropzone CSV like other uploads + activate "Import" template ──
+ */
 function initBudgetCreateForm(scope = document) {
   const form = scope.querySelector('[data-budget-create]');
   if (!form || form.dataset.budgetCreateBound === '1') return;
@@ -15403,14 +15441,16 @@ function initBudgetCreateForm(scope = document) {
       transfer.items.add(files[0]);
       input.files = transfer.files;
     } catch {
-      // Browser senza DataTransfer: resta disponibile il selettore file.
+      // Browser without DataTransfer: the file selector remains available.
       return;
     }
     input.dispatchEvent(new Event('change', { bubbles: true }));
   });
 }
 
-/* ── Prima cassa: propone il centro di costo in base alla categoria scelta ── */
+/*
+ * ── First checkout: proposes the cost center based on the chosen category ──
+ */
 function initTreasuryBudgetImpute(scope = document) {
   const form = scope.querySelector('[data-treasury-form]');
   if (!form || form.dataset.budgetImputeBound === '1') return;
@@ -15427,7 +15467,7 @@ function initTreasuryBudgetImpute(scope = document) {
   });
 }
 
-/* ── Bilancio: griglia blocco/sezione con totali live ───────────────────── */
+/* ── Financial statements: block/section grid with live totals ── */
 function initBudgetGrid(scope = document) {
   const form = scope.querySelector('[data-budget-grid]');
   if (!form || form.dataset.budgetGridBound === '1') return;
@@ -15440,8 +15480,8 @@ function initBudgetGrid(scope = document) {
 
   const symbol = form.dataset.currencySymbol || '';
   const locale = (document.documentElement.lang || 'it').slice(0, 2);
-  // Stessa formattazione del server (CurrencyService::format): 9.000,00 €.
-  // Non usiamo Intl: in alcuni ambienti ICU non raggruppa le migliaia.
+  // Same formatting as the server (CurrencyService::format): €9,000.00. We don't use Intl: in some
+  // environments ICU doesn't group thousands.
   const separators = locale === 'en' ? { group: ',', decimal: '.' } : { group: '.', decimal: ',' };
   const formatNumber = (value) => {
     const rounded = Math.round((Number(value) || 0) * 100) / 100;
@@ -15560,7 +15600,7 @@ function initBudgetGrid(scope = document) {
     }
   });
 
-  // “+ Nuova categoria…”: mostra il campo nome e lo rende obbligatorio (salvato come categoria custom).
+  // “+ New category…”: shows the name field and makes it mandatory (saved as a custom category).
   const syncNewCategory = (select, focus = false) => {
     const row = select.closest('[data-budget-row]');
     const input = row ? row.querySelector('[data-budget-new-category]') : null;
@@ -15590,7 +15630,7 @@ function initBudgetGrid(scope = document) {
     }
   });
 
-  // Autosave: 5 secondi di inattività dopo l'ultima modifica, poi salvataggio in background.
+  // Autosave: 5 seconds of inactivity after last change, then save in background.
   const autosaveStatus = form.querySelector('[data-budget-autosave]');
   const autosaveLabels = {
     pending: form.dataset.msgAutosavePending || 'Unsaved changes',
@@ -15614,8 +15654,8 @@ function initBudgetGrid(scope = document) {
   // The server returns the ids of the rows/sections it created, so the next save updates them
   // instead of inserting them again.
   const applySavedIds = (payload) => {
-    // La versione del documento avanza a ogni salvataggio (anche autosave): senza questo update
-    // il salvataggio successivo risulterebbe in conflitto con se stesso.
+    // The version of the document advances with each save (even autosave): without this update the next save
+    // would conflict with itself.
     const nextVersion = payload && payload.row_version !== undefined ? String(payload.row_version) : '';
     if (nextVersion !== '') {
       const versionInput = form.querySelector('input[name="row_version"]');
@@ -15680,7 +15720,7 @@ function initBudgetGrid(scope = document) {
       });
       const payload = await response.json().catch(() => null);
       if (response.status === 409 && payload && payload.conflict) {
-        // Un altro operatore ha salvato la stessa griglia: si interrompe l'autosave.
+        // Another operator saved the same grid: autosave stops.
         autosaveDirty = false;
         autosaveQueued = false;
         showStale(payload);
@@ -15750,7 +15790,9 @@ function initBudgetGrid(scope = document) {
   recalc();
 }
 
-/* Import soci: la dropzone è l'unico comando (click o trascinamento) e avvia l'analisi. */
+/*
+ * Import members: the dropzone is the only command (click or drag) and starts the analysis.
+ */
 (() => {
   const importField = document.querySelector('[data-import-file-field]');
   if (!(importField instanceof HTMLElement)) return;
@@ -15795,7 +15837,7 @@ function initBudgetGrid(scope = document) {
       if (submitButton instanceof HTMLButtonElement) submitButton.disabled = false;
       return;
     }
-    // Analisi automatica: l'utente non deve premere altro.
+    // Automatic analysis: the user does not have to press anything else.
     window.setTimeout(submitForm, 120);
   };
 
@@ -15828,13 +15870,15 @@ function initBudgetGrid(scope = document) {
     try {
       fileInput.files = transfer.files;
     } catch (error) {
-      return; // Browser senza supporto: resta la selezione manuale.
+      return; // Browser without support: manual selection remains.
     }
     showSelection();
   });
 })();
 
-/* Import soci: ogni campo del programma può essere scelto una sola volta. */
+/*
+ * Import members: each field of the program can be chosen only once.
+ */
 (() => {
   const form = document.querySelector('[data-import-map-form]');
   if (!(form instanceof HTMLFormElement)) return;
@@ -15885,7 +15929,9 @@ function initBudgetGrid(scope = document) {
   refresh();
 })();
 
-/* Import soci: i nomi nelle altre lingue si compilano dal nome italiano. */
+/*
+ * Import members: names in other languages ​​are compiled from the Italian name.
+ */
 (() => {
   const boxes = document.querySelectorAll('[data-import-translations]');
   if (boxes.length === 0) return;
@@ -15915,7 +15961,9 @@ function initBudgetGrid(scope = document) {
   });
 })();
 
-/* Import soci: conferma, pulsante disabilitato e avviso "importazione in corso". */
+/*
+ * Import members: confirmation, button disabled and "import in progress" warning.
+ */
 (() => {
   const form = document.querySelector('[data-import-commit]');
   if (!(form instanceof HTMLFormElement)) return;
@@ -15953,7 +16001,9 @@ function initBudgetGrid(scope = document) {
   });
 })();
 
-/* Copia negli appunti un valore testuale (es. codice QR della tessera). */
+/*
+ * Copy a textual value (e.g. QR code of the card) to the clipboard.
+ */
 (() => {
   document.querySelectorAll('[data-copy-text]').forEach((button) => {
     button.addEventListener('click', async () => {
