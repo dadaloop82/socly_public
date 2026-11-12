@@ -17,7 +17,10 @@ every 100 patches bump the series, and each bump is published to this repository
   They obey the widget manager like the others: move, hide, reload.
 - The badge of another operator now opens **exactly the record they are working in**: the link is
   built server-side (same component flag and permission as the page, so no link when you could not
-  open it anyway), travels with the heartbeat and a click (or Enter) jumps there.
+  open it anyway), travels with the heartbeat and a click (or Enter) jumps there. When no versioned
+  record is open the badge opens the **screen they are on** (list, dashboard, chosen tab): the
+  heartbeat now reports the current path + fragment, the query string is always stripped and the
+  link is rebuilt server-side.
 - The ledger cost-centre filter now groups the lines by budget and section (“2026 · Personnel”) exactly
   like the “Voce del bilancio consuntivo (Modello D)” filter, so two sections repeating a wording can no
   longer be confused; the summaries keep reading “year · section · line”.

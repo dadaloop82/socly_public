@@ -196,10 +196,13 @@ last keystroke, never for password/file/checkbox controls. A `<select>` changed 
 previewed in their colour and restored on release, and the operator who is only watching never saves
 it (submit guard).
 
-**Jumping to a colleague** — each badge also carries the record the operator has open. The URL is
-built server-side (`PresenceService::locationUrl()`) behind the same component flag and permission as
-the page, so a click (or Enter) opens exactly that member / movement / budget: no client-supplied
-path, no link for the own badge, for idle sessions or when the viewer could not open the page anyway.
+**Jumping to a colleague** — each badge carries the record the operator has open (`editing_entity` /
+`editing_id`), and when none is open the screen they are on (`page_path`: local path + fragment, query
+string always stripped). The URL is built server-side (`PresenceService::locationUrl()` for the record,
+`pageUrl()` for the screen, mapped by path prefix to the same component flag and permission as the
+page), so a click (or Enter) opens exactly that member / movement / budget / list: no client-supplied
+path, no link for the own badge, for idle sessions, for unknown paths or when the viewer could not open
+the page anyway. Switching tab or section inside a page (hash change) publishes the new screen at once.
 
 ## Budgets
 

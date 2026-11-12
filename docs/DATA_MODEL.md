@@ -33,6 +33,7 @@ One row per open session, refreshed by the presence polling.
 | editing_entity / editing_id | record the operator is editing right now (presence “X is editing”) |
 | editing_field | focused form field of that record: allowlisted name (`[A-Za-z0-9_\-\[\]]`, max 120 chars), `NULL` when nothing is focused |
 | editing_value | draft being typed (max 300 chars, control characters stripped). Field and value are ignored once `last_seen` is older than 45 s (`PresenceService::FIELD_TTL_SECONDS`) |
+| page_path | screen the session is on: local path + optional fragment (`/budgets#bil-consuntivo`), query string always stripped, max 255 chars. Used by the colleague's badge when no versioned record is open |
 
 ### row_version (members, treasury_movements, budgets, budget_items, association_documents, deadline_items, association_people)
 `INT UNSIGNED NOT NULL DEFAULT 1`, incremented by `Database::updateVersioned()`. A save posted with a

@@ -1426,6 +1426,12 @@ function initPresence() {
   const avatars = root.querySelector('[data-presence-avatars]');
   const toasts = root.querySelector('[data-presence-toasts]');
   if (!url || !avatars) return;
+  // Installation prefix ('' when the app lives at the web root): the page path travels relative to it,
+  // so the server can rebuild the URL with url() regardless of the sub-folder.
+  const presenceBase = (() => {
+    const idx = url.indexOf('/presence/state');
+    return idx > 0 ? url.slice(0, idx) : '';
+  })();
 
   let since = 0;
   let timer = null;
@@ -1734,12 +1740,25 @@ function initPresence() {
     event.preventDefault();
     jumpTo(dot);
   });
+  // Switching tab/section inside a page changes only the hash: publish the new screen right away.
+  window.addEventListener('hashchange', () => {
+    scheduleImmediatePoll(200);
+  });
 
   const poll = async () => {
     try {
       const target = new URL(url, window.location.origin);
       if (since > 0) target.searchParams.set('since', String(since));
       if (editingChip !== '') target.searchParams.set('editing', editingChip);
+      // Where this operator is right now (path + hash, never the query): the badge of a colleague
+      // opens the same screen even when no versioned record is being edited.
+      let pagePath = `${window.location.pathname}${window.location.hash}`;
+      if (presenceBase !== '') {
+        pagePath = pagePath.startsWith(presenceBase + '/') || pagePath === presenceBase
+          ? (pagePath.slice(presenceBase.length) || '/')
+          : '';
+      }
+      if (pagePath !== '') target.searchParams.set('page', pagePath);
       if (editingChip !== '' && currentField !== '') {
         target.searchParams.set('field', currentField);
         // The draft value travels too: the others see it live and the field stays locked meanwhile.

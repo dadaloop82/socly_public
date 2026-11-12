@@ -38,8 +38,10 @@ final class PresenceService
      *
      * `$editingField` is the form field the operator is working in and `$editingValue` the draft they
      * are typing: together they let everyone else outline and lock that field and see the changes live.
+     * `$page` is the screen the operator is on (path + hash): it is what the colleague's badge opens
+     * when no versioned record is being edited.
      */
-    public function touch(?string $editingEntity = null, ?int $editingId = null, string $editingField = '', string $editingValue = ''): void
+    public function touch(?string $editingEntity = null, ?int $editingId = null, string $editingField = '', string $editingValue = '', string $page = ''): void
     {
         $userId = (int) (auth_user()['id'] ?? 0);
         $sessionId = session_id();
@@ -50,12 +52,14 @@ final class PresenceService
         $hasRecord = $entity !== null && $editingId !== null && $editingId > 0;
         $field = $hasRecord ? self::normalizeFieldName($editingField) : '';
         $value = $field !== '' ? self::normalizeFieldValue($editingValue) : '';
+        $path = self::normalizePagePath($page);
         $this->db->query(
-            'INSERT INTO user_presence (session_id, user_id, connected_at, last_seen, ended_at, editing_entity, editing_id, editing_field, editing_value)
-             VALUES (:sid, :uid, NOW(), NOW(), NULL, :entity, :eid, :field, :value)
+            'INSERT INTO user_presence (session_id, user_id, connected_at, last_seen, ended_at, editing_entity, editing_id, editing_field, editing_value, page_path)
+             VALUES (:sid, :uid, NOW(), NOW(), NULL, :entity, :eid, :field, :value, :page)
              ON DUPLICATE KEY UPDATE user_id = VALUES(user_id), last_seen = NOW(), ended_at = NULL,
                  editing_entity = VALUES(editing_entity), editing_id = VALUES(editing_id),
-                 editing_field = VALUES(editing_field), editing_value = VALUES(editing_value)',
+                 editing_field = VALUES(editing_field), editing_value = VALUES(editing_value),
+                 page_path = VALUES(page_path)',
             [
                 'sid' => $sessionId,
                 'uid' => $userId,
@@ -63,10 +67,38 @@ final class PresenceService
                 'eid' => $hasRecord ? $editingId : null,
                 'field' => $field !== '' ? $field : null,
                 'value' => $value !== '' ? $value : null,
+                'page' => $path !== '' ? $path : null,
             ]
         );
         // Housekeeping: drop rows older than a day.
         $this->db->query('DELETE FROM user_presence WHERE last_seen < (NOW() - INTERVAL 1 DAY)');
+    }
+
+    /**
+     * The screen an operator reports: a local path with an optional fragment. Anything absolute
+     * (`//host`, `scheme://`) or carrying a query string is refused — the link is rebuilt server-side
+     * from this path, never navigated to as it arrives.
+     */
+    public static function normalizePagePath(string $page): string
+    {
+        $page = trim($page);
+        if ($page === '') {
+            return '';
+        }
+        $page = (string) preg_replace('/[\x00-\x20\x7F]/', '', $page);
+        if (!str_starts_with($page, '/') || str_starts_with($page, '//') || str_contains($page, '://')) {
+            return '';
+        }
+        // Never keep the query string: filters and searches can carry personal data.
+        $page = explode('?', $page, 2)[0];
+        $parts = explode('#', $page, 2);
+        $pathname = $parts[0];
+        if ($pathname === '' || strlen($pathname) > 200) {
+            return '';
+        }
+        $hash = (string) preg_replace('/[^A-Za-z0-9_\-.]/', '', (string) ($parts[1] ?? ''));
+
+        return $hash !== '' ? $pathname . '#' . mb_substr($hash, 0, 40) : $pathname;
     }
 
     /** Only a plain form-field name is stored (no free text from the client). */
@@ -119,7 +151,7 @@ final class PresenceService
     {
         $window = self::ONLINE_WINDOW;
         $rows = $this->db->fetchAll(
-            "SELECT p.session_id, p.user_id, p.connected_at, p.last_seen, p.editing_entity, p.editing_id, p.editing_field, p.editing_value,
+            "SELECT p.session_id, p.user_id, p.connected_at, p.last_seen, p.editing_entity, p.editing_id, p.editing_field, p.editing_value, p.page_path,
                     u.email, u.first_name, u.last_name, u.name, u.member_id,
                     (SELECT v.value FROM member_field_values v
                      INNER JOIN member_field_definitions d ON d.id = v.field_definition_id AND d.`key` = 'first_name'
@@ -177,6 +209,7 @@ final class PresenceService
                 if (($users[$userId]['url'] ?? '') === '' && $location['url'] !== '') {
                     $users[$userId]['editing_entity'] = $location['entity'];
                     $users[$userId]['editing_id'] = $location['id'];
+                    $users[$userId]['page'] = $location['page'];
                     $users[$userId]['url'] = $location['url'];
                 }
                 continue;
@@ -190,10 +223,11 @@ final class PresenceService
                 'self' => $userId === $currentId,
                 'sessions' => 1,
                 'connected_ts' => (int) (strtotime((string) ($row['connected_at'] ?? '')) ?: 0),
-                // Record the operator has open right now (empty when they are just browsing), with
-                // the link that opens exactly that page from a click on their badge.
+                // Record the operator has open right now (empty when they are just browsing) and the
+                // screen they are on, with the link that opens it from a click on their badge.
                 'editing_entity' => $location['entity'],
                 'editing_id' => $location['id'],
+                'page' => $location['page'],
                 'url' => $userId === $currentId ? '' : $location['url'],
             ];
         }
@@ -225,13 +259,79 @@ final class PresenceService
     private function location(array $row): array
     {
         $idle = (int) ($row['idle_seconds'] ?? 0) >= self::IDLE_SECONDS;
+        if ($idle) {
+            return ['entity' => '', 'id' => 0, 'page' => '', 'url' => ''];
+        }
         $entity = (string) ($row['editing_entity'] ?? '');
         $id = (int) ($row['editing_id'] ?? 0);
-        if ($idle || $entity === '' || $id < 1) {
-            return ['entity' => '', 'id' => 0, 'url' => ''];
+        $editUrl = ($entity !== '' && $id > 0) ? $this->locationUrl($entity, $id) : '';
+        $page = self::normalizePagePath((string) ($row['page_path'] ?? ''));
+
+        return [
+            'entity' => $entity,
+            'id' => $id,
+            'page' => $page,
+            // The record the colleague has open wins; otherwise the screen they are on.
+            'url' => $editUrl !== '' ? $editUrl : $this->pageUrl($page),
+        ];
+    }
+
+    /**
+     * Link to the screen an operator reports, but only when the viewer could open it: the path prefix
+     * decides the component flag and the permission, so a badge never leads to a 403. Unknown paths
+     * (downloads, endpoints, plugin pages) carry no link.
+     */
+    private function pageUrl(string $page): string
+    {
+        if ($page === '') {
+            return '';
+        }
+        $pathname = explode('#', $page, 2)[0];
+        $rule = $this->pagePermission($pathname);
+        if ($rule === null) {
+            return '';
+        }
+        [$component, $permission] = $rule;
+        if ($component !== '' && !component_enabled($component)) {
+            return '';
+        }
+        if ($permission !== '' && !can($permission)) {
+            return '';
         }
 
-        return ['entity' => $entity, 'id' => $id, 'url' => $this->locationUrl($entity, $id)];
+        return url($page);
+    }
+
+    /**
+     * @return array{0:string,1:string}|null [component flag, permission]
+     */
+    private function pagePermission(string $pathname): ?array
+    {
+        $needsManage = str_ends_with($pathname, '/edit')
+            || str_contains($pathname, '/create')
+            || str_contains($pathname, '/import');
+        $map = [
+            '/dashboard' => ['', Permission::DASHBOARD_VIEW],
+            '/members' => ['members', $needsManage ? Permission::MEMBERS_MANAGE : Permission::MEMBERS_VIEW],
+            '/statistics' => ['members', Permission::MEMBERS_VIEW],
+            '/treasury' => ['treasury', $needsManage ? Permission::TREASURY_MANAGE : Permission::TREASURY_VIEW],
+            '/budgets' => ['treasury', $needsManage ? Permission::TREASURY_MANAGE : Permission::TREASURY_VIEW],
+            '/rendiconto' => ['treasury', Permission::TREASURY_VIEW],
+            '/documents' => ['documents', $needsManage ? Permission::DOCUMENTS_MANAGE : Permission::DOCUMENTS_VIEW],
+            '/deadlines' => ['deadlines', $needsManage ? Permission::DEADLINES_MANAGE : Permission::DEADLINES_VIEW],
+            '/org' => ['org_roles', $needsManage ? Permission::ORG_MANAGE : Permission::ORG_VIEW],
+            '/settings' => ['', Permission::SETTINGS_MANAGE],
+            '/users' => ['', Permission::USERS_MANAGE],
+            '/audit' => ['', Permission::AUDIT_VIEW],
+            '/plugins' => ['', Permission::PLUGINS_MANAGE],
+        ];
+        foreach ($map as $prefix => $rule) {
+            if ($pathname === $prefix || str_starts_with($pathname, $prefix . '/')) {
+                return $rule;
+            }
+        }
+
+        return null;
     }
 
     /**

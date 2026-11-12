@@ -29,12 +29,15 @@ final class PresenceController extends BaseController
         // name + short text, both validated server-side.
         $editingField = (string) $request->input('field', '');
         $editingValue = (string) $request->input('value', '');
+        // Screen the operator is on (path + hash): what a colleague's badge opens when no record is open.
+        $page = (string) $request->input('page', '');
         try {
             $this->presence->touch(
                 $editingEntity !== '' ? $editingEntity : null,
                 $editingId > 0 ? $editingId : null,
                 $editingField,
-                $editingValue
+                $editingValue,
+                $page
             );
         } catch (\Throwable) {
             // presence must never break the UI
