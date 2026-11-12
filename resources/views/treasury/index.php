@@ -1,4 +1,4 @@
- nonsempre funzoina e non genera il file e non <?php
+<?php
 /** @var array{movements:list<array>,balance:float,income:float,expense:float} $ledger */
 /** @var list<array{key:string,label:string,items:list<array>}> $movement_groups */
 /** @var array{auto_from_payments?:bool} $config */
@@ -75,8 +75,9 @@ $accountFilterOptions = [];
 foreach (($accounts ?? []) as $accountOption) {
     $accountFilterOptions[(string) ($accountOption['key'] ?? '')] = (string) ($accountOption['label'] ?? '');
 }
-// Keeps the current filters when jumping from a wallet card to the filtered ledger.
+// Keeps the current filters (and the grouping) when jumping from a wallet card to the filtered ledger.
 $ledgerParams = [];
+$ledgerParams['group'] = !empty($group_by_category) ? '1' : '0';
 if (trim((string) ($search_query ?? '')) !== '') {
     $ledgerParams['q'] = (string) $search_query;
 }
@@ -97,9 +98,6 @@ if ($filterYear !== '') {
 }
 if ($sort !== 'date_desc') {
     $ledgerParams['sort'] = $sort;
-}
-if (empty($group_by_category)) {
-    $ledgerParams['group'] = '0';
 }
 $accountFilterUrl = static function (string $accountKey) use ($ledgerParams): string {
     $params = $ledgerParams;

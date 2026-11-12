@@ -37,7 +37,8 @@ final class TreasuryController extends BaseController
         if (mb_strlen($query) > 120) {
             $query = mb_substr($query, 0, 120);
         }
-        $groupByCategory = (string) $request->input('group', '1') !== '0';
+        // Grouping by category is a reading preference: it starts switched off.
+        $groupByCategory = (string) $request->input('group', '0') === '1';
         $sort = (string) $request->input('sort', 'date_desc');
         if (!in_array($sort, TreasuryService::SORTS, true)) {
             $sort = 'date_desc';
