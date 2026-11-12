@@ -1660,6 +1660,102 @@ final class TreasuryService
         );
     }
 
+    /**
+     * Current values of a movement exactly as the form shows them, for the “what changed” list of
+     * the freshness banner: the client compares them with its own fields and lists the differences.
+     *
+     * `values` are the raw form values (comparison), `display` the human labels of the choice
+     * fields and `labels` the translated field names (presentation).
+     *
+     * @return array{values:array<string,string>,display:array<string,string>,labels:array<string,string>}
+     */
+    public function formSnapshot(int $id): array
+    {
+        $row = $this->find($id);
+        if ($row === null) {
+            return ['values' => [], 'display' => [], 'labels' => []];
+        }
+        $amount = (float) ($row['amount'] ?? 0);
+        $entered = trim((string) ($row['amount_entered'] ?? ''));
+        $currency = trim((string) ($row['amount_currency'] ?? ''));
+        $direction = (string) ($row['direction'] ?? '');
+        $category = (string) ($row['category'] ?? '');
+        $account = (string) ($row['account'] ?? '');
+        $method = trim((string) ($row['payment_method'] ?? ''));
+        $documentType = (string) ($row['document_type'] ?? '');
+        $values = [
+            'movement_date' => (string) ($row['movement_date'] ?? ''),
+            'amount' => $entered !== '' ? number_format((float) $entered, 2, ',', '') : number_format($amount, 2, ',', ''),
+            'amount_currency' => $currency,
+            'direction' => $direction,
+            'category' => $category,
+            'account' => $account,
+            'transfer_account' => (string) ($row['transfer_account'] ?? ''),
+            'payment_method' => $method,
+            'description' => (string) ($row['description'] ?? ''),
+            'notes' => (string) ($row['notes'] ?? ''),
+            'beneficiary' => (string) ($row['beneficiary'] ?? ''),
+            'document_type' => $documentType,
+            'invoice_number' => (string) ($row['invoice_number'] ?? ''),
+            'invoice_date' => (string) ($row['invoice_date'] ?? ''),
+            'invoice_due_date' => (string) ($row['invoice_due_date'] ?? ''),
+            'invoice_title' => (string) ($row['invoice_title'] ?? ''),
+            'invoice_payment' => !empty($row['invoice_payment']) ? '1' : '',
+            'member_involved' => !empty($row['member_id']) ? '1' : '',
+            'member_id' => (string) (int) ($row['member_id'] ?? 0),
+            'runts_line' => (string) ($row['runts_line'] ?? ''),
+            'budget_item_id' => (string) (int) ($row['budget_item_id'] ?? 0),
+        ];
+        $display = [
+            'movement_date' => format_date($values['movement_date']) ?: $values['movement_date'],
+            'amount' => $values['amount'] . ($currency !== '' && $currency !== $this->currency->code() ? ' ' . $currency : ''),
+            'direction' => match ($direction) {
+                'income' => (string) __('treasury.direction_income'),
+                'expense' => (string) __('treasury.direction_expense'),
+                'transfer' => (string) __('treasury.direction_transfer'),
+                default => $direction,
+            },
+            'category' => $category !== '' ? $this->categoryLabel($category) : '',
+            'account' => $account !== '' ? $this->accountLabel($account) : '',
+            'transfer_account' => $values['transfer_account'] !== '' ? $this->accountLabel($values['transfer_account']) : '',
+            'payment_method' => $method !== '' ? (string) __('treasury.method_' . self::normalizePaymentMethod($method)) : '',
+            'document_type' => $documentType !== ''
+                ? (string) __('treasury.document_type_' . self::normalizeDocumentType($documentType))
+                : '',
+            'invoice_date' => $values['invoice_date'] !== '' ? (format_date($values['invoice_date']) ?: $values['invoice_date']) : '',
+            'invoice_due_date' => $values['invoice_due_date'] !== '' ? (format_date($values['invoice_due_date']) ?: $values['invoice_due_date']) : '',
+            'budget_item_id' => (int) $values['budget_item_id'] > 0 ? $this->budgetItemLabel((int) $values['budget_item_id']) : '',
+        ];
+
+        return [
+            'values' => $values,
+            'display' => $display,
+            'labels' => [
+                'movement_date' => (string) __('treasury.operation_date'),
+                'amount' => (string) __('treasury.amount'),
+                'amount_currency' => (string) __('treasury.amount_currency'),
+                'direction' => (string) __('treasury.direction_sign'),
+                'category' => (string) __('treasury.category'),
+                'account' => (string) __('treasury.account'),
+                'transfer_account' => (string) __('treasury.transfer_to'),
+                'payment_method' => (string) __('treasury.payment_method_label'),
+                'description' => (string) __('treasury.description'),
+                'notes' => (string) __('treasury.notes'),
+                'beneficiary' => (string) __('treasury.counterparty'),
+                'document_type' => (string) __('treasury.document_type'),
+                'invoice_number' => (string) __('treasury.doc_number'),
+                'invoice_date' => (string) __('treasury.doc_date'),
+                'invoice_due_date' => (string) __('treasury.invoice_due_date'),
+                'invoice_title' => (string) __('treasury.invoice_title'),
+                'invoice_payment' => (string) __('treasury.invoice_payment'),
+                'member_involved' => (string) __('treasury.member'),
+                'member_id' => (string) __('treasury.member'),
+                'runts_line' => (string) __('runts.line_label'),
+                'budget_item_id' => (string) __('treasury.budget_item'),
+            ],
+        ];
+    }
+
     public function attachmentFilePath(int $id): ?string
     {
         $row = $this->find($id);

@@ -3258,6 +3258,7 @@ return [
         'unknown_user' => 'Utente Sconosciuto',
         'connected_toast' => ':name si è appena collegato a Socly',
         'idle' => 'Inattivo',
+        'editing_field' => ':name sta lavorando in questo campo',
     ],
     'concurrency' => [
         'conflict_title' => 'Modifiche in contemporanea',
@@ -3270,5 +3271,7 @@ return [
         'stale_text' => ':user ha modificato questo record mentre stavi compilando. Ricarica per vedere i dati aggiornati: le modifiche non salvate andranno perse.',
         'deleted' => 'Questo record è stato eliminato da un altro operatore.',
         'editing_now' => ':name sta modificando questa scheda',
+        'stale_changes_title' => 'Campi cambiati da :user:',
+        'stale_changes_none' => 'I dati sono stati salvati, ma i valori coincidono con quelli già presenti nel modulo.',
     ],
 ];

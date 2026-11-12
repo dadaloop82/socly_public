@@ -12850,6 +12850,57 @@ tr.doc-row-editable:focus-visible {
 }
 
 /*
+ * Field-level presence: the field another operator is working in is outlined with the colour of
+ * their presence badge and labelled with their name (the client sets --remote-hue and
+ * data-remote-editor from the polling payload).
+ */
+.sf-field.is-remote-edit,
+input.is-remote-edit,
+select.is-remote-edit,
+textarea.is-remote-edit {
+  position: relative;
+}
+.is-remote-edit .sf-field__control,
+.sf-field.is-remote-edit input,
+.sf-field.is-remote-edit select,
+.sf-field.is-remote-edit textarea {
+  border-color: hsl(var(--remote-hue, 210) 62% 45%) !important;
+  box-shadow: 0 0 0 3px hsl(var(--remote-hue, 210) 62% 45% / 0.16);
+}
+.sf-field.is-remote-edit::after {
+  content: attr(data-remote-editor);
+  position: absolute;
+  top: -0.55rem;
+  right: 0.35rem;
+  padding: 0.05rem 0.45rem;
+  border-radius: 999px;
+  background: hsl(var(--remote-hue, 210) 64% 42%);
+  color: #fff;
+  font-size: 0.66rem;
+  font-weight: 700;
+  line-height: 1.35;
+  pointer-events: none;
+  z-index: 3;
+}
+.record-stale-changes-title {
+  margin: 0.5rem 0 0;
+  font-weight: 700;
+  font-size: 0.88rem;
+}
+/* “What the other operator changed”: the list inside the freshness banner. */
+.record-stale-changes {
+  margin: 0.45rem 0 0;
+  padding-left: 1.1rem;
+  font-weight: 500;
+  font-size: 0.86rem;
+}
+.record-stale-changes li { margin: 0.1rem 0; }
+.record-stale-changes code {
+  font-family: inherit;
+  font-weight: 700;
+}
+
+/*
  * ── Entry / Exit: large buttons with clear focus ──
  */
 .treasury-direction-field {

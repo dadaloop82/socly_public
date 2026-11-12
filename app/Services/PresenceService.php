@@ -28,8 +28,11 @@ final class PresenceService
 
     /**
      * Record/refresh the current session (called by polling).
+     *
+     * `$editingField` is the form field the operator is working in: it lets everyone else outline
+     * that field with the operator's colour (field-level presence), not just the whole record.
      */
-    public function touch(?string $editingEntity = null, ?int $editingId = null): void
+    public function touch(?string $editingEntity = null, ?int $editingId = null, string $editingField = ''): void
     {
         $userId = (int) (auth_user()['id'] ?? 0);
         $sessionId = session_id();
@@ -37,20 +40,35 @@ final class PresenceService
             return;
         }
         $entity = $editingEntity !== null && VersionService::tableFor($editingEntity) !== null ? $editingEntity : null;
+        $hasRecord = $entity !== null && $editingId !== null && $editingId > 0;
+        $field = $hasRecord ? self::normalizeFieldName($editingField) : '';
         $this->db->query(
-            'INSERT INTO user_presence (session_id, user_id, connected_at, last_seen, ended_at, editing_entity, editing_id)
-             VALUES (:sid, :uid, NOW(), NOW(), NULL, :entity, :eid)
+            'INSERT INTO user_presence (session_id, user_id, connected_at, last_seen, ended_at, editing_entity, editing_id, editing_field)
+             VALUES (:sid, :uid, NOW(), NOW(), NULL, :entity, :eid, :field)
              ON DUPLICATE KEY UPDATE user_id = VALUES(user_id), last_seen = NOW(), ended_at = NULL,
-                 editing_entity = VALUES(editing_entity), editing_id = VALUES(editing_id)',
+                 editing_entity = VALUES(editing_entity), editing_id = VALUES(editing_id),
+                 editing_field = VALUES(editing_field)',
             [
                 'sid' => $sessionId,
                 'uid' => $userId,
                 'entity' => $entity,
-                'eid' => $entity !== null && $editingId !== null && $editingId > 0 ? $editingId : null,
+                'eid' => $hasRecord ? $editingId : null,
+                'field' => $field !== '' ? $field : null,
             ]
         );
         // Housekeeping: drop rows older than a day.
         $this->db->query('DELETE FROM user_presence WHERE last_seen < (NOW() - INTERVAL 1 DAY)');
+    }
+
+    /** Only a plain form-field name is stored (no free text from the client). */
+    public static function normalizeFieldName(string $field): string
+    {
+        $field = trim($field);
+        if ($field === '' || strlen($field) > 120 || preg_match('/^[A-Za-z0-9_\-\[\]]+$/', $field) !== 1) {
+            return '';
+        }
+
+        return $field;
     }
 
     /** Closes the current presence (logout). */
@@ -75,7 +93,7 @@ final class PresenceService
     {
         $window = self::ONLINE_WINDOW;
         $rows = $this->db->fetchAll(
-            "SELECT p.session_id, p.user_id, p.connected_at, p.last_seen, p.editing_entity, p.editing_id,
+            "SELECT p.session_id, p.user_id, p.connected_at, p.last_seen, p.editing_entity, p.editing_id, p.editing_field,
                     u.email, u.first_name, u.last_name, u.name, u.member_id,
                     (SELECT v.value FROM member_field_values v
                      INNER JOIN member_field_definitions d ON d.id = v.field_definition_id AND d.`key` = 'first_name'
@@ -113,6 +131,9 @@ final class PresenceService
                     'name' => $identity['name'],
                     'initials' => $identity['initials'],
                     'hue' => $this->hue($userId),
+                    // Field the operator is working in ('' when the record is open but no field has
+                    // focus yet): the client outlines it with the same colour as the badge.
+                    'field' => self::normalizeFieldName((string) ($row['editing_field'] ?? '')),
                 ];
             }
             if (isset($users[$userId])) {

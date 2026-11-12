@@ -364,6 +364,61 @@ function initFreshnessGuard() {
   let busy = false;
   let shown = false;
 
+  // Values the form currently shows: compared with the fresh record they tell the operator *what*
+  // the other person saved (field-by-field), without touching the typed data.
+  const currentValues = () => {
+    const values = {};
+    form.querySelectorAll('[name]').forEach((el) => {
+      const name = String(el.name || '');
+      if (name === '') return;
+      if (el instanceof HTMLInputElement) {
+        if (el.type === 'checkbox') {
+          values[name] = el.checked ? '1' : '';
+          return;
+        }
+        if (el.type === 'radio') {
+          if (el.checked) values[name] = el.value;
+          else if (!(name in values)) values[name] = '';
+          return;
+        }
+        values[name] = el.value;
+        return;
+      }
+      values[name] = el.value;
+    });
+    return values;
+  };
+  const normalizeValue = (name, value) => {
+    let out = String(value ?? '').trim();
+    if (name === 'amount' || name === 'amount_entered') {
+      out = out.replace(/\./g, ',').replace(/\s+/g, '');
+    }
+    return out;
+  };
+  const changesList = (data) => {
+    const fields = data.fields && typeof data.fields === 'object' ? data.fields : null;
+    if (!fields) return null;
+    const values = fields.values && typeof fields.values === 'object' ? fields.values : {};
+    const display = fields.display && typeof fields.display === 'object' ? fields.display : {};
+    const labels = fields.labels && typeof fields.labels === 'object' ? fields.labels : {};
+    const mine = currentValues();
+    const items = [];
+    Object.keys(values).forEach((name) => {
+      if (!(name in mine)) return;
+      const theirs = normalizeValue(name, values[name]);
+      const ours = normalizeValue(name, mine[name]);
+      if (theirs === ours) return;
+      const shown = Object.prototype.hasOwnProperty.call(display, name) ? String(display[name] ?? '') : String(values[name] ?? '');
+      items.push({
+        label: String(labels[name] || name),
+        from: String(mine[name] ?? '').trim(),
+        to: shown,
+      });
+    });
+    if (items.length === 0) return [];
+    return items.slice(0, 12);
+  };
+
   const showBanner = (data) => {
     if (shown) return;
     shown = true;
@@ -382,7 +437,29 @@ function initFreshnessGuard() {
     reload.textContent = String(data.messages?.reload || '');
     reload.addEventListener('click', () => window.location.reload());
     actions.appendChild(reload);
-    banner.append(title, body, actions);
+    banner.append(title, body);
+    const changes = changesList(data);
+    if (Array.isArray(changes)) {
+      const lead = document.createElement('p');
+      lead.className = 'record-stale-changes-title';
+      if (changes.length === 0) {
+        lead.textContent = String(data.messages?.stale_changes_none || '');
+        banner.append(lead);
+      } else {
+        lead.textContent = String(data.messages?.stale_changes_title || ':user').replace(':user', editor);
+        const ul = document.createElement('ul');
+        ul.className = 'record-stale-changes';
+        changes.forEach((item) => {
+          const li = document.createElement('li');
+          li.textContent = item.from !== ''
+            ? `${item.label}: ${item.from} → ${item.to}`
+            : `${item.label}: ${item.to}`;
+          ul.appendChild(li);
+        });
+        banner.append(lead, ul);
+      }
+    }
+    banner.append(actions);
     banner.hidden = false;
   };
 
@@ -1350,12 +1427,14 @@ function initPresence() {
   const toasts = root.querySelector('[data-presence-toasts]');
   if (!url || !avatars) return;
 
-  const POLL_MS = 12000;
   let since = 0;
   let timer = null;
   const editingForm = document.querySelector('form[data-freshness-entity][data-freshness-id]');
   const editingChip = editingForm ? `${editingForm.getAttribute('data-freshness-entity')}:${editingForm.getAttribute('data-freshness-id')}` : '';
   const editingNotice = editingForm ? editingForm.querySelector('[data-editing-notice]') : null;
+  // An open record is polled more often: the field-level presence (who is working in which field)
+  // has to feel immediate, and the endpoint is a couple of light queries.
+  const POLL_MS = editingForm ? 4000 : 12000;
 
   const renderEditors = (data) => {
     if (!editingNotice) return;
@@ -1369,6 +1448,76 @@ function initPresence() {
     editingNotice.hidden = false;
     editingNotice.textContent = template.replace(':name', names.join(', '));
   };
+
+  // ── Field-level presence ────────────────────────────────────────────────────────────────
+  // The field being worked in travels with the heartbeat; the fields the other operators are in are
+  // outlined with the same colour as their badge and labelled with their name.
+  let currentField = '';
+  let fieldBlurTimer = null;
+  let immediatePollTimer = null;
+  const scheduleImmediatePoll = () => {
+    window.clearTimeout(immediatePollTimer);
+    immediatePollTimer = window.setTimeout(() => {
+      void poll();
+    }, 300);
+  };
+  const fieldInputs = (name) => (editingForm
+    ? Array.from(editingForm.querySelectorAll('[name]')).filter((el) => el.name === name)
+    : []);
+  const clearRemoteField = (wrap) => {
+    wrap.classList.remove('is-remote-edit');
+    wrap.removeAttribute('data-remote-field');
+    wrap.removeAttribute('data-remote-editor');
+    wrap.style.removeProperty('--remote-hue');
+    const tag = wrap.tagName;
+    if (tag !== 'INPUT' && tag !== 'SELECT' && tag !== 'TEXTAREA') {
+      wrap.removeAttribute('title');
+    }
+  };
+  const paintRemoteFields = (data) => {
+    if (!editingForm) return;
+    const editors = Array.isArray(data.editors) ? data.editors : [];
+    const template = String(data.messages?.editing_field || ':name');
+    const wanted = new Map();
+    editors.forEach((editor) => {
+      const field = String(editor.field || '');
+      if (field === '') return;
+      wanted.set(field, { hue: String(editor.hue ?? 210), name: String(editor.name || '') });
+    });
+    editingForm.querySelectorAll('[data-remote-field]').forEach((wrap) => {
+      if (!wanted.has(String(wrap.getAttribute('data-remote-field')))) {
+        clearRemoteField(wrap);
+      }
+    });
+    wanted.forEach((info, field) => {
+      fieldInputs(field).forEach((input) => {
+        const wrap = input.closest('.sf-field') || input;
+        wrap.classList.add('is-remote-edit');
+        wrap.setAttribute('data-remote-field', field);
+        wrap.setAttribute('data-remote-editor', info.name);
+        wrap.style.setProperty('--remote-hue', info.hue);
+        wrap.setAttribute('title', template.replace(':name', info.name));
+      });
+    });
+  };
+  if (editingForm) {
+    editingForm.addEventListener('focusin', (event) => {
+      const target = event.target;
+      const name = target instanceof HTMLElement && target.name ? String(target.name) : '';
+      if (name === currentField) return;
+      currentField = name;
+      window.clearTimeout(fieldBlurTimer);
+      scheduleImmediatePoll();
+    });
+    editingForm.addEventListener('focusout', () => {
+      // Keep the last field for a moment: jumping between fields must not make the outline blink.
+      window.clearTimeout(fieldBlurTimer);
+      fieldBlurTimer = window.setTimeout(() => {
+        currentField = '';
+        scheduleImmediatePoll();
+      }, 2500);
+    });
+  }
 
   const toast = (name, template) => {
     if (!toasts || name === '') return;
@@ -1421,6 +1570,7 @@ function initPresence() {
       const target = new URL(url, window.location.origin);
       if (since > 0) target.searchParams.set('since', String(since));
       if (editingChip !== '') target.searchParams.set('editing', editingChip);
+      if (editingChip !== '' && currentField !== '') target.searchParams.set('field', currentField);
       const res = await fetch(target.toString(), {
         headers: { Accept: 'application/json' },
         credentials: 'same-origin',
@@ -1430,6 +1580,7 @@ function initPresence() {
       const data = await res.json();
       render(data);
       renderEditors(data);
+      paintRemoteFields(data);
       if (Array.isArray(data.new) && since > 0) {
         data.new.forEach((user) => toast(String(user.name || ''), data.messages?.connected));
       }
@@ -1445,6 +1596,8 @@ function initPresence() {
     timer = window.setInterval(poll, POLL_MS);
   };
   const stop = () => {
+    window.clearTimeout(immediatePollTimer);
+    window.clearTimeout(fieldBlurTimer);
     if (!timer) return;
     window.clearInterval(timer);
     timer = null;

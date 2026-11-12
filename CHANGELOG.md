@@ -10,6 +10,10 @@ every 100 patches bump the series, and each bump is published to this repository
 
 ### Added
 
+- Field-level presence: while another operator is editing the same record, the field they are working
+  in is outlined with the colour of their badge and labelled with their name (the heartbeat carries
+  the field and is polled faster while a record is open). The “record updated” banner also lists **what
+  changed** since the page was opened — field by field, old → new — so you decide whether to reload.
 - First-note entries have a **Notes** field for internal annotations: the note is searchable from the
   ledger, is carried by the CSV export and re-imported with it, and never replaces the short
   description used by reports.

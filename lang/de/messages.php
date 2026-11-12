@@ -3252,6 +3252,7 @@ return [
         'online_label' => 'Verbundene Benutzer',
         'unknown_user' => 'Unbekannter Benutzer',
         'connected_toast' => ':name ist gerade Socly beigetreten',
+        'editing_field' => ':name arbeitet in diesem Feld',
         'idle' => 'Inaktiv',
     ],
     'concurrency' => [
@@ -3265,5 +3266,7 @@ return [
         'stale_text' => ':user hat diesen Datensatz während deiner Bearbeitung geändert. Lade neu, um die aktuellen Daten zu sehen: nicht gespeicherte Änderungen gehen verloren.',
         'deleted' => 'Dieser Datensatz wurde von einem anderen Operator gelöscht.',
         'editing_now' => ':name bearbeitet gerade diesen Datensatz',
+        'stale_changes_title' => 'Von :user geänderte Felder:',
+        'stale_changes_none' => 'Die Daten wurden gespeichert, die Werte entsprechen aber denen im Formular.',
     ],
 ];

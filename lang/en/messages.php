@@ -3252,6 +3252,7 @@ return [
         'online_label' => 'Connected operators',
         'unknown_user' => 'Unknown user',
         'connected_toast' => ':name just connected to Socly',
+        'editing_field' => ':name is working in this field',
         'idle' => 'Idle',
     ],
     'concurrency' => [
@@ -3265,5 +3266,7 @@ return [
         'stale_text' => ':user changed this record while you were editing. Reload to see the updated data: unsaved changes will be lost.',
         'deleted' => 'This record was deleted by another operator.',
         'editing_now' => ':name is editing this record',
+        'stale_changes_title' => 'Fields changed by :user:',
+        'stale_changes_none' => 'The record was saved, but its values match the ones already in the form.',
     ],
 ];
