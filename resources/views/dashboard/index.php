@@ -31,6 +31,12 @@ $treasuryFlowValues = $treasuryCharts['flow']['values'] ?? [0, 0];
 $hasTreasuryFlow = ((float) ($treasuryFlowValues[0] ?? 0) + (float) ($treasuryFlowValues[1] ?? 0)) > 0;
 $hasTreasuryExpenseCats = array_sum($treasuryCharts['expense_by_category']['values'] ?? []) > 0;
 $hasTreasuryIncomeCats = array_sum($treasuryCharts['income_by_category']['values'] ?? []) > 0;
+$hasTreasuryMonthly = (array_sum($treasuryCharts['monthly_flow']['income'] ?? [])
+    + array_sum($treasuryCharts['monthly_flow']['expense'] ?? [])) > 0;
+$hasTreasuryBalance = array_sum(array_map('abs', $treasuryCharts['balance_trend']['values'] ?? [])) > 0;
+$hasTreasuryAccounts = array_sum(array_map('abs', $treasuryCharts['by_account']['values'] ?? [])) > 0;
+$hasTreasuryBeneficiaries = array_sum($treasuryCharts['top_beneficiaries']['values'] ?? []) > 0;
+$hasTreasuryStatus = array_sum($treasuryCharts['status']['values'] ?? []) > 0;
 $treasuryWidget = is_array($widgets['treasury'] ?? null) ? $widgets['treasury'] : null;
 $hasTreasuryData = $treasuryWidget !== null && (
     !empty($treasuryWidget['recent'])
@@ -372,6 +378,11 @@ $defaultTab = $tabs[0]['id'] ?? '';
             <?php
             $treasuryWidgets = [
                 'flow' => __('dashboard.treasury_chart_flow_title'),
+                'monthly' => __('dashboard.treasury_chart_monthly_title'),
+                'balance' => __('dashboard.treasury_chart_balance_title'),
+                'accounts' => __('dashboard.treasury_chart_accounts_title'),
+                'beneficiaries' => __('dashboard.treasury_chart_beneficiaries_title'),
+                'status' => __('dashboard.treasury_chart_status_title'),
                 'expense' => __('dashboard.treasury_chart_expense_title'),
                 'income' => __('dashboard.treasury_chart_income_title'),
             ];
@@ -405,6 +416,38 @@ $defaultTab = $tabs[0]['id'] ?? '';
                     <?php endif; ?>
                 </div>
 
+                <div class="panel chart-panel chart-panel-wide" data-chart-widget="monthly">
+                    <div class="panel-header">
+                        <div>
+                            <h3 class="section-title"><?= e(__('dashboard.treasury_chart_monthly_title')) ?></h3>
+                            <p class="section-lede"><?= e(__('dashboard.treasury_chart_monthly_lede')) ?></p>
+                        </div>
+                    </div>
+                    <?php if (!$hasTreasuryMonthly): ?>
+                        <div class="empty-state compact"><?= e(__('dashboard.treasury_chart_monthly_empty')) ?></div>
+                    <?php else: ?>
+                        <div class="chart-frame">
+                            <canvas id="chart-treasury-monthly" aria-label="<?= e(__('dashboard.treasury_chart_monthly_title')) ?>"></canvas>
+                        </div>
+                    <?php endif; ?>
+                </div>
+
+                <div class="panel chart-panel chart-panel-wide" data-chart-widget="balance">
+                    <div class="panel-header">
+                        <div>
+                            <h3 class="section-title"><?= e(__('dashboard.treasury_chart_balance_title')) ?></h3>
+                            <p class="section-lede"><?= e(__('dashboard.treasury_chart_balance_lede')) ?></p>
+                        </div>
+                    </div>
+                    <?php if (!$hasTreasuryBalance): ?>
+                        <div class="empty-state compact"><?= e(__('dashboard.treasury_chart_balance_empty')) ?></div>
+                    <?php else: ?>
+                        <div class="chart-frame">
+                            <canvas id="chart-treasury-balance" aria-label="<?= e(__('dashboard.treasury_chart_balance_title')) ?>"></canvas>
+                        </div>
+                    <?php endif; ?>
+                </div>
+
                 <div class="panel chart-panel" data-chart-widget="expense">
                     <div class="panel-header">
                         <div>
@@ -433,6 +476,54 @@ $defaultTab = $tabs[0]['id'] ?? '';
                     <?php else: ?>
                         <div class="chart-frame chart-frame-donut">
                             <canvas id="chart-treasury-income" aria-label="<?= e(__('dashboard.treasury_chart_income_title')) ?>"></canvas>
+                        </div>
+                    <?php endif; ?>
+                </div>
+
+                <div class="panel chart-panel" data-chart-widget="accounts">
+                    <div class="panel-header">
+                        <div>
+                            <h3 class="section-title"><?= e(__('dashboard.treasury_chart_accounts_title')) ?></h3>
+                            <p class="section-lede"><?= e(__('dashboard.treasury_chart_accounts_lede')) ?></p>
+                        </div>
+                    </div>
+                    <?php if (!$hasTreasuryAccounts): ?>
+                        <div class="empty-state compact"><?= e(__('dashboard.treasury_chart_accounts_empty')) ?></div>
+                    <?php else: ?>
+                        <div class="chart-frame">
+                            <canvas id="chart-treasury-accounts" aria-label="<?= e(__('dashboard.treasury_chart_accounts_title')) ?>"></canvas>
+                        </div>
+                    <?php endif; ?>
+                </div>
+
+                <div class="panel chart-panel" data-chart-widget="beneficiaries">
+                    <div class="panel-header">
+                        <div>
+                            <h3 class="section-title"><?= e(__('dashboard.treasury_chart_beneficiaries_title')) ?></h3>
+                            <p class="section-lede"><?= e(__('dashboard.treasury_chart_beneficiaries_lede')) ?></p>
+                        </div>
+                    </div>
+                    <?php if (!$hasTreasuryBeneficiaries): ?>
+                        <div class="empty-state compact"><?= e(__('dashboard.treasury_chart_beneficiaries_empty')) ?></div>
+                    <?php else: ?>
+                        <div class="chart-frame">
+                            <canvas id="chart-treasury-beneficiaries" aria-label="<?= e(__('dashboard.treasury_chart_beneficiaries_title')) ?>"></canvas>
+                        </div>
+                    <?php endif; ?>
+                </div>
+
+                <div class="panel chart-panel" data-chart-widget="status">
+                    <div class="panel-header">
+                        <div>
+                            <h3 class="section-title"><?= e(__('dashboard.treasury_chart_status_title')) ?></h3>
+                            <p class="section-lede"><?= e(__('dashboard.treasury_chart_status_lede')) ?></p>
+                        </div>
+                    </div>
+                    <?php if (!$hasTreasuryStatus): ?>
+                        <div class="empty-state compact"><?= e(__('dashboard.treasury_chart_status_empty')) ?></div>
+                    <?php else: ?>
+                        <div class="chart-frame chart-frame-donut">
+                            <canvas id="chart-treasury-status" aria-label="<?= e(__('dashboard.treasury_chart_status_title')) ?>"></canvas>
                         </div>
                     <?php endif; ?>
                 </div>

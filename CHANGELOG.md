@@ -10,6 +10,22 @@ every 100 patches bump the series, and each bump is published to this repository
 
 ### Added
 
+- The treasury tab of the dashboard now carries five more charts on top of the three existing ones:
+  income and expense **month by month** over the last 12 months, the **running balance** at the end
+  of each month, the **liquidity per account** (cash desk, bank, … with negative wallets in red), the
+  **top beneficiaries** of the expenses and the **movement status** (approved vs awaiting approval).
+  They obey the widget manager like the others: move, hide, reload.
+- The badge of another operator now opens **exactly the record they are working in**: the link is
+  built server-side (same component flag and permission as the page, so no link when you could not
+  open it anyway), travels with the heartbeat and a click (or Enter) jumps there.
+- The ledger filter and every summary now read “year · **section** · line” for the cost centre, like
+  the select of the movement form: two sections repeating the same wording can no longer be confused.
+- The free-text description (“causale”) of a movement is stored **capitalised** — first letter upper
+  case, the rest lower case — whatever the operator typed, so the ledger, the CSV export and the
+  reports read consistently.
+- Charts drop their legend as soon as it has more than three entries: a wall of colours over the plot
+  is unreadable and the tooltip already names every series.
+
 - Budgets drill down to the first note: clicking a cost-centre line in “Forecast vs actuals”, a type in
   the “not imputed” table, a year row or a top category of the statistics tab opens the ledger
   filtered on exactly the movements that compose that figure (same year, approved only), so every
@@ -111,6 +127,9 @@ every 100 patches bump the series, and each bump is published to this repository
 
 ### Fixed
 
+- The “Documento” box of a movement is really hidden when the flag is off: the block is a grid and the
+  component rule was winning over the `hidden` attribute, so the fields stayed on screen (and were
+  only disabled) after unticking “This movement has a document”.
 - In the printed financial statement (“Piano finanziario”) each receipt is now a single line —
   **date · invoice number · amount** — instead of three or four wrapped lines with the “Numero
   fattura” wording and the counterparty, so the table stays readable (and no longer grows a tall row

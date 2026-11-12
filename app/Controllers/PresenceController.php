@@ -63,6 +63,7 @@ final class PresenceController extends BaseController
                 'editing_field' => (string) __('presence.editing_field', ['name' => ':name']),
                 'field_locked' => (string) __('presence.field_locked', ['name' => ':name']),
                 'field_value' => (string) __('presence.field_value', ['name' => ':name', 'value' => ':value']),
+                'jump' => (string) __('presence.jump_to_record', ['name' => ':name']),
             ],
         ], JSON_UNESCAPED_UNICODE);
     }

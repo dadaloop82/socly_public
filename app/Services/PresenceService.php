@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Socly\Services;
 
 use Socly\Core\Database;
+use Socly\Support\Permission;
 
 /**
  * Presence of connected operators: one row per open session, refreshed by the client polling. It
@@ -147,6 +148,7 @@ final class PresenceService
             }
             $identity = $this->identity($row);
             $idle = (int) ($row['idle_seconds'] ?? 0) >= self::IDLE_SECONDS;
+            $location = $this->location($row);
             if ($editEntity !== '' && $editId > 0 && !$idle
                 && (string) ($row['editing_entity'] ?? '') === $editEntity
                 && (int) ($row['editing_id'] ?? 0) === $editId
@@ -170,6 +172,13 @@ final class PresenceService
             if (isset($users[$userId])) {
                 $users[$userId]['sessions']++;
                 $users[$userId]['idle'] = $users[$userId]['idle'] && $idle;
+                // The first session wins, but a session that is really working in a record is more
+                // useful than an idle one opening the same account.
+                if (($users[$userId]['url'] ?? '') === '' && $location['url'] !== '') {
+                    $users[$userId]['editing_entity'] = $location['entity'];
+                    $users[$userId]['editing_id'] = $location['id'];
+                    $users[$userId]['url'] = $location['url'];
+                }
                 continue;
             }
             $users[$userId] = [
@@ -181,6 +190,11 @@ final class PresenceService
                 'self' => $userId === $currentId,
                 'sessions' => 1,
                 'connected_ts' => (int) (strtotime((string) ($row['connected_at'] ?? '')) ?: 0),
+                // Record the operator has open right now (empty when they are just browsing), with
+                // the link that opens exactly that page from a click on their badge.
+                'editing_entity' => $location['entity'],
+                'editing_id' => $location['id'],
+                'url' => $userId === $currentId ? '' : $location['url'],
             ];
         }
 
@@ -199,6 +213,88 @@ final class PresenceService
             'editors' => $editors,
             'now' => time(),
         ];
+    }
+
+    /**
+     * Where an operator is working right now: the record they have open (entity + id) and the link
+     * that opens exactly that page. An inactive session, or one that is just browsing, carries none.
+     *
+     * @param array<string,mixed> $row
+     * @return array{entity:string,id:int,url:string}
+     */
+    private function location(array $row): array
+    {
+        $idle = (int) ($row['idle_seconds'] ?? 0) >= self::IDLE_SECONDS;
+        $entity = (string) ($row['editing_entity'] ?? '');
+        $id = (int) ($row['editing_id'] ?? 0);
+        if ($idle || $entity === '' || $id < 1) {
+            return ['entity' => '', 'id' => 0, 'url' => ''];
+        }
+
+        return ['entity' => $entity, 'id' => $id, 'url' => $this->locationUrl($entity, $id)];
+    }
+
+    /**
+     * Link to the page another operator is working in, so a click on their badge opens exactly that
+     * record. Only the entities admitted to the version allowlist are mapped, each one behind the
+     * same component flag and permission that guard the page: no permission, no link.
+     */
+    private function locationUrl(string $entity, int $id): string
+    {
+        if ($id < 1) {
+            return '';
+        }
+        switch ($entity) {
+            case 'member':
+                if (!component_enabled('members')) {
+                    return '';
+                }
+                if (can(Permission::MEMBERS_MANAGE)) {
+                    return url('/members/' . $id . '/edit');
+                }
+                return can(Permission::MEMBERS_VIEW) ? url('/members/' . $id) : '';
+            case 'treasury':
+                if (!component_enabled('treasury')) {
+                    return '';
+                }
+                if (can(Permission::TREASURY_MANAGE)) {
+                    return url('/treasury/' . $id . '/edit');
+                }
+                return can(Permission::TREASURY_VIEW) ? url('/treasury') : '';
+            case 'budget':
+                if (!component_enabled('treasury') || !can(Permission::TREASURY_VIEW)) {
+                    return '';
+                }
+                return url('/budgets/' . $id);
+            case 'budget_item':
+                if (!component_enabled('treasury') || !can(Permission::TREASURY_VIEW)) {
+                    return '';
+                }
+                $row = $this->db->fetch('SELECT budget_id FROM budget_items WHERE id = :id', ['id' => $id]);
+                $budgetId = (int) ($row['budget_id'] ?? 0);
+
+                return $budgetId > 0 ? url('/budgets/' . $budgetId) : '';
+            case 'document':
+                if (!component_enabled('documents')) {
+                    return '';
+                }
+                return can(Permission::DOCUMENTS_VIEW) ? url('/documents/' . $id) : '';
+            case 'deadline':
+                if (!component_enabled('deadlines')) {
+                    return '';
+                }
+                if (can(Permission::DEADLINES_MANAGE)) {
+                    return url('/deadlines/' . $id . '/edit');
+                }
+                return can(Permission::DEADLINES_VIEW) ? url('/deadlines') : '';
+            case 'person':
+                if (!component_enabled('org_roles')) {
+                    return '';
+                }
+                return can(Permission::ORG_VIEW) ? url('/org/people/' . $id . '/edit') : '';
+        }
+
+        return '';
     }
 
     /**

@@ -334,6 +334,21 @@ final class TreasuryService
     }
 
     /**
+     * Capitalisation of the free-text description (the short “causale”): the first letter is always
+     * upper case and the rest lower case, whatever the operator typed, so the ledger, the CSV export
+     * and the reports read consistently. The internal notes are left untouched (they are a memo).
+     */
+    public static function normalizeDescription(string $description): string
+    {
+        $description = trim($description);
+        if ($description === '') {
+            return '';
+        }
+
+        return mb_strtoupper(mb_substr($description, 0, 1)) . mb_strtolower(mb_substr($description, 1));
+    }
+
+    /**
      * Wallets as configured in `treasury_accounts` (built-ins + custom ones).
      *
      * @return list<array{id:int,key:string,label:string,builtin:bool,active:bool,sort_order:int}>
@@ -970,7 +985,12 @@ final class TreasuryService
      * @return array{
      *   flow: array{labels:list<string>,values:list<float>},
      *   expense_by_category: array{labels:list<string>,values:list<float>},
-     *   income_by_category: array{labels:list<string>,values:list<float>}
+     *   income_by_category: array{labels:list<string>,values:list<float>},
+     *   monthly_flow: array{labels:list<string>,income:list<float>,expense:list<float>},
+     *   balance_trend: array{labels:list<string>,values:list<float>},
+     *   by_account: array{labels:list<string>,values:list<float>},
+     *   top_beneficiaries: array{labels:list<string>,values:list<float>},
+     *   status: array{labels:list<string>,values:list<int>}
      * }
      */
     public function dashboardCharts(): array
@@ -995,6 +1015,11 @@ final class TreasuryService
             ],
             'expense_by_category' => $this->sumsByCategory('expense'),
             'income_by_category' => $this->sumsByCategory('income'),
+            'monthly_flow' => $this->monthlyFlow(),
+            'balance_trend' => $this->balanceTrend(),
+            'by_account' => $this->walletBalances(),
+            'top_beneficiaries' => $this->topBeneficiaries(),
+            'status' => $this->approvalStatus(),
         ];
     }
 
@@ -1024,6 +1049,145 @@ final class TreasuryService
             $values[] = (float) ($row['total'] ?? 0);
         }
         return ['labels' => $labels, 'values' => $values];
+    }
+
+    /**
+     * Income and expense of the last 12 months, month by month (approved movements only): the trend a
+     * treasurer looks at first. Month names reuse the shared `common.month_N` labels.
+     *
+     * @return array{labels:list<string>,income:list<float>,expense:list<float>}
+     */
+    private function monthlyFlow(int $months = 12): array
+    {
+        $months = max(1, min(24, $months));
+        $start = (new \DateTimeImmutable('first day of this month'))->modify('-' . ($months - 1) . ' months');
+        $byMonth = [];
+        foreach ($this->db->fetchAll(
+            "SELECT DATE_FORMAT(movement_date, '%Y-%m') AS ym,
+                    COALESCE(SUM(CASE WHEN direction = 'income' THEN amount ELSE 0 END), 0) AS inc,
+                    COALESCE(SUM(CASE WHEN direction = 'expense' THEN amount ELSE 0 END), 0) AS exp
+             FROM treasury_movements
+             WHERE approved_at IS NOT NULL AND superseded_at IS NULL AND movement_date >= :from
+             GROUP BY ym",
+            ['from' => $start->format('Y-m-d')]
+        ) as $row) {
+            $byMonth[(string) ($row['ym'] ?? '')] = [(float) ($row['inc'] ?? 0), (float) ($row['exp'] ?? 0)];
+        }
+
+        $labels = [];
+        $income = [];
+        $expense = [];
+        for ($i = 0; $i < $months; $i++) {
+            $cursor = $start->modify('+' . $i . ' months');
+            $key = $cursor->format('Y-m');
+            $labels[] = mb_substr((string) __('common.month_' . (int) $cursor->format('n')), 0, 3);
+            $income[] = $byMonth[$key][0] ?? 0.0;
+            $expense[] = $byMonth[$key][1] ?? 0.0;
+        }
+
+        return ['labels' => $labels, 'income' => $income, 'expense' => $expense];
+    }
+
+    /**
+     * Running cash-book balance at the end of each of the last 12 months: the trend of the
+     * association's liquidity (a transfer between own wallets never moves it).
+     *
+     * @return array{labels:list<string>,values:list<float>}
+     */
+    private function balanceTrend(int $months = 12): array
+    {
+        $months = max(1, min(24, $months));
+        $flow = $this->monthlyFlow($months);
+        $start = (new \DateTimeImmutable('first day of this month'))->modify('-' . ($months - 1) . ' months');
+        $opening = $this->db->fetch(
+            "SELECT COALESCE(SUM(CASE WHEN direction = 'income' THEN amount WHEN direction = 'expense' THEN -amount ELSE 0 END), 0) AS net
+             FROM treasury_movements
+             WHERE approved_at IS NOT NULL AND superseded_at IS NULL AND movement_date < :from",
+            ['from' => $start->format('Y-m-d')]
+        );
+        $running = (float) ($opening['net'] ?? 0);
+        $values = [];
+        foreach ($flow['labels'] as $index => $_) {
+            $running += (float) ($flow['income'][$index] ?? 0) - (float) ($flow['expense'][$index] ?? 0);
+            $values[] = round($running, 2);
+        }
+
+        return ['labels' => $flow['labels'], 'values' => $values];
+    }
+
+    /**
+     * Current liquidity per wallet (cash desk, bank, …), internal transfers included: “where the
+     * money actually is”, which the global income − expense balance cannot show.
+     *
+     * @return array{labels:list<string>,values:list<float>}
+     */
+    private function walletBalances(): array
+    {
+        $labels = [];
+        $values = [];
+        foreach ($this->accountBalances() as $account) {
+            $balance = (float) ($account['balance'] ?? 0);
+            if (abs($balance) < 0.005) {
+                continue;
+            }
+            $labels[] = (string) ($account['label'] ?? '');
+            $values[] = round($balance, 2);
+        }
+
+        return ['labels' => $labels, 'values' => $values];
+    }
+
+    /**
+     * Counterparties the association pays the most (top expenses by beneficiary).
+     *
+     * @return array{labels:list<string>,values:list<float>}
+     */
+    private function topBeneficiaries(int $limit = 5): array
+    {
+        $labels = [];
+        $values = [];
+        foreach ($this->db->fetchAll(
+            "SELECT TRIM(beneficiary) AS name, COALESCE(SUM(amount), 0) AS total
+             FROM treasury_movements
+             WHERE direction = 'expense' AND approved_at IS NOT NULL AND superseded_at IS NULL
+               AND beneficiary IS NOT NULL AND TRIM(beneficiary) <> ''
+             GROUP BY name
+             ORDER BY total DESC
+             LIMIT " . max(1, min(10, $limit))
+        ) as $row) {
+            $name = trim((string) ($row['name'] ?? ''));
+            if ($name === '') {
+                continue;
+            }
+            $labels[] = mb_strlen($name) > 26 ? mb_substr($name, 0, 25) . '…' : $name;
+            $values[] = (float) ($row['total'] ?? 0);
+        }
+
+        return ['labels' => $labels, 'values' => $values];
+    }
+
+    /**
+     * Movements still waiting for the treasurer's approval: a to-do queue on the dashboard.
+     *
+     * @return array{labels:list<string>,values:list<int>}
+     */
+    private function approvalStatus(): array
+    {
+        $row = $this->db->fetch(
+            'SELECT
+                COALESCE(SUM(CASE WHEN approved_at IS NOT NULL THEN 1 ELSE 0 END), 0) AS approved,
+                COALESCE(SUM(CASE WHEN approved_at IS NULL THEN 1 ELSE 0 END), 0) AS pending
+             FROM treasury_movements
+             WHERE superseded_at IS NULL'
+        );
+
+        return [
+            'labels' => [
+                (string) __('dashboard.treasury_status_approved'),
+                (string) __('dashboard.treasury_status_pending'),
+            ],
+            'values' => [(int) ($row['approved'] ?? 0), (int) ($row['pending'] ?? 0)],
+        ];
     }
 
     /**
@@ -1077,7 +1241,9 @@ final class TreasuryService
     }
 
     /**
-     * Budget lines for the ledger filter: “2026 · Office Rental”.
+     * Budget lines for the ledger filter: “2026 · Personnel · Salaries”. The section always comes
+     * before the line: two sections can repeat the same wording, so a bare line would be ambiguous
+     * (same rule as the cost-centre select of the movement form).
      *
      * @return list<array{value:string,label:string}>
      */
@@ -1085,14 +1251,20 @@ final class TreasuryService
     {
         $options = [];
         foreach ($this->db->fetchAll(
-            "SELECT i.id, b.fiscal_year, i.label
+            "SELECT i.id, b.fiscal_year, i.label, s.title AS section_title
              FROM budget_items i
              INNER JOIN budgets b ON b.id = i.budget_id
-             ORDER BY b.fiscal_year DESC, i.sort_order ASC, i.id ASC"
+             LEFT JOIN budget_sections s ON s.id = i.section_id
+             ORDER BY b.fiscal_year DESC, s.sort_order ASC, i.sort_order ASC, i.id ASC"
         ) as $row) {
+            $item = mb_substr(trim((string) $row['label']), 0, 90);
+            $parts = array_filter(
+                [(string) $row['fiscal_year'], trim((string) ($row['section_title'] ?? '')), $item],
+                static fn (string $part): bool => $part !== ''
+            );
             $options[] = [
                 'value' => (string) (int) $row['id'],
-                'label' => (string) $row['fiscal_year'] . ' · ' . mb_substr(trim((string) $row['label']), 0, 90),
+                'label' => implode(' · ', $parts),
             ];
         }
 
@@ -1226,7 +1398,8 @@ final class TreasuryService
     }
 
     /**
-     * “year · item” label of a budget line (for summaries).
+     * “year · section · line” label of a budget line (summaries, movement card, similar changes):
+     * the section always precedes the line, so two sections repeating a wording stay distinguishable.
      */
     public function budgetItemLabel(int $id): string
     {
@@ -1234,13 +1407,26 @@ final class TreasuryService
             return '';
         }
         $row = $this->db->fetch(
-            'SELECT CONCAT(b.fiscal_year, \' · \', i.label) AS label
-             FROM budget_items i INNER JOIN budgets b ON b.id = i.budget_id
+            'SELECT i.label, b.fiscal_year, s.title AS section_title
+             FROM budget_items i
+             INNER JOIN budgets b ON b.id = i.budget_id
+             LEFT JOIN budget_sections s ON s.id = i.section_id
              WHERE i.id = :id',
             ['id' => $id]
         );
+        if ($row === null) {
+            return '';
+        }
+        $parts = array_filter(
+            [
+                (string) ($row['fiscal_year'] ?? ''),
+                trim((string) ($row['section_title'] ?? '')),
+                trim((string) ($row['label'] ?? '')),
+            ],
+            static fn (string $part): bool => $part !== ''
+        );
 
-        return $row !== null ? (string) ($row['label'] ?? '') : '';
+        return implode(' · ', $parts);
     }
 
     /**
@@ -2064,7 +2250,7 @@ final class TreasuryService
         if ($category === '' || $category === '__new__') {
             $category = 'membership_fee';
         }
-        $description = trim((string) ($input['description'] ?? ''));
+        $description = self::normalizeDescription((string) ($input['description'] ?? ''));
         if ($description === '') {
             $description = (string) __('treasury.auto_membership_payment');
         }
@@ -2244,7 +2430,7 @@ final class TreasuryService
             }
         }
 
-        $description = trim((string) ($input['description'] ?? ''));
+        $description = self::normalizeDescription((string) ($input['description'] ?? ''));
         $description = $description !== '' ? mb_substr($description, 0, 500) : '';
         // Internal memo: kept separate from the short "causale" so a working annotation never
         // endangers the description that ends up in the reports.

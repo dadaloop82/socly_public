@@ -1688,11 +1688,24 @@ function initPresence() {
       }
       const initials = dot.querySelector('.presence-initials');
       if (initials) initials.textContent = String(user.initials || '?');
+      const name = String(user.name || '');
+      const jump = String(user.url || '');
+      const jumpTemplate = String(data.messages?.jump || ':name');
       dot.style.setProperty('--presence-hue', String(user.hue ?? 210));
-      dot.title = String(user.name || '');
-      dot.setAttribute('aria-label', String(user.name || ''));
+      dot.title = jump !== '' ? jumpTemplate.replace(':name', name) : name;
+      dot.setAttribute('aria-label', dot.title);
       dot.classList.toggle('is-self', !!user.self);
       dot.classList.toggle('is-idle', !!user.idle);
+      dot.classList.toggle('has-location', jump !== '');
+      if (jump !== '') {
+        dot.setAttribute('data-presence-url', jump);
+        dot.setAttribute('role', 'link');
+        dot.setAttribute('tabindex', '0');
+      } else {
+        dot.removeAttribute('data-presence-url');
+        dot.removeAttribute('role');
+        dot.removeAttribute('tabindex');
+      }
     });
     avatars.querySelectorAll('[data-presence-user]').forEach((dot) => {
       if (seen.has(String(dot.getAttribute('data-presence-user')))) return;
@@ -1703,6 +1716,24 @@ function initPresence() {
     // The group only appears when there is more than one person connected.
     root.classList.toggle('is-visible', users.length > 1);
   };
+
+  // Clicking the badge of another operator opens exactly the record they are working in: the link
+  // is built server-side (behind the same permission) and travels with the heartbeat.
+  const jumpTo = (dot) => {
+    const target = dot?.getAttribute('data-presence-url') || '';
+    if (target !== '') window.location.assign(target);
+  };
+  avatars.addEventListener('click', (event) => {
+    const dot = event.target instanceof Element ? event.target.closest('[data-presence-url]') : null;
+    if (dot) jumpTo(dot);
+  });
+  avatars.addEventListener('keydown', (event) => {
+    if (event.key !== 'Enter' && event.key !== ' ') return;
+    const dot = event.target instanceof Element ? event.target.closest('[data-presence-url]') : null;
+    if (!dot) return;
+    event.preventDefault();
+    jumpTo(dot);
+  });
 
   const poll = async () => {
     try {
@@ -13063,6 +13094,19 @@ function initTreasuryCategory(root = document) {
     initLiveFilterForm(filterForm);
   }
 
+  // The cost-centre filter reads “year · section · line”, wider than the control itself: the full
+  // text stays reachable as a tooltip, like the select of the movement form.
+  const budgetFilter = document.getElementById('treasury-budget-filter');
+  if (budgetFilter instanceof HTMLSelectElement) {
+    const syncBudgetFilterTitle = () => {
+      const label = budgetFilter.selectedOptions[0]?.textContent?.trim() || '';
+      if (label === '') budgetFilter.removeAttribute('title');
+      else budgetFilter.setAttribute('title', label);
+    };
+    budgetFilter.addEventListener('change', syncBudgetFilterTitle);
+    syncBudgetFilterTitle();
+  }
+
   root.querySelectorAll('[data-treasury-form]').forEach((form) => {
     const categorySelect = form.querySelector('[data-treasury-category]');
     const docsRows = [...form.querySelectorAll('[data-treasury-docs-row]')];
@@ -14576,7 +14620,7 @@ function initDashboardCharts() {
         maintainAspectRatio: false,
         interaction: { mode: 'index', intersect: false },
         plugins: {
-          legend: { position: 'top', align: 'end' },
+          legend: { ...chartLegendOptions(collectionDatasets.length + pendingDataset.length + 1, 'top'), align: 'end' },
           tooltip: {
             backgroundColor: brandDeep,
             titleColor: '#F4FBF9',
@@ -14652,7 +14696,7 @@ function initDashboardCharts() {
           hoverOffset: 6,
         }],
       },
-      options: donutOptions(),
+      options: donutOptions(values.length),
     });
   }
 
@@ -14670,7 +14714,7 @@ function initDashboardCharts() {
           hoverOffset: 6,
         }],
       },
-      options: donutOptions(),
+      options: donutOptions((data.payment_standing?.values || []).length),
     });
   }
 
@@ -14688,7 +14732,7 @@ function initDashboardCharts() {
           hoverOffset: 6,
         }],
       },
-      options: donutOptions(),
+      options: donutOptions(values.length),
     });
   }
 
@@ -14711,7 +14755,7 @@ function initDashboardCharts() {
           hoverOffset: 6,
         }],
       },
-      options: donutOptions(),
+      options: donutOptions(methodValues.length),
     });
   }
 
@@ -15038,7 +15082,7 @@ function initStatisticsCharts() {
           maintainAspectRatio: false,
           indexAxis: horizontal ? 'y' : 'x',
           plugins: {
-            legend: { display: isPie, position: 'bottom' },
+            legend: isPie ? chartLegendOptions((spec.labels || []).length, 'bottom') : { display: false },
             soclyValueLabels: { enabled: Boolean(spec.percent_labels) },
             tooltip: {
               callbacks: {
@@ -15117,6 +15161,18 @@ function initTreasuryCharts() {
     },
   };
 
+  // Bars and lines carry the value in parsed.y (vertical) or parsed.x (horizontal).
+  const barMoneyTooltip = {
+    ...moneyTooltip,
+    callbacks: {
+      label(ctx) {
+        const value = ctx.parsed?.y ?? ctx.parsed?.x ?? ctx.parsed ?? 0;
+        const name = ctx.dataset.label || ctx.label || '';
+        return `${name}: ${formatMoney(value, currency)}`;
+      },
+    },
+  };
+
   const flowEl = document.getElementById('chart-treasury-flow');
   if (flowEl) {
     const values = data.flow?.values || [];
@@ -15133,9 +15189,9 @@ function initTreasuryCharts() {
         }],
       },
       options: {
-        ...donutOptions(),
+        ...donutOptions(values.length),
         plugins: {
-          ...donutOptions().plugins,
+          ...donutOptions(values.length).plugins,
           tooltip: moneyTooltip,
         },
       },
@@ -15158,9 +15214,9 @@ function initTreasuryCharts() {
         }],
       },
       options: {
-        ...donutOptions(),
+        ...donutOptions(values.length),
         plugins: {
-          ...donutOptions().plugins,
+          ...donutOptions(values.length).plugins,
           tooltip: moneyTooltip,
         },
       },
@@ -15183,10 +15239,217 @@ function initTreasuryCharts() {
         }],
       },
       options: {
-        ...donutOptions(),
+        ...donutOptions(values.length),
         plugins: {
-          ...donutOptions().plugins,
+          ...donutOptions(values.length).plugins,
           tooltip: moneyTooltip,
+        },
+      },
+    });
+  }
+
+  // Month-by-month income and expense (last 12 months): the trend of the association.
+  const monthlyEl = document.getElementById('chart-treasury-monthly');
+  if (monthlyEl) {
+    const monthly = data.monthly_flow || {};
+    new Chart(monthlyEl, {
+      type: 'bar',
+      data: {
+        labels: monthly.labels || [],
+        datasets: [
+          {
+            label: i18n.income || 'Income',
+            data: monthly.income || [],
+            backgroundColor: 'rgba(13, 110, 102, 0.82)',
+            hoverBackgroundColor: '#084B46',
+            borderRadius: 6,
+            borderSkipped: false,
+            maxBarThickness: 26,
+          },
+          {
+            label: i18n.expense || 'Expense',
+            data: monthly.expense || [],
+            backgroundColor: 'rgba(184, 74, 27, 0.78)',
+            hoverBackgroundColor: '#8B3A16',
+            borderRadius: 6,
+            borderSkipped: false,
+            maxBarThickness: 26,
+          },
+        ],
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        interaction: { mode: 'index', intersect: false },
+        plugins: {
+          legend: chartLegendOptions(2, 'top'),
+          tooltip: barMoneyTooltip,
+        },
+        scales: {
+          x: {
+            grid: { display: false },
+            ticks: { maxRotation: 0, autoSkipPadding: 6 },
+            border: { display: false },
+          },
+          y: {
+            beginAtZero: true,
+            grid: { color: 'rgba(13, 110, 102, 0.08)' },
+            border: { display: false },
+            ticks: { callback(value) { return formatMoney(value, currency, true); } },
+          },
+        },
+      },
+    });
+  }
+
+  // Running balance at the end of each month: how the liquidity moved, not just the single months.
+  const balanceEl = document.getElementById('chart-treasury-balance');
+  if (balanceEl) {
+    const trend = data.balance_trend || {};
+    new Chart(balanceEl, {
+      type: 'line',
+      data: {
+        labels: trend.labels || [],
+        datasets: [{
+          label: i18n.balance || 'Balance',
+          data: trend.values || [],
+          borderColor: brand,
+          backgroundColor: 'rgba(13, 110, 102, 0.14)',
+          pointBackgroundColor: brand,
+          pointBorderColor: '#fff',
+          pointRadius: 4,
+          pointHoverRadius: 6,
+          tension: 0.35,
+          fill: true,
+        }],
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: { display: false },
+          tooltip: {
+            ...barMoneyTooltip,
+            callbacks: {
+              label(ctx) {
+                return `${ctx.dataset.label || ''}: ${formatMoney(ctx.parsed.y || 0, currency)}`;
+              },
+            },
+          },
+        },
+        scales: {
+          x: {
+            grid: { display: false },
+            ticks: { maxRotation: 0, autoSkipPadding: 6 },
+            border: { display: false },
+          },
+          y: {
+            grid: { color: 'rgba(13, 110, 102, 0.08)' },
+            border: { display: false },
+            ticks: { callback(value) { return formatMoney(value, currency, true); } },
+          },
+        },
+      },
+    });
+  }
+
+  // Where the money is: the balance of every wallet (cash desk, bank, …), red when negative.
+  const accountsEl = document.getElementById('chart-treasury-accounts');
+  if (accountsEl) {
+    const values = data.by_account?.values || [];
+    new Chart(accountsEl, {
+      type: 'bar',
+      data: {
+        labels: data.by_account?.labels || [],
+        datasets: [{
+          data: values,
+          backgroundColor: values.map((value) => (Number(value) < 0 ? 'rgba(184, 74, 27, 0.8)' : 'rgba(13, 110, 102, 0.82)')),
+          hoverBackgroundColor: values.map((value) => (Number(value) < 0 ? '#8B3A16' : '#084B46')),
+          borderRadius: 6,
+          borderSkipped: false,
+          maxBarThickness: 26,
+        }],
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        indexAxis: 'y',
+        plugins: { legend: { display: false }, tooltip: barMoneyTooltip },
+        scales: {
+          x: {
+            beginAtZero: true,
+            grid: { color: 'rgba(13, 110, 102, 0.08)' },
+            border: { display: false },
+            ticks: { callback(value) { return formatMoney(value, currency, true); } },
+          },
+          y: { grid: { display: false }, border: { display: false } },
+        },
+      },
+    });
+  }
+
+  // Who is paid the most: the counterparties behind the biggest expenses.
+  const beneficiariesEl = document.getElementById('chart-treasury-beneficiaries');
+  if (beneficiariesEl) {
+    new Chart(beneficiariesEl, {
+      type: 'bar',
+      data: {
+        labels: data.top_beneficiaries?.labels || [],
+        datasets: [{
+          data: data.top_beneficiaries?.values || [],
+          backgroundColor: 'rgba(184, 74, 27, 0.78)',
+          hoverBackgroundColor: '#8B3A16',
+          borderRadius: 6,
+          borderSkipped: false,
+          maxBarThickness: 26,
+        }],
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        indexAxis: 'y',
+        plugins: { legend: { display: false }, tooltip: barMoneyTooltip },
+        scales: {
+          x: {
+            beginAtZero: true,
+            grid: { color: 'rgba(13, 110, 102, 0.08)' },
+            border: { display: false },
+            ticks: { callback(value) { return formatMoney(value, currency, true); } },
+          },
+          y: { grid: { display: false }, border: { display: false } },
+        },
+      },
+    });
+  }
+
+  // Movement status: the approval queue next to what is already booked.
+  const statusEl = document.getElementById('chart-treasury-status');
+  if (statusEl) {
+    const values = data.status?.values || [];
+    new Chart(statusEl, {
+      type: 'doughnut',
+      data: {
+        labels: data.status?.labels || [],
+        datasets: [{
+          data: values,
+          backgroundColor: [brand, accent],
+          borderColor: '#fff',
+          borderWidth: 3,
+          hoverOffset: 6,
+        }],
+      },
+      options: {
+        ...donutOptions(values.length),
+        plugins: {
+          ...donutOptions(values.length).plugins,
+          tooltip: {
+            ...moneyTooltip,
+            callbacks: {
+              label(ctx) {
+                return `${ctx.label}: ${Number(ctx.parsed || 0)}`;
+              },
+            },
+          },
         },
       },
     });
@@ -15195,13 +15458,21 @@ function initTreasuryCharts() {
   root.dataset.chartsReady = '1';
 }
 
-function donutOptions() {
+/**
+ * Legend of a chart: with more than three entries it takes more room than the chart itself and turns
+ * into a wall of colours (the tooltip already carries the same information), so it is dropped.
+ */
+function chartLegendOptions(count, position = 'top') {
+  return Number(count) > 3 ? { display: false } : { display: true, position };
+}
+
+function donutOptions(labelCount = 0) {
   return {
     responsive: true,
     maintainAspectRatio: false,
     cutout: '62%',
     plugins: {
-      legend: { position: 'bottom' },
+      legend: chartLegendOptions(labelCount, 'bottom'),
       tooltip: {
         backgroundColor: '#084B46',
         titleColor: '#F4FBF9',

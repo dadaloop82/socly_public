@@ -149,6 +149,11 @@ final class DashboardController extends BaseController
                     'flow' => ['labels' => [], 'values' => []],
                     'expense_by_category' => ['labels' => [], 'values' => []],
                     'income_by_category' => ['labels' => [], 'values' => []],
+                    'monthly_flow' => ['labels' => [], 'income' => [], 'expense' => []],
+                    'balance_trend' => ['labels' => [], 'values' => []],
+                    'by_account' => ['labels' => [], 'values' => []],
+                    'top_beneficiaries' => ['labels' => [], 'values' => []],
+                    'status' => ['labels' => [], 'values' => []],
                 ],
                 JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR
             ),
@@ -156,6 +161,7 @@ final class DashboardController extends BaseController
                 'currency' => $this->currency->display(),
                 'income' => __('treasury.direction_income'),
                 'expense' => __('treasury.direction_expense'),
+                'balance' => __('dashboard.treasury_balance'),
             ], JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR),
         ]);
     }

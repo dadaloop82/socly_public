@@ -268,6 +268,13 @@ a:hover { text-decoration: underline; color: var(--brand-primary-deep); }
 .presence-dot.is-idle { opacity: 0.42; filter: grayscale(0.4); }
 .presence-dot.is-enter { animation: presence-in 0.42s cubic-bezier(0.2, 0.9, 0.3, 1.35) both; }
 .presence-dot.is-leaving { opacity: 0; transform: scale(0.55) translateY(-8px); }
+/* Badge of an operator who has a record open: a click opens exactly that page. */
+.presence-dot.has-location { cursor: pointer; }
+.presence-dot.has-location:hover { transform: translateY(-1px) scale(1.06); }
+.presence-dot.has-location:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--presence-color) 70%, #fff);
+  outline-offset: 2px;
+}
 .presence-toasts {
   position: fixed;
   top: 3.4rem;
@@ -13124,6 +13131,11 @@ select.is-remote-choice {
   border-radius: 16px;
   background: color-mix(in srgb, var(--brand-primary, #0D6E66) 5%, #fff);
   border: 1px solid color-mix(in srgb, var(--brand-primary, #0D6E66) 16%, var(--line, #d7dee7));
+}
+/* The block is a grid, so the component rule would win over [hidden] and the box would stay visible
+   with the flag off: the attribute must hide it for real (and take it out of the flow). */
+.treasury-invoice-block[hidden] {
+  display: none !important;
 }
 .treasury-invoice-fields {
   display: grid;
