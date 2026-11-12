@@ -68,7 +68,7 @@ $prospect = $report['prospect'] ?? ['opening' => [], 'closing' => []];
 </head>
 <body>
 <div class="toolbar">
-    <button type="button" onclick="window.print()"><?= e(__('runts.print')) ?></button>
+    <button type="button" data-print><?= e(__('runts.print')) ?></button>
     <a href="<?= e(url('/rendiconto')) ?>"><?= e(__('runts.back')) ?></a>
 </div>
 <div class="sheet">
@@ -199,5 +199,6 @@ $prospect = $report['prospect'] ?? ['opening' => [], 'closing' => []];
         </div>
     <?php endif; ?>
 </div>
+<script src="<?= e(asset('js/print.js')) ?>?v=<?= e((string) (@filemtime(base_path('public/assets/js/print.js')) ?: time())) ?>"></script>
 </body>
 </html>

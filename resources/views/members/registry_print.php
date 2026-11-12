@@ -220,7 +220,7 @@ $generatedAt = $generatedAt !== '' ? $generatedAt : date('d/m/Y H:i');
 <div class="sheet">
     <div class="toolbar no-print">
         <button type="button" class="btn btn-ghost" data-registry-close><?= e(__('common.close')) ?></button>
-        <button type="button" class="btn btn-primary" onclick="window.print()"><?= e(__('members.registry_print')) ?></button>
+        <button type="button" class="btn btn-primary" data-print><?= e(__('members.registry_print')) ?></button>
     </div>
 
     <?php if ($incomplete !== []): ?>
@@ -359,5 +359,6 @@ $generatedAt = $generatedAt !== '' ? $generatedAt : date('d/m/Y H:i');
         });
     })();
 </script>
+<script src="<?= e(asset('js/print.js')) ?>?v=<?= e((string) (@filemtime(base_path('public/assets/js/print.js')) ?: time())) ?>"></script>
 </body>
 </html>

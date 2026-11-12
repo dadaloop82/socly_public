@@ -310,8 +310,8 @@ $personName = static function (array $person): string {
 <body>
 <div class="sheet">
     <div class="toolbar no-print">
-        <button type="button" class="btn btn-ghost" onclick="window.close()"><?= e(__('common.close')) ?></button>
-        <button type="button" class="btn btn-primary" onclick="window.print()"><?= e(__('members.registry_print')) ?></button>
+        <button type="button" class="btn btn-ghost" data-close-window><?= e(__('common.close')) ?></button>
+        <button type="button" class="btn btn-primary" data-print><?= e(__('members.registry_print')) ?></button>
     </div>
 
     <?php if ($incomplete !== []): ?>
@@ -512,5 +512,6 @@ $personName = static function (array $person): string {
 </div>
 
 
+<script src="<?= e(asset('js/print.js')) ?>?v=<?= e((string) (@filemtime(base_path('public/assets/js/print.js')) ?: time())) ?>"></script>
 </body>
 </html>

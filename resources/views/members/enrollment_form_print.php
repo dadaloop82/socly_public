@@ -144,8 +144,8 @@ $privacyBlock = $clipText((string) ($privacy_text ?? ''));
 <body>
 <div class="sheet">
     <div class="toolbar">
-        <button type="button" onclick="window.print()"><?= e(__('members.enrollment_print_form')) ?></button>
-        <button type="button" onclick="window.close()"><?= e(__('common.cancel')) ?></button>
+        <button type="button" data-print><?= e(__('members.enrollment_print_form')) ?></button>
+        <button type="button" data-close-window><?= e(__('common.cancel')) ?></button>
     </div>
 
     <header>
@@ -230,5 +230,6 @@ $privacyBlock = $clipText((string) ($privacy_text ?? ''));
 
     <p class="meta"><?= e(__('members.enrollment_form_generated', ['date' => $generated_at])) ?></p>
 </div>
+<script src="<?= e(asset('js/print.js')) ?>?v=<?= e((string) (@filemtime(base_path('public/assets/js/print.js')) ?: time())) ?>"></script>
 </body>
 </html>

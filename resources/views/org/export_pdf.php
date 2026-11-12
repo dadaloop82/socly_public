@@ -205,8 +205,8 @@ $generatedAt = $generatedAt !== '' ? $generatedAt : date('d/m/Y H:i');
 <body>
 <div class="sheet">
     <div class="toolbar no-print">
-        <button type="button" class="btn btn-ghost" onclick="window.close()"><?= e(__('common.close')) ?></button>
-        <button type="button" class="btn btn-primary" onclick="window.print()"><?= e(__('org.export_pdf')) ?></button>
+        <button type="button" class="btn btn-ghost" data-close-window><?= e(__('common.close')) ?></button>
+        <button type="button" class="btn btn-primary" data-print><?= e(__('org.export_pdf')) ?></button>
     </div>
 
     <?php if ($incomplete !== []): ?>
@@ -300,6 +300,7 @@ $generatedAt = $generatedAt !== '' ? $generatedAt : date('d/m/Y H:i');
     <p class="legal"><?= e(__('org.export_legal_note')) ?></p>
 </div>
 
+<script src="<?= e(asset('js/print.js')) ?>?v=<?= e((string) (@filemtime(base_path('public/assets/js/print.js')) ?: time())) ?>"></script>
 </body>
 </html>
 

@@ -93,7 +93,7 @@ $brandStyle = brand_root_style_decls($brandPrimary ?? null, $brandAccent ?? null
 </head>
 <body>
 <div class="toolbar">
-    <button type="button" onclick="window.print()"><?= e(__('budget.print')) ?></button>
+    <button type="button" data-print><?= e(__('budget.print')) ?></button>
     <a href="?"><?= e(__('common.cancel')) ?></a>
 </div>
 <div class="sheet">
@@ -222,6 +222,7 @@ $brandStyle = brand_root_style_decls($brandPrimary ?? null, $brandAccent ?? null
 
     <p class="doc-note"><?= e(__('budget.rendiconto_note')) ?></p>
 </div>
+<script src="<?= e(asset('js/print.js')) ?>?v=<?= e((string) (@filemtime(base_path('public/assets/js/print.js')) ?: time())) ?>"></script>
 </body>
 </html>
 
