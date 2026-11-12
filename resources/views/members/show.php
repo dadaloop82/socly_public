@@ -358,10 +358,10 @@ $nextMemberId = isset($adjacentMembers['next']) ? (int) $adjacentMembers['next']
                 <?= e(__('members.payment_'.$member['payment_status'])) ?>
             </span>
             <?php if ($totalPaid > 0): ?>
-                <span class="muted"><?= e(__('members.amount_paid')) ?>: <strong><?= e(number_format($totalPaid, 2, ',', '.')) ?> €</strong></span>
+                <span class="muted"><?= e(__('members.amount_paid')) ?>: <strong><?= e(number_format($totalPaid, 2, ',', '.')) ?>&nbsp;€</strong></span>
             <?php endif; ?>
             <?php if ($balanceDue > 0): ?>
-                <span class="muted"><?= e(__('members.balance_due')) ?>: <strong><?= e(number_format($balanceDue, 2, ',', '.')) ?> €</strong></span>
+                <span class="muted"><?= e(__('members.balance_due')) ?>: <strong><?= e(number_format($balanceDue, 2, ',', '.')) ?>&nbsp;€</strong></span>
             <?php endif; ?>
         </div>
 
@@ -583,7 +583,7 @@ $nextMemberId = isset($adjacentMembers['next']) ? (int) $adjacentMembers['next']
                         <tbody>
                         <?php foreach ($payments as $p): ?>
                             <tr>
-                                <td><?= e(number_format((float) $p['amount'], 2, ',', '.')) ?> €</td>
+                                <td><?= e(number_format((float) $p['amount'], 2, ',', '.')) ?>&nbsp;€</td>
                                 <td><?= e(__('payments.' . $p['method'])) ?></td>
                                 <td><?= e(__('payments.' . $p['type'])) ?></td>
                                 <td><?= e(format_datetime((string) ($p['created_at'] ?? '')) ?: (string) ($p['created_at'] ?? '')) ?></td>

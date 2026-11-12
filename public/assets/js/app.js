@@ -2621,7 +2621,7 @@ function initMemberWizard() {
   const paymentMethodValue = () =>
     form.querySelector('[name="payment_method"]:checked')?.value || '';
   const money = (n) =>
-    `${Number(n || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €`;
+    `${Number(n || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}\u00A0€`;
   const paymentStatusText = (status) => {
     const map = {
       paid: paymentFields?.dataset.paymentStatusPaidLabel,
@@ -3208,7 +3208,8 @@ function initTreasuryBulk() {
   const moneyTemplate = (key) => bar.getAttribute(key) || '';
   const formatMoney = (value) => {
     const [integer, decimals] = Math.abs(value).toFixed(2).split('.');
-    return `${integer.replace(/\B(?=(\d{3})+(?!\d))/g, '.')},${decimals} ${currencyDisplay}`.trim();
+    // \u00A0 = non-breaking space, so the symbol stays on the same line as the amount.
+    return `${integer.replace(/\B(?=(\d{3})+(?!\d))/g, '.')},${decimals}\u00A0${currencyDisplay}`.trim();
   };
   const withAmount = (template, amount) => template.replace(':amount', amount);
   const renderTotals = (ids) => {
@@ -14635,7 +14636,7 @@ function initStatisticsCharts() {
   }
   const palette = ['#0D6E66', '#B84A1B', '#2A8F85', '#C56A3A', '#4A6B66', '#8B3A16', '#6FA8A1', '#E08A5C', '#9AA5A2', '#084B46'];
   const money = (value) =>
-    `${Number(value || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €`;
+    `${Number(value || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}\u00A0€`;
 
   Chart.defaults.font.family = '"Manrope", "Avenir Next", "Segoe UI", sans-serif';
   Chart.defaults.color = 'rgba(11, 31, 28, 0.55)';

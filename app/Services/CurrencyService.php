@@ -36,7 +36,8 @@ final class CurrencyService
 
     public function format(float $amount): string
     {
-        return number_format($amount, 2, ',', '.') . ' ' . $this->display();
+        // Non-breaking space: the currency symbol never wraps alone on the next line.
+        return number_format($amount, 2, ',', '.') . "\u{00A0}" . $this->display();
     }
 
     public function convertToEur(float $amount, ?string $from = null): ?float

@@ -13514,6 +13514,11 @@ tr.doc-row-editable:focus-visible {
 .budget-th-amount { text-align: right; }
 .budget-th-progress { width: 22%; min-width: 140px; }
 .budget-compare-table .is-negative { color: #b42318; }
+/* Amount + currency symbol never wrap: the item label gives up the space instead. */
+.budget-compare-table th.budget-th-amount,
+.budget-compare-table td.budget-th-amount { white-space: nowrap; }
+.budget-compare-table thead th:first-child,
+.budget-compare-table tbody td:first-child { width: 100%; }
 .budget-progress {
   display: flex;
   align-items: center;

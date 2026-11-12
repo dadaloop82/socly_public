@@ -60,7 +60,7 @@ $totalPages = max(1, (int) ceil(((int) $result['total']) / max(1, $perPage)));
     </div>
     <div class="stat">
         <div class="label"><?= e(__('members.summary_due')) ?></div>
-        <div class="value"><?= e(number_format((float) ($summary['balance_due_total'] ?? 0), 2, ',', '.')) ?> €</div>
+        <div class="value"><?= e(number_format((float) ($summary['balance_due_total'] ?? 0), 2, ',', '.')) ?>&nbsp;€</div>
     </div>
     <div class="stat">
         <div class="label"><?= e(__('members.summary_pending')) ?></div>
