@@ -169,7 +169,7 @@ final class TreasuryController extends BaseController
             'config' => $this->components->config('treasury', ['auto_from_payments' => true]),
             'beneficiaries' => $this->treasury->beneficiaries(),
             'currency' => $this->currency,
-            'budget_items' => $this->budgets->itemOptions((int) date('Y')),
+            'budget_items' => $this->budgets->itemOptionsForMovement((int) date('Y')),
         ]);
     }
 
@@ -242,7 +242,10 @@ final class TreasuryController extends BaseController
             'config' => $this->components->config('treasury', ['auto_from_payments' => true]),
             'beneficiaries' => $this->treasury->beneficiaries(),
             'currency' => $this->currency,
-            'budget_items' => $this->budgets->itemOptions((int) substr((string) ($movement['movement_date'] ?? date('Y-m-d')), 0, 4)),
+            'budget_items' => $this->budgets->itemOptionsForMovement(
+                (int) substr((string) ($movement['movement_date'] ?? date('Y-m-d')), 0, 4),
+                (int) ($movement['budget_item_id'] ?? 0)
+            ),
         ]);
     }
 

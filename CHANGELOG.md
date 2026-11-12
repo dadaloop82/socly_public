@@ -88,6 +88,10 @@ every 100 patches bump the series, and each bump is published to this repository
 
 ### Fixed
 
+- The cost centre is no longer missing on some movements: when the movement year has no budget the
+  closest one is offered (labelled with its year) instead of hiding the field, and a cost centre
+  already assigned from another budget stays selectable. In the movement page the “Document” box now
+  comes after “Type and details”.
 - The previous/next arrows of a movement now follow the order of the list you are reading: same
   filters, same search, same sort (date, description, method, amount, grouped by type) and therefore
   the same sequence of the ledger, page after page.

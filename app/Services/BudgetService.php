@@ -846,6 +846,107 @@ final class BudgetService
         return $this->db->fetch('SELECT id FROM budget_items WHERE id = :id', ['id' => $itemId]) !== null;
     }
 
+    /**
+     * Fiscal years that have a budget (ascending).
+     *
+     * @return list<int>
+     */
+    public function budgetYears(): array
+    {
+        $rows = $this->db->fetchAll('SELECT fiscal_year FROM budgets ORDER BY fiscal_year ASC');
+
+        return array_values(array_map(static fn (array $row): int => (int) $row['fiscal_year'], $rows));
+    }
+
+    /** Fiscal year of a cost centre (0 when it no longer exists). */
+    public function itemYear(int $itemId): int
+    {
+        if ($itemId < 1) {
+            return 0;
+        }
+        $row = $this->db->fetch(
+            'SELECT b.fiscal_year FROM budget_items i INNER JOIN budgets b ON b.id = i.budget_id WHERE i.id = :id',
+            ['id' => $itemId]
+        );
+
+        return (int) ($row['fiscal_year'] ?? 0);
+    }
+
+    /**
+     * Closest budget year to the given one (the later one wins a tie), 0 when no budget exists.
+     */
+    private function nearestBudgetYear(int $year): int
+    {
+        $years = $this->budgetYears();
+        if ($years === []) {
+            return 0;
+        }
+        $best = $years[0];
+        $bestDistance = abs($best - $year);
+        foreach ($years as $candidate) {
+            $distance = abs($candidate - $year);
+            if ($distance < $bestDistance || ($distance === $bestDistance && $candidate > $best)) {
+                $best = $candidate;
+                $bestDistance = $distance;
+            }
+        }
+
+        return $best;
+    }
+
+    /**
+     * Cost centres offered on a movement of the given year.
+     *
+     * The budget of the reference year is used as-is. When that year has no budget the closest one
+     * is offered instead (labelled with its year), because the field must not disappear just because
+     * the association budgeted another year. A cost centre already assigned to the movement is
+     * always kept in the list, even when it belongs to a different budget.
+     *
+     * @return list<array{label:string,options:list<array{value:string,label:string,direction:string,category:string}>}>
+     */
+    public function itemOptionsForMovement(int $year, int $assignedItemId = 0): array
+    {
+        $groups = $this->itemOptions($year);
+        $fallbackYear = 0;
+        if ($groups === []) {
+            $fallbackYear = $this->nearestBudgetYear($year);
+            if ($fallbackYear > 0 && $fallbackYear !== $year) {
+                $groups = $this->itemOptions($fallbackYear);
+                foreach ($groups as $index => $group) {
+                    $groups[$index]['label'] = $fallbackYear . ' · ' . $group['label'];
+                }
+            }
+        }
+        if ($assignedItemId < 1) {
+            return $groups;
+        }
+        foreach ($groups as $group) {
+            foreach ($group['options'] as $option) {
+                if ((int) ($option['value'] ?? 0) === $assignedItemId) {
+                    return $groups;
+                }
+            }
+        }
+        // The movement is imputed to a cost centre outside the listed budget: keep it selectable.
+        $ownerYear = $this->itemYear($assignedItemId);
+        if ($ownerYear < 1) {
+            return $groups;
+        }
+        foreach ($this->itemOptions($ownerYear) as $group) {
+            foreach ($group['options'] as $option) {
+                if ((int) ($option['value'] ?? 0) === $assignedItemId) {
+                    $groups[] = [
+                        'label' => ($ownerYear === $year ? '' : $ownerYear . ' · ') . (string) $group['label'],
+                        'options' => [$option],
+                    ];
+                    return $groups;
+                }
+            }
+        }
+
+        return $groups;
+    }
+
     public function itemLabel(int $itemId): string
     {
         if ($itemId < 1) {

@@ -289,105 +289,6 @@ foreach ($members as $member) {
 $invoiceActive = $selectedDirection === 'expense' && !empty($values['invoice_payment']);
 ?>
 
-<section class="tmf-card">
-    <header class="tmf-card-head">
-        <h2 class="tmf-card-title"><?= e(__('treasury.form_section_invoice')) ?></h2>
-    </header>
-    <div class="treasury-invoice-block">
-        <div class="tmf-grid tmf-grid--2 tmf-grid--top" data-treasury-docs-row <?= $isTransfer ? 'hidden' : '' ?>>
-            <?= field('select', [
-                'name' => 'document_type',
-                'label' => (string) __('treasury.document_type'),
-                'value' => $selectedDocumentType,
-                'include_empty' => true,
-                'empty_label' => (string) __('treasury.document_type_none'),
-                'options' => $documentTypeOptions,
-                'hint' => (string) __('treasury.document_type_hint'),
-                'attrs' => ['data-treasury-document-type' => true],
-            ]) ?>
-            <?= field('text', [
-                'name' => 'invoice_number',
-                'label' => (string) __('treasury.doc_number'),
-                'value' => (string) ($values['invoice_number'] ?? ''),
-                'maxlength' => 120,
-                'placeholder' => (string) __('treasury.doc_number_placeholder'),
-            ]) ?>
-            <?= field('date', [
-                'name' => 'invoice_date',
-                'label' => (string) __('treasury.doc_date'),
-                'value' => (string) ($values['invoice_date'] ?? ''),
-            ]) ?>
-            <div class="tmf-span-2" data-treasury-expense-fields <?= $selectedDirection === 'expense' ? '' : 'hidden' ?>>
-                <?= field('checkbox', [
-                    'name' => 'invoice_payment',
-                    'label' => (string) __('treasury.invoice_payment'),
-                    'hint' => (string) __('treasury.invoice_payment_hint'),
-                    'checked' => !empty($values['invoice_payment']),
-                    'label_class' => 'checkbox-row-lg',
-                    'attrs' => ['data-treasury-invoice-toggle' => true],
-                ]) ?>
-            </div>
-            <div class="treasury-invoice-fields tmf-span-2" data-treasury-invoice-fields <?= $invoiceActive ? '' : 'hidden' ?>>
-                <?= field('text', [
-                    'name' => 'invoice_title',
-                    'label' => (string) __('treasury.invoice_title'),
-                    'value' => (string) ($values['invoice_title'] ?? ''),
-                    'maxlength' => 190,
-                    'placeholder' => (string) __('treasury.invoice_title_placeholder'),
-                ]) ?>
-                <?= field('date', [
-                    'name' => 'invoice_due_date',
-                    'label' => (string) __('treasury.invoice_due_date'),
-                    'value' => (string) ($values['invoice_due_date'] ?? ''),
-                ]) ?>
-            </div>
-        </div>
-        <div class="treasury-attach-fields">
-        <p class="section-lede treasury-attach-lede"><?= e(__('treasury.attachment_lede')) ?></p>
-            <div class="doc-file-field<?= $fileReady ? ' is-uploaded' : '' ?>" data-treasury-doc-field>
-                <div class="doc-file-row">
-                    <?= field('file', [
-                        'label' => (string) __('treasury.upload_document'),
-                        'name' => 'invoice_pdf',
-                        'button_label' => $fileReady ? (string) __('treasury.document_change') : (string) __('treasury.document_choose'),
-                        'accept' => 'application/pdf,image/jpeg,image/png,image/webp',
-                        'as_button' => true,
-                        'button_class' => 'btn btn-ghost file-btn sf-field__file-btn',
-                        'attrs' => ['data-treasury-doc-input' => true],
-                        'pick_label_attrs' => ['data-treasury-doc-pick-label' => true],
-                    ]) ?>
-                    <div class="doc-file-meta">
-                        <strong class="doc-file-name" data-treasury-doc-name <?= $attachmentName === '' ? 'hidden' : '' ?>><?= e($attachmentName) ?></strong>
-                        <span class="doc-file-status muted" data-treasury-doc-status>
-                            <?= e($fileReady ? __('treasury.document_attached') : __('documents.upload_idle')) ?>
-                        </span>
-                        <div class="doc-file-preview<?= $attachmentIsImage ? ' is-image' : '' ?>" data-treasury-doc-preview <?= ($fileReady && $attachmentPreviewUrl !== '') ? '' : 'hidden' ?>>
-                            <?php if ($fileReady && $attachmentPreviewUrl !== ''): ?>
-                                <?php if ($attachmentIsImage): ?>
-                                    <img src="<?= e($attachmentPreviewUrl) ?>" alt="<?= e(__('treasury.upload_document')) ?>" loading="lazy">
-                                <?php else: ?>
-                                    <iframe src="<?= e($attachmentPreviewUrl) ?>#toolbar=0" title="<?= e(__('treasury.upload_document')) ?>" loading="lazy"></iframe>
-                                <?php endif; ?>
-                            <?php endif; ?>
-                        </div>
-                        <span class="doc-file-hint muted"><?= e(__('documents.upload_hint', ['max' => upload_max_mb()])) ?></span>
-                        <?php if ($documentEditUrl !== ''): ?>
-                            <a class="doc-file-archive-link" href="<?= e($documentEditUrl) ?>" target="_blank" rel="noopener"><?= e(__('treasury.document_in_archive')) ?></a>
-                        <?php endif; ?>
-                    </div>
-                    <?php if ($fileReady || !empty($values['attachment_path'])): ?>
-                        <button type="button" class="btn btn-ghost btn-sm" data-treasury-doc-detach><?= e(__('treasury.document_detach')) ?></button>
-                        <?= field('hidden', [
-                            'name' => 'detach_invoice_pdf',
-                            'value' => '',
-                            'attrs' => ['data-treasury-doc-detach-input' => true],
-                        ]) ?>
-                    <?php endif; ?>
-                </div>
-            </div>
-        </div>
-    </div>
-</section>
 <section class="tmf-card" data-treasury-docs-row <?= $isTransfer ? 'hidden' : '' ?>>
     <header class="tmf-card-head">
         <h2 class="tmf-card-title"><?= e(__('treasury.form_section_details')) ?></h2>
@@ -489,6 +390,105 @@ $invoiceActive = $selectedDirection === 'expense' && !empty($values['invoice_pay
             'rows' => 4,
         ]) ?>
     </div>
+    </div>
+</section>
+<section class="tmf-card">
+    <header class="tmf-card-head">
+        <h2 class="tmf-card-title"><?= e(__('treasury.form_section_invoice')) ?></h2>
+    </header>
+    <div class="treasury-invoice-block">
+        <div class="tmf-grid tmf-grid--2 tmf-grid--top" data-treasury-docs-row <?= $isTransfer ? 'hidden' : '' ?>>
+            <?= field('select', [
+                'name' => 'document_type',
+                'label' => (string) __('treasury.document_type'),
+                'value' => $selectedDocumentType,
+                'include_empty' => true,
+                'empty_label' => (string) __('treasury.document_type_none'),
+                'options' => $documentTypeOptions,
+                'hint' => (string) __('treasury.document_type_hint'),
+                'attrs' => ['data-treasury-document-type' => true],
+            ]) ?>
+            <?= field('text', [
+                'name' => 'invoice_number',
+                'label' => (string) __('treasury.doc_number'),
+                'value' => (string) ($values['invoice_number'] ?? ''),
+                'maxlength' => 120,
+                'placeholder' => (string) __('treasury.doc_number_placeholder'),
+            ]) ?>
+            <?= field('date', [
+                'name' => 'invoice_date',
+                'label' => (string) __('treasury.doc_date'),
+                'value' => (string) ($values['invoice_date'] ?? ''),
+            ]) ?>
+            <div class="tmf-span-2" data-treasury-expense-fields <?= $selectedDirection === 'expense' ? '' : 'hidden' ?>>
+                <?= field('checkbox', [
+                    'name' => 'invoice_payment',
+                    'label' => (string) __('treasury.invoice_payment'),
+                    'hint' => (string) __('treasury.invoice_payment_hint'),
+                    'checked' => !empty($values['invoice_payment']),
+                    'label_class' => 'checkbox-row-lg',
+                    'attrs' => ['data-treasury-invoice-toggle' => true],
+                ]) ?>
+            </div>
+            <div class="treasury-invoice-fields tmf-span-2" data-treasury-invoice-fields <?= $invoiceActive ? '' : 'hidden' ?>>
+                <?= field('text', [
+                    'name' => 'invoice_title',
+                    'label' => (string) __('treasury.invoice_title'),
+                    'value' => (string) ($values['invoice_title'] ?? ''),
+                    'maxlength' => 190,
+                    'placeholder' => (string) __('treasury.invoice_title_placeholder'),
+                ]) ?>
+                <?= field('date', [
+                    'name' => 'invoice_due_date',
+                    'label' => (string) __('treasury.invoice_due_date'),
+                    'value' => (string) ($values['invoice_due_date'] ?? ''),
+                ]) ?>
+            </div>
+        </div>
+        <div class="treasury-attach-fields">
+        <p class="section-lede treasury-attach-lede"><?= e(__('treasury.attachment_lede')) ?></p>
+            <div class="doc-file-field<?= $fileReady ? ' is-uploaded' : '' ?>" data-treasury-doc-field>
+                <div class="doc-file-row">
+                    <?= field('file', [
+                        'label' => (string) __('treasury.upload_document'),
+                        'name' => 'invoice_pdf',
+                        'button_label' => $fileReady ? (string) __('treasury.document_change') : (string) __('treasury.document_choose'),
+                        'accept' => 'application/pdf,image/jpeg,image/png,image/webp',
+                        'as_button' => true,
+                        'button_class' => 'btn btn-ghost file-btn sf-field__file-btn',
+                        'attrs' => ['data-treasury-doc-input' => true],
+                        'pick_label_attrs' => ['data-treasury-doc-pick-label' => true],
+                    ]) ?>
+                    <div class="doc-file-meta">
+                        <strong class="doc-file-name" data-treasury-doc-name <?= $attachmentName === '' ? 'hidden' : '' ?>><?= e($attachmentName) ?></strong>
+                        <span class="doc-file-status muted" data-treasury-doc-status>
+                            <?= e($fileReady ? __('treasury.document_attached') : __('documents.upload_idle')) ?>
+                        </span>
+                        <div class="doc-file-preview<?= $attachmentIsImage ? ' is-image' : '' ?>" data-treasury-doc-preview <?= ($fileReady && $attachmentPreviewUrl !== '') ? '' : 'hidden' ?>>
+                            <?php if ($fileReady && $attachmentPreviewUrl !== ''): ?>
+                                <?php if ($attachmentIsImage): ?>
+                                    <img src="<?= e($attachmentPreviewUrl) ?>" alt="<?= e(__('treasury.upload_document')) ?>" loading="lazy">
+                                <?php else: ?>
+                                    <iframe src="<?= e($attachmentPreviewUrl) ?>#toolbar=0" title="<?= e(__('treasury.upload_document')) ?>" loading="lazy"></iframe>
+                                <?php endif; ?>
+                            <?php endif; ?>
+                        </div>
+                        <span class="doc-file-hint muted"><?= e(__('documents.upload_hint', ['max' => upload_max_mb()])) ?></span>
+                        <?php if ($documentEditUrl !== ''): ?>
+                            <a class="doc-file-archive-link" href="<?= e($documentEditUrl) ?>" target="_blank" rel="noopener"><?= e(__('treasury.document_in_archive')) ?></a>
+                        <?php endif; ?>
+                    </div>
+                    <?php if ($fileReady || !empty($values['attachment_path'])): ?>
+                        <button type="button" class="btn btn-ghost btn-sm" data-treasury-doc-detach><?= e(__('treasury.document_detach')) ?></button>
+                        <?= field('hidden', [
+                            'name' => 'detach_invoice_pdf',
+                            'value' => '',
+                            'attrs' => ['data-treasury-doc-detach-input' => true],
+                        ]) ?>
+                    <?php endif; ?>
+                </div>
+            </div>
+        </div>
     </div>
 </section>
 <?php if (empty($isEdit)): ?>
