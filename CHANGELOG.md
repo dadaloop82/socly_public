@@ -92,6 +92,9 @@ every 100 patches bump the series, and each bump is published to this repository
 
 ### Fixed
 
+- Confirming an update no longer throws you back to the ledger: the card stays open with the saved
+  values and the confirmation message, and the “similar movements” proposal now appears above the
+  form (applying it keeps you on the card). “Back” still returns to the filtered ledger.
 - The € of the amount field is centred inside the control again: it was anchored to the bottom of the
   wrapper and slid to the lower edge of the taller amount input.
 - The cost centre is no longer missing on some movements: when the movement year has no budget the

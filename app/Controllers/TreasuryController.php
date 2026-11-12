@@ -232,6 +232,9 @@ final class TreasuryController extends BaseController
             'movement_version' => $conflictActive ? $conflictVersion : (int) ($movement['row_version'] ?? 0),
             'movement_conflict' => $conflict,
             'adjacent' => $adjacent,
+            // “Similar movements” proposal (after an update that changed the classification): it is
+            // rendered above the form so the operator can stay on the card.
+            'similar_probe' => $this->similarProbe((int) $request->input('similar', 0)),
             'default_category' => (string) ($movement['category'] ?? 'membership_fee'),
             'categories' => $categories,
             'category_groups' => $this->treasury->categoryGroups(),
@@ -326,9 +329,14 @@ final class TreasuryController extends BaseController
                     'budget_item_id' => (string) (int) ($before['budget_item_id'] ?? 0),
                 ],
             ];
-            redirect(self::withQuery($returnPath, ['similar' => (string) (int) $id]));
+            // Stay on the card: the “similar movements” proposal is shown right above the form.
+            redirect(self::withQuery($editPath, [
+                'ret' => $returnPath,
+                'similar' => (string) (int) $id,
+            ]));
         }
-        redirect($returnPath);
+        // Stay on the card after saving: the operator keeps working on the same record.
+        redirect(self::withQuery($editPath, ['ret' => $returnPath]));
     }
 
     public function store(Request $request): void
@@ -809,6 +817,12 @@ final class TreasuryController extends BaseController
             'budget_item_id' => (string) $request->input('budget_item_id', ''),
         ], $request->ip(), $originals);
         $this->flash('success', __('treasury.similar_applied', ['count' => (string) $updated]));
+        // Applying the proposal keeps the operator where they are: on the card that started it,
+        // otherwise on the ledger.
+        $backPath = $this->recordReturnPath($request);
+        if ($backPath !== '') {
+            redirect(self::withQuery($backPath, ['ret' => $this->listReturnPath($request)]));
+        }
         redirect($this->listReturnPath($request));
     }
 
@@ -956,6 +970,29 @@ final class TreasuryController extends BaseController
         $clean = $this->listReturnQuery($request);
 
         return '/treasury' . ($clean === [] ? '' : '?' . http_build_query($clean));
+    }
+
+    /**
+     * Card the panel came from (“/treasury/12/edit”), used by the “apply to similar movements”
+     * action so the operator stays on the record. Only that exact shape is accepted: no host, no
+     * query (the ledger state is re-attached by the caller), no other screen.
+     */
+    private function recordReturnPath(Request $request): string
+    {
+        $raw = trim((string) $request->input('back', ''));
+        if ($raw === '' || mb_strlen($raw) > 200) {
+            return '';
+        }
+        $parts = parse_url($raw);
+        if (!is_array($parts)
+            || isset($parts['scheme']) || isset($parts['host']) || isset($parts['user'])
+            || isset($parts['pass']) || isset($parts['port']) || isset($parts['fragment'])
+            || isset($parts['query'])) {
+            return '';
+        }
+        $path = (string) ($parts['path'] ?? '');
+
+        return preg_match('#^/treasury/[0-9]+/edit$#', $path) === 1 ? $path : '';
     }
 
     /**

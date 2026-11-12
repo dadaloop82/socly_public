@@ -131,6 +131,19 @@ $retSuffix = $returnPath === '/treasury' ? '' : '?ret=' . rawurlencode($returnPa
     </div>
 </div>
 
+<?php
+// “Similar movements” proposal (after an update that changed the classification): rendered on the
+// card so saving never throws the operator back to the ledger.
+$probe = is_array($similar_probe ?? null) ? $similar_probe : null;
+if ($probe !== null && $movementId > 0) {
+    echo view_partial('treasury/_similar_probe', [
+        'probe' => $probe,
+        'ret_path' => $returnPath,
+        'back_path' => '/treasury/' . $movementId . '/edit',
+        'dismiss_url' => url('/treasury/' . $movementId . '/edit') . $retSuffix,
+    ]);
+}
+?>
 <form id="treasury-form" class="panel treasury-movement-form" method="post" action="<?= e($action) ?>" enctype="multipart/form-data"
       <?php if (!empty($isEdit)): ?><?= version_attrs('treasury', ['id' => (int) ($movement['id'] ?? 0), 'row_version' => (int) ($movement_version ?? ($movement['row_version'] ?? 0))]) ?><?php endif; ?>
       data-treasury-form data-leave-guard data-confirm-template="<?= e($isEdit ? __('treasury.confirm_summary_edit') : __('treasury.confirm_summary')) ?>"
