@@ -432,6 +432,7 @@ return [
         'line_hint' => 'Legt fest, wo die Bewegung im RUNTS-Bericht erscheint. “Automatisch” folgt der Kategorie.',
     ],
     'email_templates' => [
+        'saved_flash' => 'Vorlage gespeichert.',
         'intro' => 'Jede Vorlage hat IT / EN / DE. Platzhalter {{name}} und Bedingungen {{#flag}}…{{/flag}}.',
         'placeholders' => 'Verfügbare Variablen',
         'name' => 'Name',
@@ -484,6 +485,7 @@ return [
         'cond_if_member_email' => 'Wenn Mitglied E-Mail hat',
     ],
     'workflow' => [
+        'saved_flash' => 'Regel gespeichert.',
         'intro' => 'Verknüpft ein Ereignis mit einer E-Mail-Vorlage.',
         'name' => 'Regelname',
         'event' => 'Ereignis',

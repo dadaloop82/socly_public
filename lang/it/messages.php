@@ -434,6 +434,7 @@ return [
         'line_hint' => 'Determina dove finisce il movimento nel rendiconto RUNTS. Lascia “automatica” per usare la categoria.',
     ],
     'email_templates' => [
+        'saved_flash' => 'Template salvato.',
         'intro' => 'Ogni template ha versione IT / EN / DE. Usa placeholder {{nome}} e blocchi condizionali {{#flag}}…{{/flag}}.',
         'placeholders' => 'Variabili disponibili',
         'name' => 'Nome',
@@ -487,6 +488,7 @@ return [
         'cond_if_member_email' => 'Se il socio ha email',
     ],
     'workflow' => [
+        'saved_flash' => 'Regola salvata.',
         'intro' => 'Collega un evento a un template email. Le regole attive vengono eseguite quando l\'evento si verifica.',
         'name' => 'Nome regola',
         'event' => 'Evento',
