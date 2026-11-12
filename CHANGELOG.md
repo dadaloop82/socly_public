@@ -10,6 +10,10 @@ every 100 patches bump the series, and each bump is published to this repository
 
 ### Added
 
+- The “Documento” box of a movement is now behind a flag (“This movement has a document”): hidden by
+  default, it opens when the operator asks for it and starts open when the record already has a
+  document (type, number, date, subject, attachment, invoice payment). Turning the flag off clears
+  those fields on save; the CSV import is unaffected (it does not send the flag).
 - Field-level presence: while another operator is editing the same record, the field they are working
   in is outlined with the colour of their badge and labelled with their name (the heartbeat carries
   the field and is polled faster while a record is open). The “record updated” banner also lists **what

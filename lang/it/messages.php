@@ -2118,6 +2118,8 @@ return [
         'form_section_economy' => 'Importo e data',
         'form_section_accounts' => 'Conto e strumento',
         'form_section_invoice' => 'Documento',
+        'has_document' => 'Questo movimento ha un documento',
+        'has_document_hint' => 'Attivalo per registrare tipo, numero, data, oggetto e allegato. Se è disattivato il riquadro resta nascosto.',
         'form_section_details' => 'Categoria e dettagli',
         'form_section_party' => 'Controparte',
         'form_section_attachment' => 'Documento',

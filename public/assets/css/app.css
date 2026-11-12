@@ -13075,6 +13075,9 @@ textarea.is-remote-edit {
   background-position: right 0.8rem center;
   background-size: 1.1rem 1.1rem;
 }
+/* “This movement has a document”: the flag that shows/hides the whole document box. */
+.treasury-document-flag { margin: 0 0 0.2rem; }
+.treasury-document-flag .sf-field { margin-bottom: 0; }
 .treasury-attach-lede {
   margin: 0;
 }

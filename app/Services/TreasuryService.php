@@ -1777,7 +1777,9 @@ final class TreasuryService
         }
         /** @var array<string,mixed> $data */
         $data = $parsed['data'];
-        $detach = !empty($input['detach_invoice_pdf']);
+        // “This movement has a document” off ⇒ no attachment either (the whole box is hidden).
+        $detach = !empty($input['detach_invoice_pdf'])
+            || (array_key_exists('has_document', $input) && empty($input['has_document']));
         $attachment = $this->syncInvoiceDocument($data, $file, $ip, $userId, null, $detach);
         if (empty($attachment['ok'])) {
             return ['ok' => false, 'errors' => ['invoice_pdf' => (string) ($attachment['error'] ?? __('documents.upload_fail'))]];
@@ -1819,7 +1821,9 @@ final class TreasuryService
         }
         /** @var array<string,mixed> $data */
         $data = $parsed['data'];
-        $detach = !empty($input['detach_invoice_pdf']);
+        // “This movement has a document” off ⇒ the attachment is detached with the rest.
+        $detach = !empty($input['detach_invoice_pdf'])
+            || (array_key_exists('has_document', $input) && empty($input['has_document']));
         $attachment = $this->syncInvoiceDocument($data, $file, $ip, $userId, $existing, $detach);
         if (empty($attachment['ok'])) {
             return ['ok' => false, 'errors' => ['invoice_pdf' => (string) ($attachment['error'] ?? __('documents.upload_fail'))]];
@@ -2089,6 +2093,10 @@ final class TreasuryService
             return ['ok' => false, 'errors' => ['direction' => __('validation.in')]];
         }
         $isTransfer = $direction === 'transfer';
+        // “This movement has a document”: the form always sends the flag (hidden 0 + checkbox 1).
+        // When it is off every document field is cleared; when the key is absent (CSV import,
+        // internal calls) the provided values are kept as they are.
+        $documentsOff = array_key_exists('has_document', $input) && empty($input['has_document']);
         $amountRaw = (float) str_replace(',', '.', (string) ($input['amount'] ?? '0'));
         if ($amountRaw <= 0) {
             return ['ok' => false, 'errors' => ['amount' => __('validation.required')]];
@@ -2173,13 +2181,13 @@ final class TreasuryService
         $memberInvolved = !empty($input['member_involved']);
         $memberId = $memberInvolved ? trim((string) ($input['member_id'] ?? '')) : '';
         $memberId = $memberId !== '' ? (int) $memberId : null;
-        $isInvoice = $direction === 'expense' && !empty($input['invoice_payment']);
-        $invoiceNumber = mb_substr(trim((string) ($input['invoice_number'] ?? '')), 0, 120);
+        $isInvoice = $direction === 'expense' && !$documentsOff && !empty($input['invoice_payment']);
+        $invoiceNumber = $documentsOff ? '' : mb_substr(trim((string) ($input['invoice_number'] ?? '')), 0, 120);
         $invoiceTitle = $isInvoice ? mb_substr(trim((string) ($input['invoice_title'] ?? '')), 0, 190) : null;
         $invoiceDate = null;
         $invoiceDueDate = null;
         $invoiceDateRaw = trim((string) ($input['invoice_date'] ?? ''));
-        if ($invoiceDateRaw !== '') {
+        if (!$documentsOff && $invoiceDateRaw !== '') {
             if (!$this->validator->validate(['invoice_date' => $invoiceDateRaw], ['invoice_date' => 'date'])) {
                 return ['ok' => false, 'errors' => ['invoice_date' => __('validation.date')]];
             }
@@ -2210,7 +2218,7 @@ final class TreasuryService
             }
         }
         $documentType = '';
-        if (!$isTransfer) {
+        if (!$isTransfer && !$documentsOff) {
             $documentTypeRaw = trim((string) ($input['document_type'] ?? ''));
             if ($documentTypeRaw !== '') {
                 $documentType = self::normalizeDocumentType($documentTypeRaw);

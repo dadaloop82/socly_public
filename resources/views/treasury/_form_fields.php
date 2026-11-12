@@ -287,6 +287,20 @@ foreach ($members as $member) {
 // one block, on incoming and outgoing entries alike, with its type, number and date. The invoice
 // flag and the payment terms only make sense on an expense; the attachment also works on transfers.
 $invoiceActive = $selectedDirection === 'expense' && !empty($values['invoice_payment']);
+// “Does this movement have a document?”: the whole box stays hidden unless the operator turns the
+// flag on; on an existing record it starts on when something is already there.
+$hasDocument = trim((string) ($values['document_type'] ?? '')) !== ''
+    || trim((string) ($values['invoice_number'] ?? '')) !== ''
+    || trim((string) ($values['invoice_date'] ?? '')) !== ''
+    || trim((string) ($values['invoice_title'] ?? '')) !== ''
+    || trim((string) ($values['invoice_due_date'] ?? '')) !== ''
+    || trim((string) ($values['attachment_path'] ?? '')) !== ''
+    || (int) ($values['document_id'] ?? 0) > 0
+    || !empty($values['invoice_payment']);
+if (array_key_exists('has_document', $values)) {
+    // A retry after a validation error keeps the operator's choice (also when it was “off”).
+    $hasDocument = !empty($values['has_document']);
+}
 ?>
 
 <section class="tmf-card" data-treasury-docs-row <?= $isTransfer ? 'hidden' : '' ?>>
@@ -396,7 +410,19 @@ $invoiceActive = $selectedDirection === 'expense' && !empty($values['invoice_pay
     <header class="tmf-card-head">
         <h2 class="tmf-card-title"><?= e(__('treasury.form_section_invoice')) ?></h2>
     </header>
-    <div class="treasury-invoice-block">
+    <div class="treasury-document-flag">
+        <?= field('hidden', ['name' => 'has_document', 'value' => '0']) ?>
+        <?= field('checkbox', [
+            'name' => 'has_document',
+            'label' => (string) __('treasury.has_document'),
+            'hint' => (string) __('treasury.has_document_hint'),
+            'value' => $hasDocument ? '1' : '',
+            'check_value' => '1',
+            'label_class' => 'checkbox-row-lg',
+            'attrs' => ['data-treasury-document-toggle' => true],
+        ]) ?>
+    </div>
+    <div class="treasury-invoice-block" data-treasury-document-fields <?= $hasDocument ? '' : 'hidden' ?>>
         <div class="tmf-grid tmf-grid--2 tmf-grid--top" data-treasury-docs-row <?= $isTransfer ? 'hidden' : '' ?>>
             <?= field('select', [
                 'name' => 'document_type',

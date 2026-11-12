@@ -2345,6 +2345,8 @@ return [
         'form_section_economy' => 'Betrag und Datum',
         'form_section_accounts' => 'Konto und Zahlungsart',
         'form_section_invoice' => 'Beleg',
+        'has_document' => 'Diese Bewegung hat einen Beleg',
+        'has_document_hint' => 'Aktivieren, um Art, Nummer, Datum, Betreff und Anhang zu erfassen. Ist es aus, bleibt der Bereich ausgeblendet.',
         'form_section_details' => 'Kategorie und Details',
         'form_section_party' => 'Gegenpartei',
         'form_section_attachment' => 'Beleg',

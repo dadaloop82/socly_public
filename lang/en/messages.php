@@ -2345,6 +2345,8 @@ return [
         'form_section_economy' => 'Amount and date',
         'form_section_accounts' => 'Account and method',
         'form_section_invoice' => 'Document',
+        'has_document' => 'This movement has a document',
+        'has_document_hint' => 'Turn it on to record type, number, date, subject and attachment. When it is off the box stays hidden.',
         'form_section_details' => 'Category and details',
         'form_section_party' => 'Counterparty',
         'form_section_attachment' => 'Document',

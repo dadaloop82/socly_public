@@ -12932,6 +12932,10 @@ function initTreasuryCategory(root = document) {
     const transferSelect = form.querySelector('[data-treasury-transfer-account]');
     const beneficiaryWrap = form.querySelector('[data-treasury-beneficiary-wrap]');
     const invoiceToggle = form.querySelector('[data-treasury-invoice-toggle]');
+    // “This movement has a document”: the whole document box stays hidden (and is not submitted)
+    // until the operator asks for it. On an existing record the flag starts on when data is there.
+    const documentToggle = form.querySelector('[data-treasury-document-toggle]');
+    const documentFields = form.querySelector('[data-treasury-document-fields]');
     const memberToggle = form.querySelector('[data-treasury-member-toggle]');
     const memberFields = form.querySelector('[data-treasury-member-fields]');
     const memberSelect = form.querySelector('[data-treasury-member-select]');
@@ -13081,6 +13085,13 @@ function initTreasuryCategory(root = document) {
     };
     memberToggle?.addEventListener('change', syncMember);
     syncMember();
+
+    // The document flag drives the whole “Documento” box: off = hidden and not submitted.
+    const syncDocument = () => {
+      setFieldsLocked(documentFields, !documentToggle?.checked);
+    };
+    documentToggle?.addEventListener('change', syncDocument);
+    syncDocument();
 
     initTreasuryFileField(form);
 
