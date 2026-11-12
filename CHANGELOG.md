@@ -88,6 +88,10 @@ every 100 patches bump the series, and each bump is published to this repository
 
 ### Fixed
 
+- Sorting the first note while “Group by type” is on now applies to the **whole** list, not just the
+  visible page: the category is part of the database order, so pages keep the group blocks
+  contiguous and the chosen column (date, description, method, amount) sorts every row of the
+  register — pagination included.
 - Opening “Edit movement” could show an empty form (amount, account and method blank, today's date,
   type always “income”): the page reused a stale `_old` payload left in the session by another form.
   The edit/create screens now discard foreign old input (only a retry of the same form keeps it) and

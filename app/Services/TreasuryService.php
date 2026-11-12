@@ -419,7 +419,7 @@ final class TreasuryService
      * @param array{direction?:string,category?:string,from?:string,to?:string,account?:string} $filters
      * @return array{movements:list<array<string,mixed>>,balance:float,income:float,expense:float,total:int,limit:int,offset:int}
      */
-    public function ledger(int $limit = 200, string $query = '', string $sort = 'date_desc', array $filters = [], int $offset = 0): array
+    public function ledger(int $limit = 200, string $query = '', string $sort = 'date_desc', array $filters = [], int $offset = 0, bool $groupByCategory = false): array
     {
         $sql = "SELECT m.*,
                     (SELECT v.value FROM member_field_values v
@@ -447,7 +447,7 @@ final class TreasuryService
             $sql .= ' WHERE ' . implode(' AND ', $where);
         }
 
-        $order = $this->ledgerOrder($sort);
+        $order = $this->ledgerOrder($sort, $groupByCategory);
         $limit = max(1, min(500, $limit));
         $offset = max(0, $offset);
         $sql .= ' ORDER BY ' . $order . ' LIMIT ' . $limit . ' OFFSET ' . $offset;
@@ -476,12 +476,17 @@ final class TreasuryService
     /**
      * ORDER BY clause of the ledger: whitelisted keys (the SQL never contains user input) with a
      * deterministic tie-breaker, so pagination stays stable.
+     *
+     * When the ledger is read grouped by type the category comes first: the rows of a page are then
+     * bucketed by the view, so the group has to be part of the *database* order — otherwise every
+     * page would rebucket whatever slice it received and the chosen sort would only reorder the
+     * visible page.
      */
-    private function ledgerOrder(string $sort): string
+    private function ledgerOrder(string $sort, bool $groupByCategory = false): string
     {
         $tie = 'm.movement_date DESC, m.id DESC';
 
-        return match ($sort) {
+        $order = match ($sort) {
             'date_asc' => 'm.movement_date ASC, m.id ASC',
             'created_desc' => 'm.created_at DESC, m.id DESC',
             'invoice_desc' => 'm.invoice_date IS NULL, m.invoice_date DESC, ' . $tie,
@@ -497,6 +502,35 @@ final class TreasuryService
             'expense_desc' => "CASE WHEN m.direction = 'expense' THEN m.amount ELSE 0 END DESC, " . $tie,
             default => $tie,
         };
+
+        return $groupByCategory
+            ? $this->categoryOrderClause() . ', ' . $order
+            : $order;
+    }
+
+    /**
+     * Category rank in the same order as the group list shown by the ledger (built-in types first,
+     * then the custom ones), so pages stay contiguous while the chosen sort applies inside each
+     * group. Unknown/empty types go last, matching `groupedByCategory()`.
+     */
+    private function categoryOrderClause(): string
+    {
+        $when = [];
+        $rank = 1;
+        foreach ($this->categoryOptions() as $option) {
+            $key = (string) ($option['key'] ?? '');
+            if ($key === '') {
+                continue;
+            }
+            $when[] = "WHEN '" . str_replace("'", "''", $key) . "' THEN " . $rank;
+            $rank++;
+        }
+        if ($when === []) {
+            return 'm.category ASC';
+        }
+
+        return 'CASE COALESCE(NULLIF(m.category, \'\'), \'other\') ' . implode(' ', $when)
+            . ' ELSE ' . $rank . ' END ASC';
     }
 
     /**
@@ -999,7 +1033,9 @@ final class TreasuryService
      */
     public function groupedByCategory(int $limit = 200, string $query = '', string $sort = 'date_desc', array $filters = [], int $offset = 0): array
     {
-        $ledger = $this->ledger($limit, $query, $sort, $filters, $offset);
+        // The category is part of the SQL order: grouping a page after the fact would only sort the
+        // rows that page happened to receive (see ledgerOrder()).
+        $ledger = $this->ledger($limit, $query, $sort, $filters, $offset, true);
         $items = $ledger['movements'];
         $labels = $this->categoryMap();
         $buckets = [];
