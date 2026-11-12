@@ -13670,6 +13670,28 @@ tr.doc-row-editable:focus-visible {
 .import-diff ul { margin: 0.3rem 0 0; padding-left: 1.1rem; }
 .import-errors { margin: 0.35rem 0 0; padding-left: 1.1rem; font-size: 0.8rem; color: var(--danger); }
 .import-warnings { margin: 0.35rem 0 0; padding-left: 1.1rem; font-size: 0.78rem; }
+.import-order-hint { margin: 0.35rem 0 0; font-size: 0.8rem; }
+.import-preview-table tr.is-ignored td { opacity: 0.55; }
+.import-duplicate-flag { margin-top: 0.4rem; font-size: 0.78rem; }
+.import-row-fix { margin-top: 0.5rem; font-size: 0.82rem; }
+.import-row-fix summary { cursor: pointer; color: var(--brand-primary-ink); font-weight: 600; }
+.import-row-fix-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(150px, 100%), 1fr));
+  gap: 0.5rem 0.65rem;
+  margin-top: 0.5rem;
+}
+.import-fix-field { display: grid; gap: 0.2rem; font-size: 0.75rem; color: var(--muted); }
+.import-fix-field .sf-field__control { font-size: 0.85rem; }
+.import-row-fix-hint { margin: 0.4rem 0 0.25rem; font-size: 0.76rem; }
+.import-variants { margin: 0.15rem 0 0; font-size: 0.74rem; }
+.import-recurring-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 0.6rem; }
+.import-recurring-item .import-flag { font-size: 0.86rem; }
+.import-recurring-item .muted { display: block; font-size: 0.78rem; }
+.import-recurring-hint { margin: 0.75rem 0 0; font-size: 0.8rem; }
+.import-recurring-badge { margin-top: 0.35rem; }
+.import-adjust-hint { font-size: 0.8rem; }
+.import-commit-actions { margin-top: 1rem; }
 .import-ref-card {
   border: 1px solid var(--line);
   border-radius: var(--radius-sm);

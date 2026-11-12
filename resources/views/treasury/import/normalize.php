@@ -3,7 +3,7 @@
  * Import first note — step 3: normalise the values found in the CSV
  * (for example “Credito” → “Credit card”).
  *
- * @var list<array{field:string,label:string,values:list<array{index:int,raw:string,count:int,suggested:string,options:list<array{value:string,label:string}>}>}> $fields
+ * @var list<array{field:string,label:string,values:list<array{index:int,raw:string,group:string,variants:list<string>,count:int,suggested:string,options:list<array{value:string,label:string}>}>}> $fields
  * @var array<string,array<string,string>> $valueMap
  * @var list<array{value:string,label:string}> $memberOptions
  * @var string $sourceName
@@ -66,7 +66,16 @@ foreach ($memberOptions as $option) {
                             $current = (string) ($valueMap[$fieldKey][$raw] ?? $value['suggested']);
                             ?>
                             <tr>
-                                <td><strong><?= e($raw) ?></strong></td>
+                                <td>
+                                    <strong><?= e($raw) ?></strong>
+                                    <?php $variants = is_array($value['variants'] ?? null) ? $value['variants'] : []; ?>
+                                    <?php if ($variants !== []): ?>
+                                        <p class="muted import-variants"><?= e(__('treasury.import.normalize_variants', [
+                                            'count' => (string) count($variants),
+                                            'list' => implode(' · ', array_map('strval', $variants)),
+                                        ])) ?></p>
+                                    <?php endif; ?>
+                                </td>
                                 <td><span class="badge badge-muted"><?= (int) $value['count'] ?></span></td>
                                 <td>
                                     <input type="hidden" name="value_raw[<?= e($fieldKey) ?>][<?= (int) $value['index'] ?>]" value="<?= e($raw) ?>">

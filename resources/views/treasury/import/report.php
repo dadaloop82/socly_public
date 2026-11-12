@@ -35,6 +35,16 @@ $sourceName = trim((string) ($report['source_name'] ?? ''));
         <div class="value"><?= (int) ($report['skipped'] ?? 0) ?></div>
     </div>
     <div class="stat">
+        <div class="label"><?= e(__('treasury.import.report_ignored')) ?></div>
+        <div class="value"><?= (int) ($report['ignored'] ?? 0) ?></div>
+    </div>
+    <?php if ((int) ($report['recurring_rules'] ?? 0) > 0): ?>
+        <div class="stat">
+            <div class="label"><?= e(__('treasury.import.report_recurring')) ?></div>
+            <div class="value"><?= (int) $report['recurring_rules'] ?></div>
+        </div>
+    <?php endif; ?>
+    <div class="stat">
         <div class="label"><?= e(__('treasury.import.report_failed')) ?></div>
         <div class="value"><?= $failed ?></div>
     </div>

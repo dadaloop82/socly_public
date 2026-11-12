@@ -359,7 +359,8 @@ $app->bind(TreasuryCsvController::class, fn (App $a) => new TreasuryCsvControlle
 ));
 $app->bind(TreasuryCsvService::class, fn (App $a) => new TreasuryCsvService(
     $a->get(Database::class),
-    $a->get(TreasuryService::class)
+    $a->get(TreasuryService::class),
+    $a->get(RecurringService::class)
 ));
 $app->bind(BudgetService::class, fn (App $a) => new BudgetService(
     $a->get(Database::class),

@@ -167,6 +167,53 @@ final class RuntsReportService
     }
 
     /**
+     * Model D entry label prefixed with its section: the same wording appears in several sections
+     * (“1) Servizi” in A, B and E), so the bare label is ambiguous in the import menus.
+     */
+    public static function lineLabelWithSection(string $line): string
+    {
+        $line = strtoupper(trim($line));
+        if ($line === '') {
+            return '';
+        }
+        foreach (self::SECTIONS as $letter => $section) {
+            foreach (['expense', 'income'] as $direction) {
+                if (isset($section[$direction][$line])) {
+                    return self::sectionLabel((string) $letter) . ' — ' . $section[$direction][$line];
+                }
+            }
+        }
+
+        return $line;
+    }
+
+    /**
+     * Model D entries (expenses first, then income) with the section inside the label, ready for the
+     * selects that are not grouped by section.
+     *
+     * @return list<array{value:string,label:string}>
+     */
+    public static function lineOptions(): array
+    {
+        $out = [];
+        foreach (['expense', 'income'] as $direction) {
+            foreach (self::SECTIONS as $letter => $section) {
+                foreach ($section[$direction] as $key => $label) {
+                    if (isset($out[$key])) {
+                        continue;
+                    }
+                    $out[$key] = [
+                        'value' => (string) $key,
+                        'label' => self::sectionLabel((string) $letter) . ' — ' . $label,
+                    ];
+                }
+            }
+        }
+
+        return array_values($out);
+    }
+
+    /**
      * Section label (A–E); the official text of Model D remains the fallback.
      */
     public static function sectionLabel(string $letter): string

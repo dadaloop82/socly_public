@@ -39,6 +39,14 @@ if (isset($values['amount_entered']) && $values['amount_entered'] !== '' && $val
     $displayAmount = (string) $values['amount_entered'];
 }
 $memberInvolved = !empty($values['member_involved']) || trim((string) ($values['member_id'] ?? '')) !== '';
+$selectedDocumentType = \Socly\Services\TreasuryService::normalizeDocumentType((string) ($values['document_type'] ?? ''));
+$documentTypeOptions = [];
+foreach (\Socly\Services\TreasuryService::DOCUMENT_TYPES as $documentTypeKey) {
+    $documentTypeOptions[] = [
+        'value' => (string) $documentTypeKey,
+        'label' => (string) __('treasury.document_type_' . $documentTypeKey),
+    ];
+}
 $hasAttachment = !empty($values['attachment_path']) && empty($values['detach_invoice_pdf']);
 $attachmentName = $hasAttachment ? basename((string) $values['attachment_path']) : '';
 $attachmentPreviewUrl = trim((string) ($values['attachment_preview_url'] ?? ''));
@@ -369,6 +377,16 @@ $invoiceActive = $selectedDirection === 'expense' && !empty($values['invoice_pay
             'groups' => $runtsGroups,
             'hint' => (string) __('runts.line_hint'),
             'attrs' => ['data-treasury-runts' => true],
+        ]) ?>
+        <?= field('select', [
+            'name' => 'document_type',
+            'label' => (string) __('treasury.document_type'),
+            'value' => $selectedDocumentType,
+            'include_empty' => true,
+            'empty_label' => (string) __('treasury.document_type_none'),
+            'options' => $documentTypeOptions,
+            'hint' => (string) __('treasury.document_type_hint'),
+            'attrs' => ['data-treasury-document-type' => true],
         ]) ?>
         <?php
         $budgetItemGroups = [];

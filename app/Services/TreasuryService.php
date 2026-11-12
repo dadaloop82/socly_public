@@ -49,6 +49,17 @@ final class TreasuryService
     public const BUILTIN_ACCOUNTS = ['cash', 'bank', 'postal', 'paypal', 'prepaid_card', 'other'];
 
     /**
+     * Kind of document attached to a movement. An invoice (a tax document with a number and a date) is
+     * not the same as a receipt (proof of payment): they are separate entries so the association can
+     * tell them apart in the first note and in the export.
+     *
+     * @var list<string>
+     */
+    public const DOCUMENT_TYPES = [
+        'invoice', 'receipt', 'quittance', 'contract', 'premium', 'credit_note', 'debit_note', 'statement', 'other',
+    ];
+
+    /**
      * Wallets active by default on a fresh install (and after a full reset):
      * an association normally starts with cash and a bank account, the other
      * built-ins (postal, PayPal, prepaid card, other) are opt-in and get
@@ -233,6 +244,52 @@ final class TreasuryService
             $method = $aliases[$method];
         }
         return in_array($method, self::METHODS, true) ? $method : 'other';
+    }
+
+    /**
+     * Canonical document type key (empty when the value is not known).
+     */
+    public static function normalizeDocumentType(string $type): string
+    {
+        $type = mb_strtolower(trim($type));
+        if ($type === '') {
+            return '';
+        }
+        $type = (string) preg_replace('/[^a-z0-9]+/', '_', $type);
+        $type = trim($type, '_');
+        $aliases = [
+            'fattura' => 'invoice',
+            'invoice' => 'invoice',
+            'rechnung' => 'invoice',
+            'ricevuta' => 'receipt',
+            'receipt' => 'receipt',
+            'quittung' => 'receipt',
+            'quietanza' => 'quittance',
+            'quittance' => 'quittance',
+            'zahlungsquittung' => 'quittance',
+            'contratto' => 'contract',
+            'contract' => 'contract',
+            'vertrag' => 'contract',
+            'premio' => 'premium',
+            'premium' => 'premium',
+            'praemie' => 'premium',
+            'prämie' => 'premium',
+            'nota_di_credito' => 'credit_note',
+            'credit_note' => 'credit_note',
+            'gutschrift' => 'credit_note',
+            'nota_di_debito' => 'debit_note',
+            'debit_note' => 'debit_note',
+            'belastungsanzeige' => 'debit_note',
+            'estratto_conto' => 'statement',
+            'statement' => 'statement',
+            'kontoauszug' => 'statement',
+            'altro' => 'other',
+            'altro_documento' => 'other',
+            'other' => 'other',
+            'sonstiger_beleg' => 'other',
+        ];
+
+        return $aliases[$type] ?? (in_array($type, self::DOCUMENT_TYPES, true) ? $type : '');
     }
 
     /**
@@ -1771,6 +1828,16 @@ final class TreasuryService
                 $invoiceDueDate = $invoiceDueRaw;
             }
         }
+        $documentType = '';
+        if (!$isTransfer) {
+            $documentTypeRaw = trim((string) ($input['document_type'] ?? ''));
+            if ($documentTypeRaw !== '') {
+                $documentType = self::normalizeDocumentType($documentTypeRaw);
+                if ($documentType === '') {
+                    return ['ok' => false, 'errors' => ['document_type' => __('validation.in')]];
+                }
+            }
+        }
         $beneficiary = trim((string) preg_replace('/\s+/u', ' ', (string) ($input['beneficiary'] ?? '')));
         if ($beneficiary !== '') {
             $beneficiary = mb_substr($beneficiary, 0, 190);
@@ -1819,6 +1886,7 @@ final class TreasuryService
                 'invoice_date' => $invoiceDate,
                 'invoice_due_date' => $invoiceDueDate,
                 'invoice_title' => $invoiceTitle !== '' && $invoiceTitle !== null ? $invoiceTitle : null,
+                'document_type' => $documentType !== '' ? $documentType : null,
                 'beneficiary' => $beneficiary !== '' ? $beneficiary : null,
             ],
         ];

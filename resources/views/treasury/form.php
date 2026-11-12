@@ -45,6 +45,7 @@ if ($old !== []) {
         'invoice_date' => (string) ($movement['invoice_date'] ?? ''),
         'invoice_due_date' => (string) ($movement['invoice_due_date'] ?? ''),
         'invoice_title' => (string) ($movement['invoice_title'] ?? ''),
+        'document_type' => (string) ($movement['document_type'] ?? ''),
         'beneficiary' => (string) ($movement['beneficiary'] ?? ''),
         'attachment_path' => (string) ($movement['attachment_path'] ?? ''),
     ];
@@ -69,6 +70,7 @@ if ($old !== []) {
         'invoice_date' => '',
         'invoice_due_date' => '',
         'invoice_title' => '',
+        'document_type' => '',
         'beneficiary' => '',
         'attachment_path' => '',
     ];

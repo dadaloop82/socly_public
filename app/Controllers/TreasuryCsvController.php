@@ -187,7 +187,25 @@ final class TreasuryCsvController extends BaseController
             'analysis' => $analysis,
             'sourceName' => (string) ($state['source_name'] ?? ''),
             'currency' => app(CurrencyService::class),
+            'accounts' => $this->treasury->accountOptions(false),
         ]);
+    }
+
+    /**
+     * Manual corrections, ignored rows, duplicates to include and recurring choices of the dry run.
+     */
+    public function saveRows(Request $request): void
+    {
+        if (!$this->ensureAccess()) {
+            return;
+        }
+        $result = $this->csv->saveRowChoices($request->all());
+        if (empty($result['ok'])) {
+            $this->flash('errors', ['import' => __((string) ($result['error'] ?? 'treasury.import.error_no_file'))]);
+            redirect('/treasury/import');
+        }
+        $this->flash('success', __('treasury.import.rows_saved'));
+        redirect('/treasury/import/preview');
     }
 
     public function check(Request $request): void
@@ -207,7 +225,7 @@ final class TreasuryCsvController extends BaseController
         if ($out === false) {
             return;
         }
-        fputcsv($out, ['line', 'action', 'date', 'direction', 'amount', 'account', 'category', 'description', 'document_number', 'document_date', 'errors', 'warnings'], ';');
+        fputcsv($out, ['line', 'action', 'date', 'direction', 'amount', 'account', 'category', 'description', 'document_type', 'document_number', 'document_date', 'errors', 'warnings'], ';');
         foreach (($analysis['rows'] ?? []) as $row) {
             fputcsv($out, [
                 (int) ($row['line'] ?? 0),
@@ -218,6 +236,7 @@ final class TreasuryCsvController extends BaseController
                 (string) ($row['account'] ?? ''),
                 (string) ($row['category'] ?? ''),
                 (string) ($row['description'] ?? ''),
+                (string) ($row['document_type'] ?? ''),
                 (string) ($row['invoice_number'] ?? ''),
                 (string) ($row['invoice_date'] ?? ''),
                 implode(' | ', array_map('strval', (array) ($row['errors'] ?? []))),
@@ -251,6 +270,7 @@ final class TreasuryCsvController extends BaseController
         $this->flash('success', __('treasury.import.done', [
             'created' => (string) (int) ($report['created'] ?? 0),
             'skipped' => (string) (int) ($report['skipped'] ?? 0),
+            'ignored' => (string) (int) ($report['ignored'] ?? 0),
             'failed' => (string) (int) ($report['failed'] ?? 0),
         ]));
         redirect('/treasury/import/report');

@@ -87,7 +87,7 @@ Traceability of CSV member imports. `member_import_runs`: `user_id`, `source_nam
 `user_id`, `action`, `entity_type`, `entity_id`, `before_json`, `after_json`, `ip`, `created_at`.
 
 ### treasury_movements
-Cash book rows: `movement_date`, `direction` (`income` / `expense` / `transfer`), `category`, `runts_line` (line of the RUNTS cash report — Model D — automatically derived from the category and overridable per movement), `budget_item_id` (nullable cost centre), `amount`, `description`, `payment_method`, `account`, `transfer_account`, invoice fields, `attachment_path`, `member_id`, `payment_id`, `created_by`.
+Cash book rows: `movement_date`, `direction` (`income` / `expense` / `transfer`), `category`, `runts_line` (line of the RUNTS cash report — Model D — automatically derived from the category and overridable per movement), `budget_item_id` (nullable cost centre), `amount`, `description`, `payment_method`, `account`, `transfer_account`, invoice fields, `document_type` (kind of document: invoice, receipt, quittance, contract, insurance premium, credit/debit note, statement, other — `TreasuryService::DOCUMENT_TYPES`, nullable and independent from the invoice flag, never set on transfers), `attachment_path`, `member_id`, `payment_id`, `created_by`.
 
 Treasury categories are the built-in list plus `treasury.custom_categories` in the component config
 (`[{slug, label}]`). New categories can be created on the fly from movements, documents, deadlines

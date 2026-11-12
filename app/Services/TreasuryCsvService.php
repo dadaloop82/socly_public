@@ -22,7 +22,8 @@ final class TreasuryCsvService
      */
     public const COLUMNS = [
         'movement_date', 'direction', 'amount', 'account', 'transfer_account', 'payment_method', 'category',
-        'runts_line', 'budget_item', 'description', 'invoice_number', 'invoice_date', 'beneficiary', 'member', 'approved',
+        'runts_line', 'budget_item', 'description', 'document_type', 'invoice_number', 'invoice_date', 'beneficiary',
+        'member', 'approved',
     ];
 
     /**
@@ -35,8 +36,21 @@ final class TreasuryCsvService
      */
     private const NORMALIZATION_FIELDS = [
         'direction', 'approved', 'account', 'transfer_account', 'payment_method',
-        'category', 'runts_line', 'budget_item', 'member',
+        'category', 'runts_line', 'budget_item', 'document_type', 'member',
     ];
+
+    /**
+     * Fields the dry run lets the user correct by hand: the ones that can make a row fail.
+     */
+    private const EDITABLE_FIELDS = [
+        'movement_date', 'direction', 'amount', 'account', 'transfer_account',
+        'description', 'document_type', 'invoice_number', 'invoice_date',
+    ];
+
+    /**
+     * Week/month distance between two occurrences → recurring frequency.
+     */
+    private const RECURRING_MONTHS = [1 => 'monthly', 3 => 'quarterly', 6 => 'semiannual', 12 => 'yearly'];
 
     private const SESSION_KEY = '_treasury_csv_import';
     private const REPORT_KEY = '_treasury_csv_import_report';
@@ -56,7 +70,8 @@ final class TreasuryCsvService
 
     public function __construct(
         private readonly Database $db,
-        private readonly TreasuryService $treasury
+        private readonly TreasuryService $treasury,
+        private readonly RecurringService $recurring
     ) {
     }
 
@@ -101,6 +116,7 @@ final class TreasuryCsvService
             $transferAccount = TreasuryService::normalizeAccount((string) ($row['transfer_account'] ?? ''));
             $method = TreasuryService::normalizePaymentMethod((string) ($row['payment_method'] ?? ''));
             $categoryKey = trim((string) ($row['category'] ?? ''));
+            $documentTypeKey = TreasuryService::normalizeDocumentType((string) ($row['document_type'] ?? ''));
             $runtsLine = strtoupper(trim((string) ($row['runts_line'] ?? '')));
             $memberName = trim((string) (($row['last_name'] ?? '') . ' ' . ($row['first_name'] ?? '')));
             $out[] = [
@@ -114,6 +130,9 @@ final class TreasuryCsvService
                 'runts_line' => $runtsLine !== '' ? RuntsReportService::lineLabel($runtsLine) : '',
                 'budget_item' => !empty($row['budget_item_label']) ? (string) $row['budget_item_label'] : '',
                 'description' => (string) ($row['description'] ?? ''),
+                'document_type' => $documentTypeKey !== ''
+                    ? (string) __('treasury.document_type_' . $documentTypeKey)
+                    : '',
                 'invoice_number' => (string) ($row['invoice_number'] ?? ''),
                 'invoice_date' => (string) ($row['invoice_date'] ?? ''),
                 'beneficiary' => (string) ($row['beneficiary'] ?? ''),
@@ -169,6 +188,7 @@ final class TreasuryCsvService
             'runts_line' => RuntsReportService::lineLabel('A-E2'),
             'budget_item' => '',
             'description' => (string) __('treasury.csv_example_description'),
+            'document_type' => (string) __('treasury.document_type_invoice'),
             'invoice_number' => '',
             'invoice_date' => '',
             'beneficiary' => '',
@@ -469,7 +489,7 @@ final class TreasuryCsvService
             ],
             [
                 'label' => (string) __('treasury.import.group_details'),
-                'options' => $group(['description', 'invoice_number', 'invoice_date', 'beneficiary', 'member']),
+                'options' => $group(['description', 'document_type', 'invoice_number', 'invoice_date', 'beneficiary', 'member']),
             ],
         ];
     }
@@ -620,7 +640,7 @@ final class TreasuryCsvService
     /**
      * Unique CSV values for every mapped field, with the program options and a suggested match.
      *
-     * @return array{ok:bool,error?:string,fields:list<array{field:string,label:string,values:list<array{index:int,raw:string,count:int,suggested:string,options:list<array{value:string,label:string}>}>}>}
+     * @return array{ok:bool,error?:string,fields:list<array{field:string,label:string,values:list<array{index:int,raw:string,group:string,variants:list<string>,count:int,suggested:string,options:list<array{value:string,label:string}>}>}>}
      */
     public function normalization(): array
     {
@@ -643,13 +663,18 @@ final class TreasuryCsvService
             if ($index === false) {
                 continue;
             }
+            // Values are grouped ignoring case, accents and symbols: “Contanti”, “contanti”,
+            // “.Contanti” are the same value and must stay on one row.
             $counts = [];
+            $variants = [];
             foreach ($table['rows'] as $row) {
                 $raw = trim((string) ($row['cells'][(int) $index] ?? ''));
                 if ($raw === '') {
                     continue;
                 }
-                $counts[$raw] = (int) ($counts[$raw] ?? 0) + 1;
+                $key = $this->valueGroupKey($raw);
+                $counts[$key] = (int) ($counts[$key] ?? 0) + 1;
+                $variants[$key][$raw] = (int) ($variants[$key][$raw] ?? 0) + 1;
             }
             if ($counts === []) {
                 continue;
@@ -660,8 +685,12 @@ final class TreasuryCsvService
             $includeNone = $field !== 'approved';
             $values = [];
             $entry = 0;
-            foreach ($counts as $raw => $count) {
-                $raw = (string) $raw;
+            foreach ($counts as $key => $count) {
+                $key = (string) $key;
+                $spellings = array_keys($variants[$key] ?? []);
+                $raw = $this->representativeValue($variants[$key] ?? []);
+                // Symbols around the value must not break the automatic match ('.Contanti').
+                $clean = trim((string) preg_replace('/^[^\p{L}\p{N}]+|[^\p{L}\p{N}]+$/u', '', $raw));
                 $options = $baseOptions;
                 if ($includeNone) {
                     array_unshift($options, ['value' => '__none__', 'label' => $noneLabel]);
@@ -675,8 +704,10 @@ final class TreasuryCsvService
                 $values[] = [
                     'index' => $entry,
                     'raw' => $raw,
+                    'group' => $key,
+                    'variants' => count($spellings) > 1 ? array_map('strval', $spellings) : [],
                     'count' => (int) $count,
-                    'suggested' => $this->valueSuggestion($field, $raw),
+                    'suggested' => $this->valueSuggestion($field, $clean !== '' ? $clean : $raw),
                     'options' => $options,
                 ];
                 $entry++;
@@ -690,6 +721,116 @@ final class TreasuryCsvService
         $result['ok'] = true;
 
         return $result;
+    }
+
+    /**
+     * Choices made in the dry run: manual corrections, ignored rows, duplicates to include anyway and
+     * the recurring series to set up. They only change the analysis, never the first note.
+     *
+     * @param array<string,mixed> $raw whole payload of the dry-run adjustment form
+     * @return array{ok:bool,error?:string}
+     */
+    public function saveRowChoices(array $raw): array
+    {
+        $state = $this->state();
+        if ($state === null) {
+            return ['ok' => false, 'error' => 'treasury.import.error_no_file'];
+        }
+        // Only the rows rendered in the preview are replaced: choices already made for rows outside
+        // the shown slice stay untouched.
+        $present = $this->lineFlags($raw['row_present'] ?? []);
+        $previous = $this->rowChoices();
+        $fixes = $previous['fixes'];
+        $ignored = $previous['ignored'];
+        $included = $previous['included'];
+        foreach (array_keys($present) as $line) {
+            unset($fixes[$line], $ignored[$line], $included[$line]);
+        }
+        $reset = is_array($raw['fix_reset'] ?? null) ? $raw['fix_reset'] : [];
+        foreach ((array) ($raw['fix'] ?? []) as $line => $fields) {
+            $line = (int) $line;
+            if ($line < 1 || !isset($present[$line]) || !is_array($fields) || !empty($reset[$line])) {
+                continue;
+            }
+            foreach ($fields as $field => $value) {
+                $field = (string) $field;
+                if (!in_array($field, self::EDITABLE_FIELDS, true)) {
+                    continue;
+                }
+                $value = mb_substr(trim((string) $value), 0, 500);
+                if ($value === '') {
+                    // Empty field = back to the value found in the CSV.
+                    continue;
+                }
+                $fixes[$line][$field] = $value;
+            }
+        }
+        $ignored += $this->lineFlags($raw['ignore'] ?? []);
+        $included += $this->lineFlags($raw['include'] ?? []);
+        ksort($fixes);
+        ksort($ignored);
+        ksort($included);
+
+        $state['fixes'] = $fixes;
+        $state['ignored'] = $ignored;
+        $state['included'] = $included;
+        $recurring = [];
+        foreach ((array) ($raw['recurring_keys'] ?? []) as $key) {
+            $key = (string) $key;
+            if ($key === '') {
+                continue;
+            }
+            $recurring[$key] = !empty($raw['recurring'][$key]) ? '1' : '0';
+        }
+        $state['recurring'] = $recurring;
+        $this->saveState($state);
+
+        return ['ok' => true];
+    }
+
+    /**
+     * @param mixed $raw
+     * @return array<int,true>
+     */
+    private function lineFlags($raw): array
+    {
+        $out = [];
+        foreach ((array) $raw as $line => $flag) {
+            $line = (int) $line;
+            if ($line > 0 && (string) $flag === '1') {
+                $out[$line] = true;
+            }
+        }
+
+        return $out;
+    }
+
+    /**
+     * @return array{fixes:array<int,array<string,string>>,ignored:array<int,true>,included:array<int,true>,recurring:array<string,string>}
+     */
+    private function rowChoices(): array
+    {
+        $state = $this->state();
+        $fixes = [];
+        foreach ((array) ($state['fixes'] ?? []) as $line => $fields) {
+            if (!is_array($fields) || $fields === []) {
+                continue;
+            }
+            foreach ($fields as $field => $value) {
+                $fixes[(int) $line][(string) $field] = (string) $value;
+            }
+        }
+        $recurring = [];
+        foreach ((array) ($state['recurring'] ?? []) as $key => $value) {
+            $recurring[(string) $key] = (string) $value === '1' ? '1' : '0';
+        }
+
+        return [
+            'fixes' => $fixes,
+            'ignored' => $this->lineFlags($state['ignored'] ?? []),
+            'included' => $this->lineFlags($state['included'] ?? []),
+            'recurring' => $recurring,
+        ];
     }
 
     // @@VALUE_HELPERS@@
@@ -729,25 +870,15 @@ final class TreasuryCsvService
                 }
                 return $out;
             case 'runts_line':
-                $seen = [];
-                foreach (['expense', 'income'] as $direction) {
-                    foreach (RuntsReportService::selectGroups($direction) as $group) {
-                        foreach ((array) ($group['options'] ?? []) as $option) {
-                            $value = (string) ($option['value'] ?? '');
-                            if ($value === '' || isset($seen[$value])) {
-                                continue;
-                            }
-                            $seen[$value] = true;
-                            $out[] = ['value' => $value, 'label' => (string) ($option['label'] ?? $value)];
-                        }
-                    }
-                }
-                return $out;
+                // The section is part of the label: “1) Servizi” exists in several sections.
+                return RuntsReportService::lineOptions();
             case 'budget_item':
                 foreach ($this->treasury->budgetItemFilterOptions() as $option) {
                     $out[] = ['value' => (string) $option['value'], 'label' => (string) $option['label']];
                 }
                 return $out;
+            case 'document_type':
+                return $this->documentTypeOptions();
             case 'member':
                 return $this->memberChoices();
         }
@@ -764,10 +895,55 @@ final class TreasuryCsvService
             'category' => (string) __('treasury.import.value_default_category'),
             'runts_line' => (string) __('treasury.import.value_derive_runts'),
             'budget_item' => (string) __('treasury.import.value_no_budget'),
+            'document_type' => (string) __('treasury.import.value_no_document_type'),
             'member' => (string) __('treasury.import.value_no_member'),
             'direction' => (string) __('treasury.import.value_default_direction'),
             default => (string) __('treasury.import.value_none'),
         };
+    }
+
+    /**
+     * Grouping key of a CSV value: case, accents, punctuation and symbols are ignored, so “Contanti”,
+     * “contanti”, “conTanti” and “.Contanti” are the same value. Values made only of symbols fall back
+     * to the lowercased text.
+     */
+    private function valueGroupKey(string $raw): string
+    {
+        $key = ImportValueNormalizer::matchKey($raw);
+        if ($key !== '') {
+            return $key;
+        }
+        $text = mb_strtolower(ImportValueNormalizer::text($raw), 'UTF-8');
+
+        return $text !== '' ? '~' . $text : '~';
+    }
+
+    /**
+     * Spelling shown for a group of equivalent values: the most frequent, preferring a clean one
+     * (no leading symbol) and avoiding a fully uppercase variant when another one exists.
+     *
+     * @param array<string,int> $variants raw spelling => rows
+     */
+    private function representativeValue(array $variants): string
+    {
+        $best = '';
+        $bestScore = -1;
+        foreach ($variants as $raw => $count) {
+            $raw = (string) $raw;
+            $score = (int) $count * 10;
+            if (preg_match('/^[\p{L}\p{N}]/u', $raw) === 1) {
+                $score += 3;
+            }
+            if (preg_match('/\p{L}/u', $raw) === 1 && $raw === mb_strtoupper($raw, 'UTF-8')) {
+                $score -= 1;
+            }
+            if ($score > $bestScore || ($score === $bestScore && strcmp($raw, $best) < 0)) {
+                $bestScore = $score;
+                $best = $raw;
+            }
+        }
+
+        return $best;
     }
 
     // @@VALUE_SAVE@@
@@ -820,6 +996,11 @@ final class TreasuryCsvService
                     || in_array($target, $allowed[$field], true);
                 if ($valid) {
                     $map[$field][$raw] = $target;
+                    // The same target applies to every spelling of the value (“contanti”, “.Contanti”).
+                    $groupKey = $this->valueGroupKey($raw);
+                    if ($groupKey !== $raw) {
+                        $map[$field][$groupKey] = $target;
+                    }
                 }
             }
         }
@@ -839,7 +1020,7 @@ final class TreasuryCsvService
             return ['value' => '', 'none' => false, 'new' => false];
         }
         $map = $this->valueMap()[$field] ?? [];
-        $target = $map[$raw] ?? $map[mb_strtolower($raw)] ?? null;
+        $target = $map[$raw] ?? $map[mb_strtolower($raw)] ?? $map[$this->valueGroupKey($raw)] ?? null;
         if ($target === null) {
             return ['value' => '', 'none' => false, 'new' => false];
         }
@@ -905,6 +1086,9 @@ final class TreasuryCsvService
             case 'budget_item':
                 $id = $this->matchBudgetItem($raw, $this->treasury->budgetItemFilterOptions());
                 return $id > 0 ? (string) $id : '__none__';
+            case 'document_type':
+                $type = $this->matchDocumentType($raw);
+                return $type !== '' ? $type : '__none__';
             case 'member':
                 $id = (int) ($this->memberLookup()['by_key'][mb_strtolower($raw)] ?? 0);
                 return $id > 0 ? (string) $id : '__none__';
@@ -929,16 +1113,19 @@ final class TreasuryCsvService
     }
 
     /**
-     * Parse the file without writing anything: each line becomes “new”, “skip” or “error”.
+     * Parse the file without writing anything: each line becomes “new”, “skip”, “ignore” or “error”.
+     * Manual corrections, ignored rows, duplicates to include and the recurring choices saved by
+     * saveRowChoices() are applied here, so the preview and the commit share the same evaluation.
      *
-     * @return array{ok:bool,error?:string,stats:array{total:int,create:int,skip:int,error:int},rows:list<array<string,mixed>>,shown:int,total_rows:int}
+     * @return array{ok:bool,error?:string,stats:array{total:int,create:int,skip:int,error:int,ignore:int},rows:list<array<string,mixed>>,recurring:list<array<string,mixed>>,shown:int,total_rows:int}
      */
     public function analyze(int $limit = self::PREVIEW_ROWS): array
     {
         $result = [
             'ok' => false,
-            'stats' => ['total' => 0, 'create' => 0, 'skip' => 0, 'error' => 0],
+            'stats' => ['total' => 0, 'create' => 0, 'skip' => 0, 'error' => 0, 'ignore' => 0],
             'rows' => [],
+            'recurring' => [],
             'shown' => 0,
             'total_rows' => 0,
         ];
@@ -969,9 +1156,11 @@ final class TreasuryCsvService
         $budgetOptions = $this->treasury->budgetItemFilterOptions();
         $members = $this->memberLookup();
         $existing = $options['skip_duplicates'] === '1' ? $this->existingFingerprints() : [];
+        $choices = $this->rowChoices();
         $batchSeen = [];
 
         $result['ok'] = true;
+        $rows = [];
         foreach ($table['rows'] as $raw) {
             $values = [];
             foreach ($map as $index => $target) {
@@ -981,6 +1170,11 @@ final class TreasuryCsvService
                 $values[(string) $target] = trim((string) ($raw['cells'][(int) $index] ?? ''));
             }
             $line = (int) ($raw['line'] ?? 0);
+            // Manual corrections applied in the dry run replace the CSV cells before parsing.
+            $fixes = $choices['fixes'][$line] ?? [];
+            foreach ($fixes as $field => $fixedValue) {
+                $values[$field] = $fixedValue;
+            }
             $errors = [];
             $warnings = [];
 
@@ -1176,36 +1370,80 @@ final class TreasuryCsvService
                 $invoiceNumber = '';
                 $invoiceDate = '';
             }
+            $documentTypeRaw = (string) ($values['document_type'] ?? '');
+            $documentType = '';
+            $mappedDocumentType = $this->mappedValue('document_type', $documentTypeRaw);
+            if ($direction !== 'transfer') {
+                if ($mappedDocumentType['value'] !== '') {
+                    $documentType = $mappedDocumentType['value'];
+                } elseif (!$mappedDocumentType['none'] && $documentTypeRaw !== '') {
+                    $documentType = $this->matchDocumentType($documentTypeRaw);
+                }
+            }
             $invoicePayment = $direction === 'expense' && ($invoiceNumber !== '' || $invoiceDate !== '') ? '1' : '';
             $action = 'create';
+            $duplicate = null;
             if ($errors !== []) {
                 $action = 'error';
             } else {
-                $fingerprint = $this->fingerprint($date, $direction, (float) $amount, $account, $description);
-                if (isset($existing[$fingerprint]) || isset($batchSeen[$fingerprint])) {
-                    $action = 'skip';
-                    $warnings[] = (string) __('treasury.import.warning_duplicate');
+                // A movement is “already present” only with the same date, amount and description:
+                // anything else is a different movement and must not be lost.
+                $fingerprint = $this->fingerprint($date, (float) $amount, $description);
+                $twin = $existing[$fingerprint] ?? null;
+                $batchLine = (int) ($batchSeen[$fingerprint] ?? 0);
+                if ($twin !== null || $batchLine > 0) {
+                    $duplicate = [
+                        'id' => (int) ($twin['id'] ?? 0),
+                        'date' => (string) ($twin['date'] ?? ''),
+                        'description' => mb_strimwidth((string) ($twin['description'] ?? ''), 0, 60, '…'),
+                        'line' => $batchLine,
+                        'included' => isset($choices['included'][$line]),
+                    ];
+                    if ($duplicate['included']) {
+                        $action = 'create';
+                        $warnings[] = (string) ($batchLine > 0
+                            ? __('treasury.import.duplicate_batch_included', ['line' => (string) $batchLine])
+                            : __('treasury.import.duplicate_existing_included', [
+                                'id' => (string) $duplicate['id'],
+                                'date' => format_date($duplicate['date']) ?: $duplicate['date'],
+                                'description' => $duplicate['description'],
+                            ]));
+                    } else {
+                        $action = 'skip';
+                        $warnings[] = (string) ($batchLine > 0
+                            ? __('treasury.import.duplicate_batch', ['line' => (string) $batchLine])
+                            : __('treasury.import.duplicate_existing', [
+                                'id' => (string) $duplicate['id'],
+                                'date' => format_date($duplicate['date']) ?: $duplicate['date'],
+                                'description' => $duplicate['description'],
+                            ]));
+                    }
                 } else {
-                    $batchSeen[$fingerprint] = true;
+                    $batchSeen[$fingerprint] = $line;
                 }
             }
-
-            $result['stats']['total']++;
-            $result['stats'][$action]++;
-            if ($limit > 0 && count($result['rows']) >= $limit) {
-                continue;
+            if (isset($choices['ignored'][$line])) {
+                // Ignoring wins over everything: the row is neither imported nor reported as an error.
+                $action = 'ignore';
             }
-            $result['rows'][] = [
+
+            $rows[] = [
                 'line' => $line,
                 'action' => $action,
+                'ignored' => $action === 'ignore',
+                'fixed' => $fixes !== [],
+                'duplicate' => $duplicate,
+                'recurring_key' => '',
                 'date' => $date,
                 'direction' => $direction,
                 'amount' => (float) ($amount ?? 0),
                 'category' => $categoryLabel,
+                'runts_line' => $runtsLine !== '' ? RuntsReportService::lineLabelWithSection($runtsLine) : '',
                 'account' => (string) ($accountLabels[$account] ?? $account),
                 'transfer_account' => $transferAccount !== '' ? (string) ($accountLabels[$transferAccount] ?? $transferAccount) : '',
                 'method' => $method !== '' ? (string) __('treasury.method_' . $method) : '',
                 'description' => $description,
+                'document_type' => $documentType !== '' ? (string) __('treasury.document_type_' . $documentType) : '',
                 'invoice_number' => $invoiceNumber,
                 'invoice_date' => $invoiceDate,
                 'beneficiary' => $beneficiary,
@@ -1213,6 +1451,17 @@ final class TreasuryCsvService
                 'approved' => $approved,
                 'errors' => $errors,
                 'warnings' => $warnings,
+                'edit' => $errors !== [] || $fixes !== [] ? [
+                    'movement_date' => $date !== '' ? $date : (string) ($values['movement_date'] ?? ''),
+                    'direction' => $direction,
+                    'amount' => $amount !== null ? number_format($amount, 2, '.', '') : $amountRaw,
+                    'account' => $account,
+                    'transfer_account' => $transferAccount,
+                    'description' => (string) ($values['description'] ?? ''),
+                    'document_type' => $documentType,
+                    'invoice_number' => (string) ($values['invoice_number'] ?? ''),
+                    'invoice_date' => $invoiceDate !== '' ? $invoiceDate : $invoiceDateRaw,
+                ] : [],
                 'payload' => [
                     'direction' => $direction,
                     'amount' => $amount !== null ? (string) $amount : '',
@@ -1225,6 +1474,7 @@ final class TreasuryCsvService
                     'runts_line' => $runtsLine,
                     'budget_item_id' => $budgetItemId > 0 ? (string) $budgetItemId : '',
                     'description' => $description,
+                    'document_type' => $documentType,
                     'invoice_number' => $invoiceNumber,
                     'invoice_date' => $invoiceDate,
                     'invoice_payment' => $invoicePayment,
@@ -1234,10 +1484,193 @@ final class TreasuryCsvService
                 ],
             ];
         }
+        // Recurring series are recognised across the whole file, then every row is annotated with the
+        // series it belongs to (the commit uses it to create the rule and link the movements).
+        $detection = $this->detectRecurring($rows);
+        $series = $detection['series'];
+        $importable = [];
+        foreach ($detection['rows'] as $index => $key) {
+            if ((string) ($rows[$index]['action'] ?? '') === 'create') {
+                $importable[$key] = true;
+            }
+        }
+        // A rule is proposed only when at least one occurrence will really be imported.
+        foreach (array_keys($series) as $key) {
+            if (!isset($importable[$key])) {
+                unset($series[$key]);
+            }
+        }
+        foreach ($detection['rows'] as $index => $key) {
+            if (isset($series[$key], $rows[$index])) {
+                $rows[$index]['recurring_key'] = $key;
+            }
+        }
+        foreach ($series as $key => $meta) {
+            $series[$key]['enabled'] = ($choices['recurring'][(string) $key] ?? '1') === '1';
+            $series[$key]['frequency_label'] = (string) __('treasury.recurring_freq_' . (string) $meta['frequency']);
+        }
+        foreach ($rows as $row) {
+            $action = (string) ($row['action'] ?? 'error');
+            $result['stats']['total']++;
+            if (isset($result['stats'][$action])) {
+                $result['stats'][$action]++;
+            }
+        }
         $result['total_rows'] = $result['stats']['total'];
+        $result['recurring'] = array_values($series);
+        // Problems first (errors, ignored, skipped): they stay visible even when only part of the file
+        // is shown.
+        usort($rows, static function (array $a, array $b): int {
+            $order = ['error' => 0, 'ignore' => 1, 'skip' => 2, 'create' => 3];
+            $left = $order[(string) ($a['action'] ?? 'error')] ?? 4;
+            $right = $order[(string) ($b['action'] ?? 'error')] ?? 4;
+            if ($left !== $right) {
+                return $left <=> $right;
+            }
+
+            return (int) ($a['line'] ?? 0) <=> (int) ($b['line'] ?? 0);
+        });
+        $result['rows'] = $limit > 0 ? array_slice($rows, 0, $limit) : $rows;
         $result['shown'] = count($result['rows']);
 
         return $result;
+    }
+
+    /**
+     * Recognises the recurring series: same direction and category, description with the numbers
+     * stripped (“Fattura 12/2024 ENEL” → “fatturaenel”), at least three occurrences and a constant
+     * interval. Both expenses (rent, utilities, instalments) and income (fees, grants) are detected.
+     *
+     * @param list<array<string,mixed>> $rows
+     * @return array{series:array<string,array<string,mixed>>,rows:array<int,string>}
+     */
+    private function detectRecurring(array $rows): array
+    {
+        $today = date('Y-m-d');
+        $groups = [];
+        foreach ($rows as $index => $row) {
+            $action = (string) ($row['action'] ?? 'error');
+            if ($action !== 'create' && $action !== 'skip') {
+                continue;
+            }
+            $payload = is_array($row['payload'] ?? null) ? $row['payload'] : [];
+            $direction = (string) ($payload['direction'] ?? '');
+            $date = (string) ($payload['movement_date'] ?? '');
+            $amount = (float) ($payload['amount'] ?? 0);
+            if (($direction !== 'income' && $direction !== 'expense') || $date === '' || $amount <= 0) {
+                continue;
+            }
+            $needle = $this->recurringKey((string) ($payload['description'] ?? ''));
+            if (mb_strlen($needle) < 4) {
+                continue;
+            }
+            $key = $direction . '|' . (string) ($payload['category'] ?? '') . '|' . $needle;
+            $groups[$key][] = ['index' => (int) $index, 'date' => $date, 'amount' => $amount];
+        }
+
+        $series = [];
+        $members = [];
+        foreach ($groups as $key => $entries) {
+            if (count($entries) < 3) {
+                continue;
+            }
+            usort($entries, static fn (array $a, array $b): int => (string) $a['date'] <=> (string) $b['date']);
+            $frequency = $this->recurringFrequency($entries);
+            if ($frequency === '') {
+                continue;
+            }
+            $last = $entries[count($entries) - 1];
+            $lastRow = $rows[(int) $last['index']] ?? [];
+            $payload = is_array($lastRow['payload'] ?? null) ? $lastRow['payload'] : [];
+            $lastDate = (string) $last['date'];
+            $amounts = array_map(
+                static fn (array $entry): string => number_format((float) $entry['amount'], 2, '.', ''),
+                $entries
+            );
+            $description = (string) ($payload['description'] ?? '');
+            $series[$key] = [
+                'key' => (string) $key,
+                'frequency' => $frequency,
+                'day' => (int) date('j', strtotime($lastDate) ?: time()),
+                'count' => count($entries),
+                'from' => (string) $entries[0]['date'],
+                'to' => $lastDate,
+                // The rule starts from the last occurrence (never in the past): no catch-up entries.
+                'start' => $lastDate < $today ? $today : $lastDate,
+                'variable' => count(array_unique($amounts)) > 1,
+                'amount' => round((float) $last['amount'], 2),
+                'label' => mb_strimwidth($description, 0, 70, '…'),
+                'direction' => (string) ($payload['direction'] ?? ''),
+                'category' => (string) ($payload['category'] ?? ''),
+                'account' => (string) ($payload['account'] ?? ''),
+                'payment_method' => (string) ($payload['payment_method'] ?? ''),
+                'description' => $description,
+                'beneficiary' => (string) ($payload['beneficiary'] ?? ''),
+                'member_id' => (string) ($payload['member_id'] ?? ''),
+                'budget_item_id' => (string) ($payload['budget_item_id'] ?? ''),
+                'runts_line' => (string) ($payload['runts_line'] ?? ''),
+            ];
+            foreach ($entries as $entry) {
+                $members[(int) $entry['index']] = (string) $key;
+            }
+        }
+
+        return ['series' => $series, 'rows' => $members];
+    }
+
+    /**
+     * Grouping key of a recurring series: the description without numbers and month names, so
+     * “Affitto gennaio 2025” and “Affitto febbraio 2025” end up in the same series.
+     */
+    private function recurringKey(string $description): string
+    {
+        $months = 'gen|genn|gennaio|feb|febbr|febbraio|marzo|apr|aprile|mag|maggio|mai|giu|giugno|lug|luglio'
+            . '|ago|agosto|set|settembre|ott|ottobre|nov|novembre|dic|dicembre'
+            . '|januar|jänner|februar|märz|maerz|juni|juli|august|oktober|dezember'
+            . '|january|february|march|may|june|july|october|december';
+        $text = (string) preg_replace('/\b(' . $months . ')\b/u', ' ', mb_strtolower($description, 'UTF-8'));
+
+        return (string) preg_replace('/[^a-z]+/', '', ImportValueNormalizer::matchKey($text));
+    }
+
+    /**
+     * Constant interval of the occurrences → frequency (empty when the series is not regular).
+     *
+     * @param list<array{index:int,date:string,amount:float}> $entries sorted by date
+     */
+    private function recurringFrequency(array $entries): string
+    {
+        $days = [];
+        $months = [];
+        foreach ($entries as $entry) {
+            $timestamp = strtotime((string) $entry['date']);
+            if ($timestamp === false) {
+                return '';
+            }
+            $days[] = (int) date('Y', $timestamp) * 366 + (int) date('z', $timestamp);
+            $months[] = (int) date('Y', $timestamp) * 12 + (int) date('n', $timestamp);
+        }
+        $weekly = true;
+        for ($i = 1; $i < count($days); $i++) {
+            if ($days[$i] - $days[$i - 1] !== 7) {
+                $weekly = false;
+                break;
+            }
+        }
+        if ($weekly) {
+            return 'weekly';
+        }
+        $step = $months[1] - $months[0];
+        if ($step < 1) {
+            return '';
+        }
+        for ($i = 1; $i < count($months); $i++) {
+            if ($months[$i] - $months[$i - 1] !== $step) {
+                return '';
+            }
+        }
+
+        return self::RECURRING_MONTHS[$step] ?? '';
     }
 
     /**
@@ -1258,13 +1691,27 @@ final class TreasuryCsvService
         $state = $this->state();
         $created = 0;
         $skipped = 0;
+        $ignored = 0;
         $failed = 0;
         $errors = [];
         $newCategories = [];
+        // Only the recurring series kept in the dry run get a rule; the imported movements of the
+        // series are linked to it.
+        $series = [];
+        foreach ((array) ($analysis['recurring'] ?? []) as $meta) {
+            if (is_array($meta) && !empty($meta['enabled'])) {
+                $series[(string) ($meta['key'] ?? '')] = $meta;
+            }
+        }
+        $rules = [];
         foreach ($analysis['rows'] as $row) {
             $action = (string) ($row['action'] ?? 'error');
             if ($action === 'skip') {
                 $skipped++;
+                continue;
+            }
+            if ($action === 'ignore') {
+                $ignored++;
                 continue;
             }
             if ($action !== 'create') {
@@ -1287,13 +1734,28 @@ final class TreasuryCsvService
                 ];
                 continue;
             }
+            $movementId = (int) ($result['id'] ?? 0);
             if (empty($row['approved'])) {
                 $this->db->update(
                     'treasury_movements',
                     ['approved_at' => null, 'approved_by' => null],
                     'id = :id',
-                    ['id' => (int) ($result['id'] ?? 0)]
+                    ['id' => $movementId]
                 );
+            }
+            $seriesKey = (string) ($row['recurring_key'] ?? '');
+            if ($seriesKey !== '' && isset($series[$seriesKey])) {
+                if (!isset($rules[$seriesKey])) {
+                    $rules[$seriesKey] = $this->createRecurringRule($series[$seriesKey], $userId, $ip);
+                }
+                if ($rules[$seriesKey] > 0 && $movementId > 0) {
+                    $this->db->update(
+                        'treasury_movements',
+                        ['recurring_id' => $rules[$seriesKey]],
+                        'id = :id',
+                        ['id' => $movementId]
+                    );
+                }
             }
             if ((string) ($payload['category'] ?? '') === '__new__') {
                 $label = trim((string) ($payload['new_category'] ?? ''));
@@ -1303,13 +1765,16 @@ final class TreasuryCsvService
             }
             $created++;
         }
+        $recurringRules = count(array_filter($rules, static fn (int $id): bool => $id > 0));
         $report = [
             'run_id' => time(),
             'at' => date('Y-m-d H:i:s'),
             'source_name' => (string) ($state['source_name'] ?? ''),
             'created' => $created,
             'skipped' => $skipped,
+            'ignored' => $ignored,
             'failed' => $failed,
+            'recurring_rules' => $recurringRules,
             'errors' => $errors,
             'new_categories' => array_keys($newCategories),
         ];
@@ -1318,10 +1783,39 @@ final class TreasuryCsvService
         app('logger')->info('treasury.csv_imported', [
             'created' => $created,
             'skipped' => $skipped,
+            'ignored' => $ignored,
             'failed' => $failed,
+            'recurring_rules' => $recurringRules,
         ]);
 
         return ['ok' => true, 'report' => $report];
+    }
+
+    /**
+     * Creates the recurring rule detected in the dry run; 0 when it cannot be created.
+     *
+     * @param array<string,mixed> $series
+     */
+    private function createRecurringRule(array $series, ?int $userId, string $ip): int
+    {
+        $result = $this->recurring->createFromInput([
+            'direction' => (string) ($series['direction'] ?? 'expense'),
+            'amount' => (float) ($series['amount'] ?? 0),
+            'category' => (string) ($series['category'] ?? ''),
+            'description' => (string) ($series['description'] ?? ''),
+            'account' => (string) ($series['account'] ?? ''),
+            'payment_method' => (string) ($series['payment_method'] ?? ''),
+            'beneficiary' => (string) ($series['beneficiary'] ?? ''),
+            'member_id' => (int) ($series['member_id'] ?? 0),
+            'budget_item_id' => (int) ($series['budget_item_id'] ?? 0),
+            'runts_line' => (string) ($series['runts_line'] ?? ''),
+            'recurring_frequency' => (string) ($series['frequency'] ?? 'monthly'),
+            'recurring_day' => (int) ($series['day'] ?? 1),
+            'recurring_start' => (string) ($series['start'] ?? ''),
+            'recurring_variable' => !empty($series['variable']) ? '1' : '',
+        ], (string) ($series['start'] ?? ''), $userId, $ip);
+
+        return empty($result['ok']) ? 0 : (int) ($result['id'] ?? 0);
     }
 
     /** @return array<string,mixed> */
@@ -1395,6 +1889,7 @@ final class TreasuryCsvService
             'category' => ['tipologia', 'categoria', 'category', 'kategorie', 'rubrica'],
             'runts_line' => ['vocemodellod', 'voce', 'modello', 'runts', 'position', 'vocerunts'],
             'budget_item' => ['centro', 'centrodicosto', 'costo', 'progetto', 'budget', 'kostenstelle', 'vocepreventivo'],
+            'document_type' => ['tipodocumento', 'tipodoc', 'documenttype', 'doctype', 'belegart', 'belegtyp', 'documentkind', 'tipologiadocumento'],
             'invoice_number' => ['numerodocumento', 'numerofattura', 'numerodoc', 'documentnumber', 'invoicenumber', 'rechnungsnummer', 'docnumber', 'beleg', 'belegnummer'],
             'invoice_date' => ['datadocumento', 'datafattura', 'datadoc', 'documentdate', 'invoicedate', 'rechnungsdatum', 'docdate', 'datariferimento', 'belegdatum'],
             'description' => ['descrizione', 'causale', 'description', 'beschreibung', 'note', 'memo'],
@@ -1554,6 +2049,53 @@ final class TreasuryCsvService
         };
     }
 
+    /**
+     * Document types offered by the import (key + translated label).
+     *
+     * @return list<array{value:string,label:string}>
+     */
+    private function documentTypeOptions(): array
+    {
+        $out = [];
+        foreach (TreasuryService::DOCUMENT_TYPES as $key) {
+            $out[] = ['value' => (string) $key, 'label' => (string) __('treasury.document_type_' . $key)];
+        }
+
+        return $out;
+    }
+
+    /**
+     * Document type from a free label (IT/EN/DE, case and symbols ignored): “Fattura”, “invoice”,
+     * “Rechnung” → invoice; “nota di credito” and “nota di debito” stay distinct.
+     */
+    private function matchDocumentType(string $raw): string
+    {
+        $raw = trim($raw);
+        if ($raw === '') {
+            return '';
+        }
+        $direct = TreasuryService::normalizeDocumentType($raw);
+        if ($direct !== '') {
+            return $direct;
+        }
+        $needle = ImportValueNormalizer::matchKey($raw);
+        if (mb_strlen($needle) < 3) {
+            return '';
+        }
+        $matches = [];
+        foreach (TreasuryService::DOCUMENT_TYPES as $key) {
+            $label = ImportValueNormalizer::matchKey((string) __('treasury.document_type_' . $key));
+            if ($label === '') {
+                continue;
+            }
+            if ($label === $needle || str_starts_with($label, $needle) || str_starts_with($needle, $label)) {
+                $matches[$key] = true;
+            }
+        }
+
+        return count($matches) === 1 ? (string) array_key_first($matches) : '';
+    }
+
     private function matchRuntsLine(string $raw): string
     {
         $raw = trim($raw);
@@ -1664,32 +2206,40 @@ final class TreasuryCsvService
 
     /**
      * Fingerprints of the movements already in the first note (only those not superseded): they are
-     * used to skip duplicates during the preview.
+     * used to spot duplicates during the preview, together with the row they match so the dry run can
+     * name it.
      *
-     * @return array<string,true>
+     * @return array<string,array{id:int,date:string,description:string}>
      */
     private function existingFingerprints(): array
     {
         $out = [];
         foreach ($this->db->fetchAll(
-            'SELECT movement_date, direction, amount, account, description
+            'SELECT id, movement_date, amount, description
              FROM treasury_movements WHERE superseded_at IS NULL'
         ) as $row) {
-            $out[$this->fingerprint(
-                (string) ($row['movement_date'] ?? ''),
-                (string) ($row['direction'] ?? ''),
-                (float) ($row['amount'] ?? 0),
-                TreasuryService::normalizeAccount((string) ($row['account'] ?? '')),
-                (string) ($row['description'] ?? '')
-            )] = true;
+            $date = substr(trim((string) ($row['movement_date'] ?? '')), 0, 10);
+            $description = (string) ($row['description'] ?? '');
+            $fingerprint = $this->fingerprint($date, (float) ($row['amount'] ?? 0), $description);
+            if (isset($out[$fingerprint])) {
+                continue;
+            }
+            $out[$fingerprint] = [
+                'id' => (int) ($row['id'] ?? 0),
+                'date' => $date,
+                'description' => trim($description),
+            ];
         }
 
         return $out;
     }
 
-    private function fingerprint(string $date, string $direction, float $amount, string $account, string $description): string
+    /**
+     * Same date, same amount and same description: anything else is a different movement.
+     */
+    private function fingerprint(string $date, float $amount, string $description): string
     {
-        return $date . '|' . $direction . '|' . number_format($amount, 2, '.', '') . '|' . $account . '|'
-            . mb_strtolower(trim($description));
+        return $date . '|' . number_format($amount, 2, '.', '') . '|'
+            . mb_strtolower(ImportValueNormalizer::text($description));
     }
 }

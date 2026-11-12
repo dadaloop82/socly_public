@@ -178,6 +178,7 @@ $router->get('/treasury/import/report', [TreasuryCsvController::class, 'report']
 $router->get('/treasury/import/errors', [TreasuryCsvController::class, 'errorsCsv'], 'treasury.manage', ['mw.locale', 'mw.install', 'mw.auth']);
 $router->post('/treasury/import/upload', [TreasuryCsvController::class, 'upload'], 'treasury.manage', ['mw.locale', 'mw.install', 'mw.auth', 'mw.csrf']);
 $router->post('/treasury/import/map', [TreasuryCsvController::class, 'saveMap'], 'treasury.manage', ['mw.locale', 'mw.install', 'mw.auth', 'mw.csrf']);
+$router->post('/treasury/import/rows', [TreasuryCsvController::class, 'saveRows'], 'treasury.manage', ['mw.locale', 'mw.install', 'mw.auth', 'mw.csrf']);
 $router->post('/treasury/import/commit', [TreasuryCsvController::class, 'commit'], 'treasury.manage', ['mw.locale', 'mw.install', 'mw.auth', 'mw.csrf']);
 $router->post('/treasury/import/cancel', [TreasuryCsvController::class, 'cancel'], 'treasury.manage', ['mw.locale', 'mw.install', 'mw.auth', 'mw.csrf']);
 $router->post('/budgets/{id}/reopen', [BudgetController::class, 'reopen'], 'treasury.manage', ['mw.locale', 'mw.install', 'mw.auth', 'mw.csrf']);

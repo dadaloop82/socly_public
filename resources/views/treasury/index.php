@@ -511,6 +511,14 @@ foreach ($categories as $categoryOption) {
                                 $memberLabel = trim((string) (($row['last_name'] ?? '') . ' ' . ($row['first_name'] ?? '')));
                                 $desc = trim((string) ($row['description'] ?? ''));
                                 $invoiceTitle = trim((string) ($row['invoice_title'] ?? ''));
+                                $documentTypeKey = (string) ($row['document_type'] ?? '');
+                                $documentTypeLabel = '';
+                                if ($documentTypeKey !== '') {
+                                    $documentTypeLabel = (string) __('treasury.document_type_' . $documentTypeKey);
+                                    if ($documentTypeLabel === 'treasury.document_type_' . $documentTypeKey) {
+                                        $documentTypeLabel = $documentTypeKey;
+                                    }
+                                }
                                 if ($desc === '' && $invoiceTitle !== '') {
                                     $desc = $invoiceTitle;
                                 }
@@ -626,13 +634,14 @@ foreach ($categories as $categoryOption) {
                                         <?php if ($memberLabel !== ''): ?><div><?= e($memberLabel) ?></div><?php endif; ?>
                                         <?php if (!empty($row['beneficiary'])): ?><div><?= e(__('treasury.supplier')) ?>: <?= e((string) $row['beneficiary']) ?></div><?php endif; ?>
                                         <?php if ($invoiceTitle !== '' && $invoiceTitle !== $desc): ?><div><?= e(__('treasury.invoice_title')) ?>: <?= e($invoiceTitle) ?></div><?php endif; ?>
+                                        <?php if ($documentTypeLabel !== ''): ?><div><?= e(__('treasury.document_type')) ?>: <?= e($documentTypeLabel) ?></div><?php endif; ?>
                                         <?php if (!empty($row['invoice_number'])): ?><div><?= e(__('treasury.invoice_number')) ?>: <?= e((string) $row['invoice_number']) ?></div><?php endif; ?>
                                         <?php if (!empty($row['invoice_date'])): ?><div><?= e(__('treasury.invoice_date')) ?>: <?= e(format_date($row['invoice_date']) ?: (string) $row['invoice_date']) ?></div><?php endif; ?>
                                         <?php if (!empty($row['budget_item_label'])): ?><div><?= e(__('treasury.budget_item')) ?>: <?= e((string) $row['budget_item_label']) ?></div><?php endif; ?>
                                         <?php if (!empty($row['invoice_due_date'])): ?><div><?= e(__('treasury.invoice_due_date')) ?>: <?= e(format_date($row['invoice_due_date']) ?: (string) $row['invoice_due_date']) ?></div><?php endif; ?>
                                         <?php if (!empty($row['amount_entered']) && !empty($row['amount_currency'])): ?><div><?= e(__('treasury.amount_original')) ?>: <?= e(number_format((float) $row['amount_entered'], 2, ',', '.')) ?> <?= e((string) $row['amount_currency']) ?></div><?php endif; ?>
                                         <?php if (!empty($row['attachment_path'])): ?><div><a href="<?= e(url('/treasury/' . $rowId . '/attachment')) ?>" target="_blank" rel="noopener"><?= e(__('treasury.upload_document')) ?></a></div><?php endif; ?>
-                                        <?php if (empty($row['member_id']) && empty($row['beneficiary']) && empty($row['invoice_number']) && empty($row['invoice_title']) && empty($row['budget_item_label']) && empty($row['invoice_date']) && empty($row['attachment_path'])): ?><?= e(__('treasury.none')) ?><?php endif; ?>
+                                        <?php if (empty($row['member_id']) && empty($row['beneficiary']) && empty($row['invoice_number']) && empty($row['invoice_title']) && empty($row['budget_item_label']) && empty($row['invoice_date']) && empty($row['attachment_path']) && $documentTypeLabel === ''): ?><?= e(__('treasury.none')) ?><?php endif; ?>
                                     </td>
                                     <td class="<?= $isTransfer ? 'amount-transfer' : 'amount-income' ?>"><?= $isIncome || $isTransfer ? ($isTransfer ? '↔ ' : '') . e($currency->format($amount)) : '—' ?></td>
                                     <td class="amount-expense"><?= $isIncome || $isTransfer ? '—' : e($currency->format($amount)) ?></td>
