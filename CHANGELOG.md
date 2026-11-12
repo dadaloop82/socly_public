@@ -22,10 +22,11 @@ every 100 patches bump the series, and each bump is published to this repository
   heartbeat now reports the current path + fragment, the query string is always stripped and the
   link is rebuilt server-side.
 - The first-note list can now **edit the selection in bulk**: select the movements, press “Edit” and set
-  only the fields you want — financial account, type, Model D line, cost centre and notes (with
-  “replace the notes”); anything left on “keep” stays as it is. A confirmation summarises what will be
-  applied and to how many movements before overwriting them. Internal transfers take account and notes
-  only, historical rows are never touched, and every row keeps its “modified by” trail.
+  only the fields you want — financial account, type, Model D line, cost centre, description and notes
+  (with “replace the description” / “replace the notes”); anything left on “keep” stays as it is. A
+  confirmation summarises what will be applied and to how many movements before overwriting them.
+  Internal transfers take account, description and notes only, historical rows are never touched, and
+  every row keeps its “modified by” trail.
 - The ledger cost-centre filter now groups the lines by budget and section (“2026 · Personnel”) exactly
   like the “Voce del bilancio consuntivo (Modello D)” filter, so two sections repeating a wording can no
   longer be confused; the summaries keep reading “year · section · line”.
@@ -168,6 +169,10 @@ every 100 patches bump the series, and each bump is published to this repository
 - The previous/next arrows of a movement now follow the order of the list you are reading: same
   filters, same search, same sort (date, description, method, amount, grouped by type) and therefore
   the same sequence of the ledger, page after page.
+- The ‹ › arrows no longer disappear after an update that takes the movement out of the ledger you
+  came from (a reclassification while filtering by cost centre, a date moved outside the period, a
+  changed sign): when the record is not part of the filtered sequence any more, the arrows fall back
+  to the whole register with the same sort instead of disabling both.
 - A financial account is always shown with its name: a custom wallet (“Carta di credito”) is no
   longer displayed with its internal slug (`carta_di_credito`) in the ledger, in the superseded /
   transfer notes and in the account pickers; a legacy slug without a wallet still reads as a name.

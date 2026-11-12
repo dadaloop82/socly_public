@@ -612,6 +612,8 @@ final class TreasuryController extends BaseController
                 'category' => (string) $request->input('category', ''),
                 'runts_line' => (string) $request->input('runts_line', ''),
                 'budget_item_id' => (string) $request->input('budget_item_id', ''),
+                'description' => (string) $request->input('description', ''),
+                'description_action' => (string) $request->input('description_action', ''),
                 'notes' => (string) $request->input('notes', ''),
                 'notes_action' => (string) $request->input('notes_action', ''),
             ], $request->ip());

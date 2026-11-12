@@ -42,6 +42,8 @@ Permission checks on routes and UI via stable keys in `Socly\Support\Permission`
 ## Audit & logging
 
 - Mutations write to `audit_logs` (actor, entity, before/after, IP).
+- The `/audit` screen (permission `audit.view`) is the read-only activity log: filters by actor, area and
+  period, with expandable before/after payloads. It never writes audit rows.
 - Application logger redacts passwords, tokens, fiscal codes; never dump full `$_POST` / `$_SESSION`.
 - Production errors (`APP_DEBUG=false`) show a generic page; details go to `storage/logs/app.log`.
 

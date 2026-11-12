@@ -157,14 +157,15 @@ one-click `POST /treasury/similar/apply`, which updates the chosen rows through
 ## Bulk edit of the selection
 
 `POST /treasury/bulk` with `action=update` reclassifies every selected movement at once
-(`TreasuryService::updateMany()`): financial account, type, Model D line, cost centre and notes. Each
-field carries a “keep” value (`''`), so only the chosen ones overwrite what was there; `__none__`
-clears the Model D line or the cost centre, and the notes are replaced only when their checkbox is
-ticked. The dialog summarises the changes and the number of movements before sending the request; the
-service skips historical (`superseded_at`) rows, applies only account/notes to internal transfers and
-writes one `treasury.bulk_updated` audit row per movement (before/after), so the “modified by” trail
-and the freshness banner keep working. Row versions are bumped: a form left open elsewhere reopens on
-the conflict banner instead of overwriting.
+(`TreasuryService::updateMany()`): financial account, type, Model D line, cost centre, description and
+notes. Each field carries a “keep” value (`''`), so only the chosen ones overwrite what was there;
+`__none__` clears the Model D line or the cost centre, while the description and the notes are
+replaced only when their checkbox is ticked (the description is normalised like the single form: first
+letter upper case, max 500 characters). The dialog summarises the changes and the number of movements
+before sending the request; the service skips historical (`superseded_at`) rows, applies only
+account/description/notes to internal transfers and writes one `treasury.bulk_updated` audit row per
+movement (before/after), so the “modified by” trail and the freshness banner keep working. Row versions
+are bumped: a form left open elsewhere reopens on the conflict banner instead of overwriting.
 
 ## Concurrent editing (optimistic locking)
 Editable records carry `row_version`. Every form posts it in the hidden `row_version` field

@@ -563,6 +563,7 @@ if ($filterYear !== '' && !isset($yearFilterOptions[$filterYear])) {
             data-msg-category="<?= e(__('treasury.category')) ?>"
             data-msg-runts="<?= e(__('runts.line_label')) ?>"
             data-msg-budget="<?= e(__('treasury.budget_item')) ?>"
+            data-msg-description="<?= e(__('treasury.description')) ?>"
             data-msg-notes="<?= e(__('treasury.notes')) ?>"
             data-msg-confirm="<?= e(__('treasury.bulk_edit_confirm', ['changes' => ':changes', 'count' => ':count'])) ?>"
             data-msg-none="<?= e(__('treasury.bulk_edit_none')) ?>"
@@ -604,6 +605,20 @@ if ($filterYear !== '' && !isset($yearFilterOptions[$filterYear])) {
                     'groups' => $bulkBudgetGroups,
                     'options' => [],
                     'attrs' => ['data-treasury-bulk-edit-budget' => true],
+                ]) ?>
+                <?= field('checkbox', [
+                    'name' => '',
+                    'label' => (string) __('treasury.bulk_edit_description_replace'),
+                    'label_class' => 'checkbox-row-lg',
+                    'checked' => false,
+                    'attrs' => ['data-treasury-bulk-edit-description-toggle' => true],
+                ]) ?>
+                <?= field('textarea', [
+                    'name' => '',
+                    'label' => (string) __('treasury.description'),
+                    'rows' => 2,
+                    'maxlength' => 500,
+                    'attrs' => ['data-treasury-bulk-edit-description' => true],
                 ]) ?>
                 <?= field('checkbox', [
                     'name' => '',

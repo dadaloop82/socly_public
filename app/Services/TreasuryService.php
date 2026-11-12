@@ -1333,21 +1333,23 @@ final class TreasuryService
         if ($id < 1 || !in_array($sort, self::SORTS, true)) {
             return ['prev' => null, 'next' => null];
         }
+        $orderBy = $this->ledgerOrder($sort, $groupByCategory);
         [$where, $params] = $this->ledgerConditions($query, $filters);
-        $whereSql = $where === [] ? '' : ' WHERE ' . implode(' AND ', $where);
-        $ordered = 'SELECT m.id, m.movement_date, ROW_NUMBER() OVER (ORDER BY '
-            . $this->ledgerOrder($sort, $groupByCategory) . ') AS rn'
-            . ' FROM treasury_movements m' . $whereSql;
-        $current = $this->db->fetch(
-            'SELECT t.rn FROM (' . $ordered . ') t WHERE t.id = ' . $id,
-            $params
-        );
-        $position = (int) ($current['rn'] ?? 0);
+        $position = $this->ledgerPosition($id, $orderBy, $where, $params);
         if ($position < 1) {
-            return ['prev' => null, 'next' => null];
+            // The record just left the filtered ledger (reclassified while filtering by cost
+            // centre, date moved outside the period, …): fall back to the whole register with the
+            // same order so the arrows never disappear on a movement that still exists.
+            [$where, $params] = [[], []];
+            $position = $this->ledgerPosition($id, $orderBy, $where, $params);
+            if ($position < 1) {
+                return ['prev' => null, 'next' => null];
+            }
         }
         // Integer literals (already cast) keep the outer query free of bound parameters, so the
         // filter parameters of the inner query are never reused ambiguously.
+        $ordered = 'SELECT m.id, m.movement_date, ROW_NUMBER() OVER (ORDER BY ' . $orderBy . ') AS rn'
+            . ' FROM treasury_movements m' . ($where === [] ? '' : ' WHERE ' . implode(' AND ', $where));
         $rows = $this->db->fetchAll(
             'SELECT t.id, t.movement_date, t.rn FROM (' . $ordered . ') t'
             . ' WHERE t.rn IN (' . max(1, $position - 1) . ', ' . ($position + 1) . ')',
@@ -1369,6 +1371,23 @@ final class TreasuryService
         }
 
         return ['prev' => $prev, 'next' => $next];
+    }
+
+    /**
+     * 1-based position of a movement in the ordered ledger, 0 when it matches no row (e.g. it just
+     * left the current filter).
+     *
+     * @param list<string> $where
+     * @param array<string,mixed> $params
+     */
+    private function ledgerPosition(int $id, string $orderBy, array $where, array $params): int
+    {
+        $ordered = 'SELECT m.id, ROW_NUMBER() OVER (ORDER BY ' . $orderBy . ') AS rn'
+            . ' FROM treasury_movements m'
+            . ($where === [] ? '' : ' WHERE ' . implode(' AND ', $where));
+        $current = $this->db->fetch('SELECT t.rn FROM (' . $ordered . ') t WHERE t.id = ' . $id, $params);
+
+        return (int) ($current['rn'] ?? 0);
     }
 
     /**
@@ -2192,13 +2211,14 @@ final class TreasuryService
 
     /**
      * Bulk classification (“Modifica selezionati”): apply the same account / category / Model D line /
-     * cost centre / notes to the selected movements. Every field is optional — an empty value keeps the
-     * current one, `__none__` clears it — and the overwrite is explicit: what is set replaces what was
-     * there. Internal transfers only take account and notes (their category and imputation are
+     * cost centre / description / notes to the selected movements. Every field is optional — an empty
+     * value keeps the current one, `__none__` clears it — and the overwrite is explicit: what is set
+     * replaces what was there (the description and the notes only when their action is `replace`).
+     * Internal transfers only take account, description and notes (their category and imputation are
      * meaningless) and historical (superseded) rows are never touched.
      *
      * @param list<int> $ids
-     * @param array{account?:string,category?:string,runts_line?:string,budget_item_id?:string,notes?:string,notes_action?:string} $changes
+     * @param array{account?:string,category?:string,runts_line?:string,budget_item_id?:string,description?:string,description_action?:string,notes?:string,notes_action?:string} $changes
      * @return array{count:int,skipped:int}
      */
     public function updateMany(array $ids, array $changes, string $ip): array
@@ -2229,6 +2249,12 @@ final class TreasuryService
             if ($budgetId > 0 && $this->db->fetch('SELECT id FROM budget_items WHERE id = :id', ['id' => $budgetId]) !== null) {
                 $payload['budget_item_id'] = $budgetId;
             }
+        }
+        if ((string) ($changes['description_action'] ?? '') === 'replace') {
+            // Same normalisation as the single form (first letter upper case, rest lower case); the
+            // “causale” column is NOT NULL, so clearing it stores an empty string.
+            $description = self::normalizeDescription((string) ($changes['description'] ?? ''));
+            $payload['description'] = $description !== '' ? mb_substr($description, 0, 500) : '';
         }
         if ((string) ($changes['notes_action'] ?? '') === 'replace') {
             $notes = trim((string) ($changes['notes'] ?? ''));

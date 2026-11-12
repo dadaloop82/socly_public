@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use Socly\Controllers\AuditController;
 use Socly\Controllers\AuthController;
 use Socly\Controllers\BrandingController;
 use Socly\Controllers\BudgetController;
@@ -222,6 +223,9 @@ $router->get('/org/people/{id}/edit', [OrgController::class, 'edit'], null, ['mw
 $router->get('/api/org/members/{id}/profile', [OrgController::class, 'memberProfile'], null, ['mw.locale', 'mw.install', 'mw.auth']);
 $router->post('/org/people/{id}', [OrgController::class, 'update'], null, ['mw.locale', 'mw.install', 'mw.auth', 'mw.csrf']);
 $router->post('/org/people/{id}/delete', [OrgController::class, 'destroy'], null, ['mw.locale', 'mw.install', 'mw.auth', 'mw.csrf']);
+
+// Activity log: who did what and when (read-only).
+$router->get('/audit', [AuditController::class, 'index'], 'audit.view', ['mw.locale', 'mw.install', 'mw.auth']);
 
 $router->get('/settings', [SettingsController::class, 'index'], 'settings.manage', ['mw.locale', 'mw.install', 'mw.auth']);
 $router->post('/settings/general', [SettingsController::class, 'saveGeneral'], 'settings.manage', ['mw.locale', 'mw.install', 'mw.auth', 'mw.csrf']);

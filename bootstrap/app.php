@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use Dotenv\Dotenv;
+use Socly\Controllers\AuditController;
 use Socly\Controllers\AuthController;
 use Socly\Controllers\BrandingController;
 use Socly\Controllers\BudgetController;
@@ -578,6 +579,10 @@ $app->bind(UserController::class, fn (App $a) => new UserController(
 $app->bind(PluginController::class, fn (App $a) => new PluginController(
     $a->get(View::class),
     $a->get(PluginAdminService::class)
+));
+$app->bind(AuditController::class, fn (App $a) => new AuditController(
+    $a->get(View::class),
+    $a->get(AuditService::class)
 ));
 
 if (function_exists('socly_register_fatal_error_page')) {

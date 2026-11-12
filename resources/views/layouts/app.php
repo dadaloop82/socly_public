@@ -278,6 +278,13 @@ if ($user && app()->isInstalled() && !$temporaryInstance && can_manage_updates()
             </section>
         <?php endif; ?>
 
+        <?php if (can('audit.view')): ?>
+            <a class="nav-history<?= $navActive('/audit') ? ' active' : '' ?>" href="<?= e(url('/audit')) ?>" title="<?= e(__('audit.nav_hint')) ?>">
+                <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path fill="currentColor" d="M13 3a9 9 0 0 0-9 9H1l3.96 3.96L9 12H6a7 7 0 1 1 7 7 6.98 6.98 0 0 1-4.9-2.03l-1.42 1.42A8.98 8.98 0 0 0 13 21a9 9 0 0 0 0-18Zm-1 5v5l4.28 2.54.72-1.21-3.5-2.08V8H12Z"/></svg>
+                <span><?= e(__('audit.nav')) ?></span>
+            </a>
+        <?php endif; ?>
+
         <div class="sidebar-footer">
             <?php if (!empty($updateInfo['available'])): ?>
                 <?php

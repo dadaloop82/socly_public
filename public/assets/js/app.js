@@ -3830,6 +3830,8 @@ function initTreasuryBulk() {
     const categorySelect = editDialog.querySelector('[data-treasury-bulk-edit-category]');
     const runtsSelect = editDialog.querySelector('[data-treasury-bulk-edit-runts]');
     const budgetSelect = editDialog.querySelector('[data-treasury-bulk-edit-budget]');
+    const descriptionToggle = editDialog.querySelector('[data-treasury-bulk-edit-description-toggle]');
+    const descriptionField = editDialog.querySelector('[data-treasury-bulk-edit-description]');
     const notesToggle = editDialog.querySelector('[data-treasury-bulk-edit-notes-toggle]');
     const notesField = editDialog.querySelector('[data-treasury-bulk-edit-notes]');
     const applyBtn = editDialog.querySelector('[data-treasury-bulk-edit-apply]');
@@ -3843,6 +3845,11 @@ function initTreasuryBulk() {
         if (select instanceof HTMLSelectElement) select.value = '';
       });
       if (notesToggle instanceof HTMLInputElement) notesToggle.checked = false;
+      if (descriptionToggle instanceof HTMLInputElement) descriptionToggle.checked = false;
+      if (descriptionField instanceof HTMLTextAreaElement) {
+        descriptionField.value = '';
+        descriptionField.disabled = true;
+      }
       if (notesField instanceof HTMLTextAreaElement) {
         notesField.value = '';
         notesField.disabled = true;
@@ -3859,6 +3866,11 @@ function initTreasuryBulk() {
       editDialog.showModal();
     });
     editDialog.querySelector('[data-treasury-bulk-edit-cancel]')?.addEventListener('click', () => editDialog.close());
+    descriptionToggle?.addEventListener('change', () => {
+      if (!(descriptionToggle instanceof HTMLInputElement)) return;
+      if (descriptionField instanceof HTMLTextAreaElement) descriptionField.disabled = !descriptionToggle.checked;
+      if (descriptionToggle.checked && descriptionField instanceof HTMLTextAreaElement) descriptionField.focus();
+    });
     notesToggle?.addEventListener('change', () => {
       if (!(notesToggle instanceof HTMLInputElement)) return;
       if (notesField instanceof HTMLTextAreaElement) notesField.disabled = !notesToggle.checked;
@@ -3878,6 +3890,13 @@ function initTreasuryBulk() {
       push(msg('data-msg-category'), selectLabel(categorySelect));
       push(msg('data-msg-runts'), selectLabel(runtsSelect));
       push(msg('data-msg-budget'), selectLabel(budgetSelect));
+      const description = descriptionToggle instanceof HTMLInputElement && descriptionToggle.checked
+        && descriptionField instanceof HTMLTextAreaElement
+        ? descriptionField.value.trim()
+        : '';
+      if (descriptionToggle instanceof HTMLInputElement && descriptionToggle.checked) {
+        push(msg('data-msg-description'), description !== '' ? description : '—');
+      }
       const notes = notesToggle instanceof HTMLInputElement && notesToggle.checked
         && notesField instanceof HTMLTextAreaElement
         ? notesField.value.trim()
@@ -3910,6 +3929,8 @@ function initTreasuryBulk() {
       setValue('category', categorySelect);
       setValue('runts_line', runtsSelect);
       setValue('budget_item_id', budgetSelect);
+      body.set('description', description);
+      body.set('description_action', descriptionToggle instanceof HTMLInputElement && descriptionToggle.checked ? 'replace' : 'keep');
       body.set('notes', notes);
       body.set('notes_action', notesToggle instanceof HTMLInputElement && notesToggle.checked ? 'replace' : 'keep');
       if (applyBtn instanceof HTMLButtonElement) applyBtn.disabled = true;
