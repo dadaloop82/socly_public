@@ -141,7 +141,9 @@ every 100 patches bump the series, and each bump is published to this repository
 - In the printed financial statement (“Piano finanziario”) each receipt is now a single line —
   **date · invoice number · amount** — instead of three or four wrapped lines with the “Numero
   fattura” wording and the counterparty, so the table stays readable (and no longer grows a tall row
-  per cost centre).
+  per cost centre). Under **“Pezze giustificative”** only the movements that really carry a document
+  are listed (invoice/receipt number or a document type): an entry without one shows “—” instead of a
+  bare date and amount.
 - Field-level presence now covers **selects** too: when another operator picks an option you see the
   selection change in their colour (the field stays locked and the note shows their label). Your own
   selection comes back when they leave, and their pick is never saved by you.

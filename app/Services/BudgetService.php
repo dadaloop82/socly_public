@@ -1004,14 +1004,12 @@ final class BudgetService
     }
 
     /**
-     * Supporting documents per item (used by the report print sheet).
-     *
-     * @return array<int,list<array<string,mixed>>>
-     */
-    /**
      * Receipts (“pezze giustificative”) of an approved budget, grouped by cost centre.
      *
-     * Only what the printed statement shows is selected: date, invoice number and amount.
+     * Only the movements that actually carry a document are listed — one with an invoice/receipt
+     * number or a document type (invoice, receipt, quittance, …). An entry without any document is
+     * not a supporting paper and must not appear in the printed statement. Only what the sheet shows
+     * is selected: date, invoice number and amount.
      *
      * @return array<int,list<array<string,mixed>>>
      */
@@ -1028,6 +1026,10 @@ final class BudgetService
             "SELECT budget_item_id, movement_date, amount, invoice_number
              FROM treasury_movements
              WHERE approved_at IS NOT NULL AND superseded_at IS NULL AND budget_item_id IN (" . $in . ")
+               AND (
+                   (invoice_number IS NOT NULL AND TRIM(invoice_number) <> '')
+                   OR (document_type IS NOT NULL AND TRIM(document_type) <> '')
+               )
              ORDER BY movement_date ASC, id ASC"
         ) as $row) {
             $out[(int) $row['budget_item_id']][] = $row;

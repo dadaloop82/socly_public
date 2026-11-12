@@ -228,6 +228,9 @@ printed with the browser (legal header, place/date and signature line).
 - Each movement carries `runts_line` (automatic from the treasury category, overridable in the form);
   internal movements (transfers, deposits/withdrawals) are excluded from the statements but still
   count in the cash balances.
+- The “Pezze giustificative” column of the printed sheet lists only the movements that carry a
+  document (invoice/receipt number or a document type), one line each — date · number · amount; a cost
+  centre without documented movements shows “—”.
 - The legal threshold is **€ 220,000** of income per year (`RuntsReportService::CASH_LIMIT`). Below it
   the Model D is generated; at or above it the page states that the accrual statements (Models A/B/C)
   must be prepared manually — Socly does not generate them yet.
