@@ -23,6 +23,12 @@
 - [x] Organization chart with association bodies, roles and compatibility checks
 - [x] Bilancio consuntivo: RUNTS cash report (Model D) generated from the cash book, with the €220,000 threshold for the accrual statements
 - [x] Bilanci page with three tabs (Preventivo / Consuntivo / Statistiche): planned vs actual by year, expense coverage, funding need, membership-fee share and top categories
+- [x] Treasury dashboard: eight cards (income vs expense, month-by-month flow, running balance, liquidity
+      per account, top beneficiaries, approval queue, categories) inside the per-user widget layout
+- [x] Presence at field level: the field another operator holds is locked, their draft is shown live and a
+      click on their badge opens exactly the record they have open
+- [x] Cash-book polish: cost centres read “section · line” in every list, the description is stored
+      capitalised and the document block sits behind a per-movement flag
 
 ## Planned plugins (sold separately)
 

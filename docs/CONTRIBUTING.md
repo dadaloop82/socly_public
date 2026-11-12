@@ -15,6 +15,9 @@ Socly is distributed under the Socly Source-Available License (Community / Base 
 9. Never log passwords, fiscal codes, or full request/session dumps.
 10. Changes to document/OCR extraction must be verified on a multi-page scanned PDF (page coverage,
     `complete` flag) — see [LESSONS_LEARNED.md](LESSONS_LEARNED.md#document-extraction-ocr).
+11. A container styled with `display: grid` / `flex` needs an explicit `[hidden]` override when JS
+    toggles it, and chart legends are dropped above three entries — see
+    [DESIGN.md](DESIGN.md#charts--legends).
 
 ## Local run
 

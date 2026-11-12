@@ -13,10 +13,22 @@
 9. **Settings** — branding, association data, field definitions, plugin enable/disable and plugin settings.
 10. **Audit log** — record who changed what on sensitive entities.
 11. **i18n** — Italian, German, English UI strings, centralized.
-12. **Charts & statistics** — chart cards on dashboard, statistics and treasury panels with per-user order, visibility and width on a three-column grid; statistics page with demographics, registrations, cards, finances and a members map whose places are geocoded automatically.
+12. **Charts & statistics** — chart cards on the dashboard (members and treasury tabs) and on the
+    statistics page with per-user order, visibility and width on a three-column grid. The treasury tab
+    ships income vs expense, month-by-month flow, running balance, liquidity per account, top
+    beneficiaries and the approval queue. Legends disappear above three entries (the tooltip names
+    every series). Statistics page with demographics, registrations, cards, finances and a members map
+    whose places are geocoded automatically.
 13. **Organization chart** — association bodies and appointments (members or external people) with role compatibility checks; outstanding membership fees never block an appointment.
-14. **Documents, deadlines, treasury** — modular components: document archive with categories, deadlines, cash book with approvals, wallet balances and budget imputation.
+14. **Documents, deadlines, treasury** — modular components: document archive with categories,
+    deadlines, cash book with approvals, wallet balances and budget imputation. A cost centre always
+    reads “section · line” (the year prefixes the ledger filter), the description (“causale”) is stored
+    capitalised and the document block of a movement sits behind a per-movement flag.
 15. **Forecast budget** — one document per fiscal year, inline grid with autosave, expense/income types, custom categories, comparison with the cash actuals and a printable rendiconto; the year-end RUNTS report and the budget statistics live in the same **Bilanci** page (Preventivo / Consuntivo / Statistiche tabs).
+16. **Concurrent editing & presence** — optimistic locking on every versioned record; the field another
+    operator is working in is locked and their draft is shown live; a click on their presence badge
+    opens exactly the record they have open (server-side link, same permission); a stale save is
+    refused, never silently overwritten.
 
 ## Non-functional
 

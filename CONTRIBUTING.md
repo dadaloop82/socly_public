@@ -26,6 +26,9 @@ Commit messages are written in **English** and follow the `type(scope): summary`
 7. Never log passwords, fiscal codes, or full request/session dumps.
 8. Document/OCR extraction changes must be tested on a multi-page scanned PDF (page coverage and
    `complete` flag), not only on the first page.
+9. A container styled with `display: grid` / `flex` needs an explicit `[hidden]` override when JS
+   toggles it, and chart legends are dropped above three entries — see
+   [docs/DESIGN.md](docs/DESIGN.md#charts--legends).
 
 See [PLUGIN_API.md](docs/PLUGIN_API.md) for drop-in plugins.
 

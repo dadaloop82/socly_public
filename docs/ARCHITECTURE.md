@@ -97,6 +97,16 @@ The grid is three columns wide (`data-chart-size` spans 1–3, dense packing). I
 dragging or resizing — and while the “manage charts” panel is open — so cards can be placed side by
 side, and the reorder previews live before the drop. Every change survives a reload.
 
+The dashboard **Treasury** tab carries eight cards fed by `TreasuryService::dashboardCharts()` (approved,
+non-superseded movements only): income vs expense, month-by-month income/expense of the last 12 months,
+the running balance at the end of each month (a transfer between own wallets never moves it), the
+liquidity per account from `accountBalances()` (negative wallets in red), the top five expense
+beneficiaries, the approval queue (approved vs pending) and the two category splits (expenses and
+income). Month labels reuse the shared `common.month_N` keys.
+
+Chart legends are dropped above **three** entries (`chartLegendOptions()` in `app.js`): the tooltip
+already names every series, and a longer legend takes more room than the plot itself.
+
 The bottom-right tools also export the card as a PNG (`copyChartToPng()`): the canvas is redrawn on a
 solid background with the card title, copied through the async clipboard when available and
 downloaded otherwise (plain-HTTP installs are not a secure context, so they always fall back to the
@@ -155,8 +165,9 @@ so two operators can never silently overwrite each other.
   updated data” (fresh record) and “Overwrite with my data” (`force=1`, which bumps the version).
 - **While editing**: `GET /freshness?entity=&id=&version=` is polled every 15 s (`initFreshnessGuard`);
   when the version moved, an inline banner offers a reload without touching the typed values.
-- **Who is editing**: the presence heartbeat carries `editing=entity:id`; `/presence/state` returns
-  `editors` for that record and the form shows “X is editing this record”.
+- **Who is editing**: the presence heartbeat carries `editing=entity:id` (plus the focused `field` and
+  its draft value); `/presence/state` returns `editors` for that record and the form shows “X is
+  editing this record”.
 - **Wired entities**: members, first-note movements and forecast budgets (including the 5 s autosave,
   which returns the new `row_version` and stops on HTTP 409 instead of overwriting). The version
   column and the endpoint are already in place for documents, deadlines and association people.
@@ -174,6 +185,21 @@ name, initials, a stable hue (`(user_id * 137) % 360`), an `idle` flag (`last_se
 minutes) and the `new` arrivals since the previous poll (used for the “X just connected” toast).
 `/logout` marks the session as ended. The identity is `users.first_name`/`users.last_name`, else the
 linked `users.member_id` profile name, else “Unknown user”.
+
+**Field-level presence** — while a record is open the heartbeat also carries the focused `field` and
+the draft `value` (`editing_field` / `editing_value`, migrations 045/046). The field another operator
+is working in is outlined in their colour, locked for everyone else (read-only for
+text/date/textarea, blocked for selects and checkboxes — the row version stays the real safety net)
+and shows their draft live underneath. 45 seconds of silence (`FIELD_TTL_SECONDS`) release it, so a
+closed tab or a crash cannot keep a field blocked; values travel on focus change and ~0.9 s after the
+last keystroke, never for password/file/checkbox controls. A `<select>` changed by another operator is
+previewed in their colour and restored on release, and the operator who is only watching never saves
+it (submit guard).
+
+**Jumping to a colleague** — each badge also carries the record the operator has open. The URL is
+built server-side (`PresenceService::locationUrl()`) behind the same component flag and permission as
+the page, so a click (or Enter) opens exactly that member / movement / budget: no client-supplied
+path, no link for the own badge, for idle sessions or when the viewer could not open the page anyway.
 
 ## Budgets
 

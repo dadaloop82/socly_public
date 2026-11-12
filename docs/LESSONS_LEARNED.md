@@ -48,6 +48,9 @@ This document captures mistakes and costly fixes from the previous membership co
 | Anti-pattern | Socly practice |
 |--------------|----------------|
 | Calling `form.requestSubmit()` while a modal `<dialog>` is open | The rest of the page is inert, so constraint validation shows no bubble and cannot focus the field: the click looks like it does nothing. Close the dialog first, then submit and fall back to `reportValidity()` if the submit was blocked |
+| Styling a toggleable container with `display: grid` / `flex` and hiding it with the `hidden` attribute | The class rule wins over the user-agent `[hidden] { display: none }`, so the box stays on screen (only its fields looked disabled): always add the explicit `.block[hidden] { display: none !important; }` override when JS toggles it |
+| Letting a chart legend grow with the data | Above three entries the legend takes more room than the plot: hide it (`chartLegendOptions()`) and keep the tooltip, which already names every series |
+| Building a “jump to the colleague” link from client input | Presence returns a server-built URL, behind the same component flag and permission as the page: the client only navigates, it never composes a path (no link for the own badge or idle sessions) |
 | Submitting a form programmatically without its save button | `requestSubmit()` without a submitter drops the button's name/value (`action=save`, `data-tpl-submit`) and skips its click handlers: pick the first non-destructive submit button and `.click()` it |
 
 ## Money, numbers and autosave

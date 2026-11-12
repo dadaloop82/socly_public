@@ -40,6 +40,9 @@ Rules for current and future views:
 5. **Page headers** — `.page-header` with `.titles` + `.actions`; actions wrap / full-width on small screens.
 6. **Touch** — buttons keep usable height; form controls stay `font-size: 1rem` (avoids iOS zoom).
 7. **No fixed desktop widths** in new views; prefer `%`, `minmax`, `clamp`, and existing utility classes.
+8. **Visibility** — never let a component rule beat the `hidden` attribute: a container styled with
+   `display: grid` / `flex` stays visible when `hidden` is set (the class rule wins), so add the
+   explicit override (`.my-block[hidden] { display: none !important; }`) whenever JS toggles it.
 
 ## Standard specialty form fields
 
@@ -72,6 +75,32 @@ Rules:
   `Intl.NumberFormat`: reduced ICU builds silently lose the thousands separator.
 - Card and KPI grids use `auto-fit`, so a lone document fills the row instead of squeezing the
   amounts, and the KPIs wrap onto a new line when the card is narrow.
+
+## Charts & legends
+
+- Chart cards live on the dashboard (members and treasury tabs) and on the statistics page; they share
+  the three-column widget grid (`.charts`, `data-chart-widget`, per-user layout).
+- **Legends are dropped above three entries** (`chartLegendOptions()`): the tooltip already names every
+  series, and a longer legend takes more room than the plot. Keep the tooltip readable instead
+  (`label` always carries the series/row name and the formatted amount).
+- Donuts are for compositions (2–3 slices); use horizontal bars for ranked lists (liquidity per
+  account, top beneficiaries) and grouped bars for comparisons over time.
+- Money axes and tooltips use the same server format as the rest of the UI (`formatMoney()` mirrors
+  `CurrencyService::format`), never `Intl.NumberFormat`.
+- Charts never invent a colour: the fixed teal/copper palette is reused, negative values switch to the
+  copper tone instead of introducing a new hue.
+
+## Operator presence
+
+- The avatar group in the top-right corner appears only when more than one operator is connected;
+  idle operators fade out (opacity + grayscale), never disappear.
+- **Colour means person**: each badge gets a stable hue (`(user_id * 137) % 360`) reused by the field
+  outline, the draft preview and the remote select highlight, so “who is here” and “who is typing
+  this” are the same colour.
+- A badge carrying an open record shows a pointer cursor and a focus ring, and its label reads
+  “:name · open where they are working”. The link is navigation, not an action: no confirm step.
+- The field another operator holds is outlined, visibly locked (never silently editable) and shows
+  their draft underneath; 45 s of silence releases it.
 
 ## Motion & attention cues
 

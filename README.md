@@ -19,6 +19,9 @@ configuration, dedicated support, and optional paid add-ons are available separa
 - Treasury cash book with approvals, wallets and budget imputation; changing a member-type price realigns the open balances and a “recalculate balances” action repairs them
 - Bilanci page with three tabs: forecast budget (one document per fiscal year, inline grid, autosave after 5 seconds of inactivity, expense/income types, custom categories and comparison with the cash actuals), year-end RUNTS report (Model D) and budget statistics (planned vs actual, coverage, funding need, membership fees share, top categories)
 - Dashboard and statistics charts with a per-user layout (order, visibility, one-to-three column width on a visible grid) and a members map that geocodes residences and birth places automatically
+- Treasury dashboard: month-by-month flow, running balance, liquidity per account, top beneficiaries and the approval queue, inside the same per-user widget layout
+- Real-time presence: who is connected, the field another operator is typing in is locked with their draft shown live, and a click on their badge opens exactly the record they are working in
+- Cash book: cost centres read “section · line” in every list, descriptions are stored capitalised and the document block of a movement sits behind a per-movement flag
 - Organization chart with association bodies, roles and compatibility checks (outstanding fees never block an appointment)
 - RUNTS lookup: association data, documents, and statute/privacy prefill (PDF text + OCR)
 

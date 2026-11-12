@@ -31,6 +31,8 @@ One row per open session, refreshed by the presence polling.
 | last_seen | last heartbeat; older than 5 minutes ⇒ shown as idle, older than 15 ⇒ offline |
 | ended_at | set on logout; non-NULL rows are never shown |
 | editing_entity / editing_id | record the operator is editing right now (presence “X is editing”) |
+| editing_field | focused form field of that record: allowlisted name (`[A-Za-z0-9_\-\[\]]`, max 120 chars), `NULL` when nothing is focused |
+| editing_value | draft being typed (max 300 chars, control characters stripped). Field and value are ignored once `last_seen` is older than 45 s (`PresenceService::FIELD_TTL_SECONDS`) |
 
 ### row_version (members, treasury_movements, budgets, budget_items, association_documents, deadline_items, association_people)
 `INT UNSIGNED NOT NULL DEFAULT 1`, incremented by `Database::updateVersioned()`. A save posted with a
@@ -87,7 +89,7 @@ Traceability of CSV member imports. `member_import_runs`: `user_id`, `source_nam
 `user_id`, `action`, `entity_type`, `entity_id`, `before_json`, `after_json`, `ip`, `created_at`.
 
 ### treasury_movements
-Cash book rows: `movement_date`, `direction` (`income` / `expense` / `transfer`), `category`, `runts_line` (line of the RUNTS cash report — Model D — automatically derived from the category and overridable per movement), `budget_item_id` (nullable cost centre), `amount`, `description` (the short “causale” used by reports and exports), `notes` (free-text internal memo, searchable and carried by the CSV export/import — never a replacement for the description), `payment_method`, `account`, `transfer_account`, invoice fields, `document_type` (kind of document: invoice, receipt, quittance, contract, insurance premium, credit/debit note, statement, other — `TreasuryService::DOCUMENT_TYPES`, nullable and independent from the invoice flag, never set on transfers), `attachment_path`, `member_id`, `payment_id`, `created_by`.
+Cash book rows: `movement_date`, `direction` (`income` / `expense` / `transfer`), `category`, `runts_line` (line of the RUNTS cash report — Model D — automatically derived from the category and overridable per movement), `budget_item_id` (nullable cost centre), `amount`, `description` (the short “causale” used by reports and exports — stored capitalised, first letter upper case and the rest lower case, `TreasuryService::normalizeDescription()`, whatever the operator typed), `notes` (free-text internal memo, searchable and carried by the CSV export/import — never a replacement for the description), `payment_method`, `account`, `transfer_account`, invoice fields, `document_type` (kind of document: invoice, receipt, quittance, contract, insurance premium, credit/debit note, statement, other — `TreasuryService::DOCUMENT_TYPES`, nullable and independent from the invoice flag, never set on transfers), `attachment_path`, `member_id`, `payment_id`, `created_by`.
 
 Treasury categories are the built-in list plus `treasury.custom_categories` in the component config
 (`[{slug, label}]`). New categories can be created on the fly from movements, documents, deadlines
@@ -118,6 +120,9 @@ cascade-deleted with the user.
 
 `layout` is `{"order": [ids…], "hidden": [ids…], "sizes": {id: 1|2|3}}`: the order and visibility of
 the cards plus their width as a span of 1–3 columns of the chart grid.
+
+Contexts in use: `dashboard.members`, `statistics.finance` and `dashboard.treasury` (cards `flow`,
+`monthly`, `balance`, `accounts`, `beneficiaries`, `status`, `expense`, `income`).
 
 ### plugins
 `id` (plugin slug), `is_enabled`, `enabled_at`, `meta_json`.

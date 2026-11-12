@@ -19,6 +19,8 @@ Living risk register for Socly. Update when incidents or near-misses happen. See
 | Association contact data sent to the vendor without clear control | High | Low | Explicit consent (default on, revocable), demo instances excluded, hashed token, data minimisation |
 | Hardcoded maintenance SuperAdmin credentials | High | Low | Only digests in code, password reset/UI changes blocked, legacy system admins demoted, rotate by release if compromised |
 | Public geocoder (Photon/Nominatim) slow or unavailable | Med | Low | Lookups run **after** the response, stop after repeated misses, coordinates cached on disk; failed places are retried later, and the map degrades without blocking any page |
+| Presence exposes another operator's draft (possibly personal data) to connected operators | Med | Low | Only authenticated operators, behind the record permission; allowlisted field name + 300-character draft, never password/file/checkbox values, released after 45 s; “open where they are working” links are built server-side |
+| Treasury dashboard slower on very large cash books | Low | Med | Aggregate SQL (`GROUP BY` month / account / beneficiary), 12-month window and top-5 limits; no per-row loop and no extra query per card |
 | Self-hosted DB loss | High | Med | Host backups; document restore under authenticated ops only |
 
 ## Explicitly rejected patterns

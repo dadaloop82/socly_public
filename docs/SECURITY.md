@@ -29,6 +29,13 @@ All state-changing requests (POST/PUT/PATCH/DELETE) require a valid CSRF token f
 
 Permission checks on routes and UI via stable keys in `Socly\Support\Permission`. System admin bypasses checks. Deny by default.
 
+- Presence links (“open where the colleague is working”) are built **server-side** with the same
+  permission and component flag as the destination page: the client never supplies a path, and no link
+  is returned when the viewer could not open the page anyway.
+- Presence payloads are allowlisted: the focused field must match `[A-Za-z0-9_\-\[\]]` (max 120
+  characters) and the draft is capped at 300 characters with control characters stripped; both are
+  ignored after 45 seconds of silence and are never interpreted as markup.
+
 ## Audit & logging
 
 - Mutations write to `audit_logs` (actor, entity, before/after, IP).
