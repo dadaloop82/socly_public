@@ -41,6 +41,12 @@ final class TreasuryService
     public const DIRECTIONS = ['income', 'expense', 'transfer'];
 
     /**
+     * Earliest plausible year for an operation date: a typo like 0206 would otherwise pollute the
+     * period filters and the totals.
+     */
+    public const MIN_MOVEMENT_YEAR = 1900;
+
+    /**
      * Built-in wallets, seeded by migration 028. Custom wallets live in the `treasury_accounts`
      * table (label, active flag, order) and are managed in Settings → Financial Accounts.
      *
@@ -244,6 +250,23 @@ final class TreasuryService
             $method = $aliases[$method];
         }
         return in_array($method, self::METHODS, true) ? $method : 'other';
+    }
+
+    /**
+     * Latest plausible year for an operation date (a few years ahead are tolerated for planning).
+     */
+    public static function maxMovementYear(): int
+    {
+        return (int) date('Y') + 5;
+    }
+
+    /**
+     * True when the year of an operation date is plausible (1900 … current + 5). Typed or imported
+     * dates such as 03/05/0206 (year 206) are rejected instead of creating a movement in year 206.
+     */
+    public static function isPlausibleMovementYear(int $year): bool
+    {
+        return $year >= self::MIN_MOVEMENT_YEAR && $year <= self::maxMovementYear();
     }
 
     /**
@@ -983,7 +1006,8 @@ final class TreasuryService
 
     /**
      * Years with at least one movement (newest first) for the period filters; the current year is
-     * always offered so a fresh installation can filter by it.
+     * always offered so a fresh installation can filter by it. Implausible years (a typo such as
+     * 0206) are left out: they only pollute the menu.
      *
      * @return list<int>
      */
@@ -995,7 +1019,7 @@ final class TreasuryService
              WHERE movement_date IS NOT NULL ORDER BY y DESC'
         ) as $row) {
             $year = (int) ($row['y'] ?? 0);
-            if ($year > 0) {
+            if ($year > 0 && self::isPlausibleMovementYear($year) && !in_array($year, $years, true)) {
                 $years[] = $year;
             }
         }
@@ -1833,6 +1857,13 @@ final class TreasuryService
         $date = trim((string) ($input['movement_date'] ?? date('Y-m-d')));
         if (!$this->validator->validate(['movement_date' => $date], ['movement_date' => 'date'])) {
             return ['ok' => false, 'errors' => ['movement_date' => __('validation.date')]];
+        }
+        if (!$this->isPlausibleMovementYear((int) substr($date, 0, 4))) {
+            return ['ok' => false, 'errors' => ['movement_date' => __('treasury.date_out_of_range', [
+                'date' => $date,
+                'min' => (string) self::MIN_MOVEMENT_YEAR,
+                'max' => (string) self::maxMovementYear(),
+            ])]];
         }
         if ($isTransfer) {
             // A internal transfer has no category of its own: it always moves liquidity internally.

@@ -1194,6 +1194,15 @@ final class TreasuryCsvService
             $date = ImportValueNormalizer::toDate((string) ($values['movement_date'] ?? '')) ?? '';
             if ($date === '') {
                 $errors[] = (string) __('treasury.import.error_date', ['line' => (string) $line]);
+            } elseif (!TreasuryService::isPlausibleMovementYear((int) substr($date, 0, 4))) {
+                // A typo such as 03/05/0206 would create a movement in year 206: flag it so it can be
+                // fixed here instead of polluting the ledger.
+                $errors[] = (string) __('treasury.import.error_date_range', [
+                    'line' => (string) $line,
+                    'value' => $date,
+                    'min' => (string) TreasuryService::MIN_MOVEMENT_YEAR,
+                    'max' => (string) TreasuryService::maxMovementYear(),
+                ]);
             }
 
             $directionRaw = (string) ($values['direction'] ?? '');
