@@ -469,7 +469,7 @@ if ($filterYear !== '' && !isset($yearFilterOptions[$filterYear])) {
                                     <span class="badge badge-muted"><?= e(__('treasury.recurring_variable_badge')) ?></span>
                                 <?php endif; ?>
                             </td>
-                            <td><?= e($currency->format((float) ($rule['amount'] ?? 0))) ?></td>
+                            <td class="num"><?= e($currency->format((float) ($rule['amount'] ?? 0))) ?></td>
                             <td><?= e(__('treasury.recurring_freq_' . $ruleFreq)) ?></td>
                             <td><?= e(format_date($rule['next_run_date'] ?? null) ?: '—') ?></td>
                             <td>

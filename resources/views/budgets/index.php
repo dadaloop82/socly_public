@@ -247,7 +247,7 @@ $topIncome = is_array($statistics['categories']['income'] ?? null) ? $statistics
                         <?php foreach ($rendicontoYears as $row): ?>
                             <tr>
                                 <td><strong><?= e((string) (int) $row['year']) ?></strong></td>
-                                <td><?= e($currency->format((float) $row['income'])) ?></td>
+                                <td class="num"><?= e($currency->format((float) $row['income'])) ?></td>
                                 <td>
                                     <?php if (!empty($row['can_generate'])): ?>
                                         <a class="btn btn-sm" href="<?= e(url('/rendiconto/' . (int) $row['year'])) ?>">
@@ -317,12 +317,12 @@ $topIncome = is_array($statistics['categories']['income'] ?? null) ? $statistics
                         <?php foreach ($statsYears as $row): ?>
                             <tr>
                                 <td><strong><?= e((string) (int) $row['year']) ?></strong></td>
-                                <td><?= e($currency->format((float) $row['planned_expense'])) ?></td>
-                                <td><?= e($currency->format((float) $row['actual_expense'])) ?></td>
-                                <td><?= e($currency->format((float) $row['planned_income'])) ?></td>
-                                <td><?= e($currency->format((float) $row['actual_income'])) ?></td>
-                                <td><?= e(number_format((float) $row['coverage'], 1, ',', '.')) ?>%</td>
-                                <td><?= e($currency->format((float) $row['need'])) ?></td>
+                                <td class="num"><?= e($currency->format((float) $row['planned_expense'])) ?></td>
+                                <td class="num"><?= e($currency->format((float) $row['actual_expense'])) ?></td>
+                                <td class="num"><?= e($currency->format((float) $row['planned_income'])) ?></td>
+                                <td class="num"><?= e($currency->format((float) $row['actual_income'])) ?></td>
+                                <td class="num"><?= e(number_format((float) $row['coverage'], 1, ',', '.')) ?>%</td>
+                                <td class="num"><?= e($currency->format((float) $row['need'])) ?></td>
                             </tr>
                         <?php endforeach; ?>
                         </tbody>
@@ -354,8 +354,8 @@ $topIncome = is_array($statistics['categories']['income'] ?? null) ? $statistics
                                 <?php foreach ($topExpense as $cat): ?>
                                     <tr>
                                         <td><?= e((string) $cat['label']) ?></td>
-                                        <td><?= e($currency->format((float) $cat['amount'])) ?></td>
-                                        <td><?= e(number_format((float) $cat['percent'], 1, ',', '.')) ?>%</td>
+                                        <td class="num"><?= e($currency->format((float) $cat['amount'])) ?></td>
+                                        <td class="num"><?= e(number_format((float) $cat['percent'], 1, ',', '.')) ?>%</td>
                                     </tr>
                                 <?php endforeach; ?>
                                 </tbody>
@@ -386,8 +386,8 @@ $topIncome = is_array($statistics['categories']['income'] ?? null) ? $statistics
                                 <?php foreach ($topIncome as $cat): ?>
                                     <tr>
                                         <td><?= e((string) $cat['label']) ?></td>
-                                        <td><?= e($currency->format((float) $cat['amount'])) ?></td>
-                                        <td><?= e(number_format((float) $cat['percent'], 1, ',', '.')) ?>%</td>
+                                        <td class="num"><?= e($currency->format((float) $cat['amount'])) ?></td>
+                                        <td class="num"><?= e(number_format((float) $cat['percent'], 1, ',', '.')) ?>%</td>
                                     </tr>
                                 <?php endforeach; ?>
                                 </tbody>

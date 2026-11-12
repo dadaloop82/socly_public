@@ -189,7 +189,7 @@ foreach ($rows as $row) {
                         <td class="import-line"><?= $line ?></td>
                         <td><?= e(format_date((string) ($row['date'] ?? '')) ?: '—') ?></td>
                         <td><?= e($directionLabel((string) ($row['direction'] ?? ''))) ?></td>
-                        <td><?= e($currency->format((float) ($row['amount'] ?? 0))) ?></td>
+                        <td class="num"><?= e($currency->format((float) ($row['amount'] ?? 0))) ?></td>
                         <td><?= e((string) ($row['category'] ?? '')) ?></td>
                         <td>
                             <?= e((string) ($row['account'] ?? '')) ?>

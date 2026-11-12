@@ -583,7 +583,7 @@ $nextMemberId = isset($adjacentMembers['next']) ? (int) $adjacentMembers['next']
                         <tbody>
                         <?php foreach ($payments as $p): ?>
                             <tr>
-                                <td><?= e(number_format((float) $p['amount'], 2, ',', '.')) ?>&nbsp;€</td>
+                                <td class="num"><?= e(number_format((float) $p['amount'], 2, ',', '.')) ?>&nbsp;€</td>
                                 <td><?= e(__('payments.' . $p['method'])) ?></td>
                                 <td><?= e(__('payments.' . $p['type'])) ?></td>
                                 <td><?= e(format_datetime((string) ($p['created_at'] ?? '')) ?: (string) ($p['created_at'] ?? '')) ?></td>

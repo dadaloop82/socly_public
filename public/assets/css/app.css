@@ -2724,6 +2724,21 @@ th {
 tbody tr { transition: background 0.15s ease; }
 tbody tr:hover { background: color-mix(in srgb, var(--brand-primary) 4%, white); }
 td .muted { font-size: 0.88rem; margin-top: 0.15rem; }
+/*
+ * Numeric / money cells: tabular figures and no line break between the amount and the currency
+ * symbol (format() already joins them with a non-breaking space; this is the CSS safety net).
+ */
+.num,
+.treasury-ledger .amount-income,
+.treasury-ledger .amount-expense,
+.treasury-ledger .amount-transfer,
+.treasury-overview-value,
+.treasury-overview-flows span,
+.treasury-wallet-balance,
+.budget-th-amount {
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
 
 .badge {
   display: inline-block;
