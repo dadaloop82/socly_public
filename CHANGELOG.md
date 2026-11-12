@@ -10,6 +10,13 @@ every 100 patches bump the series, and each bump is published to this repository
 
 ### Added
 
+- First-note entries have a **Notes** field for internal annotations: the note is searchable from the
+  ledger, is carried by the CSV export and re-imported with it, and never replaces the short
+  description used by reports.
+- The movement page now has a single **Document** box: document type, number and date are always
+  shown, on incoming and outgoing entries alike (an invoice and a receipt share the same box), and
+  the attachment lives with them. The “invoice payment” flag only adds the optional subject and due
+  date on expenses.
 - While classifying a first-note entry (type, Model D line, cost centre) Socly now looks for other
   entries with the same sign and a similar description and offers to apply the same changes: it
   lists up to three examples with date and amount, summarises what will change (“Type: … · Model D

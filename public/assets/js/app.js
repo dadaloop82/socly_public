@@ -12767,8 +12767,7 @@ function initTreasuryCategory(root = document) {
 
   root.querySelectorAll('[data-treasury-form]').forEach((form) => {
     const categorySelect = form.querySelector('[data-treasury-category]');
-    const docsRow = form.querySelector('[data-treasury-docs-row]');
-    const docFields = form.querySelector('[data-treasury-doc-fields]');
+    const docsRows = [...form.querySelectorAll('[data-treasury-docs-row]')];
     const newCategoryWrap = form.querySelector('[data-treasury-new-category]');
     const newCategoryInput = form.querySelector('[data-treasury-new-category-input]');
     const directionRadios = [...form.querySelectorAll('[data-treasury-direction]')];
@@ -12986,11 +12985,9 @@ function initTreasuryCategory(root = document) {
       form.querySelectorAll('[data-treasury-invoice-fields]').forEach((block) => {
         setFieldsLocked(block, !isInvoice);
       });
-      // With an invoice payment the number/date live in the invoice block instead.
-      setFieldsLocked(docFields, isInvoice || isTransfer);
       // Internal transfer: only liquidity between two own wallets — no category, no document row, no payment method;
       // the account select becomes "From account" and a second "To account" wallet shows up.
-      setFieldsLocked(docsRow, isTransfer);
+      docsRows.forEach((row) => setFieldsLocked(row, isTransfer));
       if (isTransfer && categorySelect.value !== 'internal_transfer') {
         categorySelect.value = 'internal_transfer';
         sync();

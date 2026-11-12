@@ -208,6 +208,9 @@ foreach ($rows as $row) {
                             <?php if ((string) ($row['description'] ?? '') !== ''): ?>
                                 <div><?= e((string) $row['description']) ?></div>
                             <?php endif; ?>
+                            <?php if ((string) ($row['notes'] ?? '') !== ''): ?>
+                                <div class="muted"><?= e(__('treasury.notes')) ?>: <?= e((string) $row['notes']) ?></div>
+                            <?php endif; ?>
                             <?php if ((string) ($row['member'] ?? '') !== ''): ?>
                                 <div class="muted"><?= e(__('treasury.member')) ?>: <?= e((string) $row['member']) ?></div>
                             <?php endif; ?>
@@ -222,10 +225,10 @@ foreach ($rows as $row) {
                             <?php endif; ?>
                             <?php if ((string) ($row['invoice_number'] ?? '') !== '' || (string) ($row['invoice_date'] ?? '') !== ''): ?>
                                 <div class="muted">
-                                    <?= e(__('treasury.invoice_number')) ?>:
+                                    <?= e(__('treasury.doc_number')) ?>:
                                     <?= e((string) ($row['invoice_number'] ?? '—')) ?>
                                     <?php if ((string) ($row['invoice_date'] ?? '') !== ''): ?>
-                                        · <?= e(__('treasury.invoice_date')) ?>: <?= e(format_date((string) $row['invoice_date']) ?: (string) $row['invoice_date']) ?>
+                                        · <?= e(__('treasury.doc_date')) ?>: <?= e(format_date((string) $row['invoice_date']) ?: (string) $row['invoice_date']) ?>
                                     <?php endif; ?>
                                 </div>
                             <?php endif; ?>

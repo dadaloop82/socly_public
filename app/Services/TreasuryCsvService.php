@@ -22,8 +22,8 @@ final class TreasuryCsvService
      */
     public const COLUMNS = [
         'movement_date', 'direction', 'amount', 'account', 'transfer_account', 'payment_method', 'category',
-        'runts_line', 'budget_item', 'description', 'document_type', 'invoice_number', 'invoice_date', 'beneficiary',
-        'member', 'approved',
+        'runts_line', 'budget_item', 'description', 'notes', 'document_type', 'invoice_number', 'invoice_date',
+        'beneficiary', 'member', 'approved',
     ];
 
     /**
@@ -138,6 +138,7 @@ final class TreasuryCsvService
                     ? ($budgetLabels[(int) $row['budget_item_id']] ?? (string) ($row['budget_item_label'] ?? ''))
                     : '',
                 'description' => (string) ($row['description'] ?? ''),
+                'notes' => (string) ($row['notes'] ?? ''),
                 'document_type' => $documentTypeKey !== ''
                     ? (string) __('treasury.document_type_' . $documentTypeKey)
                     : '',
@@ -196,6 +197,7 @@ final class TreasuryCsvService
             'runts_line' => RuntsReportService::lineLabel('A-E2'),
             'budget_item' => '',
             'description' => (string) __('treasury.csv_example_description'),
+            'notes' => '',
             'document_type' => (string) __('treasury.document_type_invoice'),
             'invoice_number' => '',
             'invoice_date' => '',
@@ -497,7 +499,7 @@ final class TreasuryCsvService
             ],
             [
                 'label' => (string) __('treasury.import.group_details'),
-                'options' => $group(['description', 'document_type', 'invoice_number', 'invoice_date', 'beneficiary', 'member']),
+                'options' => $group(['description', 'notes', 'document_type', 'invoice_number', 'invoice_date', 'beneficiary', 'member']),
             ],
         ];
     }
@@ -1376,6 +1378,10 @@ final class TreasuryCsvService
                 }
             }
             $description = ImportValueNormalizer::text((string) ($values['description'] ?? ''));
+            $notes = trim((string) ($values['notes'] ?? ''));
+            if ($notes !== '') {
+                $notes = mb_substr($notes, 0, TreasuryService::NOTES_MAX_LENGTH);
+            }
             $beneficiary = ImportValueNormalizer::text((string) ($values['beneficiary'] ?? ''));
             $invoiceNumber = mb_substr(trim((string) ($values['invoice_number'] ?? '')), 0, 120);
             $invoiceDate = '';
@@ -1467,6 +1473,7 @@ final class TreasuryCsvService
                 'transfer_account' => $transferAccount !== '' ? (string) ($accountLabels[$transferAccount] ?? $transferAccount) : '',
                 'method' => $method !== '' ? (string) __('treasury.method_' . $method) : '',
                 'description' => $description,
+                'notes' => $notes,
                 'document_type' => $documentType !== '' ? (string) __('treasury.document_type_' . $documentType) : '',
                 'invoice_number' => $invoiceNumber,
                 'invoice_date' => $invoiceDate,
@@ -1498,6 +1505,7 @@ final class TreasuryCsvService
                     'runts_line' => $runtsLine,
                     'budget_item_id' => $budgetItemId > 0 ? (string) $budgetItemId : '',
                     'description' => $description,
+                    'notes' => $notes,
                     'document_type' => $documentType,
                     'invoice_number' => $invoiceNumber,
                     'invoice_date' => $invoiceDate,
@@ -1916,7 +1924,8 @@ final class TreasuryCsvService
             'document_type' => ['tipodocumento', 'tipodoc', 'documenttype', 'doctype', 'belegart', 'belegtyp', 'documentkind', 'tipologiadocumento'],
             'invoice_number' => ['numerodocumento', 'numerofattura', 'numerodoc', 'documentnumber', 'invoicenumber', 'rechnungsnummer', 'docnumber', 'beleg', 'belegnummer'],
             'invoice_date' => ['datadocumento', 'datafattura', 'datadoc', 'documentdate', 'invoicedate', 'rechnungsdatum', 'docdate', 'datariferimento', 'belegdatum'],
-            'description' => ['descrizione', 'causale', 'description', 'beschreibung', 'note', 'memo'],
+            'description' => ['descrizione', 'causale', 'description', 'beschreibung', 'verwendungszweck'],
+            'notes' => ['note', 'annotazioni', 'annotazione', 'notainterna', 'noteinterne', 'memo', 'internalnote', 'internalnotes', 'anmerkung', 'anmerkungen', 'notizen'],
             'beneficiary' => ['beneficiario', 'fornitore', 'beneficiary', 'empfanger', 'payee'],
             'member' => ['socio', 'numerosocio', 'member', 'mitglied', 'socionumero'],
             'approved' => ['approvato', 'approvazione', 'approval', 'freigegeben', 'stato', 'status'],

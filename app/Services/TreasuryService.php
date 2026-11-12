@@ -59,6 +59,11 @@ final class TreasuryService
     public const MIN_MOVEMENT_YEAR = 1900;
 
     /**
+     * Cap of the free-text annotations (`notes`): a memo, not a second description.
+     */
+    public const NOTES_MAX_LENGTH = 2000;
+
+    /**
      * Built-in wallets, seeded by migration 028. Custom wallets live in the `treasury_accounts`
      * table (label, active flag, order) and are managed in Settings → Financial Accounts.
      *
@@ -2063,6 +2068,13 @@ final class TreasuryService
             }
         }
 
+        $description = trim((string) ($input['description'] ?? ''));
+        $description = $description !== '' ? mb_substr($description, 0, 500) : '';
+        // Internal memo: kept separate from the short "causale" so a working annotation never
+        // endangers the description that ends up in the reports.
+        $notes = trim((string) ($input['notes'] ?? ''));
+        $notes = $notes !== '' ? mb_substr($notes, 0, self::NOTES_MAX_LENGTH) : '';
+
         $budgetItemId = 0;
         $budgetItemRaw = trim((string) ($input['budget_item_id'] ?? ''));
         if (!$isTransfer && $budgetItemRaw !== '' && $budgetItemRaw !== '0') {
@@ -2084,7 +2096,8 @@ final class TreasuryService
                 'amount' => $amount,
                 'amount_entered' => $amountEntered,
                 'amount_currency' => $amountCurrency,
-                'description' => trim((string) ($input['description'] ?? '')),
+                'description' => $description,
+                'notes' => $notes !== '' ? $notes : null,
                 'payment_method' => $method,
                 'account' => $account,
                 'transfer_account' => $transferAccount,
@@ -2201,8 +2214,10 @@ final class TreasuryService
         $params['like_invoice_title'] = $like;
         $params['like_beneficiary'] = $like;
         $params['like_invoice_number'] = $like;
+        $params['like_notes'] = $like;
         $parts = [
             'm.description LIKE :like_desc',
+            'm.notes LIKE :like_notes',
             'm.category LIKE :like_category',
             'm.payment_method LIKE :like_method',
             'm.account LIKE :like_account',

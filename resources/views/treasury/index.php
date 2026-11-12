@@ -600,6 +600,7 @@ if ($filterYear !== '' && !isset($yearFilterOptions[$filterYear])) {
                                 $amount = (float) ($row['amount'] ?? 0);
                                 $memberLabel = trim((string) (($row['last_name'] ?? '') . ' ' . ($row['first_name'] ?? '')));
                                 $desc = trim((string) ($row['description'] ?? ''));
+                                $rowNotes = trim((string) ($row['notes'] ?? ''));
                                 $invoiceTitle = trim((string) ($row['invoice_title'] ?? ''));
                                 $documentTypeKey = (string) ($row['document_type'] ?? '');
                                 $documentTypeLabel = '';
@@ -694,6 +695,11 @@ if ($filterYear !== '' && !isset($yearFilterOptions[$filterYear])) {
                                     </td>
                                     <td>
                                         <?= e($desc !== '' ? $desc : '—') ?>
+                                        <?php if ($rowNotes !== ''): ?>
+                                            <div class="muted treasury-row-notes" title="<?= e($rowNotes) ?>">
+                                                <?= e(__('treasury.notes')) ?>: <?= e(mb_strimwidth($rowNotes, 0, 120, '…')) ?>
+                                            </div>
+                                        <?php endif; ?>
                                         <?php if ($isSuperseded): ?>
                                             <span class="badge badge-muted treasury-superseded-badge">
                                                 <?= e($supersededAccountLabel !== ''
@@ -727,8 +733,8 @@ if ($filterYear !== '' && !isset($yearFilterOptions[$filterYear])) {
                                         <?php if (!empty($row['beneficiary'])): ?><div><?= e(__('treasury.supplier')) ?>: <?= e((string) $row['beneficiary']) ?></div><?php endif; ?>
                                         <?php if ($invoiceTitle !== '' && $invoiceTitle !== $desc): ?><div><?= e(__('treasury.invoice_title')) ?>: <?= e($invoiceTitle) ?></div><?php endif; ?>
                                         <?php if ($documentTypeLabel !== ''): ?><div><?= e(__('treasury.document_type')) ?>: <?= e($documentTypeLabel) ?></div><?php endif; ?>
-                                        <?php if (!empty($row['invoice_number'])): ?><div><?= e(__('treasury.invoice_number')) ?>: <?= e((string) $row['invoice_number']) ?></div><?php endif; ?>
-                                        <?php if (!empty($row['invoice_date'])): ?><div><?= e(__('treasury.invoice_date')) ?>: <?= e(format_date($row['invoice_date']) ?: (string) $row['invoice_date']) ?></div><?php endif; ?>
+                                        <?php if (!empty($row['invoice_number'])): ?><div><?= e(__('treasury.doc_number')) ?>: <?= e((string) $row['invoice_number']) ?></div><?php endif; ?>
+                                        <?php if (!empty($row['invoice_date'])): ?><div><?= e(__('treasury.doc_date')) ?>: <?= e(format_date($row['invoice_date']) ?: (string) $row['invoice_date']) ?></div><?php endif; ?>
                                         <?php if (!empty($row['budget_item_label'])): ?><div><?= e(__('treasury.budget_item')) ?>: <?= e((string) $row['budget_item_label']) ?></div><?php endif; ?>
                                         <?php if (!empty($row['invoice_due_date'])): ?><div><?= e(__('treasury.invoice_due_date')) ?>: <?= e(format_date($row['invoice_due_date']) ?: (string) $row['invoice_due_date']) ?></div><?php endif; ?>
                                         <?php if (!empty($row['amount_entered']) && !empty($row['amount_currency'])): ?><div><?= e(__('treasury.amount_original')) ?>: <?= e(number_format((float) $row['amount_entered'], 2, ',', '.')) ?> <?= e((string) $row['amount_currency']) ?></div><?php endif; ?>

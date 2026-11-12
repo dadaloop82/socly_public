@@ -12683,6 +12683,8 @@ tr.doc-row-editable:focus-visible {
 .treasury-row.is-superseded .treasury-col-check { text-decoration: none; }
 .treasury-superseded-badge { margin-left: 0.4rem; }
 .treasury-superseded-note { font-size: 0.78rem; margin-top: 0.15rem; }
+/* Internal memo of a movement: one compact line under the description, full text in the tooltip. */
+.treasury-row-notes { font-size: 0.78rem; margin-top: 0.15rem; font-style: italic; }
 /*
  * “Target Account” picker in the action bar: same visual language as the site fields, only compact
  * to fit next to the buttons.
