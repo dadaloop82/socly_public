@@ -210,6 +210,7 @@ final class TreasuryController extends BaseController
             'movement' => $movement,
             'movement_version' => $conflictActive ? $conflictVersion : (int) ($movement['row_version'] ?? 0),
             'movement_conflict' => $conflict,
+            'adjacent' => $this->treasury->adjacentMovements((int) $movement['id']),
             'default_category' => (string) ($movement['category'] ?? 'membership_fee'),
             'categories' => $categories,
             'category_groups' => $this->treasury->categoryGroups(),

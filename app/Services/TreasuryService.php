@@ -1085,6 +1085,52 @@ final class TreasuryService
     }
 
     /**
+     * Previous/next movement in chronological order (operation date, then id) for the arrows of the
+     * edit page. `prev` is the older movement, `next` the newer one; null at the ends.
+     *
+     * @return array{prev:array{id:int,date:string}|null,next:array{id:int,date:string}|null}
+     */
+    public function adjacentMovements(int $id): array
+    {
+        if ($id < 1) {
+            return ['prev' => null, 'next' => null];
+        }
+        $current = $this->db->fetch(
+            'SELECT id, movement_date FROM treasury_movements WHERE id = :id LIMIT 1',
+            ['id' => $id]
+        );
+        if ($current === null) {
+            return ['prev' => null, 'next' => null];
+        }
+        $date = (string) ($current['movement_date'] ?? '');
+        $prev = $this->db->fetch(
+            'SELECT id, movement_date FROM treasury_movements
+             WHERE movement_date < :d1 OR (movement_date = :d2 AND id < :id)
+             ORDER BY movement_date DESC, id DESC
+             LIMIT 1',
+            ['d1' => $date, 'd2' => $date, 'id' => $id]
+        );
+        $next = $this->db->fetch(
+            'SELECT id, movement_date FROM treasury_movements
+             WHERE movement_date > :d1 OR (movement_date = :d2 AND id > :id)
+             ORDER BY movement_date ASC, id ASC
+             LIMIT 1',
+            ['d1' => $date, 'd2' => $date, 'id' => $id]
+        );
+
+        return [
+            'prev' => $prev === null ? null : [
+                'id' => (int) ($prev['id'] ?? 0),
+                'date' => (string) ($prev['movement_date'] ?? ''),
+            ],
+            'next' => $next === null ? null : [
+                'id' => (int) ($next['id'] ?? 0),
+                'date' => (string) ($next['movement_date'] ?? ''),
+            ],
+        ];
+    }
+
+    /**
      * Cost centres with the full path “year · section · item”, for the menus that are not grouped by
      * section (CSV import/export): the bare item label is ambiguous when sections repeat a wording
      * (“Personale” in two macro-categories).

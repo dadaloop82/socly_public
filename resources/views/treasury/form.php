@@ -85,14 +85,42 @@ $values['document_edit_url'] = $isEdit && !empty($movement['document_id'])
 $pageTitle = $isEdit ? __('treasury.edit') : __('treasury.add_movement');
 $pageLede = $isEdit ? __('treasury.edit_lede') : __('treasury.add_lede');
 $submitLabel = $isEdit ? __('treasury.update') : __('treasury.submit');
+$adjacent = is_array($adjacent ?? null) ? $adjacent : ['prev' => null, 'next' => null];
+$adjacentPrev = is_array($adjacent['prev'] ?? null) ? $adjacent['prev'] : null;
+$adjacentNext = is_array($adjacent['next'] ?? null) ? $adjacent['next'] : null;
+$adjacentLabel = static function (array $entry, string $key): string {
+    $date = format_date((string) ($entry['date'] ?? ''));
+
+    return (string) __($key, ['date' => $date !== '' ? $date : (string) ($entry['date'] ?? '')]);
+};
 ?>
 <div class="page-header">
     <div class="titles">
         <h1 class="page-title"><?= e($pageTitle) ?></h1>
         <p class="page-lede"><?= e($pageLede) ?></p>
+    </div>
+    <div class="actions">
         <?php if ($isEdit): ?>
-            <?= view_partial('partials/record_trail', ['entity' => 'treasury', 'id' => (int) ($movement['id'] ?? 0)]) ?>
+            <div class="record-nav" role="group" aria-label="<?= e(__('treasury.nav_label')) ?>">
+                <?php if ($adjacentPrev !== null && (int) ($adjacentPrev['id'] ?? 0) > 0): ?>
+                    <a class="btn btn-ghost btn-sm record-nav-btn" href="<?= e(url('/treasury/' . (int) $adjacentPrev['id'] . '/edit')) ?>"
+                       title="<?= e($adjacentLabel($adjacentPrev, 'treasury.nav_prev_title')) ?>"
+                       aria-label="<?= e($adjacentLabel($adjacentPrev, 'treasury.nav_prev_title')) ?>">‹</a>
+                <?php else: ?>
+                    <span class="btn btn-ghost btn-sm record-nav-btn" aria-disabled="true"
+                          title="<?= e(__('treasury.nav_prev_none')) ?>">‹</span>
+                <?php endif; ?>
+                <?php if ($adjacentNext !== null && (int) ($adjacentNext['id'] ?? 0) > 0): ?>
+                    <a class="btn btn-ghost btn-sm record-nav-btn" href="<?= e(url('/treasury/' . (int) $adjacentNext['id'] . '/edit')) ?>"
+                       title="<?= e($adjacentLabel($adjacentNext, 'treasury.nav_next_title')) ?>"
+                       aria-label="<?= e($adjacentLabel($adjacentNext, 'treasury.nav_next_title')) ?>">›</a>
+                <?php else: ?>
+                    <span class="btn btn-ghost btn-sm record-nav-btn" aria-disabled="true"
+                          title="<?= e(__('treasury.nav_next_none')) ?>">›</span>
+                <?php endif; ?>
+            </div>
         <?php endif; ?>
+        <a class="btn btn-ghost" href="<?= e(url('/treasury')) ?>"><?= e(__('common.back')) ?></a>
     </div>
 </div>
 
@@ -134,4 +162,7 @@ $submitLabel = $isEdit ? __('treasury.update') : __('treasury.submit');
         <a class="btn btn-ghost" href="<?= e(url('/treasury')) ?>"><?= e(__('common.back')) ?></a>
         <button class="btn" type="submit"><?= e($submitLabel) ?></button>
     </div>
+    <?php if ($isEdit): ?>
+        <?= view_partial('partials/record_trail', ['entity' => 'treasury', 'id' => (int) ($movement['id'] ?? 0)]) ?>
+    <?php endif; ?>
 </form>
