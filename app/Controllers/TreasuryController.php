@@ -39,7 +39,7 @@ final class TreasuryController extends BaseController
         }
         $groupByCategory = (string) $request->input('group', '1') !== '0';
         $sort = (string) $request->input('sort', 'date_desc');
-        if (!in_array($sort, ['date_desc', 'date_asc', 'created_desc', 'invoice_desc'], true)) {
+        if (!in_array($sort, TreasuryService::SORTS, true)) {
             $sort = 'date_desc';
         }
         $filters = $this->ledgerFilters($request);

@@ -1,4 +1,4 @@
-<?php
+ nonsempre funzoina e non genera il file e non <?php
 /** @var array{movements:list<array>,balance:float,income:float,expense:float} $ledger */
 /** @var list<array{key:string,label:string,items:list<array>}> $movement_groups */
 /** @var array{auto_from_payments?:bool} $config */
@@ -46,6 +46,31 @@ $currentPage = (int) ($page ?? 1);
 $totalPages = (int) ($pages ?? 1);
 $pageUrl = static fn (int $p): string => url('/treasury?' . http_build_query(array_merge($pagerQuery, ['page' => $p])));
 $pageWindow = $totalPages > 1 ? range(max(1, $currentPage - 2), min($totalPages, $currentPage + 2)) : [];
+// Sortable column headers: the ledger keeps the order in a single `sort` key (`<column>_asc|_desc`),
+// so a click on the active column flips the direction and a click on another column starts over.
+$sortUrl = static function (string $next) use ($pagerQuery): string {
+    $params = $pagerQuery;
+    $params['sort'] = $next;
+    unset($params['page']);
+
+    return url('/treasury') . '?' . http_build_query($params);
+};
+$sortHeader = static function (string $column, string $labelKey, string $firstDirection = 'asc') use ($sort, $sortUrl): string {
+    $active = str_starts_with($sort, $column . '_');
+    $direction = $active ? substr($sort, strlen($column) + 1) : '';
+    $next = $active
+        ? $column . ($direction === 'asc' ? '_desc' : '_asc')
+        : $column . ($firstDirection === 'desc' ? '_desc' : '_asc');
+    $icon = $active ? ($direction === 'asc' ? '↑' : '↓') : '↕';
+    $hint = $active
+        ? (string) __($direction === 'asc' ? 'treasury.sort_current_asc' : 'treasury.sort_current_desc')
+        : (string) __('treasury.sort_hint');
+
+    return '<th class="th-sort' . ($active ? ' is-sorted' : '') . '">'
+        . '<a href="' . e($sortUrl($next)) . '" title="' . e($hint) . '"'
+        . ' aria-label="' . e(__($labelKey) . ' — ' . $hint) . '">'
+        . e(__($labelKey)) . ' <span class="th-sort-icon" aria-hidden="true">' . $icon . '</span></a></th>';
+};
 $accountFilterOptions = [];
 foreach (($accounts ?? []) as $accountOption) {
     $accountFilterOptions[(string) ($accountOption['key'] ?? '')] = (string) ($accountOption['label'] ?? '');
@@ -314,11 +339,29 @@ if ($filterYear !== '' && !isset($yearFilterOptions[$filterYear])) {
             'value' => $sort,
             'context' => 'filter',
             'include_empty' => false,
-            'options' => [
-                'date_desc' => (string) __('treasury.sort_date_desc'),
-                'date_asc' => (string) __('treasury.sort_date_asc'),
-                'created_desc' => (string) __('treasury.sort_created_desc'),
-                'invoice_desc' => (string) __('treasury.sort_invoice_desc'),
+            'groups' => [
+                [
+                    'label' => (string) __('treasury.sort_group_date'),
+                    'options' => [
+                        ['value' => 'date_desc', 'label' => (string) __('treasury.sort_date_desc')],
+                        ['value' => 'date_asc', 'label' => (string) __('treasury.sort_date_asc')],
+                        ['value' => 'created_desc', 'label' => (string) __('treasury.sort_created_desc')],
+                        ['value' => 'invoice_desc', 'label' => (string) __('treasury.sort_invoice_desc')],
+                    ],
+                ],
+                [
+                    'label' => (string) __('treasury.sort_group_columns'),
+                    'options' => [
+                        ['value' => 'description_asc', 'label' => (string) __('treasury.sort_description_asc')],
+                        ['value' => 'description_desc', 'label' => (string) __('treasury.sort_description_desc')],
+                        ['value' => 'method_asc', 'label' => (string) __('treasury.sort_method_asc')],
+                        ['value' => 'method_desc', 'label' => (string) __('treasury.sort_method_desc')],
+                        ['value' => 'income_desc', 'label' => (string) __('treasury.sort_income_desc')],
+                        ['value' => 'income_asc', 'label' => (string) __('treasury.sort_income_asc')],
+                        ['value' => 'expense_desc', 'label' => (string) __('treasury.sort_expense_desc')],
+                        ['value' => 'expense_asc', 'label' => (string) __('treasury.sort_expense_asc')],
+                    ],
+                ],
             ],
         ]) ?>
         <?= field('select', [
@@ -542,12 +585,12 @@ if ($filterYear !== '' && !isset($yearFilterOptions[$filterYear])) {
                                         >
                                     </th>
                                 <?php endif; ?>
-                                <th><?= e(__('treasury.operation_date')) ?></th>
-                                <th><?= e(__('treasury.description')) ?></th>
-                                <th><?= e(__('treasury.method')) ?></th>
+                                <?= $sortHeader('date', 'treasury.operation_date') ?>
+                                <?= $sortHeader('description', 'treasury.description') ?>
+                                <?= $sortHeader('method', 'treasury.method') ?>
                                 <th><?= e(__('treasury.details')) ?></th>
-                                <th><?= e(__('treasury.income')) ?></th>
-                                <th><?= e(__('treasury.expense')) ?></th>
+                                <?= $sortHeader('income', 'treasury.income', 'desc') ?>
+                                <?= $sortHeader('expense', 'treasury.expense', 'desc') ?>
                                 <th><?= e(__('treasury.actions')) ?></th>
                             </tr>
                             </thead>

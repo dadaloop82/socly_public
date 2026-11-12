@@ -41,6 +41,18 @@ final class TreasuryService
     public const DIRECTIONS = ['income', 'expense', 'transfer'];
 
     /**
+     * Orders accepted by the ledger and by the sortable table headers: date, registration date,
+     * document date, description, payment method and the amount of the income/expense column.
+     *
+     * @var list<string>
+     */
+    public const SORTS = [
+        'date_desc', 'date_asc', 'created_desc', 'invoice_desc',
+        'description_asc', 'description_desc', 'method_asc', 'method_desc',
+        'income_asc', 'income_desc', 'expense_asc', 'expense_desc',
+    ];
+
+    /**
      * Earliest plausible year for an operation date: a typo like 0206 would otherwise pollute the
      * period filters and the totals.
      */
@@ -430,12 +442,7 @@ final class TreasuryService
             $sql .= ' WHERE ' . implode(' AND ', $where);
         }
 
-        $order = match ($sort) {
-            'date_asc' => 'm.movement_date ASC, m.id ASC',
-            'created_desc' => 'm.created_at DESC, m.id DESC',
-            'invoice_desc' => 'm.invoice_date IS NULL, m.invoice_date DESC, m.movement_date DESC, m.id DESC',
-            default => 'm.movement_date DESC, m.id DESC',
-        };
+        $order = $this->ledgerOrder($sort);
         $limit = max(1, min(500, $limit));
         $offset = max(0, $offset);
         $sql .= ' ORDER BY ' . $order . ' LIMIT ' . $limit . ' OFFSET ' . $offset;
@@ -459,6 +466,51 @@ final class TreasuryService
             'limit' => $limit,
             'offset' => $offset,
         ];
+    }
+
+    /**
+     * ORDER BY clause of the ledger: whitelisted keys (the SQL never contains user input) with a
+     * deterministic tie-breaker, so pagination stays stable.
+     */
+    private function ledgerOrder(string $sort): string
+    {
+        $tie = 'm.movement_date DESC, m.id DESC';
+
+        return match ($sort) {
+            'date_asc' => 'm.movement_date ASC, m.id ASC',
+            'created_desc' => 'm.created_at DESC, m.id DESC',
+            'invoice_desc' => 'm.invoice_date IS NULL, m.invoice_date DESC, ' . $tie,
+            'description_asc' => '(m.description IS NULL OR m.description = \'\'), m.description ASC, ' . $tie,
+            'description_desc' => '(m.description IS NULL OR m.description = \'\'), m.description DESC, ' . $tie,
+            'method_asc' => $this->methodOrderClause('ASC') . ', ' . $tie,
+            'method_desc' => $this->methodOrderClause('DESC') . ', ' . $tie,
+            // “Entrata” / “Uscita” columns: the amount counts only for its own direction, so mixed
+            // rows (income, expense, transfers) keep a predictable order.
+            'income_asc' => "CASE WHEN m.direction = 'income' THEN m.amount ELSE 0 END ASC, " . $tie,
+            'income_desc' => "CASE WHEN m.direction = 'income' THEN m.amount ELSE 0 END DESC, " . $tie,
+            'expense_asc' => "CASE WHEN m.direction = 'expense' THEN m.amount ELSE 0 END ASC, " . $tie,
+            'expense_desc' => "CASE WHEN m.direction = 'expense' THEN m.amount ELSE 0 END DESC, " . $tie,
+            default => $tie,
+        };
+    }
+
+    /**
+     * Payment methods ordered by their localised label (the stored value is a slug such as
+     * `bank_transfer`), using FIELD() over the whitelisted methods.
+     */
+    private function methodOrderClause(string $direction): string
+    {
+        $labels = [];
+        foreach (self::METHODS as $method) {
+            $labels[$method] = (string) __('treasury.method_' . $method);
+        }
+        uksort($labels, static fn (string $a, string $b): int => strcasecmp($labels[$a], $labels[$b]));
+        $values = [];
+        foreach (array_keys($labels) as $key) {
+            $values[] = "'" . str_replace("'", "''", (string) $key) . "'";
+        }
+
+        return 'FIELD(m.payment_method, ' . implode(', ', $values) . ') ' . $direction;
     }
 
     /** Total rows matching the current ledger filters (for the pager). @param array<string,mixed> $filters */
