@@ -41,6 +41,10 @@ final class TreasuryCsvController extends BaseController
                 : '',
             'from' => (string) $request->input('from', ''),
             'to' => (string) $request->input('to', ''),
+            'month' => (string) max(0, min(12, (int) $request->input('month', 0))),
+            'year' => (int) $request->input('year', 0) >= 1900 && (int) $request->input('year', 0) <= 2200
+                ? (string) (int) $request->input('year', 0)
+                : '',
         ];
         $rows = $this->csv->exportRows(trim((string) $request->input('q', '')), $filters);
         header('Content-Type: text/csv; charset=utf-8');

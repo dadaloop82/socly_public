@@ -20,11 +20,15 @@ $filterDirection = (string) ($filters['direction'] ?? '');
 $filterCategory = (string) ($filters['category'] ?? '');
 $filterAccount = (string) ($filters['account'] ?? '');
 $advancedCount = (int) ($advanced_filters_count ?? 0);
+$filterMonth = (string) ($filters['month'] ?? '');
+$filterYear = (string) ($filters['year'] ?? '');
 $hasActiveFilters = trim((string) ($search_query ?? '')) !== ''
     || $filterPeriod !== ''
     || $filterDirection !== ''
     || $filterCategory !== ''
-    || $filterAccount !== '';
+    || $filterAccount !== ''
+    || $filterMonth !== ''
+    || $filterYear !== '';
 // Pager: keep search, filters and sort when moving between pages.
 $pagerQuery = array_filter([
     'q' => (string) ($search_query ?? ''),
@@ -33,6 +37,8 @@ $pagerQuery = array_filter([
     'category' => $filterCategory,
     'account' => $filterAccount,
     'approval' => (string) ($filters['approval'] ?? ''),
+    'month' => $filterMonth,
+    'year' => $filterYear,
     'sort' => $sort,
     'group' => !empty($group_by_category) ? '1' : '0',
 ], static fn ($value): bool => (string) $value !== '');
@@ -57,6 +63,12 @@ if ($filterCategory !== '') {
 }
 if ($filterPeriod !== '') {
     $ledgerParams['period'] = $filterPeriod;
+}
+if ($filterMonth !== '') {
+    $ledgerParams['month'] = $filterMonth;
+}
+if ($filterYear !== '') {
+    $ledgerParams['year'] = $filterYear;
 }
 if ($sort !== 'date_desc') {
     $ledgerParams['sort'] = $sort;
@@ -144,6 +156,19 @@ $categoryFilterOptions = [];
 foreach ($categories as $categoryOption) {
     $categoryFilterOptions[(string) ($categoryOption['key'] ?? '')] = (string) ($categoryOption['label'] ?? '');
 }
+// Month/year of the operation date: two extra visible filters for the most common reading
+// (“March 2025”), next to the relative period presets.
+$monthFilterOptions = [];
+for ($monthIndex = 1; $monthIndex <= 12; $monthIndex++) {
+    $monthFilterOptions[(string) $monthIndex] = (string) __('common.month_' . $monthIndex);
+}
+$yearFilterOptions = [];
+foreach (($filter_years ?? []) as $yearValue) {
+    $yearFilterOptions[(string) (int) $yearValue] = (string) (int) $yearValue;
+}
+if ($filterYear !== '' && !isset($yearFilterOptions[$filterYear])) {
+    $yearFilterOptions = [$filterYear => $filterYear] + $yearFilterOptions;
+}
 ?>
 <form class="panel filter-bar members-filter treasury-filter" method="get" action="<?= e(url('/treasury')) ?>" role="search" data-treasury-filter>
     <div class="members-filter-row treasury-filter-row">
@@ -184,6 +209,24 @@ foreach ($categories as $categoryOption) {
                 'expense' => (string) __('treasury.expense'),
                 'transfer' => (string) __('treasury.direction_transfer'),
             ],
+        ]) ?>
+        <?= field('select', [
+            'name' => 'month',
+            'id' => 'treasury-month',
+            'label' => (string) __('treasury.filter_month'),
+            'value' => $filterMonth,
+            'context' => 'filter',
+            'empty_label' => (string) __('treasury.filter_month_all'),
+            'options' => $monthFilterOptions,
+        ]) ?>
+        <?= field('select', [
+            'name' => 'year',
+            'id' => 'treasury-year',
+            'label' => (string) __('treasury.filter_year'),
+            'value' => $filterYear,
+            'context' => 'filter',
+            'empty_label' => (string) __('treasury.filter_year_all'),
+            'options' => $yearFilterOptions,
         ]) ?>
         <div class="treasury-filter-tools">
             <button type="button" class="btn btn-ghost btn-sm treasury-filter-toggle" data-treasury-advanced-toggle

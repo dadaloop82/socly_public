@@ -83,6 +83,7 @@ final class TreasuryController extends BaseController
             'hasAnyMovements' => $this->treasury->movementCount() > 0,
             'runts_filter_groups' => $this->runtsFilterGroups(),
             'budget_filter_options' => $this->treasury->budgetItemFilterOptions(),
+            'filter_years' => $this->treasury->movementYears(),
             'advanced_filters_count' => $this->advancedFilterCount($filters),
             'pending_count' => $this->treasury->pendingCount(),
             'page' => $page,
@@ -643,7 +644,7 @@ final class TreasuryController extends BaseController
     /**
      * Ledger filters from the query string (validated; period presets expand to a date range).
      *
-     * @return array{direction:string,category:string,account:string,from:string,to:string,period:string}
+     * @return array{direction:string,category:string,runts_line:string,budget_item_id:string,account:string,from:string,to:string,period:string,month:string,year:string,approval:string}
      */
     /**
      * Grouped Model D entries (Expenses / Revenues) for advanced filtering.
@@ -811,6 +812,18 @@ final class TreasuryController extends BaseController
         }
         $from = $this->isoDate((string) $request->input('from', ''));
         $to = $this->isoDate((string) $request->input('to', ''));
+        $month = (int) $request->input('month', 0);
+        if ($month < 1 || $month > 12) {
+            $month = 0;
+        }
+        $year = (int) $request->input('year', 0);
+        if ($year < 1900 || $year > 2200) {
+            $year = 0;
+        }
+        // An explicit month/year replaces the relative presets (“this month”, “last 30 days”…).
+        if ($month > 0 || $year > 0) {
+            $period = '';
+        }
         if ($from === '' && $to === '' && $period !== '') {
             [$from, $to] = match ($period) {
                 'month' => [date('Y-m-01'), date('Y-m-t')],
@@ -827,6 +840,8 @@ final class TreasuryController extends BaseController
             'from' => $from,
             'to' => $to,
             'period' => $period,
+            'month' => $month > 0 ? (string) $month : '',
+            'year' => $year > 0 ? (string) $year : '',
             'approval' => $approval,
         ];
     }

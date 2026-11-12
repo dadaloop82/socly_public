@@ -508,6 +508,25 @@ final class TreasuryService
             $where[] = 'm.movement_date <= :filter_to';
             $params['filter_to'] = $to;
         }
+        // Month/year of the operation date. A month + year becomes a date range, so the index on
+        // `movement_date` stays usable; a month alone compares the month number.
+        $month = (int) ($filters['month'] ?? 0);
+        $year = (int) ($filters['year'] ?? 0);
+        $validMonth = $month >= 1 && $month <= 12;
+        $validYear = $year >= 1900 && $year <= 2200;
+        if ($validMonth && $validYear) {
+            $start = sprintf('%04d-%02d-01', $year, $month);
+            $where[] = 'm.movement_date >= :filter_month_from AND m.movement_date < :filter_month_to';
+            $params['filter_month_from'] = $start;
+            $params['filter_month_to'] = date('Y-m-d', (int) strtotime($start . ' +1 month'));
+        } elseif ($validMonth) {
+            $where[] = 'MONTH(m.movement_date) = :filter_month';
+            $params['filter_month'] = $month;
+        } elseif ($validYear) {
+            $where[] = 'm.movement_date >= :filter_year_from AND m.movement_date < :filter_year_to';
+            $params['filter_year_from'] = sprintf('%04d-01-01', $year);
+            $params['filter_year_to'] = sprintf('%04d-01-01', $year + 1);
+        }
         $account = self::normalizeAccount((string) ($filters['account'] ?? ''));
         if ($account !== '') {
             // A wallet filter also matches the destination of a internal transfer.
@@ -960,6 +979,33 @@ final class TreasuryService
         }
 
         return $options;
+    }
+
+    /**
+     * Years with at least one movement (newest first) for the period filters; the current year is
+     * always offered so a fresh installation can filter by it.
+     *
+     * @return list<int>
+     */
+    public function movementYears(): array
+    {
+        $years = [];
+        foreach ($this->db->fetchAll(
+            'SELECT DISTINCT YEAR(movement_date) AS y FROM treasury_movements
+             WHERE movement_date IS NOT NULL ORDER BY y DESC'
+        ) as $row) {
+            $year = (int) ($row['y'] ?? 0);
+            if ($year > 0) {
+                $years[] = $year;
+            }
+        }
+        $current = (int) date('Y');
+        if (!in_array($current, $years, true)) {
+            $years[] = $current;
+            rsort($years);
+        }
+
+        return $years;
     }
 
     /**

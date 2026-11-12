@@ -12319,10 +12319,10 @@ tr.doc-row-editable:focus-visible {
   border-style: solid;
 }
 
-/* Ledger filters: one row on desktop — search + period/type/category/account/sort + grouping. */
+/* Ledger filters: one row on desktop — search + period/type/month/year + advanced + grouping. */
 @media (min-width: 961px) {
   .treasury-filter-row {
-    grid-template-columns: minmax(11rem, 2fr) repeat(5, minmax(7rem, 1fr)) auto auto;
+    grid-template-columns: minmax(11rem, 2fr) repeat(4, minmax(7rem, 1fr)) auto;
   }
 }
 .treasury-filter-group,
