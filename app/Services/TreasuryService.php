@@ -963,6 +963,39 @@ final class TreasuryService
     }
 
     /**
+     * Cost centres with the full path “year · section · item”, for the menus that are not grouped by
+     * section (CSV import/export): the bare item label is ambiguous when sections repeat a wording
+     * (“Personale” in two macro-categories).
+     *
+     * @return list<array{value:string,label:string,fiscal_year:string,section:string,item:string}>
+     */
+    public function budgetItemOptionsWithSection(): array
+    {
+        $options = [];
+        foreach ($this->db->fetchAll(
+            "SELECT i.id, b.fiscal_year, i.label, s.title AS section_title
+             FROM budget_items i
+             INNER JOIN budgets b ON b.id = i.budget_id
+             LEFT JOIN budget_sections s ON s.id = i.section_id
+             ORDER BY b.fiscal_year DESC, s.sort_order ASC, i.sort_order ASC, i.id ASC"
+        ) as $row) {
+            $year = (string) ($row['fiscal_year'] ?? '');
+            $section = trim((string) ($row['section_title'] ?? ''));
+            $item = mb_substr(trim((string) ($row['label'] ?? '')), 0, 90);
+            $parts = array_filter([$year, $section, $item], static fn (string $part): bool => $part !== '');
+            $options[] = [
+                'value' => (string) (int) $row['id'],
+                'label' => implode(' · ', $parts),
+                'fiscal_year' => $year,
+                'section' => $section,
+                'item' => $item,
+            ];
+        }
+
+        return $options;
+    }
+
+    /**
      * “year · item” label of a budget line (for summaries).
      */
     public function budgetItemLabel(int $id): string

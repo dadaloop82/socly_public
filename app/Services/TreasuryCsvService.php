@@ -106,6 +106,12 @@ final class TreasuryCsvService
         }
 
         $out = [];
+        // Full path “year · section · item” of the cost centres, so the export can be re-imported
+        // without ambiguity.
+        $budgetLabels = [];
+        foreach ($this->treasury->budgetItemOptionsWithSection() as $budgetOption) {
+            $budgetLabels[(int) $budgetOption['value']] = (string) $budgetOption['label'];
+        }
         foreach ($rows as $row) {
             if (trim((string) ($row['superseded_at'] ?? '')) !== '') {
                 // The transferred originals remain in the history but are not re-exported: the copy on the
@@ -128,7 +134,9 @@ final class TreasuryCsvService
                 'payment_method' => $method !== '' ? (string) __('treasury.method_' . $method) : '',
                 'category' => $categoryKey !== '' ? $this->treasury->categoryLabel($categoryKey) : '',
                 'runts_line' => $runtsLine !== '' ? RuntsReportService::lineLabel($runtsLine) : '',
-                'budget_item' => !empty($row['budget_item_label']) ? (string) $row['budget_item_label'] : '',
+                'budget_item' => (int) ($row['budget_item_id'] ?? 0) > 0
+                    ? ($budgetLabels[(int) $row['budget_item_id']] ?? (string) ($row['budget_item_label'] ?? ''))
+                    : '',
                 'description' => (string) ($row['description'] ?? ''),
                 'document_type' => $documentTypeKey !== ''
                     ? (string) __('treasury.document_type_' . $documentTypeKey)
@@ -873,7 +881,8 @@ final class TreasuryCsvService
                 // The section is part of the label: “1) Servizi” exists in several sections.
                 return RuntsReportService::lineOptions();
             case 'budget_item':
-                foreach ($this->treasury->budgetItemFilterOptions() as $option) {
+                // Full path “year · section · item”: the bare label can be ambiguous.
+                foreach ($this->treasury->budgetItemOptionsWithSection() as $option) {
                     $out[] = ['value' => (string) $option['value'], 'label' => (string) $option['label']];
                 }
                 return $out;
@@ -1084,7 +1093,7 @@ final class TreasuryCsvService
                 );
                 return in_array($line, $supported, true) ? $line : '__none__';
             case 'budget_item':
-                $id = $this->matchBudgetItem($raw, $this->treasury->budgetItemFilterOptions());
+                $id = $this->matchBudgetItem($raw, $this->treasury->budgetItemOptionsWithSection());
                 return $id > 0 ? (string) $id : '__none__';
             case 'document_type':
                 $type = $this->matchDocumentType($raw);
@@ -1153,7 +1162,11 @@ final class TreasuryCsvService
             }
         }
         $categories = $this->treasury->categoryMap();
-        $budgetOptions = $this->treasury->budgetItemFilterOptions();
+        $budgetOptions = $this->treasury->budgetItemOptionsWithSection();
+        $budgetLabels = [];
+        foreach ($budgetOptions as $budgetOption) {
+            $budgetLabels[(int) $budgetOption['value']] = (string) $budgetOption['label'];
+        }
         $members = $this->memberLookup();
         $existing = $options['skip_duplicates'] === '1' ? $this->existingFingerprints() : [];
         $choices = $this->rowChoices();
@@ -1318,8 +1331,9 @@ final class TreasuryCsvService
             } elseif ($mappedBudget['none']) {
                 $budgetItemId = 0;
             } else {
-                $budgetItemId = $this->matchBudgetItem($budgetRaw, $budgetOptions);
+                $budgetItemId = $this->matchBudgetItem($budgetRaw, $budgetOptions, substr($date, 0, 4));
             }
+            $budgetItemLabel = $budgetItemId > 0 ? (string) ($budgetLabels[$budgetItemId] ?? '') : '';
 
             $memberRaw = (string) ($values['member'] ?? '');
             $memberId = 0;
@@ -1439,6 +1453,7 @@ final class TreasuryCsvService
                 'amount' => (float) ($amount ?? 0),
                 'category' => $categoryLabel,
                 'runts_line' => $runtsLine !== '' ? RuntsReportService::lineLabelWithSection($runtsLine) : '',
+                'budget_item' => $budgetItemLabel,
                 'account' => (string) ($accountLabels[$account] ?? $account),
                 'transfer_account' => $transferAccount !== '' ? (string) ($accountLabels[$transferAccount] ?? $transferAccount) : '',
                 'method' => $method !== '' ? (string) __('treasury.method_' . $method) : '',
@@ -2119,21 +2134,82 @@ final class TreasuryCsvService
         return '';
     }
 
-    /** @param list<array{value:string,label:string}> $options */
-    private function matchBudgetItem(string $raw, array $options): int
+    /**
+     * Cost centre from a free label: full path (“2026 · Personale · Consulenza fiscale”), section and
+     * item, “year · item”, the bare item label or the numeric id. When the movement date is known the
+     * fiscal year of the row wins over the same label in another year.
+     *
+     * @param list<array{value:string,label:string,fiscal_year?:string,section?:string,item?:string}> $options
+     */
+    private function matchBudgetItem(string $raw, array $options, string $preferredYear = ''): int
     {
-        $needle = mb_strtolower(trim($raw));
-        if ($needle === '') {
-            return 0;
-        }
-        foreach ($options as $option) {
-            $label = mb_strtolower(trim((string) $option['label']));
-            if ($label === $needle || ($label !== '' && str_contains($label, $needle))) {
-                return (int) $option['value'];
+        if ($preferredYear !== '') {
+            $scoped = array_values(array_filter(
+                $options,
+                static fn (array $option): bool => (string) ($option['fiscal_year'] ?? '') === $preferredYear
+            ));
+            if ($scoped !== []) {
+                $scopedMatch = $this->findBudgetItemId($raw, $scoped);
+                if ($scopedMatch > 0) {
+                    return $scopedMatch;
+                }
             }
         }
 
-        return 0;
+        return $this->findBudgetItemId($raw, $options);
+    }
+
+    /**
+     * Exact match on one of the labels, otherwise a unique partial match; ambiguous labels stay
+     * unmatched so the user picks explicitly.
+     *
+     * @param list<array{value:string,label:string,fiscal_year?:string,section?:string,item?:string}> $options
+     */
+    private function findBudgetItemId(string $raw, array $options): int
+    {
+        $raw = trim($raw);
+        if ($raw === '') {
+            return 0;
+        }
+        $needle = ImportValueNormalizer::matchKey($raw);
+        $exact = [];
+        $partial = [];
+        foreach ($options as $option) {
+            $id = (int) ($option['value'] ?? 0);
+            if ($id < 1) {
+                continue;
+            }
+            if ((string) $id === $raw) {
+                return $id;
+            }
+            $year = trim((string) ($option['fiscal_year'] ?? ''));
+            $section = trim((string) ($option['section'] ?? ''));
+            $item = trim((string) ($option['item'] ?? $option['label'] ?? ''));
+            $candidates = array_values(array_filter([
+                ImportValueNormalizer::matchKey((string) ($option['label'] ?? '')),
+                ImportValueNormalizer::matchKey(trim($year . ' ' . $item)),
+                ImportValueNormalizer::matchKey(trim($section . ' ' . $item)),
+                ImportValueNormalizer::matchKey($item),
+            ], static fn (string $value): bool => $value !== ''));
+            if ($needle === '' || $candidates === []) {
+                continue;
+            }
+            if (in_array($needle, $candidates, true)) {
+                $exact[$id] = true;
+                continue;
+            }
+            foreach ($candidates as $candidate) {
+                if (str_contains($candidate, $needle) || str_contains($needle, $candidate)) {
+                    $partial[$id] = true;
+                    break;
+                }
+            }
+        }
+        if (count($exact) === 1) {
+            return (int) array_key_first($exact);
+        }
+
+        return $exact === [] && count($partial) === 1 ? (int) array_key_first($partial) : 0;
     }
 
     /**

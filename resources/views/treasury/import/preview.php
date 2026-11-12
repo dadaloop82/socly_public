@@ -214,6 +214,9 @@ foreach ($rows as $row) {
                             <?php if ((string) ($row['runts_line'] ?? '') !== ''): ?>
                                 <div class="muted"><?= e(__('treasury.csv_runts_line')) ?>: <?= e((string) $row['runts_line']) ?></div>
                             <?php endif; ?>
+                            <?php if ((string) ($row['budget_item'] ?? '') !== ''): ?>
+                                <div class="muted"><?= e(__('treasury.csv_budget_item')) ?>: <?= e((string) $row['budget_item']) ?></div>
+                            <?php endif; ?>
                             <?php if ((string) ($row['document_type'] ?? '') !== ''): ?>
                                 <div class="muted"><?= e(__('treasury.document_type')) ?>: <?= e((string) $row['document_type']) ?></div>
                             <?php endif; ?>
