@@ -936,7 +936,7 @@ final class TreasuryController extends BaseController
             parse_str($query, $parsed);
         }
         $clean = [];
-        foreach (['q', 'period', 'direction', 'category', 'account', 'approval', 'month', 'year', 'sort', 'group', 'page'] as $key) {
+        foreach (['q', 'period', 'direction', 'category', 'account', 'approval', 'month', 'year', 'sort', 'group', 'page', 'runts_line', 'budget_item_id'] as $key) {
             $value = $parsed[$key] ?? null;
             if (!is_scalar($value)) {
                 continue;

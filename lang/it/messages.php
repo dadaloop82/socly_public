@@ -3076,6 +3076,8 @@ return [
         'preventivo_eyebrow' => 'Bilancio preventivo',
         'compare_eyebrow' => 'Controllo budget',
         'compare_title' => 'Preventivo vs consuntivo :year',
+        'open_movements' => 'Vedi i movimenti di questa voce nella prima cassa',
+        'open_year_movements' => 'Vedi i movimenti del :year',
         'compare_lede' => 'Scostamenti per capitolo, con semafori su residuo e sforamenti.',
         'compare' => 'Confronto',
         'open' => 'Apri preventivo',

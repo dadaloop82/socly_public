@@ -2140,6 +2140,8 @@ return [
         'preventivo_eyebrow' => 'Forecast budget',
         'compare_eyebrow' => 'Budget control',
         'compare_title' => 'Forecast vs actuals :year',
+        'open_movements' => 'Show the movements of this line in the ledger',
+        'open_year_movements' => 'Show the movements of :year',
         'compare_lede' => 'Variances per line, with traffic lights on remaining funds and overruns.',
         'compare' => 'Comparison',
         'open' => 'Open forecast',

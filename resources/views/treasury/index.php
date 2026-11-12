@@ -22,23 +22,32 @@ $filterAccount = (string) ($filters['account'] ?? '');
 $advancedCount = (int) ($advanced_filters_count ?? 0);
 $filterMonth = (string) ($filters['month'] ?? '');
 $filterYear = (string) ($filters['year'] ?? '');
+$filterBudget = (string) ($filters['budget_item_id'] ?? '');
+$filterRunts = (string) ($filters['runts_line'] ?? '');
+$filterApproval = (string) ($filters['approval'] ?? '');
 $hasActiveFilters = trim((string) ($search_query ?? '')) !== ''
     || $filterPeriod !== ''
     || $filterDirection !== ''
     || $filterCategory !== ''
     || $filterAccount !== ''
     || $filterMonth !== ''
-    || $filterYear !== '';
-// Pager: keep search, filters and sort when moving between pages.
+    || $filterYear !== ''
+    || $filterBudget !== ''
+    || $filterRunts !== ''
+    || $filterApproval !== '';
+// Pager: keep search, filters and sort when moving between pages (cost centre and Model D line too:
+// the drill-down from budgets opens the ledger already filtered).
 $pagerQuery = array_filter([
     'q' => (string) ($search_query ?? ''),
     'period' => $filterPeriod,
     'direction' => $filterDirection,
     'category' => $filterCategory,
     'account' => $filterAccount,
-    'approval' => (string) ($filters['approval'] ?? ''),
+    'approval' => $filterApproval,
     'month' => $filterMonth,
     'year' => $filterYear,
+    'budget_item_id' => $filterBudget,
+    'runts_line' => $filterRunts,
     'sort' => $sort,
     'group' => !empty($group_by_category) ? '1' : '0',
 ], static fn ($value): bool => (string) $value !== '');

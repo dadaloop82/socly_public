@@ -10,6 +10,11 @@ every 100 patches bump the series, and each bump is published to this repository
 
 ### Added
 
+- Budgets drill down to the first note: clicking a cost-centre line in “Forecast vs actuals”, a type in
+  the “not imputed” table, a year row or a top category of the statistics tab opens the ledger
+  filtered on exactly the movements that compose that figure (same year, approved only), so every
+  number can be checked movement by movement. The filter survives the pager, “Back” and the movement
+  card; the budget page header offers the same shortcut for the whole year.
 - The field held by another operator is now **locked** for you (read-only for text fields, blocked for
   selects and checkboxes, in the person's colour) until they leave it, and their **draft value** is
   shown live under the field, so you see the change as they type it. 45 seconds of silence (closed

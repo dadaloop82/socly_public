@@ -315,7 +315,10 @@ $topIncome = is_array($statistics['categories']['income'] ?? null) ? $statistics
                         </thead>
                         <tbody>
                         <?php foreach ($statsYears as $row): ?>
-                            <tr>
+                            <tr class="clickable-row"
+                                data-href="<?= e(ledger_url(['year' => (int) $row['year']])) ?>"
+                                tabindex="0" role="link"
+                                title="<?= e(__('budget.open_year_movements', ['year' => (string) (int) $row['year']])) ?>">
                                 <td><strong><?= e((string) (int) $row['year']) ?></strong></td>
                                 <td class="num"><?= e($currency->format((float) $row['planned_expense'])) ?></td>
                                 <td class="num"><?= e($currency->format((float) $row['actual_expense'])) ?></td>
@@ -352,7 +355,13 @@ $topIncome = is_array($statistics['categories']['income'] ?? null) ? $statistics
                                 </thead>
                                 <tbody>
                                 <?php foreach ($topExpense as $cat): ?>
-                                    <tr>
+                                    <tr class="clickable-row"
+                                        data-href="<?= e(ledger_url([
+                                            'category' => (string) ($cat['key'] ?? '') !== '' ? (string) $cat['key'] : '__none__',
+                                            'direction' => 'expense',
+                                            'year' => $latestYear,
+                                        ])) ?>"
+                                        tabindex="0" role="link" title="<?= e(__('budget.open_movements')) ?>">
                                         <td><?= e((string) $cat['label']) ?></td>
                                         <td class="num"><?= e($currency->format((float) $cat['amount'])) ?></td>
                                         <td class="num"><?= e(number_format((float) $cat['percent'], 1, ',', '.')) ?>%</td>
@@ -384,7 +393,13 @@ $topIncome = is_array($statistics['categories']['income'] ?? null) ? $statistics
                                 </thead>
                                 <tbody>
                                 <?php foreach ($topIncome as $cat): ?>
-                                    <tr>
+                                    <tr class="clickable-row"
+                                        data-href="<?= e(ledger_url([
+                                            'category' => (string) ($cat['key'] ?? '') !== '' ? (string) $cat['key'] : '__none__',
+                                            'direction' => 'income',
+                                            'year' => $latestYear,
+                                        ])) ?>"
+                                        tabindex="0" role="link" title="<?= e(__('budget.open_movements')) ?>">
                                         <td><?= e((string) $cat['label']) ?></td>
                                         <td class="num"><?= e($currency->format((float) $cat['amount'])) ?></td>
                                         <td class="num"><?= e(number_format((float) $cat['percent'], 1, ',', '.')) ?>%</td>

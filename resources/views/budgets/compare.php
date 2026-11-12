@@ -17,6 +17,9 @@ $statusLabels = [
     'over' => __('budget.status_over'),
 ];
 $percentLabel = static fn (float $value): string => number_format($value, 0, ',', '.') . '%';
+// Drill-down: every line opens the ledger with the movements that compose the “actual” figure.
+$fiscalYear = (int) ($budget['fiscal_year'] ?? 0);
+$openTitle = (string) __('budget.open_movements');
 // The type saved in the estimate is a key (rent, utilities, ...): it must be shown translated.
 $categoryLabels = is_array($category_labels ?? null) ? $category_labels : [];
 $categoryText = static function (string $key) use ($categoryLabels): string {
@@ -129,7 +132,9 @@ $categoryText = static function (string $key) use ($categoryLabels): string {
                     $percent = (float) $item['percent'];
                     $barWidth = max(0.0, min(100.0, $percent));
                     ?>
-                    <tr class="budget-compare-row is-<?= e($status) ?>">
+                    <tr class="budget-compare-row is-<?= e($status) ?> clickable-row"
+                        data-href="<?= e(ledger_url(['budget_item_id' => (int) $item['id'], 'year' => $fiscalYear])) ?>"
+                        tabindex="0" role="link" title="<?= e($openTitle) ?>">
                         <td>
                             <span class="budget-compare-label"><?= e((string) $item['label']) ?></span>
                             <?php if ((string) ($item['category'] ?? '') !== ''): ?>
@@ -175,7 +180,14 @@ $categoryText = static function (string $key) use ($categoryLabels): string {
                 </thead>
                 <tbody>
                 <?php foreach ($unallocated as $row): ?>
-                    <tr>
+                    <tr class="clickable-row"
+                        data-href="<?= e(ledger_url([
+                            'category' => (string) ($row['category'] ?? '') !== '' ? (string) $row['category'] : '__none__',
+                            'direction' => (string) ($row['direction'] ?? ''),
+                            'budget_item_id' => '__none__',
+                            'year' => $fiscalYear,
+                        ])) ?>"
+                        tabindex="0" role="link" title="<?= e($openTitle) ?>">
                         <td><?= e((string) $row['label']) ?></td>
                         <td><?= e((string) $row['direction'] === 'income' ? __('budget.direction_income') : __('budget.direction_expense')) ?></td>
                         <td class="budget-th-amount"><?= e((string) $row['movements']) ?></td>

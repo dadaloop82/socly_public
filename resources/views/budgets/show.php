@@ -40,6 +40,8 @@ $rowPartial = static fn (?array $row, string $sectionKey): string => view_partia
     </div>
     <div class="actions budget-header-actions">
         <a class="btn btn-ghost btn-sm" href="<?= e(url('/budgets')) ?>"><?= e(__('budget.all_budgets')) ?></a>
+        <a class="btn btn-ghost btn-sm" href="<?= e(ledger_url(['year' => (int) ($budget['fiscal_year'] ?? 0)])) ?>"
+           title="<?= e(__('budget.open_year_movements', ['year' => (string) ($budget['fiscal_year'] ?? '')])) ?>"><?= e(__('budget.open_year_movements', ['year' => (string) ($budget['fiscal_year'] ?? '')])) ?></a>
         <a class="btn btn-ghost btn-sm" href="<?= e(url('/budgets/' . $budgetId . '/compare')) ?>"><?= e(__('budget.compare')) ?></a>
         <?= page_action_icon([
             'icon' => 'file',

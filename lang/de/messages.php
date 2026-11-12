@@ -2140,6 +2140,8 @@ return [
         'preventivo_eyebrow' => 'Haushaltsvoranschlag',
         'compare_eyebrow' => 'Budgetkontrolle',
         'compare_title' => 'Voranschlag vs. Ist-Stand :year',
+        'open_movements' => 'Bewegungen dieser Position im Kassenbuch anzeigen',
+        'open_year_movements' => 'Bewegungen des Jahres :year anzeigen',
         'compare_lede' => 'Abweichungen je Posten, mit Ampel für Restbetrag und Überschreitungen.',
         'compare' => 'Vergleich',
         'open' => 'Voranschlag öffnen',

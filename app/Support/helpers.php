@@ -1660,4 +1660,32 @@ if (!function_exists('treasury_account_label')) {
     }
 }
 
+if (!function_exists('ledger_url')) {
+    /**
+     * First-note URL filtered on one dimension (cost centre, type, Model D line, year, …).
+     *
+     * The drill-down rows of budgets, reports and statistics open the ledger with exactly the
+     * movements that compose that figure; the default `approval=approved` makes the list match the
+     * numbers shown (they are always computed on approved movements only).
+     *
+     * @param array<string,string|int> $filters
+     */
+    function ledger_url(array $filters = []): string
+    {
+        $params = [];
+        foreach ($filters as $key => $value) {
+            $value = trim((string) $value);
+            if ($value === '') {
+                continue;
+            }
+            $params[(string) $key] = $value;
+        }
+        if (!isset($params['approval'])) {
+            $params['approval'] = 'approved';
+        }
+
+        return url('/treasury' . ($params === [] ? '' : '?' . http_build_query($params)));
+    }
+}
+
 
