@@ -1226,6 +1226,7 @@ return [
         'general_lede' => 'Legal name, registered office, contacts, logo and brand colours.',
         'users_panel_hint' => 'Manage panel operators and their permissions.',
         'users_manage_title' => 'Manage Users',
+        'addons_lede' => 'Licences, packages and updates for paid extensions.',
         'open_users' => 'Manage users',
         'plugins_panel_hint' => 'Drop-in plugins from the plugins/ folder: enable, disable and configure.',
         'plugins_section_title' => 'Installed plugins',

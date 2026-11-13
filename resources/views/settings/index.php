@@ -91,6 +91,14 @@
             ],
         ];
         $navGroupFirst = true;
+        if (can(\Socly\Support\Permission::ADDONS_MANAGE)) {
+            // The add-ons page lives outside the accordion layout: a real link, not a panel.
+            $configNavGroups['system']['items']['addons'] = [
+                'addons.title',
+                'settings.addons_lede',
+                '/settings/addons',
+            ];
+        }
         ?>
         <?php foreach ($configNavGroups as $navGroupKey => $navGroup): ?>
             <div class="config-nav-group">
@@ -112,16 +120,28 @@
                     <span class="config-nav-chevron" aria-hidden="true"></span>
                 </button>
                 <div class="config-nav-sub" id="settings-nav-sub-<?= e($navGroupKey) ?>"<?= $navGroupFirst ? '' : ' hidden' ?>>
-                    <?php foreach ($navGroup['items'] as $navPanelId => [$navItemTitleKey, $navItemLedeKey]): ?>
-                        <button
-                            type="button"
-                            class="config-nav-link"
-                            data-settings-nav-link="<?= e($navPanelId) ?>"
-                            data-settings-group="<?= e($navGroupKey) ?>"
-                        >
-                            <span class="config-nav-link-title"><?= e(__($navItemTitleKey)) ?></span>
-                            <span class="config-nav-link-lede"><?= e(__($navItemLedeKey)) ?></span>
-                        </button>
+                    <?php foreach ($navGroup['items'] as $navPanelId => $navItem): ?>
+                        <?php
+                        $navItemTitleKey = (string) ($navItem[0] ?? '');
+                        $navItemLedeKey = (string) ($navItem[1] ?? '');
+                        $navItemHref = (string) ($navItem[2] ?? '');
+                        ?>
+                        <?php if ($navItemHref !== ''): ?>
+                            <a class="config-nav-link config-nav-link--page" href="<?= e(url($navItemHref)) ?>">
+                                <span class="config-nav-link-title"><?= e(__($navItemTitleKey)) ?></span>
+                                <span class="config-nav-link-lede"><?= e(__($navItemLedeKey)) ?></span>
+                            </a>
+                        <?php else: ?>
+                            <button
+                                type="button"
+                                class="config-nav-link"
+                                data-settings-nav-link="<?= e($navPanelId) ?>"
+                                data-settings-group="<?= e($navGroupKey) ?>"
+                            >
+                                <span class="config-nav-link-title"><?= e(__($navItemTitleKey)) ?></span>
+                                <span class="config-nav-link-lede"><?= e(__($navItemLedeKey)) ?></span>
+                            </button>
+                        <?php endif; ?>
                     <?php endforeach; ?>
                 </div>
             </div>

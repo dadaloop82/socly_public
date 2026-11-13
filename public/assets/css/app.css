@@ -1299,6 +1299,11 @@ a.sidebar-brand-home:hover {
   background: color-mix(in srgb, var(--brand-primary) 8%, #fff);
   border-color: color-mix(in srgb, var(--brand-primary) 16%, var(--line));
 }
+/* Entry that navigates to a real page (e.g. Add-on) instead of opening an accordion. */
+.config-nav-link.config-nav-link--page {
+  text-decoration: none;
+  color: inherit;
+}
 .config-nav-link:focus-visible {
   outline: 2px solid var(--brand-primary);
   outline-offset: 2px;

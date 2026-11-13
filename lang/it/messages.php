@@ -1230,6 +1230,7 @@ return [
         'general_lede' => 'Denominazione, sede legale, recapiti, logo e colori istituzionali.',
         'users_panel_hint' => 'Gestisci gli operatori del pannello e i relativi permessi.',
         'users_manage_title' => 'Gestisci Utenti',
+        'addons_lede' => 'Licenze, pacchetti e aggiornamenti delle estensioni a pagamento.',
         'open_users' => 'Gestisci utenti',
         'plugins_panel_hint' => 'Plugin drop-in installati nella cartella plugins/: attiva, disattiva e configura.',
         'plugins_section_title' => 'Plugin installati',

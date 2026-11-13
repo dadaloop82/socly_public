@@ -1226,6 +1226,7 @@ return [
         'general_lede' => 'Bezeichnung, Sitz, Kontakte, Logo und Markenfarben.',
         'users_panel_hint' => 'Panel-Benutzer und deren Berechtigungen verwalten.',
         'users_manage_title' => 'Benutzer verwalten',
+        'addons_lede' => 'Lizenzen, Pakete und Updates der kostenpflichtigen Erweiterungen.',
         'open_users' => 'Benutzer verwalten',
         'plugins_panel_hint' => 'Drop-in-Plugins aus dem Ordner plugins/: aktivieren, deaktivieren und konfigurieren.',
         'plugins_section_title' => 'Installierte Plugins',
