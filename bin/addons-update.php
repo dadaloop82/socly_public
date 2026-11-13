@@ -33,7 +33,7 @@ $force = !in_array('--check', $args, true);
 
 @set_time_limit(0);
 
-$result = $app->get(\Socly\Core\Addon\AddonManager::class)->autoInstall('cli', $force);
+$result = $app->get(\Socly\Core\Addon\AddonManager::class)->autoInstall('cli', $force, true);
 
 foreach ($result['installed'] as $row) {
     $from = (string) ($row['from'] ?? '') !== '' ? (string) $row['from'] : '—';

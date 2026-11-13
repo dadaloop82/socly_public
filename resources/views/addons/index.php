@@ -1,6 +1,7 @@
 <?php
 /** @var list<array<string,mixed>> $installed */
 /** @var list<array<string,mixed>> $available */
+/** @var array{count:int,items:list<array<string,string>>} $updates */
 /** @var array<string,mixed> $auto */
 /** @var \Socly\Core\Addon\Entitlement|null $entitlement */
 /** @var array<string,mixed> $entitlement_payload */
@@ -16,6 +17,7 @@
 /** @var bool $keys_ready */
 /** @var string $incoming_dir */
 $available = is_array($available ?? null) ? $available : [];
+$updates = is_array($updates ?? null) ? $updates : ['count' => 0, 'items' => []];
 $licenseId = (string) ($entitlement?->licenseId() ?? '');
 $licensedAddons = $entitlement?->addonIds() ?? [];
 $expiresAt = $entitlement?->expiresAt();
@@ -59,6 +61,22 @@ $pendingCore = is_array($auto['pending'] ?? null) ? $auto['pending'] : [];
             'min' => (string) ($pendingCore[0]['min_core'] ?? ''),
             'core' => $core_version,
         ])) ?></span>
+    </div>
+<?php endif; ?>
+<?php if ((int) ($updates['count'] ?? 0) > 0): ?>
+    <div class="alert alert-warn">
+        <span class="alert-body">
+            <strong><?= e(__('addons.updates_available_title')) ?></strong>
+            <?= e(implode(' · ', array_map(
+                static fn (array $row): string => trim(
+                    (string) ($row['name'] ?? $row['id'] ?? '')
+                    . ' ' . (string) ($row['from'] ?? '')
+                    . ' → ' . (string) ($row['to'] ?? '')
+                ),
+                is_array($updates['items'] ?? null) ? $updates['items'] : []
+            ))) ?>
+            · <?= e(__('addons.updates_available_lede')) ?>
+        </span>
     </div>
 <?php endif; ?>
 

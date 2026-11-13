@@ -22,6 +22,12 @@ every 100 patches bump the series, and each bump is published to this repository
 
 ### Added
 
+- Add-on updates are checked by themselves, like the app updates: the signed catalogue is refreshed at most
+  hourly, a sidebar badge lists the add-ons with a newer version (“Aggiornamenti add-on: N”, name and
+  version range) and links to the Add-ons page. Opening a page no longer replaces an installed add-on
+  silently: updates stay visible with the “Aggiorna” button, while “Installa tutto” and the nightly
+  `bin/addons-update.php` apply them; missing licensed add-ons still install automatically.
+
 - The treasury tab of the dashboard now carries five more charts on top of the three existing ones:
   income and expense **month by month** over the last 12 months, the **running balance** at the end
   of each month, the **liquidity per account** (cash desk, bank, … with negative wallets in red), the

@@ -139,6 +139,16 @@ if ($user && app()->isInstalled() && !$temporaryInstance && can_manage_updates()
         $updateInfo = null;
     }
 }
+// Add-on updates: the catalogue is refreshed at most once an hour (like the core check),
+// so the badge shows up on every page without hammering socly.it.
+$addonUpdates = ['count' => 0, 'items' => []];
+if ($user && app()->isInstalled() && !$temporaryInstance && can('addons.manage')) {
+    try {
+        $addonUpdates = app(\Socly\Core\Addon\AddonManager::class)->pendingUpdates();
+    } catch (\Throwable) {
+        $addonUpdates = ['count' => 0, 'items' => []];
+    }
+}
 ?>
 <?php if ($demoPreview): ?>
 <div class="demo-banner demo-banner--preview" data-demo-preview-banner>
@@ -303,6 +313,28 @@ if ($user && app()->isInstalled() && !$temporaryInstance && can_manage_updates()
         <?php endif; ?>
 
         <div class="sidebar-footer">
+            <?php if ((int) ($addonUpdates['count'] ?? 0) > 0): ?>
+                <?php
+                $addonUpdateLabels = [];
+                foreach (($addonUpdates['items'] ?? []) as $addonUpdate) {
+                    $addonUpdateLabels[] = trim(
+                        (string) ($addonUpdate['name'] ?? $addonUpdate['id'] ?? '')
+                        . ' ' . (string) ($addonUpdate['from'] ?? '')
+                        . ' → ' . (string) ($addonUpdate['to'] ?? '')
+                    );
+                }
+                ?>
+                <a
+                    class="sidebar-update sidebar-update--link"
+                    href="<?= e(url('/settings/addons')) ?>"
+                    title="<?= e(__('addons.updates_badge_title', ['list' => implode(', ', $addonUpdateLabels)])) ?>"
+                >
+                    <span class="sidebar-update-summary">
+                        <span class="sidebar-update-pill"><?= e(__('addons.updates_badge', ['count' => (int) $addonUpdates['count']])) ?></span>
+                    </span>
+                    <span class="sidebar-update-list"><?= e(implode(' · ', $addonUpdateLabels)) ?></span>
+                </a>
+            <?php endif; ?>
             <?php if (!empty($updateInfo['available'])): ?>
                 <?php
                 $updateRemote = (string) ($updateInfo['remote'] ?? '');

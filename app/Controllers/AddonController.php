@@ -64,6 +64,7 @@ final class AddonController extends BaseController
             'keys_ready' => AddonKeys::publicKey('license') !== '' && AddonKeys::publicKey('package') !== '',
             'incoming_dir' => 'storage/addons/incoming',
             'available' => $this->addons->availableAddons(),
+            'updates' => $this->addons->updatesSummary(),
         ]);
     }
 
@@ -93,7 +94,7 @@ final class AddonController extends BaseController
     /** Manual “Installa ora”: force the catalogue check and the package installs. */
     public function autoInstallAction(Request $request): void
     {
-        $result = $this->addons->autoInstall($request->ip(), true);
+        $result = $this->addons->autoInstall($request->ip(), true, true);
         if (!empty($result['installed'])) {
             $this->flash('success', __('addons.auto_installed', ['list' => $this->describeInstalled($result['installed'])]));
         }

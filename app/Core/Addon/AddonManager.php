@@ -22,6 +22,7 @@ final class AddonManager
     /** Minimum interval between automatic checks/downloads (seconds). */
     private const AUTO_CHECK_TTL = 3600;
     private const SET_AUTO_CHECK_AT = 'addons.auto_check_at';
+    private const SET_BADGE_CHECK_AT = 'addons.badge_check_at';
     private const SET_PENDING = 'addons.pending';
 
     public function __construct(
@@ -230,6 +231,54 @@ final class AddonManager
     }
 
     /**
+     * Licensed add-ons whose signed catalogue carries a newer version than the installed one.
+     * Read from the cached manifest, so it is cheap enough for the layout badge.
+     *
+     * @return array{count:int,items:list<array{id:string,name:string,from:string,to:string}>}
+     */
+    public function updatesSummary(): array
+    {
+        $names = [];
+        foreach ($this->installed() as $row) {
+            $names[(string) $row['id']] = (string) ($row['name'] ?? $row['id']);
+        }
+        $items = [];
+        foreach ($this->availableFromLicence()['rows'] as $row) {
+            if (empty($row['licensed']) || empty($row['compatible']) || empty($row['update'])) {
+                continue;
+            }
+            $id = (string) $row['id'];
+            $items[] = [
+                'id' => $id,
+                'name' => $names[$id] ?? $id,
+                'from' => (string) $row['installed_version'],
+                'to' => (string) $row['latest'],
+            ];
+        }
+
+        return ['count' => count($items), 'items' => $items];
+    }
+
+    /**
+     * Same as updatesSummary(), but refreshes the signed catalogue at most once an hour so
+     * the badge checks by itself on every authenticated page (like the core update check).
+     *
+     * @return array{count:int,items:list<array{id:string,name:string,from:string,to:string}>}
+     */
+    public function pendingUpdates(string $ip = 'layout'): array
+    {
+        if ($this->license->licenseKey() !== '') {
+            $last = (int) $this->settings->get(self::SET_BADGE_CHECK_AT, '0');
+            if ($last <= 0 || (time() - $last) >= self::AUTO_CHECK_TTL) {
+                $this->settings->set(self::SET_BADGE_CHECK_AT, (string) time());
+                $this->license->fetchManifest($ip);
+            }
+        }
+
+        return $this->updatesSummary();
+    }
+
+    /**
      * Every add-on the administrator may install right now, merged in one plain-language
      * list: the licensed catalogue downloaded from socly.it, the packages already in the
      * drop folder and the installed rows (offline licences have no catalogue at all).
@@ -395,7 +444,7 @@ final class AddonManager
      *   errors:list<string>
      * }
      */
-    public function autoInstall(string $ip, bool $force = false): array
+    public function autoInstall(string $ip, bool $force = false, bool $withUpdates = false): array
     {
         $result = ['ok' => false, 'installed' => [], 'pending' => [], 'errors' => []];
         if ($this->license->licenseKey() === '') {
@@ -461,6 +510,12 @@ final class AddonManager
             }
             $targetVersion = (string) $target['version'];
             if ($current !== '' && version_compare($targetVersion, $current, '<=')) {
+                continue;
+            }
+            if ($current !== '' && !$withUpdates) {
+                // The add-on is already installed: surface the update (badge + “Aggiorna”)
+                // instead of replacing it silently while rendering a page. The dialog
+                // "Installa tutto" and the cron (bin/addons-update.php) pass $withUpdates.
                 continue;
             }
             $install = $this->installFromLicence($id, $targetVersion, $ip);
