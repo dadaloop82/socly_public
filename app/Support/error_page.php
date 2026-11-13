@@ -324,8 +324,11 @@ if (!function_exists('socly_render_error_page')) {
         $reportNote = '';
         if (!empty($report['ok'])) {
             $reportNote = socly_msg('report.auto_sent');
-        } elseif (($report['error'] ?? '') === 'not_configured' || !empty($report['skipped'])) {
-            $reportNote = '';
+        } elseif ((string) ($report['code'] ?? $report['error'] ?? '') === 'not_configured') {
+            // Silent absence was the worst part: say that the automatic report is off.
+            $reportNote = socly_msg('report.not_configured');
+        } elseif (!empty($report['skipped'])) {
+            $reportNote = socly_msg('report.auto_skipped');
         } else {
             $reportNote = socly_msg('report.auto_failed', ['email' => $supportEmail]);
         }

@@ -251,6 +251,7 @@ return [
         'sending' => 'Invio in corso…',
         'auto_sent' => 'Abbiamo già avvisato il team SOCLY in automatico.',
         'auto_failed' => 'La segnalazione automatica non è partita in questo momento: puoi scriverci tu a :email citando il codice.',
+        'auto_skipped' => 'La segnalazione automatica era già partita da poco: non ne duplichiamo una uguale.',
     ],
     'install' => [
         'title' => 'Installazione SOCLY',

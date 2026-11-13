@@ -249,6 +249,28 @@ binary first: `SOCLY_PHP_BIN` from `.env` when set, the CLI binary, `PHP_BINDIR/
 `PATH`. If no usable CLI exists — or `exec()` is disabled on hardened hosting — the lint is skipped
 on purpose: the signature is the real boundary, the lint is only a safety net.
 
+On hosts with a restrictive `open_basedir` (Plesk) every probe is silent — a warning there would be
+turned into an exception by the error handler and would abort the install of a valid, signed package —
+and the resolver falls back to `command -v`. To let the lint actually run, allow the PHP bin directory
+and the system bins in `open_basedir`. On Plesk, with the supported command (it survives a `php.ini`
+regeneration):
+
+```bash
+cat > /tmp/socly-php-extra.ini <<'EOF'
+open_basedir = "/var/www/vhosts/<domain>/:/tmp/:/opt/plesk/php/:/usr/bin/:/usr/local/bin/:/bin/"
+EOF
+plesk bin site --update-php-settings <domain> -additional-settings /tmp/socly-php-extra.ini
+```
+
+## Crash reports and the relay
+
+`php bin/report-check.php` prints the relay URL, the site URL and whether sending is enabled;
+`php bin/report-check.php --send` sends a test crash report and prints the relay answer (the row appears
+in socly.it → Reports). Reports are sent from `App::run()`, the global exception handler and the fatal
+shutdown handler; the site stores them **before** trying GitHub, so a disabled relay or a revoked token
+no longer hides a crash. `SOCLY_REPORT_PROBLEMS=0` in `.env` stops sending on the instance, and the error
+page always says whether the automatic report went out.
+
 ## Licence management (socly.it admin)
 
 `/admin/licenses.php` → licence detail:

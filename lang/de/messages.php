@@ -249,6 +249,7 @@ return [
         'sending' => 'Wird gesendet…',
         'auto_sent' => 'Wir haben das SOCLY-Team bereits automatisch informiert.',
         'auto_failed' => 'Die automatische Meldung ist gerade nicht durchgegangen — Sie können an :email schreiben und den Code nennen.',
+        'auto_skipped' => 'Eine identische automatische Meldung wurde vor Kurzem bereits gesendet: sie wird nicht doppelt erstellt.',
     ],
     'install' => [
         'title' => 'SOCLY Installation',

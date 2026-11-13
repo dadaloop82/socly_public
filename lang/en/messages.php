@@ -249,6 +249,7 @@ return [
         'sending' => 'Sending…',
         'auto_sent' => 'We’ve already notified the SOCLY team automatically.',
         'auto_failed' => 'The automatic report didn’t go through just now — you can email :email and mention the code.',
+        'auto_skipped' => 'An identical automatic report was already sent recently: we don’t duplicate it.',
     ],
     'install' => [
         'title' => 'SOCLY setup',

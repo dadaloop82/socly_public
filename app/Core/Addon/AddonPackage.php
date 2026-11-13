@@ -457,19 +457,35 @@ final class AddonPackage
      */
     private function phpCliBinary(): string
     {
+        // Every probe is silent: under open_basedir a probe outside the allowed tree raises
+        // a warning and the error handler in public/index.php turns it into an exception,
+        // which would abort the install of an otherwise valid, signed package.
         $override = trim((string) ($_ENV['SOCLY_PHP_BIN'] ?? ''));
-        if ($override !== '' && is_file($override) && is_executable($override)) {
+        if ($override !== '' && @is_file($override) && @is_executable($override)) {
             return $override;
         }
-        if (PHP_SAPI === 'cli' && PHP_BINARY !== '' && is_file(PHP_BINARY) && is_executable(PHP_BINARY)) {
+        if (PHP_SAPI === 'cli' && PHP_BINARY !== '' && @is_file(PHP_BINARY) && @is_executable(PHP_BINARY)) {
             return PHP_BINARY;
         }
         $prefix = defined('PHP_BINDIR') ? rtrim((string) PHP_BINDIR, '/') : '';
         $names = ['php', 'php' . PHP_MAJOR_VERSION . '.' . PHP_MINOR_VERSION];
         foreach ($names as $name) {
             $path = $prefix !== '' ? $prefix . '/' . $name : $name;
-            if (is_file($path) && is_executable($path)) {
+            if (@is_file($path) && @is_executable($path)) {
                 return $path;
+            }
+        }
+        // FPM often ships a minimal PATH and every probe above may be blocked: exec/shell
+        // are NOT bound by open_basedir, so trust the shell's answer (same choice already
+        // made by SetupService::resolvePhpCliBinary() and PdfTextExtractor::bin()).
+        if (function_exists('shell_exec')
+            && !in_array('shell_exec', array_map('trim', explode(',', (string) ini_get('disable_functions'))), true)
+        ) {
+            foreach (['php' . PHP_MAJOR_VERSION . '.' . PHP_MINOR_VERSION, 'php'] as $name) {
+                $found = trim((string) @shell_exec('command -v ' . escapeshellarg($name) . ' 2>/dev/null'));
+                if ($found !== '' && str_starts_with($found, '/')) {
+                    return $found;
+                }
             }
         }
 
