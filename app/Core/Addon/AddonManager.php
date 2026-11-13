@@ -230,6 +230,156 @@ final class AddonManager
     }
 
     /**
+     * Every add-on the administrator may install right now, merged in one plain-language
+     * list: the licensed catalogue downloaded from socly.it, the packages already in the
+     * drop folder and the installed rows (offline licences have no catalogue at all).
+     *
+     * `action` tells the page what to offer: install, update, enable, core (a newer core is
+     * required), unlicensed, current or invalid (unreadable local package).
+     *
+     * @return list<array{
+     *   id:string,name:string,version:string,installed_version:string,min_core:string,
+     *   licensed:bool,enabled:bool,compatible:bool,action:string,via:string,
+     *   local_file:string,error:string
+     * }>
+     */
+    public function availableAddons(): array
+    {
+        $core = function_exists('app_version') ? app_version() : '';
+        $installed = [];
+        foreach ($this->installed() as $row) {
+            $installed[(string) $row['id']] = $row;
+        }
+
+        /** @var array<string, array{id:string,name:string,version:string,min_core:string,via:string,local_file:string,error:string,valid:bool}> $rows */
+        $rows = [];
+        foreach ($this->availableFromLicence()['rows'] as $row) {
+            $id = (string) $row['id'];
+            $rows[$id] = [
+                'id' => $id,
+                'name' => (string) ($installed[$id]['name'] ?? $id),
+                'version' => (string) $row['latest'],
+                'min_core' => (string) $row['min_core'],
+                'via' => 'catalogue',
+                'local_file' => '',
+                'error' => '',
+                'valid' => true,
+            ];
+        }
+
+        foreach ($this->discoverIncoming() as $entry) {
+            $id = (string) ($entry['id'] ?? '');
+            $ok = !empty($entry['ok']);
+            if ($id === '') {
+                $file = (string) ($entry['file'] ?? '');
+                if ($file === '') {
+                    continue;
+                }
+                $rows['file:' . $file] = [
+                    'id' => '',
+                    'name' => $file,
+                    'version' => '',
+                    'min_core' => '',
+                    'via' => 'package',
+                    'local_file' => $file,
+                    'error' => (string) ($entry['error'] ?? ''),
+                    'valid' => false,
+                ];
+                continue;
+            }
+            $version = $ok ? (string) ($entry['version'] ?? '') : '';
+            $current = $rows[$id] ?? null;
+            if ($current === null) {
+                $rows[$id] = [
+                    'id' => $id,
+                    'name' => (string) (($entry['name'] ?? '') !== '' ? $entry['name'] : ($installed[$id]['name'] ?? $id)),
+                    'version' => $version,
+                    'min_core' => $ok ? (string) ($entry['min_core'] ?? '') : '',
+                    'via' => 'package',
+                    'local_file' => (string) ($entry['file'] ?? ''),
+                    'error' => (string) ($entry['error'] ?? ''),
+                    'valid' => $ok,
+                ];
+                continue;
+            }
+            if ($current['local_file'] === '') {
+                $rows[$id]['local_file'] = (string) ($entry['file'] ?? '');
+            }
+            if ($ok && $version !== '' && version_compare($version, $current['version'], '>')) {
+                $rows[$id]['version'] = $version;
+                // The offered version comes from the local package: install from that file,
+                // not from the catalogue entry (which does not list this version).
+                $rows[$id]['via'] = 'package';
+            }
+            if ($ok && $current['min_core'] === '') {
+                $rows[$id]['min_core'] = (string) ($entry['min_core'] ?? '');
+            }
+        }
+
+        foreach ($installed as $id => $row) {
+            if (isset($rows[$id])) {
+                continue;
+            }
+            $rows[$id] = [
+                'id' => $id,
+                'name' => (string) ($row['name'] ?? $id),
+                'version' => (string) ($row['version'] ?? ''),
+                'min_core' => '',
+                'via' => 'installed',
+                'local_file' => '',
+                'error' => '',
+                'valid' => true,
+            ];
+        }
+
+        $order = ['install' => 0, 'update' => 1, 'enable' => 2, 'core' => 3, 'unlicensed' => 4, 'current' => 5, 'invalid' => 6];
+        $out = [];
+        foreach ($rows as $row) {
+            $id = $row['id'];
+            $licensed = $id !== '' && !empty($this->license->statusFor($id)['licensed']);
+            $installedVersion = $id !== '' ? (string) ($installed[$id]['version'] ?? '') : '';
+            $enabled = $id !== '' && !empty($installed[$id]['is_enabled']);
+            $minCore = $row['min_core'];
+            $compatible = $minCore === '' || $core === '' || version_compare($minCore, $core, '<=');
+            $version = $row['version'];
+            if (!$row['valid']) {
+                $action = 'invalid';
+            } elseif (!$licensed) {
+                $action = 'unlicensed';
+            } elseif ($installedVersion === '') {
+                $action = $version === '' ? 'current' : ($compatible ? 'install' : 'core');
+            } elseif ($version !== '' && version_compare($version, $installedVersion, '>')) {
+                $action = $compatible ? 'update' : 'core';
+            } elseif (!$enabled) {
+                $action = 'enable';
+            } else {
+                $action = 'current';
+            }
+            $out[] = [
+                'id' => $id,
+                'name' => $row['name'],
+                'version' => $version,
+                'installed_version' => $installedVersion,
+                'min_core' => $minCore,
+                'licensed' => $licensed,
+                'enabled' => $enabled,
+                'compatible' => $compatible,
+                'action' => $action,
+                'via' => $row['via'],
+                'local_file' => $row['local_file'],
+                'error' => $row['error'],
+            ];
+        }
+        usort($out, static function (array $a, array $b) use ($order): int {
+            $rank = ($order[$a['action']] ?? 9) <=> ($order[$b['action']] ?? 9);
+
+            return $rank !== 0 ? $rank : strcasecmp($a['name'], $b['name']);
+        });
+
+        return $out;
+    }
+
+    /**
      * Install every add-on granted by the licence that is missing or outdated.
      *
      * Runs right after an online activation, when the Add-ons page is opened (at most

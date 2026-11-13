@@ -184,7 +184,7 @@ php tools/addons/addon-tool.php verify-package dist/tablet_enrollment-1.0.0.socl
 ```
 
 `--incoming` also copies the package into `storage/addons/incoming/` of the **instance** (Settings → Add-ons
-verifies it and lists it with an Install button); `--site` copies it into `_webSite/storage/addons/incoming/`
+verifies it and lists it in “Add-on disponibili”); `--site` copies it into `_webSite/storage/addons/incoming/`
 of the **socly.it** catalogue (Admin → Add-on → Pubblica). On another server, copy the file into the matching
 folder manually. A licence containing the add-on is still required: activate it first (online key, offline
 code or request code), then install from the drop folder or from the licence catalogue.
@@ -197,24 +197,22 @@ Settings → Add-ons (`/settings/addons`, permission `addons.manage`):
   downloads and enables the licensed packages, while an offline `.soclylic` code installs the
   package from the drop folder or manual upload. Until the package is installed the menus/routes
   of the add-on do not exist and the core features gated on it stay off.
-- **Automatic discovery** — packages copied to `storage/addons/incoming/` are verified
-  (signature, hashes, `min_core`) and listed with an Install button; no browser upload.
-  `php tools/addons/addon-tool.php build … --incoming` builds and drops the package there
-  (same instance/vendor machine).
-- **Licence catalogue** — activating a licence fetches the signed manifest and installs/enables the
+- **Add-on disponibili** — the page merges three sources into one plain-language table: the licensed
+  catalogue downloaded from socly.it, the packages found in `storage/addons/incoming/` and the installed
+  rows. Each row shows the state (`Da installare`, `Aggiornamento disponibile`, `Installato, da attivare`,
+  `Serve Socly x.y.z`, `Licenza richiesta`, `Pacchetto non valido`) and the matching action, so the
+  administrator never has to understand portals, folders or manifests.
+- **Automatic install/update** — activating a licence fetches the signed manifest and installs/enables the
   licensed packages automatically; the Add-ons page repeats the check at most once per hour, and
   `php bin/addons-update.php` (cron) does the same without opening the UI. The manifest is cached and
   the package is downloaded server-side, hash-checked and signature-checked before installation.
-- **Manual upload** — still available under “Caricamento manuale” for packages that cannot be
-  copied to the drop folder.
-- **Online activation** — paste the licence key; the instance calls socly.it, stores the signed token
-  encrypted and downloads the signed catalogue.
-- **Offline activation** — paste the `.soclylic` code; no network call, no data sent.
-- **Request code** — copy the generated `SOCLY-REQ1…` and send it to the vendor for an offline licence.
+- **Offline installations** — everything technical lives under “Opzioni avanzate”: offline activation
+  (`.soclylic` code, no network call, no data sent), request code (`SOCLY-REQ1…` to send to the vendor),
+  manual `.soclyaddon` upload, drop folder (`storage/addons/incoming/`), instance code and verification
+  keys. Packages dropped there are verified (signature, hashes, `min_core`) and appear in the same
+  “Add-on disponibili” table; `php tools/addons/addon-tool.php build … --incoming` copies them there.
 - **Check updates** — with an online licence, verifies the signed catalogue, downloads newer versions
   and installs them (audit `addon.updated`). Offline installations update through the drop folder.
-- **Automatic updates** — `php bin/addons-update.php` (cron, e.g. `25 4 * * *`) installs missing or
-  outdated licensed add-ons; the same check runs at most hourly when the Add-ons page is opened.
 - **Disable / remove** — disabling keeps files and data; removal is allowed only when disabled and keeps
   the database tables (data is never destroyed automatically).
 

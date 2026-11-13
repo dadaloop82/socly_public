@@ -39,6 +39,13 @@ every 100 patches bump the series, and each bump is published to this repository
   work without internet, signed multi-file `.soclyaddon` packages, online and offline updates, and a
   socly.it admin area to register add-ons, upload signed packages and issue/revoke licences. Paid code
   never enters the public repository; only the verifier and the public keys are shipped with the core.
+- The Add-ons page now opens with **“Add-on disponibili”**: one table that merges the licensed catalogue,
+  the packages found on the server and what is already installed, with plain states (“Da installare”,
+  “Aggiornamento disponibile”, “Installato, da attivare”, “Serve Socly x.y.z”, “Licenza richiesta”) and
+  the matching button. Licensed add-ons keep installing and updating themselves (hourly check and nightly
+  cron); offline activation codes, request codes, manual upload, drop folder and verification keys moved
+  under “Opzioni avanzate”, so the page no longer talks about manifests or folders to a non-technical
+  operator.
 
 - Budgets drill down to the first note: clicking a cost-centre line in “Forecast vs actuals”, a type in
   the “not imputed” table, a year row or a top category of the statistics tab opens the ledger

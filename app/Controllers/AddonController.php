@@ -62,9 +62,8 @@ final class AddonController extends BaseController
             'license_kid' => AddonKeys::kid('license'),
             'package_kid' => AddonKeys::kid('package'),
             'keys_ready' => AddonKeys::publicKey('license') !== '' && AddonKeys::publicKey('package') !== '',
-            'incoming' => $this->addons->discoverIncoming(),
             'incoming_dir' => 'storage/addons/incoming',
-            'catalogue' => $this->addons->availableFromLicence(),
+            'available' => $this->addons->availableAddons(),
         ]);
     }
 

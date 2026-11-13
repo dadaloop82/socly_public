@@ -1,5 +1,6 @@
 <?php
 /** @var list<array<string,mixed>> $installed */
+/** @var list<array<string,mixed>> $available */
 /** @var array<string,mixed> $auto */
 /** @var \Socly\Core\Addon\Entitlement|null $entitlement */
 /** @var array<string,mixed> $entitlement_payload */
@@ -13,37 +14,15 @@
 /** @var string $license_kid */
 /** @var string $package_kid */
 /** @var bool $keys_ready */
-/** @var list<array<string,mixed>> $incoming */
 /** @var string $incoming_dir */
-/** @var array{ok:bool,rows:list<array<string,mixed>>} $catalogue */
-$incoming = is_array($incoming ?? null) ? $incoming : [];
-$catalogue = is_array($catalogue ?? null) ? $catalogue : ['ok' => false, 'rows' => []];
-$catalogueRows = is_array($catalogue['rows'] ?? null) ? $catalogue['rows'] : [];
+$available = is_array($available ?? null) ? $available : [];
 $licenseId = (string) ($entitlement?->licenseId() ?? '');
 $licensedAddons = $entitlement?->addonIds() ?? [];
 $expiresAt = $entitlement?->expiresAt();
-$installedIds = array_map(static fn (array $row): string => (string) ($row['id'] ?? ''), $installed);
-$missingLicensed = array_values(array_filter(
-    $licensedAddons,
-    static fn (string $id): bool => $id !== '' && !in_array($id, $installedIds, true)
-));
-$inactiveInstalled = array_values(array_filter(
-    $installed,
-    static fn (array $row): bool => empty($row['is_enabled'])
-));
-$blockedCatalogue = array_values(array_filter(
-    $catalogueRows,
-    static fn (array $row): bool => empty($row['compatible'])
-));
+$enabledCount = count(array_filter($installed, static fn (array $row): bool => !empty($row['is_enabled'])));
 $auto = is_array($auto ?? null) ? $auto : [];
 $autoInstalled = is_array($auto['installed'] ?? null) ? $auto['installed'] : [];
 $pendingCore = is_array($auto['pending'] ?? null) ? $auto['pending'] : [];
-if ($pendingCore === [] && $blockedCatalogue !== []) {
-    $pendingCore = [[
-        'id' => (string) ($blockedCatalogue[0]['id'] ?? ''),
-        'min_core' => (string) ($blockedCatalogue[0]['min_core'] ?? ''),
-    ]];
-}
 ?>
 <div class="page-header">
     <div class="titles">
@@ -74,34 +53,12 @@ if ($pendingCore === [] && $blockedCatalogue !== []) {
         ))])) ?></span>
     </div>
 <?php endif; ?>
-<?php if ($licenseId !== '' && $missingLicensed !== []): ?>
+<?php if ($pendingCore !== []): ?>
     <div class="alert alert-warn">
-        <span class="alert-body">
-            <strong><?= e(__('addons.next_package_title')) ?></strong>
-            <?= e(__('addons.next_package_lede', [
-                'addons' => implode(', ', $missingLicensed),
-                'dir' => (string) $incoming_dir,
-            ])) ?>
-            <?php if ($license_key_present): ?>
-                <form method="post" action="<?= e(url('/settings/addons/auto-install')) ?>" style="margin-top:0.6rem">
-                    <?= csrf_field() ?>
-                    <button class="btn btn-sm" type="submit"><?= e(__('addons.auto_install_button')) ?></button>
-                </form>
-            <?php endif; ?>
-            <?php if ($pendingCore !== []): ?>
-                <br><?= e(__('addons.next_update_core', [
-                    'min' => (string) ($pendingCore[0]['min_core'] ?? ''),
-                    'core' => $core_version,
-                ])) ?>
-            <?php endif; ?>
-        </span>
-    </div>
-<?php elseif ($licenseId !== '' && $inactiveInstalled !== []): ?>
-    <div class="alert alert-warn">
-        <span class="alert-body">
-            <strong><?= e(__('addons.next_enable_title')) ?></strong>
-            <?= e(__('addons.next_enable_lede')) ?>
-        </span>
+        <span class="alert-body"><?= e(__('addons.next_update_core', [
+            'min' => (string) ($pendingCore[0]['min_core'] ?? ''),
+            'core' => $core_version,
+        ])) ?></span>
     </div>
 <?php endif; ?>
 
@@ -112,11 +69,7 @@ if ($pendingCore === [] && $blockedCatalogue !== []) {
     </div>
     <div class="stat">
         <div class="label"><?= e(__('addons.licensed_addons')) ?></div>
-        <div class="value"><?= (int) count($licensedAddons) ?></div>
-    </div>
-    <div class="stat">
-        <div class="label"><?= e(__('addons.instance_code')) ?></div>
-        <div class="value audit-ip"><?= e($instance_code) ?></div>
+        <div class="value"><?= (int) $enabledCount ?></div>
     </div>
     <div class="stat">
         <div class="label"><?= e(__('addons.core_version')) ?></div>
@@ -146,160 +99,101 @@ if ($pendingCore === [] && $blockedCatalogue !== []) {
         <?php endif; ?>
     <?php endif; ?>
 
-    <div style="display:grid;gap:1rem;grid-template-columns:repeat(auto-fit,minmax(min(100%,22rem),1fr));margin-top:1rem">
-        <form method="post" action="<?= e(url('/settings/addons/activate')) ?>" class="panel embedded">
-            <?= csrf_field() ?>
-            <h3 class="section-title"><?= e(__('addons.activate_title')) ?></h3>
-            <p class="muted"><?= e(__('addons.activate_lede')) ?></p>
-            <?= field('text', [
-                'name' => 'license_key',
-                'label' => (string) __('addons.license_key'),
-                'placeholder' => 'SOCLY-KEY-…',
-                'autocomplete' => 'off',
-            ]) ?>
-            <button class="btn btn-sm" type="submit"><?= e(__('addons.activate_button')) ?></button>
-        </form>
-
-        <form method="post" action="<?= e(url('/settings/addons/import')) ?>" class="panel embedded">
-            <?= csrf_field() ?>
-            <h3 class="section-title"><?= e(__('addons.offline_title')) ?></h3>
-            <p class="muted"><?= e(__('addons.offline_lede')) ?></p>
-            <?= field('textarea', [
-                'name' => 'code',
-                'label' => (string) __('addons.code_label'),
-                'rows' => 4,
-                'required' => true,
-                'attrs' => ['spellcheck' => 'false', 'autocomplete' => 'off'],
-            ]) ?>
-            <button class="btn btn-sm" type="submit"><?= e(__('addons.import_button')) ?></button>
-        </form>
-    </div>
+    <form method="post" action="<?= e(url('/settings/addons/activate')) ?>" class="panel embedded">
+        <?= csrf_field() ?>
+        <h3 class="section-title"><?= e(__('addons.activate_title')) ?></h3>
+        <p class="muted"><?= e(__('addons.activate_lede')) ?></p>
+        <?= field('text', [
+            'name' => 'license_key',
+            'label' => (string) __('addons.license_key'),
+            'placeholder' => 'SOCLY-KEY-…',
+            'autocomplete' => 'off',
+        ]) ?>
+        <button class="btn btn-sm" type="submit"><?= e(__('addons.activate_button')) ?></button>
+    </form>
 
     <details class="config-accordion" style="margin-top:1rem">
-        <summary><?= e(__('addons.request_title')) ?></summary>
-        <p class="muted"><?= e(__('addons.request_hint')) ?></p>
-        <div class="setup-hint muted">
-            <?= e(__('addons.request_identity', ['host' => $host !== '' ? $host : '—', 'code' => $instance_code])) ?>
+        <summary><?= e(__('addons.advanced_title')) ?></summary>
+        <p class="muted"><?= e(__('addons.advanced_lede')) ?></p>
+        <div style="display:grid;gap:1rem;grid-template-columns:repeat(auto-fit,minmax(min(100%,22rem),1fr))">
+            <form method="post" action="<?= e(url('/settings/addons/import')) ?>" class="panel embedded">
+                <?= csrf_field() ?>
+                <h3 class="section-title"><?= e(__('addons.offline_title')) ?></h3>
+                <p class="muted"><?= e(__('addons.offline_lede')) ?></p>
+                <?= field('textarea', [
+                    'name' => 'code',
+                    'label' => (string) __('addons.code_label'),
+                    'rows' => 4,
+                    'required' => true,
+                    'attrs' => ['spellcheck' => 'false', 'autocomplete' => 'off'],
+                ]) ?>
+                <button class="btn btn-sm" type="submit"><?= e(__('addons.import_button')) ?></button>
+            </form>
+            <form method="post" action="<?= e(url('/settings/addons/install')) ?>" enctype="multipart/form-data" class="panel embedded">
+                <?= csrf_field() ?>
+                <h3 class="section-title"><?= e(__('addons.install_title')) ?></h3>
+                <p class="muted"><?= e(__('addons.install_lede')) ?></p>
+                <?= field('file', [
+                    'name' => 'package',
+                    'label' => (string) __('addons.package_file'),
+                    'required' => true,
+                    'attrs' => ['accept' => '.soclyaddon,application/zip'],
+                ]) ?>
+                <button class="btn btn-sm" type="submit"><?= e(__('addons.install_button')) ?></button>
+            </form>
         </div>
-        <textarea class="sf-field__control" rows="4" readonly onclick="this.select()"><?= e($request_code) ?></textarea>
-        <form method="get" action="<?= e(url('/settings/addons')) ?>" class="inline-form" style="margin-top:0.5rem">
-            <?= field('text', [
-                'name' => 'request',
-                'label' => (string) __('addons.request_ids_label'),
-                'value' => implode(',', $request_ids),
-                'attrs' => ['placeholder' => 'advanced_reports, altra_estensione'],
-            ]) ?>
-            <button class="btn btn-ghost btn-sm" type="submit"><?= e(__('addons.request_regenerate')) ?></button>
-        </form>
+        <details class="config-accordion" style="margin-top:1rem">
+            <summary><?= e(__('addons.request_title')) ?></summary>
+            <p class="muted"><?= e(__('addons.request_hint')) ?></p>
+            <div class="setup-hint muted">
+                <?= e(__('addons.request_identity', ['host' => $host !== '' ? $host : '—', 'code' => $instance_code])) ?>
+            </div>
+            <textarea class="sf-field__control" rows="4" readonly onclick="this.select()"><?= e($request_code) ?></textarea>
+            <form method="get" action="<?= e(url('/settings/addons')) ?>" class="inline-form" style="margin-top:0.5rem">
+                <?= field('text', [
+                    'name' => 'request',
+                    'label' => (string) __('addons.request_ids_label'),
+                    'value' => implode(',', $request_ids),
+                    'attrs' => ['placeholder' => 'advanced_reports, altra_estensione'],
+                ]) ?>
+                <button class="btn btn-ghost btn-sm" type="submit"><?= e(__('addons.request_regenerate')) ?></button>
+            </form>
+        </details>
+        <p class="setup-hint muted">
+            <?= e(__('addons.incoming_dir', ['dir' => (string) $incoming_dir])) ?>
+            · <?= e(__('addons.incoming_hint')) ?>
+        </p>
+        <p class="muted setup-hint"><?= e(__('addons.technical_details', ['code' => $instance_code])) ?></p>
+        <p class="muted setup-hint"><?= e(__('addons.footer_note', ['license_kid' => $license_kid, 'package_kid' => $package_kid])) ?></p>
     </details>
 </div>
 
 <div class="panel">
     <div class="panel-header">
         <div>
-            <h2 class="section-title"><?= e(__('addons.incoming_title')) ?></h2>
-            <p class="section-lede"><?= e(__('addons.incoming_lede')) ?></p>
+            <h2 class="section-title"><?= e(__('addons.available_title')) ?></h2>
+            <p class="section-lede"><?= e(__('addons.available_lede')) ?></p>
         </div>
     </div>
-    <p class="muted" style="font-size:0.85rem">
-        <?= e(__('addons.incoming_dir', ['dir' => (string) $incoming_dir])) ?>
-        · <?= e(__('addons.incoming_hint')) ?>
-    </p>
-    <?php if ($incoming === []): ?>
-        <div class="empty-state">
-            <strong><?= e(__('addons.incoming_empty')) ?></strong>
-            <p><?= e(__('addons.incoming_empty_hint')) ?></p>
-        </div>
-    <?php else: ?>
-        <div class="table-wrap embedded">
-            <table>
-                <thead>
-                <tr>
-                    <th><?= e(__('addons.col_addon')) ?></th>
-                    <th><?= e(__('addons.col_version')) ?></th>
-                    <th><?= e(__('addons.col_license')) ?></th>
-                    <th><?= e(__('addons.col_status')) ?></th>
-                    <th></th>
-                </tr>
-                </thead>
-                <tbody>
-                <?php foreach ($incoming as $entry): ?>
-                    <?php
-                    $entryOk = !empty($entry['ok']);
-                    $entryId = (string) ($entry['id'] ?? '');
-                    $entryFile = (string) ($entry['file'] ?? '');
-                    $entryInstalled = (string) ($entry['installed_version'] ?? '');
-                    $entryCanInstall = !empty($entry['can_install']);
-                    $entryUpdate = !empty($entry['update']);
-                    ?>
-                    <tr>
-                        <td>
-                            <strong><?= e((string) ($entry['name'] !== '' ? $entry['name'] : $entryFile)) ?></strong><br>
-                            <span class="muted audit-ip"><?= e($entryId !== '' ? $entryId : $entryFile) ?></span>
-                        </td>
-                        <td>
-                            <?= e((string) (($entry['version'] ?? '') !== '' ? $entry['version'] : '—')) ?>
-                            <?php if ($entryInstalled !== ''): ?>
-                                <br><span class="muted"><?= e(__('addons.catalogue_installed', ['version' => $entryInstalled])) ?></span>
-                            <?php endif; ?>
-                            <?php if ($entryOk && (string) ($entry['min_core'] ?? '') !== ''): ?>
-                                <br><span class="muted">core ≥ <?= e((string) $entry['min_core']) ?></span>
-                            <?php endif; ?>
-                        </td>
-                        <td>
-                            <?php if (!$entryOk): ?>
-                                <span class="muted">—</span>
-                            <?php elseif (!empty($entry['licensed'])): ?>
-                                <?= e(__('addons.status_licensed')) ?>
-                            <?php else: ?>
-                                <span class="muted"><?= e(__('addons.incoming_licensed_no')) ?></span>
-                            <?php endif; ?>
-                        </td>
-                        <td>
-                            <?php if (!$entryOk): ?>
-                                <span class="badge"><?= e(__('addons.incoming_invalid')) ?></span>
-                                <br><span class="muted" style="font-size:0.78rem"><?= e((string) ($entry['error'] ?? '')) ?></span>
-                            <?php elseif ($entryCanInstall): ?>
-                                <span class="badge"><?= e($entryUpdate ? __('addons.incoming_update') : __('addons.incoming_install')) ?></span>
-                            <?php else: ?>
-                                <span class="muted"><?= e(__('addons.incoming_current')) ?></span>
-                            <?php endif; ?>
-                        </td>
-                        <td>
-                            <?php if ($entryCanInstall): ?>
-                                <form method="post" action="<?= e(url('/settings/addons/install-incoming')) ?>">
-                                    <?= csrf_field() ?>
-                                    <input type="hidden" name="file" value="<?= e($entryFile) ?>">
-                                    <button class="btn btn-sm" type="submit"><?= e($entryUpdate ? __('addons.incoming_update') : __('addons.install_button')) ?></button>
-                                </form>
-                            <?php endif; ?>
-                        </td>
-                    </tr>
-                <?php endforeach; ?>
-                </tbody>
-            </table>
-        </div>
-    <?php endif; ?>
-</div>
-
-<?php if ($licenseId !== ''): ?>
-<div class="panel">
-    <div class="panel-header">
-        <div>
-            <h2 class="section-title"><?= e(__('addons.catalogue_title')) ?></h2>
-            <p class="section-lede"><?= e(__('addons.catalogue_lede')) ?></p>
-        </div>
+    <div style="display:flex;flex-wrap:wrap;gap:0.5rem;margin:0.75rem 0 1rem">
+        <form method="post" action="<?= e(url('/settings/addons/check')) ?>">
+            <?= csrf_field() ?>
+            <button class="btn btn-sm btn-ghost" type="submit"><?= e(__('addons.available_refresh')) ?></button>
+        </form>
+        <?php if ($license_key_present): ?>
+            <form method="post" action="<?= e(url('/settings/addons/auto-install')) ?>">
+                <?= csrf_field() ?>
+                <button class="btn btn-sm" type="submit"><?= e(__('addons.available_install_all')) ?></button>
+            </form>
+        <?php endif; ?>
     </div>
     <?php if (!$license_key_present): ?>
-        <p class="setup-hint muted"><?= e(__('addons.catalogue_offline_hint', ['dir' => (string) $incoming_dir])) ?></p>
+        <p class="setup-hint muted"><?= e(__('addons.available_offline_hint')) ?></p>
     <?php endif; ?>
-    <?php if ($catalogueRows === []): ?>
+    <?php if ($available === []): ?>
         <div class="empty-state">
-            <strong><?= e(__('addons.catalogue_empty')) ?></strong>
-            <p><?= e(__('addons.catalogue_hint')) ?></p>
-            <?php if ($licensedAddons !== []): ?>
-                <p class="muted"><?= e(__('addons.catalogue_licensed_list', ['addons' => implode(', ', $licensedAddons)])) ?></p>
-            <?php endif; ?>
+            <strong><?= e(__('addons.available_empty')) ?></strong>
+            <p><?= e(__('addons.available_empty_hint')) ?></p>
         </div>
     <?php else: ?>
         <div class="table-wrap embedded">
@@ -308,52 +202,79 @@ if ($pendingCore === [] && $blockedCatalogue !== []) {
                 <tr>
                     <th><?= e(__('addons.col_addon')) ?></th>
                     <th><?= e(__('addons.col_version')) ?></th>
-                    <th><?= e(__('addons.col_license')) ?></th>
                     <th><?= e(__('addons.col_status')) ?></th>
                     <th></th>
                 </tr>
                 </thead>
                 <tbody>
-                <?php foreach ($catalogueRows as $row): ?>
+                <?php foreach ($available as $row): ?>
                     <?php
                     $rowId = (string) ($row['id'] ?? '');
-                    $latest = (string) ($row['latest'] ?? '');
+                    $rowName = (string) ($row['name'] ?? $rowId);
+                    $action = (string) ($row['action'] ?? 'current');
+                    $via = (string) ($row['via'] ?? '');
+                    $version = (string) ($row['version'] ?? '');
                     $installedVersion = (string) ($row['installed_version'] ?? '');
-                    $canInstall = !empty($row['can_install']);
-                    $isUpdate = !empty($row['update']);
-                    $compatible = !empty($row['compatible']);
+                    $localFile = (string) ($row['local_file'] ?? '');
+                    $canRun = in_array($action, ['install', 'update'], true);
+                    $sourceText = match ($via) {
+                        'catalogue' => __('addons.source_server'),
+                        'package' => __('addons.source_package'),
+                        default => __('addons.source_installed'),
+                    };
                     ?>
                     <tr>
                         <td>
-                            <strong><?= e($rowId) ?></strong>
-                            <br><span class="muted audit-ip"><?= e(__('addons.catalogue_source')) ?></span>
+                            <strong><?= e($rowName) ?></strong>
+                            <?php if ($rowId !== '' && $rowId !== $rowName): ?>
+                                <br><span class="muted audit-ip"><?= e($rowId) ?></span>
+                            <?php endif; ?>
+                            <br><span class="muted" style="font-size:0.8rem"><?= e($sourceText) ?></span>
                         </td>
                         <td>
-                            <?= e($latest) ?>
-                            <?php if ($installedVersion !== ''): ?>
+                            <?= e($version !== '' ? $version : '—') ?>
+                            <?php if ($installedVersion !== '' && $installedVersion !== $version): ?>
                                 <br><span class="muted"><?= e(__('addons.catalogue_installed', ['version' => $installedVersion])) ?></span>
                             <?php endif; ?>
-                            <?php if ((string) ($row['min_core'] ?? '') !== ''): ?>
-                                <br><span class="muted">core ≥ <?= e((string) $row['min_core']) ?></span>
-                            <?php endif; ?>
                         </td>
-                        <td><?= e(__('addons.status_licensed')) ?></td>
                         <td>
-                            <?php if (!$compatible): ?>
-                                <span class="badge"><?= e(__('addons.error_min_core', ['min' => (string) ($row['min_core'] ?? ''), 'core' => $core_version])) ?></span>
-                            <?php elseif ($canInstall): ?>
-                                <span class="badge"><?= e($isUpdate ? __('addons.catalogue_update') : __('addons.incoming_install')) ?></span>
+                            <?php if ($action === 'invalid'): ?>
+                                <span class="badge"><?= e(__('addons.incoming_invalid')) ?></span>
+                                <?php if ((string) ($row['error'] ?? '') !== ''): ?>
+                                    <br><span class="muted" style="font-size:0.78rem"><?= e((string) $row['error']) ?></span>
+                                <?php endif; ?>
+                            <?php elseif ($action === 'core'): ?>
+                                <span class="badge"><?= e(__('addons.action_core', ['min' => (string) ($row['min_core'] ?? ''), 'core' => $core_version])) ?></span>
+                            <?php elseif ($action === 'unlicensed'): ?>
+                                <span class="muted"><?= e(__('addons.incoming_licensed_no')) ?></span>
+                            <?php elseif ($action === 'enable'): ?>
+                                <span class="badge"><?= e(__('addons.action_enable_state')) ?></span>
+                            <?php elseif ($action === 'update'): ?>
+                                <span class="badge"><?= e(__('addons.action_update_state')) ?></span>
+                            <?php elseif ($action === 'install'): ?>
+                                <span class="badge"><?= e(__('addons.action_install_state')) ?></span>
                             <?php else: ?>
-                                <span class="muted"><?= e(__('addons.incoming_current')) ?></span>
+                                <span class="muted"><?= e(__('addons.action_current_state')) ?></span>
                             <?php endif; ?>
                         </td>
-                        <td>
-                            <?php if ($canInstall): ?>
+                        <td class="doc-row-actions">
+                            <?php if ($canRun && $via === 'catalogue'): ?>
                                 <form method="post" action="<?= e(url('/settings/addons/install-licensed')) ?>">
                                     <?= csrf_field() ?>
                                     <input type="hidden" name="addon_id" value="<?= e($rowId) ?>">
-                                    <input type="hidden" name="version" value="<?= e($latest) ?>">
-                                    <button class="btn btn-sm" type="submit"><?= e($isUpdate ? __('addons.catalogue_update') : __('addons.catalogue_install')) ?></button>
+                                    <input type="hidden" name="version" value="<?= e($version) ?>">
+                                    <button class="btn btn-sm" type="submit"><?= e($action === 'update' ? __('addons.action_update') : __('addons.action_install')) ?></button>
+                                </form>
+                            <?php elseif ($canRun && $localFile !== ''): ?>
+                                <form method="post" action="<?= e(url('/settings/addons/install-incoming')) ?>">
+                                    <?= csrf_field() ?>
+                                    <input type="hidden" name="file" value="<?= e($localFile) ?>">
+                                    <button class="btn btn-sm" type="submit"><?= e($action === 'update' ? __('addons.action_update') : __('addons.action_install')) ?></button>
+                                </form>
+                            <?php elseif ($action === 'enable' && $rowId !== ''): ?>
+                                <form method="post" action="<?= e(url('/settings/addons/' . rawurlencode($rowId) . '/enable')) ?>">
+                                    <?= csrf_field() ?>
+                                    <button class="btn btn-sm" type="submit"><?= e(__('addons.enable')) ?></button>
                                 </form>
                             <?php endif; ?>
                         </td>
@@ -363,41 +284,9 @@ if ($pendingCore === [] && $blockedCatalogue !== []) {
             </table>
         </div>
     <?php endif; ?>
-</div>
-<?php endif; ?>
-
-<div class="panel">
-    <div class="panel-header">
-        <div>
-            <h2 class="section-title"><?= e(__('addons.package_section')) ?></h2>
-            <p class="section-lede"><?= e(__('addons.package_lede')) ?></p>
-        </div>
-    </div>
-    <details class="config-accordion" style="margin-bottom:1rem">
-        <summary><?= e(__('addons.manual_title')) ?></summary>
-        <p class="muted"><?= e(__('addons.manual_lede')) ?></p>
-        <form method="post" action="<?= e(url('/settings/addons/install')) ?>" enctype="multipart/form-data" class="panel embedded">
-            <?= csrf_field() ?>
-            <h3 class="section-title"><?= e(__('addons.install_title')) ?></h3>
-            <p class="muted"><?= e(__('addons.install_lede')) ?></p>
-            <?= field('file', [
-                'name' => 'package',
-                'label' => (string) __('addons.package_file'),
-                'required' => true,
-                'attrs' => ['accept' => '.soclyaddon,application/zip'],
-            ]) ?>
-            <button class="btn btn-sm" type="submit"><?= e(__('addons.install_button')) ?></button>
-        </form>
-    </details>
-    <form method="post" action="<?= e(url('/settings/addons/check')) ?>" class="panel embedded">
-        <?= csrf_field() ?>
-        <h3 class="section-title"><?= e(__('addons.updates_title')) ?></h3>
-        <p class="muted"><?= e(__('addons.updates_lede')) ?></p>
-        <?php if (!$license_key_present): ?>
-            <p class="setup-hint muted"><?= e(__('addons.offline_updates_hint')) ?></p>
-        <?php endif; ?>
-        <button class="btn btn-sm" type="submit"><?= e(__('addons.check_button')) ?></button>
-    </form>
+    <?php if ($licensedAddons !== []): ?>
+        <p class="setup-hint muted"><?= e(__('addons.catalogue_licensed_list', ['addons' => implode(', ', $licensedAddons)])) ?></p>
+    <?php endif; ?>
 </div>
 
 <div class="panel">
@@ -419,7 +308,6 @@ if ($pendingCore === [] && $blockedCatalogue !== []) {
                 <tr>
                     <th><?= e(__('addons.col_addon')) ?></th>
                     <th><?= e(__('addons.col_version')) ?></th>
-                    <th><?= e(__('addons.col_license')) ?></th>
                     <th><?= e(__('addons.col_status')) ?></th>
                     <th></th>
                 </tr>
@@ -443,8 +331,10 @@ if ($pendingCore === [] && $blockedCatalogue !== []) {
                     ?>
                     <tr>
                         <td>
-                            <strong><?= e((string) ($row['name'] ?? $id)) ?></strong><br>
-                            <span class="muted audit-ip"><?= e($id) ?></span>
+                            <strong><?= e((string) ($row['name'] ?? $id)) ?></strong>
+                            <?php if ((string) ($row['name'] ?? '') !== $id): ?>
+                                <br><span class="muted audit-ip"><?= e($id) ?></span>
+                            <?php endif; ?>
                         </td>
                         <td>
                             <?= e((string) ($row['version'] ?? '—')) ?>
@@ -453,16 +343,8 @@ if ($pendingCore === [] && $blockedCatalogue !== []) {
                             <?php endif; ?>
                         </td>
                         <td>
-                            <?= e($reasonText) ?>
-                            <?php if (!empty($row['license_id'])): ?>
-                                <br><span class="muted audit-ip"><?= e((string) $row['license_id']) ?></span>
-                            <?php endif; ?>
-                        </td>
-                        <td>
                             <?= e($isEnabled ? __('addons.status_active') : __('addons.status_disabled')) ?>
-                            <?php if (!$licensed): ?>
-                                <br><span class="muted"><?= e(__('addons.license_required')) ?></span>
-                            <?php endif; ?>
+                            <br><span class="muted"><?= e($reasonText) ?></span>
                         </td>
                         <td class="doc-row-actions">
                             <div class="inline-form" style="display:flex;flex-wrap:wrap;gap:0.35rem;justify-content:flex-end">
@@ -493,5 +375,3 @@ if ($pendingCore === [] && $blockedCatalogue !== []) {
         </div>
     <?php endif; ?>
 </div>
-
-<p class="muted setup-hint"><?= e(__('addons.footer_note', ['license_kid' => $license_kid, 'package_kid' => $package_kid])) ?></p>
