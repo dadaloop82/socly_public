@@ -226,6 +226,17 @@ another installation, installation not recognised) that points the customer to t
 wording plus the HTTP status (`error_api_rejected`), and a non-JSON body reports `error_api_response`
 with the status. The licence key never appears in a message or in the log.
 
+## When an add-on breaks the panel
+
+- `php bin/addons-toggle.php` lists the installed add-ons with their state; `php bin/addons-toggle.php
+  <id> off` disables one from the shell (files and data stay), `on` re-enables it (an active licence is
+  required). It is the rescue tool when the browser UI cannot be opened.
+- The panel isolates failures: a drop-in plugin or add-on that throws while loading or booting is logged
+  (`plugin.boot_failed`) and skipped for that request instead of taking every page down; `failedPlugins()`
+  lists them.
+- Errors keep a reference code. Signed-in administrators see the technical block (type, file:line,
+  request, message) on the error page; `SOCLY_SHOW_ERRORS=1` in `.env` shows it to anyone for support.
+
 ## Package lint and PHP-FPM
 
 Packages are linted with `php -l` before installation. Under PHP-FPM `PHP_BINARY` points at the FPM

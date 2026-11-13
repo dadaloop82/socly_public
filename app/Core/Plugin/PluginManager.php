@@ -58,6 +58,9 @@ final class PluginManager
     /** @var list<array{label:string,path:string,permission?:string}> */
     private array $menu = [];
 
+    /** @var array<string,string> plugins that failed to load or boot (id/file => message) */
+    private array $failed = [];
+
     public function __construct(
         private readonly App $app,
         private readonly string $pluginPath,
@@ -77,7 +80,13 @@ final class PluginManager
             return $this->discovered;
         }
         foreach (glob($this->pluginPath . '/*.php') ?: [] as $file) {
-            $plugin = require $file;
+            try {
+                $plugin = require $file;
+            } catch (\Throwable $e) {
+                // A drop-in plugin with a fatal must not break the whole panel.
+                $this->failed[basename($file)] = $e->getMessage();
+                continue;
+            }
             if (!$plugin instanceof PluginInterface) {
                 continue;
             }
@@ -86,7 +95,8 @@ final class PluginManager
         foreach ($this->addonPluginFiles() as $file) {
             try {
                 $plugin = require $file;
-            } catch (\Throwable) {
+            } catch (\Throwable $e) {
+                $this->failed[basename($file)] = $e->getMessage();
                 continue;
             }
             if ($plugin instanceof PluginInterface) {
@@ -131,24 +141,46 @@ final class PluginManager
             if (!in_array($id, $ids, true)) {
                 continue;
             }
-            $plugin->boot($ctx);
-            foreach ($plugin->registerRoutes() as $route) {
-                $method = (string) $route[0];
-                $path = (string) $route[1];
-                $action = $route[2];
-                $permission = $route[3] ?? null;
-                // 5th element: explicit middleware list. Public add-on endpoints
-                // (tablet kiosk) can opt out of mw.auth while keeping CSRF/install gates.
-                $middleware = $route[4] ?? null;
-                if (!is_array($middleware)) {
-                    $middleware = ['mw.csrf', 'mw.auth'];
+            // A broken add-on must never take the whole panel down: boot it in isolation,
+            // log the failure and leave it out of the menu/routes for this request.
+            try {
+                $plugin->boot($ctx);
+                foreach ($plugin->registerRoutes() as $route) {
+                    $method = (string) $route[0];
+                    $path = (string) $route[1];
+                    $action = $route[2];
+                    $permission = $route[3] ?? null;
+                    // 5th element: explicit middleware list. Public add-on endpoints
+                    // (tablet kiosk) can opt out of mw.auth while keeping CSRF/install gates.
+                    $middleware = $route[4] ?? null;
+                    if (!is_array($middleware)) {
+                        $middleware = ['mw.csrf', 'mw.auth'];
+                    }
+                    $router->add($method, $path, $action, $permission, array_values($middleware));
                 }
-                $router->add($method, $path, $action, $permission, array_values($middleware));
-            }
-            foreach ($plugin->registerMenu() as $item) {
-                $this->menu[] = $item;
+                foreach ($plugin->registerMenu() as $item) {
+                    $this->menu[] = $item;
+                }
+            } catch (\Throwable $e) {
+                $this->failed[$id] = $e->getMessage();
+                try {
+                    $this->app->get('logger')->error('plugin.boot_failed', [
+                        'plugin' => $id,
+                        'message' => $e->getMessage(),
+                        'file' => $e->getFile(),
+                        'line' => $e->getLine(),
+                    ]);
+                } catch (\Throwable) {
+                    // logging must never break the request
+                }
             }
         }
+    }
+
+    /** @return array<string,string> plugins that failed to boot in this request (id => message) */
+    public function failedPlugins(): array
+    {
+        return $this->failed;
     }
 
     /** @return list<array{label:string,path:string,permission?:string,group?:string}> */

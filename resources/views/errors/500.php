@@ -23,6 +23,16 @@ if ($supportEmail === '' || !str_contains($supportEmail, '@')) {
 }
 $mailHref = 'mailto:' . $supportEmail . '?subject=' . rawurlencode('SOCLY ' . $errorCode);
 $showTech = (bool) (config('app.debug', false) || (string) (getenv('SOCLY_SHOW_ERRORS') ?: '') === '1');
+if (!$showTech) {
+    // A signed-in administrator gets the technical block too: it is their instance and
+    // it is what the support team asks for (type, file:line, request, message).
+    try {
+        $showTech = function_exists('auth_user') && auth_user() !== null
+            && function_exists('can') && can('settings.manage');
+    } catch (Throwable) {
+        $showTech = false;
+    }
+}
 ?>
 <div class="error-reassure">
     <h1 class="h1"><?= e(__('errors.500_title')) ?></h1>
