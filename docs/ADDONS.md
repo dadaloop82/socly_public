@@ -95,23 +95,41 @@ The signature is made with the **licence** key and covers the exact JSON string.
  "versions":[{"version":"1.2.0","sha256":"…","url":"https://socly.it/api/addons.php?action=download&addon=advanced_reports&version=1.2.0"}]}}}
 ```
 
+## Admin UI (socly.it)
+
+| Page | What you do |
+|---|---|
+| `/admin/addons.php` | **Chiavi di firma** with the «Inizializza chiavi» button (creates `storage/keys/license_ed25519.key` when missing and writes `storage/keys/addons_public_keys.php`, so no CLI is needed), catalogue (id/name/description), signed package upload with signature + hash verification, per add-on detail (current version, entry point, declared files, versions with download, licences attached) |
+| `/admin/licenses.php` | **New licence** from an existing Socly installation (iid/host/customer filled automatically), from a `SOCLY-REQ1…` request code, or with a manual `iid` for offline installations; licence manager with filters (search, add-on, status, bound/unbound), per add-on coverage ("who has what"), licence detail with add-on/expiry editing, installation (re)binding, offline `.soclylic` code and event log |
+| `/admin/installations.php` | add-on column and detail row: which add-ons are licensed per installation, linking to the filtered licence list |
+
+How an add-on is "attached": the catalogue id **is** the `id` inside `addon.json`. The signed package
+uploaded for that id is stored under `storage/addons/packages/<id>/<version>.soclyaddon`; the licence
+grants `<id>` to one installation (`iid` = first 16 hex of `sha256(instance token)` = first 16 hex of the
+stored `token_hash`) and the signed manifest serves that package to the instance. The public site never
+needs the private repository: it only needs the signed package and the public verification keys.
+
 ## Vendor workflow
 
 ```bash
-php tools/addons/addon-tool.php keygen          # once per deployment (private keys in storage/)
+php tools/addons/addon-tool.php keygen          # only when the site cannot use the admin button
 php tools/addons/addon-tool.php build ./addon-src ./dist/advanced_reports-1.2.0.soclyaddon
 php tools/addons/addon-tool.php verify-package ./dist/advanced_reports-1.2.0.soclyaddon
-php tools/addons/addon-tool.php sign-license payload.json --out=license.txt   # optional, if socly.it is down
+php tools/addons/addon-tool.php sign-license payload.json --out=license.txt   # only if socly.it is down
 ```
 
-1. Register the add-on in **socly.it/admin/addons.php** (id, name, description).
-2. Upload the signed `.soclyaddon` for that add-on: the site re-checks the signature/hashes and stores
-   it under `_webSite/storage/addons/packages/<id>/<version>.soclyaddon`.
-3. Create a licence in **socly.it/admin/licenses.php**: customer, add-ons, optional request code (binds
-   `iid`/host automatically), optional expiry (empty = perpetual).
-4. Send the customer the **licence key** (`SOCLY-KEY-…`) for online activation, or the **offline code**
+1. **socly.it → Add-on → Chiavi di firma**: click «Inizializza chiavi» (idempotent, never rotates
+   existing keys). If the licence keypair is new, copy the generated `bootstrap/addons_keys.php` snippet
+   into the core repo and release a core version; the package public key must stay the one used by the
+   build machine.
+2. **socly.it → Add-on → Catalogo**: register the add-on with the same id used in `addon.json`.
+3. **socly.it → Add-on → Pacchetto firmato**: upload the `.soclyaddon`; signature and per-file hashes are
+   verified before publication under `storage/addons/packages/<id>/<version>.soclyaddon`.
+4. **socly.it → Licenze → Nuova licenza**: pick an existing installation (online activation), paste a
+   request code, or type the `iid` for an offline installation; choose the add-ons.
+5. Send the customer the **licence key** (`SOCLY-KEY-…`) for online activation, or the **offline code**
    (`.soclylic` download) plus the package file.
-5. Revoke/reactivate the licence from the same page; every event is logged in `license_events`.
+6. Revoke/reactivate from the licence detail; every event is logged in `license_events`.
 
 ## Instance workflow
 
@@ -142,9 +160,11 @@ authority and keep `SOCLY_ADDONS_API_URL` (`.env`, optional) pointing to socly.i
 
 ## Production checklist
 
-1. **Regenerate the keys** before selling (`keygen --force`): the generated public keys are tied to the
-   private keys you keep. Back up both private keys offline; losing them means you can no longer sign
-   licences or packages.
+1. **Create/verify the keys from the admin UI** (`/admin/addons.php` → «Inizializza chiavi»), which writes
+   `_webSite/storage/keys/addons_public_keys.php` on the server. Back up both private keys offline; losing
+   them means you can no longer sign licences or packages. Use `keygen --force` only for a deliberate
+   rotation, then update `bootstrap/addons_keys.php` with the snippet shown in the page and release a core
+   version.
 2. Commit the generated `bootstrap/addons_keys.php`. The site copy
    (`_webSite/storage/keys/addons_public_keys.php`) is generated on the server and stays in
    `storage/` (never committed); never commit the private keys.
