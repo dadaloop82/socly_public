@@ -469,7 +469,7 @@ final class LicenseService
             return ['ok' => false, 'error' => __('addons.error_online')];
         }
         $body = json_encode($payload, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?: '{}';
-        $raw = '';
+        $status = 0;
         if (function_exists('curl_init')) {
             $ch = curl_init($url);
             if ($ch === false) {
@@ -486,11 +486,13 @@ final class LicenseService
             ]);
             $result = curl_exec($ch);
             $status = (int) curl_getinfo($ch, CURLINFO_HTTP_CODE);
+            $errno = curl_errno($ch);
+            $transport = curl_error($ch);
             curl_close($ch);
-            if (!is_string($result) || $status >= 400) {
-                return ['ok' => false, 'error' => __('addons.error_online')];
+            if (!is_string($result) || $errno !== 0) {
+                // DNS, TLS, refused connection or timeout: that is the only “unreachable”.
+                return ['ok' => false, 'error' => __('addons.error_online'), 'transport' => $transport];
             }
-            $raw = $result;
         } else {
             $context = stream_context_create([
                 'http' => [
@@ -504,10 +506,50 @@ final class LicenseService
             if (!is_string($result)) {
                 return ['ok' => false, 'error' => __('addons.error_online')];
             }
-            $raw = $result;
+            foreach ($http_response_header ?? [] as $line) {
+                if (preg_match('#^HTTP/\S+\s+(\d{3})#', (string) $line, $matches) === 1) {
+                    $status = (int) $matches[1];
+                }
+            }
         }
-        $decoded = json_decode($raw, true);
+        $decoded = json_decode($result, true);
+        if (!is_array($decoded)) {
+            return ['ok' => false, 'error' => __('addons.error_api_response', ['status' => (string) $status]), 'status' => $status];
+        }
+        if ($status >= 400 || empty($decoded['ok'])) {
+            // socly.it answered: report its own reason instead of a fake “unreachable”.
+            return [
+                'ok' => false,
+                'error' => $this->apiError((string) ($decoded['error'] ?? ''), $status),
+                'status' => $status,
+            ];
+        }
 
-        return is_array($decoded) ? $decoded : ['ok' => false, 'error' => __('addons.error_online')];
+        return $decoded;
+    }
+
+    /**
+     * Turn a socly.it refusal into an actionable message. The site answers with a human
+     * sentence in Italian; unmapped refusals keep the original detail plus the HTTP status.
+     */
+    private function apiError(string $message, int $status): string
+    {
+        $needle = mb_strtolower(trim($message));
+        if ($needle === '') {
+            return __('addons.error_api_response', ['status' => (string) $status]);
+        }
+
+        return match (true) {
+            str_contains($needle, 'istanza non valida') => __('addons.error_instance_invalid'),
+            str_contains($needle, 'altra installazione') => __('addons.error_license_other_instance'),
+            str_contains($needle, 'revocata') => __('addons.error_license_revoked'),
+            str_contains($needle, 'scaduta') => __('addons.error_license_expired'),
+            str_contains($needle, 'non trovata'),
+            str_contains($needle, 'non valida'),
+            str_contains($needle, 'licenza mancante') => __('addons.error_license_not_found'),
+            str_contains($needle, 'non licenziato'),
+            str_contains($needle, 'non contiene add-on') => __('addons.error_addon_not_licensed'),
+            default => __('addons.error_api_rejected', ['status' => (string) $status, 'detail' => trim($message)]),
+        };
     }
 }

@@ -216,6 +216,15 @@ Settings → Add-ons (`/settings/addons`, permission `addons.manage`):
 - **Disable / remove** — disabling keeps files and data; removal is allowed only when disabled and keeps
   the database tables (data is never destroyed automatically).
 
+## Error reporting
+
+`LicenseService::post()` separates a real network failure from an API refusal: only DNS, TLS, timeout
+or refused connections read “socly.it is unreachable from this server”, while an HTTP 4xx/5xx that
+carries the site JSON is mapped to an actionable message (invalid key, revoked, expired, bound to
+another installation, installation not recognised). Unmapped refusals keep the site wording plus the
+HTTP status (`error_api_rejected`), and a non-JSON body reports `error_api_response` with the status.
+The licence key never appears in a message or in the log.
+
 ## API (socly.it)
 
 | Method | Action | Notes |
