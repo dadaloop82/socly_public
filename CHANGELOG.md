@@ -8,6 +8,14 @@ every 100 patches bump the series, and each bump is published to this repository
 
 ## [Unreleased]
 
+### Fixed
+
+- Crash and anomaly reports now always reach the socly.it **Reports** panel: the report is stored before
+  talking to GitHub, so a missing token, a GitHub outage or a disabled relay no longer makes a crash
+  disappear (the issue becomes a bonus, with the relay reason in the row notes). The error page also shows
+  the actual message next to the reference code and tells the visitor whether the automatic report went
+  out, instead of a bare code.
+
 ### Added
 
 - The treasury tab of the dashboard now carries five more charts on top of the three existing ones:

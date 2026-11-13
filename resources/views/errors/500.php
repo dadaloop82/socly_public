@@ -9,6 +9,7 @@ declare(strict_types=1);
 /** @var string|null $errorTime */
 /** @var string|null $errorRequest */
 /** @var string|null $errorMessage */
+/** @var string|null $errorReport */
 
 $errorCode = (string) ($errorCode ?? 'SOC-UNKNOWN');
 $errorType = (string) ($errorType ?? 'RuntimeError');
@@ -17,6 +18,7 @@ $errorLine = (int) ($errorLine ?? 0);
 $errorTime = (string) ($errorTime ?? date('c'));
 $errorRequest = (string) ($errorRequest ?? '—');
 $errorMessage = trim((string) ($errorMessage ?? ''));
+$errorReport = trim((string) ($errorReport ?? ''));
 $supportEmail = trim((string) __('errors.500_support_email'));
 if ($supportEmail === '' || !str_contains($supportEmail, '@')) {
     $supportEmail = 'info@socly.it';
@@ -41,6 +43,14 @@ if (!$showTech) {
     <section class="error-reassure-block">
         <h2 class="h3"><?= e(__('errors.500_what_title')) ?></h2>
         <p><?= e(__('errors.500_what_text')) ?></p>
+        <?php if ($errorMessage !== ''): ?>
+            <p class="error-reassure-message">
+                <strong><?= e(__('errors.500_message')) ?>:</strong> <code><?= e($errorMessage) ?></code>
+            </p>
+        <?php endif; ?>
+        <?php if ($errorReport !== ''): ?>
+            <p class="muted error-reassure-report"><?= e($errorReport) ?></p>
+        <?php endif; ?>
     </section>
 
     <section class="error-reassure-block">

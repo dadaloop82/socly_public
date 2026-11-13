@@ -70,6 +70,24 @@ set_exception_handler(static function (Throwable $e) use ($app, $debug): void {
         // ignore logger failures
     }
 
+    // Always attempt the automatic report (best effort). The page tells the visitor
+    // whether it went out, so “nothing arrived” never stays a mystery.
+    $reportNote = '';
+    if (function_exists('socly_auto_report_crash')) {
+        try {
+            $report = socly_auto_report_crash($e, $errorCode);
+            $reportCode = (string) ($report['code'] ?? $report['error'] ?? '');
+            if (!empty($report['ok'])) {
+                $reportNote = (string) __('report.auto_sent');
+            } elseif ($reportCode === 'not_configured') {
+                $reportNote = (string) __('report.not_configured');
+            } elseif (empty($report['skipped'])) {
+                $reportNote = (string) __('report.auto_failed', ['email' => 'info@socly.it']);
+            }
+        } catch (Throwable) {
+        }
+    }
+
     http_response_code(500);
     if ($debug) {
         header('Content-Type: text/plain; charset=utf-8');
@@ -86,6 +104,7 @@ set_exception_handler(static function (Throwable $e) use ($app, $debug): void {
         'errorTime' => $errorTime,
         'errorRequest' => $errorRequest,
         'errorMessage' => $safeMessage,
+        'errorReport' => $reportNote,
     ];
 
     try {

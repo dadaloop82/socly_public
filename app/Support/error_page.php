@@ -380,6 +380,12 @@ if (!function_exists('socly_render_error_page')) {
             . '<p class="lede">' . $esc(socly_msg('errors.500_text')) . '</p>'
             . '<div class="block"><h2>' . $esc(socly_msg('errors.500_what_title')) . '</h2>'
             . '<p>' . $esc(socly_msg('errors.500_what_text')) . '</p></div>'
+            // The message is shown even without the technical block: a bare reference
+            // code tells the person in front of the screen nothing.
+            . ($detail['message'] !== ''
+                ? '<p class="note"><strong>' . $esc(socly_msg('errors.500_message')) . ':</strong> '
+                    . '<code>' . $esc(mb_substr($detail['message'], 0, 240)) . '</code></p>'
+                : '')
             . '<div class="block"><h2>' . $esc(socly_msg('errors.500_contact_title')) . '</h2><p>';
         $contactParts = explode('{{EMAIL}}', socly_msg('errors.500_contact_text', ['email' => '{{EMAIL}}']), 2);
         echo $esc((string) ($contactParts[0] ?? ''))

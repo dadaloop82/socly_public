@@ -149,6 +149,17 @@ final class GitHubIssueService
             if ($created['ok']) {
                 $this->limiter->hit($dedupKey, self::CRASH_DEDUP_SECONDS);
                 $this->limiter->hit($ipKey, 3600);
+            } else {
+                // Keep the reason in the log: “no report arrived” must be diagnosable.
+                try {
+                    if (function_exists('app')) {
+                        app('logger')->warning('github_issue.crash_report', [
+                            'ref' => $ref,
+                            'code' => (string) ($created['code'] ?? $created['error'] ?? 'unknown'),
+                        ]);
+                    }
+                } catch (\Throwable) {
+                }
             }
             return $created;
         } catch (\Throwable $inner) {

@@ -236,6 +236,10 @@ with the status. The licence key never appears in a message or in the log.
   lists them.
 - Errors keep a reference code. Signed-in administrators see the technical block (type, file:line,
   request, message) on the error page; `SOCLY_SHOW_ERRORS=1` in `.env` shows it to anyone for support.
+- Every crash is reported automatically through the relay (`App::run()` and the global exception
+  handler), and the site stores it in `bug_reports` (Admin → Reports) **before** trying GitHub: a
+  disabled relay or a revoked token no longer hides crashes. The error page shows the message and
+  whether the report went out (`SOCLY_REPORT_PROBLEMS=0` disables sending on the instance).
 
 ## Package lint and PHP-FPM
 
