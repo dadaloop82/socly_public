@@ -161,8 +161,37 @@ document.addEventListener('DOMContentLoaded', () => {
           }
         });
       }
+      // Tablet kiosk: the summary must react as soon as the status or the partial amount
+      // changes, instead of waiting for a server round-trip.
+      const summary = document.querySelector('[data-kiosk-summary]');
+      if (summary) {
+        const price = Number.parseFloat(String(summary.dataset.price || '0').replace(',', '.')) || 0;
+        const amountInput = document.querySelector('[name="partial_amount"]');
+        const parseAmount = (raw) => {
+          const normalised = String(raw || '')
+            .replace(/[^\d,.-]/g, '')
+            .replace(/\.(?=\d{3}\b)/g, '')
+            .replace(',', '.');
+          const value = Number.parseFloat(normalised);
+          return Number.isFinite(value) ? value : 0;
+        };
+        let paid = 0;
+        if (status === 'paid') {
+          paid = price;
+        } else if (status === 'partial') {
+          paid = Math.min(price, Math.max(0, parseAmount(amountInput?.value)));
+        }
+        const due = Math.max(0, price - paid);
+        const money = (value) =>
+          `€ ${Number(value).toLocaleString('it-IT', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+        const paidTarget = summary.querySelector('[data-kiosk-paid]');
+        const dueTarget = summary.querySelector('[data-kiosk-due]');
+        if (paidTarget) paidTarget.textContent = money(paid);
+        if (dueTarget) dueTarget.textContent = money(due);
+      }
     };
     paymentInputs.forEach((input) => input.addEventListener('change', sync));
+    document.querySelector('[name="partial_amount"]')?.addEventListener('input', sync);
     sync();
   }
 
@@ -179,6 +208,7 @@ document.addEventListener('DOMContentLoaded', () => {
   initSettingsNav();
   initPersonNameCase(document);
   initMemberForm();
+  initKioskProfileForm();
   initStandaloneEnrollmentPads();
   initMemberWizard();
   initMembersList();
@@ -4171,12 +4201,28 @@ function initPersonNameCase(root = document) {
   });
 }
 
+/**
+ * Add-on tablet kiosk: the profile step reuses the member-form behaviours (name casing,
+ * phone/email hints, place lookup and the fiscal-code autocompute) without pulling in the
+ * member wizard, photo capture or leave guard.
+ */
+function initKioskProfileForm() {
+  document.querySelectorAll('[data-cf-form]').forEach((form) => {
+    if (form.dataset.kioskCfBound === '1') return;
+    form.dataset.kioskCfBound = '1';
+    initPersonNameCase(form);
+    initPhoneInputs(form);
+    initEmailValidation(form);
+    initPlaceSuggest(form);
+    initFiscalCodeAuto(form);
+  });
+}
+
 function initMemberForm() {
   const form = document.querySelector('[data-member-form]');
   if (!form) {
     return;
   }
-
   initPersonNameCase(form);
   initPhoneInputs(form);
   initEmailValidation(form);
