@@ -991,6 +991,11 @@ final class SetupService
             if (($step['key'] ?? '') === 'membership.enrollment_validation' && $value === 'otp_email' && !$this->mail->isReady()) {
                 return ['ok' => false, 'errors' => ['value' => __('mail.required_for_otp')]];
             }
+            if (($step['key'] ?? '') === 'membership.enrollment_validation'
+                && $value === EnrollmentService::METHOD_TABLET
+                && !addon_active(EnrollmentService::ADDON_TABLET)) {
+                return ['ok' => false, 'errors' => ['value' => __('setup.enrollment_tablet_unavailable')]];
+            }
         }
         $this->persistScalar($step, $value);
         if (!empty($step['required'])) {

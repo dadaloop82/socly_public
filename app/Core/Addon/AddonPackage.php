@@ -41,6 +41,76 @@ final class AddonPackage
     }
 
     /**
+     * Drop-in folder for signed packages: the admin (or the build tool) copies
+     * .soclyaddon files here and the settings page proposes them; no browser upload.
+     */
+    public function incomingDir(): string
+    {
+        $dir = $this->installRoot() . '/incoming';
+        if (!is_dir($dir) && !@mkdir($dir, 0775, true) && !is_dir($dir)) {
+            return '';
+        }
+
+        return $dir;
+    }
+
+    /**
+     * Verify every package found in the incoming folder (signature + hashes + min core).
+     *
+     * @return list<array{file:string,path:string,ok:bool,error?:string,manifest?:array<string,mixed>,size:int,sha256:string}>
+     */
+    public function scanIncoming(int $limit = 100): array
+    {
+        $dir = $this->incomingDir();
+        if ($dir === '') {
+            return [];
+        }
+        $files = glob($dir . '/*.soclyaddon') ?: [];
+        usort($files, static fn (string $a, string $b): int => (int) @filemtime($b) <=> (int) @filemtime($a));
+        $out = [];
+        foreach (array_slice($files, 0, max(1, min(500, $limit))) as $path) {
+            $entry = [
+                'file' => basename($path),
+                'path' => $path,
+                'ok' => false,
+                'size' => (int) @filesize($path),
+                'sha256' => '',
+            ];
+            $inspected = $this->inspect($path);
+            if (empty($inspected['ok']) || !is_array($inspected['manifest'] ?? null)) {
+                $entry['error'] = (string) ($inspected['error'] ?? 'invalid');
+            } else {
+                $entry['ok'] = true;
+                $entry['manifest'] = $inspected['manifest'];
+                $entry['sha256'] = (string) ($inspected['sha256'] ?? '');
+            }
+            $out[] = $entry;
+        }
+
+        return $out;
+    }
+
+    /** Resolve a file name inside the incoming folder (no traversal, .soclyaddon only). */
+    public function resolveIncomingFile(string $file): ?string
+    {
+        $file = trim($file);
+        if ($file === '' || basename($file) !== $file || !str_ends_with(strtolower($file), '.soclyaddon')) {
+            return null;
+        }
+        $dir = $this->incomingDir();
+        if ($dir === '') {
+            return null;
+        }
+        $base = realpath($dir);
+        $path = realpath($dir . '/' . $file);
+        if ($base === false || $path === false || dirname($path) !== $base || !is_file($path)) {
+            return null;
+        }
+
+        return $path;
+    }
+
+    /**
      * Validate an uploaded file (multipart) and stage it for install.
      *
      * @param array{name?:string,type?:string,tmp_name?:string,error?:int,size?:int} $file

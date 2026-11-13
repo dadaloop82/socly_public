@@ -10,6 +10,11 @@ final class EnrollmentService
 {
     public const METHODS = ['none', 'print_scan', 'tablet_sign', 'otp_email'];
 
+    /** Paid add-on that owns the tablet signature / kiosk enrolment. */
+    public const ADDON_TABLET = 'tablet_enrollment';
+
+    public const METHOD_TABLET = 'tablet_sign';
+
     public function __construct(
         private readonly Database $db,
         private readonly SettingsService $settings,
@@ -21,7 +26,21 @@ final class EnrollmentService
     public function method(): string
     {
         $m = (string) $this->settings->get('membership.enrollment_validation', 'none');
-        return in_array($m, self::METHODS, true) ? $m : 'none';
+        if (!in_array($m, self::METHODS, true)) {
+            return 'none';
+        }
+        // Tablet signature/kiosk enrolment is a paid add-on: without the add-on the
+        // stored method is inert instead of blocking every member creation.
+        if ($m === self::METHOD_TABLET && !$this->tabletAvailable()) {
+            return 'none';
+        }
+        return $m;
+    }
+
+    /** Whether the tablet add-on is installed, enabled and licensed. */
+    public function tabletAvailable(): bool
+    {
+        return addon_active(self::ADDON_TABLET);
     }
 
     /**

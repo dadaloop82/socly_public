@@ -267,6 +267,22 @@ final class LicenseService
     }
 
     /**
+     * Signed manifest already verified and stored on this instance (no network).
+     *
+     * @return array<string,mixed>|null
+     */
+    public function cachedManifest(): ?array
+    {
+        $raw = trim((string) $this->settings->get(self::SET_MANIFEST, ''));
+        if ($raw === '') {
+            return null;
+        }
+        $decoded = json_decode($raw, true);
+
+        return is_array($decoded) ? $decoded : null;
+    }
+
+    /**
      * Fetch the signed manifest of the add-on versions (latest compatible release).
      *
      * @return array{ok:bool,error?:string,manifest?:array<string,mixed>}

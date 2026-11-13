@@ -56,6 +56,9 @@ final class AddonController extends BaseController
             'license_kid' => AddonKeys::kid('license'),
             'package_kid' => AddonKeys::kid('package'),
             'keys_ready' => AddonKeys::publicKey('license') !== '' && AddonKeys::publicKey('package') !== '',
+            'incoming' => $this->addons->discoverIncoming(),
+            'incoming_dir' => 'storage/addons/incoming',
+            'catalogue' => $this->addons->availableFromLicence(),
         ]);
     }
 
@@ -90,15 +93,27 @@ final class AddonController extends BaseController
             $this->flash('errors', ['addons' => __('addons.error_no_file')]);
             redirect('/settings/addons');
         }
-        $result = $this->addons->installUpload($file, $request->ip());
-        if (empty($result['ok'])) {
-            $this->flash('errors', ['addons' => (string) ($result['error'] ?? __('addons.error_package_invalid'))]);
-        } else {
-            $this->flash('success', __('addons.installed', [
-                'addon' => (string) ($result['id'] ?? ''),
-                'version' => (string) ($result['version'] ?? ''),
-            ]));
-        }
+        $this->flashInstall($this->addons->installUpload($file, $request->ip()));
+        redirect('/settings/addons');
+    }
+
+    /** Install a package already present in storage/addons/incoming (no upload). */
+    public function installIncoming(Request $request): void
+    {
+        $result = $this->addons->installFromIncoming((string) $request->input('file', ''), $request->ip());
+        $this->flashInstall($result);
+        redirect('/settings/addons');
+    }
+
+    /** Install/update a licensed add-on from the signed catalogue. */
+    public function installLicensed(Request $request): void
+    {
+        $result = $this->addons->installFromLicence(
+            (string) $request->input('addon_id', ''),
+            (string) $request->input('version', ''),
+            $request->ip()
+        );
+        $this->flashInstall($result);
         redirect('/settings/addons');
     }
 
@@ -145,6 +160,19 @@ final class AddonController extends BaseController
         $result = $this->addons->remove($id, $request->ip());
         $this->flashResult($result, __('addons.removed', ['addon' => $id]));
         redirect('/settings/addons');
+    }
+
+    /** @param array{ok:bool,error?:string,id?:string,version?:string,replaced?:bool} $result */
+    private function flashInstall(array $result): void
+    {
+        if (empty($result['ok'])) {
+            $this->flash('errors', ['addons' => (string) ($result['error'] ?? __('addons.error_package_invalid'))]);
+            return;
+        }
+        $this->flash('success', __('addons.installed', [
+            'addon' => (string) ($result['id'] ?? ''),
+            'version' => (string) ($result['version'] ?? ''),
+        ]));
     }
 
     /** @param array{ok:bool,error?:string} $result */

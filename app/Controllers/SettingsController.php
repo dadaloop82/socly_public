@@ -563,6 +563,14 @@ final class SettingsController extends BaseController
         if ($method === 'otp_email' && !$this->mail->isReady()) {
             $this->settingsFail($request, ['enrollment_validation' => __('mail.required_for_otp')], 'enrollment');
         }
+        if ($method === \Socly\Services\EnrollmentService::METHOD_TABLET
+            && !addon_active(\Socly\Services\EnrollmentService::ADDON_TABLET)) {
+            $this->settingsFail(
+                $request,
+                ['enrollment_validation' => __('settings.enrollment_tablet_addon_required')],
+                'enrollment'
+            );
+        }
         $this->settings->set('membership.enrollment_validation', $method);
         $this->audit->log('settings.saved', 'settings', 'enrollment', null, ['method' => $method], $request->ip());
         $this->settingsFinish($request, 'enrollment');

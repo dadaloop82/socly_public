@@ -179,6 +179,7 @@ document.addEventListener('DOMContentLoaded', () => {
   initSettingsNav();
   initPersonNameCase(document);
   initMemberForm();
+  initStandaloneEnrollmentPads();
   initMemberWizard();
   initMembersList();
   initTreasuryBulk();
@@ -4303,9 +4304,23 @@ function initPhotoGenderPlaceholder(form) {
   sync(false);
 }
 
+/**
+ * Signature pad outside the member form (add-on kiosk pages). The pad is a
+ * reusable component: bind every remaining [data-enrollment-pad] exactly once.
+ */
+function initStandaloneEnrollmentPads() {
+  document.querySelectorAll('[data-enrollment-pad]').forEach((pad) => {
+    if (pad.dataset.padBound === '1') return;
+    const form = pad.closest('form') || pad.parentElement;
+    if (form) initEnrollmentPad(form);
+  });
+}
+
 function initEnrollmentPad(form) {
   const pad = form.querySelector('[data-enrollment-pad]');
   if (!pad) return;
+  if (pad.dataset.padBound === '1') return;
+  pad.dataset.padBound = '1';
   const canvas = pad.querySelector('[data-sign-canvas]');
   const input = pad.querySelector('[data-sign-input]');
   const clearBtn = pad.querySelector('[data-sign-clear]');

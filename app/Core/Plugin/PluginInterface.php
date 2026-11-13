@@ -16,7 +16,13 @@ interface PluginInterface
 
     public function boot(PluginContext $ctx): void;
 
-    /** @return list<array{0:string,1:string,2:callable|array,3?:?string}> */
+    /**
+     * Route: [method, path, action, permission?, middleware?].
+     * Middleware defaults to ['mw.csrf','mw.auth']; pass e.g. ['mw.csrf'] for a
+     * public add-on page (the kiosk) that must work without a logged-in operator.
+     *
+     * @return list<array{0:string,1:string,2:callable|array,3?:?string,4?:list<string>}>
+     */
     public function registerRoutes(): array;
 
     /** @return list<array{label:string,path:string,permission?:string}> */

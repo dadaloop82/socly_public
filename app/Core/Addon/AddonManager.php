@@ -101,8 +101,211 @@ final class AddonManager
     }
 
     /**
-     * Install a package uploaded from the admin page.
+     * Packages dropped in storage/addons/incoming, verified and merged with the
+     * install/licence state so the settings page can propose them (no upload).
      *
+     * @return list<array{
+     *   file:string,ok:bool,error:string,id:string,name:string,version:string,min_core:string,
+     *   size:int,sha256:string,installed_version:string,licensed:bool,update:bool,can_install:bool
+     * }>
+     */
+    public function discoverIncoming(int $limit = 100): array
+    {
+        $installed = [];
+        foreach ($this->db->fetchAll('SELECT id, version FROM addons') as $row) {
+            $installed[(string) $row['id']] = (string) $row['version'];
+        }
+        $out = [];
+        foreach ($this->package->scanIncoming($limit) as $entry) {
+            $manifest = is_array($entry['manifest'] ?? null) ? $entry['manifest'] : [];
+            $id = (string) ($manifest['id'] ?? '');
+            $version = (string) ($manifest['version'] ?? '');
+            $installedVersion = $installed[$id] ?? '';
+            $licensed = $id !== '' && !empty($this->license->statusFor($id)['licensed']);
+            $update = $installedVersion !== '' && $version !== '' && version_compare($version, $installedVersion, '>');
+            $out[] = [
+                'file' => (string) $entry['file'],
+                'ok' => (bool) $entry['ok'],
+                'error' => (string) ($entry['error'] ?? ''),
+                'id' => $id,
+                'name' => (string) ($manifest['name'] ?? $id),
+                'version' => $version,
+                'min_core' => (string) ($manifest['min_core'] ?? ''),
+                'size' => (int) $entry['size'],
+                'sha256' => (string) $entry['sha256'],
+                'installed_version' => $installedVersion,
+                'licensed' => $licensed,
+                'update' => $update,
+                'can_install' => (bool) $entry['ok'] && $licensed && ($installedVersion === '' || $update),
+            ];
+        }
+
+        return $out;
+    }
+
+    /**
+     * Install a package already on disk (incoming folder), keeping the file.
+     *
+     * @return array{ok:bool,error?:string,id?:string,version?:string,replaced?:bool}
+     */
+    public function installFromIncoming(string $file, string $ip): array
+    {
+        $path = $this->package->resolveIncomingFile($file);
+        if ($path === null) {
+            return ['ok' => false, 'error' => __('addons.error_package_missing')];
+        }
+
+        return $this->installFromPath($path, $ip);
+    }
+
+    /** @return array{ok:bool,error?:string,id?:string,version?:string,replaced?:bool} */
+    private function installFromPath(string $path, string $ip): array
+    {
+        $inspected = $this->package->inspect($path);
+        if (empty($inspected['ok']) || !is_array($inspected['manifest'] ?? null)) {
+            return ['ok' => false, 'error' => (string) ($inspected['error'] ?? __('addons.error_package_invalid'))];
+        }
+        // The file stays in the incoming folder: it is the administrator's copy.
+        $inspected['staged'] = $path;
+
+        return $this->installInspected($inspected, $ip);
+    }
+
+    /**
+     * Add-ons granted by the licence, read from the signed manifest cached on the
+     * instance (no network call on page load: «Cerca aggiornamenti» refreshes it).
+     *
+     * @return array{ok:bool,error?:string,rows:list<array{
+     *   id:string,latest:string,min_core:string,installed_version:string,
+     *   licensed:bool,compatible:bool,update:bool,can_install:bool
+     * }>}
+     */
+    public function availableFromLicence(): array
+    {
+        $manifest = $this->license->cachedManifest();
+        if ($manifest === null) {
+            return ['ok' => false, 'rows' => []];
+        }
+        $addons = is_array($manifest['addons'] ?? null) ? $manifest['addons'] : [];
+        $installed = [];
+        foreach ($this->db->fetchAll('SELECT id, version FROM addons') as $row) {
+            $installed[(string) $row['id']] = (string) $row['version'];
+        }
+        $core = function_exists('app_version') ? app_version() : '';
+        $rows = [];
+        foreach ($addons as $id => $meta) {
+            $id = (string) $id;
+            if (preg_match('/^[a-z0-9][a-z0-9_.-]{2,80}$/', $id) !== 1 || !is_array($meta)) {
+                continue;
+            }
+            $latest = (string) ($meta['latest'] ?? '');
+            if (preg_match('/^\d+\.\d+\.\d+/', $latest) !== 1) {
+                continue;
+            }
+            $minCore = (string) ($meta['min_core'] ?? '');
+            $installedVersion = $installed[$id] ?? '';
+            $compatible = $minCore === '' || $core === '' || version_compare($minCore, $core, '<=');
+            $update = $installedVersion !== '' && version_compare($latest, $installedVersion, '>');
+            $rows[] = [
+                'id' => $id,
+                'latest' => $latest,
+                'min_core' => $minCore,
+                'installed_version' => $installedVersion,
+                'licensed' => !empty($this->license->statusFor($id)['licensed']),
+                'compatible' => $compatible,
+                'update' => $update,
+                'can_install' => $compatible && ($installedVersion === '' || $update),
+            ];
+        }
+        usort($rows, static fn (array $a, array $b): int => strcmp($a['id'], $b['id']));
+
+        return ['ok' => true, 'rows' => $rows];
+    }
+
+    /**
+     * Download a licensed add-on from the signed manifest and install it.
+     *
+     * @return array{ok:bool,error?:string,id?:string,version?:string,replaced?:bool}
+     */
+    public function installFromLicence(string $id, string $version, string $ip): array
+    {
+        $id = strtolower(trim($id));
+        if (preg_match('/^[a-z0-9][a-z0-9_.-]{2,80}$/', $id) !== 1) {
+            return ['ok' => false, 'error' => __('addons.error_package_invalid')];
+        }
+        if (empty($this->license->statusFor($id)['licensed'])) {
+            return ['ok' => false, 'error' => __('addons.license_required_for', ['addon' => $id])];
+        }
+        $licenseKey = $this->license->licenseKey();
+        if ($licenseKey === '') {
+            return ['ok' => false, 'error' => __('addons.error_offline_only')];
+        }
+        $manifestResult = $this->license->fetchManifest($ip);
+        if (empty($manifestResult['ok']) || !is_array($manifestResult['manifest'] ?? null)) {
+            return ['ok' => false, 'error' => (string) ($manifestResult['error'] ?? __('addons.error_online'))];
+        }
+        $meta = is_array($manifestResult['manifest']['addons'][$id] ?? null)
+            ? $manifestResult['manifest']['addons'][$id]
+            : null;
+        if ($meta === null) {
+            return ['ok' => false, 'error' => __('addons.error_manifest_invalid')];
+        }
+        $core = function_exists('app_version') ? app_version() : '';
+        $requested = trim($version);
+        $target = null;
+        foreach (is_array($meta['versions'] ?? null) ? $meta['versions'] : [] as $candidate) {
+            if (!is_array($candidate)) {
+                continue;
+            }
+            $candidateVersion = trim((string) ($candidate['version'] ?? ''));
+            $candidateMin = trim((string) ($candidate['min_core'] ?? ''));
+            if ($candidateVersion === ''
+                || ($candidateMin !== '' && $core !== '' && version_compare($candidateMin, $core, '>'))
+                || ($requested !== '' && $candidateVersion !== $requested)) {
+                continue;
+            }
+            if ($target === null || version_compare($candidateVersion, (string) $target['version'], '>')) {
+                $target = $candidate;
+            }
+        }
+        if ($target === null) {
+            return ['ok' => false, 'error' => __('addons.error_manifest_invalid')];
+        }
+        $latest = (string) $target['version'];
+        $url = (string) ($target['url'] ?? '');
+        $sha = (string) ($target['sha256'] ?? '');
+        if ($url === '' || preg_match('/^[a-f0-9]{64}$/', $sha) !== 1) {
+            return ['ok' => false, 'error' => __('addons.error_manifest_invalid')];
+        }
+        $tmpDir = $this->package->installRoot() . '/.incoming';
+        if (!is_dir($tmpDir) && !@mkdir($tmpDir, 0750, true) && !is_dir($tmpDir)) {
+            return ['ok' => false, 'error' => __('addons.error_storage')];
+        }
+        $tmp = $tmpDir . '/remote-' . $id . '-' . $latest . '-' . bin2hex(random_bytes(4)) . '.soclyaddon';
+        $download = $this->license->download($url, $tmp, $licenseKey);
+        if (empty($download['ok'])) {
+            @unlink($tmp);
+            return ['ok' => false, 'error' => (string) ($download['error'] ?? __('addons.error_download'))];
+        }
+        if (!hash_equals($sha, (string) hash_file('sha256', $tmp))) {
+            @unlink($tmp);
+            return ['ok' => false, 'error' => __('addons.error_file_hash', ['file' => $latest])];
+        }
+        $inspected = $this->package->inspect($tmp);
+        if (empty($inspected['ok'])
+            || (string) ($inspected['manifest']['id'] ?? '') !== $id
+            || (string) ($inspected['manifest']['version'] ?? '') !== $latest) {
+            @unlink($tmp);
+            return ['ok' => false, 'error' => (string) ($inspected['error'] ?? __('addons.error_manifest_invalid'))];
+        }
+        $inspected['staged'] = $tmp;
+        $install = $this->installInspected($inspected, $ip);
+        @unlink($tmp);
+
+        return $install;
+    }
+
+    /**
      * @param array{name?:string,type?:string,tmp_name?:string,error?:int,size?:int} $file
      * @return array{ok:bool,error?:string,id?:string,version?:string,replaced?:bool}
      */

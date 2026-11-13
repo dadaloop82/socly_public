@@ -769,6 +769,49 @@ if (!function_exists('component_enabled')) {
     }
 }
 
+if (!function_exists('addon_active')) {
+    /**
+     * True when a paid add-on is installed, enabled and covered by the licence.
+     * Core features that belong to an add-on must use this gate (never assume the
+     * add-on package is present: the public tree does not ship it).
+     */
+    function addon_active(string $id): bool
+    {
+        static $cache = [];
+        $id = strtolower(trim($id));
+        if ($id === '') {
+            return false;
+        }
+        if (array_key_exists($id, $cache)) {
+            return $cache[$id];
+        }
+        $cache[$id] = false;
+        try {
+            if (!app()->isInstalled()) {
+                return false;
+            }
+            $db = app(\Socly\Core\Database::class);
+            $addon = $db->fetch(
+                "SELECT id FROM addons WHERE id = :id AND status = 'active' LIMIT 1",
+                ['id' => $id]
+            );
+            if ($addon === null) {
+                return false;
+            }
+            $state = $db->fetch('SELECT is_enabled FROM plugins WHERE id = :id LIMIT 1', ['id' => $id]);
+            if ($state === null || empty($state['is_enabled'])) {
+                return false;
+            }
+            $license = app(\Socly\Core\Addon\LicenseService::class)->statusFor($id);
+            $cache[$id] = !empty($license['licensed']);
+        } catch (\Throwable) {
+            $cache[$id] = false;
+        }
+
+        return $cache[$id];
+    }
+}
+
 if (!function_exists('upload_limit_bytes')) {
     function upload_limit_bytes(): int
     {

@@ -133,11 +133,17 @@ final class PluginManager
             }
             $plugin->boot($ctx);
             foreach ($plugin->registerRoutes() as $route) {
-                $method = $route[0];
-                $path = $route[1];
+                $method = (string) $route[0];
+                $path = (string) $route[1];
                 $action = $route[2];
                 $permission = $route[3] ?? null;
-                $router->add($method, $path, $action, $permission, ['mw.csrf', 'mw.auth']);
+                // 5th element: explicit middleware list. Public add-on endpoints
+                // (tablet kiosk) can opt out of mw.auth while keeping CSRF/install gates.
+                $middleware = $route[4] ?? null;
+                if (!is_array($middleware)) {
+                    $middleware = ['mw.csrf', 'mw.auth'];
+                }
+                $router->add($method, $path, $action, $permission, array_values($middleware));
             }
             foreach ($plugin->registerMenu() as $item) {
                 $this->menu[] = $item;

@@ -5,6 +5,7 @@
  * @var string $name Input name
  * @var string $value Current value
  * @var bool $mailReady Outbound mail ready for OTP
+ * @var bool $tabletReady Tablet add-on installed, enabled and licensed
  * @var string|null $mailSetupHref Optional link to configure outbound mail
  * @var bool $showFieldLabel
  * @var string|null $fieldLabel
@@ -12,6 +13,7 @@
 $name = (string) ($name ?? 'value');
 $value = (string) ($value ?? 'none');
 $mailReady = !empty($mailReady);
+$tabletReady = !empty($tabletReady);
 $mailSetupHref = isset($mailSetupHref) ? trim((string) $mailSetupHref) : '';
 $showFieldLabel = !isset($showFieldLabel) || (bool) $showFieldLabel;
 $fieldLabel = trim((string) ($fieldLabel ?? ''));
@@ -46,6 +48,9 @@ $cards = [
 if ($value === 'otp_email' && !$mailReady) {
     $value = 'none';
 }
+if ($value === 'tablet_sign' && !$tabletReady) {
+    $value = 'none';
+}
 
 $icons = [
     'doc' => '<svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true" focusable="false"><path fill="currentColor" d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8zm0 2.5L18.5 9H14zM8 12h8v1.5H8zm0 3h8v1.5H8zm0 3h5V19.5H8z"/></svg>',
@@ -68,15 +73,17 @@ $icons = [
         $requiredAttached = false;
         foreach ($cards as $optVal => $card):
             $otpBlocked = $optVal === 'otp_email' && !$mailReady;
-            $checked = $value === $optVal && !$otpBlocked;
+            $tabletBlocked = $optVal === 'tablet_sign' && !$tabletReady;
+            $blocked = $otpBlocked || $tabletBlocked;
+            $checked = $value === $optVal && !$blocked;
             $icon = $icons[$card['icon']] ?? '';
-            $attachRequired = !$otpBlocked && !$requiredAttached;
+            $attachRequired = !$blocked && !$requiredAttached;
             if ($attachRequired) {
                 $requiredAttached = true;
             }
             ?>
             <label
-                class="setup-enrollment-card<?= $checked ? ' is-selected' : '' ?><?= $otpBlocked ? ' is-disabled' : '' ?>"
+                class="setup-enrollment-card<?= $checked ? ' is-selected' : '' ?><?= $blocked ? ' is-disabled' : '' ?>"
                 data-enrollment-card
                 data-enrollment-value="<?= e($optVal) ?>"
             >
@@ -87,7 +94,7 @@ $icons = [
                     'attrs' => array_filter([
                         'data-enrollment-radio' => true,
                         'checked' => $checked,
-                        'disabled' => $otpBlocked,
+                        'disabled' => $blocked,
                         'required' => $attachRequired,
                     ]),
                 ]) ?>
@@ -100,6 +107,8 @@ $icons = [
                     <?php endif; ?>
                     <?php if ($otpBlocked): ?>
                         <span class="setup-enrollment-card-lock"><?= e(__('setup.enrollment_otp_unavailable')) ?></span>
+                    <?php elseif ($tabletBlocked): ?>
+                        <span class="setup-enrollment-card-lock"><?= e(__('setup.enrollment_tablet_unavailable')) ?></span>
                     <?php endif; ?>
                 </span>
             </label>
@@ -112,6 +121,12 @@ $icons = [
             <?php if ($mailSetupHref !== ''): ?>
                 <a href="<?= e($mailSetupHref) ?>" class="setup-enrollment-mail-link"><?= e(__('setup.enrollment_otp_go_mail')) ?></a>
             <?php endif; ?>
+        </p>
+    <?php endif; ?>
+
+    <?php if (!$tabletReady): ?>
+        <p class="setup-hint muted setup-enrollment-tablet-hint">
+            <?= e(__('setup.enrollment_tablet_hint')) ?>
         </p>
     <?php endif; ?>
 

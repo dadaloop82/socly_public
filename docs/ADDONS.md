@@ -21,7 +21,7 @@ instance with Ed25519, also without any internet connection.
 | Location | Content |
 |---|---|
 | Public repo (`socly_public`) | `app/Core/Addon/*` (verifier only), `bootstrap/addons_keys.php` (**public** keys), docs, migration `048_addons.sql` |
-| Private repo (`tools/addons/`) | key generation, package builder/signer, licence signing CLI, guard tests |
+| Private repo (`tools/addons/`, `addons-src/`) | key generation, package builder/signer, licence signing CLI, guard tests, add-on sources |
 | socly.it (`_webSite`) | catalogue, signed package storage, licence issuance/revocation, `/api/addons.php` |
 | Instance storage | `storage/addons/<id>/<version>/` (code), settings (signed entitlement, encrypted), `storage/addons/keys` (package private key in the private repo only) |
 
@@ -131,18 +131,68 @@ php tools/addons/addon-tool.php sign-license payload.json --out=license.txt   # 
    (`.soclylic` download) plus the package file.
 6. Revoke/reactivate from the licence detail; every event is logged in `license_events`.
 
+## First add-on: Iscrizione Tablet (`tablet_enrollment`)
+
+Source: `addons-src/tablet_enrollment/` (private repo; `addons-src/` is not part of the public export).
+Requires core **1.7.87+** (public plugin routes with a middleware override + `addon_active()`).
+
+| File | Purpose |
+|---|---|
+| `addon.json` | id/name/version/min_core/entry consumed by the build tool |
+| `plugin.php` | `PluginInterface`: public kiosk route, admin page + menu, migration |
+| `lib/KioskService.php` | token gate, session wizard, validation, member/payment/card creation |
+| `lib/AddonText.php` | it/de/en strings shipped with the package |
+| `views/*.php` | branded layout, wizard steps, admin panel, error page |
+
+Behaviour:
+
+- **Core gating** — the “Tablet” enrollment validation (`tablet_sign`) is selectable only when
+  `addon_active('tablet_enrollment')` is true. Setup and settings reject it otherwise; if the
+  add-on is removed/disabled/unlicensed, `EnrollmentService::method()` falls back to `none` so
+  member creation is never blocked by a method that no longer exists.
+- **Kiosk** — `GET|POST /tablet/<token>`, public (no operator login), CSRF + access token in the
+  path. Steps: Tessera (type + period + optional existing card number) → Dati (all enabled member
+  fields, dynamically rendered) → Firma (core signature pad + acknowledgements) → Pagamento
+  (paid/partial/unpaid, method, note, summary) → riepilogo with member number and card.
+- **Writes** go through `MemberService::create()` (payment row, balance, treasury, audit, hooks)
+  and `EnrollmentService::storeArtifact()` (signed PNG); the add-on issues the
+  `membership_cards` row and logs every sign-up in `addon_tablet_enrollment_log`.
+- **Admin** — `/tablet-enrollment` (menu entry, `settings.manage`): kiosk URL, status, card-number
+  mode (`auto` = member number, `existing` = ask for the printed card) and the latest sign-ups.
+- **Security** — 24 random bytes token stored encrypted and rotatable from the admin page,
+  per-IP rate limit, `noindex`, no member list exposed by the kiosk.
+
+Build and publish (private tooling):
+
+```bash
+php tools/addons/addon-tool.php build addons-src/tablet_enrollment dist/tablet_enrollment-1.0.0.soclyaddon --incoming
+php tools/addons/addon-tool.php verify-package dist/tablet_enrollment-1.0.0.soclyaddon
+```
+
+`--incoming` also copies the package into `storage/addons/incoming/`: Settings → Add-ons verifies it
+and lists it with an Install button (no browser upload). On another server, copy the file into that
+folder manually. A licence containing the add-on is still required: activate it first (online key,
+offline code or request code), then install from the drop folder or from the licence catalogue.
+
 ## Instance workflow
 
 Settings → Add-ons (`/settings/addons`, permission `addons.manage`):
 
+- **Automatic discovery** — packages copied to `storage/addons/incoming/` are verified
+  (signature, hashes, `min_core`) and listed with an Install button; no browser upload.
+  `php tools/addons/addon-tool.php build … --incoming` builds and drops the package there
+  (same instance/vendor machine).
+- **Licence catalogue** — after «Cerca aggiornamenti» the signed manifest is cached and the
+  licensed add-ons are proposed with Install/Update; the package is downloaded server-side,
+  hash-checked and signature-checked before installation.
+- **Manual upload** — still available under “Caricamento manuale” for packages that cannot be
+  copied to the drop folder.
 - **Online activation** — paste the licence key; the instance calls socly.it, stores the signed token
   encrypted and downloads the signed catalogue.
 - **Offline activation** — paste the `.soclylic` code; no network call, no data sent.
 - **Request code** — copy the generated `SOCLY-REQ1…` and send it to the vendor for an offline licence.
-- **Install / update package** — upload a `.soclyaddon`; signature, hashes, `php -l`, migrations and
-  activation run server-side. Older versions stay on disk as a backup.
 - **Check updates** — with an online licence, verifies the signed catalogue, downloads newer versions
-  and installs them (audit `addon.updated`). Offline installations update by uploading the package.
+  and installs them (audit `addon.updated`). Offline installations update through the drop folder.
 - **Disable / remove** — disabling keeps files and data; removal is allowed only when disabled and keeps
   the database tables (data is never destroyed automatically).
 

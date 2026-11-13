@@ -1197,6 +1197,7 @@ $showNameDe = !empty($showNameDe);
                             'name' => 'value',
                             'value' => (string) $value,
                             'mailReady' => $mailReadyForSelect,
+                            'tabletReady' => addon_active(\Socly\Services\EnrollmentService::ADDON_TABLET),
                             'mailSetupHref' => url('/setup?step_key=mail.smtp'),
                             'showFieldLabel' => false,
                         ]) ?>

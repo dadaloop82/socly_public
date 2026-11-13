@@ -922,6 +922,7 @@
                 'name' => 'enrollment_validation',
                 'value' => (string) ($settings['membership.enrollment_validation'] ?? 'none'),
                 'mailReady' => !empty($mailReady),
+                'tabletReady' => addon_active(\Socly\Services\EnrollmentService::ADDON_TABLET),
                 'mailSetupHref' => url('/settings#mail'),
                 'showFieldLabel' => true,
                 'fieldLabel' => (string) __('settings.enrollment_method'),
