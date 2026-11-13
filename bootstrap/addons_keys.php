@@ -8,13 +8,13 @@ declare(strict_types=1);
  * Keep this file aligned with the site keys (admin → Add-on → Chiavi di firma).
  * Private keys never leave the server.
  *
- * Current values:
- * - `license` is the **production socly.it** signing key (the private key lives on
- *   the site server in `_webSite/storage/keys/license_ed25519.key`);
- * - `package` is the **build machine** key (private key in the private repo
- *   `storage/addons/keys/package_ed25519.key`).
- * Every instance trusts these two public keys: align the site public keys file
- * with them (admin → Add-on → Chiavi di firma) before issuing licences.
+ * Current values (production):
+ * - `license` — socly.it licence signing key (private key on the site server in
+ *   `_webSite/storage/keys/license_ed25519.key`);
+ * - `package` — add-on package signing key (private key `storage/addons/keys/package_ed25519.key`
+ *   on the vendor host; packages are built there or on a machine that holds that file).
+ * Every instance trusts these two public keys: the site public keys file and this file
+ * must contain the same values.
  *
  * @return array<string, array{kid:string, public_key:string}>
  */

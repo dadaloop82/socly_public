@@ -28,21 +28,23 @@ instance with Ed25519, also without any internet connection.
 The private keys never belong to the public tree:
 
 - `_webSite/storage/keys/license_ed25519.key` — **production socly.it** signing key (licences + update manifest).
-- `storage/addons/keys/package_ed25519.key` — **build machine** key, signs `.soclyaddon` packages (vendor/CI only).
-- `bootstrap/addons_keys.php` — **public** keys shipped with the core: the production licence key **and** the
-  build-machine package key. Every instance trusts these two.
+- `storage/addons/keys/package_ed25519.key` — package signing key. It must be the private half of the
+  `package` public key in `bootstrap/addons_keys.php`; packages are built on the host that holds it
+  (vendor/CI, e.g. the socly.it host) and never on a machine without it.
+- `bootstrap/addons_keys.php` — **public** keys shipped with the core: production licence key and package key.
+  Every instance trusts these two.
 - `_webSite/storage/keys/addons_public_keys.php` — copy of the public keys used by socly.it (same two values).
 
 Keep the site file aligned with the core file: admin → Add-on → «Inizializza chiavi» derives the licence public
-key from the private one and writes the site file; the package public key must stay the build-machine one
-(paste it in the field if the deploy cannot find it). Verify the alignment on the vendor machine with:
+key from the private one and writes the site file; the package public key must stay the package-key one.
+Verify the alignment on the host that holds the private keys with:
 
 ```bash
 php tools/addons/addon-tool.php key-status
 ```
 
-The offline fallback `sign-license` needs the production licence private key on the machine that runs it; the
-normal path is issuing licences from socly.it, so the private key can stay only on the site server.
+Both rows must report `allineata al core: sì`. On a machine without the production private keys the licence
+row (and possibly the package row) shows `no`: build/sign licences on socly.it instead.
 
 ## Formats
 
