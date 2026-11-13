@@ -19,6 +19,21 @@ $navActive = static function (string $needle) use ($uri): string {
 };
 $isAdminConfig = $user && can('settings.manage');
 $configActive = str_contains($uri, '/settings') || str_contains($uri, '/users') || str_contains($uri, '/plugins');
+// Add-on menu entries may declare a `group` matching a core component key
+// (e.g. `members`): they are rendered as sub-links of that nav item.
+$pluginSubItems = [];
+$pluginStandalone = [];
+foreach ($pluginMenu as $item) {
+    if (!empty($item['permission']) && !can($item['permission'])) {
+        continue;
+    }
+    $group = (string) ($item['group'] ?? '');
+    if ($group !== '') {
+        $pluginSubItems[$group][] = $item;
+        continue;
+    }
+    $pluginStandalone[] = $item;
+}
 ?>
 <!DOCTYPE html>
 <html lang="<?= e(app('translator')->getLocale()) ?>">
@@ -187,10 +202,12 @@ if ($user && app()->isInstalled() && !$temporaryInstance && can_manage_updates()
                     <?php $budgetNavClass = trim($navActive('/budgets') . ' ' . $navActive('/rendiconto')); ?>
                     <a href="<?= e(url('/budgets')) ?>" class="<?= e($budgetNavClass) ?>"><?= e(__('nav.bilanci')) ?></a>
                 <?php endif; ?>
+                <?php foreach ($pluginSubItems[(string) ($item['key'] ?? '')] ?? [] as $sub): ?>
+                    <a class="nav-sub <?= e($navActive($sub['path'])) ?>" href="<?= e(url($sub['path'])) ?>"><?= e(__($sub['label'])) ?></a>
+                <?php endforeach; ?>
             <?php endforeach; ?>
-            <?php foreach ($pluginMenu as $item): ?>
-                <?php if (!empty($item['permission']) && !can($item['permission'])) continue; ?>
-                <a href="<?= e(url($item['path'])) ?>"><?= e(__($item['label'])) ?></a>
+            <?php foreach ($pluginStandalone as $item): ?>
+                <a href="<?= e(url($item['path'])) ?>" class="<?= e($navActive($item['path'])) ?>"><?= e(__($item['label'])) ?></a>
             <?php endforeach; ?>
             <?php if (can('members.view')): ?>
                 <a href="<?= e(url('/statistics')) ?>" class="<?= e($navActive('/statistics')) ?>"><?= e(__('nav.statistics')) ?></a>

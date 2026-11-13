@@ -25,7 +25,12 @@ interface PluginInterface
      */
     public function registerRoutes(): array;
 
-    /** @return list<array{label:string,path:string,permission?:string}> */
+    /**
+     * Menu entry: [label, path, permission?, group?].
+     * `group` nests the entry under the core nav item with that key (e.g. `members`).
+     *
+     * @return list<array{label:string,path:string,permission?:string,group?:string}>
+     */
     public function registerMenu(): array;
 
     /**

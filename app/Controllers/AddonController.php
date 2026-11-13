@@ -39,6 +39,15 @@ final class AddonController extends BaseController
                 $requested[(string) $row['id']] = (string) $row['id'];
             }
         }
+        // An online licence carries the signed catalogue: fetch it once when it is
+        // missing so the “install from catalogue” rows appear right after activation.
+        if ($this->license->licenseKey() !== '' && $this->license->cachedManifest() === null) {
+            $lastTry = (int) ($_SESSION['addons_manifest_try'] ?? 0);
+            if (time() - $lastTry > 600) {
+                $_SESSION['addons_manifest_try'] = time();
+                $this->license->fetchManifest($request->ip());
+            }
+        }
         $entitlement = $this->license->entitlement();
 
         $this->render('addons/index', [

@@ -21,6 +21,19 @@ $catalogueRows = is_array($catalogue['rows'] ?? null) ? $catalogue['rows'] : [];
 $licenseId = (string) ($entitlement?->licenseId() ?? '');
 $licensedAddons = $entitlement?->addonIds() ?? [];
 $expiresAt = $entitlement?->expiresAt();
+$installedIds = array_map(static fn (array $row): string => (string) ($row['id'] ?? ''), $installed);
+$missingLicensed = array_values(array_filter(
+    $licensedAddons,
+    static fn (string $id): bool => $id !== '' && !in_array($id, $installedIds, true)
+));
+$inactiveInstalled = array_values(array_filter(
+    $installed,
+    static fn (array $row): bool => empty($row['is_enabled'])
+));
+$blockedCatalogue = array_values(array_filter(
+    $catalogueRows,
+    static fn (array $row): bool => empty($row['compatible'])
+));
 ?>
 <div class="page-header">
     <div class="titles">
@@ -41,6 +54,30 @@ $expiresAt = $entitlement?->expiresAt();
 <?php if ($revoked): ?>
     <div class="alert alert-error">
         <span class="alert-body"><?= e(__('addons.revoked_banner')) ?></span>
+    </div>
+<?php endif; ?>
+<?php if ($licenseId !== '' && $missingLicensed !== []): ?>
+    <div class="alert alert-warn">
+        <span class="alert-body">
+            <strong><?= e(__('addons.next_package_title')) ?></strong>
+            <?= e(__('addons.next_package_lede', [
+                'addons' => implode(', ', $missingLicensed),
+                'dir' => (string) $incoming_dir,
+            ])) ?>
+            <?php if ($license_key_present && $blockedCatalogue !== []): ?>
+                <br><?= e(__('addons.next_update_core', [
+                    'min' => (string) ($blockedCatalogue[0]['min_core'] ?? ''),
+                    'core' => $core_version,
+                ])) ?>
+            <?php endif; ?>
+        </span>
+    </div>
+<?php elseif ($licenseId !== '' && $inactiveInstalled !== []): ?>
+    <div class="alert alert-warn">
+        <span class="alert-body">
+            <strong><?= e(__('addons.next_enable_title')) ?></strong>
+            <?= e(__('addons.next_enable_lede')) ?>
+        </span>
     </div>
 <?php endif; ?>
 
@@ -221,7 +258,7 @@ $expiresAt = $entitlement?->expiresAt();
     <?php endif; ?>
 </div>
 
-<?php if (!empty($license_key_present)): ?>
+<?php if ($licenseId !== ''): ?>
 <div class="panel">
     <div class="panel-header">
         <div>
@@ -229,10 +266,16 @@ $expiresAt = $entitlement?->expiresAt();
             <p class="section-lede"><?= e(__('addons.catalogue_lede')) ?></p>
         </div>
     </div>
+    <?php if (!$license_key_present): ?>
+        <p class="setup-hint muted"><?= e(__('addons.catalogue_offline_hint', ['dir' => (string) $incoming_dir])) ?></p>
+    <?php endif; ?>
     <?php if ($catalogueRows === []): ?>
         <div class="empty-state">
             <strong><?= e(__('addons.catalogue_empty')) ?></strong>
             <p><?= e(__('addons.catalogue_hint')) ?></p>
+            <?php if ($licensedAddons !== []): ?>
+                <p class="muted"><?= e(__('addons.catalogue_licensed_list', ['addons' => implode(', ', $licensedAddons)])) ?></p>
+            <?php endif; ?>
         </div>
     <?php else: ?>
         <div class="table-wrap embedded">

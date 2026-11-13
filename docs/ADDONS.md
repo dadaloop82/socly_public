@@ -193,6 +193,10 @@ code or request code), then install from the drop folder or from the licence cat
 
 Settings → Add-ons (`/settings/addons`, permission `addons.manage`):
 
+- **Licence ≠ package** — activating a licence only stores the entitlement on the instance: the
+  add-on code is installed separately (licence catalogue, drop folder or manual upload) and then
+  enabled. Until the package is installed the menus/routes of the add-on do not exist and the
+  core features gated on it stay off.
 - **Automatic discovery** — packages copied to `storage/addons/incoming/` are verified
   (signature, hashes, `min_core`) and listed with an Install button; no browser upload.
   `php tools/addons/addon-tool.php build … --incoming` builds and drops the package there

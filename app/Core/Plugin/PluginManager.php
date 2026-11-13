@@ -151,7 +151,7 @@ final class PluginManager
         }
     }
 
-    /** @return list<array{label:string,path:string,permission?:string}> */
+    /** @return list<array{label:string,path:string,permission?:string,group?:string}> */
     public function menuItems(): array
     {
         return $this->menu;

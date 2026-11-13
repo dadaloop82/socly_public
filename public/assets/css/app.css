@@ -469,6 +469,22 @@ a:hover { text-decoration: underline; color: var(--brand-primary-deep); }
 .nav a.active {
   box-shadow: inset 3px 0 0 var(--brand-accent);
 }
+.nav a.nav-sub {
+  padding: 0.45rem 0.9rem 0.45rem 1.75rem;
+  margin-top: -0.15rem;
+  font-size: 0.86rem;
+  font-weight: 600;
+  color: color-mix(in srgb, var(--brand-paper) 74%, transparent);
+}
+.nav a.nav-sub::before {
+  content: '';
+  flex: 0 0 auto;
+  width: 6px;
+  height: 6px;
+  border-radius: 999px;
+  background: currentColor;
+  opacity: 0.55;
+}
 .sidebar-deadlines {
   flex: 0 0 auto;
   margin: 0.55rem 0 0.85rem;

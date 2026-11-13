@@ -37,6 +37,8 @@ return new class implements PluginInterface {
     {
         return [
             // ['label' => 'example.menu', 'path' => '/admin/example', 'permission' => 'plugins.manage'],
+            // Nested under a core nav item: the group is the component key (members, treasury, org, …).
+            // ['label' => 'example.menu', 'path' => '/admin/example', 'permission' => 'members.manage', 'group' => 'members'],
         ];
     }
 
