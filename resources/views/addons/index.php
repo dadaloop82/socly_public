@@ -110,6 +110,7 @@ $pendingCore = is_array($auto['pending'] ?? null) ? $auto['pending'] : [];
             'autocomplete' => 'off',
         ]) ?>
         <button class="btn btn-sm" type="submit"><?= e(__('addons.activate_button')) ?></button>
+        <p class="setup-hint muted" style="margin:0.6rem 0 0"><?= e(__('addons.activate_offline_hint')) ?></p>
     </form>
 
     <details class="config-accordion" style="margin-top:1rem">

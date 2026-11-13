@@ -226,6 +226,23 @@ another installation, installation not recognised) that points the customer to t
 wording plus the HTTP status (`error_api_rejected`), and a non-JSON body reports `error_api_response`
 with the status. The licence key never appears in a message or in the log.
 
+## Licence management (socly.it admin)
+
+`/admin/licenses.php` → licence detail:
+
+- **Sblocca licenza** — clears the installation binding (`installation_token_hash`, `installation_code`,
+  host, last activation): the key can be activated on another installation and, once a new installation
+  is bound, the offline code is rebuilt. Use it after a reinstall or when the instance answers “already
+  activated on another installation”.
+- **Rigenera chiave** — replaces the `SOCLY-KEY-…` activation key; the previous one stops working
+  immediately while the installation binding and the offline `SOCLY-ENT1…` code stay valid.
+- **Elimina licenza** — deletes the licence with its add-on links and event history (irreversible):
+  key and offline code stop working at once. Installations and packages are not touched.
+
+The instance refuses the two codes in the wrong field with a dedicated message (`error_key_is_offline_code`
+and `error_code_is_online_key`), so the operator is sent to the right form instead of reading “key not
+recognised”.
+
 ## API (socly.it)
 
 | Method | Action | Notes |

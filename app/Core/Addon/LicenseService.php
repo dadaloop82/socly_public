@@ -168,6 +168,11 @@ final class LicenseService
      */
     public function import(string $code, string $ip): array
     {
+        $code = trim($code);
+        if (str_starts_with($code, 'SOCLY-KEY-')) {
+            // The online licence key does not belong in the offline field.
+            return ['ok' => false, 'error' => __('addons.error_code_is_online_key')];
+        }
         $entitlement = Entitlement::verify($code);
         if ($entitlement === null) {
             return ['ok' => false, 'error' => __('addons.error_code_invalid')];
@@ -195,6 +200,10 @@ final class LicenseService
     public function activateOnline(string $licenseKey, string $ip): array
     {
         $licenseKey = trim($licenseKey);
+        if (str_starts_with($licenseKey, 'SOCLY-ENT1')) {
+            // The offline activation code is not the online licence key.
+            return ['ok' => false, 'error' => __('addons.error_key_is_offline_code')];
+        }
         if (strlen($licenseKey) < 16) {
             return ['ok' => false, 'error' => __('addons.error_key_invalid')];
         }
