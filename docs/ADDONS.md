@@ -183,10 +183,11 @@ php tools/addons/addon-tool.php build addons-src/tablet_enrollment dist/tablet_e
 php tools/addons/addon-tool.php verify-package dist/tablet_enrollment-1.0.0.soclyaddon
 ```
 
-`--incoming` also copies the package into `storage/addons/incoming/`: Settings → Add-ons verifies it
-and lists it with an Install button (no browser upload). On another server, copy the file into that
-folder manually. A licence containing the add-on is still required: activate it first (online key,
-offline code or request code), then install from the drop folder or from the licence catalogue.
+`--incoming` also copies the package into `storage/addons/incoming/` of the **instance** (Settings → Add-ons
+verifies it and lists it with an Install button); `--site` copies it into `_webSite/storage/addons/incoming/`
+of the **socly.it** catalogue (Admin → Add-on → Pubblica). On another server, copy the file into the matching
+folder manually. A licence containing the add-on is still required: activate it first (online key, offline
+code or request code), then install from the drop folder or from the licence catalogue.
 
 ## Instance workflow
 
