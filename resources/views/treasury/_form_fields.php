@@ -283,6 +283,54 @@ foreach ($members as $member) {
     </div>
 </section>
 <?php
+// The “Controparte” card sits right under the wallet/instrument card: who the money came from or went
+// to is the natural next question after “where and how”, so it comes before the details.
+?>
+<section class="tmf-card">
+    <header class="tmf-card-head">
+        <h2 class="tmf-card-title"><?= e(__('treasury.form_section_party')) ?></h2>
+    </header>
+    <div class="treasury-soggetto-fields">
+        <?= field('checkbox', [
+            'name' => 'member_involved',
+            'label' => (string) __('treasury.member_involved'),
+            'hint' => (string) __('treasury.member_involved_hint'),
+            'checked' => $memberInvolved,
+            'label_class' => 'checkbox-row-lg',
+            'attrs' => ['data-treasury-member-toggle' => true],
+        ]) ?>
+        <div data-treasury-beneficiary-wrap <?= $memberInvolved ? 'hidden' : '' ?>
+             data-msg-suggest="<?= e(__('treasury.counterparty_suggest')) ?>">
+            <?= field('text', [
+                'name' => 'beneficiary',
+                'label' => (string) __('treasury.counterparty'),
+                'value' => (string) ($values['beneficiary'] ?? ''),
+                'maxlength' => 190,
+                'placeholder' => (string) __('treasury.supplier_placeholder'),
+                'attrs' => [
+                    'list' => 'treasury-beneficiaries',
+                    'data-treasury-beneficiary-input' => true,
+                ],
+            ]) ?>
+            <datalist id="treasury-beneficiaries">
+                <?php foreach ($beneficiaries as $beneficiary): ?>
+                    <option value="<?= e($beneficiary) ?>">
+                <?php endforeach; ?>
+            </datalist>
+        </div>
+        <div data-treasury-member-fields <?= $memberInvolved ? '' : 'hidden' ?>>
+            <?= field('select', [
+                'name' => 'member_id',
+                'label' => (string) __('treasury.member'),
+                'value' => (string) ($values['member_id'] ?? ''),
+                'empty_label' => (string) __('treasury.member_select'),
+                'options' => $treasuryMemberOptions,
+                'attrs' => ['data-treasury-member-select' => true],
+            ]) ?>
+        </div>
+    </div>
+</section>
+<?php
 // "Documento" box: the paper behind the movement (invoice, receipt, contract, ...) always lives in
 // one block, on incoming and outgoing entries alike, with its type, number and date. The invoice
 // flag and the payment terms only make sense on an expense; the attachment also works on transfers.
@@ -584,50 +632,6 @@ if (array_key_exists('has_document', $values)) {
 </section>
 <?php endif; ?>
 <div class="tmf-similar" data-similar-panel hidden></div>
-<section class="tmf-card">
-    <header class="tmf-card-head">
-        <h2 class="tmf-card-title"><?= e(__('treasury.form_section_party')) ?></h2>
-    </header>
-    <div class="treasury-soggetto-fields">
-        <?= field('checkbox', [
-            'name' => 'member_involved',
-            'label' => (string) __('treasury.member_involved'),
-            'hint' => (string) __('treasury.member_involved_hint'),
-            'checked' => $memberInvolved,
-            'label_class' => 'checkbox-row-lg',
-            'attrs' => ['data-treasury-member-toggle' => true],
-        ]) ?>
-        <div data-treasury-beneficiary-wrap <?= $memberInvolved ? 'hidden' : '' ?>
-             data-msg-suggest="<?= e(__('treasury.counterparty_suggest')) ?>">
-            <?= field('text', [
-                'name' => 'beneficiary',
-                'label' => (string) __('treasury.counterparty'),
-                'value' => (string) ($values['beneficiary'] ?? ''),
-                'maxlength' => 190,
-                'placeholder' => (string) __('treasury.supplier_placeholder'),
-                'attrs' => [
-                    'list' => 'treasury-beneficiaries',
-                    'data-treasury-beneficiary-input' => true,
-                ],
-            ]) ?>
-            <datalist id="treasury-beneficiaries">
-                <?php foreach ($beneficiaries as $beneficiary): ?>
-                    <option value="<?= e($beneficiary) ?>">
-                <?php endforeach; ?>
-            </datalist>
-        </div>
-        <div data-treasury-member-fields <?= $memberInvolved ? '' : 'hidden' ?>>
-            <?= field('select', [
-                'name' => 'member_id',
-                'label' => (string) __('treasury.member'),
-                'value' => (string) ($values['member_id'] ?? ''),
-                'empty_label' => (string) __('treasury.member_select'),
-                'options' => $treasuryMemberOptions,
-                'attrs' => ['data-treasury-member-select' => true],
-            ]) ?>
-        </div>
-    </div>
-</section>
 </div>
 <?php if (!empty($config['auto_from_payments'])): ?>
     <p class="muted"><?= e(__('treasury.auto_hint')) ?></p>

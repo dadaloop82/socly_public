@@ -3860,11 +3860,14 @@ function initTreasuryBulk() {
     const summary = editDialog.querySelector('[data-treasury-bulk-edit-summary]');
     const accountSelect = editDialog.querySelector('[data-treasury-bulk-edit-account]');
     const categorySelect = editDialog.querySelector('[data-treasury-bulk-edit-category]');
+    const methodSelect = editDialog.querySelector('[data-treasury-bulk-edit-method]');
     const runtsSelect = editDialog.querySelector('[data-treasury-bulk-edit-runts]');
     const budgetSelect = editDialog.querySelector('[data-treasury-bulk-edit-budget]');
     const descriptionToggle = editDialog.querySelector('[data-treasury-bulk-edit-description-toggle]');
+    const descriptionBlock = editDialog.querySelector('[data-treasury-bulk-edit-description-block]');
     const descriptionField = editDialog.querySelector('[data-treasury-bulk-edit-description]');
     const notesToggle = editDialog.querySelector('[data-treasury-bulk-edit-notes-toggle]');
+    const notesBlock = editDialog.querySelector('[data-treasury-bulk-edit-notes-block]');
     const notesField = editDialog.querySelector('[data-treasury-bulk-edit-notes]');
     const applyBtn = editDialog.querySelector('[data-treasury-bulk-edit-apply]');
     const msg = (key) => editDialog.getAttribute(key) || '';
@@ -3873,11 +3876,13 @@ function initTreasuryBulk() {
       return (select.selectedOptions[0]?.textContent || '').trim();
     };
     const reset = () => {
-      [accountSelect, categorySelect, runtsSelect, budgetSelect].forEach((select) => {
+      [accountSelect, categorySelect, methodSelect, runtsSelect, budgetSelect].forEach((select) => {
         if (select instanceof HTMLSelectElement) select.value = '';
       });
       if (notesToggle instanceof HTMLInputElement) notesToggle.checked = false;
       if (descriptionToggle instanceof HTMLInputElement) descriptionToggle.checked = false;
+      if (descriptionBlock instanceof HTMLElement) descriptionBlock.hidden = true;
+      if (notesBlock instanceof HTMLElement) notesBlock.hidden = true;
       if (descriptionField instanceof HTMLTextAreaElement) {
         descriptionField.value = '';
         descriptionField.disabled = true;
@@ -3900,11 +3905,13 @@ function initTreasuryBulk() {
     editDialog.querySelector('[data-treasury-bulk-edit-cancel]')?.addEventListener('click', () => editDialog.close());
     descriptionToggle?.addEventListener('change', () => {
       if (!(descriptionToggle instanceof HTMLInputElement)) return;
+      if (descriptionBlock instanceof HTMLElement) descriptionBlock.hidden = !descriptionToggle.checked;
       if (descriptionField instanceof HTMLTextAreaElement) descriptionField.disabled = !descriptionToggle.checked;
       if (descriptionToggle.checked && descriptionField instanceof HTMLTextAreaElement) descriptionField.focus();
     });
     notesToggle?.addEventListener('change', () => {
       if (!(notesToggle instanceof HTMLInputElement)) return;
+      if (notesBlock instanceof HTMLElement) notesBlock.hidden = !notesToggle.checked;
       if (notesField instanceof HTMLTextAreaElement) notesField.disabled = !notesToggle.checked;
       if (notesToggle.checked && notesField instanceof HTMLTextAreaElement) notesField.focus();
     });
@@ -3920,6 +3927,7 @@ function initTreasuryBulk() {
       };
       push(msg('data-msg-account'), selectLabel(accountSelect));
       push(msg('data-msg-category'), selectLabel(categorySelect));
+      push(msg('data-msg-method'), selectLabel(methodSelect));
       push(msg('data-msg-runts'), selectLabel(runtsSelect));
       push(msg('data-msg-budget'), selectLabel(budgetSelect));
       const description = descriptionToggle instanceof HTMLInputElement && descriptionToggle.checked
@@ -3959,6 +3967,7 @@ function initTreasuryBulk() {
       };
       setValue('account', accountSelect);
       setValue('category', categorySelect);
+      setValue('payment_method', methodSelect);
       setValue('runts_line', runtsSelect);
       setValue('budget_item_id', budgetSelect);
       body.set('description', description);

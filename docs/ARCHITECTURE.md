@@ -157,15 +157,20 @@ one-click `POST /treasury/similar/apply`, which updates the chosen rows through
 ## Bulk edit of the selection
 
 `POST /treasury/bulk` with `action=update` reclassifies every selected movement at once
-(`TreasuryService::updateMany()`): financial account, type, Model D line, cost centre, description and
-notes. Each field carries a “keep” value (`''`), so only the chosen ones overwrite what was there;
-`__none__` clears the Model D line or the cost centre, while the description and the notes are
-replaced only when their checkbox is ticked (the description is normalised like the single form: first
-letter upper case, max 500 characters). The dialog summarises the changes and the number of movements
-before sending the request; the service skips historical (`superseded_at`) rows, applies only
-account/description/notes to internal transfers and writes one `treasury.bulk_updated` audit row per
-movement (before/after), so the “modified by” trail and the freshness banner keep working. Row versions
-are bumped: a form left open elsewhere reopens on the conflict banner instead of overwriting.
+(`TreasuryService::updateMany()`): financial account, type, payment method, Model D line, cost centre,
+description and notes. Each field carries a “keep” value (`''`), so only the chosen ones overwrite what
+was there; `__none__` clears the Model D line or the cost centre, the payment method only accepts the
+whitelisted slugs (moving the selection to the cash wallet implies `cash`, as in the single form),
+while the description and the notes are replaced only when their checkbox is ticked (the description is
+normalised like the single form: first letter upper case, max 500 characters). The dialog is a compact
+decision sheet — selects in two columns, description/notes boxes that unfold only when their checkbox
+is on — and summarises the changes and the number of movements before sending the request; the category
+select keeps the movement-sheet macro-groups (income / expense / financial / custom / other, without
+“create new”) and the payment method the same groups as the form. The service
+skips historical (`superseded_at`) rows, applies only account/description/notes to internal transfers
+and writes one `treasury.bulk_updated` audit row per movement (before/after), so the “modified by” trail
+and the freshness banner keep working. Row versions are bumped: a form left open elsewhere reopens on
+the conflict banner instead of overwriting.
 
 ## Paid add-ons
 
@@ -262,6 +267,14 @@ printed with the browser (legal header, place/date and signature line).
 - The “Pezze giustificative” column of the printed sheet lists only the movements that carry a
   document (invoice/receipt number or a document type), one line each — date · number · amount; a cost
   centre without documented movements shows “—”.
+- **Official file** (`GET /rendiconto/{year}/xlsx`, permission `treasury.view`): `RuntsXlsxService`
+  copies the ministry's editable workbook (`resources/templates/mod-d.xlsx`) and rewrites
+  `xl/worksheets/sheet1.xml` in place — header (ente + years), rows A–E for the current and the
+  previous year (`B/E` shifted to `C/F`), totals, result, investments and cash. Styles, merges and the
+  official item labels are preserved by construction; the totals are formulas, so the formula stays
+  next to the refreshed cached value. Cells are matched both as `<c …>…</c>` and as empty `<c …/>`,
+  the value type (`t="s"`) is dropped when a number is written, and a cell the sheet does not have is
+  inserted in ascending row/column order.
 - The legal threshold is **€ 220,000** of income per year (`RuntsReportService::CASH_LIMIT`). Below it
   the Model D is generated; at or above it the page states that the accrual statements (Models A/B/C)
   must be prepared manually — Socly does not generate them yet.

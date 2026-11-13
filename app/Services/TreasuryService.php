@@ -2210,15 +2210,16 @@ final class TreasuryService
     }
 
     /**
-     * Bulk classification (“Modifica selezionati”): apply the same account / category / Model D line /
-     * cost centre / description / notes to the selected movements. Every field is optional — an empty
-     * value keeps the current one, `__none__` clears it — and the overwrite is explicit: what is set
-     * replaces what was there (the description and the notes only when their action is `replace`).
-     * Internal transfers only take account, description and notes (their category and imputation are
-     * meaningless) and historical (superseded) rows are never touched.
+     * Bulk classification (“Modifica selezionati”): apply the same account / category / payment method /
+     * Model D line / cost centre / description / notes to the selected movements. Every field is
+     * optional — an empty value keeps the current one, `__none__` clears the Model D line and the cost
+     * centre — and the overwrite is explicit: what is set replaces what was there (the description and
+     * the notes only when their action is `replace`). Internal transfers only take account, description
+     * and notes (their category, method and imputation are meaningless) and historical (superseded)
+     * rows are never touched.
      *
      * @param list<int> $ids
-     * @param array{account?:string,category?:string,runts_line?:string,budget_item_id?:string,description?:string,description_action?:string,notes?:string,notes_action?:string} $changes
+     * @param array{account?:string,category?:string,payment_method?:string,runts_line?:string,budget_item_id?:string,description?:string,description_action?:string,notes?:string,notes_action?:string} $changes
      * @return array{count:int,skipped:int}
      */
     public function updateMany(array $ids, array $changes, string $ip): array
@@ -2231,6 +2232,17 @@ final class TreasuryService
         $category = trim((string) ($changes['category'] ?? ''));
         if ($category !== '' && isset($this->categoryMap()[$category])) {
             $payload['category'] = $category;
+        }
+        // Whitelisted payment methods only (legacy slugs such as `bank` are normalised); an empty
+        // selection keeps the current value, because the column always holds one.
+        $method = trim((string) ($changes['payment_method'] ?? ''));
+        if ($method !== '' && in_array($method, self::METHODS, true)) {
+            $payload['payment_method'] = self::normalizePaymentMethod($method);
+        }
+        // The cash wallet implies a cash payment (same rule as the movement form): moving the
+        // selection to `cash` without choosing a method keeps the ledger consistent.
+        if (($payload['account'] ?? '') === 'cash' && !isset($payload['payment_method'])) {
+            $payload['payment_method'] = 'cash';
         }
         $runts = trim((string) ($changes['runts_line'] ?? ''));
         if ($runts === '__none__') {
@@ -2278,7 +2290,7 @@ final class TreasuryService
             $isTransfer = (string) ($row['direction'] ?? '') === 'transfer';
             $update = [];
             foreach ($payload as $field => $value) {
-                if ($isTransfer && in_array($field, ['category', 'runts_line', 'budget_item_id'], true)) {
+                if ($isTransfer && in_array($field, ['category', 'payment_method', 'runts_line', 'budget_item_id'], true)) {
                     continue;
                 }
                 $update[$field] = $value;

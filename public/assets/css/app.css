@@ -9899,35 +9899,77 @@ button.setup-scrape-logo-frame:focus-visible .setup-scrape-logo-overlay {
 .member-leave-shell {
   gap: 0.85rem;
 }
-/* Bulk edit (first note): the form is long, so the shell scrolls inside the viewport and
-   the actions stay pinned at the bottom — “Applica” must always be reachable. */
+/* Bulk edit (first note): a compact decision sheet, not a form — two columns for the selects, the
+   description/notes boxes appear only when their checkbox is on, and the actions stay pinned at the
+   bottom. The whole sheet must stay safely inside the viewport. */
 .treasury-bulk-edit-shell {
-  max-height: min(88vh, 760px);
+  max-height: min(82vh, 560px);
   overflow-y: auto;
   overscroll-behavior: contain;
-  gap: 0.6rem;
-  padding: 1.1rem 1.15rem 0;
+  gap: 0.5rem;
+  padding: 1rem 1.1rem 0;
 }
-.treasury-bulk-edit-shell .section-title {
+.treasury-bulk-edit-head {
+  display: grid;
+  gap: 0.15rem;
+}
+.treasury-bulk-edit-head .section-title {
+  margin: 0;
+  font-size: 1.05rem;
+}
+.treasury-bulk-edit-head p {
+  margin: 0;
+  font-size: 0.82rem;
+  line-height: 1.35;
+}
+.treasury-bulk-edit-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.5rem 0.7rem;
+  align-items: start;
+}
+.treasury-bulk-edit-grid .sf-field {
   margin: 0;
 }
-.treasury-bulk-edit-shell .setup-hint {
+.treasury-bulk-edit-grid .sf-field__label,
+.treasury-bulk-edit-grid .field-label {
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: color-mix(in srgb, var(--ink) 62%, transparent);
+}
+.treasury-bulk-edit-optional {
+  display: grid;
+  gap: 0.35rem;
+}
+.treasury-bulk-edit-optional .sf-field {
   margin: 0;
+}
+.treasury-bulk-edit-optional .checkbox-row-lg {
+  margin-bottom: 0;
+  font-size: 0.92rem;
+}
+.treasury-bulk-edit-optional-body[hidden] {
+  display: none;
 }
 .treasury-bulk-edit-shell .member-leave-actions {
   position: sticky;
   bottom: 0;
   z-index: 2;
-  margin: 0 -1.15rem;
-  padding: 0.7rem 1.15rem;
+  margin: 0 -1.1rem;
+  padding: 0.6rem 1.1rem;
   background: var(--card);
   border-top: 1px solid var(--line);
   box-shadow: 0 -8px 16px color-mix(in srgb, var(--ink) 6%, transparent);
 }
+@media (max-width: 460px) {
+  .treasury-bulk-edit-grid {
+    grid-template-columns: 1fr;
+  }
+}
 @media (max-height: 700px) {
   .treasury-bulk-edit-shell {
-    max-height: 94vh;
-    gap: 0.45rem;
+    max-height: 88vh;
+    gap: 0.4rem;
   }
 }
 .camera-shell { padding: 1.1rem; }

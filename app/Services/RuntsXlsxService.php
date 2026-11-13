@@ -259,48 +259,158 @@ final class RuntsXlsxService
         ];
     }
 
-    /** Replace (or create) a numeric cell, keeping its style. */
+    /** Replace (or create) a numeric cell, keeping its style (and its formula, when there is one). */
     private function setNumber(string $xml, string $cell, float $value): string
     {
-        $pattern = '~<c r="' . preg_quote($cell, '~') . '"(?P<attrs>[^>]*)>.*?</c>~s';
         $number = rtrim(rtrim(number_format($value, 2, '.', ''), '0'), '.');
         if ($number === '' || $number === '-') {
             $number = '0';
         }
-        if (preg_match($pattern, $xml) === 1) {
-            $updated = preg_replace($pattern, '<c r="' . $cell . '"${attrs}><v>' . $number . '</v></c>', $xml, 1);
 
-            return is_string($updated) ? $updated : $xml;
-        }
+        return $this->writeCell(
+            $xml,
+            $cell,
+            static function (string $attrs, string $inner) use ($cell, $number): string {
+                // Totals in the official form are formulas (SUM…): the formula stays, only the cached
+                // value is updated, so Excel recalculates on open without a broken calc chain.
+                $formula = preg_match('~<f[^>]*>.*?</f>~s', $inner, $m) === 1 ? $m[0] : '';
 
-        return $this->insertCell($xml, $cell, '<c r="' . $cell . '"><v>' . $number . '</v></c>');
+                return '<c r="' . $cell . '"' . self::cellStyle($attrs) . '>' . $formula
+                    . '<v>' . $number . '</v></c>';
+            }
+        );
     }
 
     /** Replace (or create) a text cell as inline string, keeping its style. */
     private function setString(string $xml, string $cell, string $value): string
     {
         $escaped = htmlspecialchars($value, ENT_QUOTES | ENT_XML1, 'UTF-8');
-        $pattern = '~<c r="' . preg_quote($cell, '~') . '"(?P<attrs>[^>]*)>.*?</c>~s';
-        $fragment = '<c r="' . $cell . '"${attrs} t="inlineStr"><is><t>' . $escaped . '</t></is></c>';
-        if (preg_match($pattern, $xml) === 1) {
-            $updated = preg_replace($pattern, $fragment, $xml, 1);
 
-            return is_string($updated) ? $updated : $xml;
-        }
-
-        return $this->insertCell(
+        return $this->writeCell(
             $xml,
             $cell,
-            '<c r="' . $cell . '" t="inlineStr"><is><t>' . $escaped . '</t></is></c>'
+            static fn (string $attrs, string $inner): string => '<c r="' . $cell . '"' . self::cellStyle($attrs)
+                . ' t="inlineStr"><is><t xml:space="preserve">' . $escaped . '</t></is></c>'
         );
     }
 
-    /** Append a cell to its row when the template does not have it yet. */
+    /**
+     * Style/other attributes of an existing cell, without its value type: the template stores the
+     * header years as shared strings, and keeping `t="s"` on a number makes Excel read the number as
+     * an index into the shared-strings table (an empty cell).
+     */
+    private static function cellStyle(string $attrs): string
+    {
+        $clean = (string) preg_replace('~\s*t="[^"]*"~', '', $attrs);
+
+        return rtrim($clean);
+    }
+
+    /**
+     * Rewrite one cell, whether the template renders it as `<c …>…</c>` or as an empty `<c …/>`;
+     * a cell the sheet does not have at all is inserted in the right row/column.
+     *
+     * @param callable(string,string):string $fragment builds the cell from attributes and content
+     */
+    private function writeCell(string $xml, string $cell, callable $fragment): string
+    {
+        $pattern = '~<c r="' . preg_quote($cell, '~') . '"(?P<attrs>[^>]*?)(?P<inner>/>|>.*?</c>)~s';
+        $count = 0;
+        $updated = preg_replace_callback(
+            $pattern,
+            static function (array $m) use ($fragment): string {
+                $inner = (string) ($m['inner'] ?? '');
+                $content = str_starts_with($inner, '/>') ? '' : substr($inner, 1, -4);
+
+                return $fragment((string) ($m['attrs'] ?? ''), $content);
+            },
+            $xml,
+            1,
+            $count
+        );
+        if ($count > 0 && is_string($updated)) {
+            return $updated;
+        }
+
+        return $this->insertCell($xml, $cell, $fragment('', ''));
+    }
+
+    /** Insert a cell in its row (ascending column order), creating the row when the sheet lacks it. */
     private function insertCell(string $xml, string $cell, string $fragment): string
     {
         $row = (int) preg_replace('/^[A-Z]+/', '', $cell);
-        $updated = preg_replace('~(<row r="' . $row . '"[^>]*>)(.*?)(</row>)~s', '$1$2' . $fragment . '$3', $xml, 1);
+        $column = (string) preg_replace('/\d+/', '', $cell);
 
-        return is_string($updated) ? $updated : $xml;
+        // 1. The row exists with content: place the cell before the first higher column.
+        //    `(?<!/)>` keeps self-closing rows (`<row r="6"/>`) out of this branch.
+        $pattern = '~(<row r="' . $row . '"[^>]*?(?<!/)>)(.*?)(</row>)~s';
+        $count = 0;
+        $updated = preg_replace_callback(
+            $pattern,
+            static function (array $m) use ($row, $column, $fragment): string {
+                $cells = (string) $m[2];
+                $position = null;
+                if (preg_match_all('~<c r="([A-Z]+)' . $row . '"~', $cells, $matches, PREG_OFFSET_CAPTURE) > 0) {
+                    foreach ($matches[0] as $index => $match) {
+                        if (self::compareColumns((string) $matches[1][$index][0], $column) > 0) {
+                            $position = (int) $match[1];
+                            break;
+                        }
+                    }
+                }
+                if ($position === null) {
+                    return $m[1] . $cells . $fragment . $m[3];
+                }
+
+                return $m[1] . substr($cells, 0, $position) . $fragment . substr($cells, $position) . $m[3];
+            },
+            $xml,
+            1,
+            $count
+        );
+        if ($count > 0 && is_string($updated)) {
+            return $updated;
+        }
+
+        // 2. Empty row rendered as `<row …/>`: give it its first cell.
+        $count = 0;
+        $updated = preg_replace_callback(
+            '~<row r="' . $row . '"([^>]*?)/>~s',
+            static fn (array $m): string => '<row r="' . $row . '"' . $m[1] . '>' . $fragment . '</row>',
+            $xml,
+            1,
+            $count
+        );
+        if ($count > 0 && is_string($updated)) {
+            return $updated;
+        }
+
+        // 3. The row is missing: create it before the first higher row (the sheet must stay ordered).
+        $newRow = '<row r="' . $row . '">' . $fragment . '</row>';
+        if (preg_match_all('~<row r="(\d+)"~', $xml, $matches, PREG_OFFSET_CAPTURE) > 0) {
+            foreach ($matches[0] as $index => $match) {
+                if ((int) $matches[1][$index][0] > $row) {
+                    $position = (int) $match[1];
+
+                    return substr($xml, 0, $position) . $newRow . substr($xml, $position);
+                }
+            }
+        }
+        $closing = strpos($xml, '</sheetData>');
+        if ($closing !== false) {
+            return substr($xml, 0, $closing) . $newRow . substr($xml, $closing);
+        }
+
+        return $xml;
+    }
+
+    /** Spreadsheet column order: A < Z < AA < AB (a longer reference is always greater). */
+    private static function compareColumns(string $a, string $b): int
+    {
+        if (strlen($a) !== strlen($b)) {
+            return strlen($a) <=> strlen($b);
+        }
+
+        return strcmp($a, $b) <=> 0;
     }
 }

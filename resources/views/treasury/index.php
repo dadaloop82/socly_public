@@ -5,6 +5,7 @@
 /** @var list<array> $members */
 /** @var list<array{key:string,label:string,builtin:bool}> $categories */
 /** @var list<array{label:string,keys:list<string>}> $category_groups */
+/** @var list<array{label:string,options:list<array{value:string,label:string}>}>|null $bulk_category_groups */
 /** @var list<array{key:string,label:string,active:bool}> $accounts */
 /** @var list<array{key:string,label:string,active:bool,income:float,expense:float,transfer_in:float,transfer_out:float,balance:float}> $account_balances */
 /** @var list<array{label:string,keys:list<string>}> $payment_method_groups */
@@ -543,17 +544,28 @@ if ($filterYear !== '' && !isset($yearFilterOptions[$filterYear])) {
             }
             $bulkAccountOptions[(string) $accountOption['key']] = (string) $accountOption['label'];
         }
-        $bulkCategoryOptions = [];
-        foreach (($categories ?? []) as $categoryOption) {
-            $categoryKey = (string) ($categoryOption['key'] ?? '');
-            if ($categoryKey === '' || $categoryKey === '__new__') {
-                continue;
-            }
-            $bulkCategoryOptions[$categoryKey] = (string) ($categoryOption['label'] ?? '');
-        }
+        // Categories keep the same macro-groups as the movement sheet (income / expense / financial /
+        // custom / other), taken from the single source of truth the service already exposes; the
+        // “create a new category” entry is excluded because it makes no sense in bulk.
+        $bulkCategoryGroups = is_array($bulk_category_groups ?? null) ? $bulk_category_groups : [];
         $bulkNoneGroup = [['label' => (string) __('treasury.filter_none_group'), 'options' => [['value' => '__none__', 'label' => (string) __('treasury.filter_none')]]]];
         $bulkRuntsGroups = array_merge(is_array($runts_filter_groups ?? null) ? $runts_filter_groups : [], $bulkNoneGroup);
         $bulkBudgetGroups = array_merge(is_array($budget_filter_groups ?? null) ? $budget_filter_groups : [], $bulkNoneGroup);
+        // Payment methods keep the same groups as the movement form; there is no “clear” entry
+        // because the column always holds a value (cash is implied by the cash wallet).
+        $bulkMethodGroups = [];
+        foreach (is_array($payment_method_groups ?? null) ? $payment_method_groups : [] as $methodGroup) {
+            $methodOptions = [];
+            foreach ((array) ($methodGroup['keys'] ?? []) as $methodKey) {
+                $methodOptions[] = [
+                    'value' => (string) $methodKey,
+                    'label' => (string) __('treasury.method_' . $methodKey),
+                ];
+            }
+            if ($methodOptions !== []) {
+                $bulkMethodGroups[] = ['label' => (string) ($methodGroup['label'] ?? ''), 'options' => $methodOptions];
+            }
+        }
         ?>
         <dialog
             class="member-bulk-email-dialog"
@@ -561,6 +573,7 @@ if ($filterYear !== '' && !isset($yearFilterOptions[$filterYear])) {
             data-msg-summary="<?= e(__('treasury.bulk_edit_summary', ['count' => ':count'])) ?>"
             data-msg-account="<?= e(__('treasury.account')) ?>"
             data-msg-category="<?= e(__('treasury.category')) ?>"
+            data-msg-method="<?= e(__('treasury.payment_method_label')) ?>"
             data-msg-runts="<?= e(__('runts.line_label')) ?>"
             data-msg-budget="<?= e(__('treasury.budget_item')) ?>"
             data-msg-description="<?= e(__('treasury.description')) ?>"
@@ -569,71 +582,93 @@ if ($filterYear !== '' && !isset($yearFilterOptions[$filterYear])) {
             data-msg-none="<?= e(__('treasury.bulk_edit_none')) ?>"
         >
             <div class="member-leave-shell treasury-bulk-edit-shell">
-                <h3 class="section-title"><?= e(__('treasury.bulk_edit_title')) ?></h3>
-                <p class="muted" data-treasury-bulk-edit-summary></p>
-                <p class="setup-hint muted"><?= e(__('treasury.bulk_edit_lede')) ?></p>
-                <?= field('select', [
-                    'name' => '',
-                    'label' => (string) __('treasury.account'),
-                    'include_empty' => true,
-                    'empty_label' => (string) __('treasury.bulk_edit_keep'),
-                    'options' => $bulkAccountOptions,
-                    'attrs' => ['data-treasury-bulk-edit-account' => true],
-                ]) ?>
-                <?= field('select', [
-                    'name' => '',
-                    'label' => (string) __('treasury.category'),
-                    'include_empty' => true,
-                    'empty_label' => (string) __('treasury.bulk_edit_keep'),
-                    'options' => $bulkCategoryOptions,
-                    'attrs' => ['data-treasury-bulk-edit-category' => true],
-                ]) ?>
-                <?= field('select', [
-                    'name' => '',
-                    'label' => (string) __('runts.line_label'),
-                    'include_empty' => true,
-                    'empty_label' => (string) __('treasury.bulk_edit_keep'),
-                    'groups' => $bulkRuntsGroups,
-                    'options' => [],
-                    'attrs' => ['data-treasury-bulk-edit-runts' => true],
-                ]) ?>
-                <?= field('select', [
-                    'name' => '',
-                    'label' => (string) __('treasury.budget_item'),
-                    'include_empty' => true,
-                    'empty_label' => (string) __('treasury.bulk_edit_keep'),
-                    'groups' => $bulkBudgetGroups,
-                    'options' => [],
-                    'attrs' => ['data-treasury-bulk-edit-budget' => true],
-                ]) ?>
-                <?= field('checkbox', [
-                    'name' => '',
-                    'label' => (string) __('treasury.bulk_edit_description_replace'),
-                    'label_class' => 'checkbox-row-lg',
-                    'checked' => false,
-                    'attrs' => ['data-treasury-bulk-edit-description-toggle' => true],
-                ]) ?>
-                <?= field('textarea', [
-                    'name' => '',
-                    'label' => (string) __('treasury.description'),
-                    'rows' => 2,
-                    'maxlength' => 500,
-                    'attrs' => ['data-treasury-bulk-edit-description' => true],
-                ]) ?>
-                <?= field('checkbox', [
-                    'name' => '',
-                    'label' => (string) __('treasury.bulk_edit_notes_replace'),
-                    'label_class' => 'checkbox-row-lg',
-                    'checked' => false,
-                    'attrs' => ['data-treasury-bulk-edit-notes-toggle' => true],
-                ]) ?>
-                <?= field('textarea', [
-                    'name' => '',
-                    'label' => (string) __('treasury.notes'),
-                    'rows' => 2,
-                    'maxlength' => 2000,
-                    'attrs' => ['data-treasury-bulk-edit-notes' => true],
-                ]) ?>
+                <div class="treasury-bulk-edit-head">
+                    <h3 class="section-title"><?= e(__('treasury.bulk_edit_title')) ?></h3>
+                    <p class="muted" data-treasury-bulk-edit-summary></p>
+                    <p class="muted"><?= e(__('treasury.bulk_edit_lede')) ?></p>
+                </div>
+                <div class="treasury-bulk-edit-grid">
+                    <?= field('select', [
+                        'name' => '',
+                        'label' => (string) __('treasury.account'),
+                        'include_empty' => true,
+                        'empty_label' => (string) __('treasury.bulk_edit_keep'),
+                        'options' => $bulkAccountOptions,
+                        'attrs' => ['data-treasury-bulk-edit-account' => true],
+                    ]) ?>
+                    <?= field('select', [
+                        'name' => '',
+                        'label' => (string) __('treasury.category'),
+                        'include_empty' => true,
+                        'empty_label' => (string) __('treasury.bulk_edit_keep'),
+                        'groups' => $bulkCategoryGroups,
+                        'options' => [],
+                        'attrs' => ['data-treasury-bulk-edit-category' => true],
+                    ]) ?>
+                    <?= field('select', [
+                        'name' => '',
+                        'label' => (string) __('treasury.payment_method_label'),
+                        'include_empty' => true,
+                        'empty_label' => (string) __('treasury.bulk_edit_keep'),
+                        'groups' => $bulkMethodGroups,
+                        'options' => [],
+                        'attrs' => ['data-treasury-bulk-edit-method' => true],
+                    ]) ?>
+                    <?= field('select', [
+                        'name' => '',
+                        'label' => (string) __('runts.line_label'),
+                        'include_empty' => true,
+                        'empty_label' => (string) __('treasury.bulk_edit_keep'),
+                        'groups' => $bulkRuntsGroups,
+                        'options' => [],
+                        'attrs' => ['data-treasury-bulk-edit-runts' => true],
+                    ]) ?>
+                    <?= field('select', [
+                        'name' => '',
+                        'label' => (string) __('treasury.budget_item'),
+                        'include_empty' => true,
+                        'empty_label' => (string) __('treasury.bulk_edit_keep'),
+                        'groups' => $bulkBudgetGroups,
+                        'options' => [],
+                        'attrs' => ['data-treasury-bulk-edit-budget' => true],
+                    ]) ?>
+                </div>
+                <div class="treasury-bulk-edit-optional">
+                    <?= field('checkbox', [
+                        'name' => '',
+                        'label' => (string) __('treasury.bulk_edit_description_replace'),
+                        'label_class' => 'checkbox-row-lg',
+                        'checked' => false,
+                        'attrs' => ['data-treasury-bulk-edit-description-toggle' => true],
+                    ]) ?>
+                    <div class="treasury-bulk-edit-optional-body" data-treasury-bulk-edit-description-block hidden>
+                        <?= field('textarea', [
+                            'name' => '',
+                            'label' => (string) __('treasury.description'),
+                            'rows' => 2,
+                            'maxlength' => 500,
+                            'attrs' => ['data-treasury-bulk-edit-description' => true],
+                        ]) ?>
+                    </div>
+                </div>
+                <div class="treasury-bulk-edit-optional">
+                    <?= field('checkbox', [
+                        'name' => '',
+                        'label' => (string) __('treasury.bulk_edit_notes_replace'),
+                        'label_class' => 'checkbox-row-lg',
+                        'checked' => false,
+                        'attrs' => ['data-treasury-bulk-edit-notes-toggle' => true],
+                    ]) ?>
+                    <div class="treasury-bulk-edit-optional-body" data-treasury-bulk-edit-notes-block hidden>
+                        <?= field('textarea', [
+                            'name' => '',
+                            'label' => (string) __('treasury.notes'),
+                            'rows' => 2,
+                            'maxlength' => 2000,
+                            'attrs' => ['data-treasury-bulk-edit-notes' => true],
+                        ]) ?>
+                    </div>
+                </div>
                 <div class="member-leave-actions">
                     <button type="button" class="btn btn-ghost" data-treasury-bulk-edit-cancel><?= e(__('common.cancel')) ?></button>
                     <button type="button" class="btn" data-treasury-bulk-edit-apply><?= e(__('treasury.bulk_edit_apply')) ?></button>

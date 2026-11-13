@@ -74,6 +74,9 @@ final class TreasuryController extends BaseController
             'members' => $this->members->listForSelect(),
             'categories' => $this->treasury->categoryOptions(),
             'category_groups' => $this->treasury->categoryGroups(),
+            // Ready-made macro-groups (income / expense / financial / custom / other) for the bulk
+            // classification sheet: the same list the movement form shows, without “create new”.
+            'bulk_category_groups' => $this->treasury->categorySelectGroups(false),
             'accounts' => $wallets['accounts'],
             'account_balances' => $wallets['balances'],
             'payment_method_groups' => $this->treasury->paymentMethodGroups(),
@@ -610,6 +613,7 @@ final class TreasuryController extends BaseController
             $result = $this->treasury->updateMany(array_values($ids), [
                 'account' => (string) $request->input('account', ''),
                 'category' => (string) $request->input('category', ''),
+                'payment_method' => (string) $request->input('payment_method', ''),
                 'runts_line' => (string) $request->input('runts_line', ''),
                 'budget_item_id' => (string) $request->input('budget_item_id', ''),
                 'description' => (string) $request->input('description', ''),

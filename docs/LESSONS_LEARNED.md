@@ -91,6 +91,7 @@ This document captures mistakes and costly fixes from the previous membership co
 | Thin RISKS.md ignoring real incidents | Keep `docs/RISKS.md` and this file updated when we find issues |
 | Telemetry counters on guessed table/column names wrapped in `catch` → silent zeros | Check names against migrations; never hide “empty stats” behind a catch-all |
 | JS `console.log` and duplicate asset files in prod | No debug console in shipped assets; no `-old` / `-backup` copies |
+| Rewriting an official XLSX with `preg_replace('<c … ${attrs}>')` | PHP does **not** expand `${name}` in the replacement: the placeholder lands in the sheet, the XML is malformed and Excel shows an **empty file**. Inject the attributes with `preg_replace_callback`, handle self-closing `<c …/>`, drop `t="s"` when writing a number (otherwise it is read as a shared-string index) and keep the `<f>` formula next to the new cached `<v>` |
 
 ## Plugin boundary
 
