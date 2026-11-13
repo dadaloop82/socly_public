@@ -411,13 +411,13 @@ final class MemberController extends BaseController
     {
         $this->guardMembers();
         $result = $this->payments->record((int) $id, $request->all(), $request->ip());
-        $redirect = trim((string) $request->input('redirect', ''));
+        $redirect = local_url_path(trim((string) $request->input('redirect', '')), '/members/' . $id);
         if (!$result['ok']) {
             $this->flash('errors', $result['errors']);
         } else {
             $this->flash('success', __('payments.recorded'));
         }
-        if ($redirect !== '' && str_starts_with($redirect, '/members')) {
+        if (str_starts_with($redirect, '/members')) {
             redirect($redirect);
         }
         redirect('/members/' . $id);

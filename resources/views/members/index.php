@@ -4,7 +4,10 @@
 /** @var array{active_count:int,balance_due_total:float,pending_count:int} $summary */
 $filters = is_array($filters ?? null) ? $filters : [];
 $filters += ['q' => '', 'status' => '', 'member_type_id' => '', 'payment' => '', 'sort' => '', 'dir' => '', 'issues' => ''];
-$redirectBack = url('/members?' . http_build_query(array_filter(array_merge($filters, ['page' => $page > 1 ? $page : null]))));
+$redirectQuery = http_build_query(array_filter(array_merge($filters, ['page' => $page > 1 ? $page : null])));
+// Local path, never an absolute URL: redirect() prefixes the base, so “https://host/members?q=…”
+// became “https://host/https://host/members?q=…” after a bulk action.
+$redirectBack = '/members' . ($redirectQuery !== '' ? '?' . $redirectQuery : '');
 $canManage = can('members.manage');
 $canPayments = can('payments.manage');
 $sortKey = (string) ($filters['sort'] ?? 'member_number');

@@ -92,6 +92,7 @@ This document captures mistakes and costly fixes from the previous membership co
 | Telemetry counters on guessed table/column names wrapped in `catch` → silent zeros | Check names against migrations; never hide “empty stats” behind a catch-all |
 | JS `console.log` and duplicate asset files in prod | No debug console in shipped assets; no `-old` / `-backup` copies |
 | Rewriting an official XLSX with `preg_replace('<c … ${attrs}>')` | PHP does **not** expand `${name}` in the replacement: the placeholder lands in the sheet, the XML is malformed and Excel shows an **empty file**. Inject the attributes with `preg_replace_callback`, handle self-closing `<c …/>`, drop `t="s"` when writing a number (otherwise it is read as a shared-string index) and keep the `<f>` formula next to the new cached `<v>` |
+| Putting `url('/members?…')` in a hidden `redirect` field | `redirect()` prefixes the base, so the browser got `https://host/https://host/members?q=…` after a bulk action. Put the **path** in the form; `local_url_path()` (used by `redirect()`) reduces an absolute URL to its path, strips the app sub-directory and refuses anything that is not local, which also keeps open redirects out |
 
 ## Plugin boundary
 

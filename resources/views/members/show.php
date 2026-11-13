@@ -168,7 +168,8 @@ if ($periodEndsOn !== '') {
 } elseif (!empty($member['period_label'])) {
     $metaBits[] = (string) $member['period_label'];
 }
-$redirectBack = url('/members/' . (int) $member['id']);
+// Local path, never an absolute URL: redirect() prefixes the base (see local_url_path()).
+$redirectBack = '/members/' . (int) $member['id'];
 $hasPhoto = !empty($fields['photo']);
 // Membership-card QR: only when the card really stores a qr_code (shown top-right on the card).
 $cardQrCode = is_array($card ?? null) ? trim((string) ($card['qr_code'] ?? '')) : '';

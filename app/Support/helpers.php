@@ -153,10 +153,50 @@ if (!function_exists('flash')) {
     }
 }
 
+if (!function_exists('local_url_path')) {
+    /**
+     * Reduce a redirect target to an in-app path.
+     *
+     * Forms (and pages still cached in a browser) post the absolute URL of the current page as
+     * `redirect`; handing an absolute value to redirect() appended it to the base, so the browser
+     * ended up on “https://host/https://host/members?q=…”. An absolute URL keeps only path + query +
+     * fragment, the app sub-directory is stripped (url() adds it back) and anything suspicious falls
+     * back to $fallback: no open redirect, no doubled base.
+     */
+    function local_url_path(string $url, string $fallback = '/'): string
+    {
+        $path = trim($url);
+        if (preg_match('~^[a-z][a-z0-9+.\-]*://~i', $path) === 1) {
+            $path = (string) preg_replace('~^[a-z][a-z0-9+.\-]*://[^/?\#]*~i', '', $path);
+            if ($path === '') {
+                $path = '/';
+            }
+        }
+        $basePath = (string) (parse_url(base_url(), PHP_URL_PATH) ?? '');
+        $basePath = rtrim(str_replace('\\', '/', $basePath), '/');
+        if ($basePath !== '') {
+            if ($path === $basePath) {
+                $path = '/';
+            } elseif (str_starts_with($path, $basePath . '/')) {
+                $path = substr($path, strlen($basePath));
+            }
+        }
+        if ($path === '' || $path[0] !== '/' || str_starts_with($path, '//')) {
+            return $fallback;
+        }
+        if (preg_match('~[\\\\\x00-\x1F\x7F]~', $path) === 1) {
+            return $fallback;
+        }
+
+        return $path;
+    }
+}
+
 if (!function_exists('redirect')) {
+    /** Redirect to an in-app path (absolute URLs are reduced to their path, see local_url_path()). */
     function redirect(string $path): never
     {
-        header('Location: ' . url($path));
+        header('Location: ' . url(local_url_path($path)));
         exit;
     }
 }
