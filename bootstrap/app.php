@@ -89,6 +89,7 @@ use Socly\Services\PdfTextExtractor;
 use Socly\Services\RuntsDetailScrapeService;
 use Socly\Services\RuntsLookupService;
 use Socly\Services\RuntsReportService;
+use Socly\Services\RuntsXlsxService;
 use Socly\Services\SettingsService;
 use Socly\Services\SetupService;
 use Socly\Services\StatisticsService;
@@ -548,9 +549,14 @@ $app->bind(BudgetController::class, fn (App $a) => new BudgetController(
     $a->get(VersionService::class)
 ));
 $app->bind(RuntsReportService::class, fn (App $a) => new RuntsReportService($a->get(Database::class)));
+$app->bind(RuntsXlsxService::class, fn (App $a) => new RuntsXlsxService(
+    $basePath,
+    $a->get(RuntsReportService::class)
+));
 $app->bind(RendicontoController::class, fn (App $a) => new RendicontoController(
     $a->get(View::class),
     $a->get(RuntsReportService::class),
+    $a->get(RuntsXlsxService::class),
     $a->get(CurrencyService::class),
     $a->get(SettingsService::class)
 ));

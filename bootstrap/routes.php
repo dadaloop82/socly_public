@@ -191,6 +191,7 @@ $router->get('/budgets/{id}/rendiconto', [BudgetController::class, 'rendiconto']
 // Final balance sheet - RUNTS Model D (cash statement).
 $router->get('/rendiconto', [RendicontoController::class, 'index'], 'treasury.view', ['mw.locale', 'mw.install', 'mw.auth']);
 $router->get('/rendiconto/{year}', [RendicontoController::class, 'show'], 'treasury.view', ['mw.locale', 'mw.install', 'mw.auth']);
+$router->get('/rendiconto/{year}/xlsx', [RendicontoController::class, 'xlsx'], 'treasury.view', ['mw.locale', 'mw.install', 'mw.auth']);
 
 $router->get('/deadlines', [DeadlinesController::class, 'index'], 'deadlines.view', ['mw.locale', 'mw.install', 'mw.auth']);
 $router->get('/deadlines/create', [DeadlinesController::class, 'create'], 'deadlines.manage', ['mw.locale', 'mw.install', 'mw.auth']);

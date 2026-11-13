@@ -68,7 +68,10 @@ $prospect = $report['prospect'] ?? ['opening' => [], 'closing' => []];
 </head>
 <body>
 <div class="toolbar">
-    <button type="button" data-print><?= e(__('runts.print')) ?></button>
+    <button type="button" data-print><?= e(__('runts.export_pdf')) ?></button>
+    <?php if ($can_generate): ?>
+        <a href="<?= e(url('/rendiconto/' . (int) $year . '/xlsx')) ?>"><?= e(__('runts.export_xlsx')) ?></a>
+    <?php endif; ?>
     <a href="<?= e(url('/rendiconto')) ?>"><?= e(__('runts.back')) ?></a>
 </div>
 <div class="sheet">
