@@ -247,8 +247,25 @@ final class AuthService
         unset($user['password']);
         $_SESSION['user'] = $user;
         $_SESSION['permissions'] = $this->permissionsFor((int) $user['id'], (bool) $user['is_system_admin']);
+        $_SESSION['permissions_synced_at'] = time();
         $_SESSION['last_activity'] = time();
         $this->audit->log('login', 'user', (string) $user['id'], null, $meta, $ip);
+    }
+
+    /**
+     * Reload the cached permission list. Used after an upgrade grants a new
+     * permission (e.g. addons.manage) so already-open sessions see it without a
+     * forced logout.
+     */
+    public function refreshPermissions(): void
+    {
+        $user = auth_user();
+        $userId = (int) ($user['id'] ?? 0);
+        if ($userId < 1) {
+            return;
+        }
+        $_SESSION['permissions'] = $this->permissionsFor($userId, (bool) ($user['is_system_admin'] ?? false));
+        $_SESSION['permissions_synced_at'] = time();
     }
 
     private function issueRememberToken(int $userId, string $ip): void
