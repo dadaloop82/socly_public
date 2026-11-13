@@ -427,14 +427,53 @@ final class AddonPackage
         }
         $out = [];
         $code = 0;
-        $binary = PHP_BINARY !== '' ? PHP_BINARY : 'php';
+        $binary = $this->phpCliBinary();
         @exec(escapeshellarg($binary) . ' -l ' . escapeshellarg($file) . ' 2>&1', $out, $code);
         if ($code === 0) {
             return '';
         }
-        $detail = trim(implode(' ', $out));
+        $detail = '';
+        foreach (is_array($out) ? $out : [] as $line) {
+            $detail .= ' ' . trim((string) $line);
+        }
+        $detail = trim($detail);
+        if ($detail === '' || $code === 127) {
+            return '';
+        }
+        // php-fpm/php-cgi and wrappers answer with a usage or help screen: the package is
+        // signed, so a lint we cannot run must not block the install.
+        foreach (['Usage:', 'Usage/', 'php-fpm', 'php-cgi', 'No php.ini file', 'not found'] as $needle) {
+            if (str_contains($detail, $needle)) {
+                return '';
+            }
+        }
 
-        return mb_substr($detail !== '' ? $detail : 'syntax error', 0, 240);
+        return mb_substr($detail, 0, 240);
+    }
+
+    /**
+     * Path of a PHP binary that understands `-l`. Under php-fpm `PHP_BINARY` points at
+     * the FPM binary, which answers with its usage screen, so the CLI is resolved first.
+     */
+    private function phpCliBinary(): string
+    {
+        $override = trim((string) ($_ENV['SOCLY_PHP_BIN'] ?? ''));
+        if ($override !== '' && is_file($override) && is_executable($override)) {
+            return $override;
+        }
+        if (PHP_SAPI === 'cli' && PHP_BINARY !== '' && is_file(PHP_BINARY) && is_executable(PHP_BINARY)) {
+            return PHP_BINARY;
+        }
+        $prefix = defined('PHP_BINDIR') ? rtrim((string) PHP_BINDIR, '/') : '';
+        $names = ['php', 'php' . PHP_MAJOR_VERSION . '.' . PHP_MINOR_VERSION];
+        foreach ($names as $name) {
+            $path = $prefix !== '' ? $prefix . '/' . $name : $name;
+            if (is_file($path) && is_executable($path)) {
+                return $path;
+            }
+        }
+
+        return 'php';
     }
 
     /** @return list<string> */

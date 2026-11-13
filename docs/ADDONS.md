@@ -226,6 +226,14 @@ another installation, installation not recognised) that points the customer to t
 wording plus the HTTP status (`error_api_rejected`), and a non-JSON body reports `error_api_response`
 with the status. The licence key never appears in a message or in the log.
 
+## Package lint and PHP-FPM
+
+Packages are linted with `php -l` before installation. Under PHP-FPM `PHP_BINARY` points at the FPM
+binary, which has no `-l` switch (it answers with its usage screen), so the instance resolves a CLI
+binary first: `SOCLY_PHP_BIN` from `.env` when set, the CLI binary, `PHP_BINDIR/php`, then `php` from
+`PATH`. If no usable CLI exists — or `exec()` is disabled on hardened hosting — the lint is skipped
+on purpose: the signature is the real boundary, the lint is only a safety net.
+
 ## Licence management (socly.it admin)
 
 `/admin/licenses.php` → licence detail:
