@@ -10,6 +10,8 @@ every 100 patches bump the series, and each bump is published to this rep come o
 
 ### Fixed
 
+- The “Modifica i movimenti selezionati” dialog no longer grows taller than the screen: the form scrolls
+  inside the popup and the “Applica”/“Annulla” buttons stay pinned at the bottom (also on short screens).
 - Installing an add-on package no longer crashes on hosts with a restrictive `open_basedir` (Plesk):
   the PHP CLI probes are silent and fall back to the shell, so a valid signed package installs instead of
   showing an error page. `php bin/report-check.php` (with `--send`) verifies the crash-report relay from

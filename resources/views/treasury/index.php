@@ -568,7 +568,7 @@ if ($filterYear !== '' && !isset($yearFilterOptions[$filterYear])) {
             data-msg-confirm="<?= e(__('treasury.bulk_edit_confirm', ['changes' => ':changes', 'count' => ':count'])) ?>"
             data-msg-none="<?= e(__('treasury.bulk_edit_none')) ?>"
         >
-            <div class="member-leave-shell">
+            <div class="member-leave-shell treasury-bulk-edit-shell">
                 <h3 class="section-title"><?= e(__('treasury.bulk_edit_title')) ?></h3>
                 <p class="muted" data-treasury-bulk-edit-summary></p>
                 <p class="setup-hint muted"><?= e(__('treasury.bulk_edit_lede')) ?></p>
@@ -630,7 +630,7 @@ if ($filterYear !== '' && !isset($yearFilterOptions[$filterYear])) {
                 <?= field('textarea', [
                     'name' => '',
                     'label' => (string) __('treasury.notes'),
-                    'rows' => 3,
+                    'rows' => 2,
                     'maxlength' => 2000,
                     'attrs' => ['data-treasury-bulk-edit-notes' => true],
                 ]) ?>
