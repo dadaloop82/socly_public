@@ -236,6 +236,7 @@ $router->post('/settings/addons/install', [AddonController::class, 'install'], '
 $router->post('/settings/addons/install-incoming', [AddonController::class, 'installIncoming'], 'addons.manage', ['mw.locale', 'mw.install', 'mw.auth', 'mw.csrf']);
 $router->post('/settings/addons/install-licensed', [AddonController::class, 'installLicensed'], 'addons.manage', ['mw.locale', 'mw.install', 'mw.auth', 'mw.csrf']);
 $router->post('/settings/addons/check', [AddonController::class, 'check'], 'addons.manage', ['mw.locale', 'mw.install', 'mw.auth', 'mw.csrf']);
+$router->post('/settings/addons/auto-install', [AddonController::class, 'autoInstallAction'], 'addons.manage', ['mw.locale', 'mw.install', 'mw.auth', 'mw.csrf']);
 $router->post('/settings/addons/{id}/enable', [AddonController::class, 'enable'], 'addons.manage', ['mw.locale', 'mw.install', 'mw.auth', 'mw.csrf']);
 $router->post('/settings/addons/{id}/disable', [AddonController::class, 'disable'], 'addons.manage', ['mw.locale', 'mw.install', 'mw.auth', 'mw.csrf']);
 $router->post('/settings/addons/{id}/remove', [AddonController::class, 'remove'], 'addons.manage', ['mw.locale', 'mw.install', 'mw.auth', 'mw.csrf']);

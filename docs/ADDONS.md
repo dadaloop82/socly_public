@@ -193,17 +193,18 @@ code or request code), then install from the drop folder or from the licence cat
 
 Settings → Add-ons (`/settings/addons`, permission `addons.manage`):
 
-- **Licence ≠ package** — activating a licence only stores the entitlement on the instance: the
-  add-on code is installed separately (licence catalogue, drop folder or manual upload) and then
-  enabled. Until the package is installed the menus/routes of the add-on do not exist and the
-  core features gated on it stay off.
+- **Licence ≠ package** — activating a licence stores the entitlement; an online activation also
+  downloads and enables the licensed packages, while an offline `.soclylic` code installs the
+  package from the drop folder or manual upload. Until the package is installed the menus/routes
+  of the add-on do not exist and the core features gated on it stay off.
 - **Automatic discovery** — packages copied to `storage/addons/incoming/` are verified
   (signature, hashes, `min_core`) and listed with an Install button; no browser upload.
   `php tools/addons/addon-tool.php build … --incoming` builds and drops the package there
   (same instance/vendor machine).
-- **Licence catalogue** — after «Cerca aggiornamenti» the signed manifest is cached and the
-  licensed add-ons are proposed with Install/Update; the package is downloaded server-side,
-  hash-checked and signature-checked before installation.
+- **Licence catalogue** — activating a licence fetches the signed manifest and installs/enables the
+  licensed packages automatically; the Add-ons page repeats the check at most once per hour, and
+  `php bin/addons-update.php` (cron) does the same without opening the UI. The manifest is cached and
+  the package is downloaded server-side, hash-checked and signature-checked before installation.
 - **Manual upload** — still available under “Caricamento manuale” for packages that cannot be
   copied to the drop folder.
 - **Online activation** — paste the licence key; the instance calls socly.it, stores the signed token
@@ -212,6 +213,8 @@ Settings → Add-ons (`/settings/addons`, permission `addons.manage`):
 - **Request code** — copy the generated `SOCLY-REQ1…` and send it to the vendor for an offline licence.
 - **Check updates** — with an online licence, verifies the signed catalogue, downloads newer versions
   and installs them (audit `addon.updated`). Offline installations update through the drop folder.
+- **Automatic updates** — `php bin/addons-update.php` (cron, e.g. `25 4 * * *`) installs missing or
+  outdated licensed add-ons; the same check runs at most hourly when the Add-ons page is opened.
 - **Disable / remove** — disabling keeps files and data; removal is allowed only when disabled and keeps
   the database tables (data is never destroyed automatically).
 

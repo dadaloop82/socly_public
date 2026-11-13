@@ -8,6 +8,7 @@ use Socly\Core\Database;
 use Socly\Core\Migrator;
 use Socly\Core\Plugin\PluginInterface;
 use Socly\Services\AuditService;
+use Socly\Services\SettingsService;
 
 /**
  * Installed add-on packages: lifecycle, enable/disable, updates and plugin discovery.
@@ -18,12 +19,18 @@ use Socly\Services\AuditService;
  */
 final class AddonManager
 {
+    /** Minimum interval between automatic checks/downloads (seconds). */
+    private const AUTO_CHECK_TTL = 3600;
+    private const SET_AUTO_CHECK_AT = 'addons.auto_check_at';
+    private const SET_PENDING = 'addons.pending';
+
     public function __construct(
         private readonly Database $db,
         private readonly LicenseService $license,
         private readonly AddonPackage $package,
         private readonly Migrator $migrator,
-        private readonly AuditService $audit
+        private readonly AuditService $audit,
+        private readonly SettingsService $settings
     ) {
     }
 
@@ -220,6 +227,121 @@ final class AddonManager
         usort($rows, static fn (array $a, array $b): int => strcmp($a['id'], $b['id']));
 
         return ['ok' => true, 'rows' => $rows];
+    }
+
+    /**
+     * Install every add-on granted by the licence that is missing or outdated.
+     *
+     * Runs right after an online activation, when the Add-ons page is opened (at most
+     * once per hour) and from `bin/addons-update.php` (cron). Only signed packages from
+     * the licence catalogue are downloaded; offline licences cannot download and must
+     * use the drop folder instead.
+     *
+     * @return array{
+     *   ok:bool,
+     *   reason?:string,
+     *   installed:list<array{id:string,from:string,to:string}>,
+     *   pending:list<array{id:string,min_core:string}>,
+     *   errors:list<string>
+     * }
+     */
+    public function autoInstall(string $ip, bool $force = false): array
+    {
+        $result = ['ok' => false, 'installed' => [], 'pending' => [], 'errors' => []];
+        if ($this->license->licenseKey() === '') {
+            return $result + ['reason' => 'offline'];
+        }
+        $last = (int) $this->settings->get(self::SET_AUTO_CHECK_AT, '0');
+        if (!$force && $last > 0 && (time() - $last) < self::AUTO_CHECK_TTL) {
+            return ['ok' => true, 'reason' => 'cached', 'installed' => [], 'pending' => $this->pendingFromSettings(), 'errors' => []];
+        }
+        $this->settings->set(self::SET_AUTO_CHECK_AT, (string) time());
+
+        $manifestResult = $this->license->fetchManifest($ip);
+        if (empty($manifestResult['ok']) || !is_array($manifestResult['manifest'] ?? null)) {
+            return $result + [
+                'reason' => 'catalogue',
+                'errors' => [(string) ($manifestResult['error'] ?? __('addons.error_online'))],
+            ];
+        }
+        $manifest = $manifestResult['manifest'];
+        $core = function_exists('app_version') ? app_version() : '';
+        $installed = [];
+        foreach ($this->db->fetchAll('SELECT id, version FROM addons') as $row) {
+            $installed[(string) $row['id']] = (string) $row['version'];
+        }
+
+        $installedNow = [];
+        $pending = [];
+        $errors = [];
+        foreach (is_array($manifest['addons'] ?? null) ? $manifest['addons'] : [] as $id => $meta) {
+            $id = (string) $id;
+            if (preg_match('/^[a-z0-9][a-z0-9_.-]{2,80}$/', $id) !== 1
+                || !is_array($meta)
+                || empty($this->license->statusFor($id)['licensed'])) {
+                continue;
+            }
+            $current = $installed[$id] ?? '';
+            $target = null;
+            $blockedMin = '';
+            foreach (is_array($meta['versions'] ?? null) ? $meta['versions'] : [] as $candidate) {
+                if (!is_array($candidate)) {
+                    continue;
+                }
+                $version = trim((string) ($candidate['version'] ?? ''));
+                $minCore = trim((string) ($candidate['min_core'] ?? ''));
+                if ($version === '' || preg_match('/^\d+\.\d+\.\d+/', $version) !== 1) {
+                    continue;
+                }
+                if ($minCore !== '' && $core !== '' && version_compare($minCore, $core, '>')) {
+                    if ($blockedMin === '' || version_compare($minCore, $blockedMin, '<')) {
+                        $blockedMin = $minCore;
+                    }
+                    continue;
+                }
+                if ($target === null || version_compare($version, (string) $target['version'], '>')) {
+                    $target = $candidate;
+                }
+            }
+            if ($target === null) {
+                if ($current === '' && $blockedMin !== '') {
+                    $pending[] = ['id' => $id, 'min_core' => $blockedMin];
+                }
+                continue;
+            }
+            $targetVersion = (string) $target['version'];
+            if ($current !== '' && version_compare($targetVersion, $current, '<=')) {
+                continue;
+            }
+            $install = $this->installFromLicence($id, $targetVersion, $ip);
+            if (empty($install['ok'])) {
+                $errors[] = $id . ': ' . (string) ($install['error'] ?? __('addons.error_generic'));
+                continue;
+            }
+            $newVersion = (string) ($install['version'] ?? $targetVersion);
+            $installedNow[] = ['id' => $id, 'from' => $current, 'to' => $newVersion];
+            $this->audit->log('addon.auto_installed', 'addon', $id, null, [
+                'from' => $current,
+                'to' => $newVersion,
+            ], $ip);
+        }
+        $this->settings->set(self::SET_PENDING, json_encode($pending, JSON_UNESCAPED_UNICODE) ?: '[]');
+
+        return [
+            'ok' => true,
+            'installed' => $installedNow,
+            'pending' => $pending,
+            'errors' => $errors,
+        ];
+    }
+
+    /** @return list<array{id:string,min_core:string}> */
+    private function pendingFromSettings(): array
+    {
+        $raw = trim((string) $this->settings->get(self::SET_PENDING, '[]'));
+        $decoded = $raw !== '' ? json_decode($raw, true) : null;
+
+        return is_array($decoded) ? array_values(array_filter($decoded, 'is_array')) : [];
     }
 
     /**

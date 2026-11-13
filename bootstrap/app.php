@@ -220,7 +220,8 @@ $app->bind(AddonManager::class, fn (App $a) => new AddonManager(
     $a->get(LicenseService::class),
     $a->get(AddonPackage::class),
     $a->get(Migrator::class),
-    $a->get(AuditService::class)
+    $a->get(AuditService::class),
+    $a->get(SettingsService::class)
 ));
 $app->bind(AuthService::class, fn (App $a) => new AuthService(
     $a->get(Database::class),

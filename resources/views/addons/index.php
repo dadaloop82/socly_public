@@ -1,5 +1,6 @@
 <?php
 /** @var list<array<string,mixed>> $installed */
+/** @var array<string,mixed> $auto */
 /** @var \Socly\Core\Addon\Entitlement|null $entitlement */
 /** @var array<string,mixed> $entitlement_payload */
 /** @var bool $license_key_present */
@@ -34,6 +35,15 @@ $blockedCatalogue = array_values(array_filter(
     $catalogueRows,
     static fn (array $row): bool => empty($row['compatible'])
 ));
+$auto = is_array($auto ?? null) ? $auto : [];
+$autoInstalled = is_array($auto['installed'] ?? null) ? $auto['installed'] : [];
+$pendingCore = is_array($auto['pending'] ?? null) ? $auto['pending'] : [];
+if ($pendingCore === [] && $blockedCatalogue !== []) {
+    $pendingCore = [[
+        'id' => (string) ($blockedCatalogue[0]['id'] ?? ''),
+        'min_core' => (string) ($blockedCatalogue[0]['min_core'] ?? ''),
+    ]];
+}
 ?>
 <div class="page-header">
     <div class="titles">
@@ -56,6 +66,14 @@ $blockedCatalogue = array_values(array_filter(
         <span class="alert-body"><?= e(__('addons.revoked_banner')) ?></span>
     </div>
 <?php endif; ?>
+<?php if ($autoInstalled !== []): ?>
+    <div class="alert alert-success">
+        <span class="alert-body"><?= e(__('addons.auto_installed', ['list' => implode(', ', array_map(
+            static fn (array $row): string => (string) ($row['id'] ?? '') . ' ' . (string) ($row['to'] ?? ''),
+            $autoInstalled
+        ))])) ?></span>
+    </div>
+<?php endif; ?>
 <?php if ($licenseId !== '' && $missingLicensed !== []): ?>
     <div class="alert alert-warn">
         <span class="alert-body">
@@ -64,9 +82,15 @@ $blockedCatalogue = array_values(array_filter(
                 'addons' => implode(', ', $missingLicensed),
                 'dir' => (string) $incoming_dir,
             ])) ?>
-            <?php if ($license_key_present && $blockedCatalogue !== []): ?>
+            <?php if ($license_key_present): ?>
+                <form method="post" action="<?= e(url('/settings/addons/auto-install')) ?>" style="margin-top:0.6rem">
+                    <?= csrf_field() ?>
+                    <button class="btn btn-sm" type="submit"><?= e(__('addons.auto_install_button')) ?></button>
+                </form>
+            <?php endif; ?>
+            <?php if ($pendingCore !== []): ?>
                 <br><?= e(__('addons.next_update_core', [
-                    'min' => (string) ($blockedCatalogue[0]['min_core'] ?? ''),
+                    'min' => (string) ($pendingCore[0]['min_core'] ?? ''),
                     'core' => $core_version,
                 ])) ?>
             <?php endif; ?>

@@ -25,6 +25,9 @@ final class AddonController extends BaseController
 
     public function index(Request $request): void
     {
+        // Keep licensed packages installed and updated: activation alone never leaves
+        // the add-on half-configured (at most one catalogue check per hour).
+        $auto = $this->addons->autoInstall($request->ip());
         $installed = $this->addons->installed();
         $requested = [];
         $rawRequest = trim((string) $request->input('request', ''));
@@ -39,20 +42,14 @@ final class AddonController extends BaseController
                 $requested[(string) $row['id']] = (string) $row['id'];
             }
         }
-        // An online licence carries the signed catalogue: fetch it once when it is
-        // missing so the “install from catalogue” rows appear right after activation.
-        if ($this->license->licenseKey() !== '' && $this->license->cachedManifest() === null) {
-            $lastTry = (int) ($_SESSION['addons_manifest_try'] ?? 0);
-            if (time() - $lastTry > 600) {
-                $_SESSION['addons_manifest_try'] = time();
-                $this->license->fetchManifest($request->ip());
-            }
-        }
+        // An online licence carries the signed catalogue: autoInstall() above already
+        // refreshed it, so the catalogue rows can be built without another network call.
         $entitlement = $this->license->entitlement();
 
         $this->render('addons/index', [
             'title' => __('addons.title'),
             'installed' => $installed,
+            'auto' => $auto,
             'entitlement' => $entitlement,
             'entitlement_payload' => $entitlement?->payload() ?? [],
             'license_key_present' => $this->license->licenseKey() !== '',
@@ -77,8 +74,40 @@ final class AddonController extends BaseController
         $result = $this->license->activateOnline($key, $request->ip());
         if (empty($result['ok'])) {
             $this->flash('errors', ['addons' => (string) ($result['error'] ?? __('addons.error_online'))]);
-        } else {
-            $this->flash('success', __('addons.activated', ['addons' => implode(', ', $result['addons'] ?? [])]));
+            redirect('/settings/addons');
+        }
+        // Paid = ready: download and enable the licensed packages straight away.
+        $auto = $this->addons->autoInstall($request->ip(), true);
+        $message = __('addons.activated', ['addons' => implode(', ', $result['addons'] ?? [])]);
+        if (!empty($auto['installed'])) {
+            $message .= ' · ' . __('addons.auto_installed', ['list' => $this->describeInstalled($auto['installed'])]);
+        } elseif (!empty($auto['pending'])) {
+            $message .= ' · ' . $this->describePending($auto['pending']);
+        }
+        $this->flash('success', $message);
+        if (!empty($auto['errors'])) {
+            $this->flash('errors', ['addons' => implode(' · ', array_map('strval', $auto['errors']))]);
+        }
+        redirect('/settings/addons');
+    }
+
+    /** Manual “Installa ora”: force the catalogue check and the package installs. */
+    public function autoInstallAction(Request $request): void
+    {
+        $result = $this->addons->autoInstall($request->ip(), true);
+        if (!empty($result['installed'])) {
+            $this->flash('success', __('addons.auto_installed', ['list' => $this->describeInstalled($result['installed'])]));
+        }
+        if (!empty($result['pending'])) {
+            $this->flash('errors', ['addons' => $this->describePending($result['pending'])]);
+        }
+        if (!empty($result['errors'])) {
+            $this->flash('errors', ['addons' => implode(' · ', array_map('strval', $result['errors']))]);
+        }
+        if (empty($result['installed']) && empty($result['pending']) && empty($result['errors'])) {
+            $this->flash('success', ($result['reason'] ?? '') === 'offline'
+                ? __('addons.error_offline_only')
+                : __('addons.auto_none'));
         }
         redirect('/settings/addons');
     }
@@ -169,6 +198,28 @@ final class AddonController extends BaseController
         $result = $this->addons->remove($id, $request->ip());
         $this->flashResult($result, __('addons.removed', ['addon' => $id]));
         redirect('/settings/addons');
+    }
+
+    /** @param list<array{id:string,from:string,to:string}> $rows */
+    private function describeInstalled(array $rows): string
+    {
+        $parts = [];
+        foreach ($rows as $row) {
+            $parts[] = $row['id'] . ' ' . $row['to'];
+        }
+
+        return implode(', ', $parts);
+    }
+
+    /** @param list<array{id:string,min_core:string}> $rows */
+    private function describePending(array $rows): string
+    {
+        $parts = [];
+        foreach ($rows as $row) {
+            $parts[] = $row['id'] . ' (core ≥ ' . $row['min_core'] . ')';
+        }
+
+        return __('addons.auto_pending', ['list' => implode(', ', $parts)]);
     }
 
     /** @param array{ok:bool,error?:string,id?:string,version?:string,replaced?:bool} $result */
