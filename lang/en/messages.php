@@ -2290,6 +2290,8 @@ return [
         'updates_badge_title' => 'Updates available: :list',
         'updates_available_title' => 'Add-on updates available',
         'updates_available_lede' => 'These add-ons have a newer version: press “Update” in the row, or let the nightly cron (php bin/addons-update.php) do it.',
+        'checking' => 'Checking for updates…',
+        'installing' => 'Installing…',
         'available_refresh' => 'Check for updates',
         'available_install_all' => 'Install all',
         'available_offline_hint' => 'Offline licence: add-ons arrive as signed packages. Use “Advanced options” to upload them.',

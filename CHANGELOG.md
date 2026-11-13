@@ -4,7 +4,7 @@ All notable changes to the public Socly base product are documented in this file
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and versions follow the automatic `1.<series>.<patch>` scheme: every commit on `main` bumps the patch,
-every 100 patches bump the series, and each bump is published to this repository by the release sync.
+every 100 patches bump the series, and each bump is published to this rep come ository by the release sync.
 
 ## [Unreleased]
 
@@ -27,6 +27,9 @@ every 100 patches bump the series, and each bump is published to this repository
   version range) and links to the Add-ons page. Opening a page no longer replaces an installed add-on
   silently: updates stay visible with the “Aggiorna” button, while “Installa tutto” and the nightly
   `bin/addons-update.php` apply them; missing licensed add-ons still install automatically.
+- “Controlla aggiornamenti” and “Installa tutto” on the Add-ons page now work in place: the page does not
+  reload, the outcome appears right under the buttons and the lists and the sidebar badge refresh from the
+  same response.
 
 - The treasury tab of the dashboard now carries five more charts on top of the three existing ones:
   income and expense **month by month** over the last 12 months, the **running balance** at the end

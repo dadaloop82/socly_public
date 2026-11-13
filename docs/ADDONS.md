@@ -207,7 +207,9 @@ Settings → Add-ons (`/settings/addons`, permission `addons.manage`):
   are installed automatically. New versions are **not applied silently**: the sidebar shows
   “Aggiornamenti add-on: N” with the name and version range, and the Add-ons page lists them with the
   “Aggiorna” button; “Installa tutto” and the nightly cron `php bin/addons-update.php` apply them. The
-  manifest is cached and the package is downloaded server-side, hash-checked and signature-checked
+  two buttons on the page post in the background and refresh the lists in place (the outcome appears
+  under the buttons, the page does not reload); without JavaScript they fall back to a flash message.
+  The manifest is cached and the package is downloaded server-side, hash-checked and signature-checked
   before installation.
 - **Offline installations** — everything technical lives under “Opzioni avanzate”: offline activation
   (`.soclylic` code, no network call, no data sent), request code (`SOCLY-REQ1…` to send to the vendor),

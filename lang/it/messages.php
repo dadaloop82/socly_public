@@ -3238,6 +3238,8 @@ return [
         'updates_badge_title' => 'Aggiornamenti disponibili: :list',
         'updates_available_title' => 'Aggiornamenti add-on disponibili',
         'updates_available_lede' => 'Questi add-on hanno una versione più recente: premi «Aggiorna» nella riga, oppure lascia fare al cron notturno (php bin/addons-update.php).',
+        'checking' => 'Controllo aggiornamenti…',
+        'installing' => 'Installazione in corso…',
         'available_refresh' => 'Controlla aggiornamenti',
         'available_install_all' => 'Installa tutto',
         'available_offline_hint' => 'Licenza offline: gli add-on arrivano come pacchetto firmato. Usa «Opzioni avanzate» per caricarli.',

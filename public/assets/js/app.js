@@ -201,6 +201,7 @@ document.addEventListener('DOMContentLoaded', () => {
   initMobileNav();
   initTopbarScroll();
   initFlashDismiss();
+  initAddonPanels();
   initSidebarUpdate();
   initOrgHideVacant();
   initSidebarDeadlines();
@@ -11716,6 +11717,77 @@ function initFlashDismiss() {
     const ms = Number.parseInt(String(alertEl.getAttribute('data-auto-dismiss-ms') || ''), 10);
     if (Number.isFinite(ms) && ms > 0) {
       window.setTimeout(() => dismissFlashAlert(alertEl), ms);
+    }
+  });
+}
+
+/**
+ * Add-ons page: “Controlla aggiornamenti” and “Installa tutto” post through fetch and the
+ * server answers JSON with the re-rendered panels. The page never reloads; the outcome is
+ * written under the buttons and the sidebar badge is refreshed.
+ */
+function initAddonPanels() {
+  const statusElement = () => document.querySelector('[data-addons-status]');
+  const setStatus = (text, level) => {
+    const element = statusElement();
+    if (!element) return;
+    element.textContent = text;
+    element.hidden = text === '';
+    element.classList.remove('is-ok', 'is-err', 'is-busy');
+    if (text !== '') {
+      element.classList.add(level === 'error' ? 'is-err' : level === 'busy' ? 'is-busy' : 'is-ok');
+    }
+  };
+  const syncBadge = (updates) => {
+    const link = document.querySelector('[data-addons-badge]');
+    if (!link) return;
+    const count = Number(updates && updates.count ? updates.count : 0);
+    if (count <= 0) {
+      link.hidden = true;
+      return;
+    }
+    link.hidden = false;
+    const template = link.getAttribute('data-addons-badge') || '';
+    const pill = link.querySelector('.sidebar-update-pill');
+    if (pill) pill.textContent = template.replace(':count', String(count));
+    const list = link.querySelector('.sidebar-update-list');
+    const items = updates && Array.isArray(updates.items) ? updates.items : [];
+    if (list) {
+      list.textContent = items
+        .map((item) => `${item.name || item.id} ${item.from} → ${item.to}`)
+        .join(' · ');
+    }
+  };
+
+  document.addEventListener('submit', async (event) => {
+    const form = event.target;
+    if (!(form instanceof HTMLFormElement) || !form.matches('[data-addons-json]')) return;
+    event.preventDefault();
+    const button = form.querySelector('button[type="submit"]');
+    if (button) button.disabled = true;
+    setStatus(String(form.dataset.busy || ''), 'busy');
+    try {
+      const response = await fetch(form.action, {
+        method: 'POST',
+        body: new FormData(form),
+        headers: { 'X-Requested-With': 'XMLHttpRequest', Accept: 'application/json' },
+        credentials: 'same-origin',
+      });
+      const data = await response.json().catch(() => null);
+      if (!response.ok || !data) {
+        setStatus(String(form.dataset.error || ''), 'error');
+        return;
+      }
+      const container = document.querySelector('[data-addons-panels]');
+      if (container && typeof data.html === 'string') {
+        container.innerHTML = data.html;
+      }
+      setStatus(String(data.message || ''), String(data.level || 'ok'));
+      syncBadge(data.updates);
+    } catch (error) {
+      setStatus(String(form.dataset.error || ''), 'error');
+    } finally {
+      if (button) button.disabled = false;
     }
   });
 }

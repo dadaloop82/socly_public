@@ -770,6 +770,24 @@ a.sidebar-brand-home:hover {
   opacity: 0.85;
   word-break: break-word;
 }
+.addons-status {
+  margin: 0 0 0.9rem;
+  font-size: 0.9rem;
+  font-weight: 600;
+  line-height: 1.4;
+}
+.addons-status[hidden] {
+  display: none;
+}
+.addons-status.is-ok {
+  color: #1a7f37;
+}
+.addons-status.is-err {
+  color: #b3261e;
+}
+.addons-status.is-busy {
+  color: var(--muted);
+}
 .sidebar-update[hidden] {
   display: none !important;
 }

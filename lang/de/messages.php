@@ -2290,6 +2290,8 @@ return [
         'updates_badge_title' => 'Verfügbare Updates: :list',
         'updates_available_title' => 'Verfügbare Add-on-Updates',
         'updates_available_lede' => 'Für diese Add-ons gibt es eine neuere Version: «Aktualisieren» in der Zeile drücken oder den nächtlichen Cron (php bin/addons-update.php) machen lassen.',
+        'checking' => 'Updates werden geprüft…',
+        'installing' => 'Installation läuft…',
         'available_refresh' => 'Nach Updates suchen',
         'available_install_all' => 'Alle installieren',
         'available_offline_hint' => 'Offline-Lizenz: Add-ons kommen als signiertes Paket. Über «Erweiterte Optionen» hochladen.',

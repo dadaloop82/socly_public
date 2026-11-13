@@ -327,6 +327,7 @@ if ($user && app()->isInstalled() && !$temporaryInstance && can('addons.manage')
                 <a
                     class="sidebar-update sidebar-update--link"
                     href="<?= e(url('/settings/addons')) ?>"
+                    data-addons-badge="<?= e(__('addons.updates_badge', ['count' => ':count'])) ?>"
                     title="<?= e(__('addons.updates_badge_title', ['list' => implode(', ', $addonUpdateLabels)])) ?>"
                 >
                     <span class="sidebar-update-summary">

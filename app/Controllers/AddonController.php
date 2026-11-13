@@ -95,21 +95,8 @@ final class AddonController extends BaseController
     public function autoInstallAction(Request $request): void
     {
         $result = $this->addons->autoInstall($request->ip(), true, true);
-        if (!empty($result['installed'])) {
-            $this->flash('success', __('addons.auto_installed', ['list' => $this->describeInstalled($result['installed'])]));
-        }
-        if (!empty($result['pending'])) {
-            $this->flash('errors', ['addons' => $this->describePending($result['pending'])]);
-        }
-        if (!empty($result['errors'])) {
-            $this->flash('errors', ['addons' => implode(' · ', array_map('strval', $result['errors']))]);
-        }
-        if (empty($result['installed']) && empty($result['pending']) && empty($result['errors'])) {
-            $this->flash('success', ($result['reason'] ?? '') === 'offline'
-                ? __('addons.error_offline_only')
-                : __('addons.auto_none'));
-        }
-        redirect('/settings/addons');
+        [$level, $message] = $this->autoInstallOutcome($result);
+        $this->answerAddonTool($request, $level, $message);
     }
 
     public function import(Request $request): void
@@ -158,25 +145,102 @@ final class AddonController extends BaseController
     public function check(Request $request): void
     {
         $result = $this->addons->checkUpdates($request->ip());
-        if (empty($result['ok'])) {
-            $this->flash('errors', ['addons' => (string) ($result['error'] ?? __('addons.error_online'))]);
-            redirect('/settings/addons');
+        [$level, $message] = $this->checkOutcome($result);
+        $this->answerAddonTool($request, $level, $message);
+    }
+
+    /**
+     * AJAX call from the Add-ons page: answer JSON with the freshly rendered panels, so
+     * the page updates in place instead of reloading with the message at the top. Without
+     * JavaScript the same form posts normally and falls back to a flash + redirect.
+     */
+    private function answerAddonTool(Request $request, string $level, string $message): void
+    {
+        if ($this->wantsJson($request)) {
+            $this->jsonResponse([
+                'ok' => $level !== 'error',
+                'level' => $level,
+                'message' => $message,
+                'updates' => $this->addons->updatesSummary(),
+                'html' => $this->dynamicPanelsHtml(),
+            ]);
+
+            return;
         }
-        $updated = is_array($result['updated'] ?? null) ? $result['updated'] : [];
-        $errors = is_array($result['errors'] ?? null) ? $result['errors'] : [];
-        if ($errors !== []) {
-            $this->flash('errors', ['addons' => implode(' · ', $errors)]);
-        }
-        if ($updated === []) {
-            $this->flash('success', __('addons.updates_none'));
+        if ($level === 'error') {
+            $this->flash('errors', ['addons' => $message]);
         } else {
-            $parts = [];
-            foreach ($updated as $row) {
-                $parts[] = $row['id'] . ' ' . $row['from'] . ' → ' . $row['to'];
-            }
-            $this->flash('success', __('addons.updated', ['list' => implode(', ', $parts)]));
+            $this->flash('success', $message);
         }
         redirect('/settings/addons');
+    }
+
+    private function wantsJson(Request $request): bool
+    {
+        $requested = strtolower(trim((string) $request->header('X-Requested-With', '')));
+        $accept = strtolower((string) $request->header('Accept', ''));
+
+        return $requested === 'xmlhttprequest' || str_contains($accept, 'application/json');
+    }
+
+    /** @param array<string,mixed> $result @return array{0:string,1:string} */
+    private function checkOutcome(array $result): array
+    {
+        if (empty($result['ok'])) {
+            return ['error', (string) ($result['error'] ?? __('addons.error_online'))];
+        }
+        $errors = is_array($result['errors'] ?? null) ? $result['errors'] : [];
+        if ($errors !== []) {
+            return ['error', implode(' · ', array_map('strval', $errors))];
+        }
+        $updated = is_array($result['updated'] ?? null) ? $result['updated'] : [];
+        if ($updated === []) {
+            return ['ok', (string) __('addons.updates_none')];
+        }
+        $parts = [];
+        foreach ($updated as $row) {
+            $parts[] = (string) ($row['id'] ?? '') . ' ' . (string) ($row['from'] ?? '') . ' → ' . (string) ($row['to'] ?? '');
+        }
+
+        return ['ok', (string) __('addons.updated', ['list' => implode(', ', $parts)])];
+    }
+
+    /** @param array<string,mixed> $result @return array{0:string,1:string} */
+    private function autoInstallOutcome(array $result): array
+    {
+        $parts = [];
+        $level = 'ok';
+        if (!empty($result['installed'])) {
+            $parts[] = (string) __('addons.auto_installed', ['list' => $this->describeInstalled($result['installed'])]);
+        }
+        if (!empty($result['pending'])) {
+            $parts[] = $this->describePending($result['pending']);
+        }
+        if (!empty($result['errors'])) {
+            $level = 'error';
+            $parts[] = implode(' · ', array_map('strval', $result['errors']));
+        }
+        if ($parts === []) {
+            $parts[] = (string) (($result['reason'] ?? '') === 'offline'
+                ? __('addons.error_offline_only')
+                : __('addons.auto_none'));
+        }
+
+        return [$level, implode(' ', $parts)];
+    }
+
+    private function dynamicPanelsHtml(): string
+    {
+        $entitlement = $this->license->entitlement();
+
+        return (string) view_partial('addons/dynamic', [
+            'available' => $this->addons->availableAddons(),
+            'updates' => $this->addons->updatesSummary(),
+            'installed' => $this->addons->installed(),
+            'core_version' => app_version(),
+            'license_key_present' => $this->license->licenseKey() !== '',
+            'licensedAddons' => $entitlement?->addonIds() ?? [],
+        ]);
     }
 
     public function enable(Request $request, string $id): void
