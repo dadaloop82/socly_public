@@ -5730,6 +5730,21 @@ body.legal-doc-expanded::before {
   margin: 0;
   font-size: 0.86rem;
 }
+/* Checkbox/radio inside a standard field keep their native size: the generic
+   `.sf-field__control` width:100% is meant for text inputs and would make the
+   control take the whole row, squeezing the label to one character per line. */
+.sf-field .checkbox-row > input[type="checkbox"],
+.sf-field .checkbox-row > input[type="radio"] {
+  width: 1.05rem;
+  height: 1.05rem;
+  min-width: 1.05rem;
+  flex: 0 0 auto;
+  margin: 0.15rem 0 0;
+}
+.sf-field .checkbox-row > span {
+  flex: 1 1 auto;
+  min-width: 0;
+}
 .sf-field--checkbox,
 .sf-field--radio {
   gap: 0.35rem;
