@@ -35,6 +35,10 @@ every 100 patches bump the series, and each bump is published to this repository
   reports read consistently.
 - Charts drop their legend as soon as it has more than three entries: a wall of colours over the plot
   is unreadable and the tooltip already names every series.
+- Paid add-ons: one-off perpetual licences bound to a single installation, offline activation codes that
+  work without internet, signed multi-file `.soclyaddon` packages, online and offline updates, and a
+  socly.it admin area to register add-ons, upload signed packages and issue/revoke licences. Paid code
+  never enters the public repository; only the verifier and the public keys are shipped with the core.
 
 - Budgets drill down to the first note: clicking a cost-centre line in “Forecast vs actuals”, a type in
   the “not imputed” table, a year row or a top category of the statistics tab opens the ledger

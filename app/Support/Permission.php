@@ -26,6 +26,7 @@ final class Permission
     public const DEADLINES_MANAGE = 'deadlines.manage';
     public const DOCUMENTS_VIEW = 'documents.view';
     public const DOCUMENTS_MANAGE = 'documents.manage';
+    public const ADDONS_MANAGE = 'addons.manage';
 
     /** @return array<string, string> key => description */
     public static function catalogue(): array
@@ -48,6 +49,7 @@ final class Permission
             self::DEADLINES_MANAGE => 'Manage deadlines',
             self::DOCUMENTS_VIEW => 'View documents archive',
             self::DOCUMENTS_MANAGE => 'Manage documents',
+            self::ADDONS_MANAGE => 'Install and manage paid add-ons',
         ];
     }
 
@@ -93,7 +95,7 @@ final class Permission
             [
                 'key' => 'admin',
                 'label_key' => 'permissions.group_admin',
-                'keys' => [self::SETTINGS_MANAGE, self::USERS_MANAGE, self::PLUGINS_MANAGE, self::AUDIT_VIEW],
+                'keys' => [self::SETTINGS_MANAGE, self::USERS_MANAGE, self::PLUGINS_MANAGE, self::AUDIT_VIEW, self::ADDONS_MANAGE],
             ],
         ];
     }

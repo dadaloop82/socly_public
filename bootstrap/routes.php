@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use Socly\Controllers\AddonController;
 use Socly\Controllers\AuditController;
 use Socly\Controllers\AuthController;
 use Socly\Controllers\BrandingController;
@@ -226,6 +227,16 @@ $router->post('/org/people/{id}/delete', [OrgController::class, 'destroy'], null
 
 // Activity log: who did what and when (read-only).
 $router->get('/audit', [AuditController::class, 'index'], 'audit.view', ['mw.locale', 'mw.install', 'mw.auth']);
+
+// Paid add-ons: licence, offline codes, signed packages and updates.
+$router->get('/settings/addons', [AddonController::class, 'index'], 'addons.manage', ['mw.locale', 'mw.install', 'mw.auth']);
+$router->post('/settings/addons/activate', [AddonController::class, 'activate'], 'addons.manage', ['mw.locale', 'mw.install', 'mw.auth', 'mw.csrf']);
+$router->post('/settings/addons/import', [AddonController::class, 'import'], 'addons.manage', ['mw.locale', 'mw.install', 'mw.auth', 'mw.csrf']);
+$router->post('/settings/addons/install', [AddonController::class, 'install'], 'addons.manage', ['mw.locale', 'mw.install', 'mw.auth', 'mw.csrf']);
+$router->post('/settings/addons/check', [AddonController::class, 'check'], 'addons.manage', ['mw.locale', 'mw.install', 'mw.auth', 'mw.csrf']);
+$router->post('/settings/addons/{id}/enable', [AddonController::class, 'enable'], 'addons.manage', ['mw.locale', 'mw.install', 'mw.auth', 'mw.csrf']);
+$router->post('/settings/addons/{id}/disable', [AddonController::class, 'disable'], 'addons.manage', ['mw.locale', 'mw.install', 'mw.auth', 'mw.csrf']);
+$router->post('/settings/addons/{id}/remove', [AddonController::class, 'remove'], 'addons.manage', ['mw.locale', 'mw.install', 'mw.auth', 'mw.csrf']);
 
 $router->get('/settings', [SettingsController::class, 'index'], 'settings.manage', ['mw.locale', 'mw.install', 'mw.auth']);
 $router->post('/settings/general', [SettingsController::class, 'saveGeneral'], 'settings.manage', ['mw.locale', 'mw.install', 'mw.auth', 'mw.csrf']);

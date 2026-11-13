@@ -44,6 +44,10 @@ Permission checks on routes and UI via stable keys in `Socly\Support\Permission`
 - Mutations write to `audit_logs` (actor, entity, before/after, IP).
 - The `/audit` screen (permission `audit.view`) is the read-only activity log: filters by actor, area and
   period, with expandable before/after payloads. It never writes audit rows.
+- Add-on packages are Ed25519-signed (`addon.json.sig` + per-file SHA-256) and extracted only under
+  `storage/addons/`; unsigned or modified files are refused. Licences (`SOCLY-ENT1…`) are verified locally
+  with the public key shipped in `bootstrap/addons_keys.php`; private keys never live in the repository or
+  the public export.
 - Application logger redacts passwords, tokens, fiscal codes; never dump full `$_POST` / `$_SESSION`.
 - Production errors (`APP_DEBUG=false`) show a generic page; details go to `storage/logs/app.log`.
 

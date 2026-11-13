@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Socly\Core\Plugin;
 
 use Socly\Core\App;
+use Socly\Core\Addon\AddonManager;
 use Socly\Core\Http\Router;
 
 final class HookBus
@@ -82,7 +83,35 @@ final class PluginManager
             }
             $this->discovered[$plugin->id()] = $plugin;
         }
+        foreach ($this->addonPluginFiles() as $file) {
+            try {
+                $plugin = require $file;
+            } catch (\Throwable) {
+                continue;
+            }
+            if ($plugin instanceof PluginInterface) {
+                $this->discovered[$plugin->id()] = $plugin;
+            }
+        }
         return $this->discovered;
+    }
+
+    /**
+     * Entry files of the paid add-ons that may boot (installed, enabled and licensed).
+     *
+     * @return list<string>
+     */
+    private function addonPluginFiles(): array
+    {
+        try {
+            if (!function_exists('app') || !app()->isInstalled()) {
+                return [];
+            }
+
+            return app(AddonManager::class)->pluginFiles();
+        } catch (\Throwable) {
+            return [];
+        }
     }
 
     public function find(string $id): ?PluginInterface

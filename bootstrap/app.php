@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use Dotenv\Dotenv;
+use Socly\Controllers\AddonController;
 use Socly\Controllers\AuditController;
 use Socly\Controllers\AuthController;
 use Socly\Controllers\BrandingController;
@@ -27,6 +28,9 @@ use Socly\Controllers\UpdateController;
 use Socly\Controllers\UserController;
 use Socly\Controllers\WidgetController;
 use Socly\Core\App;
+use Socly\Core\Addon\AddonManager;
+use Socly\Core\Addon\AddonPackage;
+use Socly\Core\Addon\LicenseService;
 use Socly\Core\Csrf;
 use Socly\Core\Database;
 use Socly\Core\Encryptor;
@@ -205,6 +209,19 @@ $app->bind(Encryptor::class, function (App $a) {
 $app->bind(Migrator::class, fn (App $a) => new Migrator($a->get(Database::class), $codePath . '/database/migrations'));
 $app->bind(SettingsService::class, fn (App $a) => new SettingsService($a->get(Database::class), $a->get(Encryptor::class)));
 $app->bind(AuditService::class, fn (App $a) => new AuditService($a->get(Database::class)));
+$app->bind(AddonPackage::class, fn (App $a) => new AddonPackage($basePath));
+$app->bind(LicenseService::class, fn (App $a) => new LicenseService(
+    $a->get(SettingsService::class),
+    $a->get(PlatformService::class),
+    $a->get(AuditService::class)
+));
+$app->bind(AddonManager::class, fn (App $a) => new AddonManager(
+    $a->get(Database::class),
+    $a->get(LicenseService::class),
+    $a->get(AddonPackage::class),
+    $a->get(Migrator::class),
+    $a->get(AuditService::class)
+));
 $app->bind(AuthService::class, fn (App $a) => new AuthService(
     $a->get(Database::class),
     $a->get(AuditService::class),
@@ -583,6 +600,11 @@ $app->bind(PluginController::class, fn (App $a) => new PluginController(
 $app->bind(AuditController::class, fn (App $a) => new AuditController(
     $a->get(View::class),
     $a->get(AuditService::class)
+));
+$app->bind(AddonController::class, fn (App $a) => new AddonController(
+    $a->get(View::class),
+    $a->get(AddonManager::class),
+    $a->get(LicenseService::class)
 ));
 
 if (function_exists('socly_register_fatal_error_page')) {

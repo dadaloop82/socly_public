@@ -167,6 +167,24 @@ account/description/notes to internal transfers and writes one `treasury.bulk_up
 movement (before/after), so the “modified by” trail and the freshness banner keep working. Row versions
 are bumped: a form left open elsewhere reopens on the conflict banner instead of overwriting.
 
+## Paid add-ons
+
+`app/Core/Addon` implements the licence layer (see `docs/ADDONS.md` for the full contract):
+
+- `Entitlement` verifies `SOCLY-ENT1.<payload>.<signature>` tokens with the public licence key embedded
+  in `bootstrap/addons_keys.php`; `LicenseService` stores the token (encrypted settings), activates
+  online through `POST /api/addons.php`, imports offline codes, refreshes the signed manifest and revokes
+  when socly.it reports it.
+- `AddonPackage` verifies `.soclyaddon` packages (Ed25519 signature over `addon.json`, per-file SHA-256,
+  extension/path allowlist, `min_core`, `php -l`) and extracts them atomically under
+  `storage/addons/<id>/<version>/`; older versions stay as rollback copies.
+- `AddonManager` tracks the installed versions in `addons`, reuses the `plugins` table for
+  enable/disable/migrations so add-ons keep the normal Plugin API (menus, routes, settings, hooks), and
+  downloads/installs signed updates from the manifest. `PluginManager::discover()` also loads the entry
+  files of installed, enabled and licensed add-ons.
+- Private tooling lives in `tools/addons/` (excluded from the public tree): key generation, package
+  builder/signer and licence signing. The paid code never enters `socly_public`.
+
 ## Concurrent editing (optimistic locking)
 Editable records carry `row_version`. Every form posts it in the hidden `row_version` field
 (`version_field()` / `version_attrs()` helpers + `partials/record_lock_notice.php`), and the service

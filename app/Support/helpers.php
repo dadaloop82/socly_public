@@ -569,6 +569,19 @@ if (!function_exists('socly_platform_api_url')) {
     }
 }
 
+if (!function_exists('socly_addons_api_url')) {
+    /** Base URL of the add-on licence/manifest API (socly.it by default). */
+    function socly_addons_api_url(): string
+    {
+        $override = trim((string) ($_ENV['SOCLY_ADDONS_API_URL'] ?? ''));
+        if ($override !== '') {
+            return $override;
+        }
+
+        return socly_site_api_url('/api/addons.php');
+    }
+}
+
 if (!function_exists('resolve_upload_absolute_path')) {
     /** Resolve a stored relative upload path to an absolute filesystem path. */
     function resolve_upload_absolute_path(string $relative): ?string

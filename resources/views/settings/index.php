@@ -3,9 +3,14 @@
         <h1 class="page-title"><?= e(__('settings.title')) ?></h1>
         <p class="page-lede"><?= e(__('settings.lede')) ?></p>
     </div>
-    <?php if (can('dashboard.view')): ?>
+    <?php if (can('dashboard.view') || can('addons.manage')): ?>
         <div class="actions">
-            <a class="btn btn-ghost" href="<?= e(url('/dashboard')) ?>"><?= e(__('nav.back_to_dashboard')) ?></a>
+            <?php if (can('addons.manage')): ?>
+                <a class="btn btn-ghost" href="<?= e(url('/settings/addons')) ?>"><?= e(__('addons.title')) ?></a>
+            <?php endif; ?>
+            <?php if (can('dashboard.view')): ?>
+                <a class="btn btn-ghost" href="<?= e(url('/dashboard')) ?>"><?= e(__('nav.back_to_dashboard')) ?></a>
+            <?php endif; ?>
         </div>
     <?php endif; ?>
 </div>
