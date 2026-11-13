@@ -2432,6 +2432,7 @@ return [
     ],
     'budget' => [
         'title' => 'Budget',
+        'model_d_button' => 'Model D (RUNTS)',
         'title_year' => 'Forecast :year',
         'lede' => 'Yearly forecast budget and live comparison with the cash actuals.',
         'preventivo_eyebrow' => 'Forecast budget',

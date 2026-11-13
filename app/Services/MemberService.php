@@ -843,6 +843,9 @@ final class MemberService
                 $payload['sort_order'] = $sortByKey[$key];
             }
             $this->db->update('member_field_definitions', $payload, 'id = :id', ['id' => (int) $field['id']]);
+            if ($type !== (string) ($field['field_type'] ?? '')) {
+                $this->convertFieldValues((int) $field['id'], (string) ($field['field_type'] ?? ''), $type);
+            }
         }
 
         if (!$createNew) {
@@ -898,6 +901,66 @@ final class MemberService
         ]);
 
         return ['ok' => true];
+    }
+
+    /**
+     * Convert the stored values of a field when its type changes (text → checkbox and
+     * back, text → date), so every member record — and the tablet sign-up that reads the
+     * same definitions — keeps a value the new type understands.
+     */
+    private function convertFieldValues(int $definitionId, string $from, string $to): void
+    {
+        try {
+            $from = MemberFieldTypes::resolve($from);
+            $to = MemberFieldTypes::resolve($to);
+            if ($from === $to) {
+                return;
+            }
+            $rows = $this->db->fetchAll(
+                'SELECT id, value FROM member_field_values WHERE field_definition_id = :d',
+                ['d' => $definitionId]
+            );
+            if ($rows === []) {
+                return;
+            }
+            $truthy = ['1', 'on', 'yes', 'true', 'si', 'sì', 'ja', 'x', 'ok'];
+            foreach ($rows as $row) {
+                $raw = trim((string) ($row['value'] ?? ''));
+                $new = $raw;
+                if ($to === MemberFieldTypes::CHECKBOX) {
+                    $new = in_array(mb_strtolower($raw), $truthy, true) ? '1' : '';
+                } elseif ($from === MemberFieldTypes::CHECKBOX) {
+                    // "1" stays "1": any text-like type can hold it, an unchecked box stays empty.
+                    $new = $raw;
+                } elseif ($to === MemberFieldTypes::DATE && $raw !== '') {
+                    $parsed = null;
+                    foreach (['d/m/Y', 'd-m-Y', 'd.m.Y', 'Y-m-d'] as $format) {
+                        $date = \DateTime::createFromFormat('!' . $format, $raw);
+                        if ($date instanceof \DateTime && $date->format($format) === $raw) {
+                            $parsed = $date->format('Y-m-d');
+                            break;
+                        }
+                    }
+                    if ($parsed !== null) {
+                        $new = $parsed;
+                    }
+                }
+                if ($new === $raw) {
+                    continue;
+                }
+                $this->db->update('member_field_values', ['value' => $new], 'id = :id', ['id' => (int) $row['id']]);
+            }
+        } catch (\Throwable $e) {
+            try {
+                app('logger')->warning('member.field_type_conversion_failed', [
+                    'definition' => $definitionId,
+                    'from' => $from,
+                    'to' => $to,
+                    'error' => $e->getMessage(),
+                ]);
+            } catch (\Throwable) {
+            }
+        }
     }
 
     /**

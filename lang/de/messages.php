@@ -2432,6 +2432,7 @@ return [
     ],
     'budget' => [
         'title' => 'Budget',
+        'model_d_button' => 'Modell D (RUNTS)',
         'title_year' => 'Voranschlag :year',
         'lede' => 'Voranschlag je Vereinsjahr und laufender Vergleich mit dem Ist-Stand der Kassa.',
         'preventivo_eyebrow' => 'Haushaltsvoranschlag',

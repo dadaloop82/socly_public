@@ -3380,6 +3380,7 @@ return [
     ],
     'budget' => [
         'title' => 'Bilancio',
+        'model_d_button' => 'Modello D (RUNTS)',
         'title_year' => 'Preventivo :year',
         'lede' => 'Preventivo per anno sociale e confronto in tempo reale con il consuntivo di prima cassa.',
         'preventivo_eyebrow' => 'Bilancio preventivo',

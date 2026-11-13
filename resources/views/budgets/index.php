@@ -33,6 +33,9 @@ $topIncome = is_array($statistics['categories']['income'] ?? null) ? $statistics
         <p class="page-lede"><?= e(__('budget.lede')) ?></p>
     </div>
     <div class="actions">
+        <a class="btn" href="<?= e(url('/rendiconto/' . max(2000, (int) ($default_year ?: (int) date('Y'))))) ?>">
+            <?= e(__('budget.model_d_button')) ?>
+        </a>
         <a class="btn btn-ghost" href="<?= e(url('/treasury')) ?>"><?= e(__('treasury.title')) ?></a>
     </div>
 </div>

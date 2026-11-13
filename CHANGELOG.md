@@ -27,6 +27,11 @@ every 100 patches bump the series, and each bump is published to this rep come o
   version range) and links to the Add-ons page. Opening a page no longer replaces an installed add-on
   silently: updates stay visible with the “Aggiorna” button, while “Installa tutto” and the nightly
   `bin/addons-update.php` apply them; missing licensed add-ons still install automatically.
+- Custom member fields can change **type** from Settings → Campi anagrafica where the key allows it (locked
+  core keys keep their type): a text field holding 1/0 can become a checkbox, stored values are converted
+  (1/sì/yes → checked, 0/no → empty, text dates → ISO dates) and the change applies to every member record
+  and to the tablet sign-up.
+- Bilanci has a “Modello D (RUNTS)” button that opens the cash report for the year.
 - “Controlla aggiornamenti” and “Installa tutto” on the Add-ons page now work in place: the page does not
   reload, the outcome appears right under the buttons and the lists and the sidebar badge refresh from the
   same response.

@@ -119,7 +119,27 @@ $renderFieldRow = static function (
                 'attrs' => ['data-field-step-input' => true],
             ]) ?>
         </td>
-        <th scope="row"><span class="setup-fields-name"><?= e($flabel) ?></span></th>
+        <th scope="row">
+            <span class="setup-fields-name"><?= e($flabel) ?></span>
+            <?php if ($setupMode && $allowTypeEdit && $lockedType === null): ?>
+                <?= field('select', [
+                    'name' => 'field_types[' . $fkey . ']',
+                    'label' => '',
+                    'context' => 'inline',
+                    'wrapper_class' => 'setup-fields-type',
+                    'include_empty' => false,
+                    'value' => $resolvedType,
+                    'options' => array_map(
+                        static fn (string $opt): array => [
+                            'value' => $opt,
+                            'label' => \Socly\Support\MemberFieldTypes::label($opt),
+                        ],
+                        $typeOptions
+                    ),
+                    'attrs' => ['aria-label' => __('setup.fields_col_type') . ': ' . $flabel],
+                ]) ?>
+            <?php endif; ?>
+        </th>
         <?php if (!$setupMode): ?>
         <td>
             <?php if (!$allowTypeEdit || $lockedType !== null): ?>
@@ -147,7 +167,9 @@ $renderFieldRow = static function (
             <?php endif; ?>
         </td>
         <?php else: ?>
-            <?= field('hidden', ['name' => 'field_types[' . $fkey . ']', 'value' => $lockedType ?? $resolvedType]) ?>
+            <?php if (!$allowTypeEdit || $lockedType !== null): ?>
+                <?= field('hidden', ['name' => 'field_types[' . $fkey . ']', 'value' => $lockedType ?? $resolvedType]) ?>
+            <?php endif; ?>
         <?php endif; ?>
         <td class="setup-fields-col-check">
             <?php if ($coreLocked): ?>

@@ -684,7 +684,7 @@
             'fields' => $fields,
             'formSteps' => $formSteps ?? [],
             'typeOptions' => \Socly\Support\MemberFieldTypes::keys(),
-            'allowTypeEdit' => false,
+            'allowTypeEdit' => true,
             'setupMode' => true,
             'autosaveUrl' => url('/settings/fields/autosave'),
         ]) ?>
