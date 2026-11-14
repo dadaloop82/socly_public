@@ -106,13 +106,8 @@ final class TreasuryController extends BaseController
     private function runRecurringDue(Request $request): void
     {
         try {
-            $marker = storage_path('cache/recurring_run.txt');
-            $last = is_file($marker) ? (int) filemtime($marker) : 0;
-            if ($last > 0 && (time() - $last) < 900) {
-                return;
-            }
-            @touch($marker);
-            $this->recurring->runDue($request->ip(), auth_user()['id'] ?? null);
+            $userId = auth_user()['id'] ?? null;
+            $this->recurring->runDueThrottled(900, $request->ip(), $userId !== null ? (int) $userId : null);
         } catch (\Throwable) {
             // a broken rule does not have to block the first note
         }
@@ -155,6 +150,21 @@ final class TreasuryController extends BaseController
             $this->clearOld();
         }
         $returnPath = $this->listReturnPath($request);
+        // The loan/deposit registers open the form already on their category (and on the right
+        // direction: money received vs money paid back).
+        $categories = $this->treasury->categoryOptions();
+        $requestedCategory = trim((string) $request->input('category', ''));
+        $defaultCategory = $this->treasury->defaultCategory();
+        foreach ($categories as $categoryOption) {
+            if ((string) ($categoryOption['key'] ?? '') === $requestedCategory) {
+                $defaultCategory = $requestedCategory;
+                break;
+            }
+        }
+        $requestedDirection = (string) $request->input('direction', '');
+        $defaultDirection = in_array($requestedDirection, ['income', 'expense', 'transfer'], true)
+            ? $requestedDirection
+            : 'income';
         $this->render('treasury/form', [
             'title' => __('treasury.add_movement'),
             'isEdit' => false,
@@ -162,8 +172,9 @@ final class TreasuryController extends BaseController
             'return_url' => url($returnPath),
             'return_path' => $returnPath,
             'movement' => null,
-            'default_category' => $this->treasury->defaultCategory(),
-            'categories' => $this->treasury->categoryOptions(),
+            'default_category' => $defaultCategory,
+            'default_direction' => $defaultDirection,
+            'categories' => $categories,
             'category_groups' => $this->treasury->categoryGroups(),
             'accounts' => $this->treasury->accountOptions(),
             'account_balances' => $this->treasury->accountBalances(),
@@ -234,6 +245,8 @@ final class TreasuryController extends BaseController
             'movement' => $movement,
             'movement_version' => $conflictActive ? $conflictVersion : (int) ($movement['row_version'] ?? 0),
             'movement_conflict' => $conflict,
+            // “Just created/modified by …” (last 15 minutes): the form refreshes it by polling.
+            'movement_activity' => $this->versions->recentActivity('treasury', (int) $movement['id'], 15),
             'adjacent' => $adjacent,
             // “Similar movements” proposal (after an update that changed the classification): it is
             // rendered above the form so the operator can stay on the card.
@@ -664,6 +677,17 @@ final class TreasuryController extends BaseController
             redirect('/treasury');
         } elseif ($action === 'unapprove') {
             $count = $this->treasury->setApprovalMany(array_values($ids), false, $request->ip(), auth_user()['id'] ?? null);
+            if ($count === 0) {
+                // Only cash rows were selected: the cash desk never needs the first-note approval.
+                $message = (string) __('treasury.bulk_unapproved_cash');
+                if ($isAjax) {
+                    header('Content-Type: application/json; charset=utf-8');
+                    echo json_encode(['ok' => true, 'action' => 'unapprove', 'count' => 0, 'message' => $message], JSON_UNESCAPED_UNICODE);
+                    return;
+                }
+                $this->flash('success', $message);
+                redirect('/treasury');
+            }
         } elseif ($action === 'approve') {
             $count = $this->treasury->approveMany(array_values($ids), $request->ip(), auth_user()['id'] ?? null);
         } elseif ($action === 'delete') {
@@ -681,6 +705,11 @@ final class TreasuryController extends BaseController
                 'description_action' => (string) $request->input('description_action', ''),
                 'notes' => (string) $request->input('notes', ''),
                 'notes_action' => (string) $request->input('notes_action', ''),
+                // Counterparty: a linked member (`__none__` unlinks) or a free-text supplier; the
+                // two exclude each other, exactly like in the movement form.
+                'member_id' => (string) $request->input('member_id', ''),
+                'beneficiary' => (string) $request->input('beneficiary', ''),
+                'beneficiary_action' => (string) $request->input('beneficiary_action', ''),
             ], $request->ip());
             $count = (int) ($result['count'] ?? 0);
             $skipped = (int) ($result['skipped'] ?? 0);
@@ -815,6 +844,73 @@ final class TreasuryController extends BaseController
         return $count;
     }
 
+    /**
+     * “Gestione fornitori”: every supplier of the register with its income/expense shares and a
+     * link to the ledger filtered on that supplier.
+     */
+    public function suppliers(Request $request): void
+    {
+        require_component('treasury');
+        $query = trim((string) $request->input('q', ''));
+        if (mb_strlen($query) > 120) {
+            $query = mb_substr($query, 0, 120);
+        }
+        $sort = (string) $request->input('sort', 'volume');
+        if (!in_array($sort, ['volume', 'name'], true)) {
+            $sort = 'volume';
+        }
+        $overview = $this->treasury->supplierOverview($query, $sort);
+        $this->render('treasury/suppliers', [
+            'title' => __('treasury.suppliers_title'),
+            'suppliers' => $overview['rows'],
+            'supplier_totals' => $overview['totals'],
+            'search_query' => $query,
+            'sort' => $sort,
+            'currency' => $this->currency,
+        ]);
+    }
+
+    public function loans(Request $request): void
+    {
+        $this->renderPositions($request, 'loan');
+    }
+
+    public function deposits(Request $request): void
+    {
+        $this->renderPositions($request, 'deposit');
+    }
+
+    /**
+     * Loan and security-deposit registers share one view: same shape as the supplier page, with
+     * the two flows of the category and the amount still open for each counterparty.
+     */
+    private function renderPositions(Request $request, string $kind): void
+    {
+        require_component('treasury');
+        $query = trim((string) $request->input('q', ''));
+        if (mb_strlen($query) > 120) {
+            $query = mb_substr($query, 0, 120);
+        }
+        $sort = (string) $request->input('sort', 'volume');
+        if (!in_array($sort, ['volume', 'name'], true)) {
+            $sort = 'volume';
+        }
+        $isLoan = $kind === 'loan';
+        $overview = $isLoan
+            ? $this->treasury->loanOverview($query, $sort)
+            : $this->treasury->depositOverview($query, $sort);
+        $this->render('treasury/positions', [
+            'title' => $isLoan ? __('treasury.loans_title') : __('treasury.deposits_title'),
+            'kind' => $isLoan ? 'loan' : 'deposit',
+            'category' => $isLoan ? 'member_loan' : 'security_deposit',
+            'positions' => $overview['rows'],
+            'position_totals' => $overview['totals'],
+            'search_query' => $query,
+            'sort' => $sort,
+            'currency' => $this->currency,
+        ]);
+    }
+
 
     /**
      * Proposal “also apply to similar movements” calculated server-side for a movement.
@@ -856,7 +952,7 @@ final class TreasuryController extends BaseController
             'direction' => (string) ($movement['direction'] ?? ''),
             'description' => (string) ($movement['description'] ?? ''),
             'beneficiary' => (string) ($movement['beneficiary'] ?? ''),
-        ], 3, $movementId, $fields, $originals);
+        ], TreasuryService::SIMILAR_LIST_LIMIT, $movementId, $fields, $originals);
         if (($result['total'] ?? 0) < 1) {
             return null;
         }
@@ -867,6 +963,11 @@ final class TreasuryController extends BaseController
             'matches' => $result['matches'],
             'total' => (int) $result['total'],
             'skipped' => (int) ($result['skipped'] ?? 0),
+            'fields' => $result['fields'] ?? $fields,
+            'amount_total_formatted' => (string) ($result['amount_total_formatted'] ?? ''),
+            'date_from_formatted' => (string) ($result['date_from_formatted'] ?? ''),
+            'date_to_formatted' => (string) ($result['date_to_formatted'] ?? ''),
+            'originals' => $originals,
             'changes' => $this->describeClassification([
                 'category' => $values['category'],
                 'runts_line' => $values['runts_line'],
@@ -953,6 +1054,11 @@ final class TreasuryController extends BaseController
             $approval = '';
         }
         $anomaly = (string) $request->input('anomaly', '') === '1' ? '1' : '';
+        // Supplier drill-down from “Gestione fornitori”: exact name, case/space insensitive.
+        $beneficiary = trim((string) preg_replace('/\s+/u', ' ', (string) $request->input('beneficiary', '')));
+        if (mb_strlen($beneficiary) > 190) {
+            $beneficiary = mb_substr($beneficiary, 0, 190);
+        }
         $from = $this->isoDate((string) $request->input('from', ''));
         $to = $this->isoDate((string) $request->input('to', ''));
         $month = (int) $request->input('month', 0);
@@ -987,6 +1093,7 @@ final class TreasuryController extends BaseController
             'year' => $year > 0 ? (string) $year : '',
             'approval' => $approval,
             'anomaly' => $anomaly,
+            'beneficiary' => $beneficiary,
         ];
         if ($anomaly === '1') {
             $filters['pattern_ids'] = $this->treasury->classificationAnomalyIds();
@@ -1035,7 +1142,7 @@ final class TreasuryController extends BaseController
             parse_str($query, $parsed);
         }
         $clean = [];
-        foreach (['q', 'period', 'direction', 'category', 'account', 'approval', 'anomaly', 'month', 'year', 'sort', 'group', 'page', 'runts_line', 'budget_item_id'] as $key) {
+        foreach (['q', 'period', 'direction', 'category', 'account', 'approval', 'anomaly', 'month', 'year', 'sort', 'group', 'page', 'runts_line', 'budget_item_id', 'beneficiary'] as $key) {
             $value = $parsed[$key] ?? null;
             if (!is_scalar($value)) {
                 continue;
@@ -1066,6 +1173,11 @@ final class TreasuryController extends BaseController
 
     private function listReturnPath(Request $request): string
     {
+        // A movement corrected from the member card comes back to that card, not to the ledger.
+        $raw = trim((string) $request->input('ret', ''));
+        if (preg_match('#^/members/[0-9]+$#', $raw) === 1) {
+            return $raw;
+        }
         $clean = $this->listReturnQuery($request);
 
         return '/treasury' . ($clean === [] ? '' : '?' . http_build_query($clean));

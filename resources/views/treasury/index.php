@@ -27,6 +27,7 @@ $filterBudget = (string) ($filters['budget_item_id'] ?? '');
 $filterRunts = (string) ($filters['runts_line'] ?? '');
 $filterApproval = (string) ($filters['approval'] ?? '');
 $filterAnomaly = (string) ($filters['anomaly'] ?? '');
+$filterBeneficiary = (string) ($filters['beneficiary'] ?? '');
 $hasActiveFilters = trim((string) ($search_query ?? '')) !== ''
     || $filterPeriod !== ''
     || $filterDirection !== ''
@@ -37,7 +38,8 @@ $hasActiveFilters = trim((string) ($search_query ?? '')) !== ''
     || $filterBudget !== ''
     || $filterRunts !== ''
     || $filterApproval !== ''
-    || $filterAnomaly !== '';
+    || $filterAnomaly !== ''
+    || $filterBeneficiary !== '';
 // Pager: keep search, filters and sort when moving between pages (cost centre and Model D line too:
 // the drill-down from budgets opens the ledger already filtered).
 $pagerQuery = array_filter([
@@ -52,6 +54,7 @@ $pagerQuery = array_filter([
     'year' => $filterYear,
     'budget_item_id' => $filterBudget,
     'runts_line' => $filterRunts,
+    'beneficiary' => $filterBeneficiary,
     'sort' => $sort,
     'group' => !empty($group_by_category) ? '1' : '0',
 ], static fn ($value): bool => (string) $value !== '');
@@ -120,6 +123,9 @@ if ($filterYear !== '') {
 if ($filterAnomaly !== '') {
     $ledgerParams['anomaly'] = '1';
 }
+if ($filterBeneficiary !== '') {
+    $ledgerParams['beneficiary'] = $filterBeneficiary;
+}
 if ($sort !== 'date_desc') {
     $ledgerParams['sort'] = $sort;
 }
@@ -130,6 +136,10 @@ $accountFilterUrl = static function (string $accountKey) use ($ledgerParams): st
     }
     return url('/treasury') . ($params !== [] ? '?' . http_build_query($params) : '');
 };
+// Supplier drill-down: “show every movement again” keeps the other filters.
+$supplierResetParams = $ledgerParams;
+unset($supplierResetParams['beneficiary']);
+$supplierResetUrl = url('/treasury') . ($supplierResetParams !== [] ? '?' . http_build_query($supplierResetParams) : '');
 ?>
 <div class="page-header">
     <div class="titles">
@@ -137,6 +147,9 @@ $accountFilterUrl = static function (string $accountKey) use ($ledgerParams): st
         <p class="page-lede"><?= e(__('treasury.lede')) ?></p>
     </div>
     <div class="actions">
+        <a class="btn btn-ghost" href="<?= e(url('/treasury/loans')) ?>"><?= e(__('treasury.loans_manage')) ?></a>
+        <a class="btn btn-ghost" href="<?= e(url('/treasury/deposits')) ?>"><?= e(__('treasury.deposits_manage')) ?></a>
+        <a class="btn btn-ghost" href="<?= e(url('/treasury/suppliers')) ?>"><?= e(__('treasury.suppliers_manage')) ?></a>
         <?php if ($canManage): ?>
             <a class="btn<?= empty($hasAnyMovements) ? ' is-first-cta' : '' ?>" href="<?= e(url('/treasury/create') . $retSuffix) ?>"><?= e(__('treasury.add_movement')) ?></a>
             <a class="btn-action-icon" href="<?= e(url('/treasury/import')) ?>" aria-label="<?= e(__('treasury.csv_import_button')) ?>" title="<?= e(__('treasury.csv_import_button')) ?>">
@@ -162,6 +175,9 @@ $accountFilterUrl = static function (string $accountKey) use ($ledgerParams): st
         <div class="treasury-overview-actions">
             <?php if ($canManage): ?>
                 <a class="btn btn-ghost btn-sm" href="<?= e(url('/budgets')) ?>"><?= e(__('budget.title')) ?></a>
+            <?php endif; ?>
+            <?php if (can('settings.manage')): ?>
+                <a class="btn btn-ghost btn-sm" href="<?= e(url('/settings#treasury-accounts')) ?>"><?= e(__('settings.treasury_accounts_title')) ?></a>
             <?php endif; ?>
         </div>
     </div>
@@ -218,6 +234,9 @@ if ($filterYear !== '' && !isset($yearFilterOptions[$filterYear])) {
 }
 ?>
 <form class="panel filter-bar members-filter treasury-filter" method="get" action="<?= e(url('/treasury')) ?>" role="search" data-treasury-filter>
+    <?php if ($filterBeneficiary !== ''): ?>
+        <?= field('hidden', ['name' => 'beneficiary', 'value' => $filterBeneficiary]) ?>
+    <?php endif; ?>
     <div class="members-filter-row treasury-filter-row">
         <div class="members-filter-q">
             <?= field('search', [
@@ -422,6 +441,16 @@ if ($filterYear !== '' && !isset($yearFilterOptions[$filterYear])) {
     </div>
 <?php endif; ?>
 
+<?php if ($filterBeneficiary !== ''): ?>
+    <div class="setup-hint muted treasury-supplier-notice" data-treasury-supplier-notice>
+        <span><?= e(__('treasury.suppliers_filter_active', [
+            'name' => $filterBeneficiary,
+            'count' => (string) (int) ($total_rows ?? 0),
+        ])) ?></span>
+        <a class="btn btn-ghost btn-sm" href="<?= e($supplierResetUrl) ?>"><?= e(__('treasury.suppliers_filter_clear')) ?></a>
+    </div>
+<?php endif; ?>
+
 <?= view_partial('treasury/_similar_probe', [
     'probe' => $similar_probe ?? null,
     'ret_path' => $listPath,
@@ -590,6 +619,19 @@ if ($filterYear !== '' && !isset($yearFilterOptions[$filterYear])) {
                 $bulkMethodGroups[] = ['label' => (string) ($methodGroup['label'] ?? ''), 'options' => $methodOptions];
             }
         }
+        // Counterparty: a linked member or a free-text supplier. The member list uses the same
+        // labels as the movement sheet; `__none__` unlinks, an empty value keeps the current one.
+        $bulkMemberOptions = [['value' => '__none__', 'label' => (string) __('treasury.bulk_edit_member_none')]];
+        foreach (($members ?? []) as $member) {
+            $bulkMemberLabel = trim((string) ($member['last_name'] ?? '') . ' ' . (string) ($member['first_name'] ?? ''));
+            if (!empty($member['member_number'])) {
+                $bulkMemberLabel .= ' (#' . (string) $member['member_number'] . ')';
+            }
+            $bulkMemberOptions[] = [
+                'value' => (string) (int) $member['id'],
+                'label' => $bulkMemberLabel,
+            ];
+        }
         ?>
         <dialog
             class="member-bulk-email-dialog"
@@ -602,6 +644,8 @@ if ($filterYear !== '' && !isset($yearFilterOptions[$filterYear])) {
             data-msg-budget="<?= e(__('treasury.budget_item')) ?>"
             data-msg-description="<?= e(__('treasury.description')) ?>"
             data-msg-notes="<?= e(__('treasury.notes')) ?>"
+            data-msg-member="<?= e(__('treasury.member')) ?>"
+            data-msg-beneficiary="<?= e(__('treasury.counterparty')) ?>"
             data-msg-confirm="<?= e(__('treasury.bulk_edit_confirm', ['changes' => ':changes', 'count' => ':count'])) ?>"
             data-msg-none="<?= e(__('treasury.bulk_edit_none')) ?>"
         >
@@ -656,6 +700,48 @@ if ($filterYear !== '' && !isset($yearFilterOptions[$filterYear])) {
                         'options' => [],
                         'attrs' => ['data-treasury-bulk-edit-budget' => true],
                     ]) ?>
+                </div>
+                <div class="treasury-bulk-edit-optional">
+                    <?= field('checkbox', [
+                        'name' => '',
+                        'label' => (string) __('treasury.bulk_edit_counterparty_replace'),
+                        'label_class' => 'checkbox-row-lg',
+                        'checked' => false,
+                        'attrs' => ['data-treasury-bulk-edit-counterparty-toggle' => true],
+                    ]) ?>
+                    <div class="treasury-bulk-edit-optional-body" data-treasury-bulk-edit-counterparty-block hidden>
+                        <p class="muted"><?= e(__('treasury.bulk_edit_counterparty_hint')) ?></p>
+                        <?= field('select', [
+                            'name' => '',
+                            'label' => (string) __('treasury.member'),
+                            'include_empty' => true,
+                            'empty_label' => (string) __('treasury.bulk_edit_keep'),
+                            'options' => $bulkMemberOptions,
+                            'attrs' => ['data-treasury-bulk-edit-member' => true],
+                        ]) ?>
+                        <?= field('text', [
+                            'name' => '',
+                            'label' => (string) __('treasury.counterparty'),
+                            'placeholder' => (string) __('treasury.bulk_edit_beneficiary_hint'),
+                            'maxlength' => 190,
+                            'attrs' => [
+                                'list' => 'treasury-bulk-beneficiaries',
+                                'data-treasury-bulk-edit-beneficiary' => true,
+                            ],
+                        ]) ?>
+                        <datalist id="treasury-bulk-beneficiaries">
+                            <?php foreach ((array) ($beneficiaries ?? []) as $beneficiary): ?>
+                                <option value="<?= e((string) $beneficiary) ?>"></option>
+                            <?php endforeach; ?>
+                        </datalist>
+                        <?= field('checkbox', [
+                            'name' => '',
+                            'label' => (string) __('treasury.bulk_edit_beneficiary_clear'),
+                            'label_class' => 'checkbox-row',
+                            'checked' => false,
+                            'attrs' => ['data-treasury-bulk-edit-beneficiary-clear' => true],
+                        ]) ?>
+                    </div>
                 </div>
                 <div class="treasury-bulk-edit-optional">
                     <?= field('checkbox', [
@@ -767,7 +853,9 @@ if ($filterYear !== '' && !isset($yearFilterOptions[$filterYear])) {
                                     $desc = $memberLabel;
                                 }
                                 $rowId = (int) ($row['id'] ?? 0);
-                                $isPending = trim((string) ($row['approved_at'] ?? '')) === '';
+                                // The cash desk never needs the approval: a cash row is never “pending”.
+                                $isPending = trim((string) ($row['approved_at'] ?? '')) === ''
+                                    && \Socly\Services\TreasuryService::requiresApproval((string) ($row['account'] ?? ''));
                                 $isSuperseded = trim((string) ($row['superseded_at'] ?? '')) !== '';
                                 $supersededNote = trim((string) ($row['superseded_note'] ?? ''));
                                 $supersededAccountLabel = '';

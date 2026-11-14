@@ -1777,7 +1777,9 @@ final class TreasuryCsvService
                 continue;
             }
             $movementId = (int) ($result['id'] ?? 0);
-            if (empty($row['approved'])) {
+            // A row without the “approved” flag lands in the approval queue — except on the cash
+            // desk, which never needs the first-note approval.
+            if (empty($row['approved']) && TreasuryService::requiresApproval((string) ($payload['account'] ?? ''))) {
                 $this->db->update(
                     'treasury_movements',
                     ['approved_at' => null, 'approved_by' => null],

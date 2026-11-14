@@ -112,6 +112,44 @@ final class RecurringService
     }
 
     /**
+     * Marker file of the last automatic run (shared by the page and the app heartbeat).
+     */
+    public static function runMarkerPath(): string
+    {
+        return storage_path('cache/recurring_run.txt');
+    }
+
+    /** True when the last automatic run is older than $minSeconds (cheap file check). */
+    public static function runIsDue(int $minSeconds = 3600): bool
+    {
+        $marker = self::runMarkerPath();
+        $last = is_file($marker) ? (int) filemtime($marker) : 0;
+
+        return $last < 1 || (time() - $last) >= max(60, $minSeconds);
+    }
+
+    /**
+     * Run the due rules at most once every $minSeconds. Recurring entries must appear on
+     * their own: the generator is called on ordinary authenticated requests (and from the
+     * CLI), not only when somebody opens the cash book.
+     */
+    public function runDueThrottled(int $minSeconds = 3600, string $ip = 'system', ?int $userId = null): int
+    {
+        if (!self::runIsDue($minSeconds)) {
+            return 0;
+        }
+        $marker = self::runMarkerPath();
+        $dir = dirname($marker);
+        if (!is_dir($dir)) {
+            @mkdir($dir, 0775, true);
+        }
+        // Touch before running: a slow run must not be started twice by two requests.
+        @touch($marker);
+
+        return $this->runDue($ip, $userId);
+    }
+
+    /**
      * Generate the due entries; returns how many were created.
      */
     public function runDue(string $ip = 'system', ?int $userId = null, ?string $today = null): int
@@ -161,7 +199,8 @@ final class RecurringService
         if ($account === '') {
             $account = 'bank';
         }
-        $approve = $account === 'cash';
+        // The cash desk does not need the first-note approval (same rule as the movement form).
+        $approve = !TreasuryService::requiresApproval($account);
         $description = trim((string) ($rule['description'] ?? ''));
         if ($description === '') {
             $description = (string) __('treasury.recurring_default_description');

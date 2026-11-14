@@ -1008,10 +1008,11 @@ final class BudgetService
      *
      * Only the movements that actually carry a document are listed — one with an invoice/receipt
      * number or a document type (invoice, receipt, quittance, …). An entry without any document is
-     * not a supporting paper and must not appear in the printed statement. Only what the sheet shows
-     * is selected: date, invoice number and amount.
+     * not a supporting paper and must not appear in the printed statement. Each receipt carries its
+     * stable code (P + movement number) plus document date, document number, payment date and
+     * counterparty, so the statement reads like a proper appendix.
      *
-     * @return array<int,list<array<string,mixed>>>
+     * @return array<int,list<array{id:int,code:string,movement_date:string,amount:float,invoice_number:string,invoice_date:string,counterparty:string}>>
      */
     public function evidence(int $id): array
     {
@@ -1021,19 +1022,47 @@ final class BudgetService
         }
         $ids = array_map(static fn (array $item): int => (int) $item['id'], $budget['items']);
         $in = implode(', ', array_map('intval', $ids));
-        $out = [];
-        foreach ($this->db->fetchAll(
-            "SELECT budget_item_id, movement_date, amount, invoice_number
-             FROM treasury_movements
-             WHERE approved_at IS NOT NULL AND superseded_at IS NULL AND budget_item_id IN (" . $in . ")
+        $rows = $this->db->fetchAll(
+            "SELECT m.budget_item_id, m.id, m.movement_date, m.amount, m.invoice_number, m.invoice_date,
+                    m.justification_code, m.beneficiary, m.member_id
+             FROM treasury_movements m
+             WHERE m.approved_at IS NOT NULL AND m.superseded_at IS NULL AND m.budget_item_id IN (" . $in . ")
                AND (
-                   (invoice_number IS NOT NULL AND TRIM(invoice_number) <> '')
-                   OR (document_type IS NOT NULL AND TRIM(document_type) <> '')
+                   (m.invoice_number IS NOT NULL AND TRIM(m.invoice_number) <> '')
+                   OR (m.document_type IS NOT NULL AND TRIM(m.document_type) <> '')
                )
-             ORDER BY movement_date ASC, id ASC"
-        ) as $row) {
-            $out[(int) $row['budget_item_id']][] = $row;
+             ORDER BY m.movement_date ASC, m.id ASC"
+        );
+        $memberIds = [];
+        foreach ($rows as $row) {
+            $memberId = (int) ($row['member_id'] ?? 0);
+            if ($memberId > 0) {
+                $memberIds[] = $memberId;
+            }
         }
+        $memberNames = $memberIds === [] ? [] : $this->treasury->memberDisplayNames($memberIds);
+        $out = [];
+        foreach ($rows as $row) {
+            $memberId = (int) ($row['member_id'] ?? 0);
+            $counterparty = trim((string) ($memberNames[$memberId] ?? ''));
+            if ($counterparty === '') {
+                $counterparty = trim((string) ($row['beneficiary'] ?? ''));
+            }
+            $code = trim((string) ($row['justification_code'] ?? ''));
+            if ($code === '') {
+                $code = TreasuryService::justificationCode((int) ($row['id'] ?? 0));
+            }
+            $out[(int) $row['budget_item_id']][] = [
+                'id' => (int) ($row['id'] ?? 0),
+                'code' => $code,
+                'movement_date' => (string) ($row['movement_date'] ?? ''),
+                'amount' => (float) ($row['amount'] ?? 0),
+                'invoice_number' => trim((string) ($row['invoice_number'] ?? '')),
+                'invoice_date' => trim((string) ($row['invoice_date'] ?? '')),
+                'counterparty' => $counterparty,
+            ];
+        }
+
         return $out;
     }
 

@@ -6,6 +6,7 @@
  * @var array<string,mixed>|null $movement
  * @var string $action
  * @var string $default_category
+ * @var string $default_direction
  * @var list<array{key:string,label:string,builtin?:bool}> $categories
  * @var list<array{key:string,label:string}> $accounts
  * @var list<array> $members
@@ -53,7 +54,7 @@ if ($old !== []) {
     ];
 } else {
     $values = [
-        'direction' => 'income',
+        'direction' => (string) ($default_direction ?? 'income'),
         'amount' => '',
         'amount_entered' => '',
         'amount_currency' => '',
@@ -196,6 +197,7 @@ if ($probe !== null && $movementId > 0) {
             'recordId' => (int) ($movement['id'] ?? 0),
             'version' => (int) ($movement_version ?? ($movement['row_version'] ?? 0)),
             'conflict' => $movement_conflict ?? null,
+            'activity' => $movement_activity ?? null,
         ]) ?>
     <?php endif; ?>
     <?php require __DIR__ . '/_form_fields.php'; ?>

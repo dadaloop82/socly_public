@@ -124,7 +124,7 @@ foreach ($memberOptions as $memberOption) {
 
     <div class="member-profile-block" data-org-copy-fields>
         <h3 class="member-profile-block-title"><?= e(__('org.form_section_person')) ?></h3>
-        <p class="muted org-locked-hint" data-org-locked-hint hidden><?= e(__('org.person_fields_locked_hint')) ?></p>
+        <p class="muted org-locked-hint" data-org-locked-hint hidden><?= e(__('org.person_fields_sync_hint')) ?></p>
         <div class="org-field-row">
             <?= field('text', [
                 'name' => 'first_name',
@@ -261,6 +261,7 @@ foreach ($memberOptions as $memberOption) {
                 'placeholder' => (string) __('org.appointment_minutes_placeholder'),
             ]) ?>
         </div>
+        <p class="muted org-mandate-hint"><?= e(__('org.mandate_deadline_hint')) ?></p>
     </div>
 
     <div class="form-actions form-actions-end">

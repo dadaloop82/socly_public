@@ -231,6 +231,9 @@ $votingMembersCount = (int) ($votingMembersCount ?? 0);
             <a class="btn" href="<?= e(url('/org/people/create')) ?>"><?= e(__('org.add_person')) ?></a>
             <a class="btn btn-ghost" href="<?= e(url('/org/history')) ?>"><?= e(__('org.history_title')) ?></a>
         <?php endif; ?>
+        <?php if (can('settings.manage')): ?>
+            <a class="btn btn-ghost" href="<?= e(url('/settings#org')) ?>"><?= e(__('org.settings_link')) ?></a>
+        <?php endif; ?>
         <?= page_action_icon([
             'icon' => 'image',
             'label' => (string) __('org.export_chart'),
@@ -254,21 +257,6 @@ $votingMembersCount = (int) ($votingMembersCount ?? 0);
     </div>
 </div>
 
-<div class="panel org-control-body-panel">
-        <form method="post" action="<?= e(url('/org/control-body')) ?>" class="org-control-body-form">
-            <?= csrf_field() ?>
-            <?= field('checkbox', [
-                'name' => 'has_control_body',
-                'check_value' => '1',
-                'label' => (string) __('org.control_body_label'),
-                'value' => ($hasControlBody ?? true) ? '1' : '0',
-                'checked' => (bool) ($hasControlBody ?? true),
-                'context' => 'inline',
-            ]) ?>
-            <p class="muted org-control-body-hint"><?= e(__('org.control_body_hint')) ?></p>
-            <button class="btn btn-sm btn-ghost" type="submit"><?= e(__('common.save')) ?></button>
-        </form>
-    </div>
     <div class="panel org-chart-panel">
     <div class="panel-header">
         <div>

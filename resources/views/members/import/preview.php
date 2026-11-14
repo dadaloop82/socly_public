@@ -59,7 +59,8 @@ $gapLabels = static function (array $gapsList, string $key): string {
 
 <?php if ($gapsCount > 0): ?>
     <div class="alert alert-warn import-gaps-alert">
-        <strong><?= e(__('members.import.gaps_found', ['count' => (string) $gapsCount])) ?></strong>
+        <strong><?= e(__($gapsCount === 1 ? 'members.import.gaps_found_one' : 'members.import.gaps_found_many', ['count' => (string) $gapsCount])) ?></strong>
+        <p class="import-gaps-hint"><?= e(__('members.import.gaps_next_hint')) ?></p>
         <ul>
             <?php if ($gaps['types'] !== []): ?>
                 <li><?= e(__('members.import.gaps_types', ['count' => (string) count($gaps['types'])])) ?>:

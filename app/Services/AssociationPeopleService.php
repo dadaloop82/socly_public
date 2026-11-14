@@ -316,8 +316,16 @@ final class AssociationPeopleService
         $first = trim((string) ($input['first_name'] ?? ''));
         $last = trim((string) ($input['last_name'] ?? ''));
         $cf = strtoupper(preg_replace('/\s+/', '', (string) ($input['fiscal_code'] ?? '')) ?? '');
-        if ($first === '' || $last === '' || $cf === '') {
-            return ['ok' => false, 'errors' => ['member_id' => __('org.member_profile_incomplete')]];
+        if ($first === '' || $last === '') {
+            return ['ok' => false, 'errors' => ['first_name' => __('org.person_name_required')]];
+        }
+        if ($cf === '') {
+            // A person linked to a member takes the fiscal code from the member record;
+            // an external officer (auditor, commission…) must type it here.
+            return [
+                'ok' => false,
+                'errors' => ['fiscal_code' => $isExternal ? __('org.person_fiscal_code_required') : __('org.member_profile_incomplete')],
+            ];
         }
 
         $roleMeta = $this->role($role) ?? [];
@@ -396,6 +404,32 @@ final class AssociationPeopleService
                 $this->db->query('DELETE FROM association_people WHERE id = :id', [
                     'id' => (int) ($existingUnique['id'] ?? 0),
                 ]);
+            }
+        }
+
+        // A person linked to a member is the same human: the edits made here are
+        // mirrored on the member record (and the duplicate checks of the member form
+        // still apply), so the two screens never show different data. Only the fields
+        // the user actually changed are pushed, so a stale person row cannot overwrite
+        // fresher member data.
+        if ($memberId > 0) {
+            $previous = $id !== null && $id > 0 ? $this->find($id) : null;
+            $syncFields = [];
+            foreach ([
+                'first_name', 'last_name', 'fiscal_code', 'gender', 'birth_date', 'birth_place',
+                'email', 'phone', 'city', 'postal_code', 'address', 'house_number',
+            ] as $key) {
+                $value = (string) ($row[$key] ?? '');
+                if ($previous !== null && $this->sameProfileValue($key, $previous[$key] ?? null, $value)) {
+                    continue;
+                }
+                $syncFields[$key] = $value;
+            }
+            if ($syncFields !== []) {
+                $sync = $this->members->syncProfileFromOrgPerson($memberId, $syncFields);
+                if (empty($sync['ok'])) {
+                    return ['ok' => false, 'errors' => $sync['errors']];
+                }
             }
         }
 
@@ -689,5 +723,16 @@ final class AssociationPeopleService
     {
         $v = trim((string) ($value ?? ''));
         return $v === '' ? null : $v;
+    }
+
+    /** Compare a profile value the way the member form would: trim, and case for gender/CF. */
+    private function sameProfileValue(string $key, mixed $previous, string $current): bool
+    {
+        $old = trim((string) ($previous ?? ''));
+        $new = trim($current);
+        if ($key === 'gender' || $key === 'fiscal_code') {
+            return strtoupper($old) === strtoupper($new);
+        }
+        return $old === $new;
     }
 }

@@ -6,6 +6,7 @@ namespace Socly\Middleware;
 
 use Socly\Core\Http\Request;
 use Socly\Services\AuthService;
+use Socly\Services\RecurringService;
 
 final class AuthMiddleware
 {
@@ -30,9 +31,31 @@ final class AuthMiddleware
             return false;
         }
         $this->refreshPermissionsIfStale();
+        $this->runRecurringGenerator($request);
         // After auth, force setup wizard for admins with missing config.
         app('mw.setup')->handle($request);
         return true;
+    }
+
+    /**
+     * Recurring journal entries must appear on their own: a throttled check on ordinary
+     * authenticated requests generates the entries that are due, without waiting for
+     * somebody to open the cash book. The marker file keeps the cost to a stat().
+     */
+    private function runRecurringGenerator(Request $request): void
+    {
+        try {
+            if (!RecurringService::runIsDue(3600)) {
+                return;
+            }
+            if (!function_exists('component_enabled') || !component_enabled('treasury')) {
+                return;
+            }
+            $userId = (int) (auth_user()['id'] ?? 0);
+            app(RecurringService::class)->runDueThrottled(3600, $request->ip(), $userId > 0 ? $userId : null);
+        } catch (\Throwable) {
+            // A broken rule must never block the page that is being served.
+        }
     }
 
     /**

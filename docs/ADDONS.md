@@ -146,7 +146,7 @@ php tools/addons/addon-tool.php sign-license payload.json --out=license.txt   # 
    (`.soclylic` download) plus the package file.
 6. Revoke/reactivate from the licence detail; every event is logged in `license_events`.
 
-## First add-on: Iscrizione Tablet (`tablet_enrollment`)
+## First add-on: Iscrizione rapida (`tablet_enrollment`)
 
 Source: `addons-src/tablet_enrollment/` (private repo; `addons-src/` is not part of the public export).
 Requires core **1.7.88+** (public plugin routes with a middleware override + `addon_active()`).

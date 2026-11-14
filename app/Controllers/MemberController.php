@@ -68,6 +68,8 @@ final class MemberController extends BaseController
             'sort' => (string) $request->input('sort', ''),
             'dir' => (string) $request->input('dir', ''),
             'issues' => (string) $request->input('issues', ''),
+            // “New members this year”: the dashboard KPI links here.
+            'joined' => (string) $request->input('joined', ''),
         ];
         $page = max(1, (int) $request->input('page', 1));
         $result = $this->members->search($filters, $page);
@@ -421,6 +423,30 @@ final class MemberController extends BaseController
             redirect($redirect);
         }
         redirect('/members/' . $id);
+    }
+
+    public function registerPaymentMovement(Request $request, string $id, string $paymentId): void
+    {
+        $this->guardMembers();
+        $result = $this->payments->registerTreasuryForPayment((int) $id, (int) $paymentId, $request->ip());
+        if ($result['ok']) {
+            $this->flash('success', $result['message']);
+        } else {
+            $this->flash('errors', ['payment' => $result['message']]);
+        }
+        redirect('/members/' . (int) $id . '#payments');
+    }
+
+    public function deletePaymentMovement(Request $request, string $id, string $paymentId): void
+    {
+        $this->guardMembers();
+        $result = $this->payments->deleteTreasuryForPayment((int) $id, (int) $paymentId, $request->ip());
+        if ($result['ok']) {
+            $this->flash('success', $result['message']);
+        } else {
+            $this->flash('errors', ['payment' => $result['message']]);
+        }
+        redirect('/members/' . (int) $id . '#payments');
     }
 
     public function remindPayment(Request $request, string $id): void

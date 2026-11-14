@@ -8,6 +8,8 @@ $totalPaid = array_sum(array_map(static fn (array $payment): float => (float) ($
 $balanceDue = (float) ($member['balance_due'] ?? 0);
 $canManage = can('members.manage');
 $canPayments = can('payments.manage');
+$canTreasuryManage = can('treasury.manage');
+$treasuryActive = component_enabled('treasury');
 $showStatus = (string) ($member['status'] ?? '');
 $showStatusBadge = match ($showStatus) {
     'active' => 'badge-ok',
@@ -556,7 +558,7 @@ $nextMemberId = isset($adjacentMembers['next']) ? (int) $adjacentMembers['next']
             <?php endif; ?>
         </section>
 
-        <section class="panel member-scheda-card">
+        <section class="panel member-scheda-card" id="payments">
             <div class="panel-header">
                 <div>
                     <h2 class="section-title"><?= e(__('payments.title')) ?></h2>
@@ -582,15 +584,71 @@ $nextMemberId = isset($adjacentMembers['next']) ? (int) $adjacentMembers['next']
                             <th><?= e(__('payments.method')) ?></th>
                             <th><?= e(__('payments.type')) ?></th>
                             <th><?= e(__('members.enrollment_recorded_at')) ?></th>
+                            <th><?= e(__('payments.treasury')) ?></th>
                         </tr>
                         </thead>
                         <tbody>
                         <?php foreach ($payments as $p): ?>
+                            <?php
+                            $paymentId = (int) ($p['id'] ?? 0);
+                            $movementId = (int) ($p['movement_id'] ?? 0);
+                            $treasuryState = (string) ($p['treasury_state'] ?? 'none');
+                            $paymentBase = '/members/' . (int) $member['id'] . '/payments/' . $paymentId;
+                            ?>
                             <tr>
                                 <td class="num"><?= e(number_format((float) $p['amount'], 2, ',', '.')) ?>&nbsp;€</td>
                                 <td><?= e(__('payments.' . $p['method'])) ?></td>
                                 <td><?= e(__('payments.' . $p['type'])) ?></td>
                                 <td><?= e(format_datetime((string) ($p['created_at'] ?? '')) ?: (string) ($p['created_at'] ?? '')) ?></td>
+                                <td class="member-payment-treasury">
+                                    <?php if ($treasuryState === 'none'): ?>
+                                        <span class="muted">—</span>
+                                    <?php else: ?>
+                                        <div class="member-payment-treasury-state">
+                                            <?php if ($treasuryState === 'ok'): ?>
+                                                <span class="badge badge-ok"><?= e(__('payments.treasury_ok')) ?></span>
+                                            <?php else: ?>
+                                                <span class="badge badge-warn member-payment-warn">
+                                                    <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path fill="currentColor" d="M12 2 1 21h22L12 2zm1 15h-2v-2h2v2zm0-4h-2V9h2v4z"/></svg>
+                                                    <?= e(match ($treasuryState) {
+                                                        'missing' => __('payments.treasury_missing'),
+                                                        'mismatch' => __('payments.treasury_mismatch'),
+                                                        'pending' => __('payments.treasury_pending'),
+                                                        default => __('payments.treasury_mismatch'),
+                                                    }) ?>
+                                                </span>
+                                            <?php endif; ?>
+                                        </div>
+                                        <?php if ($canPayments || $canTreasuryManage): ?>
+                                        <div class="member-payment-treasury-actions">
+                                            <?php if ($treasuryState === 'missing'): ?>
+                                                <?php if ($treasuryActive && $canPayments): ?>
+                                                    <form method="post" action="<?= e(url($paymentBase . '/treasury')) ?>">
+                                                        <?= csrf_field() ?>
+                                                        <button class="btn btn-ghost btn-sm" type="submit"><?= e(__('payments.treasury_register')) ?></button>
+                                                    </form>
+                                                <?php endif; ?>
+                                            <?php else: ?>
+                                                <?php if ($canTreasuryManage): ?>
+                                                    <a class="btn btn-ghost btn-sm"
+                                                       href="<?= e(url('/treasury/' . $movementId . '/edit') . '?ret=' . rawurlencode('/members/' . (int) $member['id'])) ?>">
+                                                        <?= e(__('payments.treasury_edit')) ?>
+                                                    </a>
+                                                <?php endif; ?>
+                                                <?php if ($canPayments): ?>
+                                                    <form method="post"
+                                                          action="<?= e(url($paymentBase . '/treasury/delete')) ?>"
+                                                          data-confirm="<?= e(__('payments.treasury_delete_confirm')) ?>"
+                                                          data-confirm-danger="1">
+                                                        <?= csrf_field() ?>
+                                                        <button class="btn btn-ghost btn-sm is-danger" type="submit"><?= e(__('payments.treasury_delete')) ?></button>
+                                                    </form>
+                                                <?php endif; ?>
+                                            <?php endif; ?>
+                                        </div>
+                                        <?php endif; ?>
+                                    <?php endif; ?>
+                                </td>
                             </tr>
                         <?php endforeach; ?>
                         </tbody>

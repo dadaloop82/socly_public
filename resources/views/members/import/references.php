@@ -15,9 +15,13 @@ $hasGaps = $gaps['types'] !== [] || $gaps['fields'] !== [] || $gaps['methods'] !
 $periodMissing = (int) ($options['period_id'] ?? 0) <= 0 && $periods === [];
 $typeOptions = [['value' => 'create', 'label' => (string) __('members.import.ref_type_create')]];
 foreach ($types as $type) {
+    $typePrice = number_format((float) ($type['price'] ?? 0), 2, ',', '');
     $typeOptions[] = [
         'value' => 'map:' . (int) $type['id'],
-        'label' => (string) __('members.import.ref_type_use', ['name' => localized($type['name_json'] ?? '')]),
+        'label' => (string) __('members.import.ref_type_use', ['name' => localized($type['name_json'] ?? '')])
+            . ' · ' . $typePrice . ' €',
+        // Read by the JS: choosing an existing type fills and locks the annual fee.
+        'attrs' => ['data-price' => $typePrice],
     ];
 }
 $typeOptions[] = ['value' => 'skip', 'label' => (string) __('members.import.ref_type_skip')];
@@ -94,6 +98,7 @@ foreach (\Socly\Services\MemberService::memberStatuses() as $status) {
                             'context' => 'setup',
                             'include_empty' => false,
                             'options' => $typeOptions,
+                            'attrs' => ['data-import-type-action' => true],
                         ]) ?>
                         <?= field('text', [
                             'name' => 'types[' . $slug . '][name_it]',
@@ -109,6 +114,9 @@ foreach (\Socly\Services\MemberService::memberStatuses() as $status) {
                             'value' => '',
                             'context' => 'setup',
                             'placeholder' => '0,00',
+                            'attrs' => ['data-import-type-price' => true],
+                            'hint' => (string) __('members.import.ref_price_locked'),
+                            'hint_attrs' => ['data-import-type-hint' => true, 'hidden' => true],
                         ]) ?>
                     </div>
                     <details class="import-ref-translations" data-import-translations>

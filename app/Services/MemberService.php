@@ -1379,6 +1379,10 @@ final class MemberService
                 $where[] = 'm.balance_due > 0';
             }
         }
+        // “New members this year”: same rule as the dashboard KPI (admission date, else creation).
+        if (($filters['joined'] ?? '') === 'year') {
+            $where[] = 'YEAR(COALESCE(m.admitted_at, m.created_at)) = YEAR(CURDATE())';
+        }
         // Missing mandatory data: same rule as the red triangle, also usable as a list filter.
         $missingCondition = $this->missingDataCondition('m');
         $missingCount = 0;
@@ -1648,6 +1652,63 @@ final class MemberService
             $this->audit->log('member.autofix', 'member', (string) $memberId, null, ['fixed' => $fixed], $ip);
         }
         return ['ok' => $fixed !== [], 'fixed' => $fixed, 'errors' => $errors];
+    }
+
+    /**
+     * Mirror the identity data edited on an org-chart person onto the linked member, so
+     * the person and the member never disagree. Only the keys the person form shows are
+     * touched; every other member value stays as it is. Empty values clear the member
+     * value (the form is the source of truth while it is being saved).
+     *
+     * @param array<string,string> $fields member field key => new value
+     * @return array{ok:bool,changed:list<string>,errors:array<string,string>}
+     */
+    public function syncProfileFromOrgPerson(int $memberId, array $fields): array
+    {
+        if ($memberId < 1 || $fields === []) {
+            return ['ok' => true, 'changed' => [], 'errors' => []];
+        }
+        $allowed = [
+            'first_name', 'last_name', 'fiscal_code', 'gender', 'birth_date', 'birth_place',
+            'email', 'phone', 'city', 'postal_code', 'address', 'house_number',
+        ];
+        $clean = [];
+        foreach ($allowed as $key) {
+            if (!array_key_exists($key, $fields)) {
+                continue;
+            }
+            $value = trim((string) $fields[$key]);
+            if ($key === 'gender' || $key === 'fiscal_code') {
+                $value = strtoupper($value);
+            }
+            $clean[$key] = $value;
+        }
+        // Same duplicate guard as the member form: syncing must not create a second
+        // member with the same fiscal code (or the same name + birth date).
+        $duplicates = $this->duplicateIdentityErrors($clean, $memberId);
+        if ($duplicates !== []) {
+            return ['ok' => false, 'changed' => [], 'errors' => $duplicates];
+        }
+        $current = $this->fieldValues($memberId);
+        $changed = [];
+        foreach ($clean as $key => $value) {
+            $old = trim((string) ($current[$key] ?? ''));
+            if ($key === 'gender' || $key === 'fiscal_code') {
+                $old = strtoupper($old);
+            }
+            if ($old === $value) {
+                continue;
+            }
+            if ($this->setFieldValue($memberId, $key, $value)) {
+                $changed[] = $key;
+            }
+        }
+        if ($changed !== []) {
+            $this->audit->log('member.profile_synced_from_org', 'member', (string) $memberId, null, [
+                'fields' => $changed,
+            ]);
+        }
+        return ['ok' => true, 'changed' => $changed, 'errors' => []];
     }
 
     /** Write one profile field value (creates the row when missing). */
@@ -1986,7 +2047,8 @@ final class MemberService
                             'payment_method' => (string) ($data['payment_method'] ?? 'cash'),
                             'description' => trim((string) ($data['treasury_description'] ?? '')),
                             'category' => 'membership_fee',
-                        ]
+                        ],
+                        auth_user()['id'] ?? null
                     );
                 } elseif (!$skipTreasury) {
                     $this->treasury->autoRegisterFromPayment(
@@ -1994,7 +2056,8 @@ final class MemberService
                         (int) $id,
                         $paidAmount,
                         (string) ($data['payment_method'] ?? 'cash'),
-                        date('Y-m-d')
+                        date('Y-m-d'),
+                        auth_user()['id'] ?? null
                     );
                 }
             }

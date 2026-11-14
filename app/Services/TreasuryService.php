@@ -42,6 +42,12 @@ final class TreasuryService
     public const DIRECTIONS = ['income', 'expense', 'transfer'];
 
     /**
+     * Movements listed inside the “also apply to similar movements?” proposal: enough to judge the
+     * batch without turning the banner into a second ledger (the total stays exact).
+     */
+    public const SIMILAR_LIST_LIMIT = 50;
+
+    /**
      * Orders accepted by the ledger and by the sortable table headers: date, registration date,
      * last modification, document date, description, payment method and the amount of the
      * income/expense column.
@@ -129,11 +135,16 @@ final class TreasuryService
         return (int) ($this->db->fetch('SELECT COUNT(*) AS c FROM treasury_movements')['c'] ?? 0);
     }
 
-    /** Movements waiting for manual approval (they do not count towards balances yet). */
+    /**
+     * Movements waiting for manual approval (they do not count towards balances yet). The cash desk
+     * never waits: a cash row is never part of the queue, whatever its approval columns say.
+     */
     public function pendingCount(): int
     {
         return (int) ($this->db->fetch(
-            'SELECT COUNT(*) AS c FROM treasury_movements WHERE approved_at IS NULL'
+            "SELECT COUNT(*) AS c FROM treasury_movements
+              WHERE approved_at IS NULL
+                AND (account IS NULL OR account <> 'cash')"
         )['c'] ?? 0);
     }
 
@@ -705,10 +716,18 @@ final class TreasuryService
         }
         $approval = (string) ($filters['approval'] ?? '');
         if ($approval === 'pending') {
-            $where[] = 'm.approved_at IS NULL';
+            // The cash desk never needs the approval: cash rows never show up in the queue.
+            $where[] = "m.approved_at IS NULL AND (m.account IS NULL OR m.account <> 'cash')";
         } elseif ($approval === 'approved') {
-            $where[] = 'm.approved_at IS NOT NULL';
+            $where[] = "(m.approved_at IS NOT NULL OR m.account = 'cash')";
         }
+        // Supplier drill-down: the stored spelling wins, comparison ignores case and extra spaces.
+        $beneficiary = trim((string) preg_replace('/\s+/u', ' ', (string) ($filters['beneficiary'] ?? '')));
+        if ($beneficiary !== '') {
+            $where[] = 'LOWER(TRIM(m.beneficiary)) = LOWER(:filter_beneficiary)';
+            $params['filter_beneficiary'] = $beneficiary;
+        }
+
         return [$where, $params];
     }
 
@@ -1010,6 +1029,122 @@ final class TreasuryService
         return ['ok' => true];
     }
 
+    /**
+     * Opening balances currently stored in the ledger, keyed by wallet slug.
+     *
+     * @return array<string,float>
+     */
+    public function openingBalances(): array
+    {
+        $rows = $this->db->fetchAll(
+            'SELECT account, amount FROM treasury_movements
+              WHERE is_opening_balance = 1 AND superseded_at IS NULL
+              ORDER BY id ASC'
+        );
+        $out = [];
+        foreach ($rows as $row) {
+            $key = self::normalizeAccount((string) ($row['account'] ?? ''));
+            if ($key !== '') {
+                $out[$key] = round((float) ($row['amount'] ?? 0), 2);
+            }
+        }
+
+        return $out;
+    }
+
+    /**
+     * Flags an already-created movement as the opening balance of its wallet (the setup wizard
+     * writes it through create() and then marks it here).
+     */
+    public function markOpeningBalance(int $id): void
+    {
+        if ($id < 1) {
+            return;
+        }
+        $this->db->update('treasury_movements', ['is_opening_balance' => 1], 'id = :id', ['id' => $id]);
+    }
+
+    /**
+     * Sets (or removes, with 0) the opening balance of a wallet. It is stored as the first income
+     * movement of that account, so every balance, chart and report keeps reading the ledger only.
+     *
+     * @return array{ok:bool,errors?:array<string,string>}
+     */
+    public function setAccountOpeningBalance(string $account, float $amount, string $ip = '', ?int $userId = null): array
+    {
+        $account = self::normalizeAccount($account);
+        $label = '';
+        foreach ($this->accountOptions() as $option) {
+            if ((string) ($option['key'] ?? '') === $account) {
+                $label = (string) ($option['label'] ?? '');
+                break;
+            }
+        }
+        if ($account === '' || $label === '') {
+            return ['ok' => false, 'errors' => ['account' => __('errors.404')]];
+        }
+        if (!is_finite($amount) || $amount < 0 || $amount > 999999999.99) {
+            return ['ok' => false, 'errors' => ['account' => __('setup.accounts_opening_invalid')]];
+        }
+        $amount = round($amount, 2);
+        $existing = $this->db->fetch(
+            "SELECT id, amount FROM treasury_movements
+              WHERE is_opening_balance = 1 AND account = :account AND superseded_at IS NULL
+              ORDER BY id ASC LIMIT 1",
+            ['account' => $account]
+        );
+        if ($amount <= 0.0) {
+            if ($existing === null) {
+                return ['ok' => true];
+            }
+            $movementId = (int) $existing['id'];
+            $this->db->query('DELETE FROM treasury_movements WHERE id = :id', ['id' => $movementId]);
+            $this->audit->log('treasury.opening_balance_removed', 'treasury', (string) $movementId, [
+                'account' => $account,
+                'amount' => (float) ($existing['amount'] ?? 0),
+            ], null, $ip, $userId);
+
+            return ['ok' => true];
+        }
+        $description = mb_substr(
+            (string) __('setup.accounts_opening_movement', ['account' => $label]),
+            0,
+            500
+        );
+        if ($existing !== null) {
+            $movementId = (int) $existing['id'];
+            $this->db->update('treasury_movements', [
+                'amount' => $amount,
+                'description' => $description,
+                'approved_at' => date('Y-m-d H:i:s'),
+                'approved_by' => $userId,
+            ], 'id = :id', ['id' => $movementId]);
+            $this->audit->log('treasury.opening_balance_updated', 'treasury', (string) $movementId, [
+                'amount' => (float) ($existing['amount'] ?? 0),
+            ], ['amount' => $amount, 'account' => $account], $ip, $userId);
+
+            return ['ok' => true];
+        }
+        $movementId = $this->db->insert('treasury_movements', [
+            'movement_date' => date('Y-m-d'),
+            'direction' => 'income',
+            'category' => 'other',
+            'amount' => $amount,
+            'description' => $description,
+            'payment_method' => $account === 'cash' ? 'cash' : 'bank_transfer',
+            'account' => $account,
+            'approved_at' => date('Y-m-d H:i:s'),
+            'approved_by' => $userId,
+            'is_opening_balance' => 1,
+        ]);
+        $this->audit->log('treasury.opening_balance_set', 'treasury', (string) $movementId, null, [
+            'account' => $account,
+            'amount' => $amount,
+        ], $ip, $userId);
+
+        return ['ok' => true];
+    }
+
     /** Slug sanitised to `[a-z0-9_]` (max 40 chars), matching the stored wallet keys. */
     public static function normalizeAccount(string $account): string
     {
@@ -1267,11 +1402,11 @@ final class TreasuryService
     private function approvalStatus(): array
     {
         $row = $this->db->fetch(
-            'SELECT
-                COALESCE(SUM(CASE WHEN approved_at IS NOT NULL THEN 1 ELSE 0 END), 0) AS approved,
-                COALESCE(SUM(CASE WHEN approved_at IS NULL THEN 1 ELSE 0 END), 0) AS pending
+            "SELECT
+                COALESCE(SUM(CASE WHEN approved_at IS NOT NULL OR account = 'cash' THEN 1 ELSE 0 END), 0) AS approved,
+                COALESCE(SUM(CASE WHEN approved_at IS NULL AND (account IS NULL OR account <> 'cash') THEN 1 ELSE 0 END), 0) AS pending
              FROM treasury_movements
-             WHERE superseded_at IS NULL'
+             WHERE superseded_at IS NULL"
         );
 
         return [
@@ -1580,7 +1715,7 @@ final class TreasuryService
 
         $rows = $this->db->fetchAll(
             "SELECT m.id, m.movement_date, m.description, m.beneficiary, m.amount, m.category, m.direction,
-                    m.runts_line, m.budget_item_id, m.approved_at
+                    m.runts_line, m.budget_item_id, m.approved_at, m.account, m.payment_method, m.member_id
              FROM treasury_movements m
              WHERE m.direction = :direction AND m.id <> :exclude
                AND m.description IS NOT NULL AND m.description <> ''
@@ -1611,6 +1746,7 @@ final class TreasuryService
         $skipped = 0;
         foreach ($scored as $row) {
             $blocked = false;
+            $missing = [];
             foreach ($fields as $field) {
                 $current = trim((string) ($row[$field] ?? ''));
                 $empty = $field === 'budget_item_id' ? (int) $current === 0 : $current === '';
@@ -1626,6 +1762,9 @@ final class TreasuryService
                     ));
                     $sameAsOriginal = $automatic !== '' && strtoupper($current) === $automatic;
                 }
+                if ($empty) {
+                    $missing[] = $field;
+                }
                 if (!$empty && !$sameAsOriginal) {
                     $blocked = true;
                     break;
@@ -1635,13 +1774,44 @@ final class TreasuryService
                 $skipped++;
                 continue;
             }
+            $row['missing'] = $missing;
             $open[] = $row;
         }
 
         $ids = array_map(static fn (array $row): int => (int) $row['id'], $open);
+        // Details for the proposal: counterparty, wallet and amount — plus the overall range and
+        // total, so the operator can judge the batch before touching anything.
+        $memberNames = $this->memberNames(array_map(
+            static fn (array $row): int => (int) ($row['member_id'] ?? 0),
+            $open
+        ));
+        $accountLabels = [];
+        foreach ($this->accountOptions() as $accountOption) {
+            $accountLabels[(string) $accountOption['key']] = (string) $accountOption['label'];
+        }
+        $amountTotal = 0.0;
+        $dateFrom = '';
+        $dateTo = '';
+        foreach ($open as $row) {
+            $amountTotal += (float) ($row['amount'] ?? 0);
+            $rowDate = trim((string) ($row['movement_date'] ?? ''));
+            if ($rowDate === '') {
+                continue;
+            }
+            if ($dateFrom === '' || $rowDate < $dateFrom) {
+                $dateFrom = $rowDate;
+            }
+            if ($dateTo === '' || $rowDate > $dateTo) {
+                $dateTo = $rowDate;
+            }
+        }
         $matches = [];
         foreach (array_slice($open, 0, max(1, $limit)) as $row) {
             $categoryKey = trim((string) ($row['category'] ?? ''));
+            $accountKey = (string) ($row['account'] ?? '');
+            $methodKey = (string) ($row['payment_method'] ?? '');
+            $memberId = (int) ($row['member_id'] ?? 0);
+            $beneficiary = trim((string) ($row['beneficiary'] ?? ''));
             $matches[] = [
                 'id' => (int) $row['id'],
                 'date' => (string) ($row['movement_date'] ?? ''),
@@ -1655,8 +1825,25 @@ final class TreasuryService
                 'budget_item_id' => (int) ($row['budget_item_id'] ?? 0),
                 'approved' => trim((string) ($row['approved_at'] ?? '')) !== '',
                 'score' => (float) ($row['score'] ?? 0),
+                'account' => $accountKey,
+                'account_label' => $accountKey !== ''
+                    ? ($accountLabels[$accountKey] ?? $this->accountLabel($accountKey))
+                    : '',
+                'method' => $methodKey,
+                'method_label' => $methodKey !== '' ? (string) __('treasury.method_' . $methodKey) : '',
+                'member_id' => $memberId,
+                'beneficiary' => $beneficiary,
+                'counterparty' => $memberId > 0
+                    ? (string) ($memberNames[$memberId] ?? '')
+                    : $beneficiary,
+                'missing' => (array) ($row['missing'] ?? []),
             ];
         }
+        // Display order: the batch reads best by date (the selection itself stays by relevance).
+        usort($matches, static fn (array $a, array $b): int => strcmp(
+            (string) ($b['date'] ?? ''),
+            (string) ($a['date'] ?? '')
+        ));
 
         return [
             'count' => count($matches),
@@ -1664,8 +1851,299 @@ final class TreasuryService
             'skipped' => $skipped,
             'ids' => $ids,
             'matches' => $matches,
+            'fields' => $fields,
+            'amount_total' => $amountTotal,
+            'amount_total_formatted' => $this->currency->format($amountTotal),
+            'date_from' => $dateFrom,
+            'date_to' => $dateTo,
+            'date_from_formatted' => $dateFrom !== '' ? (string) (format_date($dateFrom) ?: $dateFrom) : '',
+            'date_to_formatted' => $dateTo !== '' ? (string) (format_date($dateTo) ?: $dateTo) : '',
             'score_min' => 0.45,
         ];
+    }
+
+    /**
+     * Display names of the given members in one query (used by the “similar movements” list).
+     *
+     * @param list<int> $ids
+     * @return array<int,string>
+     */
+    private function memberNames(array $ids): array
+    {
+        $ids = array_values(array_unique(array_filter(
+            array_map('intval', $ids),
+            static fn (int $id): bool => $id > 0
+        )));
+        if ($ids === []) {
+            return [];
+        }
+        $rows = $this->db->fetchAll(
+            "SELECT v.member_id, d.`key`, v.value
+             FROM member_field_values v
+             INNER JOIN member_field_definitions d ON d.id = v.field_definition_id
+             WHERE v.member_id IN (" . implode(',', $ids) . ")
+               AND d.`key` IN ('first_name', 'last_name')"
+        );
+        $parts = [];
+        foreach ($rows as $row) {
+            $id = (int) $row['member_id'];
+            $parts[$id] = $parts[$id] ?? ['first' => '', 'last' => ''];
+            if ((string) $row['key'] === 'first_name') {
+                $parts[$id]['first'] = trim((string) $row['value']);
+            } else {
+                $parts[$id]['last'] = trim((string) $row['value']);
+            }
+        }
+        $names = [];
+        foreach ($parts as $id => $nameParts) {
+            $label = trim($nameParts['last'] . ' ' . $nameParts['first']);
+            if ($label !== '') {
+                $names[$id] = $label;
+            }
+        }
+
+        return $names;
+    }
+
+    /**
+     * Suppliers (the free-text counterparty of a movement) with their income/expense shares.
+     * The “Gestione fornitori” page reads this list and links every row to the filtered ledger;
+     * member-linked movements carry no beneficiary and therefore never show up here.
+     *
+     * @return array{
+     *     rows:list<array{name:string,movements:int,income:float,expense:float,net:float,last_date:string,last_date_formatted:string}>,
+     *     totals:array{suppliers:int,movements:int,income:float,expense:float}
+     * }
+     */
+    public function supplierOverview(string $query = '', string $sort = 'volume'): array
+    {
+        $query = trim($query);
+        $params = [];
+        $where = "m.beneficiary IS NOT NULL AND TRIM(m.beneficiary) <> ''"
+            . " AND m.direction IN ('income', 'expense')";
+        if ($query !== '') {
+            $where .= ' AND LOWER(m.beneficiary) LIKE :q';
+            $params['q'] = '%' . mb_strtolower($query) . '%';
+        }
+        $rows = $this->db->fetchAll(
+            "SELECT TRIM(m.beneficiary) AS name,
+                    COUNT(*) AS movements,
+                    COALESCE(SUM(CASE WHEN m.direction = 'income' THEN m.amount ELSE 0 END), 0) AS income,
+                    COALESCE(SUM(CASE WHEN m.direction = 'expense' THEN m.amount ELSE 0 END), 0) AS expense,
+                    MAX(m.movement_date) AS last_date
+             FROM treasury_movements m
+             WHERE " . $where . "
+             GROUP BY TRIM(m.beneficiary)
+             ORDER BY name ASC",
+            $params
+        );
+        // Older data can store the same supplier with different spelling/case: merge by the
+        // normalised name and keep the spelling used most often.
+        $merged = [];
+        foreach ($rows as $row) {
+            $name = trim((string) preg_replace('/\s+/u', ' ', (string) ($row['name'] ?? '')));
+            if ($name === '') {
+                continue;
+            }
+            $key = mb_strtolower($name);
+            $movements = (int) ($row['movements'] ?? 0);
+            $entry = $merged[$key] ?? [
+                'spellings' => [],
+                'movements' => 0,
+                'income' => 0.0,
+                'expense' => 0.0,
+                'last_date' => '',
+            ];
+            $entry['spellings'][$name] = (int) ($entry['spellings'][$name] ?? 0) + $movements;
+            $entry['movements'] += $movements;
+            $entry['income'] += (float) ($row['income'] ?? 0);
+            $entry['expense'] += (float) ($row['expense'] ?? 0);
+            $lastDate = (string) ($row['last_date'] ?? '');
+            if ($lastDate > (string) $entry['last_date']) {
+                $entry['last_date'] = $lastDate;
+            }
+            $merged[$key] = $entry;
+        }
+
+        $list = [];
+        $totals = ['suppliers' => 0, 'movements' => 0, 'income' => 0.0, 'expense' => 0.0];
+        foreach ($merged as $entry) {
+            $spellings = (array) $entry['spellings'];
+            arsort($spellings);
+            $income = (float) $entry['income'];
+            $expense = (float) $entry['expense'];
+            $lastDate = (string) $entry['last_date'];
+            $list[] = [
+                'name' => (string) array_key_first($spellings),
+                'movements' => (int) $entry['movements'],
+                'income' => $income,
+                'expense' => $expense,
+                'net' => $income - $expense,
+                'last_date' => $lastDate,
+                'last_date_formatted' => $lastDate !== '' ? (string) (format_date($lastDate) ?: $lastDate) : '',
+            ];
+            $totals['suppliers']++;
+            $totals['movements'] += (int) $entry['movements'];
+            $totals['income'] += $income;
+            $totals['expense'] += $expense;
+        }
+        if ($sort === 'name') {
+            usort($list, static fn (array $a, array $b): int => strnatcasecmp($a['name'], $b['name']));
+        } else {
+            usort($list, static fn (array $a, array $b): int => (($b['income'] + $b['expense']) <=> ($a['income'] + $a['expense']))
+                ?: strnatcasecmp($a['name'], $b['name']));
+        }
+
+        return ['rows' => $list, 'totals' => $totals];
+    }
+
+    /**
+     * Display names of the given members (public wrapper used by the financial statement and by
+     * the loan/deposit registers, which group movements by counterparty).
+     *
+     * @param list<int> $ids
+     * @return array<int,string>
+     */
+    public function memberDisplayNames(array $ids): array
+    {
+        return $this->memberNames($ids);
+    }
+
+    /**
+     * Counterparties of one managed category (loans, security deposits) with what came in and what
+     * went out for each of them. Member-linked movements take the member name; everything else uses
+     * the free-text counterparty.
+     *
+     * @return array{
+     *     rows:list<array{name:string,member_id:int,movements:int,income:float,expense:float,net:float,last_date:string,last_date_formatted:string}>,
+     *     totals:array{count:int,movements:int,income:float,expense:float}
+     * }
+     */
+    public function positionOverview(string $category, string $query = '', string $sort = 'volume'): array
+    {
+        $category = trim($category);
+        $totals = ['count' => 0, 'movements' => 0, 'income' => 0.0, 'expense' => 0.0];
+        if ($category === '') {
+            return ['rows' => [], 'totals' => $totals];
+        }
+        $rows = $this->db->fetchAll(
+            "SELECT m.beneficiary, m.member_id, m.direction, m.amount, m.movement_date
+             FROM treasury_movements m
+             WHERE m.category = :category AND m.superseded_at IS NULL
+               AND (m.approved_at IS NOT NULL OR m.account = 'cash')
+             ORDER BY m.movement_date DESC, m.id DESC",
+            ['category' => $category]
+        );
+        $ids = [];
+        foreach ($rows as $row) {
+            $memberId = (int) ($row['member_id'] ?? 0);
+            if ($memberId > 0) {
+                $ids[] = $memberId;
+            }
+        }
+        $names = $ids === [] ? [] : $this->memberNames($ids);
+        $needle = mb_strtolower(trim($query));
+        $groups = [];
+        foreach ($rows as $row) {
+            $memberId = (int) ($row['member_id'] ?? 0);
+            $name = trim((string) ($names[$memberId] ?? ''));
+            if ($name === '') {
+                $name = trim((string) preg_replace('/\s+/u', ' ', (string) ($row['beneficiary'] ?? '')));
+            }
+            if ($name === '') {
+                $name = (string) __('treasury.counterparty_missing');
+            }
+            if ($needle !== '' && !str_contains(mb_strtolower($name), $needle)) {
+                continue;
+            }
+            $key = mb_strtolower($name);
+            $entry = $groups[$key] ?? [
+                'name' => $name,
+                'member_id' => 0,
+                'movements' => 0,
+                'income' => 0.0,
+                'expense' => 0.0,
+                'last_date' => '',
+            ];
+            if ($entry['member_id'] === 0 && $memberId > 0) {
+                $entry['member_id'] = $memberId;
+            }
+            $entry['movements']++;
+            if ((string) ($row['direction'] ?? '') === 'income') {
+                $entry['income'] += (float) ($row['amount'] ?? 0);
+            } else {
+                $entry['expense'] += (float) ($row['amount'] ?? 0);
+            }
+            $lastDate = (string) ($row['movement_date'] ?? '');
+            if ($lastDate > $entry['last_date']) {
+                $entry['last_date'] = $lastDate;
+            }
+            $groups[$key] = $entry;
+        }
+        $list = [];
+        foreach ($groups as $entry) {
+            $income = round((float) $entry['income'], 2);
+            $expense = round((float) $entry['expense'], 2);
+            $lastDate = (string) $entry['last_date'];
+            $list[] = [
+                'name' => (string) $entry['name'],
+                'member_id' => (int) $entry['member_id'],
+                'movements' => (int) $entry['movements'],
+                'income' => $income,
+                'expense' => $expense,
+                'net' => round($income - $expense, 2),
+                'last_date' => $lastDate,
+                'last_date_formatted' => $lastDate !== '' ? (string) (format_date($lastDate) ?: $lastDate) : '',
+            ];
+            $totals['count']++;
+            $totals['movements'] += (int) $entry['movements'];
+            $totals['income'] += $income;
+            $totals['expense'] += $expense;
+        }
+        if ($sort === 'name') {
+            usort($list, static fn (array $a, array $b): int => strnatcasecmp($a['name'], $b['name']));
+        } else {
+            usort($list, static fn (array $a, array $b): int => (($b['income'] + $b['expense']) <=> ($a['income'] + $a['expense']))
+                ?: strnatcasecmp($a['name'], $b['name']));
+        }
+        $totals['income'] = round((float) $totals['income'], 2);
+        $totals['expense'] = round((float) $totals['expense'], 2);
+
+        return ['rows' => $list, 'totals' => $totals];
+    }
+
+    /** Loans and member financing: received (income) versus repaid (expense). */
+    public function loanOverview(string $query = '', string $sort = 'volume'): array
+    {
+        return $this->positionOverview('member_loan', $query, $sort);
+    }
+
+    /** Security deposits (SIAE, municipality, rent contract, …): paid versus refunded. */
+    public function depositOverview(string $query = '', string $sort = 'volume'): array
+    {
+        return $this->positionOverview('security_deposit', $query, $sort);
+    }
+
+    /** Deletes one movement (used by the member card to unlink a payment from the cash book). */
+    public function delete(int $id, string $ip = '', ?int $userId = null): bool
+    {
+        if ($id < 1) {
+            return false;
+        }
+        $row = $this->db->fetch('SELECT * FROM treasury_movements WHERE id = :id', ['id' => $id]);
+        if ($row === null) {
+            return false;
+        }
+        $this->db->query('DELETE FROM treasury_movements WHERE id = :id', ['id' => $id]);
+        $this->audit->log('treasury.deleted', 'treasury', (string) $id, [
+            'direction' => $row['direction'] ?? null,
+            'amount' => $row['amount'] ?? null,
+            'movement_date' => $row['movement_date'] ?? null,
+            'description' => $row['description'] ?? null,
+            'payment_id' => $row['payment_id'] ?? null,
+        ], null, $ip, $userId);
+
+        return true;
     }
 
     /**
@@ -2424,6 +2902,7 @@ final class TreasuryService
         $account = (string) ($row['account'] ?? '');
         $method = trim((string) ($row['payment_method'] ?? ''));
         $documentType = (string) ($row['document_type'] ?? '');
+        $justificationCode = trim((string) ($row['justification_code'] ?? ''));
         $values = [
             'movement_date' => (string) ($row['movement_date'] ?? ''),
             'amount' => $entered !== '' ? number_format((float) $entered, 2, ',', '') : number_format($amount, 2, ',', ''),
@@ -2437,6 +2916,7 @@ final class TreasuryService
             'notes' => (string) ($row['notes'] ?? ''),
             'beneficiary' => (string) ($row['beneficiary'] ?? ''),
             'document_type' => $documentType,
+            'justification_code' => $justificationCode,
             'invoice_number' => (string) ($row['invoice_number'] ?? ''),
             'invoice_date' => (string) ($row['invoice_date'] ?? ''),
             'invoice_due_date' => (string) ($row['invoice_due_date'] ?? ''),
@@ -2463,6 +2943,7 @@ final class TreasuryService
             'document_type' => $documentType !== ''
                 ? (string) __('treasury.document_type_' . self::normalizeDocumentType($documentType))
                 : '',
+            'justification_code' => $justificationCode,
             'invoice_date' => $values['invoice_date'] !== '' ? (format_date($values['invoice_date']) ?: $values['invoice_date']) : '',
             'invoice_due_date' => $values['invoice_due_date'] !== '' ? (format_date($values['invoice_due_date']) ?: $values['invoice_due_date']) : '',
             'budget_item_id' => (int) $values['budget_item_id'] > 0 ? $this->budgetItemLabel((int) $values['budget_item_id']) : '',
@@ -2484,6 +2965,7 @@ final class TreasuryService
                 'notes' => (string) __('treasury.notes'),
                 'beneficiary' => (string) __('treasury.counterparty'),
                 'document_type' => (string) __('treasury.document_type'),
+                'justification_code' => (string) __('budget.evidence_code'),
                 'invoice_number' => (string) __('treasury.doc_number'),
                 'invoice_date' => (string) __('treasury.doc_date'),
                 'invoice_due_date' => (string) __('treasury.invoice_due_date'),
@@ -2509,6 +2991,41 @@ final class TreasuryService
         return is_file($path) ? $path : null;
     }
 
+    /**
+     * Code of a supporting document (“pezza giustificativa”): a letter plus the movement number,
+     * zero-padded to six digits. The id makes it unique by construction and stable over time.
+     */
+    public static function justificationCode(int $id): string
+    {
+        return $id > 0 ? 'P' . str_pad((string) $id, 6, '0', STR_PAD_LEFT) : '';
+    }
+
+    /**
+     * Keeps the justification code aligned with the document fields: assigned on the first save
+     * that carries a document, cleared when the document is removed. Existing codes never change.
+     */
+    private function syncJustificationCode(int $id): void
+    {
+        if ($id < 1) {
+            return;
+        }
+        $row = $this->db->fetch(
+            'SELECT id, invoice_number, document_type, justification_code
+               FROM treasury_movements WHERE id = :id',
+            ['id' => $id]
+        );
+        if ($row === null) {
+            return;
+        }
+        $hasDocument = trim((string) ($row['invoice_number'] ?? '')) !== ''
+            || trim((string) ($row['document_type'] ?? '')) !== '';
+        $stored = trim((string) ($row['justification_code'] ?? ''));
+        $code = $hasDocument ? ($stored !== '' ? $stored : self::justificationCode($id)) : null;
+        if ((string) ($row['justification_code'] ?? '') !== (string) ($code ?? '')) {
+            $this->db->update('treasury_movements', ['justification_code' => $code], 'id = :id', ['id' => $id]);
+        }
+    }
+
     /** @param array<string,mixed> $input */
     public function create(array $input, ?array $file, string $ip, ?int $userId = null): array
     {
@@ -2532,6 +3049,7 @@ final class TreasuryService
         $data['approved_at'] = date('Y-m-d H:i:s');
         $data['approved_by'] = $userId;
         $id = $this->db->insert('treasury_movements', $data);
+        $this->syncJustificationCode($id);
         $this->audit->log('treasury.created', 'treasury', (string) $id, null, $input, $ip);
         return ['ok' => true, 'id' => $id];
     }
@@ -2586,6 +3104,7 @@ final class TreasuryService
                 'errors' => [],
             ];
         }
+        $this->syncJustificationCode($id);
         $this->audit->log('treasury.updated', 'treasury', (string) $id, [
             'direction' => $existing['direction'] ?? null,
             'amount' => $existing['amount'] ?? null,
@@ -2597,6 +3116,18 @@ final class TreasuryService
             'category' => $data['category'],
             'movement_date' => $data['movement_date'],
         ], $ip);
+        // Reclassified to the cash desk: a cash movement never waits for the first-note approval.
+        if (!self::requiresApproval((string) ($data['account'] ?? ''))
+            && trim((string) ($existing['approved_at'] ?? '')) === '') {
+            $this->db->update('treasury_movements', [
+                'approved_at' => date('Y-m-d H:i:s'),
+                'approved_by' => $userId,
+            ], 'id = :id', ['id' => $id]);
+            $this->audit->log('treasury.approved', 'treasury', (string) $id, null, [
+                'approved_by' => $userId,
+                'reason' => 'cash',
+            ], $ip);
+        }
         return ['ok' => true, 'id' => $id];
     }
 
@@ -2635,6 +3166,14 @@ final class TreasuryService
         foreach (array_unique(array_map('intval', $ids)) as $id) {
             if ($id < 1) {
                 continue;
+            }
+            if (!$approved) {
+                // The cash desk never needs the approval: un-approving it would only put it back in
+                // the queue, so those rows are left alone.
+                $row = $this->db->fetch('SELECT account FROM treasury_movements WHERE id = :id', ['id' => $id]);
+                if ($row === null || !self::requiresApproval((string) ($row['account'] ?? ''))) {
+                    continue;
+                }
             }
             $this->db->update('treasury_movements', [
                 'approved_at' => $approved ? date('Y-m-d H:i:s') : null,
@@ -2698,6 +3237,11 @@ final class TreasuryService
             $copy['superseded_account'] = null;
             $copy['superseded_note'] = null;
             $copy['superseded_by_id'] = null;
+            // Landing on the cash desk: the copy is approved at once, like any cash movement.
+            if (!self::requiresApproval($target)) {
+                $copy['approved_at'] = date('Y-m-d H:i:s');
+                $copy['approved_by'] = $userId;
+            }
             $newId = $this->db->insert('treasury_movements', array_filter(
                 $copy,
                 static fn (string $key): bool => !str_starts_with($key, 'first_name') && !str_starts_with($key, 'last_name'),
@@ -2792,6 +3336,25 @@ final class TreasuryService
                 $payload['budget_item_id'] = $budgetId;
             }
         }
+        // Counterparty: a linked member and a free-text supplier exclude each other (same rule as
+        // the movement form). An empty selection keeps the current value, `__none__` unlinks the
+        // member and `beneficiary_action = clear` empties the “fornitore”.
+        $memberRaw = trim((string) ($changes['member_id'] ?? ''));
+        $beneficiaryRaw = (string) ($changes['beneficiary'] ?? '');
+        if ($memberRaw === '__none__') {
+            $payload['member_id'] = null;
+        } elseif ($memberRaw !== '') {
+            $memberId = (int) $memberRaw;
+            if ($memberId > 0 && $this->db->fetch('SELECT id FROM members WHERE id = :id', ['id' => $memberId]) !== null) {
+                $payload['member_id'] = $memberId;
+                $payload['beneficiary'] = null;
+            }
+        } elseif (trim($beneficiaryRaw) !== '') {
+            $payload['beneficiary'] = $this->normalizeBeneficiary($beneficiaryRaw);
+            $payload['member_id'] = null;
+        } elseif ((string) ($changes['beneficiary_action'] ?? '') === 'clear') {
+            $payload['beneficiary'] = null;
+        }
         if ((string) ($changes['description_action'] ?? '') === 'replace') {
             // Same normalisation as the single form (first letter upper case, rest lower case); the
             // “causale” column is NOT NULL, so clearing it stores an empty string.
@@ -2875,8 +3438,23 @@ final class TreasuryService
         return $count;
     }
 
-    public function autoRegisterFromPayment(int $paymentId, int $memberId, float $amount, string $method, string $date): void
+    /**
+     * Cash movements never wait for the first-note approval: the cash desk is booked as it happens.
+     * Bank, card and the other wallets keep the approval step (automatic entries land as pending).
+     */
+    public static function requiresApproval(string $account): bool
     {
+        return self::normalizeAccount($account) !== 'cash';
+    }
+
+    public function autoRegisterFromPayment(
+        int $paymentId,
+        int $memberId,
+        float $amount,
+        string $method,
+        string $date,
+        ?int $userId = null
+    ): void {
         if (!$this->components->isEnabled('treasury')) {
             return;
         }
@@ -2890,18 +3468,21 @@ final class TreasuryService
             'payment_method' => $method,
             'description' => __('treasury.auto_membership_payment'),
             'category' => 'membership_fee',
-        ]);
+        ], $userId);
     }
 
     /**
      * @param array{amount:float|int|string,movement_date?:string,payment_method?:string,description?:string,category?:string} $input
      */
-    public function registerMembershipIncome(int $paymentId, int $memberId, array $input): void
+    public function registerMembershipIncome(int $paymentId, int $memberId, array $input, ?int $userId = null): void
     {
         if (!$this->components->isEnabled('treasury')) {
             return;
         }
-        $exists = $this->db->fetch('SELECT id FROM treasury_movements WHERE payment_id = :p', ['p' => $paymentId]);
+        $exists = $this->db->fetch(
+            'SELECT id FROM treasury_movements WHERE payment_id = :p AND superseded_at IS NULL LIMIT 1',
+            ['p' => $paymentId]
+        );
         if ($exists) {
             return;
         }
@@ -2922,6 +3503,9 @@ final class TreasuryService
         if ($description === '') {
             $description = (string) __('treasury.auto_membership_payment');
         }
+        $account = self::accountForPaymentMethod($method);
+        // The cash desk does not need the first-note approval: a cash payment is booked at once.
+        $approved = !self::requiresApproval($account);
         $this->db->insert('treasury_movements', [
             'movement_date' => $date,
             'direction' => 'income',
@@ -2929,9 +3513,11 @@ final class TreasuryService
             'amount' => $amount,
             'description' => mb_substr($description, 0, 500),
             'payment_method' => $method,
-            'account' => self::accountForPaymentMethod($method),
+            'account' => $account,
             'member_id' => $memberId,
             'payment_id' => $paymentId,
+            'approved_at' => $approved ? date('Y-m-d H:i:s') : null,
+            'approved_by' => $approved ? $userId : null,
         ]);
     }
 
@@ -3081,22 +3667,7 @@ final class TreasuryService
                 }
             }
         }
-        $beneficiary = trim((string) preg_replace('/\s+/u', ' ', (string) ($input['beneficiary'] ?? '')));
-        if ($beneficiary !== '') {
-            $beneficiary = mb_substr($beneficiary, 0, 190);
-            // Reuse the canonical spelling already stored (ignoring case/spacing) so “Municipality of
-            // Bolzano” and “municipality of bolzano” never become duplicates.
-            $existingName = $this->db->fetch(
-                "SELECT beneficiary FROM treasury_movements
-                 WHERE beneficiary IS NOT NULL AND beneficiary <> ''
-                   AND LOWER(TRIM(beneficiary)) = LOWER(:name)
-                 ORDER BY id ASC LIMIT 1",
-                ['name' => $beneficiary]
-            );
-            if (is_array($existingName) && trim((string) ($existingName['beneficiary'] ?? '')) !== '') {
-                $beneficiary = (string) $existingName['beneficiary'];
-            }
-        }
+        $beneficiary = $this->normalizeBeneficiary((string) ($input['beneficiary'] ?? ''));
 
         $description = self::normalizeDescription((string) ($input['description'] ?? ''));
         $description = $description !== '' ? mb_substr($description, 0, 500) : '';
@@ -3141,6 +3712,32 @@ final class TreasuryService
                 'beneficiary' => $beneficiary !== '' ? $beneficiary : null,
             ],
         ];
+    }
+
+    /**
+     * Counterparty name as it gets stored: trimmed, single-spaced, capped — and reusing the
+     * spelling the register already knows so “Municipality of Bolzano” and “municipality of
+     * bolzano” never become two different suppliers.
+     */
+    private function normalizeBeneficiary(string $raw): string
+    {
+        $beneficiary = trim((string) preg_replace('/\s+/u', ' ', $raw));
+        if ($beneficiary === '') {
+            return '';
+        }
+        $beneficiary = mb_substr($beneficiary, 0, 190);
+        $existingName = $this->db->fetch(
+            "SELECT beneficiary FROM treasury_movements
+             WHERE beneficiary IS NOT NULL AND beneficiary <> ''
+               AND LOWER(TRIM(beneficiary)) = LOWER(:name)
+             ORDER BY id ASC LIMIT 1",
+            ['name' => $beneficiary]
+        );
+        if (is_array($existingName) && trim((string) ($existingName['beneficiary'] ?? '')) !== '') {
+            return (string) $existingName['beneficiary'];
+        }
+
+        return $beneficiary;
     }
 
     /**

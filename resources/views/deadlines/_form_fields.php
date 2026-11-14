@@ -63,7 +63,7 @@ foreach (preg_split('/[^\d]+/', (string) ($values['notify_days'] ?? '')) ?: [] a
     }
 }
 $notifySelected = array_values(array_unique($notifySelected));
-$notifyPresets = [30, 7, 0];
+$notifyPresets = [30, 15, 7, 0];
 foreach ($notifySelected as $day) {
     if (!in_array($day, $notifyPresets, true)) {
         $notifyPresets[] = $day;

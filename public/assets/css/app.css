@@ -2393,18 +2393,6 @@ a.sidebar-brand-home:hover {
   gap: 1rem;
   margin-bottom: 1.5rem;
 }
-.org-control-body-panel {
-  padding: 0.85rem 1rem;
-  margin-bottom: 1rem;
-}
-.org-control-body-form {
-  display: grid;
-  gap: 0.35rem;
-}
-.org-control-body-hint {
-  margin: 0 0 0.35rem;
-  font-size: 0.85rem;
-}
 /* Dashboard KPIs: a value that needs attention turns red/orange. */
 .stat {
   padding: 1.2rem 1.25rem;
@@ -2424,6 +2412,37 @@ a.sidebar-brand-home:hover {
 }
 .stat.is-warn .value {
   color: #b45309;
+}
+/*
+ * KPI as a door: the dashboard boxes are links. Same skin, plus a hover/focus affordance and a
+ * small arrow so it is obvious that the number opens the filtered list.
+ */
+.stat-link {
+  display: block;
+  color: inherit;
+  text-decoration: none;
+  transition: transform 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease;
+}
+.stat-link .label::after {
+  content: "→";
+  margin-left: 0.35rem;
+  opacity: 0;
+  transition: opacity 0.15s ease;
+}
+.stat-link:hover {
+  border-color: color-mix(in srgb, var(--brand-primary) 55%, var(--line));
+  box-shadow: 0 12px 26px color-mix(in srgb, var(--ink) 14%, transparent);
+  transform: translateY(-1px);
+}
+.stat-link:hover .label::after,
+.stat-link:focus-visible .label::after { opacity: 1; }
+.stat-link:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--brand-primary) 60%, white);
+  outline-offset: 2px;
+}
+@media (prefers-reduced-motion: reduce) {
+  .stat-link { transition: none; }
+  .stat-link:hover { transform: none; }
 }
 /* Small caption under a KPI value (statistics page). */
 .stat-hint {
@@ -3298,6 +3317,15 @@ button.btn-icon:hover:not(:disabled) {
   flex-wrap: wrap;
   margin: 0 0 0.85rem;
 }
+/* “New members this year” banner: same shape as the missing-data one, informational colours. */
+.member-joined-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.65rem 1rem;
+  flex-wrap: wrap;
+  margin: 0 0 0.85rem;
+}
 .member-issues-banner-actions {
   display: inline-flex;
   align-items: center;
@@ -3617,6 +3645,35 @@ tr.clickable-row:focus-visible {
   gap: 0.25rem;
   align-items: center;
 }
+/* Member list columns: PRIVACY carries three long consent labels and used to steal the
+   room the "Situazione" badge needs, breaking "50,00 €" before the symbol. Bound the
+   PRIVACY width and keep amount + currency on one line. */
+@media (min-width: 641px) {
+  .members-table .members-col-gdpr {
+    width: 13rem;
+    min-width: 13rem;
+    padding-left: 0.5rem;
+    padding-right: 0.5rem;
+  }
+  /* The PRIVACY cell used to claim a third of the table with three badges on one line.
+     Stacked, compact labels keep it narrow and give the room to PAGAMENTO/SITUAZIONE. */
+  .members-table .member-gdpr-badges {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.2rem;
+    max-width: 13rem;
+  }
+  .members-table .members-col-gdpr .badge {
+    padding: 0.16rem 0.45rem;
+    font-size: 0.7rem;
+  }
+  .members-table .members-col-situation {
+    width: 11rem;
+  }
+  .members-table .members-col-situation .badge {
+    white-space: nowrap;
+  }
+}
 .member-scheda-main {
   display: grid;
   gap: 1.15rem;
@@ -3624,6 +3681,30 @@ tr.clickable-row:focus-visible {
 }
 .member-scheda-card .panel-header {
   align-items: center;
+}
+.member-payment-treasury {
+  min-width: 12rem;
+}
+.member-payment-treasury-state {
+  margin-bottom: 0.35rem;
+}
+.member-payment-warn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+}
+.member-payment-warn svg {
+  width: 14px;
+  height: 14px;
+}
+.member-payment-treasury-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.35rem;
+}
+.member-payment-treasury-actions form {
+  margin: 0;
 }
 .member-scheda-facts {
   display: grid;
@@ -10963,12 +11044,6 @@ img.org-assoc-logo-img {
   margin: 0 0 0.35rem;
   font-size: 0.88rem;
 }
-.org-person-form .org-copy-fields.is-locked input,
-.org-person-form .org-copy-fields.is-locked select,
-.org-person-form .org-copy-fields.is-locked textarea {
-  background: #f2f2f2;
-  color: #4a4a4a;
-}
 .org-person-delete {
   display: flex;
   justify-content: flex-end;
@@ -12680,7 +12755,7 @@ tr.doc-row-editable:focus-visible {
   gap: 0.6rem;
 }
 .config-accordion-body > form.accounts-admin-add {
-  grid-template-columns: minmax(0, 1fr) auto auto;
+  grid-template-columns: minmax(0, 1fr) minmax(8rem, 10rem) auto auto;
   align-items: end;
   gap: 0.75rem;
   margin-top: 0.9rem;
@@ -12689,7 +12764,7 @@ tr.doc-row-editable:focus-visible {
 }
 .accounts-admin-row {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto minmax(9rem, 13rem);
+  grid-template-columns: minmax(0, 1fr) minmax(8rem, 10rem) auto minmax(9rem, 13rem);
   align-items: end;
   gap: 0.55rem 0.9rem;
   padding: 0.7rem 0.9rem;
@@ -12903,6 +12978,72 @@ tr.doc-row-editable:focus-visible {
 .tmf-similar-amount { flex: 0 0 auto; font-weight: 700; font-variant-numeric: tabular-nums; }
 .tmf-similar-actions { display: flex; flex-wrap: wrap; gap: 0.5rem; }
 .tmf-similar-done { margin: 0; font-weight: 700; color: var(--brand-primary-deep); }
+/*
+ * Detailed proposal (“I noticed N similar movements”): one compact line of figures and a
+ * scrollable table with date, counterparty, wallet and amount, so the batch is judged before it is
+ * applied. The “Apri” link opens the movement in a new tab and keeps the proposal in place.
+ */
+.tmf-similar-summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem 0.9rem;
+  margin: 0;
+  font-size: 0.87rem;
+  color: color-mix(in srgb, var(--ink) 72%, transparent);
+}
+.tmf-similar-total { font-weight: 700; color: var(--ink); font-variant-numeric: tabular-nums; }
+.tmf-similar-table-wrap {
+  max-height: 21rem;
+  overflow: auto;
+  border-radius: 12px;
+  border: 1px solid color-mix(in srgb, var(--ink) 10%, transparent);
+  background: #fff;
+}
+.tmf-similar-table { width: 100%; border-collapse: collapse; font-size: 0.86rem; }
+.tmf-similar-table thead th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  padding: 0.45rem 0.6rem;
+  text-align: left;
+  font-size: 0.72rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: color-mix(in srgb, var(--ink) 55%, transparent);
+  background: color-mix(in srgb, var(--brand-primary) 6%, #fff);
+  border-bottom: 1px solid color-mix(in srgb, var(--ink) 10%, transparent);
+  white-space: nowrap;
+}
+.tmf-similar-table tbody td {
+  padding: 0.42rem 0.6rem;
+  border-bottom: 1px solid color-mix(in srgb, var(--ink) 6%, transparent);
+  vertical-align: top;
+}
+.tmf-similar-table tbody tr:last-child td { border-bottom: 0; }
+.tmf-similar-table .is-amount { text-align: right; white-space: nowrap; }
+.tmf-similar-table .tmf-similar-date { white-space: nowrap; }
+.tmf-similar-table .tmf-similar-text {
+  min-width: 15rem;
+  white-space: normal;
+  overflow: visible;
+  text-overflow: clip;
+}
+.tmf-similar-table .tmf-similar-amount { text-align: right; }
+.tmf-similar-missing {
+  display: block;
+  margin-top: 0.1rem;
+  font-size: 0.76rem;
+  color: color-mix(in srgb, #b54708 75%, var(--ink));
+}
+.tmf-similar-open-cell { width: 2.4rem; text-align: right; }
+.tmf-similar-open {
+  font-weight: 700;
+  font-size: 1rem;
+  text-decoration: none;
+  color: var(--brand-primary-deep);
+}
+.tmf-similar-open:hover,
+.tmf-similar-open:focus-visible { text-decoration: underline; }
 
 /*
  * ── First note: counting line (historical, excluded from the counts) ─────────────
@@ -12998,6 +13139,49 @@ tr.doc-row-editable:focus-visible {
   background: color-mix(in srgb, #b54708 6%, #fff);
   color: color-mix(in srgb, #7a3e05 85%, var(--ink, #142a28));
 }
+/*
+ * Supplier drill-down notice + “Gestione fornitori” page: same visual language as the anomaly
+ * banner, plus a numeric table where income/expense keep their colours.
+ */
+.treasury-supplier-notice {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  margin: 0.2rem 0 0.8rem;
+  padding: 0.45rem 0.5rem 0.45rem 0.75rem;
+  border-radius: 10px;
+  border: 1px solid color-mix(in srgb, var(--brand-primary) 26%, var(--line));
+  background: color-mix(in srgb, var(--brand-primary) 6%, #fff);
+  color: var(--ink);
+}
+.suppliers-filter {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 0.6rem;
+}
+.suppliers-filter > * { flex: 1 1 14rem; }
+.suppliers-filter-actions {
+  flex: 0 0 auto;
+  display: flex;
+  gap: 0.4rem;
+  align-items: center;
+}
+.suppliers-table td.is-num,
+.suppliers-table th.is-num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.suppliers-table td.is-income { color: #0f6b4d; font-weight: 600; }
+.suppliers-table td.is-expense { color: #9a1c12; font-weight: 600; }
+.suppliers-table td.is-negative { color: #9a1c12; }
+.suppliers-name { font-weight: 700; color: var(--brand-primary-deep); text-decoration: none; }
+.suppliers-name:hover,
+.suppliers-name:focus-visible { text-decoration: underline; }
+.suppliers-actions { text-align: right; white-space: nowrap; }
 .tmf-similar-probe {
   position: relative;
   border: 2px solid color-mix(in srgb, var(--brand-primary) 55%, var(--line));
@@ -13111,6 +13295,24 @@ tr.doc-row-editable:focus-visible {
   animation: record-editing-pulse 1.6s ease-in-out infinite;
 }
 .record-editing[hidden] { display: none; }
+/*
+ * “Just created/changed by …” (last 15 minutes): soft notice above the record form, refreshed by
+ * the freshness poll; a creation is neutral, a change is amber.
+ */
+.record-activity {
+  margin: 0 0 1rem;
+  border-radius: 14px;
+  border-left: 4px solid color-mix(in srgb, var(--line) 70%, var(--brand-primary));
+}
+.record-activity[hidden] { display: none; }
+.record-activity strong { display: block; margin-bottom: 0.2rem; }
+.record-activity p { margin: 0; line-height: 1.45; }
+.record-activity[data-activity-kind="created"] {
+  border-left-color: color-mix(in srgb, var(--brand-primary) 65%, var(--line));
+}
+.record-activity[data-activity-kind="updated"] {
+  border-left-color: color-mix(in srgb, #d97706 70%, var(--line));
+}
 @keyframes record-editing-pulse {
   0%, 100% { opacity: 1; }
   50% { opacity: 0.35; }
@@ -14058,6 +14260,7 @@ select.is-remote-choice {
 .import-col-sample { font-size: 0.8rem; max-width: 320px; word-break: break-word; }
 .import-stats { margin-bottom: 1rem; }
 .import-gaps-alert ul { margin: 0.35rem 0 0; padding-left: 1.1rem; }
+.import-gaps-alert .import-gaps-hint { margin: 0.35rem 0 0; font-size: 0.9rem; }
 .import-preview-table { width: 100%; border-collapse: collapse; }
 .import-preview-table th {
   text-align: left;
@@ -14351,6 +14554,46 @@ select.is-remote-choice {
 }
 
 /* ── Model D help wizard (movement form) ─────────────────────────────────────────────────────── */
+/* Model D (RUNTS): exercise chooser, built from the years available in the cash book. */
+.runts-year-panel { display: grid; gap: 0.75rem; }
+.runts-year-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(13rem, 1fr));
+  gap: 0.7rem;
+}
+.runts-year-card {
+  display: grid;
+  gap: 0.2rem;
+  justify-items: start;
+  padding: 0.9rem 1rem;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: #fff;
+  color: var(--ink);
+  text-decoration: none;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease, transform 0.15s ease;
+}
+.runts-year-card:hover,
+.runts-year-card:focus-visible {
+  border-color: color-mix(in srgb, var(--brand-primary) 45%, var(--line));
+  box-shadow: var(--shadow-soft);
+  transform: translateY(-1px);
+  text-decoration: none;
+}
+.runts-year-card.is-current {
+  border-color: color-mix(in srgb, var(--brand-primary) 45%, var(--line));
+  background: color-mix(in srgb, var(--brand-primary) 4%, #fff);
+}
+.runts-year-card.is-pending { background: #fdfaf0; }
+.runts-year-value {
+  font-family: var(--font-display);
+  font-size: 1.45rem;
+  font-weight: 700;
+  color: var(--brand-primary-deep);
+  line-height: 1.1;
+}
+.runts-year-meta { font-size: 0.82rem; color: var(--muted); }
+
 .runts-line-field .sf-field__label {
   display: flex;
   width: 100%;

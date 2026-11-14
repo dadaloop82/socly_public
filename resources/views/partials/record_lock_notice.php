@@ -1,19 +1,28 @@
 <?php
 /**
  * Competition between operators: hidden version, conflict warning when saving, "card updated"
- * banner (polling) and "modifying" indicator.
+ * banner (polling), "modifying" indicator and "just created/modified by …" box.
  *
  * @var string $entity
  * @var array<string,mixed>|null $row
  * @var int|null $version       versione da inviare (default: quella della riga)
  * @var int|null $recordId
  * @var array{user?:string,at?:string,current?:int,reload_url?:string}|null $conflict
+ * @var array{kind?:string,user?:string,at?:string}|null $activity
  */
 $entity = (string) ($entity ?? '');
 $row = is_array($row ?? null) ? $row : null;
 $recordId = (int) ($recordId ?? ($row['id'] ?? 0));
 $version = (int) ($version ?? ($row['row_version'] ?? 0));
 $conflict = is_array($conflict ?? null) ? $conflict : null;
+$activity = is_array($activity ?? null) ? $activity : null;
+$activityText = '';
+if ($activity !== null) {
+    $activityText = (string) __(
+        (string) ($activity['kind'] ?? '') === 'created' ? 'concurrency.activity_created' : 'concurrency.activity_updated',
+        ['user' => (string) ($activity['user'] ?? ''), 'at' => (string) ($activity['at'] ?? '')]
+    );
+}
 $reloadUrl = (string) ($conflict['reload_url'] ?? '');
 if ($reloadUrl === '') {
     $reloadUrl = (string) ($_SERVER['REQUEST_URI'] ?? '');
@@ -39,4 +48,8 @@ if ($reloadUrl === '') {
     </div>
 <?php endif; ?>
 <div class="alert alert-warn record-stale" role="alert" hidden data-freshness-banner></div>
+<div class="alert alert-info record-activity" role="status" data-recent-activity data-activity-kind="<?= e((string) ($activity['kind'] ?? '')) ?>"<?= $activity === null ? ' hidden' : '' ?>>
+    <strong><?= e(__('concurrency.activity_title')) ?></strong>
+    <p data-recent-activity-text><?= e($activityText) ?></p>
+</div>
 <div class="record-editing" role="status" hidden data-editing-notice></div>

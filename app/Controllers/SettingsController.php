@@ -118,6 +118,9 @@ final class SettingsController extends BaseController
             'showNameDe' => $this->setup->showGermanNameField(),
             'components' => ComponentRegistry::all(),
             'enabledComponents' => array_fill_keys($this->components->enabledKeys(), true),
+            // Organigramma: whether the association has a control body (auditors/sindaci).
+            // The setting lives only in Settings → Organigramma, not on the org chart page.
+            'orgHasControlBody' => (string) $this->settings->get('org.has_control_body', '1') !== '0',
             'componentConfigs' => [
                 'treasury' => $this->components->config('treasury', ['auto_from_payments' => true]),
                 'org_roles' => $this->components->config('org_roles', []),
@@ -131,6 +134,7 @@ final class SettingsController extends BaseController
             'treasuryAccounts' => $this->treasury->accountOptions(),
             'treasuryAccountUsage' => $this->treasury->accountUsage(),
             'treasuryAccountBalances' => $this->treasury->accountBalances(),
+            'treasuryOpeningBalances' => $this->treasury->openingBalances(),
             'panelUsers' => $this->users->panelUsers(),
             'memberOptions' => $this->users->memberOptions(),
             'emailTemplates' => $this->emailTemplates->all(),
@@ -484,6 +488,8 @@ final class SettingsController extends BaseController
 
         $this->settings->set('association.board_configured', '1');
         $this->settings->set('association.auditors_configured', '1');
+        // Mandate dates changed here must show up in the Scadenzario right away.
+        $this->deadlines->syncSystemDeadlines();
         $this->flash('success', __('settings.saved'));
         redirect('/settings#people');
     }
@@ -574,6 +580,28 @@ final class SettingsController extends BaseController
         $this->settings->set('membership.enrollment_validation', $method);
         $this->audit->log('settings.saved', 'settings', 'enrollment', null, ['method' => $method], $request->ip());
         $this->settingsFinish($request, 'enrollment');
+    }
+
+    /**
+     * Organigramma: the association declares whether it has a control body (auditors /
+     * sindaci). This is configuration, asked once and editable only here — not on the
+     * org chart page, which must stay a pure view of the current officers.
+     */
+    public function saveOrg(Request $request): void
+    {
+        $hasControlBody = (string) $request->input('has_control_body', '0') === '1';
+        $before = (string) $this->settings->get('org.has_control_body', '1');
+        $this->settings->set('org.has_control_body', $hasControlBody ? '1' : '0');
+        $this->audit->log(
+            'org.control_body_updated',
+            'settings',
+            'org.has_control_body',
+            ['has_control_body' => $before],
+            ['has_control_body' => $hasControlBody ? '1' : '0'],
+            $request->ip()
+        );
+        $this->plugins->fire('settings.saved', ['org.has_control_body']);
+        $this->settingsFinish($request, 'org');
     }
 
     public function savePlatform(Request $request): void
@@ -853,6 +881,11 @@ final class SettingsController extends BaseController
         if (is_array($bulkIds) && $bulkIds !== []) {
             $labels = is_array($data['account_label'] ?? null) ? array_values($data['account_label']) : [];
             $activeMap = is_array($data['account_active'] ?? null) ? $data['account_active'] : [];
+            $openingMap = is_array($data['account_opening'] ?? null) ? $data['account_opening'] : [];
+            $accountSlugs = [];
+            foreach ($this->treasury->accountOptions() as $option) {
+                $accountSlugs[(int) ($option['id'] ?? 0)] = (string) ($option['key'] ?? '');
+            }
             $errors = [];
             foreach (array_values($bulkIds) as $index => $rawId) {
                 $accountId = (int) $rawId;
@@ -864,6 +897,23 @@ final class SettingsController extends BaseController
                 $result = $this->treasury->updateAccount($accountId, $label, $active, $request->ip(), auth_user()['id'] ?? null);
                 if (empty($result['ok'])) {
                     $errors = array_merge($errors, $result['errors'] ?? ['account' => __('validation.required')]);
+                }
+                // Opening balance: an empty field means 0 (no opening movement for that wallet).
+                if (isset($accountSlugs[$accountId]) && array_key_exists($accountId, $openingMap)) {
+                    $opening = $this->parseOpeningBalance($openingMap[$accountId]);
+                    if ($opening === null) {
+                        $errors['account_opening'] = __('setup.accounts_opening_invalid');
+                        continue;
+                    }
+                    $openingResult = $this->treasury->setAccountOpeningBalance(
+                        $accountSlugs[$accountId],
+                        $opening,
+                        $request->ip(),
+                        auth_user()['id'] ?? null
+                    );
+                    if (empty($openingResult['ok'])) {
+                        $errors = array_merge($errors, $openingResult['errors'] ?? ['account_opening' => __('setup.accounts_opening_invalid')]);
+                    }
                 }
             }
             if ($errors !== []) {
@@ -880,14 +930,63 @@ final class SettingsController extends BaseController
 
         if ($id > 0) {
             $result = $this->treasury->updateAccount($id, $label, $active, $request->ip(), auth_user()['id'] ?? null);
+            $slug = (string) ($result['slug'] ?? '');
+            if ($slug === '') {
+                foreach ($this->treasury->accountOptions() as $option) {
+                    if ((int) ($option['id'] ?? 0) === $id) {
+                        $slug = (string) ($option['key'] ?? '');
+                        break;
+                    }
+                }
+            }
         } else {
             $result = $this->treasury->createAccount($label, $active, $request->ip(), auth_user()['id'] ?? null);
+            $slug = (string) ($result['slug'] ?? '');
         }
         if (empty($result['ok'])) {
             $this->settingsFail($request, $result['errors'] ?? ['account' => __('validation.required')], 'treasury-accounts');
         }
+        // A new wallet can start with its own opening balance right away.
+        if ($slug !== '' && array_key_exists('opening_balance', $data)) {
+            $opening = $this->parseOpeningBalance($data['opening_balance']);
+            if ($opening === null) {
+                $this->settingsFail($request, ['opening_balance' => __('setup.accounts_opening_invalid')], 'treasury-accounts');
+            }
+            $openingResult = $this->treasury->setAccountOpeningBalance($slug, $opening, $request->ip(), auth_user()['id'] ?? null);
+            if (empty($openingResult['ok'])) {
+                $this->settingsFail(
+                    $request,
+                    $openingResult['errors'] ?? ['opening_balance' => __('setup.accounts_opening_invalid')],
+                    'treasury-accounts'
+                );
+            }
+        }
         $this->audit->log('settings.saved', 'settings', 'treasury_accounts', null, null, $request->ip());
         $this->settingsFinish($request, 'treasury-accounts');
+    }
+
+    /** Opening balance from the form: empty = 0, accepts “1.234,56” and “1234.56”. */
+    private function parseOpeningBalance(mixed $raw): ?float
+    {
+        if ($raw !== null && !is_scalar($raw)) {
+            return null;
+        }
+        $value = trim((string) ($raw ?? ''));
+        if ($value === '') {
+            return 0.0;
+        }
+        $value = str_replace([' ', '€'], '', $value);
+        if (str_contains($value, ',')) {
+            // Italian notation: “1.234,56” — the dot is a thousands separator.
+            $value = str_replace('.', '', $value);
+            $value = str_replace(',', '.', $value);
+        }
+        if (!is_numeric($value)) {
+            return null;
+        }
+        $amount = (float) $value;
+
+        return is_finite($amount) && $amount >= 0 ? round($amount, 2) : null;
     }
 
     public function deleteTreasuryAccount(Request $request): void

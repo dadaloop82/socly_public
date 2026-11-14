@@ -4,6 +4,8 @@
  *
  * @var array<string,mixed>|null $report
  * @var int $year
+ * @var list<int> $years
+ * @var bool $year_has_movements
  * @var float $income
  * @var float $limit
  * @var bool $can_generate
@@ -38,8 +40,12 @@ $prospect = $report['prospect'] ?? ['opening' => [], 'closing' => []];
         * { box-sizing: border-box; }
         body { margin: 0; padding: 20px 24px 28px; font: 12.5px/1.45 "Segoe UI", Helvetica, Arial, sans-serif; color: #16181d; background: #f4f1ef; }
         .sheet { max-width: 900px; margin: 0 auto; background: #fff; border: 1px solid color-mix(in srgb, var(--brand-primary) 18%, #d8d5d2); border-radius: 16px; padding: 1.15rem 1.35rem 1.5rem; }
-        .toolbar { max-width: 900px; margin: 0 auto 0.85rem; display: flex; justify-content: flex-end; gap: 0.5rem; }
+        .toolbar { max-width: 900px; margin: 0 auto 0.85rem; display: flex; justify-content: flex-end; gap: 0.5rem; align-items: center; flex-wrap: wrap; }
         .toolbar button, .toolbar a { font: inherit; font-weight: 600; border-radius: 10px; border: 1px solid color-mix(in srgb, var(--brand-primary) 35%, #ccc); background: #fff; color: #16181d; padding: 0.45rem 0.9rem; cursor: pointer; text-decoration: none; }
+        .toolbar .toolbar-year { display: inline-flex; align-items: center; gap: 0.35rem; margin: 0 0.25rem 0 0; }
+        .toolbar .toolbar-year label { font-size: 0.8rem; color: #555; }
+        .toolbar .toolbar-year select { font: inherit; padding: 0.4rem 0.5rem; border-radius: 10px; border: 1px solid color-mix(in srgb, var(--brand-primary) 35%, #ccc); background: #fff; color: #16181d; }
+        .runts-year-note { max-width: 900px; margin: 0 auto 0.85rem; font-size: 0.82rem; color: #7a4a00; background: #fdfaf0; border: 1px solid #e5d7a8; border-radius: 12px; padding: 0.55rem 0.8rem; }
         .doc-head { border-bottom: 2px solid var(--brand-primary); padding-bottom: 0.7rem; margin-bottom: 1rem; }
         .doc-assoc { font-size: 1.05rem; font-weight: 700; }
         .doc-meta { color: #555; font-size: 0.85rem; }
@@ -61,19 +67,33 @@ $prospect = $report['prospect'] ?? ['opening' => [], 'closing' => []];
         @media print {
           body { background: #fff; padding: 0; }
           .sheet { border: none; border-radius: 0; padding: 0; max-width: none; }
-          .toolbar { display: none; }
+          .toolbar, .runts-year-note { display: none; }
           tr { page-break-inside: avoid; }
         }
     </style>
 </head>
 <body>
 <div class="toolbar">
+    <?php if (($years ?? []) !== []): ?>
+        <form class="toolbar-year" method="get" action="<?= e(url('/rendiconto')) ?>">
+            <label for="runts-year"><?= e(__('runts.year')) ?></label>
+            <select id="runts-year" name="year">
+                <?php foreach ($years as $option): ?>
+                    <option value="<?= (int) $option ?>" <?= (int) $option === (int) $year ? 'selected' : '' ?>><?= (int) $option ?></option>
+                <?php endforeach; ?>
+            </select>
+            <button type="submit"><?= e(__('runts.change_year')) ?></button>
+        </form>
+    <?php endif; ?>
     <button type="button" data-print><?= e(__('runts.export_pdf')) ?></button>
     <?php if ($can_generate): ?>
         <a href="<?= e(url('/rendiconto/' . (int) $year . '/xlsx')) ?>"><?= e(__('runts.export_xlsx')) ?></a>
     <?php endif; ?>
     <a href="<?= e(url('/rendiconto')) ?>"><?= e(__('runts.back')) ?></a>
 </div>
+<?php if (empty($year_has_movements)): ?>
+    <p class="runts-year-note"><?= e(__('runts.no_movements_year', ['year' => (string) $year])) ?></p>
+<?php endif; ?>
 <div class="sheet">
     <header class="doc-head">
         <div class="doc-assoc"><?= e($assocName) ?><?= $assocLegalCode !== '' ? ' — ' . e($assocLegalCode) : '' ?></div>

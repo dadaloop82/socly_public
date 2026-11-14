@@ -80,6 +80,15 @@ $brandStyle = brand_root_style_decls($brandPrimary ?? null, $brandAccent ?? null
         tr.grand-total td { background: color-mix(in srgb, var(--brand-primary) 10%, #fff); font-weight: 700; }
         .evidence { font-size: 0.78rem; color: #444; }
         .evidence span { display: block; white-space: nowrap; }
+        .evidence-table th, .evidence-table td { font-size: 0.78rem; }
+        .evidence-table .evidence-code { font-weight: 700; white-space: nowrap; }
+        .evidence-table tr.evidence-section td {
+          background: color-mix(in srgb, var(--brand-primary) 10%, #fff);
+          font-weight: 700;
+          text-transform: uppercase;
+          letter-spacing: 0.03em;
+        }
+        .evidence-table tr.evidence-item td { background: #faf8f7; font-weight: 600; }
         .sign { margin-top: 2.2rem; display: flex; justify-content: space-between; gap: 2rem; }
         .sign div { flex: 1; border-top: 1px solid #333; padding-top: 0.4rem; font-size: 0.82rem; }
         .doc-note { margin-top: 1.2rem; font-size: 0.72rem; color: #666; }
@@ -135,16 +144,13 @@ $brandStyle = brand_root_style_decls($brandPrimary ?? null, $brandAccent ?? null
                         <?php else: ?>
                             <?php foreach ($rows as $row): ?>
                                 <?php
-                                // Just the reference of the receipt: date · invoice number · amount.
-                                // The counterparty and the wording “Numero fattura” are left out so a
-                                // document stays on one line in the printed statement.
+                                // Compact reference in the plan: the receipt code + amount. The full
+                                // details (document date/number, payment date, counterparty) live in
+                                // the appendix below the statement.
                                 $evidenceParts = [
-                                    format_date((string) ($row['movement_date'] ?? '')) ?: (string) ($row['movement_date'] ?? ''),
+                                    (string) ($row['code'] ?? ''),
+                                    $currency->format((float) ($row['amount'] ?? 0)),
                                 ];
-                                if ((string) ($row['invoice_number'] ?? '') !== '') {
-                                    $evidenceParts[] = (string) $row['invoice_number'];
-                                }
-                                $evidenceParts[] = $currency->format((float) ($row['amount'] ?? 0));
                                 ?>
                                 <span><?= e(implode(' · ', array_filter($evidenceParts, static fn (string $part): bool => $part !== ''))) ?></span>
                             <?php endforeach; ?>
@@ -215,6 +221,72 @@ $brandStyle = brand_root_style_decls($brandPrimary ?? null, $brandAccent ?? null
         </tr>
         </tbody>
     </table>
+
+    <?php
+    // Appendix: the supporting documents in a readable table (code, document date/number,
+    // payment date, counterparty, amount), grouped by cost centre as in the plan above.
+    $evidenceCount = 0;
+    foreach ($sections as $sectionRow) {
+        foreach ((array) ($sectionRow['items'] ?? []) as $itemRow) {
+            $evidenceCount += count($evidence[(int) ($itemRow['id'] ?? 0)] ?? []);
+        }
+    }
+    $evidenceDate = static function (string $value): string {
+        if ($value === '') {
+            return '—';
+        }
+        return (string) (format_date($value) ?: $value);
+    };
+    ?>
+    <?php if ($evidenceCount > 0): ?>
+        <h2><?= e(__('budget.evidence_annex_title')) ?></h2>
+        <table class="evidence-table">
+            <thead>
+            <tr>
+                <th><?= e(__('budget.evidence_code')) ?></th>
+                <th><?= e(__('budget.evidence_document_date')) ?></th>
+                <th><?= e(__('budget.evidence_document_number')) ?></th>
+                <th><?= e(__('budget.evidence_payment_date')) ?></th>
+                <th><?= e(__('budget.evidence_counterparty')) ?></th>
+                <th class="num"><?= e(__('budget.evidence_amount')) ?></th>
+            </tr>
+            </thead>
+            <tbody>
+            <?php foreach ($sections as $sectionRow): ?>
+                <?php
+                $sectionRows = [];
+                foreach ((array) ($sectionRow['items'] ?? []) as $itemRow) {
+                    $itemEvidence = $evidence[(int) ($itemRow['id'] ?? 0)] ?? [];
+                    if ($itemEvidence !== []) {
+                        $sectionRows[] = ['label' => (string) ($itemRow['label'] ?? ''), 'rows' => $itemEvidence];
+                    }
+                }
+                if ($sectionRows === []) {
+                    continue;
+                }
+                ?>
+                <tr class="evidence-section">
+                    <td colspan="6"><?= e((string) ($sectionRow['title'] ?? '')) ?></td>
+                </tr>
+                <?php foreach ($sectionRows as $sectionRowItem): ?>
+                    <tr class="evidence-item">
+                        <td colspan="6"><?= e((string) $sectionRowItem['label']) ?></td>
+                    </tr>
+                    <?php foreach ((array) $sectionRowItem['rows'] as $row): ?>
+                        <tr>
+                            <td class="evidence-code"><?= e((string) ($row['code'] ?? '')) ?></td>
+                            <td><?= e($evidenceDate((string) ($row['invoice_date'] ?? ''))) ?></td>
+                            <td><?= e((string) ($row['invoice_number'] ?? '') !== '' ? (string) $row['invoice_number'] : '—') ?></td>
+                            <td><?= e($evidenceDate((string) ($row['movement_date'] ?? ''))) ?></td>
+                            <td><?= e((string) ($row['counterparty'] ?? '') !== '' ? (string) $row['counterparty'] : '—') ?></td>
+                            <td class="num"><?= e($currency->format((float) ($row['amount'] ?? 0))) ?></td>
+                        </tr>
+                    <?php endforeach; ?>
+                <?php endforeach; ?>
+            <?php endforeach; ?>
+            </tbody>
+        </table>
+    <?php endif; ?>
 
     <div class="sign">
         <div>

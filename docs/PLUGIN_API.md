@@ -80,7 +80,7 @@ return new class implements PluginInterface {
 - Paths support `{name}` placeholders; the action receives them after the `Request`:
   `public function show(Request $request, string $token): void`.
 
-Public pages must not leak member data. The `Iscrizione Tablet` add-on is the reference
+Public pages must not leak member data. The `Iscrizione rapida` add-on is the reference
 implementation (token in the path, server-rendered wizard, core services for writes).
 
 ## Gating core features on an add-on

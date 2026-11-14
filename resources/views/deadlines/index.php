@@ -248,10 +248,14 @@ foreach ($deadline_items as $item) {
                                 $sourceAction = [];
                                 if ($isSystem) {
                                     if (str_starts_with($source, 'system:mandate:')) {
+                                        // Straight to the officer, so the mandate dates can be fixed
+                                        // where the deadline is generated.
+                                        $personId = (int) substr($source, strlen('system:mandate:'));
+                                        $canEditPerson = $canManage && can('org.manage') && $personId > 0;
                                         $sourceAction = [
                                             'icon' => 'edit',
-                                            'label' => __('deadlines.open_org_chart'),
-                                            'href' => url('/org'),
+                                            'label' => $canEditPerson ? __('deadlines.open_org_person') : __('deadlines.open_org_chart'),
+                                            'href' => $canEditPerson ? url('/org/people/' . $personId . '/edit') : url('/org'),
                                             'show' => can('org.view'),
                                         ];
                                     } elseif (str_starts_with($source, 'system:member_cert:')) {

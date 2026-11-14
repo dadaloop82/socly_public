@@ -104,7 +104,10 @@ final class ApiController extends BaseController
             (string) $request->input('gender', ''),
             (string) $request->input('birth_place', '')
         );
-        $this->json($result, $result['ok'] ? 200 : 422);
+        // “Not computable” is a normal outcome while the operator is still typing (place or gender
+        // missing): answer 200 with ok=false, so the helper stays silent instead of logging a 422
+        // error in the browser console for every half-filled field.
+        $this->json($result);
     }
 
     public function reportProblem(Request $request): void

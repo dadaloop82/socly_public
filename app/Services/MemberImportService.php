@@ -2433,7 +2433,14 @@ final class MemberImportService
         $movementDate = $useRegistration && $admittedAt !== ''
             ? substr($admittedAt, 0, 10)
             : substr($paymentDate, 0, 10);
-        $this->treasury->autoRegisterFromPayment($paymentId, $memberId, $amount, $method, $movementDate);
+        $this->treasury->autoRegisterFromPayment(
+            $paymentId,
+            $memberId,
+            $amount,
+            $method,
+            $movementDate,
+            auth_user()['id'] ?? null
+        );
         if (!$paymentChanged) {
             return;
         }

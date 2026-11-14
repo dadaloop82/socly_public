@@ -32,8 +32,16 @@ final class RendicontoController extends BaseController
     public function index(Request $request): void
     {
         require_component('treasury');
-        // The final balance now lives in the “Final” tab on the Financial Statements page.
-        redirect('/budgets#bil-consuntivo');
+        // The Model D is generated per exercise: ask which one before opening the sheet.
+        $requested = (int) $request->input('year', 0);
+        if ($requested >= 2000 && $requested <= 2100) {
+            redirect('/rendiconto/' . $requested);
+        }
+        $this->render('rendiconto/choose', [
+            'title' => __('runts.choose_title'),
+            'years' => $this->runts->yearsOverview(),
+            'currentYear' => (int) date('Y'),
+        ]);
     }
 
     public function show(Request $request, string $year): void
@@ -44,6 +52,20 @@ final class RendicontoController extends BaseController
             http_response_code(404);
             $this->render('errors/404');
             return;
+        }
+        // Exercises offered by the page: every year in the cash book, plus the requested
+        // one (a previous year can be opened for comparison even without movements).
+        $years = [];
+        $approvedYears = [];
+        foreach ($this->runts->yearsOverview() as $row) {
+            $years[] = (int) $row['year'];
+            if ((int) $row['approved'] > 0) {
+                $approvedYears[] = (int) $row['year'];
+            }
+        }
+        if (!in_array($year, $years, true)) {
+            $years[] = $year;
+            rsort($years);
         }
         $income = $this->runts->totalIncome($year);
         $canGenerate = $income < RuntsReportService::CASH_LIMIT;
@@ -59,6 +81,8 @@ final class RendicontoController extends BaseController
         $this->render('rendiconto/modello_d', [
             'report' => $canGenerate ? $this->runts->report($year) : null,
             'year' => $year,
+            'years' => $years,
+            'year_has_movements' => in_array($year, $approvedYears, true),
             'income' => $income,
             'limit' => RuntsReportService::CASH_LIMIT,
             'can_generate' => $canGenerate,

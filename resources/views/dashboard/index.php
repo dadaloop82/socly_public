@@ -161,43 +161,100 @@ $defaultTab = $tabs[0]['id'] ?? '';
             </div>
 
             <?php if ($hasMembers): ?>
+            <?php
+            // Every KPI is a door: the members boxes open the list with the matching filter, the
+            // two “collected” boxes open the cash book on the same period (permission-checked).
+            $membersIndexUrl = can('members.view')
+                ? static fn (array $params = []): string => url('/members' . ($params === [] ? '' : '?' . http_build_query($params)))
+                : null;
+            $treasuryIndexUrl = can('treasury.view')
+                ? static fn (array $params = []): string => url('/treasury' . ($params === [] ? '' : '?' . http_build_query($params)))
+                : null;
+            $overdue = (int) ($stats['overdue_count'] ?? 0);
+            $expired = (int) ($stats['members_expired'] ?? 0);
+            $suspended = (int) ($stats['members_suspended'] ?? 0);
+            $memberStatItems = [
+                [
+                    'label' => __('dashboard.members_total'),
+                    'value' => (string) (int) ($stats['members_total'] ?? 0),
+                    'class' => '',
+                    'href' => $membersIndexUrl === null ? null : $membersIndexUrl(),
+                ],
+                [
+                    'label' => __('dashboard.overdue_count'),
+                    'value' => (string) $overdue,
+                    'class' => $overdue > 0 ? 'is-alert' : '',
+                    'href' => $membersIndexUrl === null ? null : $membersIndexUrl(['payment' => 'due']),
+                ],
+                [
+                    'label' => __('dashboard.collected_month'),
+                    'value' => $currency->format((float) ($stats['collected_month'] ?? 0)),
+                    'class' => '',
+                    'href' => $treasuryIndexUrl === null ? null : $treasuryIndexUrl(['period' => 'month']),
+                ],
+                [
+                    'label' => __('dashboard.members_active'),
+                    'value' => (string) (int) ($stats['members_active'] ?? 0),
+                    'class' => '',
+                    'href' => $membersIndexUrl === null ? null : $membersIndexUrl(['status' => 'active']),
+                ],
+                [
+                    'label' => __('dashboard.members_settled'),
+                    'value' => (string) (int) ($stats['members_settled'] ?? 0),
+                    'class' => '',
+                    'href' => $membersIndexUrl === null ? null : $membersIndexUrl(['payment' => 'paid']),
+                ],
+                [
+                    'label' => __('dashboard.collected_year'),
+                    'value' => $currency->format((float) ($stats['collected_year'] ?? 0)),
+                    'class' => '',
+                    'href' => $treasuryIndexUrl === null ? null : $treasuryIndexUrl(['year' => date('Y')]),
+                ],
+                [
+                    'label' => __('dashboard.members_expired'),
+                    'value' => (string) $expired,
+                    'class' => $expired > 0 ? 'is-warn' : '',
+                    'href' => $membersIndexUrl === null ? null : $membersIndexUrl(['status' => 'expired']),
+                ],
+                [
+                    'label' => __('dashboard.members_suspended'),
+                    'value' => (string) $suspended,
+                    'class' => $suspended > 0 ? 'is-alert' : '',
+                    'href' => $membersIndexUrl === null ? null : $membersIndexUrl(['status' => 'suspended']),
+                ],
+                [
+                    'label' => __('dashboard.new_members_year'),
+                    'value' => (string) (int) ($stats['new_members_year'] ?? 0),
+                    'class' => '',
+                    'href' => $membersIndexUrl === null ? null : $membersIndexUrl(['joined' => 'year']),
+                ],
+            ];
+            ?>
             <div class="stats stats-context-members" data-stats-context="members">
-                <div class="stat">
-                    <div class="label"><?= e(__('dashboard.members_total')) ?></div>
-                    <div class="value"><?= (int) ($stats['members_total'] ?? 0) ?></div>
-                </div>
-                <div class="stat<?= ((int) ($stats['overdue_count'] ?? 0)) > 0 ? ' is-alert' : '' ?>">
-                    <div class="label"><?= e(__('dashboard.overdue_count')) ?></div>
-                    <div class="value"><?= (int) ($stats['overdue_count'] ?? 0) ?></div>
-                </div>
-                <div class="stat">
-                    <div class="label"><?= e(__('dashboard.collected_month')) ?></div>
-                    <div class="value"><?= e($currency->format((float) ($stats['collected_month'] ?? 0))) ?></div>
-                </div>
-                <div class="stat">
-                    <div class="label"><?= e(__('dashboard.members_active')) ?></div>
-                    <div class="value"><?= (int) ($stats['members_active'] ?? 0) ?></div>
-                </div>
-                <div class="stat">
-                    <div class="label"><?= e(__('dashboard.members_settled')) ?></div>
-                    <div class="value"><?= (int) ($stats['members_settled'] ?? 0) ?></div>
-                </div>
-                <div class="stat">
-                    <div class="label"><?= e(__('dashboard.collected_year')) ?></div>
-                    <div class="value"><?= e($currency->format((float) ($stats['collected_year'] ?? 0))) ?></div>
-                </div>
-                <div class="stat<?= ((int) ($stats['members_expired'] ?? 0)) > 0 ? ' is-warn' : '' ?>">
-                    <div class="label"><?= e(__('dashboard.members_expired')) ?></div>
-                    <div class="value"><?= (int) ($stats['members_expired'] ?? 0) ?></div>
-                </div>
-                <div class="stat<?= ((int) ($stats['members_suspended'] ?? 0)) > 0 ? ' is-alert' : '' ?>">
-                    <div class="label"><?= e(__('dashboard.members_suspended')) ?></div>
-                    <div class="value"><?= (int) ($stats['members_suspended'] ?? 0) ?></div>
-                </div>
-                <div class="stat">
-                    <div class="label"><?= e(__('dashboard.new_members_year')) ?></div>
-                    <div class="value"><?= (int) ($stats['new_members_year'] ?? 0) ?></div>
-                </div>
+                <?php foreach ($memberStatItems as $statItem): ?>
+                    <?php
+                    $statHref = $statItem['href'] === null ? null : (string) $statItem['href'];
+                    $statClass = implode(' ', array_filter([
+                        'stat',
+                        (string) $statItem['class'],
+                        $statHref !== null ? 'stat-link' : '',
+                    ]));
+                    $statTitle = (string) __($statHref !== null && str_starts_with($statHref, url('/treasury'))
+                        ? 'dashboard.stat_open_treasury'
+                        : 'dashboard.stat_open_members');
+                    ?>
+                    <?php if ($statHref !== null): ?>
+                        <a class="<?= e($statClass) ?>" href="<?= e($statHref) ?>" title="<?= e($statTitle) ?>">
+                            <div class="label"><?= e((string) $statItem['label']) ?></div>
+                            <div class="value"><?= e((string) $statItem['value']) ?></div>
+                        </a>
+                    <?php else: ?>
+                        <div class="<?= e($statClass) ?>">
+                            <div class="label"><?= e((string) $statItem['label']) ?></div>
+                            <div class="value"><?= e((string) $statItem['value']) ?></div>
+                        </div>
+                    <?php endif; ?>
+                <?php endforeach; ?>
             </div>
             <?php endif; ?>
 

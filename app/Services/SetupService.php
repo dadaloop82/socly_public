@@ -3351,6 +3351,7 @@ final class SetupService
                     $errors['accounts'] = __('setup.accounts_opening_failed', ['account' => $label]);
                     break;
                 }
+                $treasury->markOpeningBalance((int) ($result['id'] ?? 0));
                 $createdMovementIds[] = (int) ($result['id'] ?? 0);
             }
 
@@ -3405,6 +3406,7 @@ final class SetupService
                     $errors['accounts'] = __('setup.accounts_opening_failed', ['account' => $label]);
                     break;
                 }
+                $treasury->markOpeningBalance((int) ($result['id'] ?? 0));
                 $createdMovementIds[] = (int) ($result['id'] ?? 0);
             }
         } catch (\Throwable $e) {

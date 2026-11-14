@@ -40,6 +40,7 @@
                 'items' => [
                     'general' => ['settings.general', 'settings.general_lede'],
                     'people' => ['settings.people', 'settings.people_lede'],
+                    'org' => ['settings.org_title', 'settings.org_lede'],
                     'components' => ['settings.components_title', 'settings.components_lede'],
                 ],
             ],
@@ -91,6 +92,10 @@
             ],
         ];
         $navGroupFirst = true;
+        if (empty($enabledComponents['org_roles'])) {
+            // Without the org chart component there is nothing to configure here.
+            unset($configNavGroups['assoc']['items']['org']);
+        }
         if (can(\Socly\Support\Permission::ADDONS_MANAGE)) {
             // The add-ons page lives outside the accordion layout: a real link, not a panel.
             $configNavGroups['system']['items']['addons'] = [
@@ -1055,6 +1060,35 @@
 </details>
 <?php endif; ?>
 
+<?php if (!empty($enabledComponents['org_roles'])): ?>
+<details class="config-accordion" id="org" data-config-accordion data-settings-group="assoc">
+    <summary class="config-accordion-summary">
+        <span class="config-accordion-title"><?= e(__('settings.org_title')) ?></span>
+        <span class="config-accordion-lede"><?= e(__('settings.org_lede')) ?></span>
+    </summary>
+    <div class="config-accordion-body">
+        <form method="post" action="<?= e(url('/settings/org')) ?>" data-leave-guard data-settings-autosave>
+            <?= csrf_field() ?>
+            <p class="muted"><?= e(__('settings.org_roles_hint')) ?></p>
+            <input type="hidden" name="has_control_body" value="0">
+            <?= field('checkbox', [
+                'name' => 'has_control_body',
+                'check_value' => '1',
+                'label' => (string) __('org.control_body_label'),
+                'checked' => !empty($orgHasControlBody),
+                'context' => 'setup',
+                'label_class' => 'checkbox-row',
+            ]) ?>
+            <p class="muted"><?= e(__('org.control_body_hint')) ?></p>
+            <p class="settings-autosave-status muted" data-settings-autosave-status aria-live="polite"></p>
+            <div class="config-accordion-actions">
+                <a class="btn btn-ghost btn-sm" href="<?= e(url('/org')) ?>"><?= e(__('settings.open_org')) ?></a>
+            </div>
+        </form>
+    </div>
+</details>
+<?php endif; ?>
+
 <details class="config-accordion" id="components" data-config-accordion data-settings-group="assoc">
     <summary class="config-accordion-summary">
         <span class="config-accordion-title"><?= e(__('settings.components_title')) ?></span>
@@ -1233,6 +1267,7 @@
             <p class="muted"><?= e(__('settings.treasury_accounts_component_off')) ?></p>
         <?php else: ?>
             <p class="muted"><?= e(__('settings.treasury_accounts_hint')) ?></p>
+            <p class="muted"><?= e(__('settings.treasury_account_openings_hint')) ?></p>
             <form method="post" action="<?= e(url('/settings/treasury-accounts')) ?>" class="accounts-admin">
                 <?= csrf_field() ?>
                 <?= field('hidden', ['name' => 'bulk', 'value' => '1']) ?>
@@ -1256,6 +1291,18 @@
                             'wrapper_class' => 'accounts-admin-label',
                             'placeholder' => $accountBuiltin ? (string) __('settings.treasury_account_builtin_placeholder') : '',
                         ]) ?>
+                        <div class="accounts-admin-opening">
+                            <?= field('number', [
+                                'name' => 'account_opening[' . $accountId . ']',
+                                'label' => (string) __('settings.treasury_account_opening'),
+                                'value' => number_format((float) (($treasuryOpeningBalances ?? [])[$accountSlug] ?? 0), 2, '.', ''),
+                                'context' => 'setup',
+                                'min' => 0,
+                                'step' => '0.01',
+                                'wrapper_class' => 'accounts-admin-opening-field',
+                                'inputmode' => 'decimal',
+                            ]) ?>
+                        </div>
                         <div class="accounts-admin-toggle-cell">
                             <?= field('checkbox', [
                                 'name' => 'account_active[' . $accountId . ']',
@@ -1310,6 +1357,17 @@
                         'maxlength' => 80,
                         'required' => true,
                         'placeholder' => (string) __('settings.treasury_account_new_placeholder'),
+                    ]) ?>
+                </div>
+                <div class="accounts-admin-add-opening">
+                    <?= field('number', [
+                        'name' => 'opening_balance',
+                        'label' => (string) __('settings.treasury_account_opening'),
+                        'value' => '',
+                        'context' => 'setup',
+                        'min' => 0,
+                        'step' => '0.01',
+                        'inputmode' => 'decimal',
                     ]) ?>
                 </div>
                 <div class="accounts-admin-toggle-cell">

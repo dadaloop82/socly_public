@@ -392,7 +392,36 @@ function initFreshnessGuard() {
   const id = form.getAttribute('data-freshness-id') || '';
   const banner = form.querySelector('[data-freshness-banner]');
   const versionInput = form.querySelector('input[name="row_version"]');
+  const activityBox = form.querySelector('[data-recent-activity]');
+  const activityText = form.querySelector('[data-recent-activity-text]');
   if (!url || !entity || !id || !banner) return;
+
+  // “Just created/modified by …”: the box comes from the server and this poll keeps it honest
+  // (a record touched a moment ago shows up at once, and the box disappears after 15 minutes).
+  const renderActivity = (data) => {
+    if (!(activityBox instanceof HTMLElement) || !(activityText instanceof HTMLElement)) return;
+    const activity = data && data.activity && typeof data.activity === 'object' ? data.activity : null;
+    if (!activity) {
+      activityBox.hidden = true;
+      activityBox.dataset.activityKind = '';
+      activityText.textContent = '';
+      return;
+    }
+    const template = String(
+      activity.kind === 'created'
+        ? (data.messages?.activity_created || '')
+        : (data.messages?.activity_updated || '')
+    );
+    if (template === '') {
+      activityBox.hidden = true;
+      return;
+    }
+    activityText.textContent = template
+      .replace(':user', String(activity.user || ''))
+      .replace(':at', String(activity.at || ''));
+    activityBox.dataset.activityKind = String(activity.kind || '');
+    activityBox.hidden = false;
+  };
 
   let known = Number(form.getAttribute('data-freshness-version') || (versionInput ? versionInput.value : 0) || 0);
   let busy = false;
@@ -512,6 +541,7 @@ function initFreshnessGuard() {
       });
       if (!res.ok) return;
       const data = await res.json();
+      renderActivity(data);
       if (!data.ok) return;
       if (data.deleted) {
         banner.textContent = String(data.messages?.deleted || '');
@@ -529,6 +559,10 @@ function initFreshnessGuard() {
   };
 
   window.setInterval(check, 15000);
+  // First check right away: the “just created/modified” box must not wait for the first round.
+  window.setTimeout(check, 800);
+  window.addEventListener('pageshow', () => { check(); });
+  window.addEventListener('focus', () => { check(); });
   document.addEventListener('visibilitychange', () => {
     if (document.visibilityState === 'visible') check();
   });
@@ -2367,12 +2401,6 @@ function initTreasuryPatternHints() {
     icon.innerHTML = iconSvg(kind);
     return icon;
   };
-  const selectedLabel = (el) => {
-    if (el instanceof HTMLSelectElement) {
-      return String(el.selectedOptions?.[0]?.textContent || el.value || '');
-    }
-    return valueOf(el);
-  };
   const renderSlot = (field, data) => {
     const slot = slots.get(field);
     if (!slot) return;
@@ -2410,13 +2438,16 @@ function initTreasuryPatternHints() {
       }
     });
   };
+  let inFlight = false;
   const refresh = async () => {
+    if (inFlight) return;
     const data = payload();
     if (!['income', 'expense'].includes(data.direction)
       || (data.description.trim().length < 3 && data.beneficiary.trim().length < 3)) {
       render(null);
       return;
     }
+    inFlight = true;
     try {
       const body = new URLSearchParams(data);
       const res = await fetch(url, {
@@ -2433,6 +2464,8 @@ function initTreasuryPatternHints() {
       if (result && result.ok) render(result);
     } catch (err) {
       // network unavailable: no suggestion
+    } finally {
+      inFlight = false;
     }
   };
   const queue = () => {
@@ -2454,15 +2487,10 @@ function initTreasuryPatternHints() {
       lastValues[field] = valueOf(el);
     });
     el.addEventListener('change', () => {
-      const oldValue = lastValues[field] ?? '';
-      const current = profile && profile.fields ? profile.fields[field] : null;
-      if (isEdit && current && current.anomaly && el.value !== oldValue) {
-        if (!confirmChange(current.current_label || oldValue, selectedLabel(el))) {
-          el.value = oldValue;
-          return;
-        }
-      }
-      lastValues[field] = el.value;
+      // A manual edit is already the operator's decision: the "change from … to …" confirmation
+      // belongs only to the suggestion buttons (the alert/wand icons), which replace the value
+      // on the operator's behalf. Asking here made every hand edit need an extra click.
+      lastValues[field] = valueOf(el);
       queue();
     });
   });
@@ -2473,6 +2501,22 @@ function initTreasuryPatternHints() {
   } catch (err) {
     render(null);
   }
+
+  // The suggestions come from the whole cash book: they must never stay frozen on the
+  // snapshot embedded in the page. Refresh right away, when the tab is shown again (another
+  // operator, an import or a bulk edit may have changed the typical values) and while the
+  // form stays open. `refresh()` ignores the short "no description" case by itself.
+  const refreshIfVisible = () => {
+    if (document.visibilityState === 'visible') refresh();
+  };
+  document.addEventListener('visibilitychange', refreshIfVisible);
+  window.addEventListener('focus', refreshIfVisible);
+  window.addEventListener('pageshow', (event) => {
+    // Restored from the back/forward cache: the embedded profile can be older than the data.
+    if (event.persisted) refresh();
+  });
+  window.setInterval(refreshIfVisible, 60000);
+  window.setTimeout(refresh, 250);
   if (isEdit && (!profile || !profile.fields || Object.keys(profile.fields).length === 0)) {
     window.setTimeout(refresh, 200);
   }
@@ -4291,20 +4335,63 @@ function initTreasuryBulk() {
     const notesToggle = editDialog.querySelector('[data-treasury-bulk-edit-notes-toggle]');
     const notesBlock = editDialog.querySelector('[data-treasury-bulk-edit-notes-block]');
     const notesField = editDialog.querySelector('[data-treasury-bulk-edit-notes]');
+    const counterpartyToggle = editDialog.querySelector('[data-treasury-bulk-edit-counterparty-toggle]');
+    const counterpartyBlock = editDialog.querySelector('[data-treasury-bulk-edit-counterparty-block]');
+    const memberSelect = editDialog.querySelector('[data-treasury-bulk-edit-member]');
+    const beneficiaryField = editDialog.querySelector('[data-treasury-bulk-edit-beneficiary]');
+    const beneficiaryClear = editDialog.querySelector('[data-treasury-bulk-edit-beneficiary-clear]');
     const applyBtn = editDialog.querySelector('[data-treasury-bulk-edit-apply]');
     const msg = (key) => editDialog.getAttribute(key) || '';
     const selectLabel = (select) => {
       if (!(select instanceof HTMLSelectElement) || select.value === '') return '';
       return (select.selectedOptions[0]?.textContent || '').trim();
     };
+    const resetCounterparty = () => {
+      if (memberSelect instanceof HTMLSelectElement) memberSelect.value = '';
+      if (beneficiaryField instanceof HTMLInputElement) {
+        beneficiaryField.value = '';
+        beneficiaryField.disabled = false;
+      }
+      if (beneficiaryClear instanceof HTMLInputElement) {
+        beneficiaryClear.checked = false;
+        beneficiaryClear.disabled = false;
+      }
+    };
+    // A linked member and a free-text supplier exclude each other (same rule as the movement
+    // sheet): picking one clears the other, so the bulk edit can never store both.
+    const syncCounterparty = () => {
+      const memberPicked = memberSelect instanceof HTMLSelectElement && memberSelect.value !== '';
+      if (beneficiaryField instanceof HTMLInputElement) {
+        beneficiaryField.disabled = memberPicked;
+        if (memberPicked) beneficiaryField.value = '';
+      }
+      if (beneficiaryClear instanceof HTMLInputElement) {
+        beneficiaryClear.disabled = memberPicked;
+        if (memberPicked) beneficiaryClear.checked = false;
+      }
+    };
+    memberSelect?.addEventListener('change', syncCounterparty);
+    beneficiaryField?.addEventListener('input', () => {
+      if (!(beneficiaryField instanceof HTMLInputElement) || !(memberSelect instanceof HTMLSelectElement)) return;
+      if (beneficiaryField.value.trim() !== '' && memberSelect.value !== '') {
+        memberSelect.value = '';
+      }
+    });
+    beneficiaryClear?.addEventListener('change', () => {
+      if (!(beneficiaryClear instanceof HTMLInputElement) || !(memberSelect instanceof HTMLSelectElement)) return;
+      if (beneficiaryClear.checked) memberSelect.value = '';
+    });
     const reset = () => {
       [accountSelect, categorySelect, methodSelect, runtsSelect, budgetSelect].forEach((select) => {
         if (select instanceof HTMLSelectElement) select.value = '';
       });
       if (notesToggle instanceof HTMLInputElement) notesToggle.checked = false;
       if (descriptionToggle instanceof HTMLInputElement) descriptionToggle.checked = false;
+      if (counterpartyToggle instanceof HTMLInputElement) counterpartyToggle.checked = false;
       if (descriptionBlock instanceof HTMLElement) descriptionBlock.hidden = true;
       if (notesBlock instanceof HTMLElement) notesBlock.hidden = true;
+      if (counterpartyBlock instanceof HTMLElement) counterpartyBlock.hidden = true;
+      resetCounterparty();
       if (descriptionField instanceof HTMLTextAreaElement) {
         descriptionField.value = '';
         descriptionField.disabled = true;
@@ -4325,6 +4412,13 @@ function initTreasuryBulk() {
       editDialog.showModal();
     });
     editDialog.querySelector('[data-treasury-bulk-edit-cancel]')?.addEventListener('click', () => editDialog.close());
+    counterpartyToggle?.addEventListener('change', () => {
+      if (!(counterpartyToggle instanceof HTMLInputElement)) return;
+      if (counterpartyBlock instanceof HTMLElement) counterpartyBlock.hidden = !counterpartyToggle.checked;
+      if (!counterpartyToggle.checked) resetCounterparty();
+      syncCounterparty();
+      if (counterpartyToggle.checked && memberSelect instanceof HTMLElement) memberSelect.focus();
+    });
     descriptionToggle?.addEventListener('change', () => {
       if (!(descriptionToggle instanceof HTMLInputElement)) return;
       if (descriptionBlock instanceof HTMLElement) descriptionBlock.hidden = !descriptionToggle.checked;
@@ -4366,6 +4460,22 @@ function initTreasuryBulk() {
       if (notesToggle instanceof HTMLInputElement && notesToggle.checked) {
         push(msg('data-msg-notes'), notes !== '' ? notes : '—');
       }
+      // Counterparty: member and supplier are exclusive, so the summary shows the one in force.
+      const counterpartyOn = counterpartyToggle instanceof HTMLInputElement && counterpartyToggle.checked;
+      const memberPicked = memberSelect instanceof HTMLSelectElement && memberSelect.value !== '';
+      const beneficiary = counterpartyOn && beneficiaryField instanceof HTMLInputElement
+        ? beneficiaryField.value.trim()
+        : '';
+      const clearBeneficiary = counterpartyOn && beneficiaryClear instanceof HTMLInputElement
+        && beneficiaryClear.checked
+        && !memberPicked;
+      if (memberPicked) {
+        push(msg('data-msg-member'), selectLabel(memberSelect));
+      } else if (beneficiary !== '') {
+        push(msg('data-msg-beneficiary'), beneficiary);
+      } else if (clearBeneficiary) {
+        push(msg('data-msg-beneficiary'), '—');
+      }
       if (chosen.length === 0) {
         const none = msg('data-msg-none');
         if (none !== '') {
@@ -4396,6 +4506,9 @@ function initTreasuryBulk() {
       body.set('description_action', descriptionToggle instanceof HTMLInputElement && descriptionToggle.checked ? 'replace' : 'keep');
       body.set('notes', notes);
       body.set('notes_action', notesToggle instanceof HTMLInputElement && notesToggle.checked ? 'replace' : 'keep');
+      body.set('member_id', counterpartyOn && memberPicked && memberSelect instanceof HTMLSelectElement ? memberSelect.value : '');
+      body.set('beneficiary', counterpartyOn && !memberPicked ? beneficiary : '');
+      body.set('beneficiary_action', clearBeneficiary ? 'clear' : 'keep');
       if (applyBtn instanceof HTMLButtonElement) applyBtn.disabled = true;
       try {
         const res = await fetch(form.getAttribute('action') || '', {
@@ -12604,46 +12717,18 @@ function initOrgPersonForm(form) {
   const residenceWrap = form.querySelector('[data-org-residence-fields]');
   const replaceInput = form.querySelector('[data-org-replace-unique]');
   const profileUrlTemplate = form.dataset.orgMemberProfileUrl || '';
-  const memberFields = form.querySelectorAll('[data-org-member-field]');
   const birthPlaceInput = form.querySelector('[data-birth-place-input]');
-  const phoneInput = form.querySelector('[data-phone-field] input[type="tel"], [name="phone"]');
 
-  const setMemberFieldsLocked = (locked) => {
-    memberFields.forEach((el) => {
-      if (el instanceof HTMLSelectElement) {
-        if (locked) {
-          el.setAttribute('disabled', 'disabled');
-        } else {
-          el.removeAttribute('disabled');
-        }
-        return;
-      }
-      if (locked) {
-        el.setAttribute('readonly', 'readonly');
-      } else {
-        el.removeAttribute('readonly');
-      }
-    });
-    if (birthPlaceInput instanceof HTMLInputElement) {
-      if (locked) {
-        birthPlaceInput.setAttribute('readonly', 'readonly');
-      } else {
-        birthPlaceInput.removeAttribute('readonly');
-      }
-    }
-    if (phoneInput instanceof HTMLInputElement) {
-      if (locked) {
-        phoneInput.setAttribute('readonly', 'readonly');
-      } else {
-        phoneInput.removeAttribute('readonly');
-      }
-    }
-    form.classList.toggle('is-member-locked', locked);
+  /**
+   * A person linked to a member stays fully editable: on save the server mirrors the
+   * identity data on the member record. The hint only explains that link.
+   */
+  const setMemberLinkedHint = (linked) => {
     const copyFields = form.querySelector('[data-org-copy-fields]');
-    copyFields?.classList.toggle('is-locked', locked);
-    const lockedHint = form.querySelector('[data-org-locked-hint]');
-    if (lockedHint instanceof HTMLElement) {
-      lockedHint.hidden = !locked;
+    copyFields?.classList.toggle('is-linked', linked);
+    const hint = form.querySelector('[data-org-locked-hint]');
+    if (hint instanceof HTMLElement) {
+      hint.hidden = !linked;
     }
   };
 
@@ -12673,9 +12758,9 @@ function initOrgPersonForm(form) {
     setValue('house_number', profile.house_number || '');
   };
 
-  const loadMemberProfile = async (memberId, lockFields = true) => {
+  const loadMemberProfile = async (memberId, applyProfile = true) => {
     if (!memberId || !profileUrlTemplate) {
-      setMemberFieldsLocked(false);
+      setMemberLinkedHint(false);
       return;
     }
     const params = new URLSearchParams();
@@ -12694,13 +12779,13 @@ function initOrgPersonForm(form) {
       const res = await fetch(url, { credentials: 'same-origin' });
       const data = await res.json();
       if (!data?.ok || !data.profile) {
-        setMemberFieldsLocked(false);
+        setMemberLinkedHint(false);
         return;
       }
-      applyMemberProfile(data.profile);
-      if (lockFields) {
-        setMemberFieldsLocked(true);
+      if (applyProfile) {
+        applyMemberProfile(data.profile);
       }
+      setMemberLinkedHint(true);
       if (Array.isArray(data.incompatible_roles) && data.incompatible_roles.length > 0) {
         const tpl = form.dataset.msgRoleIncompatible || '';
         const existing = data.incompatible_roles.map((item) => item.role_label || item.role_key).join(', ');
@@ -12710,7 +12795,7 @@ function initOrgPersonForm(form) {
         }
       }
     } catch {
-      setMemberFieldsLocked(false);
+      setMemberLinkedHint(false);
     }
   };
 
@@ -12723,20 +12808,22 @@ function initOrgPersonForm(form) {
 
   memberSelect?.addEventListener('change', () => {
     if (isExternalMember()) {
-      setMemberFieldsLocked(false);
+      setMemberLinkedHint(false);
       return;
     }
+    // Picking another member prefills the identity fields from that member.
     loadMemberProfile(memberSelect.value, true);
   });
 
   roleSelect?.addEventListener('change', () => {
     if (memberSelect?.value && !isExternalMember()) {
-      loadMemberProfile(memberSelect.value, true);
+      // Only refresh the compatibility warning: never overwrite what the user typed.
+      loadMemberProfile(memberSelect.value, false);
     }
   });
 
   if (memberSelect?.value && !isExternalMember()) {
-    loadMemberProfile(memberSelect.value, true);
+    loadMemberProfile(memberSelect.value, false);
   }
 
   const syncResidence = () => {
@@ -12796,13 +12883,6 @@ function initOrgPersonForm(form) {
     }
     if (replaceInput?.value === '1') {
       return;
-    }
-    memberFields.forEach((el) => el.removeAttribute('disabled'));
-    if (birthPlaceInput instanceof HTMLInputElement) {
-      birthPlaceInput.removeAttribute('readonly');
-    }
-    if (phoneInput instanceof HTMLInputElement) {
-      phoneInput.removeAttribute('readonly');
     }
     const option = roleSelect?.selectedOptions?.[0];
     if (option?.dataset?.requiresResidence !== '1' && residenceWrap) {
@@ -15234,6 +15314,7 @@ function initDashboardCharts() {
   if (!root || typeof Chart === 'undefined') {
     return;
   }
+  registerSoclyPiePercentPlugin();
   const panel = root.closest('[data-dashboard-panel]');
   if (panel && panel.hidden) {
     return;
@@ -15730,6 +15811,7 @@ function initStatisticsCharts() {
   if (typeof Chart === 'undefined') {
     return;
   }
+  registerSoclyPiePercentPlugin();
   const palette = ['#0D6E66', '#B84A1B', '#2A8F85', '#C56A3A', '#4A6B66', '#8B3A16', '#6FA8A1', '#E08A5C', '#9AA5A2', '#084B46'];
   const money = (value) =>
     `${Number(value || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}\u00A0€`;
@@ -15828,13 +15910,13 @@ function initStatisticsCharts() {
           maintainAspectRatio: false,
           indexAxis: horizontal ? 'y' : 'x',
           plugins: {
-            legend: isPie ? chartLegendOptions((spec.labels || []).length, 'bottom') : { display: false },
+            legend: isPie ? pieLegendOptions((spec.labels || []).length, 'bottom') : { display: false },
             soclyValueLabels: { enabled: Boolean(spec.percent_labels) },
             tooltip: {
               callbacks: {
                 label: (ctx) => {
                   const value = ctx.parsed.y ?? ctx.parsed.x ?? ctx.parsed;
-                  return `${ctx.label}: ${isMoney ? money(value) : value}`;
+                  return `${ctx.label}: ${isMoney ? money(value) : value}${soclyShareSuffix(ctx)}`;
                 },
               },
             },
@@ -15864,6 +15946,7 @@ function initTreasuryCharts() {
   if (!root || typeof Chart === 'undefined') {
     return;
   }
+  registerSoclyPiePercentPlugin();
   const panel = root.closest('[data-dashboard-panel]');
   if (panel && panel.hidden) {
     return;
@@ -15909,7 +15992,7 @@ function initTreasuryCharts() {
       label(ctx) {
         const label = ctx.label || '';
         const value = ctx.parsed || 0;
-        return `${label}: ${formatMoney(value, currency)}`;
+        return `${label}: ${formatMoney(value, currency)}${soclyShareSuffix(ctx)}`;
       },
     },
   };
@@ -16199,7 +16282,7 @@ function initTreasuryCharts() {
             ...moneyTooltip,
             callbacks: {
               label(ctx) {
-                return `${ctx.label}: ${Number(ctx.parsed || 0)}`;
+                return `${ctx.label}: ${Number(ctx.parsed || 0)}${soclyShareSuffix(ctx)}`;
               },
             },
           },
@@ -16225,16 +16308,185 @@ function donutOptions(labelCount = 0) {
     maintainAspectRatio: false,
     cutout: '62%',
     plugins: {
-      legend: chartLegendOptions(labelCount, 'bottom'),
+      legend: pieLegendOptions(labelCount, 'bottom'),
       tooltip: {
         backgroundColor: '#084B46',
         titleColor: '#F4FBF9',
         bodyColor: '#D7E8E4',
         padding: 12,
         cornerRadius: 10,
+        callbacks: {
+          label(ctx) {
+            const value = Number(ctx.parsed || 0);
+            return `${ctx.label}: ${value}${soclyShareSuffix(ctx)}`;
+          },
+        },
       },
     },
   };
+}
+
+/*
+ * ── Pie / doughnut percentages ───────────────────────────────────────────────────────────────
+ * A pie that only shows shapes forces the reader to guess: every slice now carries its share
+ * (drawn inside the arc, contrast-aware), and the same percentage is repeated in the tooltip and
+ * in the legend. Bars are untouched.
+ */
+function soclyFormatPercent(percent) {
+  const value = Number(percent) || 0;
+  return `${value.toLocaleString(undefined, {
+    minimumFractionDigits: 1,
+    maximumFractionDigits: 1,
+  })} %`;
+}
+
+function pieDatasetValues(chart, datasetIndex) {
+  const dataset = chart?.data?.datasets?.[datasetIndex] || {};
+  return (Array.isArray(dataset.data) ? dataset.data : []).map((value) => Math.abs(Number(value) || 0));
+}
+
+function pieDatasetTotal(values) {
+  return (Array.isArray(values) ? values : []).reduce((sum, value) => sum + (Number(value) || 0), 0);
+}
+
+/** “ (45,2 %)” for pie slices, empty string for every other chart type. */
+function soclyShareSuffix(ctx) {
+  const type = ctx?.chart?.config?.type;
+  if (type !== 'pie' && type !== 'doughnut') {
+    return '';
+  }
+  const values = pieDatasetValues(ctx.chart, ctx.datasetIndex || 0);
+  const total = pieDatasetTotal(values);
+  if (total <= 0) {
+    return '';
+  }
+  return ` (${soclyFormatPercent(((values[ctx.dataIndex] || 0) * 100) / total)})`;
+}
+
+/**
+ * Legend labels with the share appended: “Quote associative · 45,2 %”. It mirrors the Chart.js
+ * doughnut/pie generator (one entry per label, with the slice style) instead of relying on the
+ * generic one, which is dataset-based and would print “undefined”.
+ */
+function soclyPieLegendLabels(chart) {
+  const labels = Array.isArray(chart?.data?.labels) ? chart.data.labels : [];
+  const meta = typeof chart?.getDatasetMeta === 'function' ? chart.getDatasetMeta(0) : null;
+  if (labels.length === 0 || !meta || !meta.controller) {
+    return [];
+  }
+  const values = pieDatasetValues(chart, 0);
+  const total = pieDatasetTotal(values);
+  const legendLabels = chart.options?.plugins?.legend?.labels || {};
+  const pointStyle = legendLabels.usePointStyle ? 'circle' : 'rectRounded';
+  return labels.map((label, index) => {
+    const style = meta.controller.getStyle(index);
+    const share = total > 0 ? soclyFormatPercent(((values[index] || 0) * 100) / total) : '';
+    return {
+      text: share !== '' ? `${label} · ${share}` : String(label),
+      fillStyle: style.backgroundColor,
+      strokeStyle: style.borderColor,
+      fontColor: legendLabels.color || chart.options?.color,
+      lineWidth: style.borderWidth,
+      pointStyle,
+      hidden: !chart.getDataVisibility(index),
+      index,
+      datasetIndex: 0,
+    };
+  });
+}
+
+/** Legend options: visible only for a handful of slices (as before) and with percentages. */
+function pieLegendOptions(count, position = 'bottom') {
+  const base = chartLegendOptions(count, position);
+  if (base.display === false) {
+    return base;
+  }
+  return { ...base, labels: { ...(base.labels || {}), generateLabels: soclyPieLegendLabels } };
+}
+
+/** White on dark slices, ink on light ones, so the percentage stays readable on any colour. */
+function soclyContrastText(color) {
+  const raw = String(color || '');
+  let rgb = null;
+  if (raw.startsWith('#')) {
+    let hex = raw.slice(1);
+    if (hex.length === 3 || hex.length === 4) {
+      hex = hex.split('').map((char) => char + char).join('');
+    }
+    if (hex.length >= 6) {
+      rgb = [0, 2, 4].map((offset) => parseInt(hex.slice(offset, offset + 2), 16));
+    }
+  } else {
+    const parts = raw.match(/\d+/g);
+    if (parts && parts.length >= 3) {
+      rgb = [Number(parts[0]), Number(parts[1]), Number(parts[2])];
+    }
+  }
+  if (!rgb || rgb.some((value) => Number.isNaN(value))) {
+    return '#ffffff';
+  }
+  const luminance = (0.299 * rgb[0] + 0.587 * rgb[1] + 0.114 * rgb[2]) / 255;
+  return luminance > 0.62 ? '#142a28' : '#ffffff';
+}
+
+/**
+ * Draws the share inside every pie/doughnut slice. Slices thinner than 4% are skipped (the label
+ * would not fit: the tooltip still carries the exact percentage).
+ */
+function registerSoclyPiePercentPlugin() {
+  if (typeof Chart === 'undefined' || Chart.registry.plugins.get('soclyPiePercent')) {
+    return;
+  }
+  Chart.register({
+    id: 'soclyPiePercent',
+    afterDatasetsDraw(chart) {
+      const type = chart.config?.type;
+      if (type !== 'pie' && type !== 'doughnut') {
+        return;
+      }
+      if (chart.options?.plugins?.soclyPiePercent?.enabled === false) {
+        return;
+      }
+      const ctx = chart.ctx;
+      chart.data.datasets.forEach((dataset, datasetIndex) => {
+        const meta = chart.getDatasetMeta(datasetIndex);
+        if (!meta || meta.hidden) {
+          return;
+        }
+        const values = pieDatasetValues(chart, datasetIndex);
+        const total = pieDatasetTotal(values);
+        if (total <= 0) {
+          return;
+        }
+        meta.data.forEach((element, index) => {
+          const value = values[index] || 0;
+          if (value <= 0) {
+            return;
+          }
+          const percent = (value * 100) / total;
+          if (percent < 4) {
+            return;
+          }
+          const center = typeof element.tooltipPosition === 'function'
+            ? element.tooltipPosition()
+            : (typeof element.getCenterPoint === 'function' ? element.getCenterPoint() : null);
+          if (!center) {
+            return;
+          }
+          const background = Array.isArray(dataset.backgroundColor)
+            ? dataset.backgroundColor[index]
+            : dataset.backgroundColor;
+          ctx.save();
+          ctx.fillStyle = soclyContrastText(background);
+          ctx.font = '700 12px "Manrope", "Segoe UI", sans-serif';
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'middle';
+          ctx.fillText(soclyFormatPercent(percent), center.x, center.y);
+          ctx.restore();
+        });
+      });
+    },
+  });
 }
 
 function formatMoney(value, currency, compact = false) {
@@ -17338,6 +17590,60 @@ function initBudgetGrid(scope = document) {
     });
     source.addEventListener('input', sync);
     sync();
+  });
+})();
+
+/*
+ * Import members: picking an existing member type fills the annual fee from that type
+ * and locks it (the fee belongs to the type). The name/translation fields are only used
+ * when a new type is created, so they are disabled otherwise.
+ */
+(() => {
+  const form = document.querySelector('[data-import-commit]');
+  if (!(form instanceof HTMLFormElement)) return;
+
+  form.querySelectorAll('.import-ref-card').forEach((card) => {
+    const select = card.querySelector('[data-import-type-action]');
+    const price = card.querySelector('[data-import-type-price]');
+    if (!(select instanceof HTMLSelectElement) || !(price instanceof HTMLInputElement)) return;
+    const hint = card.querySelector('[data-import-type-hint]');
+    const translations = card.querySelector('[data-import-translations]');
+    const names = Array.from(card.querySelectorAll('[data-import-name-source], [data-import-translation]'))
+      .filter((field) => field instanceof HTMLInputElement);
+    let customPrice = price.value;
+    let mode = 'create';
+
+    const apply = () => {
+      const value = select.value || 'create';
+      const isCreate = value === 'create';
+      const isMap = value.startsWith('map:');
+      if (mode === 'create' && !isCreate) {
+        customPrice = price.value;
+      }
+      price.disabled = !isCreate;
+      price.readOnly = !isCreate;
+      price.setAttribute('aria-disabled', isCreate ? 'false' : 'true');
+      if (isCreate) {
+        price.value = customPrice;
+      } else if (isMap) {
+        const option = select.options[select.selectedIndex] || null;
+        price.value = option ? String(option.dataset.price || '') : '';
+      } else {
+        price.value = '';
+      }
+      names.forEach((field) => {
+        field.disabled = !isCreate;
+      });
+      if (hint instanceof HTMLElement) hint.hidden = isCreate;
+      if (translations instanceof HTMLElement) translations.hidden = !isCreate;
+      mode = isCreate ? 'create' : (isMap ? 'map' : 'skip');
+    };
+
+    select.addEventListener('change', apply);
+    price.addEventListener('input', () => {
+      if (mode === 'create') customPrice = price.value;
+    });
+    apply();
   });
 })();
 

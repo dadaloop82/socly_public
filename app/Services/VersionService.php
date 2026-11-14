@@ -169,6 +169,78 @@ final class VersionService
     }
 
     /**
+     * Creation/modification inside the last $minutes, with the author. The movement page shows
+     * “just created/modified by …” so two operators notice a change made a moment ago (the
+     * client polls the freshness endpoint and keeps the box up to date).
+     *
+     * @return array{kind:string,user:string,at:string,at_iso:string,minutes:int}|null
+     */
+    public function recentActivity(string $entity, int $id, int $minutes = 15): ?array
+    {
+        $table = self::TRAIL_TABLES[$entity] ?? null;
+        if ($table === null || $id < 1 || $minutes < 1) {
+            return null;
+        }
+        $params = ['type' => $entity, 'id' => (string) $id];
+        $row = $this->db->fetch(
+            "SELECT a.action, a.created_at, u.first_name, u.last_name, u.name, u.email
+             FROM audit_logs a
+             LEFT JOIN users u ON u.id = a.user_id
+             WHERE a.entity_type = :type AND a.entity_id = :id
+               AND (a.action LIKE '%created%' OR a.action LIKE '%updated%')
+             ORDER BY a.id DESC
+             LIMIT 1",
+            $params
+        );
+        $kind = '';
+        $author = '';
+        $raw = '';
+        if ($row !== null) {
+            $kind = str_contains((string) ($row['action'] ?? ''), 'created') ? 'created' : 'updated';
+            $author = $this->auditAuthor($row)['name'];
+            $raw = trim((string) ($row['created_at'] ?? ''));
+        }
+        if ($raw === '') {
+            // Data saved before the audit existed: fall back to the row timestamps.
+            try {
+                $line = $this->db->fetch(
+                    sprintf('SELECT created_at, updated_at FROM `%s` WHERE id = :id', $table),
+                    ['id' => $id]
+                );
+            } catch (\Throwable) {
+                $line = null;
+            }
+            if ($line === null) {
+                return null;
+            }
+            $createdAt = trim((string) ($line['created_at'] ?? ''));
+            $updatedAt = trim((string) ($line['updated_at'] ?? ''));
+            if ($updatedAt !== '' && $updatedAt !== $createdAt) {
+                $raw = $updatedAt;
+                $kind = 'updated';
+            } elseif ($createdAt !== '') {
+                $raw = $createdAt;
+                $kind = 'created';
+            }
+        }
+        if ($raw === '') {
+            return null;
+        }
+        $time = strtotime($raw);
+        if ($time === false || (time() - $time) > $minutes * 60 || $time > time() + 60) {
+            return null;
+        }
+
+        return [
+            'kind' => $kind,
+            'user' => $author !== '' ? $author : (string) __('presence.unknown_user'),
+            'at' => (string) (format_datetime($raw) ?: $raw),
+            'at_iso' => date('c', $time),
+            'minutes' => (int) floor(max(0, time() - $time) / 60),
+        ];
+    }
+
+    /**
      * Name and moment of an audit row (user names, then the legacy `name`, then the email).
      *
      * @param array<string,mixed> $row

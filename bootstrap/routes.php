@@ -143,11 +143,16 @@ $router->get('/members/{id}/edit', [MemberController::class, 'edit'], 'members.m
 $router->post('/members/{id}', [MemberController::class, 'update'], 'members.manage', ['mw.locale', 'mw.install', 'mw.auth', 'mw.csrf']);
 $router->post('/members/{id}/delete', [MemberController::class, 'destroy'], 'members.delete', ['mw.locale', 'mw.install', 'mw.auth', 'mw.csrf']);
 $router->post('/members/{id}/payments', [MemberController::class, 'storePayment'], 'payments.manage', ['mw.locale', 'mw.install', 'mw.auth', 'mw.csrf']);
+$router->post('/members/{id}/payments/{paymentId}/treasury', [MemberController::class, 'registerPaymentMovement'], 'payments.manage', ['mw.locale', 'mw.install', 'mw.auth', 'mw.csrf']);
+$router->post('/members/{id}/payments/{paymentId}/treasury/delete', [MemberController::class, 'deletePaymentMovement'], 'payments.manage', ['mw.locale', 'mw.install', 'mw.auth', 'mw.csrf']);
 $router->post('/members/{id}/remind-payment', [MemberController::class, 'remindPayment'], 'members.manage', ['mw.locale', 'mw.install', 'mw.auth', 'mw.csrf']);
 $router->post('/members/{id}/autofix', [MemberController::class, 'autoFix'], 'members.manage', ['mw.locale', 'mw.install', 'mw.auth', 'mw.csrf']);
 
 $router->get('/treasury', [TreasuryController::class, 'index'], 'treasury.view', ['mw.locale', 'mw.install', 'mw.auth']);
 $router->get('/treasury/create', [TreasuryController::class, 'create'], 'treasury.manage', ['mw.locale', 'mw.install', 'mw.auth']);
+$router->get('/treasury/suppliers', [TreasuryController::class, 'suppliers'], 'treasury.view', ['mw.locale', 'mw.install', 'mw.auth']);
+$router->get('/treasury/loans', [TreasuryController::class, 'loans'], 'treasury.view', ['mw.locale', 'mw.install', 'mw.auth']);
+$router->get('/treasury/deposits', [TreasuryController::class, 'deposits'], 'treasury.view', ['mw.locale', 'mw.install', 'mw.auth']);
 $router->get('/treasury/accounts/balances', [TreasuryController::class, 'accountBalances'], 'treasury.view', ['mw.locale', 'mw.install', 'mw.auth']);
 $router->post('/treasury/bulk', [TreasuryController::class, 'bulk'], 'treasury.manage', ['mw.locale', 'mw.install', 'mw.auth', 'mw.csrf']);
 $router->post('/treasury/{id}/approve', [TreasuryController::class, 'approve'], 'treasury.manage', ['mw.locale', 'mw.install', 'mw.auth', 'mw.csrf']);
@@ -219,7 +224,6 @@ $router->get('/org', [OrgController::class, 'index'], 'org.view', ['mw.locale', 
 $router->get('/org/history', [OrgController::class, 'history'], 'org.view', ['mw.locale', 'mw.install', 'mw.auth']);
 $router->get('/org/export.csv', [OrgController::class, 'exportCsv'], 'org.view', ['mw.locale', 'mw.install', 'mw.auth']);
 $router->get('/org/export.pdf', [OrgController::class, 'exportPdf'], 'org.view', ['mw.locale', 'mw.install', 'mw.auth']);
-$router->post('/org/control-body', [OrgController::class, 'saveControlBody'], 'org.manage', ['mw.locale', 'mw.install', 'mw.auth', 'mw.csrf']);
 $router->get('/org/export.chart', [OrgController::class, 'exportChart'], 'org.view', ['mw.locale', 'mw.install', 'mw.auth']);
 $router->post('/org/organs', [OrgController::class, 'storeOrgan'], null, ['mw.locale', 'mw.install', 'mw.auth', 'mw.csrf']);
 $router->post('/org/organs/{key}/delete', [OrgController::class, 'destroyOrgan'], null, ['mw.locale', 'mw.install', 'mw.auth', 'mw.csrf']);
@@ -250,6 +254,7 @@ $router->post('/settings/addons/licenses/{id}/remove', [AddonController::class, 
 $router->get('/settings', [SettingsController::class, 'index'], 'settings.manage', ['mw.locale', 'mw.install', 'mw.auth']);
 $router->post('/settings/general', [SettingsController::class, 'saveGeneral'], 'settings.manage', ['mw.locale', 'mw.install', 'mw.auth', 'mw.csrf']);
 $router->post('/settings/people', [SettingsController::class, 'savePeople'], 'settings.manage', ['mw.locale', 'mw.install', 'mw.auth', 'mw.csrf']);
+$router->post('/settings/org', [SettingsController::class, 'saveOrg'], 'settings.manage', ['mw.locale', 'mw.install', 'mw.auth', 'mw.csrf']);
 $router->post('/settings/officers', [SettingsController::class, 'savePeople'], 'settings.manage', ['mw.locale', 'mw.install', 'mw.auth', 'mw.csrf']);
 $router->post('/settings/legal', [SettingsController::class, 'saveLegal'], 'settings.manage', ['mw.locale', 'mw.install', 'mw.auth', 'mw.csrf']);
 $router->post('/settings/types', [SettingsController::class, 'saveType'], 'settings.manage', ['mw.locale', 'mw.install', 'mw.auth', 'mw.csrf']);

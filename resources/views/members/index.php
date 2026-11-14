@@ -3,7 +3,7 @@
 /** @var int $page */
 /** @var array{active_count:int,balance_due_total:float,pending_count:int} $summary */
 $filters = is_array($filters ?? null) ? $filters : [];
-$filters += ['q' => '', 'status' => '', 'member_type_id' => '', 'payment' => '', 'sort' => '', 'dir' => '', 'issues' => ''];
+$filters += ['q' => '', 'status' => '', 'member_type_id' => '', 'payment' => '', 'sort' => '', 'dir' => '', 'issues' => '', 'joined' => ''];
 $redirectQuery = http_build_query(array_filter(array_merge($filters, ['page' => $page > 1 ? $page : null])));
 // Local path, never an absolute URL: redirect() prefixes the base, so “https://host/members?q=…”
 // became “https://host/https://host/members?q=…” after a bulk action.
@@ -192,6 +192,13 @@ $totalPages = max(1, (int) ceil(((int) $result['total']) / max(1, $perPage)));
                 </div>
             </div>
         <?php endif; ?>
+        <?php if ((string) ($filters['joined'] ?? '') === 'year'): ?>
+            <?php $joinedClearUrl = url('/members?' . http_build_query(array_filter(array_merge($filters, ['joined' => null, 'page' => null])))); ?>
+            <div class="alert alert-info member-joined-banner" role="status">
+                <span><?= e(__('members.joined_filter_active', ['count' => (string) (int) ($result['total'] ?? 0)])) ?></span>
+                <a class="btn btn-sm btn-ghost" href="<?= e($joinedClearUrl) ?>"><?= e(__('members.joined_filter_clear')) ?></a>
+            </div>
+        <?php endif; ?>
         <div class="table-wrap embedded members-table-wrap">
             <table class="members-table">
                 <thead>
@@ -212,10 +219,10 @@ $totalPages = max(1, (int) ceil(((int) $result['total']) / max(1, $perPage)));
                     <?= $sortHeader('type', (string) __('members.type')) ?>
                     <?= $sortHeader('status', (string) __('members.status')) ?>
                     <?php if (!empty($gdprEnabled)): ?>
-                        <th><?= e(__('members.gdpr_column')) ?></th>
+                        <th class="members-col-gdpr"><?= e(__('members.gdpr_column')) ?></th>
                     <?php endif; ?>
                     <?= $sortHeader('payment', (string) __('members.payment')) ?>
-                    <th><?= e(__('members.situation_column')) ?></th>
+                    <th class="members-col-situation"><?= e(__('members.situation_column')) ?></th>
                     <th><?= e(__('members.actions')) ?></th>
                 </tr>
                 </thead>
@@ -340,7 +347,7 @@ $totalPages = max(1, (int) ceil(((int) $result['total']) / max(1, $perPage)));
                         <?php
                         $gdprBadges = is_array($item['gdpr_badges'] ?? null) ? $item['gdpr_badges'] : [];
                         if (!empty($gdprEnabled)): ?>
-                        <td data-label="<?= e(__('members.gdpr_column')) ?>">
+                        <td class="members-col-gdpr" data-label="<?= e(__('members.gdpr_column')) ?>">
                             <?php if ($gdprBadges !== []): ?>
                                 <div class="member-gdpr-badges">
                                     <?php foreach ($gdprBadges as $badge): ?>
@@ -396,7 +403,7 @@ $totalPages = max(1, (int) ceil(((int) $result['total']) / max(1, $perPage)));
                             $situationBadges[] = ['class' => 'badge-ok', 'label' => __('members.situation_ok')];
                         }
                         ?>
-                        <td data-label="<?= e(__('members.situation_column')) ?>">
+                        <td class="members-col-situation" data-label="<?= e(__('members.situation_column')) ?>">
                             <div class="member-situation">
                                 <?php foreach ($situationBadges as $situationBadge): ?>
                                     <span class="badge <?= e((string) $situationBadge['class']) ?>"><?= e((string) $situationBadge['label']) ?></span>

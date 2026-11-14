@@ -477,6 +477,39 @@ final class RuntsReportService
     }
 
     /**
+     * Years present in the cash book, with how many movements are approved (the Model D
+     * only uses approved ones). The chooser must show every year the association actually
+     * has in Prima cassa, so a year still waiting for approval is visible too.
+     *
+     * @return list<array{year:int,approved:int,total:int}>
+     */
+    public function yearsOverview(): array
+    {
+        $rows = $this->db->fetchAll(
+            'SELECT YEAR(movement_date) AS y,
+                    SUM(CASE WHEN approved_at IS NOT NULL THEN 1 ELSE 0 END) AS approved,
+                    COUNT(*) AS total
+             FROM treasury_movements
+             WHERE superseded_at IS NULL
+             GROUP BY YEAR(movement_date)
+             ORDER BY y DESC'
+        );
+        $out = [];
+        foreach ($rows as $row) {
+            $year = (int) ($row['y'] ?? 0);
+            if ($year < 2000) {
+                continue;
+            }
+            $out[] = [
+                'year' => $year,
+                'approved' => (int) ($row['approved'] ?? 0),
+                'total' => (int) ($row['total'] ?? 0),
+            ];
+        }
+        return $out;
+    }
+
+    /**
      * Revenue for the year on a cash basis (excluding internal movements).
      */
     public function totalIncome(int $year): float
