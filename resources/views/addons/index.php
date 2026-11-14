@@ -5,6 +5,7 @@
 /** @var array<string,mixed> $auto */
 /** @var \Socly\Core\Addon\Entitlement|null $entitlement */
 /** @var array<string,mixed> $entitlement_payload */
+/** @var list<array{id:string,addons:list<string>,trial:bool,expires_at:?int,key_present:bool}> $licenses */
 /** @var bool $license_key_present */
 /** @var bool $revoked */
 /** @var string $instance_code */
@@ -18,9 +19,15 @@
 /** @var string $incoming_dir */
 $available = is_array($available ?? null) ? $available : [];
 $updates = is_array($updates ?? null) ? $updates : ['count' => 0, 'items' => []];
-$licenseId = (string) ($entitlement?->licenseId() ?? '');
-$licensedAddons = $entitlement?->addonIds() ?? [];
-$expiresAt = $entitlement?->expiresAt();
+$licenses = is_array($licenses ?? null) ? $licenses : [];
+$licensedAddons = [];
+foreach ($licenses as $licenseRow) {
+    foreach (is_array($licenseRow['addons'] ?? null) ? $licenseRow['addons'] : [] as $addonId) {
+        $licensedAddons[(string) $addonId] = (string) $addonId;
+    }
+}
+$licensedAddons = array_values($licensedAddons);
+$licenseIds = array_map(static fn (array $row): string => (string) ($row['id'] ?? ''), $licenses);
 $enabledCount = count(array_filter($installed, static fn (array $row): bool => !empty($row['is_enabled'])));
 $auto = is_array($auto ?? null) ? $auto : [];
 $autoInstalled = is_array($auto['installed'] ?? null) ? $auto['installed'] : [];
@@ -68,7 +75,7 @@ $pendingCore = is_array($auto['pending'] ?? null) ? $auto['pending'] : [];
 <div class="stats stats-context-members members-summary-stats">
     <div class="stat">
         <div class="label"><?= e(__('addons.license')) ?></div>
-        <div class="value"><?= e($licenseId !== '' ? $licenseId : __('addons.status_no_license')) ?></div>
+        <div class="value"><?= e($licenseIds !== [] ? implode(', ', $licenseIds) : __('addons.status_no_license')) ?></div>
     </div>
     <div class="stat">
         <div class="label"><?= e(__('addons.licensed_addons')) ?></div>
@@ -87,19 +94,41 @@ $pendingCore = is_array($auto['pending'] ?? null) ? $auto['pending'] : [];
             <p class="section-lede"><?= e(__('addons.license_section_lede')) ?></p>
         </div>
     </div>
-    <?php if ($licenseId !== ''): ?>
-        <p class="muted">
-            <?= e(__('addons.license_active_line', [
-                'id' => $licenseId,
-                'addons' => $licensedAddons !== [] ? implode(', ', $licensedAddons) : '—',
-            ])) ?>
-        </p>
-        <?php if ($expiresAt !== null): ?>
-            <p class="muted"><?= e(__('addons.license_expires', ['date' => format_datetime(date('Y-m-d H:i:s', $expiresAt))])) ?></p>
-        <?php endif; ?>
-        <?php if ($entitlement?->isTrial()): ?>
-            <p class="muted"><?= e(__('addons.license_trial')) ?></p>
-        <?php endif; ?>
+    <?php if ($licenses === []): ?>
+        <p class="muted"><?= e(__('addons.license_none')) ?></p>
+    <?php else: ?>
+        <div style="display:grid;gap:0.65rem">
+            <?php foreach ($licenses as $license): ?>
+                <?php $rowId = (string) ($license['id'] ?? ''); ?>
+                <div class="panel embedded" style="display:flex;flex-wrap:wrap;gap:0.75rem;justify-content:space-between;align-items:flex-start">
+                    <div>
+                        <p class="muted">
+                            <?= e(__('addons.license_active_line', [
+                                'id' => $rowId,
+                                'addons' => !empty($license['addons']) ? implode(', ', array_map('strval', (array) $license['addons'])) : '—',
+                            ])) ?>
+                        </p>
+                        <?php if (($license['expires_at'] ?? null) !== null): ?>
+                            <p class="muted"><?= e(__('addons.license_expires', [
+                                'date' => format_datetime(date('Y-m-d H:i:s', (int) $license['expires_at'])),
+                            ])) ?></p>
+                        <?php endif; ?>
+                        <?php if (!empty($license['trial'])): ?>
+                            <p class="muted"><?= e(__('addons.license_trial')) ?></p>
+                        <?php endif; ?>
+                        <?php if (empty($license['key_present'])): ?>
+                            <p class="muted"><?= e(__('addons.license_offline')) ?></p>
+                        <?php endif; ?>
+                    </div>
+                    <form method="post"
+                          action="<?= e(url('/settings/addons/licenses/' . rawurlencode($rowId) . '/remove')) ?>"
+                          data-confirm="<?= e(__('addons.license_remove_confirm', ['id' => $rowId])) ?>">
+                        <?= csrf_field() ?>
+                        <button class="btn btn-sm btn-ghost is-danger" type="submit"><?= e(__('addons.license_remove')) ?></button>
+                    </form>
+                </div>
+            <?php endforeach; ?>
+        </div>
     <?php endif; ?>
 
     <form method="post" action="<?= e(url('/settings/addons/activate')) ?>" class="panel embedded">

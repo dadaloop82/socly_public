@@ -52,6 +52,7 @@ final class AddonController extends BaseController
             'auto' => $auto,
             'entitlement' => $entitlement,
             'entitlement_payload' => $entitlement?->payload() ?? [],
+            'licenses' => $this->license->licenses(),
             'license_key_present' => $this->license->licenseKey() !== '',
             'revoked' => $this->license->isRevoked(),
             'instance_code' => $this->license->instanceCode(),
@@ -108,6 +109,14 @@ final class AddonController extends BaseController
         } else {
             $this->flash('success', __('addons.imported', ['addons' => implode(', ', $result['addons'] ?? [])]));
         }
+        redirect('/settings/addons');
+    }
+
+    /** Remove one stored licence: only the add-ons it covers stop booting. */
+    public function removeLicense(Request $request, string $licenseId): void
+    {
+        $result = $this->license->removeLicense($licenseId, $request->ip());
+        $this->flashResult($result, __('addons.license_removed', ['id' => $licenseId]));
         redirect('/settings/addons');
     }
 
@@ -231,15 +240,13 @@ final class AddonController extends BaseController
 
     private function dynamicPanelsHtml(): string
     {
-        $entitlement = $this->license->entitlement();
-
         return (string) view_partial('addons/dynamic', [
             'available' => $this->addons->availableAddons(),
             'updates' => $this->addons->updatesSummary(),
             'installed' => $this->addons->installed(),
             'core_version' => app_version(),
             'license_key_present' => $this->license->licenseKey() !== '',
-            'licensedAddons' => $entitlement?->addonIds() ?? [],
+            'licensedAddons' => $this->license->licensedAddonIds(),
         ]);
     }
 

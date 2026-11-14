@@ -11,6 +11,7 @@ instance with Ed25519, also without any internet connection.
 |---|---|
 | Price | One-off (perpetual licence) |
 | Licence | One licence = one installation (an association with several seats uses the same instance) |
+| Several licences | An installation can hold more than one licence (one key each): every key grants only its own add-ons and activating a new one never replaces the existing licences |
 | Offline codes | Perpetual, signed; no network required |
 | Add-ons | Multi-file packages with one PHP entry point implementing `PluginInterface` |
 | Updates | The vendor builds and publishes new signed versions; the instance updates online or by uploading the new package |
@@ -23,7 +24,7 @@ instance with Ed25519, also without any internet connection.
 | Public repo (`socly_public`) | `app/Core/Addon/*` (verifier only), `bootstrap/addons_keys.php` (**public** keys), docs, migration `048_addons.sql` |
 | Private repo (`tools/addons/`, `addons-src/`) | key generation, package builder/signer, licence signing CLI, guard tests, add-on sources |
 | socly.it (`_webSite`) | catalogue, signed package storage, licence issuance/revocation, `/api/addons.php` |
-| Instance storage | `storage/addons/<id>/<version>/` (code), settings (signed entitlement, encrypted), `storage/addons/keys` (package private key in the private repo only) |
+| Instance storage | `storage/addons/<id>/<version>/` (code), settings (signed entitlements and licence keys, encrypted, one entry per licence), `storage/addons/keys` (package private key in the private repo only) |
 
 The private keys never belong to the public tree:
 

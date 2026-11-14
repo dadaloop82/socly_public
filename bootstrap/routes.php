@@ -245,6 +245,7 @@ $router->post('/settings/addons/auto-install', [AddonController::class, 'autoIns
 $router->post('/settings/addons/{id}/enable', [AddonController::class, 'enable'], 'addons.manage', ['mw.locale', 'mw.install', 'mw.auth', 'mw.csrf']);
 $router->post('/settings/addons/{id}/disable', [AddonController::class, 'disable'], 'addons.manage', ['mw.locale', 'mw.install', 'mw.auth', 'mw.csrf']);
 $router->post('/settings/addons/{id}/remove', [AddonController::class, 'remove'], 'addons.manage', ['mw.locale', 'mw.install', 'mw.auth', 'mw.csrf']);
+$router->post('/settings/addons/licenses/{id}/remove', [AddonController::class, 'removeLicense'], 'addons.manage', ['mw.locale', 'mw.install', 'mw.auth', 'mw.csrf']);
 
 $router->get('/settings', [SettingsController::class, 'index'], 'settings.manage', ['mw.locale', 'mw.install', 'mw.auth']);
 $router->post('/settings/general', [SettingsController::class, 'saveGeneral'], 'settings.manage', ['mw.locale', 'mw.install', 'mw.auth', 'mw.csrf']);

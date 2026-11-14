@@ -563,7 +563,8 @@ final class AddonManager
         if (empty($this->license->statusFor($id)['licensed'])) {
             return ['ok' => false, 'error' => __('addons.license_required_for', ['addon' => $id])];
         }
-        $licenseKey = $this->license->licenseKey();
+        // Download with the key of the licence that actually grants this add-on.
+        $licenseKey = $this->license->licenseKeyFor($id);
         if ($licenseKey === '') {
             return ['ok' => false, 'error' => __('addons.error_offline_only')];
         }
@@ -777,14 +778,16 @@ final class AddonManager
         if (!empty($status['revoked'])) {
             return ['ok' => false, 'error' => __('addons.revoked_banner')];
         }
+        if (empty($status['ok'])) {
+            return ['ok' => false, 'error' => (string) ($status['error'] ?? __('addons.error_online'))];
+        }
         $manifestResult = $this->license->fetchManifest($ip);
         if (empty($manifestResult['ok'])) {
             return ['ok' => false, 'error' => (string) ($manifestResult['error'] ?? __('addons.error_online'))];
         }
         $manifest = is_array($manifestResult['manifest'] ?? null) ? $manifestResult['manifest'] : [];
         $available = is_array($manifest['addons'] ?? null) ? $manifest['addons'] : [];
-        $licenseKey = $this->license->licenseKey();
-        if ($licenseKey === '') {
+        if ($this->license->licenseKey() === '') {
             return ['ok' => false, 'error' => __('addons.error_offline_only')];
         }
         $updated = [];
@@ -795,6 +798,11 @@ final class AddonManager
                 continue;
             }
             $meta = $available[$id];
+            $licenseKey = $this->license->licenseKeyFor($id);
+            if ($licenseKey === '') {
+                $errors[] = $id . ': ' . __('addons.error_offline_only');
+                continue;
+            }
             $currentCore = function_exists('app_version') ? app_version() : '0.0.0';
             $versions = is_array($meta['versions'] ?? null) ? $meta['versions'] : [];
             $target = null;
