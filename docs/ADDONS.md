@@ -201,7 +201,7 @@ can never type free text. Polls can be open or secret (aggregate only). Source:
 `addons-src/board_voting/` (private repo; `addons-src/` is not part of the public export).
 
 ```bash
-php tools/addons/addon-tool.php build addons-src/board_voting dist/board_voting-1.0.0.soclyaddon --incoming
+php tools/addons/addon-tool.php build addons-src/board_voting dist/board_voting-1.0.1.soclyaddon --incoming
 ```
 
 ## Instance workflow
