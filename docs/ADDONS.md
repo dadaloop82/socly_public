@@ -190,6 +190,20 @@ of the **socly.it** catalogue (Admin → Add-on → Pubblica). On another server
 folder manually. A licence containing the add-on is still required: activate it first (online key, offline
 code or request code), then install from the drop folder or from the licence catalogue.
 
+## Board voting add-on (`board_voting`)
+
+Official polls of the board (consiglio direttivo), published as a drop-in add-on: a five-step
+wizard (title/period, participants, topics, preview, share link), participants identified by first
+name + last name + fiscal code, one ballot per person written inside a transaction, live results
+with charts, participation log, CSV export and a branded public page carrying the “part of the
+Socly package” line. Questions are numeric, single/multiple choice or predetermined text: voters
+can never type free text. Polls can be open or secret (aggregate only). Source:
+`addons-src/board_voting/` (private repo; `addons-src/` is not part of the public export).
+
+```bash
+php tools/addons/addon-tool.php build addons-src/board_voting dist/board_voting-1.0.0.soclyaddon --incoming
+```
+
 ## Instance workflow
 
 Settings → Add-ons (`/settings/addons`, permission `addons.manage`):
