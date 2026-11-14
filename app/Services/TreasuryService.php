@@ -2249,7 +2249,8 @@ final class TreasuryService
             $payload['runts_line'] = null;
         } elseif ($runts !== '') {
             $line = strtoupper($runts);
-            if (RuntsReportService::lineLabel($line) !== '') {
+            if (RuntsReportService::isKnownLine($line, 'expense')
+                || RuntsReportService::isKnownLine($line, 'income')) {
                 $payload['runts_line'] = $line;
             }
         }

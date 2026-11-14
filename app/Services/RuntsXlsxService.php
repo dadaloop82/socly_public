@@ -163,96 +163,133 @@ final class RuntsXlsxService
     private function values(array $report): array
     {
         $sections = is_array($report['sections'] ?? null) ? $report['sections'] : [];
+        $investments = is_array($report['investments'] ?? null) ? $report['investments'] : [];
         $line = static function (string $letter, string $direction, string $key) use ($sections): float {
             return round((float) ($sections[$letter]['lines'][$direction][$key] ?? 0), 2);
         };
         $total = static function (string $letter, string $direction) use ($sections): float {
             return round((float) ($sections[$letter]['totals'][$direction] ?? 0), 2);
         };
+        $investLine = static function (string $direction, string $key) use ($investments): float {
+            return round((float) ($investments['lines'][$direction][$key] ?? 0), 2);
+        };
+        $investTotal = static function (string $direction) use ($investments): float {
+            return round((float) ($investments['totals'][$direction] ?? 0), 2);
+        };
         $expenseTotal = round((float) ($report['total_expense'] ?? 0), 2);
         $incomeTotal = round((float) ($report['total_income'] ?? 0), 2);
         $balance = round($incomeTotal - $expenseTotal, 2);
-        $investmentExpense = round(
-            $line('D', 'expense', 'D-E1') + $line('D', 'expense', 'D-E2') + $line('D', 'expense', 'D-E3'),
-            2
-        );
-        $investmentBalance = round(-$investmentExpense, 2);
+        $investmentExpense = $investTotal('expense');
+        $investmentIncome = $investTotal('income');
+        $investmentBalance = round($investmentIncome - $investmentExpense, 2);
+        $result = round($balance + $investmentBalance, 2);
         $closing = is_array($report['prospect']['closing'] ?? null) ? $report['prospect']['closing'] : [];
         $opening = is_array($report['prospect']['opening'] ?? null) ? $report['prospect']['opening'] : [];
-        $result = round($balance + $investmentBalance, 2);
 
         return [
+            // A) Attività di interesse generale.
             'B11' => $line('A', 'expense', 'A-E1'),
             'B12' => $line('A', 'expense', 'A-E2'),
             'B13' => $line('A', 'expense', 'A-E3'),
             'B14' => $line('A', 'expense', 'A-E4'),
             'B15' => $line('A', 'expense', 'A-E5'),
             'E11' => $line('A', 'income', 'A-I1'),
-            'E14' => $line('A', 'income', 'A-I6'),
-            'E15' => $line('A', 'income', 'A-I7'),
-            'E16' => $line('A', 'income', 'A-I3'),
-            'E17' => $line('A', 'income', 'A-I5'),
-            'E18' => $line('A', 'income', 'A-I2'),
-            'E19' => $line('A', 'income', 'A-I4'),
-            'E20' => $line('A', 'income', 'A-I8'),
+            'E12' => $line('A', 'income', 'A-I2'),
+            'E13' => $line('A', 'income', 'A-I3'),
+            'E14' => $line('A', 'income', 'A-I4'),
+            'E15' => $line('A', 'income', 'A-I5'),
+            'E16' => $line('A', 'income', 'A-I6'),
+            'E17' => $line('A', 'income', 'A-I7'),
+            'E18' => $line('A', 'income', 'A-I8'),
+            'E19' => $line('A', 'income', 'A-I9'),
+            'E20' => $line('A', 'income', 'A-I10'),
             'B22' => $total('A', 'expense'),
             'E22' => $total('A', 'income'),
             'E24' => round($total('A', 'income') - $total('A', 'expense'), 2),
+            // B) Attività diverse.
             'B28' => $line('B', 'expense', 'B-E1'),
             'B29' => $line('B', 'expense', 'B-E2'),
             'B30' => $line('B', 'expense', 'B-E3'),
             'B31' => $line('B', 'expense', 'B-E4'),
             'B32' => $line('B', 'expense', 'B-E5'),
-            'E29' => $line('B', 'income', 'B-I1'),
+            'E28' => $line('B', 'income', 'B-I1'),
+            'E29' => $line('B', 'income', 'B-I2'),
+            'E30' => $line('B', 'income', 'B-I3'),
+            'E31' => $line('B', 'income', 'B-I4'),
+            'E32' => $line('B', 'income', 'B-I5'),
+            'E33' => $line('B', 'income', 'B-I6'),
             'B36' => $total('B', 'expense'),
             'E36' => $total('B', 'income'),
             'E37' => round($total('B', 'income') - $total('B', 'expense'), 2),
+            // C) Attività di raccolta fondi.
             'B41' => $line('C', 'expense', 'C-E1'),
             'B42' => $line('C', 'expense', 'C-E2'),
+            'B43' => $line('C', 'expense', 'C-E3'),
             'E41' => $line('C', 'income', 'C-I1'),
             'E42' => $line('C', 'income', 'C-I2'),
+            'E43' => $line('C', 'income', 'C-I3'),
             'B44' => $total('C', 'expense'),
             'E44' => $total('C', 'income'),
             'E46' => round($total('C', 'income') - $total('C', 'expense'), 2),
+            // D) Attività finanziarie e patrimoniali.
+            'B50' => $line('D', 'expense', 'D-E1'),
+            'B51' => $line('D', 'expense', 'D-E2'),
+            'B52' => $line('D', 'expense', 'D-E3'),
+            'B53' => $line('D', 'expense', 'D-E4'),
+            'B54' => $line('D', 'expense', 'D-E5'),
             'E50' => $line('D', 'income', 'D-I1'),
-            'E52' => $line('D', 'income', 'D-I2'),
-            'E54' => $line('D', 'income', 'D-I3'),
-            'B56' => 0.0,
+            'E51' => $line('D', 'income', 'D-I2'),
+            'E52' => $line('D', 'income', 'D-I3'),
+            'E53' => $line('D', 'income', 'D-I4'),
+            'E54' => $line('D', 'income', 'D-I5'),
+            'B56' => $total('D', 'expense'),
             'E56' => $total('D', 'income'),
-            'E58' => $total('D', 'income'),
+            'E58' => round($total('D', 'income') - $total('D', 'expense'), 2),
+            // E) Supporto generale.
             'B62' => $line('E', 'expense', 'E-E1'),
             'B63' => $line('E', 'expense', 'E-E2'),
             'B64' => $line('E', 'expense', 'E-E3'),
             'B65' => $line('E', 'expense', 'E-E4'),
             'B66' => $line('E', 'expense', 'E-E5'),
-            'E63' => $line('E', 'income', 'E-I1'),
+            'E62' => $line('E', 'income', 'E-I1'),
+            'E63' => $line('E', 'income', 'E-I2'),
             'B69' => $total('E', 'expense'),
             'E69' => $total('E', 'income'),
+            // Operating totals (sections A–E, investments excluded).
             'B71' => $expenseTotal,
             'E71' => $incomeTotal,
             'E72' => $balance,
             'E74' => 0.0,
             'E76' => $balance,
-            'B79' => $line('D', 'expense', 'D-E1'),
-            'B81' => $line('D', 'expense', 'D-E2'),
-            'B82' => $line('D', 'expense', 'D-E3'),
+            // Investments and financing (outside the operating totals).
+            'B79' => $investLine('expense', 'INV-E1'),
+            'B80' => $investLine('expense', 'INV-E2'),
+            'B81' => $investLine('expense', 'INV-E3'),
+            'B82' => $investLine('expense', 'INV-E4'),
+            'E79' => $investLine('income', 'INV-I1'),
+            'E80' => $investLine('income', 'INV-I2'),
+            'E81' => $investLine('income', 'INV-I3'),
+            'E82' => $investLine('income', 'INV-I4'),
             'B84' => $investmentExpense,
-            'E84' => 0.0,
+            'E84' => $investmentIncome,
             'E86' => $investmentBalance,
             'E88' => 0.0,
             'E90' => $investmentBalance,
             'E92' => $balance,
             'E93' => $investmentBalance,
             'E94' => $result,
+            // Cash and bank.
             'E96' => round((float) ($closing['cash'] ?? 0), 2),
             'E97' => round((float) ($closing['bank'] ?? 0), 2),
             'E98' => round((float) ($closing['total'] ?? 0), 2),
+            // Optional figurative costs/income (not calculated).
             'B106' => 0.0,
             'B107' => 0.0,
             'B108' => 0.0,
             'E106' => 0.0,
             'E107' => 0.0,
             'E108' => 0.0,
+            // Balance check: opening + comprehensive result = closing.
             'B111' => round((float) ($opening['total'] ?? 0), 2),
             'B112' => $result,
             'B113' => round((float) ($closing['total'] ?? 0), 2),

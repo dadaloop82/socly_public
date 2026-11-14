@@ -391,9 +391,25 @@ if (array_key_exists('has_document', $values)) {
             }
         }
         ?>
+        <?php
+        // Magic-wand button at the end of the label row: it opens the mini-wizard that finds the
+        // Model D line with at most two questions and writes the answer straight into the select.
+        $runtsWizardOpenLabel = (string) __('runts.wizard_open');
+        $runtsWizardButton = '<button type="button" class="btn-icon runts-help-btn" data-runts-wizard-open'
+            . ' aria-label="' . e($runtsWizardOpenLabel) . '" title="' . e($runtsWizardOpenLabel) . '">'
+            . '<svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true" focusable="false"'
+            . ' fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">'
+            . '<path d="M3.5 20.5 14 10" stroke-width="2.4"/>'
+            . '<path d="M18.5 3v3.5M16.75 4.75h3.5"/>'
+            . '<path d="M21 10.5v2.5M19.75 11.75h2.5"/>'
+            . '<path d="M9 3.5v2.5M7.75 4.75h2.5"/>'
+            . '</svg></button>';
+        ?>
         <?= field('select', [
             'name' => 'runts_line',
             'label' => (string) __('runts.line_label'),
+            'label_extra' => $runtsWizardButton,
+            'wrapper_class' => 'runts-line-field',
             'value' => (string) ($values['runts_line'] ?? ''),
             'include_empty' => true,
             'empty_label' => (string) __('runts.line_auto'),
@@ -401,6 +417,7 @@ if (array_key_exists('has_document', $values)) {
             'hint' => (string) __('runts.line_hint'),
             'attrs' => ['data-treasury-runts' => true],
         ]) ?>
+        <?= view_partial('treasury/_runts_wizard', ['direction' => $selectedDirection]) ?>
         <?php
         // Cost centre / project: a flat list whose label always starts with the budget section and
         // then the line, so the chosen value keeps its context even when the field is collapsed

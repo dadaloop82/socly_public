@@ -241,6 +241,7 @@ document.addEventListener('DOMContentLoaded', () => {
   initFreshnessGuard();
   initTreasuryRecurring();
   initTreasurySimilar();
+  initTreasuryRuntsWizard();
   initTreasuryAdvancedFilters();
   initBudgetSectionSort();
   initBudgetCategoryRename();
@@ -2194,6 +2195,146 @@ function initTreasurySimilar() {
     actions.append(apply, dismiss);
     panel.appendChild(actions);
   }
+}
+
+/**
+ * Model D help wizard: at most two questions (area → line) and the chosen line is written straight
+ * on the movement form. The form already knows the sign, so it is never asked again; the dialog
+ * markup already carries every translated option and this only moves between the steps.
+ */
+function initTreasuryRuntsWizard() {
+  const form = document.querySelector('form[data-treasury-form]');
+  const dialog = document.querySelector('[data-runts-wizard]');
+  if (!(form instanceof HTMLFormElement) || !(dialog instanceof HTMLDialogElement)) return;
+  const select = form.querySelector('select[name="runts_line"]');
+  if (!(select instanceof HTMLSelectElement) || dialog.dataset.wizardBound === '1') return;
+  dialog.dataset.wizardBound = '1';
+
+  const steps = [...dialog.querySelectorAll('[data-runts-step]')];
+  const dots = [...dialog.querySelectorAll('[data-runts-step-dot]')];
+  const stepLabel = dialog.querySelector('[data-runts-step-label]');
+  const signText = dialog.querySelector('[data-runts-sign-text]');
+  const backBtn = dialog.querySelector('[data-runts-wizard-back]');
+  const stepTemplate = dialog.getAttribute('data-msg-step') || 'Step :current / :total';
+  const signIncome = dialog.getAttribute('data-msg-sign-income') || '';
+  const signExpense = dialog.getAttribute('data-msg-sign-expense') || '';
+  const order = ['area', 'item'];
+  let step = 'area';
+  let direction = 'income';
+  let area = 'A';
+
+  const setStep = (next) => {
+    step = order.includes(next) ? next : 'area';
+    steps.forEach((section) => {
+      section.hidden = section.getAttribute('data-runts-step') !== step;
+    });
+    const index = order.indexOf(step);
+    dots.forEach((dot, dotIndex) => {
+      dot.classList.toggle('is-active', dotIndex === index);
+      dot.classList.toggle('is-done', dotIndex < index);
+    });
+    if (stepLabel) {
+      stepLabel.textContent = stepTemplate
+        .replace(':current', String(index + 1))
+        .replace(':total', String(order.length));
+    }
+    if (backBtn instanceof HTMLButtonElement) {
+      backBtn.hidden = step === 'area';
+    }
+    const panel = dialog.querySelector(`[data-runts-step="${step}"]`);
+    panel?.querySelector('button[data-runts-choice]')?.focus?.();
+  };
+
+  // Only the blocks of the chosen sign stay in play (the same line letters exist on both sides).
+  const syncDirectionBlocks = () => {
+    dialog.querySelectorAll('[data-runts-items]').forEach((block) => {
+      block.hidden = block.getAttribute('data-runts-items') !== direction;
+    });
+  };
+
+  const applyLine = (line) => {
+    if (line === '') return;
+    select.value = line;
+    select.dispatchEvent(new Event('change', { bubbles: true }));
+    select.classList.remove('is-runts-applied');
+    void select.offsetWidth;
+    select.classList.add('is-runts-applied');
+    window.setTimeout(() => select.classList.remove('is-runts-applied'), 1400);
+    dialog.close();
+  };
+
+  const pickArea = (nextArea) => {
+    area = ['A', 'B', 'C', 'D', 'E', 'INV'].includes(nextArea) ? nextArea : 'A';
+    syncDirectionBlocks();
+    dialog.querySelectorAll('[data-runts-group]').forEach((group) => {
+      group.hidden = group.getAttribute('data-runts-group') !== area;
+    });
+    const areaButton = dialog.querySelector(`[data-runts-step="area"] [data-runts-area="${area}"]`);
+    const areaLabel = areaButton?.querySelector('.runts-wizard-option-label')?.textContent?.trim() || '';
+    dialog.querySelectorAll('[data-runts-area-label]').forEach((el) => {
+      el.textContent = areaLabel;
+    });
+    // Areas with a single line (B and E on the income side) need no second question.
+    const group = dialog.querySelector(`[data-runts-items="${direction}"] [data-runts-group="${area}"]`);
+    const lines = group ? [...group.querySelectorAll('[data-runts-line]')] : [];
+    if (lines.length === 1) {
+      applyLine(lines[0].getAttribute('data-runts-line') || '');
+      return;
+    }
+    setStep('item');
+  };
+
+  const open = () => {
+    const checked = form.querySelector('[data-treasury-direction]:checked');
+    const sign = checked instanceof HTMLInputElement ? checked.value : 'income';
+    // Internal transfers have no Model D line: the whole field is hidden for them anyway.
+    if (sign === 'transfer') return;
+    direction = sign === 'expense' ? 'expense' : 'income';
+    if (signText) {
+      signText.textContent = direction === 'expense' ? signExpense : signIncome;
+    }
+    dialog.querySelectorAll('[data-runts-items],[data-runts-group]').forEach((block) => {
+      block.hidden = true;
+    });
+    dialog.querySelectorAll('[data-runts-area-label]').forEach((el) => {
+      el.textContent = '';
+    });
+    syncDirectionBlocks();
+    setStep('area');
+    if (typeof dialog.showModal === 'function') {
+      dialog.showModal();
+    } else {
+      dialog.setAttribute('open', 'open');
+    }
+  };
+
+  dialog.addEventListener('click', (event) => {
+    const target = event.target instanceof Element ? event.target : null;
+    if (!target) return;
+    if (target.closest('[data-runts-wizard-close]')) {
+      dialog.close();
+      return;
+    }
+    const choice = target.closest('[data-runts-choice]');
+    if (!(choice instanceof HTMLButtonElement)) return;
+    if (choice.hasAttribute('data-runts-area')) {
+      pickArea(choice.getAttribute('data-runts-area') || 'A');
+      return;
+    }
+    const line = choice.getAttribute('data-runts-line') || '';
+    if (line !== '') applyLine(line);
+  });
+
+  backBtn?.addEventListener('click', () => {
+    if (step === 'item') setStep('area');
+  });
+
+  form.querySelectorAll('[data-runts-wizard-open]').forEach((btn) => {
+    btn.addEventListener('click', (event) => {
+      event.preventDefault();
+      open();
+    });
+  });
 }
 
 /**

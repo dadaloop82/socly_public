@@ -102,7 +102,7 @@ $prospect = $report['prospect'] ?? ['opening' => [], 'closing' => []];
             <table>
                 <thead>
                 <tr>
-                    <th><?= e(__('runts.model_title')) ?></th>
+                    <th><?= e(__('runts.movements')) ?></th>
                     <th class="num"><?= e(__('budget.amount')) ?></th>
                 </tr>
                 </thead>
@@ -127,6 +127,64 @@ $prospect = $report['prospect'] ?? ['opening' => [], 'closing' => []];
                 </tbody>
             </table>
         <?php endforeach; ?>
+
+        <?php
+        $investments = is_array($report['investments'] ?? null) ? $report['investments'] : null;
+        if ($investments !== null):
+            ?>
+            <h2><?= e((string) ($investments['label'] ?? __('runts.section_investments'))) ?></h2>
+            <table>
+                <thead>
+                <tr>
+                    <th><?= e(__('runts.movements')) ?></th>
+                    <th class="num"><?= e(__('budget.amount')) ?></th>
+                </tr>
+                </thead>
+                <tbody>
+                <tr class="group"><td colspan="2"><?= e(__('runts.expenses')) ?></td></tr>
+                <?php foreach (($investments['expense'] ?? []) as $lineKey => $lineLabel): ?>
+                    <tr>
+                        <td><?= e((string) $lineLabel) ?></td>
+                        <td class="num"><?= e($money((float) ($investments['lines']['expense'][$lineKey] ?? 0))) ?></td>
+                    </tr>
+                <?php endforeach; ?>
+                <tr class="section-total">
+                    <td><?= e(__('runts.total_investment_expense')) ?></td>
+                    <td class="num"><?= e($money((float) ($investments['totals']['expense'] ?? 0))) ?></td>
+                </tr>
+                <tr class="group"><td colspan="2"><?= e(__('runts.incomes')) ?></td></tr>
+                <?php foreach (($investments['income'] ?? []) as $lineKey => $lineLabel): ?>
+                    <tr>
+                        <td><?= e((string) $lineLabel) ?></td>
+                        <td class="num"><?= e($money((float) ($investments['lines']['income'][$lineKey] ?? 0))) ?></td>
+                    </tr>
+                <?php endforeach; ?>
+                <tr class="section-total">
+                    <td><?= e(__('runts.total_investment_income')) ?></td>
+                    <td class="num"><?= e($money((float) ($investments['totals']['income'] ?? 0))) ?></td>
+                </tr>
+                </tbody>
+            </table>
+        <?php endif; ?>
+
+        <table>
+            <tbody>
+            <tr class="section-total">
+                <td><?= e(__('runts.balance')) ?></td>
+                <td class="num"><?= e($money((float) ($report['balance'] ?? 0))) ?></td>
+            </tr>
+            <?php if ($investments !== null): ?>
+                <tr class="section-total">
+                    <td><?= e(__('runts.investment_balance')) ?></td>
+                    <td class="num"><?= e($money((float) ($report['investment_balance'] ?? 0))) ?></td>
+                </tr>
+                <tr class="grand-total">
+                    <td><?= e(__('runts.result')) ?></td>
+                    <td class="num"><?= e($money((float) ($report['result'] ?? 0))) ?></td>
+                </tr>
+            <?php endif; ?>
+            </tbody>
+        </table>
 
         <?php if ((float) ($report['internal'] ?? 0) > 0): ?>
             <p class="notice"><?= e(__('runts.internal', ['amount' => $money((float) $report['internal'])])) ?></p>
@@ -165,8 +223,8 @@ $prospect = $report['prospect'] ?? ['opening' => [], 'closing' => []];
                 <td class="num"><?= e($money((float) ($prospect['opening']['total'] ?? 0))) ?></td>
             </tr>
             <tr class="section-total">
-                <td colspan="3"><?= e(__('runts.balance')) ?></td>
-                <td class="num"><?= e($money((float) ($report['balance'] ?? 0))) ?></td>
+                <td colspan="3"><?= e(__('runts.result')) ?></td>
+                <td class="num"><?= e($money((float) ($report['result'] ?? 0))) ?></td>
             </tr>
             <tr class="grand-total">
                 <td><?= e(__('runts.closing')) ?></td>

@@ -36,21 +36,23 @@ final class RuntsReportService
         'A' => [
             'label' => 'A) Attività di interesse generale',
             'expense' => [
-                'A-E1' => '1) Acquisto materie prime, sussidiarie, di consumo e merci',
+                'A-E1' => '1) Materie prime, sussidiarie, di consumo e di merci',
                 'A-E2' => '2) Servizi',
-                'A-E3' => '3) Godimento beni di terzi',
+                'A-E3' => '3) Godimento di beni di terzi',
                 'A-E4' => '4) Personale',
                 'A-E5' => '5) Uscite diverse di gestione',
             ],
             'income' => [
-                'A-I1' => '1) Quote associative',
-                'A-I2' => '2) Contributi da enti pubblici',
-                'A-I3' => '3) Contributi da privati',
-                'A-I4' => '4) Proventi da contratti con enti pubblici',
-                'A-I5' => '5) Proventi da attività di interesse generale',
-                'A-I6' => '6) Erogazioni liberali',
-                'A-I7' => '7) 5 per mille',
-                'A-I8' => '8) Altri proventi',
+                'A-I1' => '1) Entrate da quote associative e apporti dei fondatori',
+                'A-I2' => '2) Entrate dagli associati per attività mutualistiche',
+                'A-I3' => '3) Entrate per prestazioni e cessioni ad associati e fondatori',
+                'A-I4' => '4) Erogazioni liberali',
+                'A-I5' => '5) Entrate del 5 per mille',
+                'A-I6' => '6) Contributi da soggetti privati',
+                'A-I7' => '7) Entrate per prestazioni e cessioni a terzi',
+                'A-I8' => '8) Contributi da enti pubblici',
+                'A-I9' => '9) Entrate da contratti con enti pubblici',
+                'A-I10' => '10) Altre entrate',
             ],
         ],
         'B' => [
@@ -63,45 +65,79 @@ final class RuntsReportService
                 'B-E5' => '5) Uscite diverse di gestione',
             ],
             'income' => [
-                'B-I1' => '1) Proventi da attività diverse',
+                'B-I1' => '1) Entrate per prestazioni e cessioni ad associati e fondatori',
+                'B-I2' => '2) Contributi da soggetti privati',
+                'B-I3' => '3) Entrate per prestazioni e cessioni a terzi',
+                'B-I4' => '4) Contributi da enti pubblici',
+                'B-I5' => '5) Entrate da contratti con enti pubblici',
+                'B-I6' => '6) Altre entrate',
             ],
         ],
         'C' => [
             'label' => 'C) Attività di raccolta fondi',
             'expense' => [
-                'C-E1' => '1) Raccolte fondi abituali',
-                'C-E2' => '2) Raccolte fondi occasionali',
+                'C-E1' => '1) Uscite per raccolte fondi abituali',
+                'C-E2' => '2) Uscite per raccolte fondi occasionali',
+                'C-E3' => '3) Altre uscite',
             ],
             'income' => [
-                'C-I1' => '1) Raccolte fondi abituali',
-                'C-I2' => '2) Raccolte fondi occasionali',
+                'C-I1' => '1) Entrate da raccolte fondi abituali',
+                'C-I2' => '2) Entrate da raccolte fondi occasionali',
+                'C-I3' => '3) Altre entrate',
             ],
         ],
         'D' => [
             'label' => 'D) Attività finanziarie e patrimoniali',
             'expense' => [
-                'D-E1' => '1) Acquisto immobilizzazioni materiali e immateriali',
-                'D-E2' => '2) Acquisto immobilizzazioni finanziarie',
-                'D-E3' => '3) Altre uscite finanziarie',
+                'D-E1' => '1) Su rapporti bancari',
+                'D-E2' => '2) Su investimenti finanziari',
+                'D-E3' => '3) Su patrimonio edilizio',
+                'D-E4' => '4) Su altri beni patrimoniali',
+                'D-E5' => '5) Altre uscite',
             ],
             'income' => [
-                'D-I1' => '1) Proventi da attività finanziarie',
-                'D-I2' => '2) Proventi da attività patrimoniali',
-                'D-I3' => '3) Altre entrate finanziarie',
+                'D-I1' => '1) Da rapporti bancari',
+                'D-I2' => '2) Da altri investimenti finanziari',
+                'D-I3' => '3) Da patrimonio edilizio',
+                'D-I4' => '4) Da altri beni patrimoniali',
+                'D-I5' => '5) Altre entrate',
             ],
         ],
         'E' => [
             'label' => 'E) Supporto generale',
             'expense' => [
-                'E-E1' => '1) Acquisto materie prime, sussidiarie, di consumo e merci',
+                'E-E1' => '1) Materie prime, sussidiarie, di consumo e di merci',
                 'E-E2' => '2) Servizi',
-                'E-E3' => '3) Godimento beni di terzi',
+                'E-E3' => '3) Godimento di beni di terzi',
                 'E-E4' => '4) Personale',
-                'E-E5' => '5) Uscite diverse di gestione',
+                'E-E5' => '5) Altre uscite',
             ],
             'income' => [
-                'E-I1' => '1) Proventi da supporto generale',
+                'E-I1' => '1) Entrate da distacco del personale',
+                'E-I2' => '2) Altre entrate di supporto generale',
             ],
+        ],
+    ];
+
+    /**
+     * Investment and financing section of Model D (rows 79–82): it sits outside the operating
+     * totals of sections A–E, exactly like the official workbook.
+     *
+     * @var array{label:string,expense:array<string,string>,income:array<string,string>}
+     */
+    private const INVESTMENTS = [
+        'label' => 'Investimenti e finanziamenti',
+        'expense' => [
+            'INV-E1' => '1) Investimenti in immobilizzazioni inerenti alle attività di interesse generale',
+            'INV-E2' => '2) Investimenti in immobilizzazioni inerenti alle attività diverse',
+            'INV-E3' => '3) Investimenti in attività finanziarie e patrimoniali',
+            'INV-E4' => '4) Rimborso di finanziamenti per quota capitale e di prestiti',
+        ],
+        'income' => [
+            'INV-I1' => '1) Disinvestimenti in immobilizzazioni inerenti alle attività di interesse generale',
+            'INV-I2' => '2) Disinvestimenti in immobilizzazioni inerenti alle attività diverse',
+            'INV-I3' => '3) Disinvestimenti in attività finanziarie e patrimoniali',
+            'INV-I4' => '4) Ricevimento di finanziamenti e di prestiti',
         ],
     ];
 
@@ -113,12 +149,12 @@ final class RuntsReportService
      */
     private const CATEGORY_MAP = [
         'membership_fee' => ['income' => 'A-I1'],
-        'public_grants' => ['income' => 'A-I2'],
-        'donation' => ['income' => 'A-I6'],
-        'five_per_thousand' => ['income' => 'A-I7'],
-        'institutional_activities' => ['income' => 'A-I5', 'expense' => 'A-E2'],
-        'sponsorship' => ['income' => 'B-I1'],
-        'commercial_sales' => ['income' => 'B-I1', 'expense' => 'B-E5'],
+        'public_grants' => ['income' => 'A-I8'],
+        'donation' => ['income' => 'A-I4'],
+        'five_per_thousand' => ['income' => 'A-I5'],
+        'institutional_activities' => ['income' => 'A-I7', 'expense' => 'A-E2'],
+        'sponsorship' => ['income' => 'B-I3'],
+        'commercial_sales' => ['income' => 'B-I3', 'expense' => 'B-E5'],
         'events' => ['income' => 'C-I1', 'expense' => 'C-E1'],
         'financial_income' => ['income' => 'D-I1'],
         'rent' => ['expense' => 'A-E3'],
@@ -130,12 +166,12 @@ final class RuntsReportService
         'services_consulting' => ['expense' => 'A-E2'],
         'insurance' => ['expense' => 'A-E2'],
         'maintenance' => ['expense' => 'A-E2'],
-        'equipment' => ['expense' => 'D-E1'],
+        'equipment' => ['expense' => 'INV-E1'],
         'marketing_promo' => ['expense' => 'E-E2'],
-        'taxes' => ['expense' => 'A-E5'],
-        'bank_fees' => ['expense' => 'D-E3'],
-        'member_loan' => ['expense' => 'D-E3', 'income' => 'D-I3'],
-        'security_deposit' => ['expense' => 'D-E2', 'income' => 'D-I2'],
+        'taxes' => ['expense' => 'E-E5'],
+        'bank_fees' => ['expense' => 'D-E1'],
+        'member_loan' => ['expense' => 'INV-E4', 'income' => 'INV-I4'],
+        'security_deposit' => ['expense' => 'INV-E3', 'income' => 'INV-I3'],
         'internal_transfer' => ['expense' => self::INTERNAL_LINE, 'income' => self::INTERNAL_LINE],
         'cash_deposit_withdrawal' => ['expense' => self::INTERNAL_LINE, 'income' => self::INTERNAL_LINE],
     ];
@@ -153,12 +189,19 @@ final class RuntsReportService
         if ($line === '') {
             return '';
         }
-        foreach (self::SECTIONS as $letter => $section) {
+        foreach (self::SECTIONS as $section) {
             foreach (['expense', 'income'] as $direction) {
                 foreach ($section[$direction] as $key => $label) {
                     if ($key === $line) {
                         return $label;
                     }
+                }
+            }
+        }
+        foreach (['expense', 'income'] as $direction) {
+            foreach (self::INVESTMENTS[$direction] as $key => $label) {
+                if ($key === $line) {
+                    return $label;
                 }
             }
         }
@@ -181,6 +224,11 @@ final class RuntsReportService
                 if (isset($section[$direction][$line])) {
                     return self::sectionLabel((string) $letter) . ' — ' . $section[$direction][$line];
                 }
+            }
+        }
+        foreach (['expense', 'income'] as $direction) {
+            if (isset(self::INVESTMENTS[$direction][$line])) {
+                return self::sectionLabel('INV') . ' — ' . self::INVESTMENTS[$direction][$line];
             }
         }
 
@@ -208,17 +256,31 @@ final class RuntsReportService
                     ];
                 }
             }
+            foreach (self::INVESTMENTS[$direction] as $key => $label) {
+                if (isset($out[$key])) {
+                    continue;
+                }
+                $out[$key] = [
+                    'value' => (string) $key,
+                    'label' => self::sectionLabel('INV') . ' — ' . $label,
+                ];
+            }
         }
 
         return array_values($out);
     }
 
     /**
-     * Section label (A–E); the official text of Model D remains the fallback.
+     * Section label (A–E and the investment block); the official text of Model D remains the fallback.
      */
     public static function sectionLabel(string $letter): string
     {
         $letter = strtoupper($letter);
+        if ($letter === 'INV') {
+            $key = 'runts.section_investments';
+            $translated = (string) __($key);
+            return $translated !== $key && $translated !== '' ? $translated : self::INVESTMENTS['label'];
+        }
         $fallback = (string) (self::SECTIONS[$letter]['label'] ?? '');
         $key = 'runts.section_' . strtolower($letter);
         $translated = (string) __($key);
@@ -228,7 +290,7 @@ final class RuntsReportService
     /**
      * Items of Model D grouped by section, for the selects of the movements form.
      *
-     * @return list<array{label:string,options:list<array{value:string,label:string}>}>
+     * @return list<array{key:string,label:string,options:list<array{value:string,label:string}>}>
      */
     public static function selectGroups(string $direction): array
     {
@@ -240,8 +302,23 @@ final class RuntsReportService
                 $options[] = ['value' => $key, 'label' => $label];
             }
             if ($options !== []) {
-                $groups[] = ['label' => self::sectionLabel((string) $letter), 'options' => $options];
+                $groups[] = [
+                    'key' => (string) $letter,
+                    'label' => self::sectionLabel((string) $letter),
+                    'options' => $options,
+                ];
             }
+        }
+        $investmentOptions = [];
+        foreach (self::INVESTMENTS[$direction] as $key => $label) {
+            $investmentOptions[] = ['value' => $key, 'label' => $label];
+        }
+        if ($investmentOptions !== []) {
+            $groups[] = [
+                'key' => 'INV',
+                'label' => self::sectionLabel('INV'),
+                'options' => $investmentOptions,
+            ];
         }
         return $groups;
     }
@@ -270,7 +347,7 @@ final class RuntsReportService
             return $mapped;
         }
         // Custom categories: they end up among the "others" of section A and remain editable.
-        return $direction === 'income' ? 'A-I8' : 'A-E5';
+        return $direction === 'income' ? 'A-I10' : 'A-E5';
     }
 
     /**
@@ -286,7 +363,7 @@ final class RuntsReportService
                 return true;
             }
         }
-        return false;
+        return isset(self::INVESTMENTS[$direction][$line]);
     }
 
     /**
@@ -322,7 +399,9 @@ final class RuntsReportService
              FROM treasury_movements
              WHERE approved_at IS NOT NULL AND superseded_at IS NULL
                AND direction = 'income'
-               AND YEAR(movement_date) = :y",
+               AND YEAR(movement_date) = :y
+               AND (runts_line IS NULL OR UPPER(runts_line) <> 'X1')
+               AND category NOT IN ('internal_transfer', 'cash_deposit_withdrawal')",
             ['y' => $year]
         );
         return round((float) ($row['total'] ?? 0), 2);
@@ -362,6 +441,14 @@ final class RuntsReportService
                 'counts' => ['expense' => 0, 'income' => 0],
             ];
         }
+        $investments = [
+            'label' => self::sectionLabel('INV'),
+            'expense' => self::INVESTMENTS['expense'],
+            'income' => self::INVESTMENTS['income'],
+            'totals' => ['expense' => 0.0, 'income' => 0.0],
+            'lines' => ['expense' => [], 'income' => []],
+            'counts' => ['expense' => 0, 'income' => 0],
+        ];
         $totalExpense = 0.0;
         $totalIncome = 0.0;
         $internal = 0.0;
@@ -402,6 +489,14 @@ final class RuntsReportService
                 }
                 continue;
             }
+            // Investments and financing are outside the operating totals of sections A–E, exactly
+            // like the official workbook (rows 79–82).
+            if (isset(self::INVESTMENTS[$direction][$line])) {
+                $investments['totals'][$direction] += $amount;
+                $investments['lines'][$direction][$line] = ($investments['lines'][$direction][$line] ?? 0.0) + $amount;
+                $investments['counts'][$direction] += 1;
+                continue;
+            }
             // Unrecognized entry (legacy data or direction changed): reported, not lost.
             $unclassified[] = [
                 'direction' => $direction,
@@ -411,12 +506,20 @@ final class RuntsReportService
             ];
         }
 
+        $balance = round($totalIncome - $totalExpense, 2);
+        $investmentBalance = round($investments['totals']['income'] - $investments['totals']['expense'], 2);
+
         return [
             'year' => $year,
             'sections' => $sections,
+            'investments' => $investments,
             'total_expense' => round($totalExpense, 2),
             'total_income' => round($totalIncome, 2),
-            'balance' => round($totalIncome - $totalExpense, 2),
+            'balance' => $balance,
+            'investment_expense' => round($investments['totals']['expense'], 2),
+            'investment_income' => round($investments['totals']['income'], 2),
+            'investment_balance' => $investmentBalance,
+            'result' => round($balance + $investmentBalance, 2),
             'internal' => round($internal, 2),
             'movements' => count($movements),
             'unclassified' => $unclassified,

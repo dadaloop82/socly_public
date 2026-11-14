@@ -14278,4 +14278,241 @@ select.is-remote-choice {
   border-radius: 12px;
   background: #fff;
 }
+
+/* ── Model D help wizard (movement form) ─────────────────────────────────────────────────────── */
+.runts-line-field .sf-field__label {
+  display: flex;
+  width: 100%;
+  flex-wrap: wrap;
+  align-items: center;
+  row-gap: 0.3rem;
+}
+.runts-help-btn {
+  margin-left: auto;
+  width: 2.4rem;
+  height: 2.4rem;
+  min-width: 2.4rem;
+  min-height: 2.4rem;
+  flex: 0 0 2.4rem;
+  border-radius: 50%;
+  border-color: color-mix(in srgb, var(--brand-primary) 28%, var(--line));
+  background: color-mix(in srgb, var(--brand-primary) 9%, #fff);
+  color: var(--brand-primary-deep);
+  box-shadow: 0 5px 14px color-mix(in srgb, var(--brand-primary) 18%, transparent);
+}
+.runts-help-btn svg {
+  width: 1.35rem;
+  height: 1.35rem;
+}
+.runts-help-btn:hover:not(:disabled) {
+  border-color: var(--brand-primary);
+  background: color-mix(in srgb, var(--brand-primary) 14%, #fff);
+  color: var(--brand-primary-deep);
+  transform: translateY(-1px);
+}
+.is-runts-applied {
+  animation: runts-line-applied 1.4s ease;
+}
+@keyframes runts-line-applied {
+  0% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--brand-primary) 45%, transparent); }
+  100% { box-shadow: 0 0 0 12px transparent; }
+}
+.runts-wizard-dialog {
+  border: 0;
+  outline: 0;
+  border-radius: 20px;
+  padding: 0;
+  max-width: min(560px, 94vw);
+  width: 100%;
+  background: transparent;
+  z-index: 1100;
+  overflow: visible;
+  box-shadow: none;
+}
+.runts-wizard-dialog::backdrop {
+  background: color-mix(in srgb, var(--brand-primary-deep) 50%, transparent);
+  backdrop-filter: blur(4px);
+}
+.runts-wizard-shell {
+  display: grid;
+  gap: 0.7rem;
+  max-height: min(86vh, 640px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 1.15rem 1.25rem 1.1rem;
+  border-radius: 20px;
+  background: var(--card);
+  box-shadow: var(--shadow);
+}
+.runts-wizard-head {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+}
+.runts-wizard-head > div {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.runts-wizard-title {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 1.15rem;
+  line-height: 1.25;
+  color: var(--brand-primary-deep);
+}
+.runts-wizard-lede {
+  margin: 0.2rem 0 0;
+  font-size: 0.85rem;
+  line-height: 1.4;
+  color: var(--muted);
+}
+.runts-wizard-sign {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.4rem;
+  margin: 0.4rem 0 0;
+  padding: 0.2rem 0.6rem;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--brand-primary) 8%, #fff);
+  border: 1px solid color-mix(in srgb, var(--brand-primary) 18%, var(--line));
+}
+.runts-wizard-sign-label {
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.runts-wizard-sign-value {
+  font-size: 0.82rem;
+  font-weight: 800;
+  color: var(--brand-primary-deep);
+}
+.runts-wizard-close {
+  flex: 0 0 2rem;
+}
+.runts-wizard-progress-row {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+.runts-wizard-progress {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.runts-wizard-progress li {
+  width: 1.7rem;
+  height: 0.32rem;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--brand-primary) 14%, var(--line));
+  transition: background 0.2s ease;
+}
+.runts-wizard-progress li.is-done {
+  background: color-mix(in srgb, var(--brand-primary) 55%, #fff);
+}
+.runts-wizard-progress li.is-active {
+  background: var(--brand-primary);
+}
+.runts-wizard-progress-label {
+  margin: 0;
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.runts-wizard-question {
+  margin: 0 0 0.55rem;
+  font-size: 0.98rem;
+  font-weight: 700;
+  line-height: 1.35;
+  color: var(--ink);
+}
+.runts-wizard-question-area {
+  display: block;
+  margin-top: 0.1rem;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--brand-primary-deep);
+}
+.runts-wizard-options {
+  display: grid;
+  gap: 0.5rem;
+}
+.runts-wizard-items,
+.runts-wizard-group {
+  display: grid;
+  gap: 0.5rem;
+}
+.runts-wizard-step[hidden],
+.runts-wizard-group[hidden],
+.runts-wizard-items > [data-runts-items][hidden] {
+  display: none !important;
+}
+.runts-wizard-option {
+  display: grid;
+  gap: 0.15rem;
+  width: 100%;
+  padding: 0.6rem 0.75rem;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--brand-primary) 3%, #fff);
+  color: var(--ink);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: border-color 0.15s ease, background 0.15s ease, transform 0.15s ease;
+}
+.runts-wizard-option:hover {
+  border-color: var(--brand-primary);
+  background: color-mix(in srgb, var(--brand-primary) 6%, #fff);
+  transform: translateY(-1px);
+}
+.runts-wizard-option:focus-visible {
+  outline: 3px solid color-mix(in srgb, var(--brand-primary) 45%, #fff);
+  outline-offset: 2px;
+}
+.runts-wizard-option.is-current {
+  border-color: var(--brand-primary);
+  box-shadow: inset 3px 0 0 var(--brand-primary);
+}
+.runts-wizard-option-label {
+  font-size: 0.9rem;
+  font-weight: 700;
+  line-height: 1.3;
+}
+.runts-wizard-option-hint {
+  font-size: 0.8rem;
+  line-height: 1.35;
+  color: var(--muted);
+}
+.runts-wizard-note {
+  margin: 0.55rem 0 0;
+  font-size: 0.78rem;
+  line-height: 1.35;
+  color: var(--muted);
+}
+.runts-wizard-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 0.5rem;
+  margin-top: 0.15rem;
+}
+.runts-wizard-actions .btn {
+  margin-left: auto;
+}
+.runts-wizard-actions [data-runts-wizard-back]:not([hidden]) {
+  margin-left: 0;
+}
+@media (max-width: 520px) {
+  .runts-wizard-shell {
+    padding: 1rem 1rem 0.95rem;
+  }
+}
+
 .member-card-qr-text { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem; }
