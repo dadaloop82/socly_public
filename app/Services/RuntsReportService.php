@@ -367,6 +367,93 @@ final class RuntsReportService
     }
 
     /**
+     * Directions in which a Model D item is valid (empty for the internal technical item).
+     *
+     * @return list<string>
+     */
+    public static function lineDirections(string $line): array
+    {
+        $line = strtoupper(trim($line));
+        if ($line === '' || $line === self::INTERNAL_LINE) {
+            return [];
+        }
+        $out = [];
+        foreach (['expense', 'income'] as $direction) {
+            if (self::isKnownLine($line, $direction)) {
+                $out[] = $direction;
+            }
+        }
+        return $out;
+    }
+
+    /**
+     * All official items valid for a direction, plus the internal technical item. The ledger uses
+     * this list to decide when an explicit `runts_line` is invalid and the category fallback applies.
+     *
+     * @return list<string>
+     */
+    public static function knownLines(string $direction): array
+    {
+        $direction = $direction === 'income' ? 'income' : 'expense';
+        $out = [self::INTERNAL_LINE];
+        foreach (self::SECTIONS as $section) {
+            foreach (array_keys($section[$direction]) as $key) {
+                $out[] = (string) $key;
+            }
+        }
+        foreach (array_keys(self::INVESTMENTS[$direction]) as $key) {
+            $out[] = (string) $key;
+        }
+        return array_values(array_unique($out));
+    }
+
+    /**
+     * Treasury categories whose automatic classification lands on the given Model D item.
+     *
+     * @return list<string>
+     */
+    public static function categoriesForLine(string $line, string $direction): array
+    {
+        $line = strtoupper(trim($line));
+        $direction = $direction === 'income' ? 'income' : 'expense';
+        $out = [];
+        foreach (self::CATEGORY_MAP as $category => $map) {
+            if (($map[$direction] ?? '') === $line) {
+                $out[] = (string) $category;
+            }
+        }
+        return $out;
+    }
+
+    /**
+     * Categories that have an explicit mapping for the direction. Every other category (including
+     * custom ones) falls back to A-E5 / A-I10, exactly like `lineForCategory()`.
+     *
+     * @return list<string>
+     */
+    public static function categoriesMappedFor(string $direction): array
+    {
+        $direction = $direction === 'income' ? 'income' : 'expense';
+        $out = [];
+        foreach (self::CATEGORY_MAP as $category => $map) {
+            if (($map[$direction] ?? '') !== '') {
+                $out[] = (string) $category;
+            }
+        }
+        return $out;
+    }
+
+    /**
+     * True when the item also collects every category without an explicit mapping.
+     */
+    public static function isFallbackLine(string $line, string $direction): bool
+    {
+        $line = strtoupper(trim($line));
+        return ($direction === 'income' && $line === 'A-I10')
+            || ($direction === 'expense' && $line === 'A-E5');
+    }
+
+    /**
      * Years with approved cash flows.
      *
      * @return list<int>
@@ -438,6 +525,7 @@ final class RuntsReportService
                 'income' => $section['income'],
                 'totals' => ['expense' => 0.0, 'income' => 0.0],
                 'lines' => ['expense' => [], 'income' => []],
+                'line_counts' => ['expense' => [], 'income' => []],
                 'counts' => ['expense' => 0, 'income' => 0],
             ];
         }
@@ -447,6 +535,7 @@ final class RuntsReportService
             'income' => self::INVESTMENTS['income'],
             'totals' => ['expense' => 0.0, 'income' => 0.0],
             'lines' => ['expense' => [], 'income' => []],
+            'line_counts' => ['expense' => [], 'income' => []],
             'counts' => ['expense' => 0, 'income' => 0],
         ];
         $totalExpense = 0.0;
@@ -477,6 +566,7 @@ final class RuntsReportService
                 }
                 $sections[$letter]['totals'][$direction] += $amount;
                 $sections[$letter]['lines'][$direction][$line] = ($sections[$letter]['lines'][$direction][$line] ?? 0.0) + $amount;
+                $sections[$letter]['line_counts'][$direction][$line] = ($sections[$letter]['line_counts'][$direction][$line] ?? 0) + 1;
                 $sections[$letter]['counts'][$direction] += 1;
                 $placed = true;
                 break;
@@ -494,6 +584,7 @@ final class RuntsReportService
             if (isset(self::INVESTMENTS[$direction][$line])) {
                 $investments['totals'][$direction] += $amount;
                 $investments['lines'][$direction][$line] = ($investments['lines'][$direction][$line] ?? 0.0) + $amount;
+                $investments['line_counts'][$direction][$line] = ($investments['line_counts'][$direction][$line] ?? 0) + 1;
                 $investments['counts'][$direction] += 1;
                 continue;
             }

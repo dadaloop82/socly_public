@@ -213,11 +213,21 @@ if ($user && app()->isInstalled() && !$temporaryInstance && can('addons.manage')
                     <a href="<?= e(url('/budgets')) ?>" class="<?= e($budgetNavClass) ?>"><?= e(__('nav.bilanci')) ?></a>
                 <?php endif; ?>
                 <?php foreach ($pluginSubItems[(string) ($item['key'] ?? '')] ?? [] as $sub): ?>
-                    <a class="nav-sub <?= e($navActive($sub['path'])) ?>" href="<?= e(url($sub['path'])) ?>"><?= e(__($sub['label'])) ?></a>
+                    <a class="nav-sub nav-addon <?= e($navActive($sub['path'])) ?>" href="<?= e(url($sub['path'])) ?>">
+                        <svg class="nav-addon-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
+                            <path d="m7.5 4.27 9 5.15"/><path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"/><path d="m3.3 7 8.7 5 8.7-5"/><path d="M12 22V12"/>
+                        </svg>
+                        <span><?= e(__($sub['label'])) ?></span>
+                    </a>
                 <?php endforeach; ?>
             <?php endforeach; ?>
             <?php foreach ($pluginStandalone as $item): ?>
-                <a href="<?= e(url($item['path'])) ?>" class="<?= e($navActive($item['path'])) ?>"><?= e(__($item['label'])) ?></a>
+                <a class="nav-addon <?= e($navActive($item['path'])) ?>" href="<?= e(url($item['path'])) ?>">
+                    <svg class="nav-addon-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
+                        <path d="m7.5 4.27 9 5.15"/><path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"/><path d="m3.3 7 8.7 5 8.7-5"/><path d="M12 22V12"/>
+                    </svg>
+                    <span><?= e(__($item['label'])) ?></span>
+                </a>
             <?php endforeach; ?>
             <?php if (can('members.view')): ?>
                 <a href="<?= e(url('/statistics')) ?>" class="<?= e($navActive('/statistics')) ?>"><?= e(__('nav.statistics')) ?></a>

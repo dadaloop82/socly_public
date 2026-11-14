@@ -26,6 +26,7 @@ $filterYear = (string) ($filters['year'] ?? '');
 $filterBudget = (string) ($filters['budget_item_id'] ?? '');
 $filterRunts = (string) ($filters['runts_line'] ?? '');
 $filterApproval = (string) ($filters['approval'] ?? '');
+$filterAnomaly = (string) ($filters['anomaly'] ?? '');
 $hasActiveFilters = trim((string) ($search_query ?? '')) !== ''
     || $filterPeriod !== ''
     || $filterDirection !== ''
@@ -35,7 +36,8 @@ $hasActiveFilters = trim((string) ($search_query ?? '')) !== ''
     || $filterYear !== ''
     || $filterBudget !== ''
     || $filterRunts !== ''
-    || $filterApproval !== '';
+    || $filterApproval !== ''
+    || $filterAnomaly !== '';
 // Pager: keep search, filters and sort when moving between pages (cost centre and Model D line too:
 // the drill-down from budgets opens the ledger already filtered).
 $pagerQuery = array_filter([
@@ -45,6 +47,7 @@ $pagerQuery = array_filter([
     'category' => $filterCategory,
     'account' => $filterAccount,
     'approval' => $filterApproval,
+    'anomaly' => $filterAnomaly,
     'month' => $filterMonth,
     'year' => $filterYear,
     'budget_item_id' => $filterBudget,
@@ -113,6 +116,9 @@ if ($filterMonth !== '') {
 }
 if ($filterYear !== '') {
     $ledgerParams['year'] = $filterYear;
+}
+if ($filterAnomaly !== '') {
+    $ledgerParams['anomaly'] = '1';
 }
 if ($sort !== 'date_desc') {
     $ledgerParams['sort'] = $sort;
@@ -362,6 +368,8 @@ if ($filterYear !== '' && !isset($yearFilterOptions[$filterYear])) {
                         ['value' => 'date_desc', 'label' => (string) __('treasury.sort_date_desc')],
                         ['value' => 'date_asc', 'label' => (string) __('treasury.sort_date_asc')],
                         ['value' => 'created_desc', 'label' => (string) __('treasury.sort_created_desc')],
+                        ['value' => 'updated_desc', 'label' => (string) __('treasury.sort_updated_desc')],
+                        ['value' => 'updated_asc', 'label' => (string) __('treasury.sort_updated_asc')],
                         ['value' => 'invoice_desc', 'label' => (string) __('treasury.sort_invoice_desc')],
                     ],
                 ],
@@ -393,9 +401,25 @@ if ($filterYear !== '' && !isset($yearFilterOptions[$filterYear])) {
             ],
             'context' => 'filter',
         ]) ?>
+        <?= field('checkbox', [
+            'name' => 'anomaly',
+            'id' => 'treasury-anomaly-filter',
+            'label' => (string) __('treasury.pattern_filter'),
+            'hint' => (string) __('treasury.pattern_filter_hint'),
+            'value' => $filterAnomaly === '1' ? '1' : '',
+            'check_value' => '1',
+            'context' => 'filter',
+            'label_class' => 'checkbox-row-lg',
+        ]) ?>
         </div>
     </div>
 </form>
+<?php endif; ?>
+
+<?php if ($filterAnomaly === '1'): ?>
+    <div class="setup-hint muted treasury-anomaly-notice">
+        <?= e(__('treasury.pattern_filter_active', ['count' => (string) (int) ($total_rows ?? 0)])) ?>
+    </div>
 <?php endif; ?>
 
 <?= view_partial('treasury/_similar_probe', [

@@ -9,6 +9,10 @@
  * @var list<array{year:int,income:float,can_generate:bool}> $rendiconto_years
  * @var float $runts_limit
  * @var array<string,mixed> $statistics
+ * @var int $model_d_year
+ * @var list<int> $model_d_years
+ * @var array<string,mixed>|null $model_d_report
+ * @var string $default_tab
  * @var \Socly\Services\CurrencyService $currency
  */
 $canManage = can('treasury.manage');
@@ -16,6 +20,23 @@ $drafts = is_array($drafts ?? null) ? $drafts : [];
 $rendicontoYears = is_array($rendiconto_years ?? null) ? $rendiconto_years : [];
 $runtsLimit = (float) ($runts_limit ?? 0);
 $statistics = is_array($statistics ?? null) ? $statistics : [];
+$modelDYears = is_array($model_d_years ?? null) ? $model_d_years : [];
+$modelDYear = (int) ($model_d_year ?? 0);
+$modelDReport = is_array($model_d_report ?? null) ? $model_d_report : null;
+$budgetDefaultTab = in_array((string) ($default_tab ?? ''), ['preventivo', 'consuntivo', 'model_d', 'statistiche'], true)
+    ? (string) $default_tab
+    : 'preventivo';
+$modelDSections = [];
+if ($modelDReport !== null) {
+    foreach (($modelDReport['sections'] ?? []) as $section) {
+        if (is_array($section)) {
+            $modelDSections[] = $section;
+        }
+    }
+    if (is_array($modelDReport['investments'] ?? null)) {
+        $modelDSections[] = $modelDReport['investments'];
+    }
+}
 $statsYears = is_array($statistics['years'] ?? null) ? $statistics['years'] : [];
 $latestYear = (int) ($statistics['latest_year'] ?? 0);
 $latestStats = [];
@@ -40,7 +61,7 @@ $topIncome = is_array($statistics['categories']['income'] ?? null) ? $statistics
     </div>
 </div>
 
-<div class="dashboard-tabs" data-budget-tabs data-default-tab="preventivo">
+<div class="dashboard-tabs" data-budget-tabs data-default-tab="<?= e($budgetDefaultTab) ?>">
     <div class="dashboard-tablist-wrap">
         <div class="dashboard-tablist" role="tablist" aria-label="<?= e(__('budget.title')) ?>">
             <button type="button" class="dashboard-tab" role="tab" data-budget-tab="preventivo"
@@ -50,6 +71,10 @@ $topIncome = is_array($statistics['categories']['income'] ?? null) ? $statistics
             <button type="button" class="dashboard-tab" role="tab" data-budget-tab="consuntivo"
                 aria-controls="budget-panel-consuntivo" aria-selected="false" tabindex="-1">
                 <?= e(__('budget.tab_consuntivo')) ?>
+            </button>
+            <button type="button" class="dashboard-tab" role="tab" data-budget-tab="model_d"
+                aria-controls="budget-panel-model_d" aria-selected="false" tabindex="-1">
+                <?= e(__('budget.tab_model_d')) ?>
             </button>
             <button type="button" class="dashboard-tab" role="tab" data-budget-tab="statistiche"
                 aria-controls="budget-panel-statistiche" aria-selected="false" tabindex="-1">
@@ -270,6 +295,144 @@ $topIncome = is_array($statistics['categories']['income'] ?? null) ? $statistics
                     </table>
                 </div>
             </div>
+        <?php endif; ?>
+    </section>
+
+    <section class="dashboard-panel" id="budget-panel-model_d" role="tabpanel" data-budget-panel="model_d" hidden>
+        <p class="setup-hint muted"><?= e(__('budget.model_d_lede')) ?></p>
+        <?php if ($modelDReport === null): ?>
+            <div class="panel">
+                <div class="empty-state">
+                    <strong><?= e(__('runts.empty_title')) ?></strong>
+                    <p><?= e(__('budget.model_d_empty')) ?></p>
+                </div>
+            </div>
+        <?php else: ?>
+            <div class="panel budget-model-d-toolbar">
+                <form class="filter-bar" method="get" action="<?= e(url('/budgets')) ?>">
+                    <label class="field">
+                        <span><?= e(__('runts.year')) ?></span>
+                        <select name="model_d_year">
+                            <?php foreach ($modelDYears as $year): ?>
+                                <option value="<?= (int) $year ?>" <?= (int) $year === $modelDYear ? 'selected' : '' ?>>
+                                    <?= (int) $year ?>
+                                </option>
+                            <?php endforeach; ?>
+                        </select>
+                    </label>
+                    <button class="btn btn-sm" type="submit"><?= e(__('budget.model_d_show')) ?></button>
+                    <a class="btn btn-ghost btn-sm" href="<?= e(url('/rendiconto/' . $modelDYear)) ?>">
+                        <?= e(__('runts.open')) ?>
+                    </a>
+                </form>
+            </div>
+
+            <?php foreach ($modelDSections as $modelDSection): ?>
+                <?php
+                $sectionLines = is_array($modelDSection['lines'] ?? null) ? $modelDSection['lines'] : [];
+                $sectionCounts = is_array($modelDSection['line_counts'] ?? null) ? $modelDSection['line_counts'] : [];
+                $sectionTotals = is_array($modelDSection['totals'] ?? null) ? $modelDSection['totals'] : [];
+                $sectionTotalsCounts = is_array($modelDSection['counts'] ?? null) ? $modelDSection['counts'] : [];
+                ?>
+                <section class="panel budget-compare-section">
+                    <header class="budget-compare-head">
+                        <h2 class="section-title"><?= e((string) ($modelDSection['label'] ?? '')) ?></h2>
+                        <span class="budget-compare-totals muted">
+                            <?= e(__('runts.expenses')) ?> <?= e($currency->format((float) ($sectionTotals['expense'] ?? 0))) ?>
+                            · <?= e(__('runts.incomes')) ?> <?= e($currency->format((float) ($sectionTotals['income'] ?? 0))) ?>
+                        </span>
+                    </header>
+                    <div class="table-wrap embedded">
+                        <table class="budget-compare-table">
+                            <thead>
+                            <tr>
+                                <th><?= e(__('budget.model_d_items')) ?></th>
+                                <th class="budget-th-amount"><?= e(__('budget.model_d_amount')) ?></th>
+                                <th class="budget-th-amount"><?= e(__('budget.model_d_movements')) ?></th>
+                            </tr>
+                            </thead>
+                            <tbody>
+                            <?php foreach (['expense' => 'runts.expenses', 'income' => 'runts.incomes'] as $direction => $heading): ?>
+                                <?php $officialLines = is_array($modelDSection[$direction] ?? null) ? $modelDSection[$direction] : []; ?>
+                                <tr class="budget-model-d-group">
+                                    <td colspan="3"><?= e(__($heading)) ?></td>
+                                </tr>
+                                <?php foreach ($officialLines as $line => $label): ?>
+                                    <?php
+                                    $amount = (float) ($sectionLines[$direction][$line] ?? 0);
+                                    $count = (int) ($sectionCounts[$direction][$line] ?? 0);
+                                    ?>
+                                    <tr class="clickable-row"
+                                        data-href="<?= e(ledger_url([
+                                            'runts_line' => (string) $line,
+                                            'year' => $modelDYear,
+                                        ])) ?>"
+                                        tabindex="0" role="link" title="<?= e(__('budget.open_movements')) ?>">
+                                        <td><?= e((string) $label) ?></td>
+                                        <td class="num"><?= e($currency->format($amount)) ?></td>
+                                        <td class="num"><?= $count ?></td>
+                                    </tr>
+                                <?php endforeach; ?>
+                                <tr class="budget-model-d-total">
+                                    <td><?= e(__('runts.total_' . $direction)) ?></td>
+                                    <td class="num"><?= e($currency->format((float) ($sectionTotals[$direction] ?? 0))) ?></td>
+                                    <td class="num"><?= (int) ($sectionTotalsCounts[$direction] ?? 0) ?></td>
+                                </tr>
+                            <?php endforeach; ?>
+                            </tbody>
+                        </table>
+                    </div>
+                </section>
+            <?php endforeach; ?>
+
+            <div class="budget-kpis">
+                <div class="budget-kpi">
+                    <span class="budget-kpi-label"><?= e(__('runts.total_expense')) ?></span>
+                    <strong><?= e($currency->format((float) ($modelDReport['total_expense'] ?? 0))) ?></strong>
+                </div>
+                <div class="budget-kpi">
+                    <span class="budget-kpi-label"><?= e(__('runts.total_income')) ?></span>
+                    <strong><?= e($currency->format((float) ($modelDReport['total_income'] ?? 0))) ?></strong>
+                </div>
+                <div class="budget-kpi">
+                    <span class="budget-kpi-label"><?= e(__('runts.balance')) ?></span>
+                    <strong><?= e($currency->format((float) ($modelDReport['balance'] ?? 0))) ?></strong>
+                </div>
+            </div>
+            <?php if ((float) ($modelDReport['internal'] ?? 0) > 0): ?>
+                <p class="setup-hint muted"><?= e(__('runts.internal', [
+                    'amount' => $currency->format((float) $modelDReport['internal']),
+                ])) ?></p>
+            <?php endif; ?>
+            <?php if (($modelDReport['unclassified'] ?? []) !== []): ?>
+                <section class="panel budget-compare-section">
+                    <header class="budget-compare-head">
+                        <div>
+                            <h2 class="section-title"><?= e(__('runts.unclassified_title')) ?></h2>
+                            <p class="section-lede"><?= e(__('runts.unclassified_text')) ?></p>
+                        </div>
+                    </header>
+                    <div class="table-wrap embedded">
+                        <table class="budget-compare-table">
+                            <tbody>
+                            <?php foreach ($modelDReport['unclassified'] as $unclassified): ?>
+                                <?php $category = trim((string) ($unclassified['category'] ?? '')); ?>
+                                <tr class="clickable-row"
+                                    data-href="<?= e(ledger_url([
+                                        'category' => $category !== '' ? $category : '__none__',
+                                        'direction' => (string) ($unclassified['direction'] ?? ''),
+                                        'year' => $modelDYear,
+                                    ])) ?>"
+                                    tabindex="0" role="link" title="<?= e(__('budget.open_movements')) ?>">
+                                    <td><?= e($category !== '' ? $category : __('treasury.category_other')) ?></td>
+                                    <td class="budget-th-amount"><?= e($currency->format((float) ($unclassified['amount'] ?? 0))) ?></td>
+                                </tr>
+                            <?php endforeach; ?>
+                            </tbody>
+                        </table>
+                    </div>
+                </section>
+            <?php endif; ?>
         <?php endif; ?>
     </section>
 

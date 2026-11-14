@@ -44,13 +44,21 @@ final class BudgetController extends BaseController
         $years = $this->budgets->creatableYears();
         $defaultYear = in_array($currentYear + 1, $years, true) ? $currentYear + 1 : ($years[0] ?? $currentYear + 1);
         $rendicontoYears = [];
-        foreach ($this->runts->years() as $year) {
+        $modelDYears = $this->runts->years();
+        foreach ($modelDYears as $year) {
             $income = $this->runts->totalIncome($year);
             $rendicontoYears[] = [
                 'year' => $year,
                 'income' => $income,
                 'can_generate' => $income < RuntsReportService::CASH_LIMIT,
             ];
+        }
+        $requestedModelDYear = (int) $request->input('model_d_year', 0);
+        $modelDYear = $requestedModelDYear;
+        if (!in_array($modelDYear, $modelDYears, true)) {
+            $modelDYear = in_array($currentYear, $modelDYears, true)
+                ? $currentYear
+                : (int) ($modelDYears[0] ?? $currentYear);
         }
         $this->render('budgets/index', [
             'title' => __('budget.title'),
@@ -61,6 +69,10 @@ final class BudgetController extends BaseController
             'rendiconto_years' => $rendicontoYears,
             'runts_limit' => RuntsReportService::CASH_LIMIT,
             'statistics' => $this->budgets->statistics(),
+            'model_d_year' => $modelDYear,
+            'model_d_years' => $modelDYears,
+            'model_d_report' => $modelDYears === [] ? null : $this->runts->report($modelDYear),
+            'default_tab' => $requestedModelDYear > 0 ? 'model_d' : 'preventivo',
             'currency' => $this->currency,
         ]);
     }

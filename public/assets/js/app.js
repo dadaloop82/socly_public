@@ -241,6 +241,7 @@ document.addEventListener('DOMContentLoaded', () => {
   initFreshnessGuard();
   initTreasuryRecurring();
   initTreasurySimilar();
+  initTreasuryPatternHints();
   initTreasuryRuntsWizard();
   initTreasuryAdvancedFilters();
   initBudgetSectionSort();
@@ -2194,6 +2195,286 @@ function initTreasurySimilar() {
     });
     actions.append(apply, dismiss);
     panel.appendChild(actions);
+  }
+}
+
+/**
+ * Classification fingerprint: while the essential data (direction + description/beneficiary) are
+ * filled, every field shows the value typically used by similar movements. On an existing movement
+ * a different value becomes a warning; the operator can apply the typical value (with confirmation)
+ * or acknowledge that the current value is correct.
+ */
+function initTreasuryPatternHints() {
+  const form = document.querySelector('form[data-treasury-form]');
+  if (!(form instanceof HTMLElement)) return;
+  const url = form.getAttribute('data-pattern-url') || '';
+  const ackUrl = form.getAttribute('data-pattern-ack-url') || '';
+  const isEdit = form.getAttribute('data-is-edit') === '1';
+  const token = form.querySelector('input[name="_token"]')?.value || '';
+  const fields = {
+    payment_method: form.querySelector('[name="payment_method"]'),
+    category: form.querySelector('[name="category"]'),
+    runts_line: form.querySelector('[name="runts_line"]'),
+    budget_item_id: form.querySelector('[name="budget_item_id"]'),
+  };
+  const slots = new Map();
+  form.querySelectorAll('[data-tmf-pattern-field]').forEach((slot) => {
+    if (slot instanceof HTMLElement) {
+      slots.set(slot.getAttribute('data-tmf-pattern-field') || '', slot);
+    }
+  });
+  if (url === '' || slots.size === 0) return;
+
+  const description = form.querySelector('[name="description"]');
+  const beneficiary = form.querySelector('[name="beneficiary"]');
+  const amountInput = form.querySelector('[name="amount"]');
+  const recordInput = form.querySelector('[name="record_id"]');
+  const baseCurrency = form.getAttribute('data-base-currency') || 'EUR';
+  const messages = {
+    typical: form.getAttribute('data-msg-pattern-typical') || 'Typically: :value',
+    samples: form.getAttribute('data-msg-pattern-samples') || ':count similar movements',
+    apply: form.getAttribute('data-msg-pattern-apply') || 'Apply the typical value',
+    ack: form.getAttribute('data-msg-pattern-ack') || 'I confirm the current values are correct',
+    acknowledged: form.getAttribute('data-msg-pattern-acknowledged') || 'Current values confirmed.',
+    confirm: form.getAttribute('data-msg-pattern-confirm') || 'Change from :from to :to for :amount?',
+    warning: form.getAttribute('data-msg-pattern-warning') || 'Value differs from the typical one',
+  };
+  let profile = null;
+  let timer = null;
+  const lastValues = {};
+
+  const direction = () => {
+    const checked = form.querySelector('[data-treasury-direction]:checked');
+    return checked instanceof HTMLInputElement ? checked.value : '';
+  };
+  const valueOf = (el) => {
+    if (el instanceof HTMLSelectElement || el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement) {
+      return String(el.value || '');
+    }
+    return '';
+  };
+  const payload = () => ({
+    _token: token,
+    movement_id: valueOf(recordInput) || '0',
+    direction: direction(),
+    description: valueOf(description),
+    beneficiary: valueOf(beneficiary),
+    payment_method: valueOf(fields.payment_method),
+    category: valueOf(fields.category),
+    runts_line: valueOf(fields.runts_line),
+    budget_item_id: valueOf(fields.budget_item_id),
+    amount: valueOf(amountInput),
+  });
+  const amountLabel = () => {
+    const value = Number(valueOf(amountInput).replace(',', '.')) || 0;
+    try {
+      return new Intl.NumberFormat(document.documentElement.lang || 'it', {
+        style: 'currency',
+        currency: baseCurrency,
+      }).format(value);
+    } catch (err) {
+      return value.toFixed(2);
+    }
+  };
+  const titleFor = (data) => {
+    let title = String(messages.typical).replace(':value', data.typical_label || data.typical);
+    if (Number(data.samples) > 0) {
+      title += ' · ' + String(messages.samples).replace(':count', String(data.samples));
+    }
+    return title;
+  };
+  const confirmChange = (from, to) => {
+    const text = String(messages.confirm)
+      .replace(':from', from || '—')
+      .replace(':to', to || '—')
+      .replace(':amount', amountLabel());
+    return window.confirm(text);
+  };
+  const applyValue = (field, data, ask) => {
+    const el = fields[field];
+    if (!el || !data || !data.typical) return;
+    if (el instanceof HTMLSelectElement && !Array.from(el.options).some((option) => option.value === data.typical)) {
+      return;
+    }
+    const from = data.current_label || valueOf(el) || '—';
+    if (ask && !confirmChange(from, data.typical_label || data.typical)) return;
+    el.value = data.typical;
+    lastValues[field] = el.value;
+    if (profile && profile.fields && profile.fields[field]) {
+      profile.fields[field].current = data.typical;
+      profile.fields[field].current_label = data.typical_label || data.typical;
+      profile.fields[field].is_match = true;
+      profile.fields[field].anomaly = false;
+      renderSlot(field, profile.fields[field]);
+    }
+    queue();
+  };
+
+  const acknowledge = async (field, data) => {
+    if (!data || !data.typical) return;
+    const body = new URLSearchParams({
+      _token: token,
+      movement_id: valueOf(recordInput) || '0',
+      field,
+      current: data.current,
+      typical: data.typical,
+    });
+    try {
+      const res = await fetch(ackUrl, {
+        method: 'POST',
+        headers: {
+          Accept: 'application/json',
+          'Content-Type': 'application/x-www-form-urlencoded',
+          'X-Requested-With': 'XMLHttpRequest',
+        },
+        body,
+      });
+      const result = await res.json().catch(() => ({}));
+      if (!res.ok || !result.ok) return;
+      data.acknowledged = true;
+      data.anomaly = false;
+      renderSlot(field, data);
+    } catch (err) {
+      // network unavailable: the warning stays visible
+    }
+  };
+  const iconSvg = (kind) => {
+    if (kind === 'warning') {
+      return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10.3 3.9 2.4 18a2 2 0 0 0 1.8 3h15.6a2 2 0 0 0 1.8-3L13.7 3.9a2 2 0 0 0-3.4 0Z"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg>';
+    }
+    if (kind === 'check') {
+      return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m20 6-11 11-5-5"/></svg>';
+    }
+    return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3.5 20.5 14 10" stroke-width="2.4"/><path d="M18.5 3v3.5M16.75 4.75h3.5"/><path d="M21 10.5v2.5M19.75 11.75h2.5"/><path d="M9 3.5v2.5M7.75 4.75h2.5"/></svg>';
+  };
+  const makePatternButton = (kind, title, onClick) => {
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = 'tmf-pattern-btn tmf-pattern-btn--' + kind;
+    button.title = title;
+    button.setAttribute('aria-label', title);
+    button.innerHTML = iconSvg(kind);
+    if (typeof onClick === 'function') {
+      button.addEventListener('click', onClick);
+    }
+    return button;
+  };
+  const makePatternIcon = (kind, title) => {
+    const icon = document.createElement('span');
+    icon.className = 'tmf-pattern-btn tmf-pattern-btn--' + kind + ' is-static';
+    icon.title = title;
+    icon.setAttribute('aria-label', title);
+    icon.innerHTML = iconSvg(kind);
+    return icon;
+  };
+  const selectedLabel = (el) => {
+    if (el instanceof HTMLSelectElement) {
+      return String(el.selectedOptions?.[0]?.textContent || el.value || '');
+    }
+    return valueOf(el);
+  };
+  const renderSlot = (field, data) => {
+    const slot = slots.get(field);
+    if (!slot) return;
+    slot.textContent = '';
+    if (!data || !data.typical) return;
+    const title = titleFor(data);
+    if (isEdit && data.anomaly) {
+      const actions = document.createElement('span');
+      actions.className = 'tmf-pattern-actions';
+      actions.append(
+        makePatternButton('warning', title + ' · ' + messages.warning, () => applyValue(field, data, true)),
+        makePatternButton('check', messages.ack, () => acknowledge(field, data))
+      );
+      slot.append(actions);
+      return;
+    }
+    if (isEdit) {
+      if (data.acknowledged || data.is_match) {
+        slot.append(makePatternIcon('check', data.acknowledged ? title + ' · ' + messages.acknowledged : title));
+        return;
+      }
+      // Too few examples for a reliable anomaly: keep the suggestion visible without an alert.
+      slot.append(makePatternButton('wand', title, () => applyValue(field, data, true)));
+      return;
+    }
+    slot.append(makePatternButton('wand', title, () => applyValue(field, data, false)));
+  };
+  const render = (data) => {
+    profile = data && typeof data === 'object' ? data : null;
+    const values = profile && profile.fields && typeof profile.fields === 'object' ? profile.fields : {};
+    Object.keys(fields).forEach((field) => {
+      renderSlot(field, values[field] || null);
+      if (values[field]) {
+        lastValues[field] = valueOf(fields[field]);
+      }
+    });
+  };
+  const refresh = async () => {
+    const data = payload();
+    if (!['income', 'expense'].includes(data.direction)
+      || (data.description.trim().length < 3 && data.beneficiary.trim().length < 3)) {
+      render(null);
+      return;
+    }
+    try {
+      const body = new URLSearchParams(data);
+      const res = await fetch(url, {
+        method: 'POST',
+        headers: {
+          Accept: 'application/json',
+          'Content-Type': 'application/x-www-form-urlencoded',
+          'X-Requested-With': 'XMLHttpRequest',
+        },
+        body,
+      });
+      if (!res.ok) return;
+      const result = await res.json().catch(() => null);
+      if (result && result.ok) render(result);
+    } catch (err) {
+      // network unavailable: no suggestion
+    }
+  };
+  const queue = () => {
+    window.clearTimeout(timer);
+    timer = window.setTimeout(refresh, 650);
+  };
+
+  [description, beneficiary].forEach((el) => {
+    if (el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement) {
+      el.addEventListener('input', queue);
+    }
+  });
+  form.querySelectorAll('[data-treasury-direction]').forEach((el) => {
+    el.addEventListener('change', queue);
+  });
+  Object.entries(fields).forEach(([field, el]) => {
+    if (!el) return;
+    el.addEventListener('focus', () => {
+      lastValues[field] = valueOf(el);
+    });
+    el.addEventListener('change', () => {
+      const oldValue = lastValues[field] ?? '';
+      const current = profile && profile.fields ? profile.fields[field] : null;
+      if (isEdit && current && current.anomaly && el.value !== oldValue) {
+        if (!confirmChange(current.current_label || oldValue, selectedLabel(el))) {
+          el.value = oldValue;
+          return;
+        }
+      }
+      lastValues[field] = el.value;
+      queue();
+    });
+  });
+
+  try {
+    const initial = JSON.parse(form.getAttribute('data-pattern-profile') || '{}');
+    render(initial);
+  } catch (err) {
+    render(null);
+  }
+  if (isEdit && (!profile || !profile.fields || Object.keys(profile.fields).length === 0)) {
+    window.setTimeout(refresh, 200);
   }
 }
 

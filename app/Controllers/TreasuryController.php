@@ -252,6 +252,7 @@ final class TreasuryController extends BaseController
                 (int) substr((string) ($movement['movement_date'] ?? date('Y-m-d')), 0, 4),
                 (int) ($movement['budget_item_id'] ?? 0)
             ),
+            'pattern_profile' => $this->treasury->classificationProfile($movement, (int) $movement['id'], 24),
         ]);
     }
 
@@ -436,6 +437,66 @@ final class TreasuryController extends BaseController
             'matches' => $result['matches'],
             'changes' => $this->describeClassification($data, $fieldsToApply),
         ]);
+    }
+
+    /**
+     * Typical values for the four classification fields, computed from similar movements.
+     * Used by the per-field hints on the movement form (new and edit).
+     */
+    public function pattern(Request $request): void
+    {
+        require_component('treasury');
+        if (!can('treasury.manage')) {
+            $this->jsonResponse(['ok' => false, 'error' => __('errors.403')], 403);
+            return;
+        }
+        $data = $request->all();
+        $movement = [
+            'id' => (int) ($data['movement_id'] ?? 0),
+            'direction' => (string) ($data['direction'] ?? ''),
+            'description' => (string) ($data['description'] ?? ''),
+            'beneficiary' => (string) ($data['beneficiary'] ?? ''),
+            'payment_method' => (string) ($data['payment_method'] ?? ''),
+            'category' => (string) ($data['category'] ?? ''),
+            'runts_line' => (string) ($data['runts_line'] ?? ''),
+            'budget_item_id' => (int) ($data['budget_item_id'] ?? 0),
+            'amount' => (float) ($data['amount'] ?? 0),
+        ];
+        if ($movement['category'] === '__new__') {
+            $movement['category'] = '';
+        }
+        $profile = $this->treasury->classificationProfile(
+            $movement,
+            (int) $movement['id'],
+            24
+        );
+        $this->jsonResponse(['ok' => true] + $profile);
+    }
+
+    /**
+     * “The current value is correct”: silence one anomaly for this movement/field.
+     */
+    public function acknowledgePattern(Request $request): void
+    {
+        require_component('treasury');
+        if (!can('treasury.manage')) {
+            $this->jsonResponse(['ok' => false, 'error' => __('errors.403')], 403);
+            return;
+        }
+        $ok = $this->treasury->acknowledgePattern(
+            (int) $request->input('movement_id', 0),
+            (string) $request->input('field', ''),
+            (string) $request->input('current', ''),
+            (string) $request->input('typical', ''),
+            auth_user()['id'] ?? null,
+            $request->ip()
+        );
+        $this->jsonResponse([
+            'ok' => $ok,
+            'message' => $ok
+                ? (string) __('treasury.pattern_acknowledged')
+                : (string) __('errors.403'),
+        ], $ok ? 200 : 422);
     }
 
     /**
@@ -719,7 +780,7 @@ final class TreasuryController extends BaseController
     /**
      * Ledger filters from the query string (validated; period presets expand to a date range).
      *
-     * @return array{direction:string,category:string,runts_line:string,budget_item_id:string,account:string,from:string,to:string,period:string,month:string,year:string,approval:string}
+     * @return array{direction:string,category:string,runts_line:string,budget_item_id:string,account:string,from:string,to:string,period:string,month:string,year:string,approval:string,anomaly:string,pattern_ids?:list<int>}
      */
     /**
      * Grouped Model D entries (Expenses / Revenues) for advanced filtering.
@@ -745,7 +806,7 @@ final class TreasuryController extends BaseController
     private function advancedFilterCount(array $filters): int
     {
         $count = 0;
-        foreach (['category', 'runts_line', 'budget_item_id', 'account', 'approval'] as $key) {
+        foreach (['category', 'runts_line', 'budget_item_id', 'account', 'approval', 'anomaly'] as $key) {
             if (trim((string) ($filters[$key] ?? '')) !== '') {
                 $count++;
             }
@@ -891,6 +952,7 @@ final class TreasuryController extends BaseController
         if (!in_array($approval, ['pending', 'approved'], true)) {
             $approval = '';
         }
+        $anomaly = (string) $request->input('anomaly', '') === '1' ? '1' : '';
         $from = $this->isoDate((string) $request->input('from', ''));
         $to = $this->isoDate((string) $request->input('to', ''));
         $month = (int) $request->input('month', 0);
@@ -912,7 +974,7 @@ final class TreasuryController extends BaseController
                 default => [date('Y-m-d', strtotime('-30 days')), date('Y-m-d')],
             };
         }
-        return [
+        $filters = [
             'direction' => $direction,
             'category' => $category,
             'runts_line' => $runtsLine,
@@ -924,7 +986,13 @@ final class TreasuryController extends BaseController
             'month' => $month > 0 ? (string) $month : '',
             'year' => $year > 0 ? (string) $year : '',
             'approval' => $approval,
+            'anomaly' => $anomaly,
         ];
+        if ($anomaly === '1') {
+            $filters['pattern_ids'] = $this->treasury->classificationAnomalyIds();
+        }
+
+        return $filters;
     }
 
     private function isoDate(string $value): string
@@ -967,7 +1035,7 @@ final class TreasuryController extends BaseController
             parse_str($query, $parsed);
         }
         $clean = [];
-        foreach (['q', 'period', 'direction', 'category', 'account', 'approval', 'month', 'year', 'sort', 'group', 'page', 'runts_line', 'budget_item_id'] as $key) {
+        foreach (['q', 'period', 'direction', 'category', 'account', 'approval', 'anomaly', 'month', 'year', 'sort', 'group', 'page', 'runts_line', 'budget_item_id'] as $key) {
             $value = $parsed[$key] ?? null;
             if (!is_scalar($value)) {
                 continue;

@@ -43,15 +43,32 @@ final class TreasuryService
 
     /**
      * Orders accepted by the ledger and by the sortable table headers: date, registration date,
-     * document date, description, payment method and the amount of the income/expense column.
+     * last modification, document date, description, payment method and the amount of the
+     * income/expense column.
      *
      * @var list<string>
      */
     public const SORTS = [
-        'date_desc', 'date_asc', 'created_desc', 'invoice_desc',
+        'date_desc', 'date_asc', 'created_desc', 'updated_desc', 'updated_asc', 'invoice_desc',
         'description_asc', 'description_desc', 'method_asc', 'method_desc',
         'income_asc', 'income_desc', 'expense_asc', 'expense_desc',
     ];
+
+    /**
+     * Classification fields compared with the fingerprint of similar movements.
+     *
+     * @var list<string>
+     */
+    public const PATTERN_FIELDS = ['payment_method', 'category', 'runts_line', 'budget_item_id'];
+
+    /** Minimum similarity for a movement to contribute to the “typical” values. */
+    private const PATTERN_MIN_SCORE = 0.45;
+    /** Maximum number of similar movements kept for one fingerprint. */
+    private const PATTERN_SAMPLE_LIMIT = 24;
+    /** A field needs at least two similar examples before it can be reported as an anomaly. */
+    private const PATTERN_MIN_ANOMALY_SAMPLES = 2;
+    /** Candidate pool used by the fingerprint scan (newest movements first). */
+    private const PATTERN_CANDIDATE_LIMIT = 4000;
 
     /**
      * Earliest plausible year for an operation date: a typo like 0206 would otherwise pollute the
@@ -506,6 +523,8 @@ final class TreasuryService
         $order = match ($sort) {
             'date_asc' => 'm.movement_date ASC, m.id ASC',
             'created_desc' => 'm.created_at DESC, m.id DESC',
+            'updated_desc' => 'COALESCE(m.updated_at, m.created_at) DESC, m.id DESC',
+            'updated_asc' => 'COALESCE(m.updated_at, m.created_at) ASC, m.id ASC',
             'invoice_desc' => 'm.invoice_date IS NULL, m.invoice_date DESC, ' . $tie,
             'description_asc' => '(m.description IS NULL OR m.description = \'\'), m.description ASC, ' . $tie,
             'description_desc' => '(m.description IS NULL OR m.description = \'\'), m.description DESC, ' . $tie,
@@ -615,11 +634,16 @@ final class TreasuryService
         }
         $runtsFilter = trim((string) ($filters['runts_line'] ?? ''));
         if ($runtsFilter !== '') {
+            // Model D is computed on the approved register only: superseded originals (the struck
+            // through copies of an internal transfer) must not inflate the drill-down count.
+            $where[] = 'm.superseded_at IS NULL';
             if ($runtsFilter === '__none__') {
                 $where[] = "(m.runts_line IS NULL OR m.runts_line = '')";
             } else {
-                $where[] = 'm.runts_line = :filter_runts';
-                $params['filter_runts'] = strtoupper($runtsFilter);
+                $condition = $this->runtsLineCondition(strtoupper($runtsFilter), $params);
+                if ($condition !== null) {
+                    $where[] = $condition;
+                }
             }
         }
         $budgetFilter = $filters['budget_item_id'] ?? '';
@@ -628,6 +652,20 @@ final class TreasuryService
         } elseif ((int) $budgetFilter > 0) {
             $where[] = 'm.budget_item_id = :filter_budget_item';
             $params['filter_budget_item'] = (int) $budgetFilter;
+        }
+        if (array_key_exists('pattern_ids', $filters)) {
+            $patternIds = [];
+            foreach ((array) $filters['pattern_ids'] as $patternId) {
+                $patternId = (int) $patternId;
+                if ($patternId > 0) {
+                    $patternIds[$patternId] = $patternId;
+                }
+            }
+            if ($patternIds === []) {
+                $where[] = '1 = 0';
+            } else {
+                $where[] = 'm.id IN (' . implode(', ', array_values($patternIds)) . ')';
+            }
         }
         $from = trim((string) ($filters['from'] ?? ''));
         if ($from !== '') {
@@ -672,6 +710,61 @@ final class TreasuryService
             $where[] = 'm.approved_at IS NOT NULL';
         }
         return [$where, $params];
+    }
+
+    /**
+     * WHERE condition for one Model D item. It mirrors RuntsReportService::normalizeLine():
+     * the explicit item wins when it is valid for the movement direction, otherwise the item is
+     * derived from the treasury category (including the A-E5 / A-I10 fallback for custom categories).
+     * Without this, clicking a Model D row would show fewer movements than the report total.
+     *
+     * @param array<string,mixed> $params
+     */
+    private function runtsLineCondition(string $line, array &$params): ?string
+    {
+        $directions = RuntsReportService::lineDirections($line);
+        if ($directions === []) {
+            return null;
+        }
+        $bindList = static function (array $values, string $prefix) use (&$params): string {
+            $placeholders = [];
+            foreach (array_values($values) as $index => $value) {
+                $name = $prefix . '_' . $index;
+                $placeholders[] = ':' . $name;
+                $params[$name] = (string) $value;
+            }
+            return $placeholders === [] ? 'NULL' : implode(', ', $placeholders);
+        };
+
+        $branches = [];
+        foreach ($directions as $index => $direction) {
+            $suffix = (string) $index;
+            $fallback = [];
+            $categories = RuntsReportService::categoriesForLine($line, $direction);
+            if ($categories !== []) {
+                $fallback[] = 'LOWER(m.category) IN (' . $bindList($categories, 'filter_runts_cat_' . $suffix) . ')';
+            }
+            if (RuntsReportService::isFallbackLine($line, $direction)) {
+                $mapped = RuntsReportService::categoriesMappedFor($direction);
+                $fallback[] = "(m.category IS NULL OR m.category = '' OR LOWER(m.category) NOT IN ("
+                    . $bindList($mapped, 'filter_runts_mapped_' . $suffix) . '))';
+            }
+            if ($fallback === []) {
+                continue;
+            }
+            $directionParam = 'filter_runts_dir_' . $suffix;
+            $lineParam = 'filter_runts_line_' . $suffix;
+            $params[$directionParam] = $direction;
+            $params[$lineParam] = $line;
+            $known = $bindList(RuntsReportService::knownLines($direction), 'filter_runts_known_' . $suffix);
+            $branches[] = "(m.direction = :{$directionParam}"
+                . " AND (UPPER(TRIM(m.runts_line)) = :{$lineParam}"
+                . " OR ((m.runts_line IS NULL OR TRIM(m.runts_line) = ''"
+                . " OR UPPER(TRIM(m.runts_line)) NOT IN ({$known}))"
+                . ' AND (' . implode(' OR ', $fallback) . '))))';
+        }
+
+        return $branches === [] ? null : '(' . implode(' OR ', $branches) . ')';
     }
 
     /** @return array{id:int,slug:string,label:?string,builtin:bool,active:bool,sort_order:int}|null */
@@ -1576,6 +1669,123 @@ final class TreasuryService
     }
 
     /**
+     * Typical classification of the movements that look like the given one.
+     *
+     * @param list<array<string,mixed>> $movements
+     * @return array<int,array<string,mixed>>
+     */
+    public function classificationProfiles(array $movements, int $sampleLimit = self::PATTERN_SAMPLE_LIMIT): array
+    {
+        // Interactive hints only need a recent candidate pool: the form must stay responsive.
+        return $this->classificationProfilesInternal($movements, $this->patternCandidates(1200), $sampleLimit);
+    }
+
+    /**
+     * One movement's fingerprint: typical values, current values and examples.
+     *
+     * @param array<string,mixed> $movement
+     * @return array<string,mixed>
+     */
+    public function classificationProfile(array $movement, int $excludeId = 0, int $sampleLimit = 20): array
+    {
+        $id = $excludeId > 0 ? $excludeId : (int) ($movement['id'] ?? 0);
+        $movement['id'] = $id;
+        $profiles = $this->classificationProfiles([$movement], $sampleLimit);
+
+        return $profiles[$id] ?? [
+            'fields' => [],
+            'examples' => [],
+            'total' => 0,
+            'sample_count' => 0,
+        ];
+    }
+
+    /**
+     * IDs of movements with at least one unacknowledged classification anomaly.
+     *
+     * @return list<int>
+     */
+    public function classificationAnomalyIds(): array
+    {
+        $movements = $this->db->fetchAll(
+            'SELECT id, movement_date, description, beneficiary, amount, direction, payment_method, category,
+                    runts_line, budget_item_id, updated_at
+             FROM treasury_movements
+             WHERE direction IN (\'income\', \'expense\') AND superseded_at IS NULL
+             ORDER BY movement_date DESC, id DESC
+             LIMIT ' . self::PATTERN_CANDIDATE_LIMIT
+        );
+        $profiles = $this->classificationProfilesInternal($movements, $movements, self::PATTERN_SAMPLE_LIMIT);
+        $ids = [];
+        foreach ($profiles as $id => $profile) {
+            if ((int) $id < 1) {
+                continue;
+            }
+            foreach (($profile['fields'] ?? []) as $field) {
+                if (!empty($field['anomaly'])) {
+                    $ids[] = (int) $id;
+                    break;
+                }
+            }
+        }
+
+        return $ids;
+    }
+
+    /**
+     * Store “the current values are correct” for one field. The acknowledgement stops applying
+     * automatically when the current value or the typical one changes.
+     */
+    public function acknowledgePattern(
+        int $movementId,
+        string $field,
+        string $currentValue,
+        string $typicalValue,
+        ?int $userId = null,
+        string $ip = ''
+    ): bool {
+        if ($movementId < 1 || !in_array($field, self::PATTERN_FIELDS, true)) {
+            return false;
+        }
+        if ($this->db->fetch('SELECT id FROM treasury_movements WHERE id = :id', ['id' => $movementId]) === null) {
+            return false;
+        }
+        if ($userId !== null) {
+            // The session may outlive a deleted operator: never break the acknowledgement on the FK.
+            $user = $this->db->fetch('SELECT id FROM users WHERE id = :id LIMIT 1', ['id' => $userId]);
+            if ($user === null) {
+                $userId = null;
+            }
+        }
+        $currentValue = mb_substr(trim($currentValue), 0, 190);
+        $typicalValue = mb_substr(trim($typicalValue), 0, 190);
+        $existing = $this->db->fetch(
+            'SELECT id FROM treasury_classification_acknowledgements WHERE movement_id = :movement_id AND field = :field',
+            ['movement_id' => $movementId, 'field' => $field]
+        );
+        if ($existing !== null) {
+            $this->db->update('treasury_classification_acknowledgements', [
+                'current_value' => $currentValue,
+                'typical_value' => $typicalValue,
+                'user_id' => $userId,
+            ], 'id = :id', ['id' => (int) $existing['id']]);
+        } else {
+            $this->db->insert('treasury_classification_acknowledgements', [
+                'movement_id' => $movementId,
+                'field' => $field,
+                'current_value' => $currentValue,
+                'typical_value' => $typicalValue,
+                'user_id' => $userId,
+            ]);
+        }
+        $this->audit->log('treasury.pattern_acknowledged', 'treasury', (string) $movementId, null, [
+            'field' => $field,
+        ], $ip);
+
+        return true;
+    }
+
+    /**
      * Apply the same classification (type, Model D item, cost center) to multiple transactions.
      *
      * @param list<int> $ids
@@ -1712,6 +1922,325 @@ final class TreasuryService
         }
 
         return min(1.0, $dice);
+    }
+
+    /**
+     * @param list<array<string,mixed>> $movements
+     * @param list<array<string,mixed>> $candidates
+     * @return array<int,array<string,mixed>>
+     */
+    private function classificationProfilesInternal(array $movements, array $candidates, int $sampleLimit): array
+    {
+        $targets = [];
+        foreach ($movements as $movement) {
+            if (!is_array($movement)) {
+                continue;
+            }
+            $direction = (string) ($movement['direction'] ?? '');
+            if (!in_array($direction, ['income', 'expense'], true)) {
+                continue;
+            }
+            $id = (int) ($movement['id'] ?? 0);
+            $movement['id'] = $id;
+            $targets[$id] = $movement;
+        }
+        if ($targets === []) {
+            return [];
+        }
+
+        $candidateById = [];
+        $tokenMap = [];
+        $postings = [];
+        foreach ($candidates as $candidate) {
+            if (!is_array($candidate)) {
+                continue;
+            }
+            $id = (int) ($candidate['id'] ?? 0);
+            if ($id < 1) {
+                continue;
+            }
+            $candidateById[$id] = $candidate;
+            $tokens = $this->similarityTokens($this->patternText($candidate));
+            $tokenMap[$id] = $tokens;
+            foreach ($tokens as $token) {
+                $postings[$token][] = $id;
+            }
+        }
+
+        $acknowledgements = $this->patternAcknowledgements(array_keys($targets));
+        $out = [];
+        foreach ($targets as $id => $movement) {
+            $out[$id] = $this->patternProfileForOne(
+                $movement,
+                (int) $id,
+                $candidateById,
+                $tokenMap,
+                $postings,
+                $acknowledgements,
+                $sampleLimit
+            );
+        }
+
+        return $out;
+    }
+
+    /** @return list<array<string,mixed>> */
+    private function patternCandidates(int $limit = self::PATTERN_CANDIDATE_LIMIT): array
+    {
+        $limit = max(1, min(self::PATTERN_CANDIDATE_LIMIT, $limit));
+
+        return $this->db->fetchAll(
+            'SELECT id, movement_date, description, beneficiary, amount, direction, payment_method, category,
+                    runts_line, budget_item_id, updated_at
+             FROM treasury_movements
+             WHERE direction IN (\'income\', \'expense\') AND superseded_at IS NULL
+               AND (
+                    (description IS NOT NULL AND description <> \'\')
+                    OR (beneficiary IS NOT NULL AND beneficiary <> \'\')
+               )
+             ORDER BY movement_date DESC, id DESC
+             LIMIT ' . $limit
+        );
+    }
+
+    /**
+     * @param list<int> $movementIds
+     * @return array<int,array<string,array{current_value:string,typical_value:string}>>
+     */
+    private function patternAcknowledgements(array $movementIds): array
+    {
+        $ids = [];
+        foreach ($movementIds as $id) {
+            $id = (int) $id;
+            if ($id > 0) {
+                $ids[$id] = $id;
+            }
+        }
+        if ($ids === []) {
+            return [];
+        }
+        $placeholders = [];
+        $params = [];
+        foreach (array_values($ids) as $index => $id) {
+            $name = 'ack_' . $index;
+            $placeholders[] = ':' . $name;
+            $params[$name] = $id;
+        }
+        $rows = $this->db->fetchAll(
+            'SELECT movement_id, field, current_value, typical_value
+             FROM treasury_classification_acknowledgements
+             WHERE movement_id IN (' . implode(', ', $placeholders) . ')',
+            $params
+        );
+        $out = [];
+        foreach ($rows as $row) {
+            $out[(int) ($row['movement_id'] ?? 0)][(string) ($row['field'] ?? '')] = [
+                'current_value' => (string) ($row['current_value'] ?? ''),
+                'typical_value' => (string) ($row['typical_value'] ?? ''),
+            ];
+        }
+
+        return $out;
+    }
+
+    /**
+     * @param array<string,mixed> $row
+     */
+    private function patternText(array $row): string
+    {
+        $description = trim((string) ($row['description'] ?? ''));
+
+        return $description !== '' ? $description : trim((string) ($row['beneficiary'] ?? ''));
+    }
+
+    /**
+     * Normalised value of a pattern field. The Model D line follows the report logic: when the
+     * explicit line is missing or not valid for the direction, the category suggests it.
+     *
+     * @param array<string,mixed> $row
+     */
+    private function patternValue(array $row, string $field): string
+    {
+        $direction = (string) ($row['direction'] ?? 'expense');
+        if (!in_array($direction, ['income', 'expense'], true)) {
+            $direction = 'expense';
+        }
+        if ($field === 'payment_method') {
+            $raw = trim((string) ($row['payment_method'] ?? ''));
+
+            return $raw !== '' ? self::normalizePaymentMethod($raw) : '';
+        }
+        if ($field === 'category') {
+            return trim((string) ($row['category'] ?? ''));
+        }
+        if ($field === 'runts_line') {
+            return RuntsReportService::normalizeLine(
+                (string) ($row['runts_line'] ?? ''),
+                (string) ($row['category'] ?? ''),
+                $direction
+            );
+        }
+        if ($field === 'budget_item_id') {
+            $id = (int) ($row['budget_item_id'] ?? 0);
+
+            return $id > 0 ? (string) $id : '';
+        }
+
+        return '';
+    }
+
+    /**
+     * @return array{fields:array<string,mixed>,examples:list<array<string,mixed>>,total:int,sample_count:int}
+     */
+    private function emptyPatternProfile(): array
+    {
+        return ['fields' => [], 'examples' => [], 'total' => 0, 'sample_count' => 0];
+    }
+
+    /**
+     * @param array<string,mixed> $movement
+     * @param array<int,array<string,mixed>> $candidateById
+     * @param array<int,list<string>> $tokenMap
+     * @param array<string,list<int>> $postings
+     * @param array<int,array<string,array{current_value:string,typical_value:string}>> $acknowledgements
+     * @return array<string,mixed>
+     */
+    private function patternProfileForOne(
+        array $movement,
+        int $excludeId,
+        array $candidateById,
+        array $tokenMap,
+        array $postings,
+        array $acknowledgements,
+        int $sampleLimit
+    ): array {
+        $tokens = $this->similarityTokens($this->patternText($movement));
+        if ($tokens === []) {
+            return $this->emptyPatternProfile();
+        }
+
+        $candidateIds = [];
+        foreach ($tokens as $token) {
+            foreach (array_slice($postings[$token] ?? [], 0, 250) as $candidateId) {
+                if ($candidateId === $excludeId) {
+                    continue;
+                }
+                $candidateIds[$candidateId] = true;
+            }
+            if (count($candidateIds) >= 400) {
+                break;
+            }
+        }
+
+        $scored = [];
+        foreach (array_keys($candidateIds) as $candidateId) {
+            if (!isset($candidateById[$candidateId])) {
+                continue;
+            }
+            $score = $this->similarityScore($tokens, $tokenMap[$candidateId] ?? []);
+            if ($score >= self::PATTERN_MIN_SCORE) {
+                $scored[$candidateId] = $score;
+            }
+        }
+        if ($scored === []) {
+            return $this->emptyPatternProfile();
+        }
+        arsort($scored);
+        $total = count($scored);
+        $top = array_slice($scored, 0, max(1, min(60, $sampleLimit)), true);
+
+        $fields = [];
+        foreach (self::PATTERN_FIELDS as $field) {
+            $weights = [];
+            $counts = [];
+            foreach (array_keys($top) as $candidateId) {
+                $value = $this->patternValue($candidateById[$candidateId], $field);
+                if ($value === '') {
+                    continue;
+                }
+                $weights[$value] = ($weights[$value] ?? 0.0) + max(0.1, (float) $scored[$candidateId]);
+                $counts[$value] = ($counts[$value] ?? 0) + 1;
+            }
+            if ($counts === []) {
+                continue;
+            }
+            uksort($weights, static function (string $a, string $b) use ($weights, $counts): int {
+                return ($weights[$b] <=> $weights[$a])
+                    ?: ($counts[$b] <=> $counts[$a])
+                    ?: strcmp($a, $b);
+            });
+            $typical = (string) array_key_first($weights);
+            $samples = array_sum($counts);
+            $current = $this->patternValue($movement, $field);
+            $ack = $acknowledgements[$excludeId][$field] ?? null;
+            $acknowledged = is_array($ack)
+                && (string) ($ack['current_value'] ?? '') === $current
+                && (string) ($ack['typical_value'] ?? '') === $typical;
+            $fields[$field] = [
+                'typical' => $typical,
+                'typical_label' => $this->patternValueLabel($field, $typical),
+                'current' => $current,
+                'current_label' => $this->patternValueLabel($field, $current),
+                'samples' => $samples,
+                'is_match' => $current === $typical,
+                'acknowledged' => $acknowledged,
+                'anomaly' => $samples >= self::PATTERN_MIN_ANOMALY_SAMPLES
+                    && $current !== $typical
+                    && !$acknowledged,
+            ];
+        }
+
+        $examples = [];
+        foreach (array_slice($top, 0, 5, true) as $candidateId => $score) {
+            $row = $candidateById[$candidateId];
+            $values = [];
+            foreach (self::PATTERN_FIELDS as $field) {
+                $values[$field] = $this->patternValue($row, $field);
+            }
+            $examples[] = [
+                'id' => (int) $candidateId,
+                'date' => (string) ($row['movement_date'] ?? ''),
+                'date_formatted' => (string) (format_date((string) ($row['movement_date'] ?? '')) ?: ($row['movement_date'] ?? '')),
+                'description' => mb_substr(trim((string) ($row['description'] ?? '')), 0, 160),
+                'amount' => (float) ($row['amount'] ?? 0),
+                'amount_formatted' => $this->currency->format((float) ($row['amount'] ?? 0)),
+                'values' => $values,
+                'score' => round((float) $score, 3),
+            ];
+        }
+
+        return [
+            'fields' => $fields,
+            'examples' => $examples,
+            'total' => $total,
+            'sample_count' => count($top),
+        ];
+    }
+
+    private function patternValueLabel(string $field, string $value): string
+    {
+        if ($value === '') {
+            return '';
+        }
+        if ($field === 'payment_method') {
+            $key = 'treasury.method_' . $value;
+            $label = (string) __($key);
+
+            return $label !== $key ? $label : $value;
+        }
+        if ($field === 'category') {
+            return $this->categoryLabel($value);
+        }
+        if ($field === 'runts_line') {
+            return RuntsReportService::lineLabelWithSection($value);
+        }
+        if ($field === 'budget_item_id') {
+            $label = $this->budgetItemLabel((int) $value);
+
+            return $label !== '' ? $label : $value;
+        }
+
+        return $value;
     }
 
     /**

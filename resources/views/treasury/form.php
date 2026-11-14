@@ -12,6 +12,7 @@
  * @var array{auto_from_payments?:bool} $config
  * @var list<string> $beneficiaries
  * @var list<array{label:string,options:list<array{value:string,label:string,direction:string,category:string}>}>|null $budget_items
+ * @var array<string,mixed>|null $pattern_profile
  * @var \Socly\Services\CurrencyService $currency
  */
 $movementId = $isEdit ? (int) ($movement['id'] ?? 0) : 0;
@@ -100,6 +101,14 @@ $adjacentLabel = static function (array $entry, string $key): string {
 $returnPath = (string) ($return_path ?? '/treasury');
 $returnUrl = (string) ($return_url ?? url('/treasury'));
 $retSuffix = $returnPath === '/treasury' ? '' : '?ret=' . rawurlencode($returnPath);
+$patternProfile = is_array($pattern_profile ?? null) ? $pattern_profile : [];
+$patternProfileJson = (string) json_encode(
+    $patternProfile,
+    JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT
+);
+if ($patternProfileJson === '') {
+    $patternProfileJson = '{}';
+}
 ?>
 <div class="page-header">
     <div class="titles">
@@ -158,6 +167,17 @@ if ($probe !== null && $movementId > 0) {
       data-original-runts-line="<?= e((string) ($movement['runts_line'] ?? '')) ?>"
       data-original-budget-item="<?= e((string) (int) ($movement['budget_item_id'] ?? 0)) ?>"
       data-similar-apply-url="<?= e(url('/treasury/similar/apply')) ?>"
+      data-is-edit="<?= $isEdit ? '1' : '0' ?>"
+      data-pattern-url="<?= e(url('/treasury/pattern')) ?>"
+      data-pattern-ack-url="<?= e(url('/treasury/pattern/ack')) ?>"
+      data-pattern-profile="<?= e($patternProfileJson) ?>"
+      data-msg-pattern-typical="<?= e(__('treasury.pattern_typical')) ?>"
+      data-msg-pattern-samples="<?= e(__('treasury.pattern_samples')) ?>"
+      data-msg-pattern-apply="<?= e(__('treasury.pattern_apply')) ?>"
+      data-msg-pattern-ack="<?= e(__('treasury.pattern_ack')) ?>"
+      data-msg-pattern-acknowledged="<?= e(__('treasury.pattern_acknowledged')) ?>"
+      data-msg-pattern-confirm="<?= e(__('treasury.pattern_confirm')) ?>"
+      data-msg-pattern-warning="<?= e(__('treasury.pattern_warning')) ?>"
       data-msg-similar-title="<?= e(__('treasury.similar_title', ['count' => ':count'])) ?>"
       data-msg-similar-hint="<?= e(__('treasury.similar_hint')) ?>"
       data-msg-similar-changes="<?= e(__('treasury.similar_changes')) ?>"
@@ -169,6 +189,7 @@ if ($probe !== null && $movementId > 0) {
       data-msg-upload-too-large="<?= e(__('documents.upload_too_large', ['max' => upload_max_mb()])) ?>">
     <?= csrf_field() ?>
     <?php if (!empty($isEdit)): ?>
+        <?= field('hidden', ['name' => 'record_id', 'value' => (string) $movementId]) ?>
         <?= view_partial('partials/record_lock_notice', [
             'entity' => 'treasury',
             'row' => $movement ?? null,

@@ -54,6 +54,9 @@ $attachmentIsImage = $hasAttachment
     && preg_match('/\.(?:jpe?g|png|webp)$/i', (string) ($values['attachment_path'] ?? '')) === 1;
 $documentEditUrl = trim((string) ($values['document_edit_url'] ?? ''));
 $fileReady = $hasAttachment;
+// Filled by `initTreasuryPatternHints()` from the fingerprint of similar movements.
+$patternSlot = static fn (string $field): string => '<span class="tmf-pattern-slot" data-tmf-pattern-field="'
+    . e($field) . '"></span>';
 
 $treasuryCategoryGroups = [];
 $treasuryCategoryFlat = [];
@@ -259,6 +262,7 @@ foreach ($members as $member) {
         <?= field('select', [
             'name' => 'payment_method',
             'label' => (string) __('treasury.payment_method_label'),
+            'label_extra' => $patternSlot('payment_method'),
             'value' => $selectedMethod,
             'include_empty' => true,
             'empty_label' => (string) __('treasury.method_unspecified'),
@@ -355,6 +359,7 @@ if (array_key_exists('has_document', $values)) {
         <?= field('select', [
             'name' => 'category',
             'label' => (string) __('treasury.category'),
+            'label_extra' => $patternSlot('category'),
             'value' => $selectedCategory,
             'include_empty' => false,
             'groups' => $treasuryCategoryGroups !== [] ? $treasuryCategoryGroups : null,
@@ -403,7 +408,7 @@ if (array_key_exists('has_document', $values)) {
         <?= field('select', [
             'name' => 'runts_line',
             'label' => (string) __('runts.line_label'),
-            'label_extra' => $runtsWizardButton,
+            'label_extra' => $runtsWizardButton . $patternSlot('runts_line'),
             'wrapper_class' => 'runts-line-field',
             'value' => (string) ($values['runts_line'] ?? ''),
             'include_empty' => true,
@@ -446,6 +451,7 @@ if (array_key_exists('has_document', $values)) {
                 <?= field('select', [
                     'name' => 'budget_item_id',
                     'label' => (string) __('treasury.budget_item'),
+                    'label_extra' => $patternSlot('budget_item_id'),
                     'value' => (string) ($values['budget_item_id'] ?? ''),
                     'empty_label' => (string) __('treasury.budget_item_none'),
                     'options' => $budgetItemOptions,

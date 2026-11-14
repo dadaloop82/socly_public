@@ -154,6 +154,13 @@ $router->post('/treasury/{id}/approve', [TreasuryController::class, 'approve'], 
 $router->post('/treasury/recurring/{id}/toggle', [TreasuryController::class, 'toggleRecurring'], 'treasury.manage', ['mw.locale', 'mw.install', 'mw.auth', 'mw.csrf']);
 $router->post('/treasury/recurring/{id}/delete', [TreasuryController::class, 'deleteRecurring'], 'treasury.manage', ['mw.locale', 'mw.install', 'mw.auth', 'mw.csrf']);
 $router->post('/treasury', [TreasuryController::class, 'store'], 'treasury.manage', ['mw.locale', 'mw.install', 'mw.auth', 'mw.csrf']);
+// Static POST routes must precede POST /treasury/{id}: otherwise “similar” / “pattern” are
+// captured as movement IDs and the AJAX panels never reach their controller.
+$router->post('/treasury/similar', [TreasuryController::class, 'similar'], 'treasury.manage', ['mw.locale', 'mw.install', 'mw.auth', 'mw.csrf']);
+$router->post('/treasury/similar/apply', [TreasuryController::class, 'applySimilar'], 'treasury.manage', ['mw.locale', 'mw.install', 'mw.auth', 'mw.csrf']);
+$router->post('/treasury/similar/apply-form', [TreasuryController::class, 'applySimilarForm'], 'treasury.manage', ['mw.locale', 'mw.install', 'mw.auth', 'mw.csrf']);
+$router->post('/treasury/pattern', [TreasuryController::class, 'pattern'], 'treasury.manage', ['mw.locale', 'mw.install', 'mw.auth', 'mw.csrf']);
+$router->post('/treasury/pattern/ack', [TreasuryController::class, 'acknowledgePattern'], 'treasury.manage', ['mw.locale', 'mw.install', 'mw.auth', 'mw.csrf']);
 $router->get('/treasury/{id}/attachment', [TreasuryController::class, 'attachment'], 'treasury.view', ['mw.locale', 'mw.install', 'mw.auth']);
 $router->get('/treasury/{id}/edit', [TreasuryController::class, 'edit'], 'treasury.manage', ['mw.locale', 'mw.install', 'mw.auth']);
 $router->post('/treasury/{id}', [TreasuryController::class, 'update'], 'treasury.manage', ['mw.locale', 'mw.install', 'mw.auth', 'mw.csrf']);
@@ -164,9 +171,6 @@ $router->get('/budgets/{id}', [BudgetController::class, 'show'], 'treasury.view'
 $router->post('/budgets/{id}', [BudgetController::class, 'save'], 'treasury.manage', ['mw.locale', 'mw.install', 'mw.auth', 'mw.csrf']);
 $router->post('/budgets/{id}/approve', [BudgetController::class, 'approve'], 'treasury.manage', ['mw.locale', 'mw.install', 'mw.auth', 'mw.csrf']);
 $router->post('/treasury/categories/rename', [BudgetController::class, 'renameCategory'], 'treasury.manage', ['mw.locale', 'mw.install', 'mw.auth', 'mw.csrf']);
-$router->post('/treasury/similar', [TreasuryController::class, 'similar'], 'treasury.manage', ['mw.locale', 'mw.install', 'mw.auth', 'mw.csrf']);
-$router->post('/treasury/similar/apply', [TreasuryController::class, 'applySimilar'], 'treasury.manage', ['mw.locale', 'mw.install', 'mw.auth', 'mw.csrf']);
-$router->post('/treasury/similar/apply-form', [TreasuryController::class, 'applySimilarForm'], 'treasury.manage', ['mw.locale', 'mw.install', 'mw.auth', 'mw.csrf']);
 $router->get('/treasury/export', [TreasuryCsvController::class, 'export'], 'treasury.view', ['mw.locale', 'mw.install', 'mw.auth']);
 $router->get('/treasury/import', [TreasuryCsvController::class, 'index'], 'treasury.manage', ['mw.locale', 'mw.install', 'mw.auth']);
 $router->get('/treasury/import/template', [TreasuryCsvController::class, 'template'], 'treasury.manage', ['mw.locale', 'mw.install', 'mw.auth']);
