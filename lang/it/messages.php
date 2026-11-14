@@ -3124,7 +3124,7 @@ return [
         'created_by' => 'Creato da :user il :date',
         'updated_by' => 'Modificato da :user il :date',
         'created_on' => 'Creato il :date',
-        'updated_on' => 'Modificato il :date',
+        'updated_on' => 'Modificato il :date (autore non disponibile)',
         'title' => 'Storico attività',
         'nav' => 'Storico attività',
         'nav_hint' => 'Chi ha fatto cosa e quando',

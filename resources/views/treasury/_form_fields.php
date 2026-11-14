@@ -335,16 +335,11 @@ foreach ($members as $member) {
 // one block, on incoming and outgoing entries alike, with its type, number and date. The invoice
 // flag and the payment terms only make sense on an expense; the attachment also works on transfers.
 $invoiceActive = $selectedDirection === 'expense' && !empty($values['invoice_payment']);
-// “Does this movement have a document?”: the whole box stays hidden unless the operator turns the
-// flag on; on an existing record it starts on when something is already there.
-$hasDocument = trim((string) ($values['document_type'] ?? '')) !== ''
-    || trim((string) ($values['invoice_number'] ?? '')) !== ''
-    || trim((string) ($values['invoice_date'] ?? '')) !== ''
-    || trim((string) ($values['invoice_title'] ?? '')) !== ''
-    || trim((string) ($values['invoice_due_date'] ?? '')) !== ''
-    || trim((string) ($values['attachment_path'] ?? '')) !== ''
-    || (int) ($values['document_id'] ?? 0) > 0
-    || !empty($values['invoice_payment']);
+// “Does this movement have a document?”: the box stays on only when the document has a real
+// identity — a document number or a selected document type. A date, a title or an attachment
+// alone no longer count: without number and type the toggle stays off.
+$hasDocument = trim((string) ($values['invoice_number'] ?? '')) !== ''
+    || $selectedDocumentType !== '';
 if (array_key_exists('has_document', $values)) {
     // A retry after a validation error keeps the operator's choice (also when it was “off”).
     $hasDocument = !empty($values['has_document']);

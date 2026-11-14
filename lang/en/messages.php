@@ -2176,7 +2176,7 @@ return [
         'created_by' => 'Created by :user on :date',
         'updated_by' => 'Modified by :user on :date',
         'created_on' => 'Created on :date',
-        'updated_on' => 'Modified on :date',
+        'updated_on' => 'Modified on :date (author unavailable)',
         'title' => 'Activity log',
         'nav' => 'Activity log',
         'nav_hint' => 'Who did what and when',

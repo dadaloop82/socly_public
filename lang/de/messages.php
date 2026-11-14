@@ -2176,7 +2176,7 @@ return [
         'created_by' => 'Erstellt von :user am :date',
         'updated_by' => 'Geändert von :user am :date',
         'created_on' => 'Erstellt am :date',
-        'updated_on' => 'Geändert am :date',
+        'updated_on' => 'Geändert am :date (Autor nicht verfügbar)',
         'title' => 'Aktivitätsprotokoll',
         'nav' => 'Aktivitätsprotokoll',
         'nav_hint' => 'Wer hat was und wann getan',
