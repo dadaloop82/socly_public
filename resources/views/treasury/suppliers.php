@@ -78,7 +78,7 @@ $resetUrl = static function () use ($query, $sortKey, $partyKey): string {
     ])) ?></p>
 </section>
 
-<form class="panel filter-bar suppliers-filter" method="get" action="<?= e(url('/treasury/suppliers')) ?>" role="search">
+<form class="panel filter-bar suppliers-filter" method="get" action="<?= e(url('/treasury/suppliers')) ?>" role="search" data-live-filter>
     <?= field('search', [
         'name' => 'q',
         'id' => 'suppliers-q',

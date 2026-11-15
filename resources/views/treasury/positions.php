@@ -107,7 +107,7 @@ $canManage = can('treasury.manage');
     ])) ?></p>
 </section>
 
-<form class="panel filter-bar suppliers-filter" method="get" action="<?= e(url($listPath)) ?>" role="search">
+<form class="panel filter-bar suppliers-filter" method="get" action="<?= e(url($listPath)) ?>" role="search" data-live-filter>
     <?= field('search', [
         'name' => 'q',
         'id' => 'positions-q',

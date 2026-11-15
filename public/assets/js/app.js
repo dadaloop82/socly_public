@@ -299,6 +299,7 @@ document.addEventListener('DOMContentLoaded', () => {
   initDeadlineCategory(document);
   initDeadlineFilters(document);
   initDeadlineTemplates(document);
+  initLiveFilters(document);
   initTreasuryCategory(document);
   initLeaveGuards(document);
   initConfirmForms(document);
@@ -12747,6 +12748,19 @@ function initSidebarUpdate() {
 function initDeadlineFilters(root = document) {
   // Deadlines filters (search + category + status) apply live, like the members list.
   root.querySelectorAll('[data-deadlines-filter]').forEach((form) => {
+    if (form instanceof HTMLFormElement) {
+      initLiveFilterForm(form);
+    }
+  });
+}
+
+/**
+ * Generic opt-in for list filters: any GET form with data-live-filter applies on change
+ * (selects/checkboxes immediately, text inputs after the shared debounce), exactly like the
+ * members archive and the treasury ledger.
+ */
+function initLiveFilters(root = document) {
+  root.querySelectorAll('[data-live-filter]').forEach((form) => {
     if (form instanceof HTMLFormElement) {
       initLiveFilterForm(form);
     }

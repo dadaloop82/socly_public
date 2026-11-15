@@ -117,7 +117,7 @@ foreach (($options['entities'] ?? []) as $entityType) {
     </div>
 </div>
 
-<form class="panel filter-bar members-filter audit-filter" method="get" action="<?= e(url('/audit')) ?>" role="search">
+<form class="panel filter-bar members-filter audit-filter" method="get" action="<?= e(url('/audit')) ?>" role="search" data-live-filter>
     <div class="members-filter-row">
         <div class="members-filter-q">
             <?= field('search', [
