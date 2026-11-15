@@ -59,39 +59,51 @@ final class MemberService
 
     /**
      * GDPR / privacy consent indicators for list and profile views.
+     * Only consents whose field definition is still enabled produce a badge: a disabled feature
+     * (e.g. the photo/video release switched off in Settings) must not keep showing a “missing”
+     * badge just because old values are still stored for that member.
      *
      * @param array<string,mixed> $member
+     * @param list<array<string,mixed>>|null $defs Enabled field definitions (optional preload)
      * @return list<array{key:string,ok:bool,label:string}>
      */
-    public function gdprBadges(array $member): array
+    public function gdprBadges(array $member, ?array $defs = null): array
     {
         if (!$this->isGdprEnabled()) {
             return [];
         }
         $fields = is_array($member['fields'] ?? null) ? $member['fields'] : [];
+        $enabled = [];
+        foreach ($defs ?? $this->fieldDefinitions(true) as $def) {
+            $key = (string) ($def['key'] ?? '');
+            if ($key !== '') {
+                $enabled[$key] = $def;
+            }
+        }
         $badges = [];
         $isChecked = static function (mixed $raw): bool {
             return $raw === true || $raw === 1 || $raw === '1' || $raw === 'on' || $raw === 'yes';
         };
 
-        $privacyOk = $isChecked($fields['privacy_ack'] ?? null);
-        $badges[] = [
-            'key' => 'privacy',
-            'ok' => $privacyOk,
-            'label' => $privacyOk ? __('members.gdpr_privacy_ok') : __('members.gdpr_privacy_missing'),
-        ];
+        if (isset($enabled['privacy_ack'])) {
+            $privacyOk = $isChecked($fields['privacy_ack'] ?? null);
+            $badges[] = [
+                'key' => 'privacy',
+                'ok' => $privacyOk,
+                'label' => $privacyOk ? __('members.gdpr_privacy_ok') : __('members.gdpr_privacy_missing'),
+            ];
+        }
 
         $imageKey = null;
         foreach (['image_consent', 'photo_consent', 'image_ack', 'photo_ack', 'images_consent'] as $candidate) {
-            if (array_key_exists($candidate, $fields)) {
+            if (isset($enabled[$candidate])) {
                 $imageKey = $candidate;
                 break;
             }
         }
         if ($imageKey === null) {
-            foreach ($this->fieldDefinitions(true) as $def) {
-                $key = (string) ($def['key'] ?? '');
-                if ($key === '' || $key === 'photo' || $key === 'privacy_ack') {
+            foreach ($enabled as $key => $def) {
+                if ($key === 'photo' || $key === 'privacy_ack') {
                     continue;
                 }
                 if ((string) ($def['field_type'] ?? '') === 'checkbox' && preg_match('/image|photo|immagin/i', $key)) {
@@ -111,13 +123,13 @@ final class MemberService
 
         $commsKey = null;
         foreach (['newsletter_consent', 'comms_consent', 'marketing_consent', 'newsletter_ack'] as $candidate) {
-            if (array_key_exists($candidate, $fields)) {
+            if (isset($enabled[$candidate])) {
                 $commsKey = $candidate;
                 break;
             }
         }
         if ($commsKey === null) {
-            foreach ($this->fieldDefinitions(true) as $def) {
+            foreach ($enabled as $key => $def) {
                 $key = (string) ($def['key'] ?? '');
                 if ($key !== '' && (string) ($def['field_type'] ?? '') === 'checkbox'
                     && preg_match('/newsletter|comms|marketing|comunicaz/i', $key)
@@ -1463,8 +1475,9 @@ final class MemberService
         }
         unset($item);
         $this->attachComplianceIssues($items);
+        $gdprDefs = $items === [] ? [] : $this->fieldDefinitions(true);
         foreach ($items as &$item) {
-            $item['gdpr_badges'] = $this->gdprBadges($item);
+            $item['gdpr_badges'] = $this->gdprBadges($item, $gdprDefs);
         }
         unset($item);
         return [
@@ -1506,7 +1519,7 @@ final class MemberService
         $list = [$member];
         $this->attachComplianceIssues($list);
         $member = $list[0];
-        $member['gdpr_badges'] = $this->gdprBadges($member);
+        $member['gdpr_badges'] = $this->gdprBadges($member, $this->fieldDefinitions(true));
         $this->attachGuardian($member);
         return $member;
     }

@@ -72,12 +72,17 @@ $isChecked = static function (mixed $raw): bool {
 };
 $consentItems = [];
 $consentKeysUsed = [];
+$enabledDefKeys = [];
 foreach ($fieldDefs as $def) {
     if (!(int) ($def['is_enabled'] ?? 0)) {
         continue;
     }
     $key = (string) ($def['key'] ?? '');
-    if ($key === '' || (string) ($def['field_type'] ?? '') !== 'checkbox') {
+    if ($key === '') {
+        continue;
+    }
+    $enabledDefKeys[$key] = true;
+    if ((string) ($def['field_type'] ?? '') !== 'checkbox') {
         continue;
     }
     $consentKeysUsed[$key] = true;
@@ -87,14 +92,14 @@ foreach ($fieldDefs as $def) {
         'ok' => $isChecked($fields[$key] ?? null),
     ];
 }
-if (!isset($consentKeysUsed['privacy_ack']) && array_key_exists('privacy_ack', $fields)) {
+if (!isset($consentKeysUsed['privacy_ack']) && isset($enabledDefKeys['privacy_ack'])) {
     array_unshift($consentItems, [
         'key' => 'privacy_ack',
         'label' => __('members.consent_privacy'),
         'ok' => $isChecked($fields['privacy_ack'] ?? null),
     ]);
 }
-if (!isset($consentKeysUsed['statute_ack']) && array_key_exists('statute_ack', $fields)) {
+if (!isset($consentKeysUsed['statute_ack']) && isset($enabledDefKeys['statute_ack'])) {
     $consentItems[] = [
         'key' => 'statute_ack',
         'label' => __('members.consent_statute'),
