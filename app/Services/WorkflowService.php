@@ -665,6 +665,7 @@ final class WorkflowService
         } catch (\Throwable) {
             return [];
         }
+        sort($files);
 
         return $files;
     }
