@@ -180,7 +180,9 @@ foreach (($options['entities'] ?? []) as $entityType) {
      data-endless-target="[data-audit-rows]"
      data-msg-endless-loading="<?= e(__('common.endless_loading')) ?>"
      data-msg-endless-done="<?= e(__('common.endless_done')) ?>"
-     data-msg-endless-error="<?= e(__('common.endless_error')) ?>"<?php endif; ?>>
+     data-msg-endless-more="<?= e(__('common.endless_more')) ?>"
+     data-msg-endless-error="<?= e(__('common.endless_error')) ?>"
+     data-endless-total="<?= (int) ($result['total'] ?? 0) ?>"<?php endif; ?>>
     <div class="panel-header">
         <div>
             <h2 class="section-title"><?= e(__('audit.results')) ?></h2>
@@ -271,8 +273,10 @@ foreach (($options['entities'] ?? []) as $entityType) {
         </div>
     <?php endif; ?>
     <?php if ($pages > 1): ?>
-        <div class="endless-sentinel" data-endless-sentinel aria-hidden="true"></div>
-        <p class="muted endless-status" data-endless-status aria-live="polite" hidden></p>
+        <div class="endless-more" data-endless-sentinel>
+            <span class="endless-spinner" aria-hidden="true"></span>
+            <span class="endless-more-text" data-endless-status aria-live="polite"></span>
+        </div>
         <?php
         // Pager: window of pages around the current one + first/last (same pattern as the lists).
         $pageWindow = [1];

@@ -490,7 +490,9 @@ if ($filterYear !== '' && !isset($yearFilterOptions[$filterYear])) {
      data-endless-groups-container="[data-endless-groups-container]"
      data-msg-endless-loading="<?= e(__('common.endless_loading')) ?>"
      data-msg-endless-done="<?= e(__('common.endless_done')) ?>"
-     data-msg-endless-error="<?= e(__('common.endless_error')) ?>"<?php endif; ?>>
+     data-msg-endless-more="<?= e(__('common.endless_more')) ?>"
+     data-msg-endless-error="<?= e(__('common.endless_error')) ?>"
+     data-endless-total="<?= (int) ($total_rows ?? 0) ?>"<?php endif; ?>>
     <div class="panel-header">
         <div>
             <h2 class="section-title"><?= e(__('treasury.ledger')) ?></h2>
@@ -1034,8 +1036,10 @@ if ($filterYear !== '' && !isset($yearFilterOptions[$filterYear])) {
         </div>
     <?php endif; ?>
     <?php if ($totalPages > 1): ?>
-        <div class="endless-sentinel" data-endless-sentinel aria-hidden="true"></div>
-        <p class="muted endless-status" data-endless-status aria-live="polite" hidden></p>
+        <div class="endless-more" data-endless-sentinel>
+            <span class="endless-spinner" aria-hidden="true"></span>
+            <span class="endless-more-text" data-endless-status aria-live="polite"></span>
+        </div>
         <nav class="list-pager" aria-label="<?= e(__('common.pager_aria')) ?>">
             <?php if ($currentPage > 1): ?>
                 <a class="list-pager-step" href="<?= e($pageUrl($currentPage - 1)) ?>" rel="prev">← <?= e(__('common.pager_prev')) ?></a>

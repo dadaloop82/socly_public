@@ -3752,19 +3752,44 @@ tr.clickable-row:focus-visible {
 [data-endless-list].is-infinite .list-pager {
   display: none;
 }
-.endless-sentinel {
-  height: 1px;
-}
-.endless-status {
+/* Endless feed footer: spinner + “scroll to load N more” + “you have reached the end”. */
+.endless-more {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.55rem;
+  min-height: 2.6rem;
   margin: 0.8rem 0 0;
+  padding: 0.55rem 0.75rem;
+  border-top: 1px dashed color-mix(in srgb, var(--line) 75%, transparent);
+  color: var(--muted, #667085);
+  font-size: 0.86rem;
   text-align: center;
 }
-.members-infinite-sentinel {
-  height: 1px;
+.endless-more-text { line-height: 1.35; }
+.endless-spinner {
+  display: none;
+  width: 1rem;
+  height: 1rem;
+  flex: 0 0 auto;
+  border-radius: 50%;
+  border: 2px solid color-mix(in srgb, var(--brand-primary) 22%, transparent);
+  border-top-color: var(--brand-primary);
+  animation: endless-spin 0.8s linear infinite;
 }
-.members-infinite-status {
-  margin: 0.8rem 0 0;
-  text-align: center;
+.endless-more.is-loading .endless-spinner { display: inline-block; }
+.endless-more.is-loading .endless-more-text {
+  color: var(--brand-primary-deep);
+  font-weight: 600;
+}
+.endless-more.is-done .endless-more-text { color: var(--ok); font-weight: 600; }
+.endless-more.is-done .endless-more-text::before { content: '✓ '; }
+.endless-more.is-error .endless-more-text { color: #9a1c12; font-weight: 600; }
+@keyframes endless-spin {
+  to { transform: rotate(360deg); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .endless-spinner { animation-duration: 2.4s; }
 }
 .member-scheda-facts {
   display: grid;

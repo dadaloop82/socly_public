@@ -4718,23 +4718,50 @@ function initMembersList() {
   collectDialog?.querySelector('[data-member-collect-cancel]')?.addEventListener('click', () => collectDialog.close());
 
   // Members feed: five rows are already rendered; scroll near the end to append the next
-  // page. The classic pager stays in the HTML as a no-JS fallback and is hidden by CSS.
+  // page. The footer shows a spinner while loading, how many members are still to come and
+  // when the list is finished; the classic pager stays as a no-JS fallback (hidden by CSS).
   const infiniteSentinel = root.querySelector('[data-members-infinite-sentinel]');
   const infiniteStatus = root.querySelector('[data-members-infinite-status]');
   const membersTableBody = root.querySelector('.members-table tbody');
   const membersPager = root.querySelector('.list-pager');
+  const infiniteTotal = Math.max(0, Number(root.getAttribute('data-members-total') || '0'));
+  const infiniteMoreTemplate = root.getAttribute('data-msg-infinite-more') || '';
+  const infiniteDoneTemplate = root.getAttribute('data-msg-infinite-done') || '';
   let nextPage = Math.max(1, Number(root.getAttribute('data-members-page') || '1')) + 1;
-  let totalPages = Math.max(1, Number(root.getAttribute('data-members-pages') || '1'));
+  const totalPages = Math.max(1, Number(root.getAttribute('data-members-pages') || '1'));
   let infiniteLoading = false;
   let infiniteDone = nextPage > totalPages;
+  const loadedRows = () => (membersTableBody ? membersTableBody.querySelectorAll('tr').length : 0);
+  const remainingRows = () => Math.max(0, infiniteTotal - loadedRows());
   const setInfiniteStatus = (text) => {
-    if (!infiniteStatus) return;
+    if (!(infiniteStatus instanceof HTMLElement)) return;
     infiniteStatus.textContent = text || '';
     infiniteStatus.hidden = !text;
+  };
+  const setInfiniteState = (state) => {
+    if (!(infiniteSentinel instanceof HTMLElement)) return;
+    infiniteSentinel.classList.toggle('is-loading', state === 'loading');
+    infiniteSentinel.classList.toggle('is-done', state === 'done');
+    infiniteSentinel.classList.toggle('is-error', state === 'error');
+  };
+  const showRemainingMembers = () => {
+    const left = remainingRows();
+    if (left <= 0) {
+      setInfiniteStatus('');
+      return;
+    }
+    setInfiniteStatus(infiniteMoreTemplate.replace(':count', String(left)));
+  };
+  const showMembersDone = () => {
+    infiniteDone = true;
+    if (membersPager) membersPager.classList.add('is-hidden');
+    setInfiniteState('done');
+    setInfiniteStatus(infiniteDoneTemplate.replace(':total', String(infiniteTotal)));
   };
   const loadMoreMembers = async () => {
     if (infiniteLoading || infiniteDone || !membersTableBody || !infiniteSentinel) return;
     infiniteLoading = true;
+    setInfiniteState('loading');
     setInfiniteStatus(root.getAttribute('data-msg-infinite-loading') || '');
     try {
       const target = new URL(root.getAttribute('data-members-infinite-url') || window.location.pathname, window.location.origin);
@@ -4750,26 +4777,24 @@ function initMembersList() {
       if (!feedBody) throw new Error('feed');
       const rows = [...feedBody.querySelectorAll('tr')];
       if (rows.length === 0) {
-        infiniteDone = true;
+        showMembersDone();
       } else {
         rows.forEach((row) => membersTableBody.appendChild(document.importNode(row, true)));
         nextPage += 1;
-        if (nextPage > totalPages) infiniteDone = true;
         if (typeof initDocumentRowLinks === 'function') initDocumentRowLinks(membersTableBody);
         syncBulkBar();
-      }
-      if (infiniteDone) {
-        infiniteSentinel.hidden = true;
-        if (membersPager) membersPager.classList.add('is-hidden');
-        setInfiniteStatus(root.getAttribute('data-msg-infinite-done') || '');
-      } else {
-        setInfiniteStatus('');
+        if (nextPage > totalPages || remainingRows() <= 0) {
+          showMembersDone();
+        } else {
+          setInfiniteState('');
+          showRemainingMembers();
+        }
       }
     } catch (error) {
       infiniteDone = true;
-      infiniteSentinel.hidden = true;
       root.classList.remove('is-infinite');
       if (membersPager) membersPager.classList.remove('is-hidden');
+      setInfiniteState('error');
       setInfiniteStatus(root.getAttribute('data-msg-infinite-error') || '');
     } finally {
       infiniteLoading = false;
@@ -4778,15 +4803,21 @@ function initMembersList() {
 
   if (infiniteSentinel && membersTableBody && membersPager) {
     root.classList.add('is-infinite');
-    if ('IntersectionObserver' in window && !infiniteDone) {
-      const observer = new IntersectionObserver((entries) => {
-        if (entries.some((entry) => entry.isIntersecting)) loadMoreMembers();
-      }, { rootMargin: '600px 0px' });
-      observer.observe(infiniteSentinel);
-    } else if (!infiniteDone) {
-      infiniteSentinel.addEventListener('click', loadMoreMembers);
-      infiniteSentinel.setAttribute('role', 'button');
-      infiniteSentinel.tabIndex = 0;
+    if (infiniteDone) {
+      showMembersDone();
+    } else {
+      setInfiniteState('');
+      showRemainingMembers();
+      if ('IntersectionObserver' in window) {
+        const observer = new IntersectionObserver((entries) => {
+          if (entries.some((entry) => entry.isIntersecting)) loadMoreMembers();
+        }, { rootMargin: '600px 0px' });
+        observer.observe(infiniteSentinel);
+      } else {
+        infiniteSentinel.addEventListener('click', loadMoreMembers);
+        infiniteSentinel.setAttribute('role', 'button');
+        infiniteSentinel.tabIndex = 0;
+      }
     }
   }
 
@@ -4865,21 +4896,40 @@ function initEndlessLists() {
     const totalPages = Math.max(1, Number(root.getAttribute('data-endless-pages') || '1'));
     let done = nextPage > totalPages;
     let loading = false;
+    const total = Math.max(0, Number(root.getAttribute('data-endless-total') || '0'));
+    const moreTemplate = root.getAttribute('data-msg-endless-more') || '';
+    const doneTemplate = root.getAttribute('data-msg-endless-done') || '';
+    const countRows = () => [...root.querySelectorAll(targetSelector)]
+      .reduce((sum, el) => sum + el.querySelectorAll('tr').length, 0);
+    const remainingRows = () => Math.max(0, total - countRows());
 
     const setStatus = (text) => {
       if (!(status instanceof HTMLElement)) return;
       status.textContent = text || '';
       status.hidden = !text;
     };
-    const finish = (message) => {
+    const setState = (state) => {
+      if (!(sentinel instanceof HTMLElement)) return;
+      sentinel.classList.toggle('is-loading', state === 'loading');
+      sentinel.classList.toggle('is-done', state === 'done');
+      sentinel.classList.toggle('is-error', state === 'error');
+    };
+    const showRemaining = () => {
+      const left = remainingRows();
+      if (left <= 0) {
+        setStatus('');
+        return;
+      }
+      setStatus(moreTemplate.replace(':count', String(left)));
+    };
+    const showDone = () => {
       done = true;
-      sentinel.hidden = true;
       if (pager) pager.classList.add('is-hidden');
-      setStatus(message || root.getAttribute('data-msg-endless-done') || '');
+      setState('done');
+      setStatus(doneTemplate.replace(':total', String(total)));
     };
     if (done) {
-      sentinel.hidden = true;
-      if (pager) pager.classList.add('is-hidden');
+      showDone();
       return;
     }
 
@@ -4892,6 +4942,7 @@ function initEndlessLists() {
     const loadMore = async () => {
       if (loading || done) return;
       loading = true;
+      setState('loading');
       setStatus(root.getAttribute('data-msg-endless-loading') || '');
       try {
         const url = new URL(root.getAttribute('data-endless-url') || window.location.pathname, window.location.origin);
@@ -4936,22 +4987,23 @@ function initEndlessLists() {
         }
 
         if (!appended) {
-          finish();
+          showDone();
         } else {
           nextPage += 1;
-          if (nextPage > totalPages) {
-            finish();
+          if (nextPage > totalPages || remainingRows() <= 0) {
+            showDone();
           } else {
-            setStatus('');
+            setState('');
+            showRemaining();
           }
           if (typeof initDocumentRowLinks === 'function') initDocumentRowLinks(root);
           root.dispatchEvent(new CustomEvent('socly:rows-appended', { bubbles: true }));
         }
       } catch (error) {
         done = true;
-        sentinel.hidden = true;
         root.classList.remove('is-infinite');
         if (pager) pager.classList.remove('is-hidden');
+        setState('error');
         setStatus(root.getAttribute('data-msg-endless-error') || '');
       } finally {
         loading = false;
@@ -4959,6 +5011,12 @@ function initEndlessLists() {
     };
 
     root.classList.add('is-infinite');
+    if (done) {
+      showDone();
+      return;
+    }
+    setState('');
+    showRemaining();
     if ('IntersectionObserver' in window) {
       const observer = new IntersectionObserver((entries) => {
         if (entries.some((entry) => entry.isIntersecting)) loadMore();

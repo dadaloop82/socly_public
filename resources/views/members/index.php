@@ -170,7 +170,9 @@ $totalPages = max(1, (int) ceil(((int) $result['total']) / max(1, $perPage)));
      data-members-infinite-url="<?= e(url('/members')) ?>"
      data-msg-infinite-loading="<?= e(__('members.infinite_loading')) ?>"
      data-msg-infinite-done="<?= e(__('members.infinite_done')) ?>"
-     data-msg-infinite-error="<?= e(__('members.infinite_error')) ?>">
+     data-msg-infinite-more="<?= e(__('members.infinite_more')) ?>"
+     data-msg-infinite-error="<?= e(__('members.infinite_error')) ?>"
+     data-members-total="<?= (int) $result['total'] ?>">
     <div class="panel-header">
         <div>
             <h2 class="section-title"><?= e(__('members.results')) ?></h2>
@@ -502,8 +504,10 @@ $totalPages = max(1, (int) ceil(((int) $result['total']) / max(1, $perPage)));
             </table>
         </div>
         <?php if ($totalPages > 1): ?>
-            <div class="members-infinite-sentinel" data-members-infinite-sentinel aria-hidden="true"></div>
-            <p class="muted members-infinite-status" data-members-infinite-status aria-live="polite" hidden></p>
+            <div class="endless-more members-infinite-sentinel" data-members-infinite-sentinel>
+                <span class="endless-spinner" aria-hidden="true"></span>
+                <span class="endless-more-text" data-members-infinite-status aria-live="polite"></span>
+            </div>
             <?php
             // Pager retained as a no-JS/link fallback; the script hides it while infinite scroll runs.
             $pageWindow = [];
