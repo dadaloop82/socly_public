@@ -197,11 +197,29 @@ wizard (title/period, participants, topics, preview, share link), participants i
 name + last name + fiscal code, one ballot per person written inside a transaction, live results
 with charts, participation log, CSV export and a branded public page carrying the “part of the
 Socly package” line. Questions are numeric, single/multiple choice or predetermined text: voters
-can never type free text. Polls can be open or secret (aggregate only). Source:
+can never type free text. Polls can be open or secret (aggregate only). The “Argomenti” step also
+collects the reference material of the poll: PDF/JPG/PNG files uploaded to `storage/uploads` and
+external http(s) links; the public ballot page opens the documents inline (same-origin PDF iframe,
+image preview) or downloads them with the original name. Source:
 `addons-src/board_voting/` (private repo; `addons-src/` is not part of the public export).
 
 ```bash
-php tools/addons/addon-tool.php build addons-src/board_voting dist/board_voting-1.0.1.soclyaddon --incoming
+php tools/addons/addon-tool.php build addons-src/board_voting dist/board_voting-1.1.0.soclyaddon --incoming
+```
+
+## Internal forum add-on (`internal_forum`)
+
+Reserved discussion space for the people enabled by the association: forums with their own
+settings (posting allowed to everybody or moderators only, pre-moderation of new topics, author
+editing), participants enabled per forum exactly like the board polls (members from the archive or
+external people with first name, last name and fiscal code), moderators appointed per forum,
+topics and replies, search, pagination, pinning and locking. Public pages are token-based and
+identify participants by name + fiscal code; operators manage forums, participants and moderation
+from `/internal-forum` (permission `members.manage`, nested under “Soci”). Every write is audited
+(`internal_forum.*`). Source: `addons-src/internal_forum/`.
+
+```bash
+php tools/addons/addon-tool.php build addons-src/internal_forum dist/internal_forum-1.0.0.soclyaddon --incoming
 ```
 
 ## Instance workflow
