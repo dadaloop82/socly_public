@@ -57,6 +57,32 @@ final class AuditService
             'after_json' => $after === null ? null : json_encode($this->redact($after), JSON_UNESCAPED_UNICODE),
             'ip' => $ip,
         ]);
+        $this->forwardToWorkflow($action, $entityType, $entityId, $before, $after, $ip);
+    }
+
+    /**
+     * An audit row is also a domain event: Workflow can send an email for the actions listed in
+     * WorkflowService::auditEventMap() (core and enabled plugins). Never break the write.
+     */
+    private function forwardToWorkflow(
+        string $action,
+        string $entityType,
+        ?string $entityId,
+        mixed $before,
+        mixed $after,
+        ?string $ip
+    ): void {
+        if (str_starts_with($action, 'workflow.')) {
+            return;
+        }
+        try {
+            if (!function_exists('app') || !app()->isInstalled()) {
+                return;
+            }
+            app(WorkflowService::class)->dispatchAudit($action, $entityType, $entityId, $before, $after, $ip);
+        } catch (\Throwable) {
+            // A mail/workflow failure must never undo an audit entry (or the business write).
+        }
     }
 
     /**

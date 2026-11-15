@@ -27,6 +27,7 @@ namespace Socly\Core\Plugin;
 
 use Socly\Core\App;
 use Socly\Core\Addon\AddonManager;
+use Socly\Core\Database;
 use Socly\Core\Http\Router;
 
 final class HookBus
@@ -148,6 +149,38 @@ final class PluginManager
     public function find(string $id): ?PluginInterface
     {
         return $this->discover()[$id] ?? null;
+    }
+
+    /**
+     * Discovered plugins that are enabled in Settings → Plugins (core plugins and paid add-ons).
+     *
+     * @return array<string, PluginInterface>
+     */
+    public function enabled(): array
+    {
+        try {
+            if (!$this->app->isInstalled()) {
+                return [];
+            }
+            $rows = $this->app->get(Database::class)->fetchAll('SELECT id FROM plugins WHERE is_enabled = 1');
+            $ids = [];
+            foreach ($rows as $row) {
+                $ids[(string) ($row['id'] ?? '')] = true;
+            }
+            if ($ids === []) {
+                return [];
+            }
+            $out = [];
+            foreach ($this->discover() as $id => $plugin) {
+                if (isset($ids[$id])) {
+                    $out[$id] = $plugin;
+                }
+            }
+
+            return $out;
+        } catch (\Throwable) {
+            return [];
+        }
     }
 
     public function bootEnabled(): void

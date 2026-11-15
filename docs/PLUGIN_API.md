@@ -100,6 +100,44 @@ erroring (see the “Tablet” enrollment validation in `EnrollmentService::meth
 | `payment.recorded` | payment row |
 | `settings.saved` | keys changed |
 
+## Workflow events (optional)
+
+Settings → Workflow sends an email when a domain event occurs. A plugin/add-on can publish its own
+events by implementing `Socly\Core\Plugin\WorkflowEventProviderInterface` **in addition to**
+`PluginInterface`:
+
+```php
+use Socly\Core\Plugin\WorkflowEventProviderInterface;
+
+final class MyPlugin implements PluginInterface, WorkflowEventProviderInterface
+{
+    /** Group label => [event key => final display label]. */
+    public function workflowEventGroups(): array
+    {
+        return [
+            'My plugin' => [
+                'my_plugin.request_created' => 'My plugin · new request',
+            ],
+        ];
+    }
+
+    /** Audit action => event key; AuditService forwards it automatically. */
+    public function workflowAuditMap(): array
+    {
+        return ['my_plugin.request.created' => 'my_plugin.request_created'];
+    }
+}
+```
+
+- The groups and events appear in the Workflow picker **only while the plugin is enabled**.
+- Labels must be final display strings (use the plugin's own `AddonText`); core labels are lang keys.
+- Event keys are stored in `workflow_rules.event_key` (max 80 chars, `[a-z0-9_.-]`).
+- The audit bridge is optional: the plugin can also emit explicitly:
+  `app(\Socly\Services\WorkflowService::class)->dispatch('my_plugin.request_created', ['email' => $to, ...])`.
+- A plugin event needs a recipient (`email` or `_to`) to send; otherwise `dispatch()` returns 0.
+- Core events are listed by `WorkflowService::coreEventGroups()` (users, members, enrollment, payments,
+  documents, deadlines, treasury, budgets, bodies/org roles).
+
 ## Settings
 
 Keys returned by `registerSettings()` appear under Configuration when the plugin is enabled. Encrypted flags use the same Encryptor as core settings.

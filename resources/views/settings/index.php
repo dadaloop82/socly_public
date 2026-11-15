@@ -950,6 +950,8 @@
     <div class="config-accordion-body">
         <?= view_partial('partials/workflow_panel', [
             'workflowRules' => $workflowRules ?? [],
+            'workflowEventGroups' => $workflowEventGroups ?? [],
+            'workflowEvents' => $workflowEvents ?? [],
             'emailTemplates' => $emailTemplates ?? [],
             'editingWorkflow' => $editingWorkflow ?? null,
         ]) ?>

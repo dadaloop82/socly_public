@@ -22,14 +22,22 @@
 
 /**
  * @var list<array<string,mixed>> $workflowRules
+ * @var array<string, array<string, string>> $workflowEventGroups
+ * @var array<string, string> $workflowEvents
  * @var list<array<string,mixed>> $emailTemplates
  * @var array<string,mixed>|null $editingWorkflow
  */
 $workflowRules = is_array($workflowRules ?? null) ? $workflowRules : [];
+$workflowEventGroups = is_array($workflowEventGroups ?? null) && $workflowEventGroups !== []
+    ? $workflowEventGroups
+    : \Socly\Services\WorkflowService::coreEventGroups();
+$workflowEvents = is_array($workflowEvents ?? null) && $workflowEvents !== []
+    ? $workflowEvents
+    : \Socly\Services\WorkflowService::coreEvents();
 $emailTemplates = is_array($emailTemplates ?? null) ? $emailTemplates : [];
 $editing = is_array($editingWorkflow ?? null) ? $editingWorkflow : null;
-$eventGroups = \Socly\Services\WorkflowService::eventGroups();
-$events = \Socly\Services\WorkflowService::events();
+$eventGroups = $workflowEventGroups;
+$events = $workflowEvents;
 ?>
 <p class="setup-hint muted"><?= e(__('workflow.intro')) ?></p>
 
@@ -66,6 +74,7 @@ $events = \Socly\Services\WorkflowService::events();
             'include_empty' => false,
             'groups' => $eventOptionGroups,
         ]) ?>
+        <p class="setup-hint muted"><?= e(__('workflow.plugin_hint')) ?></p>
         <div class="setup-equal-row">
             <?php
             $templateOptions = [];

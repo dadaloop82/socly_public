@@ -160,6 +160,8 @@ final class SettingsController extends BaseController
             'memberOptions' => $this->users->memberOptions(),
             'emailTemplates' => $this->emailTemplates->all(),
             'workflowRules' => $this->workflow->all(),
+            'workflowEventGroups' => $this->workflow->eventGroups(),
+            'workflowEvents' => $this->workflow->events(),
             'editingTemplate' => $this->resolveEditingTemplate($request),
             'editingWorkflow' => $this->resolveEditingWorkflow($request),
             'emailSampleJson' => json_encode($this->emailTemplates->sampleVarsByLang(), JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?: '{}',

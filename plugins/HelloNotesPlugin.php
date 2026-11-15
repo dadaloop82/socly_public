@@ -25,12 +25,15 @@ declare(strict_types=1);
 
 use Socly\Core\Plugin\PluginContext;
 use Socly\Core\Plugin\PluginInterface;
+use Socly\Core\Plugin\WorkflowEventProviderInterface;
+use Socly\Services\SettingsService;
+use Socly\Services\WorkflowService;
 
 /**
  * Example drop-in plugin. Enable it from Settings → Plugins.
- * Demonstrates hooks and encrypted settings. Safe to leave disabled.
+ * Demonstrates hooks, encrypted settings and Workflow events. Safe to leave disabled.
  */
-return new class implements PluginInterface {
+return new class implements PluginInterface, WorkflowEventProviderInterface {
     public function id(): string
     {
         return 'hello_notes';
@@ -43,21 +46,51 @@ return new class implements PluginInterface {
 
     public function version(): string
     {
-        return '1.0.0';
+        return '1.1.0';
     }
 
     public function description(): string
     {
-        return 'Example plugin that appends an audit-friendly note marker on member create.';
+        return 'Example plugin that appends an audit-friendly note marker on member create and exposes a Workflow event.';
     }
 
     public function boot(PluginContext $ctx): void
     {
         $ctx->hooks()->on('member.created', function (array $member) use ($ctx): void {
-            // Intentionally lightweight — real plugins add their own tables/UI.
-            $prefix = (string) $ctx->get(\Socly\Services\SettingsService::class)->get('hello_notes.prefix', '[plugin]');
-            unset($prefix, $member);
+            // Real plugins add their own tables/UI. The example also declares a Workflow event so
+            // Settings → Workflow lists it while the plugin is enabled.
+            $prefix = (string) $ctx->get(SettingsService::class)->get('hello_notes.prefix', '[plugin]');
+            $fields = is_array($member['fields'] ?? null) ? $member['fields'] : [];
+            $email = strtolower(trim((string) ($fields['email'] ?? $member['email'] ?? '')));
+            if ($email === '' || !filter_var($email, FILTER_VALIDATE_EMAIL)) {
+                return;
+            }
+            $name = trim((string) ($fields['first_name'] ?? '') . ' ' . (string) ($fields['last_name'] ?? ''));
+            if ($name === '') {
+                $name = trim((string) ($member['member_number'] ?? ''));
+            }
+            $ctx->get(WorkflowService::class)->dispatch('hello_notes.member_note', [
+                'email' => $email,
+                'member_email' => $email,
+                'member_name' => $name,
+                'note_prefix' => $prefix,
+                'association_name' => (string) $ctx->get(SettingsService::class)->get('association.name', ''),
+            ], null, null);
         });
+    }
+
+    public function workflowEventGroups(): array
+    {
+        return [
+            'Hello Notes' => [
+                'hello_notes.member_note' => 'Hello Notes · member note',
+            ],
+        ];
+    }
+
+    public function workflowAuditMap(): array
+    {
+        return [];
     }
 
     public function registerRoutes(): array
