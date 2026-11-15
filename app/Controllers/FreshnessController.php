@@ -48,10 +48,10 @@ final class FreshnessController extends BaseController
         $version = $this->versions->current($entity, $id);
         $editor = $version === null ? ['name' => '', 'at' => ''] : $this->versions->lastEditor($entity, $id);
         $changed = $version !== null && $expected > 0 && (int) $version !== $expected;
-        // “Just created/modified by …”: the form shows it as a box and the client keeps it
-        // up to date on every poll (it disappears once the 15 minutes have passed).
+        // “Just created/modified by …”: only treasury movements show this box, because the copy is
+        // movement-specific. The client keeps it up to date on every poll until 15 minutes pass.
         $activity = null;
-        if ($entity !== '' && $id > 0) {
+        if ($entity === 'treasury' && $id > 0) {
             try {
                 $activity = $this->versions->recentActivity($entity, $id, 15);
             } catch (\Throwable) {

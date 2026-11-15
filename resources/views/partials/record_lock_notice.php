@@ -69,8 +69,10 @@ if ($reloadUrl === '') {
     </div>
 <?php endif; ?>
 <div class="alert alert-warn record-stale" role="alert" hidden data-freshness-banner></div>
-<div class="alert alert-info record-activity" role="status" data-recent-activity data-activity-kind="<?= e((string) ($activity['kind'] ?? '')) ?>"<?= $activity === null ? ' hidden' : '' ?>>
-    <strong><?= e(__('concurrency.activity_title')) ?></strong>
-    <p data-recent-activity-text><?= e($activityText) ?></p>
-</div>
+<?php if ($entity === 'treasury'): ?>
+    <div class="alert alert-info record-activity" role="status" data-recent-activity data-activity-kind="<?= e((string) ($activity['kind'] ?? '')) ?>"<?= $activity === null ? ' hidden' : '' ?>>
+        <strong><?= e(__('concurrency.activity_title')) ?></strong>
+        <p data-recent-activity-text><?= e($activityText) ?></p>
+    </div>
+<?php endif; ?>
 <div class="record-editing" role="status" hidden data-editing-notice></div>
