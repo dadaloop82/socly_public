@@ -171,7 +171,16 @@ foreach (($options['entities'] ?? []) as $entityType) {
     </div>
 </form>
 
-<div class="panel audit-panel">
+<?php $auditEndless = $pages > 1; ?>
+<div class="panel audit-panel"<?php if ($auditEndless): ?>
+     data-endless-list
+     data-endless-url="<?= e(url('/audit')) ?>"
+     data-endless-page="<?= (int) $page ?>"
+     data-endless-pages="<?= (int) $pages ?>"
+     data-endless-target="[data-audit-rows]"
+     data-msg-endless-loading="<?= e(__('common.endless_loading')) ?>"
+     data-msg-endless-done="<?= e(__('common.endless_done')) ?>"
+     data-msg-endless-error="<?= e(__('common.endless_error')) ?>"<?php endif; ?>>
     <div class="panel-header">
         <div>
             <h2 class="section-title"><?= e(__('audit.results')) ?></h2>
@@ -196,7 +205,7 @@ foreach (($options['entities'] ?? []) as $entityType) {
                     <th><?= e(__('audit.col_details')) ?></th>
                 </tr>
                 </thead>
-                <tbody>
+                <tbody data-audit-rows>
                 <?php foreach ($rows as $row): ?>
                     <?php
                     $rowId = (int) ($row['id'] ?? 0);
@@ -262,6 +271,8 @@ foreach (($options['entities'] ?? []) as $entityType) {
         </div>
     <?php endif; ?>
     <?php if ($pages > 1): ?>
+        <div class="endless-sentinel" data-endless-sentinel aria-hidden="true"></div>
+        <p class="muted endless-status" data-endless-status aria-live="polite" hidden></p>
         <?php
         // Pager: window of pages around the current one + first/last (same pattern as the lists).
         $pageWindow = [1];

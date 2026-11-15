@@ -3748,8 +3748,16 @@ tr.clickable-row:focus-visible {
   white-space: normal;
   overflow-wrap: anywhere;
 }
-.panel.is-infinite .list-pager {
+.panel.is-infinite .list-pager,
+[data-endless-list].is-infinite .list-pager {
   display: none;
+}
+.endless-sentinel {
+  height: 1px;
+}
+.endless-status {
+  margin: 0.8rem 0 0;
+  text-align: center;
 }
 .members-infinite-sentinel {
   height: 1px;

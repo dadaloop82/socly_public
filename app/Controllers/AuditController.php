@@ -48,7 +48,8 @@ final class AuditController extends BaseController
             'date_from' => (string) $request->input('date_from', ''),
             'date_to' => (string) $request->input('date_to', ''),
         ];
-        $result = $this->audit->search($filters, (int) $request->input('page', 1));
+        // Endless audit feed: five entries per batch, appended while scrolling.
+        $result = $this->audit->search($filters, (int) $request->input('page', 1), 5);
 
         $this->render('audit/index', [
             'title' => __('audit.title'),

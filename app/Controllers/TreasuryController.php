@@ -65,8 +65,9 @@ final class TreasuryController extends BaseController
             $sort = 'date_desc';
         }
         $filters = $this->ledgerFilters($request);
-        // Paged ledger: 50 rows per page keeps the first note fast on large registers.
-        $perPage = 50;
+        // Endless ledger: five rows per batch, appended while scrolling (the pager stays as a
+        // no-JS fallback and is hidden by the feed).
+        $perPage = 5;
         $totalRows = $this->treasury->ledgerTotal($query, $filters);
         $pages = max(1, (int) ceil($totalRows / $perPage));
         $page = min($pages, max(1, (int) $request->input('page', 1)));

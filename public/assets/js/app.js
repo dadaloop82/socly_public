@@ -234,6 +234,7 @@ document.addEventListener('DOMContentLoaded', () => {
   initStandaloneEnrollmentPads();
   initMemberWizard();
   initMembersList();
+  initEndlessLists();
   initTreasuryBulk();
   initLegalDocs();
   initSetupSmtp(document);
@@ -4064,9 +4065,9 @@ function initTreasuryBulk() {
   const form = document.querySelector('[data-treasury-bulk-form]');
   const actionInput = form?.querySelector('[data-treasury-bulk-action-input]');
   const idHost = form?.querySelector('[data-treasury-bulk-id-host]');
-  const checkboxes = [...root.querySelectorAll('[data-treasury-select]')];
+  const checkboxes = () => [...root.querySelectorAll('[data-treasury-select]')];
 
-  const selectedIds = () => checkboxes.filter((cb) => cb.checked).map((cb) => cb.value);
+  const selectedIds = () => checkboxes().filter((cb) => cb.checked).map((cb) => cb.value);
 
   // Totals of the selected movements: incomes and expenses are summed separately, the balance is
   // their difference; internal transfers move liquidity and are shown on their own.
@@ -4144,23 +4145,46 @@ function initTreasuryBulk() {
     renderTotals(ids);
   };
 
-  checkboxes.forEach((cb) => cb.addEventListener('change', sync));
-
-  // “Select all” per ledger table (the first note can show several category groups).
-  root.querySelectorAll('[data-treasury-select-all]').forEach((master) => {
-    const table = master.closest('table');
-    const boxes = table ? [...table.querySelectorAll('[data-treasury-select]')] : [];
-    master.addEventListener('change', () => {
-      boxes.forEach((cb) => {
-        cb.checked = master.checked;
-      });
-      sync();
+  // Endless ledger: rows appended while scrolling must join the bulk selection too, so the
+  // checkbox/“select all” bindings are idempotent and re-run after every batch.
+  const bindCheckboxes = () => {
+    checkboxes().forEach((cb) => {
+      if (cb.dataset.bulkBound === '1') return;
+      cb.dataset.bulkBound = '1';
+      cb.addEventListener('change', sync);
     });
-    boxes.forEach((cb) => cb.addEventListener('change', () => {
-      const checked = boxes.filter((box) => box.checked).length;
-      master.indeterminate = checked > 0 && checked < boxes.length;
-      master.checked = boxes.length > 0 && checked === boxes.length;
-    }));
+  };
+
+  // “Select all” per ledger table (the first note can show several category groups). The checkbox
+  // list is read at click time, so rows appended by the endless feed are included.
+  const bindSelectAll = () => {
+    root.querySelectorAll('[data-treasury-select-all]').forEach((master) => {
+      if (master.dataset.bulkBound === '1') return;
+      master.dataset.bulkBound = '1';
+      master.addEventListener('change', () => {
+        const table = master.closest('table');
+        (table ? [...table.querySelectorAll('[data-treasury-select]')] : []).forEach((cb) => {
+          cb.checked = master.checked;
+        });
+        sync();
+      });
+      const table = master.closest('table');
+      table?.addEventListener('change', (event) => {
+        const target = event.target;
+        if (!(target instanceof HTMLInputElement) || !target.matches('[data-treasury-select]')) return;
+        const boxes = [...table.querySelectorAll('[data-treasury-select]')];
+        const checked = boxes.filter((box) => box.checked).length;
+        master.indeterminate = checked > 0 && checked < boxes.length;
+        master.checked = boxes.length > 0 && checked === boxes.length;
+      });
+    });
+  };
+
+  bindCheckboxes();
+  bindSelectAll();
+  root.addEventListener('socly:rows-appended', () => {
+    bindCheckboxes();
+    bindSelectAll();
   });
 
   const pendingBanner = root.querySelector('[data-treasury-pending-banner]');
@@ -4811,6 +4835,141 @@ function initMembersList() {
   });
 
   syncBulkBar();
+}
+
+/**
+ * Endless lists: append the next batch while scrolling, like a social feed.
+ * A container opts in with `data-endless-list` + `data-endless-url|page|pages|target`;
+ * grouped lists (the treasury ledger) also pass `data-endless-groups` and
+ * `data-endless-groups-container`, so a new page can add rows to an existing group or
+ * introduce a new one. The classic pager stays in the HTML as a no-JS fallback and is
+ * hidden by CSS while the feed is active.
+ */
+function initEndlessLists() {
+  document.querySelectorAll('[data-endless-list]').forEach((root) => {
+    if (root.dataset.endlessBound === '1') return;
+    root.dataset.endlessBound = '1';
+
+    const sentinel = root.querySelector('[data-endless-sentinel]');
+    const status = root.querySelector('[data-endless-status]');
+    const pager = root.querySelector('.list-pager');
+    if (!sentinel) return;
+
+    const targetSelector = root.getAttribute('data-endless-target') || 'tbody';
+    const groupSelector = root.getAttribute('data-endless-groups') || '';
+    const groupsContainerSelector = root.getAttribute('data-endless-groups-container') || '';
+    const groupsContainer = groupsContainerSelector !== ''
+      ? root.querySelector(groupsContainerSelector)
+      : (groupSelector !== '' ? (root.querySelector(groupSelector)?.parentElement || null) : null);
+    let nextPage = Math.max(1, Number(root.getAttribute('data-endless-page') || '1')) + 1;
+    const totalPages = Math.max(1, Number(root.getAttribute('data-endless-pages') || '1'));
+    let done = nextPage > totalPages;
+    let loading = false;
+
+    const setStatus = (text) => {
+      if (!(status instanceof HTMLElement)) return;
+      status.textContent = text || '';
+      status.hidden = !text;
+    };
+    const finish = (message) => {
+      done = true;
+      sentinel.hidden = true;
+      if (pager) pager.classList.add('is-hidden');
+      setStatus(message || root.getAttribute('data-msg-endless-done') || '');
+    };
+    if (done) {
+      sentinel.hidden = true;
+      if (pager) pager.classList.add('is-hidden');
+      return;
+    }
+
+    const appendRows = (from, to) => {
+      [...from.querySelectorAll('tr')].forEach((row) => {
+        to.appendChild(document.importNode(row, true));
+      });
+    };
+
+    const loadMore = async () => {
+      if (loading || done) return;
+      loading = true;
+      setStatus(root.getAttribute('data-msg-endless-loading') || '');
+      try {
+        const url = new URL(root.getAttribute('data-endless-url') || window.location.pathname, window.location.origin);
+        url.search = new URLSearchParams(window.location.search).toString();
+        url.searchParams.set('page', String(nextPage));
+        const response = await fetch(url.toString(), {
+          headers: { 'X-Requested-With': 'XMLHttpRequest', 'Accept': 'text/html' },
+          credentials: 'same-origin'
+        });
+        if (!response.ok) throw new Error('endless');
+        const doc = new DOMParser().parseFromString(await response.text(), 'text/html');
+        let appended = false;
+
+        if (groupSelector !== '') {
+          const fetchedGroups = [...doc.querySelectorAll(groupSelector)];
+          if (fetchedGroups.length > 0 && groupsContainer) {
+            fetchedGroups.forEach((group) => {
+              const key = group.getAttribute('data-endless-group') || '';
+              const current = [...root.querySelectorAll(groupSelector)]
+                .find((el) => (el.getAttribute('data-endless-group') || '') === key);
+              if (current) {
+                const currentBody = current.querySelector(targetSelector);
+                const nextBody = group.querySelector(targetSelector);
+                if (currentBody && nextBody && nextBody.querySelectorAll('tr').length > 0) {
+                  appendRows(nextBody, currentBody);
+                  appended = true;
+                }
+              } else {
+                // A category seen for the first time on this page: add its whole group.
+                groupsContainer.appendChild(document.importNode(group, true));
+                appended = true;
+              }
+            });
+          }
+        } else {
+          const currentTarget = root.querySelector(targetSelector);
+          const nextTarget = doc.querySelector(targetSelector);
+          if (currentTarget && nextTarget && nextTarget.querySelectorAll('tr').length > 0) {
+            appendRows(nextTarget, currentTarget);
+            appended = true;
+          }
+        }
+
+        if (!appended) {
+          finish();
+        } else {
+          nextPage += 1;
+          if (nextPage > totalPages) {
+            finish();
+          } else {
+            setStatus('');
+          }
+          if (typeof initDocumentRowLinks === 'function') initDocumentRowLinks(root);
+          root.dispatchEvent(new CustomEvent('socly:rows-appended', { bubbles: true }));
+        }
+      } catch (error) {
+        done = true;
+        sentinel.hidden = true;
+        root.classList.remove('is-infinite');
+        if (pager) pager.classList.remove('is-hidden');
+        setStatus(root.getAttribute('data-msg-endless-error') || '');
+      } finally {
+        loading = false;
+      }
+    };
+
+    root.classList.add('is-infinite');
+    if ('IntersectionObserver' in window) {
+      const observer = new IntersectionObserver((entries) => {
+        if (entries.some((entry) => entry.isIntersecting)) loadMore();
+      }, { rootMargin: '600px 0px' });
+      observer.observe(sentinel);
+    } else {
+      sentinel.addEventListener('click', loadMore);
+      sentinel.setAttribute('role', 'button');
+      sentinel.tabIndex = 0;
+    }
+  });
 }
 
 function personNameCase(raw) {

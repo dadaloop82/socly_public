@@ -479,7 +479,18 @@ if ($filterYear !== '' && !isset($yearFilterOptions[$filterYear])) {
     'dismiss_url' => url($listPath),
 ]) ?>
 
-<div class="panel" data-treasury-list>
+<?php $ledgerEndless = $totalPages > 1; ?>
+<div class="panel" data-treasury-list<?php if ($ledgerEndless): ?>
+     data-endless-list
+     data-endless-url="<?= e(url('/treasury')) ?>"
+     data-endless-page="<?= (int) $currentPage ?>"
+     data-endless-pages="<?= (int) $totalPages ?>"
+     data-endless-target="[data-treasury-rows]"
+     data-endless-groups="[data-endless-group]"
+     data-endless-groups-container="[data-endless-groups-container]"
+     data-msg-endless-loading="<?= e(__('common.endless_loading')) ?>"
+     data-msg-endless-done="<?= e(__('common.endless_done')) ?>"
+     data-msg-endless-error="<?= e(__('common.endless_error')) ?>"<?php endif; ?>>
     <div class="panel-header">
         <div>
             <h2 class="section-title"><?= e(__('treasury.ledger')) ?></h2>
@@ -818,9 +829,9 @@ if ($filterYear !== '' && !isset($yearFilterOptions[$filterYear])) {
             <?php endif; ?>
         </div>
     <?php else: ?>
-        <div class="doc-archive">
+        <div class="doc-archive" data-endless-groups-container>
             <?php foreach ($movement_groups as $group): ?>
-                <section class="doc-archive-group">
+                <section class="doc-archive-group" data-endless-group="<?= e((string) $group['key']) ?>">
                     <header class="doc-archive-group-head">
                         <h3 class="doc-archive-group-title"><?= e((string) $group['label']) ?></h3>
                     </header>
@@ -846,7 +857,7 @@ if ($filterYear !== '' && !isset($yearFilterOptions[$filterYear])) {
                                 <th><?= e(__('treasury.actions')) ?></th>
                             </tr>
                             </thead>
-                            <tbody>
+                            <tbody data-treasury-rows>
                             <?php foreach ($group['items'] as $row): ?>
                                 <?php
                                 $isIncome = ($row['direction'] ?? '') === 'income';
@@ -1023,6 +1034,8 @@ if ($filterYear !== '' && !isset($yearFilterOptions[$filterYear])) {
         </div>
     <?php endif; ?>
     <?php if ($totalPages > 1): ?>
+        <div class="endless-sentinel" data-endless-sentinel aria-hidden="true"></div>
+        <p class="muted endless-status" data-endless-status aria-live="polite" hidden></p>
         <nav class="list-pager" aria-label="<?= e(__('common.pager_aria')) ?>">
             <?php if ($currentPage > 1): ?>
                 <a class="list-pager-step" href="<?= e($pageUrl($currentPage - 1)) ?>" rel="prev">← <?= e(__('common.pager_prev')) ?></a>
