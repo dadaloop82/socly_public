@@ -51,7 +51,7 @@
     </div>
     <?php if ($plugin['is_enabled'] && $plugin['settings']): ?>
         <h3 class="section-title"><?= e(__('plugins.settings')) ?></h3>
-        <form method="post" action="<?= e(url('/plugins/'.$plugin['id'].'/settings')) ?>">
+        <form method="post" action="<?= e(url('/plugins/'.$plugin['id'].'/settings')) ?>" data-leave-guard>
             <?= csrf_field() ?>
             <?php foreach ($plugin['settings'] as $key => $def): ?>
                 <?php if (!empty($def['encrypted'])): ?>

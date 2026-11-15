@@ -463,7 +463,7 @@ $votingMembersCount = (int) ($votingMembersCount ?? 0);
         <?php if ($canEdit): ?>
             <div class="org-spine" aria-hidden="true"></div>
             <div class="org-tier org-tier--add-organ">
-                <form class="org-add-organ-form org-add-organ-footer" method="post" action="<?= e(url('/org/organs')) ?>">
+                <form class="org-add-organ-form org-add-organ-footer" method="post" action="<?= e(url('/org/organs')) ?>" data-leave-guard>
                     <?= csrf_field() ?>
                     <?= field('text', [
                         'name' => 'label',

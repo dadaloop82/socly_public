@@ -5460,14 +5460,23 @@ function initMemberLeaveGuard(form) {
     dirty = false;
   });
 
+  // Browser back / tab close / reload: the native prompt protects the same state.
+  window.addEventListener('beforeunload', (event) => {
+    if (allowLeave || !dirty) return;
+    event.preventDefault();
+    event.returnValue = '';
+  });
+
   const askLeave = async (href) => {
     pendingHref = href || '';
     if (dialog && typeof dialog.showModal === 'function') {
       dialog.showModal();
       return;
     }
+    const shared = document.querySelector('[data-leave-dialog]');
     const text = dialog?.querySelector('.member-leave-text')?.textContent?.trim()
-      || 'Stai per abbandonare l’inserimento. Sei sicuro?';
+      || shared?.getAttribute('data-msg-leave-text')
+      || '';
     if (await appConfirm(text)) {
       allowLeave = true;
       if (pendingHref) window.location.href = pendingHref;
@@ -5527,70 +5536,77 @@ function initMemberLeaveGuard(form) {
 }
 
 function initLeaveGuards(scope = document) {
+  // Shared server-rendered dialog (partials/leave_guard_dialog): the JS carries no UI strings.
+  const dialog = document.querySelector('[data-leave-dialog]');
+  const fallbackText = dialog?.getAttribute('data-msg-leave-text') || '';
+  const fallbackSave = dialog?.getAttribute('data-msg-leave-save') || '';
+  const fallbackStay = dialog?.getAttribute('data-msg-leave-stay') || '';
+
+  const openDialog = (guard, href) => {
+    guard.pendingHref = href || '';
+    if (!dialog || typeof dialog.showModal !== 'function') return false;
+    // Several guarded forms can live on one page (settings): never stack or re-open the dialog.
+    if (dialog.open) return true;
+    dialog.__leaveGuard = guard;
+    dialog.showModal();
+    return true;
+  };
+
+  if (dialog && dialog.dataset.leaveBound !== '1') {
+    dialog.dataset.leaveBound = '1';
+    dialog.querySelector('[data-leave-save]')?.addEventListener('click', () => {
+      const guard = dialog.__leaveGuard;
+      dialog.__leaveGuard = null;
+      guard?.submitAndLeave();
+    });
+    dialog.querySelector('[data-leave-discard]')?.addEventListener('click', () => {
+      const guard = dialog.__leaveGuard;
+      dialog.__leaveGuard = null;
+      if (!guard) return;
+      dialog.close();
+      guard.allowLeaveTo(guard.pendingHref);
+    });
+    dialog.querySelector('[data-leave-stay]')?.addEventListener('click', () => {
+      dialog.__leaveGuard = null;
+      dialog.close();
+    });
+    dialog.addEventListener('cancel', (event) => {
+      event.preventDefault();
+      dialog.__leaveGuard = null;
+      dialog.close();
+    });
+  }
+
   scope.querySelectorAll('form[data-leave-guard]').forEach((form) => {
     if (form.dataset.leaveGuardBound === '1' || form.hasAttribute('data-member-leave-guard') || form.hasAttribute('data-settings-autosave')) return;
     form.dataset.leaveGuardBound = '1';
 
-    let dirty = false;
-    let ready = false;
-    let allowLeave = false;
-    let pendingHref = '';
-    window.setTimeout(() => { ready = true; }, 400);
+    const state = {
+      dirty: false,
+      ready: false,
+      allowLeave: false,
+      pendingHref: '',
+      submitAndLeave: () => {},
+      allowLeaveTo: (href) => {
+        state.allowLeave = true;
+        state.dirty = false;
+        if (href) window.location.href = href;
+      },
+    };
+    window.setTimeout(() => { state.ready = true; }, 400);
     const markDirty = () => {
-      if (ready) dirty = true;
+      if (state.ready) state.dirty = true;
     };
     form.addEventListener('input', markDirty, true);
     form.addEventListener('change', markDirty, true);
-    const isDirty = () => dirty;
+    const isDirty = () => state.dirty;
 
-    const labels = {
-      it: {
-        title: 'Modifiche non salvate',
-        text: 'Vuoi salvare le modifiche prima di uscire?',
-        save: 'Salva',
-        discard: 'Esci senza salvare',
-        stay: 'Resta',
-      },
-      de: {
-        title: 'Nicht gespeicherte Änderungen',
-        text: 'Möchten Sie die Änderungen vor dem Verlassen speichern?',
-        save: 'Speichern',
-        discard: 'Ohne Speichern verlassen',
-        stay: 'Bleiben',
-      },
-      en: {
-        title: 'Unsaved changes',
-        text: 'Would you like to save your changes before leaving?',
-        save: 'Save',
-        discard: 'Leave without saving',
-        stay: 'Stay',
-      },
-    };
-    const lang = (document.documentElement.lang || 'it').slice(0, 2);
-    const copy = labels[lang] || labels.it;
-    const dialog = document.createElement('dialog');
-    dialog.className = 'member-leave-dialog';
-    dialog.innerHTML = `
-      <div class="member-leave-shell">
-        <h3 class="section-title">${copy.title}</h3>
-        <p class="member-leave-text">${copy.text}</p>
-        <div class="member-leave-actions">
-          <button type="button" class="btn btn-ghost" data-leave-stay>${copy.stay}</button>
-          <button type="button" class="btn btn-ghost" data-leave-discard>${copy.discard}</button>
-          <button type="button" class="btn" data-leave-save>${copy.save}</button>
-        </div>
-      </div>`;
-    document.body.appendChild(dialog);
-
-    const askLeave = async (href) => {
-      pendingHref = href;
-      if (typeof dialog.showModal === 'function') {
-        dialog.showModal();
-        return;
-      }
-      if (await appConfirm(copy.text)) {
-        submitAndLeave();
-      }
+    const askLeave = (href) => {
+      state.pendingHref = href || '';
+      if (openDialog(state, href)) return;
+      appConfirm(fallbackText, { confirmLabel: fallbackSave, cancelLabel: fallbackStay }).then((ok) => {
+        if (ok) state.submitAndLeave();
+      });
     };
 
     // "Salva" must behave like the form's own default submit: pick the first
@@ -5618,8 +5634,8 @@ function initLeaveGuards(scope = document) {
     // page handler cancelling it) would show no bubble and no focus — the
     // "Save" click would look like it does nothing.
     const submitAndLeave = () => {
-      allowLeave = true;
-      if (dialog.open) dialog.close();
+      state.allowLeave = true;
+      if (dialog?.open) dialog.close();
       const submitter = pickSubmitter();
       if (submitter) {
         // Faithful "press the form's own save button": it runs the button's
@@ -5635,16 +5651,20 @@ function initLeaveGuards(scope = document) {
       // cancelled it: surface the native messages and re-arm the guard.
       window.setTimeout(() => {
         if (!form.isConnected) return;
-        allowLeave = false;
+        state.allowLeave = false;
         if (typeof form.reportValidity === 'function' && !form.checkValidity()) {
           form.reportValidity();
         }
       }, 180);
     };
+    state.submitAndLeave = submitAndLeave;
 
-    form.addEventListener('submit', () => { allowLeave = true; });
+    form.addEventListener('submit', () => {
+      state.allowLeave = true;
+      state.dirty = false;
+    });
     document.addEventListener('click', (event) => {
-      if (allowLeave || !isDirty()) return;
+      if (state.allowLeave || !isDirty()) return;
       const link = event.target.closest?.('a[href]');
       if (!link || link.closest('dialog') || link.target === '_blank' || link.hasAttribute('download')) return;
       const href = link.getAttribute('href') || '';
@@ -5658,16 +5678,11 @@ function initLeaveGuards(scope = document) {
       event.preventDefault();
       askLeave(href);
     });
-    dialog.querySelector('[data-leave-save]')?.addEventListener('click', submitAndLeave);
-    dialog.querySelector('[data-leave-discard]')?.addEventListener('click', () => {
-      allowLeave = true;
-      dialog.close();
-      if (pendingHref) window.location.href = pendingHref;
-    });
-    dialog.querySelector('[data-leave-stay]')?.addEventListener('click', () => dialog.close());
-    dialog.addEventListener('cancel', (event) => {
+    // Browser back / tab close / reload: the native prompt protects the same state.
+    window.addEventListener('beforeunload', (event) => {
+      if (state.allowLeave || !isDirty()) return;
       event.preventDefault();
-      dialog.close();
+      event.returnValue = '';
     });
   });
 }

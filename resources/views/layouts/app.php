@@ -562,6 +562,7 @@ if ($user && app()->isInstalled() && !$temporaryInstance && can('addons.manage')
                 <div><?= credit_line() ?></div>
             </div>
         </footer>
+        <?= view_partial('partials/leave_guard_dialog') ?>
     </div>
 </div>
 <?php else: ?>

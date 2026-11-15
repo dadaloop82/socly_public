@@ -1252,7 +1252,7 @@
                                     </form>
                                     <?php if (!empty($plugin['is_enabled']) && !empty($plugin['settings'])): ?>
                                         <h4 class="setup-subhead"><?= e(__('plugins.settings')) ?></h4>
-                                        <form method="post" action="<?= e(url('/plugins/' . rawurlencode((string) ($plugin['id'] ?? '')) . '/settings')) ?>">
+                                        <form method="post" action="<?= e(url('/plugins/' . rawurlencode((string) ($plugin['id'] ?? '')) . '/settings')) ?>" data-leave-guard>
                                             <?= csrf_field() ?>
                                             <?php foreach ($plugin['settings'] as $key => $def): ?>
                                                 <?php
@@ -1289,7 +1289,7 @@
         <?php else: ?>
             <p class="muted"><?= e(__('settings.treasury_accounts_hint')) ?></p>
             <p class="muted"><?= e(__('settings.treasury_account_openings_hint')) ?></p>
-            <form method="post" action="<?= e(url('/settings/treasury-accounts')) ?>" class="accounts-admin">
+            <form method="post" action="<?= e(url('/settings/treasury-accounts')) ?>" class="accounts-admin" data-leave-guard>
                 <?= csrf_field() ?>
                 <?= field('hidden', ['name' => 'bulk', 'value' => '1']) ?>
                 <?php foreach (($treasuryAccounts ?? []) as $accountRow): ?>
@@ -1366,7 +1366,7 @@
                 </form>
             <?php endforeach; ?>
 
-            <form method="post" action="<?= e(url('/settings/treasury-accounts')) ?>" class="accounts-admin-add">
+            <form method="post" action="<?= e(url('/settings/treasury-accounts')) ?>" class="accounts-admin-add" data-leave-guard>
                 <?= csrf_field() ?>
                 <?= field('hidden', ['name' => 'id', 'value' => '0']) ?>
                 <div class="accounts-admin-add-label">

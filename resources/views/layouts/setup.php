@@ -128,6 +128,7 @@ $assetVer = (string) max(
             <span data-i18n-html="auth.footer_tagline"><?= credit_line() ?></span>
         </nav>
     </footer>
+    <?= view_partial('partials/leave_guard_dialog') ?>
 </div>
 <script src="<?= e(asset('js/app.js')) ?>?v=<?= e($assetVer) ?>"></script>
 </body>
