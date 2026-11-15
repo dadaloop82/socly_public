@@ -1,4 +1,25 @@
 <?php
+/*
+ * Socly Project Header
+ *
+ *   ███████╗ ██████╗  ██████╗ ██╗   ██╗
+ *   ██╔════╝██╔═══██╗██╔════╝ ██║   ██║
+ *   ███████╗██║   ██║██║      ██║   ██║
+ *   ╚════██║██║   ██║██║      ██║   ██║
+ *   ███████║╚██████╔╝╚██████╗ ╚██████╔╝
+ *   ╚══════╝ ╚═════╝  ╚═════╝  ╚═════╝
+ *
+ *   Socly — https://socly.it/
+ *   Open-source project for association management.
+ *   Independent project by Stimpfl Daniel. Free software.
+ *   Repository: https://github.com/dadaloop82/socly_public
+ *   License: Socly Source-Available License (Community / Base Edition)
+ *   Copyright (c) 2026 Socly. All rights reserved.
+ *
+ *   This header is part of the project identity. Keep it in derived files.
+ *
+ */
+
 /** @var array<string,mixed> $filters */
 /** @var int $page */
 /** @var array{active_count:int,balance_due_total:float,pending_count:int} $summary */
@@ -131,7 +152,13 @@ $totalPages = max(1, (int) ceil(((int) $result['total']) / max(1, $perPage)));
 </form>
 <?php endif; ?>
 
-<div class="panel" data-members-list data-members-base="<?= e(rtrim(url('/members'), '/')) ?>">
+<div class="panel" data-members-list data-members-base="<?= e(rtrim(url('/members'), '/')) ?>"
+     data-members-page="<?= (int) $page ?>"
+     data-members-pages="<?= (int) $totalPages ?>"
+     data-members-infinite-url="<?= e(url('/members')) ?>"
+     data-msg-infinite-loading="<?= e(__('members.infinite_loading')) ?>"
+     data-msg-infinite-done="<?= e(__('members.infinite_done')) ?>"
+     data-msg-infinite-error="<?= e(__('members.infinite_error')) ?>">
     <div class="panel-header">
         <div>
             <h2 class="section-title"><?= e(__('members.results')) ?></h2>
@@ -450,8 +477,10 @@ $totalPages = max(1, (int) ceil(((int) $result['total']) / max(1, $perPage)));
             </table>
         </div>
         <?php if ($totalPages > 1): ?>
+            <div class="members-infinite-sentinel" data-members-infinite-sentinel aria-hidden="true"></div>
+            <p class="muted members-infinite-status" data-members-infinite-status aria-live="polite" hidden></p>
             <?php
-            // Pager: window of pages around the current one + first/last.
+            // Pager retained as a no-JS/link fallback; the script hides it while infinite scroll runs.
             $pageWindow = [];
             $pageWindow[] = 1;
             for ($p = max(2, $page - 1); $p <= min($totalPages - 1, $page + 1); $p++) {

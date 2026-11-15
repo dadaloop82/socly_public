@@ -1,3 +1,24 @@
+/*
+ * Socly Project Header
+ *
+ *   ███████╗ ██████╗  ██████╗ ██╗   ██╗
+ *   ██╔════╝██╔═══██╗██╔════╝ ██║   ██║
+ *   ███████╗██║   ██║██║      ██║   ██║
+ *   ╚════██║██║   ██║██║      ██║   ██║
+ *   ███████║╚██████╔╝╚██████╗ ╚██████╔╝
+ *   ╚══════╝ ╚═════╝  ╚═════╝  ╚═════╝
+ *
+ *   Socly — https://socly.it/
+ *   Open-source project for association management.
+ *   Independent project by Stimpfl Daniel. Free software.
+ *   Repository: https://github.com/dadaloop82/socly_public
+ *   License: Socly Source-Available License (Community / Base Edition)
+ *   Copyright (c) 2026 Socly. All rights reserved.
+ *
+ *   This header is part of the project identity. Keep it in derived files.
+ *
+ */
+
 -- Cash book register: separate the "Financial account" (where the money is: cash register, bank, postal
 -- account...) from the "Payment method" (how it moved: bank transfer, POS...). `transfer_method` (arrival
 -- account, introduced in 026) becomes `transfer_account`.

@@ -1,4 +1,25 @@
 <?php
+/*
+ * Socly Project Header
+ *
+ *   ███████╗ ██████╗  ██████╗ ██╗   ██╗
+ *   ██╔════╝██╔═══██╗██╔════╝ ██║   ██║
+ *   ███████╗██║   ██║██║      ██║   ██║
+ *   ╚════██║██║   ██║██║      ██║   ██║
+ *   ███████║╚██████╔╝╚██████╗ ╚██████╔╝
+ *   ╚══════╝ ╚═════╝  ╚═════╝  ╚═════╝
+ *
+ *   Socly — https://socly.it/
+ *   Open-source project for association management.
+ *   Independent project by Stimpfl Daniel. Free software.
+ *   Repository: https://github.com/dadaloop82/socly_public
+ *   License: Socly Source-Available License (Community / Base Edition)
+ *   Copyright (c) 2026 Socly. All rights reserved.
+ *
+ *   This header is part of the project identity. Keep it in derived files.
+ *
+ */
+
 $isEdit = $member !== null;
 $fieldValues = $member['fields'] ?? [];
 $oldFields = $_SESSION['_old']['fields'] ?? [];
@@ -279,7 +300,7 @@ $buildProfileFieldsHtml = function (array $list, ?string $stepKey = null) use (
         $val = $fieldValue($field);
         $genderRaw = strtoupper(trim($valFor('gender')));
         $photoGender = $genderRaw === 'F' ? 'f' : 'm';
-        $hasExistingPhoto = $isEdit && $val !== '';
+        $hasExistingPhoto = $isEdit && ($val !== '' || trim((string) ($member['photo_path'] ?? '')) !== '');
         echo field('photo', [
             'name' => 'fields[photo]',
             'label' => '',
@@ -287,7 +308,9 @@ $buildProfileFieldsHtml = function (array $list, ?string $stepKey = null) use (
             'data_field' => $key,
             'context' => 'member',
             'has_existing' => $hasExistingPhoto,
-            'existing_url' => $hasExistingPhoto ? url('/members/' . $member['id'] . '/photo') : '',
+            'existing_url' => $hasExistingPhoto
+                ? url('/members/' . $member['id'] . '/photo') . '?v=' . rawurlencode((string) ($member['updated_at'] ?? ''))
+                : '',
             'gender' => $photoGender,
         ]);
     };
@@ -593,8 +616,8 @@ $paymentExtraHtml = $buildProfileFieldsHtml($paymentExtraFields, \Socly\Services
     // Membership-card preview: one shared partial (same artwork as the member detail page).
     // It is attached under the photo block of the profile step, so face and card stay together.
     $tesseraPhotoSrc = '';
-    if ($isEdit && !empty($member['id']) && trim((string) ($fieldValues['photo'] ?? '')) !== '') {
-        $tesseraPhotoSrc = url('/members/' . (int) $member['id'] . '/photo');
+    if ($isEdit && !empty($member['id']) && trim((string) ($fieldValues['photo'] ?? $member['photo_path'] ?? '')) !== '') {
+        $tesseraPhotoSrc = url('/members/' . (int) $member['id'] . '/photo') . '?v=' . rawurlencode((string) ($member['updated_at'] ?? ''));
     }
     $tesseraGenderRaw = strtoupper(trim($valFor('gender')));
     $tesseraPhotoGender = $tesseraGenderRaw === 'F' ? 'f' : 'm';

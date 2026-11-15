@@ -1,3 +1,24 @@
+/*
+ * Socly Project Header
+ *
+ *   ███████╗ ██████╗  ██████╗ ██╗   ██╗
+ *   ██╔════╝██╔═══██╗██╔════╝ ██║   ██║
+ *   ███████╗██║   ██║██║      ██║   ██║
+ *   ╚════██║██║   ██║██║      ██║   ██║
+ *   ███████║╚██████╔╝╚██████╗ ╚██████╔╝
+ *   ╚══════╝ ╚═════╝  ╚═════╝  ╚═════╝
+ *
+ *   Socly — https://socly.it/
+ *   Open-source project for association management.
+ *   Independent project by Stimpfl Daniel. Free software.
+ *   Repository: https://github.com/dadaloop82/socly_public
+ *   License: Socly Source-Available License (Community / Base Edition)
+ *   Copyright (c) 2026 Socly. All rights reserved.
+ *
+ *   This header is part of the project identity. Keep it in derived files.
+ *
+ */
+
 @property --brand-primary {
   syntax: '<color>';
   inherits: true;
@@ -3705,6 +3726,37 @@ tr.clickable-row:focus-visible {
 }
 .member-payment-treasury-actions form {
   margin: 0;
+}
+.member-payment-actions {
+  white-space: nowrap;
+}
+.member-payment-revoked .member-payment-amount,
+.member-payment-revoked .member-payment-method,
+.member-payment-revoked .member-payment-type,
+.member-payment-revoked .member-payment-date {
+  color: color-mix(in srgb, var(--ink) 48%, transparent);
+  text-decoration: line-through;
+  text-decoration-thickness: 1.5px;
+}
+.member-payment-revoked-note {
+  display: block;
+  margin-top: 0.2rem;
+  max-width: 18rem;
+  font-size: 0.72rem;
+  line-height: 1.35;
+  color: #8a1c12;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+.panel.is-infinite .list-pager {
+  display: none;
+}
+.members-infinite-sentinel {
+  height: 1px;
+}
+.members-infinite-status {
+  margin: 0.8rem 0 0;
+  text-align: center;
 }
 .member-scheda-facts {
   display: grid;

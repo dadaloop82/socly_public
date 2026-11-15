@@ -1,3 +1,24 @@
+/*
+ * Socly Project Header
+ *
+ *   ███████╗ ██████╗  ██████╗ ██╗   ██╗
+ *   ██╔════╝██╔═══██╗██╔════╝ ██║   ██║
+ *   ███████╗██║   ██║██║      ██║   ██║
+ *   ╚════██║██║   ██║██║      ██║   ██║
+ *   ███████║╚██████╔╝╚██████╗ ╚██████╔╝
+ *   ╚══════╝ ╚═════╝  ╚═════╝  ╚═════╝
+ *
+ *   Socly — https://socly.it/
+ *   Open-source project for association management.
+ *   Independent project by Stimpfl Daniel. Free software.
+ *   Repository: https://github.com/dadaloop82/socly_public
+ *   License: Socly Source-Available License (Community / Base Edition)
+ *   Copyright (c) 2026 Socly. All rights reserved.
+ *
+ *   This header is part of the project identity. Keep it in derived files.
+ *
+ */
+
 -- Default treasury wallets: on a fresh install only "Cash Box" and "Bank / Current Account" are active.
 -- Migration 028 seeded every built-in as active, so this migration also fixes installations upgraded from
 -- older releases (the setup step used to pre-select all of them). Safety net, the update only touches wallets

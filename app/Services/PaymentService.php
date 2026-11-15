@@ -1,4 +1,25 @@
 <?php
+/*
+ * Socly Project Header
+ *
+ *   ███████╗ ██████╗  ██████╗ ██╗   ██╗
+ *   ██╔════╝██╔═══██╗██╔════╝ ██║   ██║
+ *   ███████╗██║   ██║██║      ██║   ██║
+ *   ╚════██║██║   ██║██║      ██║   ██║
+ *   ███████║╚██████╔╝╚██████╗ ╚██████╔╝
+ *   ╚══════╝ ╚═════╝  ╚═════╝  ╚═════╝
+ *
+ *   Socly — https://socly.it/
+ *   Open-source project for association management.
+ *   Independent project by Stimpfl Daniel. Free software.
+ *   Repository: https://github.com/dadaloop82/socly_public
+ *   License: Socly Source-Available License (Community / Base Edition)
+ *   Copyright (c) 2026 Socly. All rights reserved.
+ *
+ *   This header is part of the project identity. Keep it in derived files.
+ *
+ */
+
 
 declare(strict_types=1);
 
@@ -37,6 +58,11 @@ final class PaymentService
         // The member card must show at a glance whether the quota reached the cash book: a payment
         // with no movement (or with a different amount) gets the warning mark and the fix action.
         foreach ($rows as &$row) {
+            $row['revoked'] = trim((string) ($row['revoked_at'] ?? '')) !== '';
+            if ($row['revoked']) {
+                $row['treasury_state'] = 'revoked';
+                continue;
+            }
             $movementId = (int) ($row['movement_id'] ?? 0);
             $type = (string) ($row['type'] ?? '');
             $row['movement_id'] = $movementId;
@@ -146,6 +172,121 @@ final class PaymentService
         ], null, $ip);
 
         return ['ok' => true, 'message' => (string) __('payments.treasury_deleted')];
+    }
+
+    /**
+     * Revoke a payment from the member card.
+     *
+     * A payment that never reached the cash book is removed from the member history.
+     * A payment already booked in the cash book is kept as a struck-through record and
+     * its treasury movement is superseded (the same safe pattern used by a giroconto),
+     * so the audit trail and the original amount remain visible.
+     *
+     * @return array{ok:bool,message:string}
+     */
+    public function revoke(int $memberId, int $paymentId, string $ip): array
+    {
+        $payment = $this->db->fetch(
+            'SELECT * FROM payments WHERE id = :id AND member_id = :member',
+            ['id' => $paymentId, 'member' => $memberId]
+        );
+        $member = $this->db->fetch('SELECT * FROM members WHERE id = :id', ['id' => $memberId]);
+        if ($payment === null || $member === null) {
+            return ['ok' => false, 'message' => (string) __('payments.not_found')];
+        }
+        if (trim((string) ($payment['revoked_at'] ?? '')) !== '') {
+            return ['ok' => true, 'message' => (string) __('payments.already_revoked')];
+        }
+
+        $user = auth_user();
+        $userId = (int) ($user['id'] ?? 0) ?: null;
+        $userName = trim((string) ($user['name'] ?? ''));
+        if ($userName === '') {
+            $userName = (string) __('payments.system_user');
+        }
+        $note = (string) __('payments.revoked_note', [
+            'user' => $userName,
+            'date' => date('d/m/Y'),
+        ]);
+        $movement = $this->db->fetch(
+            'SELECT id, amount, movement_date, superseded_at
+             FROM treasury_movements
+             WHERE payment_id = :payment AND member_id = :member
+             ORDER BY id DESC LIMIT 1',
+            ['payment' => $paymentId, 'member' => $memberId]
+        );
+        $wasRegistered = $movement !== null;
+        $activeMovement = $wasRegistered && trim((string) ($movement['superseded_at'] ?? '')) === '';
+        $amount = round((float) ($payment['amount'] ?? 0), 2);
+
+        $this->db->beginTransaction();
+        try {
+            if ($activeMovement) {
+                $this->db->query(
+                    'UPDATE treasury_movements
+                     SET superseded_at = :at, superseded_account = NULL, superseded_note = :note,
+                         superseded_by_id = :user, row_version = row_version + 1
+                     WHERE id = :id AND superseded_at IS NULL',
+                    [
+                        'at' => date('Y-m-d H:i:s'),
+                        'note' => mb_substr($note, 0, 190),
+                        'user' => $userId,
+                        'id' => (int) $movement['id'],
+                    ]
+                );
+            }
+
+            if ($wasRegistered) {
+                $oldNote = trim((string) ($payment['note'] ?? ''));
+                $combinedNote = $note . ($oldNote !== '' ? ' · ' . $oldNote : '');
+                $this->db->update('payments', [
+                    'revoked_at' => date('Y-m-d H:i:s'),
+                    'revoked_by' => $userId,
+                    'revoked_note' => mb_substr($note, 0, 255),
+                    'note' => mb_substr($combinedNote, 0, 255),
+                ], 'id = :id', ['id' => $paymentId]);
+            } else {
+                $this->db->query('DELETE FROM payments WHERE id = :id AND member_id = :member', [
+                    'id' => $paymentId,
+                    'member' => $memberId,
+                ]);
+            }
+
+            if ($activeMovement || !$wasRegistered) {
+                $this->db->update(
+                    'members',
+                    ['balance_due' => round((float) ($member['balance_due'] ?? 0) + $amount, 2)],
+                    'id = :id',
+                    ['id' => $memberId]
+                );
+            }
+
+            $this->db->commit();
+        } catch (\Throwable $e) {
+            $this->db->rollBack();
+            return ['ok' => false, 'message' => (string) __('payments.revoke_failed')];
+        }
+
+        $this->audit->log(
+            $wasRegistered ? 'payment.revoked' : 'payment.deleted_unregistered',
+            'payment',
+            (string) $paymentId,
+            [
+                'amount' => $amount,
+                'method' => (string) ($payment['method'] ?? ''),
+                'type' => (string) ($payment['type'] ?? ''),
+                'movement_id' => $wasRegistered ? (int) ($movement['id'] ?? 0) : null,
+            ],
+            ['note' => $note],
+            $ip
+        );
+
+        return [
+            'ok' => true,
+            'message' => (string) ($wasRegistered
+                ? __('payments.revoked_ok')
+                : __('payments.deleted_ok')),
+        ];
     }
 
     /** @return array{ok:bool,errors?:array} */

@@ -1,10 +1,34 @@
 <?php
+/*
+ * Socly Project Header
+ *
+ *   ███████╗ ██████╗  ██████╗ ██╗   ██╗
+ *   ██╔════╝██╔═══██╗██╔════╝ ██║   ██║
+ *   ███████╗██║   ██║██║      ██║   ██║
+ *   ╚════██║██║   ██║██║      ██║   ██║
+ *   ███████║╚██████╔╝╚██████╗ ╚██████╔╝
+ *   ╚══════╝ ╚═════╝  ╚═════╝  ╚═════╝
+ *
+ *   Socly — https://socly.it/
+ *   Open-source project for association management.
+ *   Independent project by Stimpfl Daniel. Free software.
+ *   Repository: https://github.com/dadaloop82/socly_public
+ *   License: Socly Source-Available License (Community / Base Edition)
+ *   Copyright (c) 2026 Socly. All rights reserved.
+ *
+ *   This header is part of the project identity. Keep it in derived files.
+ *
+ */
+
 $issues = is_array($member['compliance_issues'] ?? null) ? $member['compliance_issues'] : [];
 $enrollmentMethod = (string) ($enrollmentMethod ?? 'none');
 $enrollmentArtifact = is_array($enrollmentArtifact ?? null) ? $enrollmentArtifact : null;
 $fields = is_array($member['fields'] ?? null) ? $member['fields'] : [];
 $displayName = trim(($fields['first_name'] ?? '') . ' ' . ($fields['last_name'] ?? ''));
-$totalPaid = array_sum(array_map(static fn (array $payment): float => (float) ($payment['amount'] ?? 0), (array) ($payments ?? [])));
+$totalPaid = array_sum(array_map(
+    static fn (array $payment): float => !empty($payment['revoked']) ? 0.0 : (float) ($payment['amount'] ?? 0),
+    (array) ($payments ?? [])
+));
 $balanceDue = (float) ($member['balance_due'] ?? 0);
 $canManage = can('members.manage');
 $canPayments = can('payments.manage');
@@ -172,7 +196,7 @@ if ($periodEndsOn !== '') {
 }
 // Local path, never an absolute URL: redirect() prefixes the base (see local_url_path()).
 $redirectBack = '/members/' . (int) $member['id'];
-$hasPhoto = !empty($fields['photo']);
+$hasPhoto = trim((string) ($fields['photo'] ?? $member['photo_path'] ?? '')) !== '';
 // Membership-card QR: only when the card really stores a qr_code (shown top-right on the card).
 $cardQrCode = is_array($card ?? null) ? trim((string) ($card['qr_code'] ?? '')) : '';
 $cardQrSvgBadge = $cardQrCode !== '' ? \Socly\Support\QrCode::svg($cardQrCode, 3, 2, 'M') : '';
@@ -378,7 +402,9 @@ $nextMemberId = isset($adjacentMembers['next']) ? (int) $adjacentMembers['next']
                 'number' => (string) $member['member_number'],
                 'role' => __('members.card_role'),
                 'type' => $typeLabel,
-                'photo_url' => $hasPhoto ? url('/members/' . (int) $member['id'] . '/photo') : '',
+                'photo_url' => $hasPhoto
+                    ? url('/members/' . (int) $member['id'] . '/photo') . '?v=' . rawurlencode((string) ($member['updated_at'] ?? ''))
+                    : '',
                 'gender' => $genderRaw === 'F' ? 'f' : 'm',
                 'logo_url' => assoc_logo_url(),
                 'qr_svg' => $cardQrSvgBadge,
@@ -585,6 +611,7 @@ $nextMemberId = isset($adjacentMembers['next']) ? (int) $adjacentMembers['next']
                             <th><?= e(__('payments.type')) ?></th>
                             <th><?= e(__('members.enrollment_recorded_at')) ?></th>
                             <th><?= e(__('payments.treasury')) ?></th>
+                            <th><?= e(__('payments.actions')) ?></th>
                         </tr>
                         </thead>
                         <tbody>
@@ -593,22 +620,36 @@ $nextMemberId = isset($adjacentMembers['next']) ? (int) $adjacentMembers['next']
                             $paymentId = (int) ($p['id'] ?? 0);
                             $movementId = (int) ($p['movement_id'] ?? 0);
                             $treasuryState = (string) ($p['treasury_state'] ?? 'none');
+                            $paymentRevoked = !empty($p['revoked']);
                             $paymentBase = '/members/' . (int) $member['id'] . '/payments/' . $paymentId;
                             ?>
-                            <tr>
-                                <td class="num"><?= e(number_format((float) $p['amount'], 2, ',', '.')) ?>&nbsp;€</td>
-                                <td><?= e(__('payments.' . $p['method'])) ?></td>
-                                <td><?= e(__('payments.' . $p['type'])) ?></td>
-                                <td><?= e(format_datetime((string) ($p['created_at'] ?? '')) ?: (string) ($p['created_at'] ?? '')) ?></td>
+                            <tr class="<?= $paymentRevoked ? 'member-payment-revoked' : '' ?>">
+                                <td class="num">
+                                    <span class="member-payment-amount"><?= e(number_format((float) $p['amount'], 2, ',', '.')) ?>&nbsp;€</span>
+                                    <?php if ($paymentRevoked && trim((string) ($p['revoked_note'] ?? '')) !== ''): ?>
+                                        <span class="member-payment-revoked-note"><?= e((string) $p['revoked_note']) ?></span>
+                                    <?php endif; ?>
+                                </td>
+                                <td class="member-payment-method"><?= e(__('payments.' . $p['method'])) ?></td>
+                                <td class="member-payment-type"><?= e(__('payments.' . $p['type'])) ?></td>
+                                <td class="member-payment-date"><?= e(format_datetime((string) ($p['created_at'] ?? '')) ?: (string) ($p['created_at'] ?? '')) ?></td>
                                 <td class="member-payment-treasury">
-                                    <?php if ($treasuryState === 'none'): ?>
+                                    <?php if ($paymentRevoked): ?>
+                                        <span class="badge badge-muted" title="<?= e((string) ($p['revoked_note'] ?? '')) ?>"><?= e(__('payments.revoked')) ?></span>
+                                    <?php elseif ($treasuryState === 'none'): ?>
                                         <span class="muted">—</span>
                                     <?php else: ?>
                                         <div class="member-payment-treasury-state">
                                             <?php if ($treasuryState === 'ok'): ?>
                                                 <span class="badge badge-ok"><?= e(__('payments.treasury_ok')) ?></span>
                                             <?php else: ?>
-                                                <span class="badge badge-warn member-payment-warn">
+                                                <span class="badge badge-warn member-payment-warn"
+                                                      title="<?= e(match ($treasuryState) {
+                                                          'missing' => __('payments.treasury_missing'),
+                                                          'mismatch' => __('payments.treasury_mismatch'),
+                                                          'pending' => __('payments.treasury_pending'),
+                                                          default => __('payments.treasury_mismatch'),
+                                                      }) ?>">
                                                     <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path fill="currentColor" d="M12 2 1 21h22L12 2zm1 15h-2v-2h2v2zm0-4h-2V9h2v4z"/></svg>
                                                     <?= e(match ($treasuryState) {
                                                         'missing' => __('payments.treasury_missing'),
@@ -647,6 +688,19 @@ $nextMemberId = isset($adjacentMembers['next']) ? (int) $adjacentMembers['next']
                                             <?php endif; ?>
                                         </div>
                                         <?php endif; ?>
+                                    <?php endif; ?>
+                                </td>
+                                <td class="member-payment-actions" data-label="<?= e(__('payments.actions')) ?>" data-stop-row-nav>
+                                    <?php if (!$paymentRevoked && $canPayments): ?>
+                                        <form method="post"
+                                              action="<?= e(url($paymentBase . '/revoke')) ?>"
+                                              data-confirm="<?= e(__('payments.revoke_confirm')) ?>"
+                                              data-confirm-danger="1">
+                                            <?= csrf_field() ?>
+                                            <button class="btn btn-ghost btn-sm is-danger" type="submit"><?= e(__('payments.revoke')) ?></button>
+                                        </form>
+                                    <?php else: ?>
+                                        <span class="muted">—</span>
                                     <?php endif; ?>
                                 </td>
                             </tr>

@@ -1,4 +1,25 @@
 <?php
+/*
+ * Socly Project Header
+ *
+ *   ███████╗ ██████╗  ██████╗ ██╗   ██╗
+ *   ██╔════╝██╔═══██╗██╔════╝ ██║   ██║
+ *   ███████╗██║   ██║██║      ██║   ██║
+ *   ╚════██║██║   ██║██║      ██║   ██║
+ *   ███████║╚██████╔╝╚██████╗ ╚██████╔╝
+ *   ╚══════╝ ╚═════╝  ╚═════╝  ╚═════╝
+ *
+ *   Socly — https://socly.it/
+ *   Open-source project for association management.
+ *   Independent project by Stimpfl Daniel. Free software.
+ *   Repository: https://github.com/dadaloop82/socly_public
+ *   License: Socly Source-Available License (Community / Base Edition)
+ *   Copyright (c) 2026 Socly. All rights reserved.
+ *
+ *   This header is part of the project identity. Keep it in derived files.
+ *
+ */
+
 
 declare(strict_types=1);
 
@@ -94,7 +115,8 @@ final class StatisticsService
                     COALESCE(SUM(CASE WHEN YEAR(created_at) = YEAR(CURDATE())
                                        AND MONTH(created_at) = MONTH(CURDATE()) THEN amount ELSE 0 END), 0) AS this_month,
                     COALESCE(AVG(amount), 0) AS average
-             FROM payments'
+             FROM payments
+             WHERE revoked_at IS NULL'
         ) ?? [];
 
         return [
@@ -652,7 +674,8 @@ final class StatisticsService
         foreach ($this->db->fetchAll(
             "SELECT DATE_FORMAT(created_at, '%Y-%m') AS ym, COALESCE(SUM(amount), 0) AS s
              FROM payments
-             WHERE created_at >= DATE_FORMAT(DATE_SUB(CURDATE(), INTERVAL 11 MONTH), '%Y-%m-01')
+             WHERE revoked_at IS NULL
+               AND created_at >= DATE_FORMAT(DATE_SUB(CURDATE(), INTERVAL 11 MONTH), '%Y-%m-01')
              GROUP BY ym"
         ) as $row) {
             $monthly[(string) $row['ym']] = round((float) $row['s'], 2);
@@ -672,7 +695,7 @@ final class StatisticsService
         ];
         $methodValues = ['cash' => 0.0, 'bank' => 0.0, 'other' => 0.0];
         foreach ($this->db->fetchAll(
-            'SELECT method, COALESCE(SUM(amount), 0) AS s FROM payments GROUP BY method'
+            'SELECT method, COALESCE(SUM(amount), 0) AS s FROM payments WHERE revoked_at IS NULL GROUP BY method'
         ) as $row) {
             $key = (string) ($row['method'] ?? 'other');
             if (!isset($methodValues[$key])) {
@@ -688,7 +711,7 @@ final class StatisticsService
         ];
         $typeValues = ['membership' => 0.0, 'debt' => 0.0, 'adjustment' => 0.0];
         foreach ($this->db->fetchAll(
-            'SELECT type, COALESCE(SUM(amount), 0) AS s FROM payments GROUP BY type'
+            'SELECT type, COALESCE(SUM(amount), 0) AS s FROM payments WHERE revoked_at IS NULL GROUP BY type'
         ) as $row) {
             $key = (string) ($row['type'] ?? 'membership');
             if (!isset($typeValues[$key])) {

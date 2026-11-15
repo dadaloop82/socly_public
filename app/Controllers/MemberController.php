@@ -1,4 +1,25 @@
 <?php
+/*
+ * Socly Project Header
+ *
+ *   ███████╗ ██████╗  ██████╗ ██╗   ██╗
+ *   ██╔════╝██╔═══██╗██╔════╝ ██║   ██║
+ *   ███████╗██║   ██║██║      ██║   ██║
+ *   ╚════██║██║   ██║██║      ██║   ██║
+ *   ███████║╚██████╔╝╚██████╗ ╚██████╔╝
+ *   ╚══════╝ ╚═════╝  ╚═════╝  ╚═════╝
+ *
+ *   Socly — https://socly.it/
+ *   Open-source project for association management.
+ *   Independent project by Stimpfl Daniel. Free software.
+ *   Repository: https://github.com/dadaloop82/socly_public
+ *   License: Socly Source-Available License (Community / Base Edition)
+ *   Copyright (c) 2026 Socly. All rights reserved.
+ *
+ *   This header is part of the project identity. Keep it in derived files.
+ *
+ */
+
 
 declare(strict_types=1);
 
@@ -72,7 +93,7 @@ final class MemberController extends BaseController
             'joined' => (string) $request->input('joined', ''),
         ];
         $page = max(1, (int) $request->input('page', 1));
-        $result = $this->members->search($filters, $page);
+        $result = $this->members->search($filters, $page, 10);
         $this->render('members/index', [
             'title' => __('members.title'),
             'result' => $result,
@@ -328,7 +349,7 @@ final class MemberController extends BaseController
             echo 'Not found';
             return;
         }
-        $relative = (string) ($member['fields']['photo'] ?? '');
+        $relative = (string) ($member['fields']['photo'] ?? $member['photo_path'] ?? '');
         $absolute = $this->members->memberPhotoAbsolutePath($relative);
         if (!$absolute) {
             http_response_code(404);
@@ -441,6 +462,18 @@ final class MemberController extends BaseController
     {
         $this->guardMembers();
         $result = $this->payments->deleteTreasuryForPayment((int) $id, (int) $paymentId, $request->ip());
+        if ($result['ok']) {
+            $this->flash('success', $result['message']);
+        } else {
+            $this->flash('errors', ['payment' => $result['message']]);
+        }
+        redirect('/members/' . (int) $id . '#payments');
+    }
+
+    public function revokePayment(Request $request, string $id, string $paymentId): void
+    {
+        $this->guardMembers();
+        $result = $this->payments->revoke((int) $id, (int) $paymentId, $request->ip());
         if ($result['ok']) {
             $this->flash('success', $result['message']);
         } else {

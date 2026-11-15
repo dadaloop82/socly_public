@@ -1,3 +1,24 @@
+/*
+ * Socly Project Header
+ *
+ *   ███████╗ ██████╗  ██████╗ ██╗   ██╗
+ *   ██╔════╝██╔═══██╗██╔════╝ ██║   ██║
+ *   ███████╗██║   ██║██║      ██║   ██║
+ *   ╚════██║██║   ██║██║      ██║   ██║
+ *   ███████║╚██████╔╝╚██████╗ ╚██████╔╝
+ *   ╚══════╝ ╚═════╝  ╚═════╝  ╚═════╝
+ *
+ *   Socly — https://socly.it/
+ *   Open-source project for association management.
+ *   Independent project by Stimpfl Daniel. Free software.
+ *   Repository: https://github.com/dadaloop82/socly_public
+ *   License: Socly Source-Available License (Community / Base Edition)
+ *   Copyright (c) 2026 Socly. All rights reserved.
+ *
+ *   This header is part of the project identity. Keep it in derived files.
+ *
+ */
+
 /** Styled in-app confirm — never uses the browser native dialog. */
 let appConfirmDialog = null;
 
@@ -4561,7 +4582,7 @@ function initMembersList() {
   const bulkActionInput = bulkForm?.querySelector('[data-members-bulk-action-input]');
   const bulkIdHost = bulkForm?.querySelector('[data-members-bulk-id-host]');
   const selectAll = root.querySelector('[data-members-select-all]');
-  const checkboxes = [...root.querySelectorAll('[data-member-select]')];
+  const checkboxes = () => [...root.querySelectorAll('[data-member-select]')];
   const collectDialog = document.querySelector('[data-member-collect-dialog]');
   const collectForm = collectDialog?.querySelector('[data-member-collect-form]');
   const collectName = collectDialog?.querySelector('[data-member-collect-name]');
@@ -4571,10 +4592,11 @@ function initMembersList() {
   const emailBody = emailDialog?.querySelector('[data-members-bulk-email-body]');
 
   const selectedIds = () =>
-    checkboxes.filter((cb) => cb.checked).map((cb) => cb.value);
+    checkboxes().filter((cb) => cb.checked).map((cb) => cb.value);
 
   const syncBulkBar = () => {
     const ids = selectedIds();
+    const boxes = checkboxes();
     const open = ids.length > 0;
     if (bulkBar) {
       bulkBar.classList.toggle('is-open', open);
@@ -4582,15 +4604,20 @@ function initMembersList() {
     }
     if (bulkCount) bulkCount.textContent = String(ids.length);
     if (selectAll) {
-      selectAll.indeterminate = ids.length > 0 && ids.length < checkboxes.length;
-      selectAll.checked = checkboxes.length > 0 && ids.length === checkboxes.length;
+      selectAll.indeterminate = ids.length > 0 && ids.length < boxes.length;
+      selectAll.checked = boxes.length > 0 && ids.length === boxes.length;
     }
   };
 
-  checkboxes.forEach((cb) => cb.addEventListener('change', syncBulkBar));
+  root.addEventListener('change', (event) => {
+    const target = event.target;
+    if (target instanceof HTMLInputElement && target.matches('[data-member-select]')) {
+      syncBulkBar();
+    }
+  });
   selectAll?.addEventListener('change', () => {
     const on = selectAll.checked;
-    checkboxes.forEach((cb) => {
+    checkboxes().forEach((cb) => {
       cb.checked = on;
     });
     syncBulkBar();
@@ -4648,21 +4675,96 @@ function initMembersList() {
     submitBulk('group_email', { subject, body });
   });
 
-  root.querySelectorAll('[data-member-collect]').forEach((btn) => {
-    btn.addEventListener('click', () => {
-      const id = btn.getAttribute('data-member-id') || '';
-      const name = btn.getAttribute('data-member-name') || '';
-      const balance = btn.getAttribute('data-member-balance') || '0';
-      const base = root.getAttribute('data-members-base') || '/members';
-      if (!collectForm || !collectDialog) return;
-      collectForm.action = `${base}/${id}/payments`;
-      if (collectName) collectName.textContent = name;
-      if (collectAmount) collectAmount.value = balance;
-      collectDialog.showModal();
-    });
+  root.addEventListener('click', (event) => {
+    const target = event.target;
+    if (!(target instanceof Element)) return;
+    const btn = target.closest('[data-member-collect]');
+    if (!btn || !root.contains(btn)) return;
+    const id = btn.getAttribute('data-member-id') || '';
+    const name = btn.getAttribute('data-member-name') || '';
+    const balance = btn.getAttribute('data-member-balance') || '0';
+    const base = root.getAttribute('data-members-base') || '/members';
+    if (!collectForm || !collectDialog) return;
+    collectForm.action = `${base}/${id}/payments`;
+    if (collectName) collectName.textContent = name;
+    if (collectAmount) collectAmount.value = balance;
+    collectDialog.showModal();
   });
 
   collectDialog?.querySelector('[data-member-collect-cancel]')?.addEventListener('click', () => collectDialog.close());
+
+  // Members feed: ten rows are already rendered; scroll near the end to append the next
+  // page. The classic pager stays in the HTML as a no-JS fallback and is hidden by CSS.
+  const infiniteSentinel = root.querySelector('[data-members-infinite-sentinel]');
+  const infiniteStatus = root.querySelector('[data-members-infinite-status]');
+  const membersTableBody = root.querySelector('.members-table tbody');
+  const membersPager = root.querySelector('.list-pager');
+  let nextPage = Math.max(1, Number(root.getAttribute('data-members-page') || '1')) + 1;
+  let totalPages = Math.max(1, Number(root.getAttribute('data-members-pages') || '1'));
+  let infiniteLoading = false;
+  let infiniteDone = nextPage > totalPages;
+  const setInfiniteStatus = (text) => {
+    if (!infiniteStatus) return;
+    infiniteStatus.textContent = text || '';
+    infiniteStatus.hidden = !text;
+  };
+  const loadMoreMembers = async () => {
+    if (infiniteLoading || infiniteDone || !membersTableBody || !infiniteSentinel) return;
+    infiniteLoading = true;
+    setInfiniteStatus(root.getAttribute('data-msg-infinite-loading') || '');
+    try {
+      const target = new URL(root.getAttribute('data-members-infinite-url') || window.location.pathname, window.location.origin);
+      target.search = new URLSearchParams(window.location.search).toString();
+      target.searchParams.set('page', String(nextPage));
+      const response = await fetch(target.toString(), {
+        headers: { 'X-Requested-With': 'XMLHttpRequest', 'Accept': 'text/html' },
+        credentials: 'same-origin'
+      });
+      if (!response.ok) throw new Error('feed');
+      const doc = new DOMParser().parseFromString(await response.text(), 'text/html');
+      const feedBody = doc.querySelector('.members-table tbody');
+      if (!feedBody) throw new Error('feed');
+      const rows = [...feedBody.querySelectorAll('tr')];
+      if (rows.length === 0) {
+        infiniteDone = true;
+      } else {
+        rows.forEach((row) => membersTableBody.appendChild(document.importNode(row, true)));
+        nextPage += 1;
+        if (nextPage > totalPages) infiniteDone = true;
+        if (typeof initDocumentRowLinks === 'function') initDocumentRowLinks(membersTableBody);
+        syncBulkBar();
+      }
+      if (infiniteDone) {
+        infiniteSentinel.hidden = true;
+        if (membersPager) membersPager.classList.add('is-hidden');
+        setInfiniteStatus(root.getAttribute('data-msg-infinite-done') || '');
+      } else {
+        setInfiniteStatus('');
+      }
+    } catch (error) {
+      infiniteDone = true;
+      infiniteSentinel.hidden = true;
+      root.classList.remove('is-infinite');
+      if (membersPager) membersPager.classList.remove('is-hidden');
+      setInfiniteStatus(root.getAttribute('data-msg-infinite-error') || '');
+    } finally {
+      infiniteLoading = false;
+    }
+  };
+
+  if (infiniteSentinel && membersTableBody && membersPager) {
+    root.classList.add('is-infinite');
+    if ('IntersectionObserver' in window && !infiniteDone) {
+      const observer = new IntersectionObserver((entries) => {
+        if (entries.some((entry) => entry.isIntersecting)) loadMoreMembers();
+      }, { rootMargin: '600px 0px' });
+      observer.observe(infiniteSentinel);
+    } else if (!infiniteDone) {
+      infiniteSentinel.addEventListener('click', loadMoreMembers);
+      infiniteSentinel.setAttribute('role', 'button');
+      infiniteSentinel.tabIndex = 0;
+    }
+  }
 
   root.querySelectorAll('[data-enrollment-dropzone]').forEach((form) => {
     if (!(form instanceof HTMLFormElement) || form.dataset.dropBound === '1') return;

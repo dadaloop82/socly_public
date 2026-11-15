@@ -1,4 +1,25 @@
 <?php
+/*
+ * Socly Project Header
+ *
+ *   ███████╗ ██████╗  ██████╗ ██╗   ██╗
+ *   ██╔════╝██╔═══██╗██╔════╝ ██║   ██║
+ *   ███████╗██║   ██║██║      ██║   ██║
+ *   ╚════██║██║   ██║██║      ██║   ██║
+ *   ███████║╚██████╔╝╚██████╗ ╚██████╔╝
+ *   ╚══════╝ ╚═════╝  ╚═════╝  ╚═════╝
+ *
+ *   Socly — https://socly.it/
+ *   Open-source project for association management.
+ *   Independent project by Stimpfl Daniel. Free software.
+ *   Repository: https://github.com/dadaloop82/socly_public
+ *   License: Socly Source-Available License (Community / Base Edition)
+ *   Copyright (c) 2026 Socly. All rights reserved.
+ *
+ *   This header is part of the project identity. Keep it in derived files.
+ *
+ */
+
 
 declare(strict_types=1);
 
@@ -1123,7 +1144,7 @@ final class MemberService
     {
         $rows = $this->db->fetchAll(
             "SELECT m.id, m.balance_due, mt.price,
-                    COALESCE((SELECT SUM(p.amount) FROM payments p WHERE p.member_id = m.id), 0) AS paid_total
+                    COALESCE((SELECT SUM(p.amount) FROM payments p WHERE p.member_id = m.id AND p.revoked_at IS NULL), 0) AS paid_total
              FROM members m
              INNER JOIN member_types mt ON mt.id = m.member_type_id
              WHERE m.balance_due > 0 AND m.status <> 'cancelled'"
@@ -1421,11 +1442,11 @@ final class MemberService
         $items = $this->db->fetchAll(
             "SELECT m.*, mt.name_json AS type_name_json, mt.price AS type_price,
                     mp.label AS period_label, mp.ends_on AS period_ends_on,
-                    (SELECT p.amount FROM payments p WHERE p.member_id = m.id
+                    (SELECT p.amount FROM payments p WHERE p.member_id = m.id AND p.revoked_at IS NULL
                      ORDER BY p.created_at DESC, p.id DESC LIMIT 1) AS last_payment_amount,
-                    (SELECT p.created_at FROM payments p WHERE p.member_id = m.id
+                    (SELECT p.created_at FROM payments p WHERE p.member_id = m.id AND p.revoked_at IS NULL
                      ORDER BY p.created_at DESC, p.id DESC LIMIT 1) AS last_payment_at,
-                    (SELECT COALESCE(SUM(p.amount), 0) FROM payments p WHERE p.member_id = m.id) AS paid_total
+                    (SELECT COALESCE(SUM(p.amount), 0) FROM payments p WHERE p.member_id = m.id AND p.revoked_at IS NULL) AS paid_total
              FROM members m
              INNER JOIN member_types mt ON mt.id = m.member_type_id
              INNER JOIN membership_periods mp ON mp.id = m.membership_period_id
@@ -1463,6 +1484,15 @@ final class MemberService
         }
         $member['payment_status'] = $this->paymentStatus($member);
         $member['fields'] = $this->fieldValues($id);
+        // Keep a direct photo fallback as well: old installations can have the path in
+        // member_field_values while a temporary field-definition cache omits the key.
+        $photoRow = $this->db->fetch(
+            'SELECT v.value FROM member_field_values v
+             INNER JOIN member_field_definitions d ON d.id = v.field_definition_id
+             WHERE v.member_id = :id AND d.`key` = \'photo\' LIMIT 1',
+            ['id' => $id]
+        );
+        $member['photo_path'] = trim((string) ($photoRow['value'] ?? ''));
         $list = [$member];
         $this->attachComplianceIssues($list);
         $member = $list[0];
@@ -1553,6 +1583,17 @@ final class MemberService
             ];
         }
 
+        foreach ((array) ($ctx['payment_issues'] ?? []) as $paymentIssue) {
+            $label = trim((string) $paymentIssue);
+            if ($label !== '') {
+                $issues[] = [
+                    'code' => 'payment_anomaly',
+                    'field' => 'payments',
+                    'label' => $label,
+                ];
+            }
+        }
+
         return $issues;
     }
 
@@ -1574,6 +1615,7 @@ final class MemberService
         }
         $ids = array_map(static fn (array $m): int => (int) ($m['id'] ?? 0), $members);
         $artifactMap = is_object($enrollment) ? $enrollment->artifactPresenceMap($ids) : [];
+        $paymentIssues = count($ids) <= 500 ? $this->paymentIssueMap($ids) : [];
         foreach ($members as &$member) {
             $mid = (int) ($member['id'] ?? 0);
             $member['compliance_issues'] = $this->complianceIssues($member, [
@@ -1581,9 +1623,58 @@ final class MemberService
                 'gdpr' => $gdpr,
                 'enrollment' => $enrollment,
                 'has_artifact' => $artifactMap[$mid] ?? false,
+                'payment_issues' => $paymentIssues[$mid] ?? [],
             ]);
         }
         unset($member);
+    }
+
+    /**
+     * Cash-book anomalies per member, in one query for the whole visible page.
+     * The member list uses the same warning icon/tooltip as the other compliance issues.
+     *
+     * @param list<int> $ids
+     * @return array<int,list<string>>
+     */
+    private function paymentIssueMap(array $ids): array
+    {
+        $ids = array_values(array_unique(array_filter(array_map('intval', $ids), static fn (int $id): bool => $id > 0)));
+        if ($ids === []) {
+            return [];
+        }
+        $placeholders = implode(',', array_fill(0, count($ids), '?'));
+        $rows = $this->db->fetchAll(
+            "SELECT p.member_id,
+                    SUM(CASE WHEN tm.id IS NULL THEN 1 ELSE 0 END) AS missing,
+                    SUM(CASE WHEN tm.id IS NOT NULL AND ABS(tm.amount - p.amount) > 0.005 THEN 1 ELSE 0 END) AS mismatch,
+                    SUM(CASE WHEN tm.id IS NOT NULL AND tm.approved_at IS NULL THEN 1 ELSE 0 END) AS pending
+             FROM payments p
+             LEFT JOIN treasury_movements tm ON tm.payment_id = p.id AND tm.superseded_at IS NULL
+             WHERE p.member_id IN ({$placeholders})
+               AND p.revoked_at IS NULL
+               AND p.type IN ('membership', 'debt')
+             GROUP BY p.member_id",
+            $ids
+        );
+        $out = [];
+        foreach ($rows as $row) {
+            $memberId = (int) ($row['member_id'] ?? 0);
+            $labels = [];
+            if ((int) ($row['missing'] ?? 0) > 0) {
+                $labels[] = (string) __('members.anomaly_payment_missing');
+            }
+            if ((int) ($row['mismatch'] ?? 0) > 0) {
+                $labels[] = (string) __('members.anomaly_payment_mismatch');
+            }
+            if ((int) ($row['pending'] ?? 0) > 0) {
+                $labels[] = (string) __('members.anomaly_payment_pending');
+            }
+            if ($labels !== []) {
+                $out[$memberId] = $labels;
+            }
+        }
+
+        return $out;
     }
 
     /**
@@ -2511,11 +2602,11 @@ final class MemberService
                 'SELECT COUNT(*) c FROM members WHERE YEAR(COALESCE(admitted_at, created_at)) = YEAR(CURDATE())'
             )['c'] ?? 0),
             'collected_year' => (float) ($this->db->fetch(
-                'SELECT COALESCE(SUM(amount), 0) c FROM payments WHERE YEAR(created_at) = YEAR(CURDATE())'
+                'SELECT COALESCE(SUM(amount), 0) c FROM payments WHERE revoked_at IS NULL AND YEAR(created_at) = YEAR(CURDATE())'
             )['c'] ?? 0),
             'collected_month' => (float) ($this->db->fetch(
                 'SELECT COALESCE(SUM(amount), 0) c FROM payments
-                 WHERE YEAR(created_at) = YEAR(CURDATE()) AND MONTH(created_at) = MONTH(CURDATE())'
+                 WHERE revoked_at IS NULL AND YEAR(created_at) = YEAR(CURDATE()) AND MONTH(created_at) = MONTH(CURDATE())'
             )['c'] ?? 0),
             'charts' => $this->dashboardCharts(),
         ];
@@ -2537,7 +2628,8 @@ final class MemberService
         $paymentRows = $this->db->fetchAll(
             "SELECT DATE_FORMAT(created_at, '%Y-%m') AS ym, COALESCE(SUM(amount), 0) AS total
              FROM payments
-             WHERE created_at >= DATE_FORMAT(DATE_SUB(CURDATE(), INTERVAL 11 MONTH), '%Y-%m-01')
+             WHERE revoked_at IS NULL
+               AND created_at >= DATE_FORMAT(DATE_SUB(CURDATE(), INTERVAL 11 MONTH), '%Y-%m-01')
              GROUP BY ym"
         );
         $paymentsByMonth = [];
@@ -2550,7 +2642,8 @@ final class MemberService
         $methodRows = $this->db->fetchAll(
             "SELECT DATE_FORMAT(created_at, '%Y-%m') AS ym, method, COALESCE(SUM(amount), 0) AS total
              FROM payments
-             WHERE created_at >= DATE_FORMAT(DATE_SUB(CURDATE(), INTERVAL 11 MONTH), '%Y-%m-01')
+             WHERE revoked_at IS NULL
+               AND created_at >= DATE_FORMAT(DATE_SUB(CURDATE(), INTERVAL 11 MONTH), '%Y-%m-01')
              GROUP BY ym, method"
         );
         $methodByMonth = [];
