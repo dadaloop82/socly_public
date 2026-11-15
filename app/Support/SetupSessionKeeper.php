@@ -1,15 +1,15 @@
 <?php
 /*
- * Socly Project Header
+ * SOCLY Project Header
  *
- *   ███████╗ ██████╗  ██████╗ ██╗   ██╗
- *   ██╔════╝██╔═══██╗██╔════╝ ██║   ██║
- *   ███████╗██║   ██║██║      ██║   ██║
- *   ╚════██║██║   ██║██║      ██║   ██║
- *   ███████║╚██████╔╝╚██████╗ ╚██████╔╝
- *   ╚══════╝ ╚═════╝  ╚═════╝  ╚═════╝
+ *   ███████╗  ██████╗  ██████╗ ██╗     ██╗   ██╗
+ *   ██╔════╝ ██╔═══██╗██╔════╝ ██║     ╚██╗ ██╔╝
+ *   ███████╗ ██║   ██║██║      ██║      ╚████╔╝
+ *   ╚════██║ ██║   ██║██║      ██║       ╚██╔╝
+ *   ███████║ ╚██████╔╝╚██████╗ ███████╗   ██║
+ *   ╚══════╝  ╚═════╝  ╚═════╝ ╚══════╝   ╚═╝
  *
- *   Socly — https://socly.it/
+ *   SOCLY — https://socly.it/
  *   Open-source project for association management.
  *   Independent project by Stimpfl Daniel. Free software.
  *   Repository: https://github.com/dadaloop82/socly_public
