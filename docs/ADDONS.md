@@ -205,7 +205,7 @@ events `board_voting.published`, `board_voting.closed` and `board_voting.vote_ca
 `addons-src/board_voting/` (private repo; `addons-src/` is not part of the public export).
 
 ```bash
-php tools/addons/addon-tool.php build addons-src/board_voting dist/board_voting-1.1.1.soclyaddon --incoming
+php tools/addons/addon-tool.php build addons-src/board_voting dist/board_voting-1.1.2.soclyaddon --incoming
 ```
 
 ## Internal forum add-on (`internal_forum`)
