@@ -258,7 +258,20 @@ $nextMemberId = isset($adjacentMembers['next']) ? (int) $adjacentMembers['next']
     </div>
 </div>
 
-<?php if ($issues !== []): ?>
+<?php
+// Two different kinds of anomaly: profile data to complete (edit member) and payments that
+// must be fixed from the payments section of this page — never by editing the profile.
+$dataIssues = array_values(array_filter(
+    $issues,
+    static fn (array $issue): bool => (string) ($issue['code'] ?? '') !== 'payment_anomaly'
+));
+$paymentIssues = array_values(array_filter(
+    $issues,
+    static fn (array $issue): bool => (string) ($issue['code'] ?? '') === 'payment_anomaly'
+));
+?>
+
+<?php if ($dataIssues !== []): ?>
 <div class="alert alert-warn member-anomaly-banner" role="status">
     <div class="member-anomaly-banner-head">
         <span class="member-anomaly-mark is-static" aria-hidden="true">
@@ -272,7 +285,7 @@ $nextMemberId = isset($adjacentMembers['next']) ? (int) $adjacentMembers['next']
         </div>
     </div>
     <ul class="member-anomaly-list">
-        <?php foreach ($issues as $issue): ?>
+        <?php foreach ($dataIssues as $issue): ?>
             <li><?= e((string) ($issue['label'] ?? '')) ?></li>
         <?php endforeach; ?>
     </ul>
@@ -285,6 +298,28 @@ $nextMemberId = isset($adjacentMembers['next']) ? (int) $adjacentMembers['next']
         <?php endif; ?>
         <a class="btn btn-sm btn-ghost" href="<?= e(url('/members/'.$member['id'].'/edit')) ?>"><?= e(__('members.anomaly_fix')) ?></a>
     <?php endif; ?>
+</div>
+<?php endif; ?>
+
+<?php if ($paymentIssues !== []): ?>
+<div class="alert alert-warn member-anomaly-banner" role="status">
+    <div class="member-anomaly-banner-head">
+        <span class="member-anomaly-mark is-static" aria-hidden="true">
+            <svg viewBox="0 0 24 24" width="20" height="20" focusable="false">
+                <path fill="currentColor" d="M12 3.2 22 20.5H2L12 3.2zm0 5.3c-.7 0-1.2.5-1.1 1.2l.4 5.1h1.4l.4-5.1c.1-.7-.4-1.2-1.1-1.2zm0 8.3a1.15 1.15 0 1 0 0 2.3 1.15 1.15 0 0 0 0-2.3z"/>
+            </svg>
+        </span>
+        <div>
+            <strong><?= e(__('members.anomaly_payment_title')) ?></strong>
+            <p class="muted" style="margin:0.25rem 0 0"><?= e(__('members.anomaly_payment_lede')) ?></p>
+        </div>
+    </div>
+    <ul class="member-anomaly-list">
+        <?php foreach ($paymentIssues as $issue): ?>
+            <li><?= e((string) ($issue['label'] ?? '')) ?></li>
+        <?php endforeach; ?>
+    </ul>
+    <a class="btn btn-sm btn-ghost" href="#payments"><?= e(__('members.anomaly_payment_action')) ?></a>
 </div>
 <?php endif; ?>
 

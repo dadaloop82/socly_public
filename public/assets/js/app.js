@@ -4693,7 +4693,7 @@ function initMembersList() {
 
   collectDialog?.querySelector('[data-member-collect-cancel]')?.addEventListener('click', () => collectDialog.close());
 
-  // Members feed: ten rows are already rendered; scroll near the end to append the next
+  // Members feed: five rows are already rendered; scroll near the end to append the next
   // page. The classic pager stays in the HTML as a no-JS fallback and is hidden by CSS.
   const infiniteSentinel = root.querySelector('[data-members-infinite-sentinel]');
   const infiniteStatus = root.querySelector('[data-members-infinite-status]');

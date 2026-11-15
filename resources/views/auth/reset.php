@@ -1,3 +1,4 @@
+<?php
 /*
  * SOCLY Project Header
  *
@@ -19,6 +20,7 @@
  *
  */
 
+?>
 <h1 class="h1"><?= e(__('auth.reset_title')) ?></h1>
 <p class="lede"><?= e(__('auth.reset_text')) ?></p>
 

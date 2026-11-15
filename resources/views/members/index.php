@@ -148,6 +148,18 @@ $totalPages = max(1, (int) ceil(((int) $result['total']) / max(1, $perPage)));
             'empty_label' => (string) __('members.filter_all'),
             'options' => $memberTypeOptions,
         ]) ?>
+        <?= field('select', [
+            'name' => 'issues',
+            'label' => (string) __('members.filter_issues'),
+            'value' => (string) ($filters['issues'] ?? ''),
+            'context' => 'filter',
+            'empty_label' => (string) __('members.filter_all'),
+            'options' => [
+                'any' => (string) __('members.filter_issues_any'),
+                'data' => (string) __('members.filter_issues_data'),
+                'payment' => (string) __('members.filter_issues_payment'),
+            ],
+        ]) ?>
     </div>
 </form>
 <?php endif; ?>
@@ -189,19 +201,32 @@ $totalPages = max(1, (int) ceil(((int) $result['total']) / max(1, $perPage)));
         </div>
         <?php endif; ?>
         <?php
-        // Banner: members with missing mandatory data — fix in bulk (only derivable values) or filter.
+        // Banner: members with any anomaly (missing data, signature, guardian, payments not in
+        // the first cash book) — fix the derivable data in bulk or filter the list.
         $issuesCount = (int) ($result['issues_count'] ?? 0);
-        $issuesActive = !empty($filters['issues']);
+        $dataIssuesCount = (int) ($result['data_issues_count'] ?? 0);
+        $paymentIssuesCount = (int) ($result['payment_issues_count'] ?? 0);
+        $issuesFilterValue = (string) ($filters['issues'] ?? '');
+        $issuesActive = $issuesFilterValue !== '';
         $autofixCount = (int) ($autofixCount ?? 0);
-        $issuesAutofix = $canManage && $autofixCount > 0;
+        // The bulk fix only touches the profile data, so it makes no sense on a payments-only view.
+        $issuesAutofix = $canManage && $autofixCount > 0 && $issuesFilterValue !== 'payment';
         $issuesClearUrl = url('/members?' . http_build_query(array_filter(array_merge($filters, ['issues' => null]))));
-        $issuesFilterUrl = url('/members?' . http_build_query(array_filter(array_merge($filters, ['issues' => '1', 'page' => null]))));
+        $issuesFilterUrl = url('/members?' . http_build_query(array_filter(array_merge($filters, ['issues' => 'any', 'page' => null]))));
         ?>
         <?php if ($issuesActive || $issuesCount > 0): ?>
             <div class="alert alert-error member-issues-banner" role="status">
-                <span><?= e($issuesActive
-                    ? __('members.issues_filter_active', ['count' => (string) $issuesCount])
-                    : __('members.issues_banner', ['count' => (string) $issuesCount])) ?></span>
+                <div>
+                    <span><?= e($issuesActive
+                        ? __('members.issues_filter_active', ['count' => (string) (int) ($result['total'] ?? 0)])
+                        : __('members.issues_banner', ['count' => (string) $issuesCount])) ?></span>
+                    <?php if (!$issuesActive && ($dataIssuesCount > 0 || $paymentIssuesCount > 0)): ?>
+                        <p class="muted" style="margin:0.2rem 0 0"><?= e(__('members.issues_breakdown', [
+                            'data' => (string) $dataIssuesCount,
+                            'payment' => (string) $paymentIssuesCount,
+                        ])) ?></p>
+                    <?php endif; ?>
+                </div>
                 <div class="member-issues-banner-actions">
                     <?php if ($issuesAutofix): ?>
                         <form method="post" action="<?= e(url('/members/autofix-all')) ?>" class="member-issues-autofix">

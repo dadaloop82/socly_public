@@ -1,3 +1,4 @@
+<?php
 /*
  * SOCLY Project Header
  *
@@ -19,6 +20,7 @@
  *
  */
 
+?>
 <div class="page-header">
     <div class="titles">
         <h1 class="page-title"><?= e(__('errors.404')) ?></h1>

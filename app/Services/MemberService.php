@@ -1404,18 +1404,20 @@ final class MemberService
         if (($filters['joined'] ?? '') === 'year') {
             $where[] = 'YEAR(COALESCE(m.admitted_at, m.created_at)) = YEAR(CURDATE())';
         }
-        // Missing mandatory data: same rule as the red triangle, also usable as a list filter.
-        $missingCondition = $this->missingDataCondition('m');
-        $missingCount = 0;
-        if ($missingCondition[0] !== '1=0') {
-            $missingCount = (int) $this->db->fetch(
-                "SELECT COUNT(*) AS c FROM members m INNER JOIN member_types mt ON mt.id = m.member_type_id WHERE {$missingCondition[0]}",
-                $missingCondition[1]
-            )['c'];
-        }
-        if (!empty($filters['issues'])) {
-            $where[] = $missingCondition[0];
-            $params += $missingCondition[1];
+        // Anomalies: same rule as the red triangle. The list filter accepts `any` (all kinds),
+        // `data` (mandatory data only) and `payment` (payments not aligned with the cash book).
+        $issuesFilter = (string) ($filters['issues'] ?? '');
+        $issueCounts = $this->anomalyCounts();
+        if ($issuesFilter === 'data') {
+            $dataCondition = $this->missingDataCondition('m');
+            $where[] = $dataCondition[0];
+            $params += $dataCondition[1];
+        } elseif ($issuesFilter === 'payment') {
+            $where[] = $this->paymentAnomalyCondition('m');
+        } elseif ($issuesFilter === 'any') {
+            $anomalyCondition = $this->anomalyCondition('m');
+            $where[] = $anomalyCondition[0];
+            $params += $anomalyCondition[1];
         }
         $whereSql = implode(' AND ', $where);
         $total = (int) $this->db->fetch(
@@ -1465,7 +1467,15 @@ final class MemberService
             $item['gdpr_badges'] = $this->gdprBadges($item);
         }
         unset($item);
-        return ['items' => $items, 'total' => $total, 'per_page' => $perPage, 'page' => $page, 'issues_count' => $missingCount];
+        return [
+            'items' => $items,
+            'total' => $total,
+            'per_page' => $perPage,
+            'page' => $page,
+            'issues_count' => $issueCounts['any'],
+            'data_issues_count' => $issueCounts['data'],
+            'payment_issues_count' => $issueCounts['payment'],
+        ];
     }
 
     public function find(int $id): ?array
@@ -1647,7 +1657,7 @@ final class MemberService
             "SELECT p.member_id,
                     SUM(CASE WHEN tm.id IS NULL THEN 1 ELSE 0 END) AS missing,
                     SUM(CASE WHEN tm.id IS NOT NULL AND ABS(tm.amount - p.amount) > 0.005 THEN 1 ELSE 0 END) AS mismatch,
-                    SUM(CASE WHEN tm.id IS NOT NULL AND tm.approved_at IS NULL THEN 1 ELSE 0 END) AS pending
+                    SUM(CASE WHEN tm.id IS NOT NULL AND tm.approved_at IS NULL AND tm.account <> 'cash' THEN 1 ELSE 0 END) AS pending
              FROM payments p
              LEFT JOIN treasury_movements tm ON tm.payment_id = p.id AND tm.superseded_at IS NULL
              WHERE p.member_id IN ({$placeholders})
@@ -1953,9 +1963,12 @@ final class MemberService
      * SQL fragment for members missing mandatory data (registry identity + required fields),
      * mirroring complianceIssues() so the list banner and the red triangle agree.
      *
+     * @param string $alias Member table alias used by the outer query.
+     * @param string $paramPrefix Keeps named placeholders unique when the same fragment is
+     *                            reused in one statement (e.g. the anomaly counters).
      * @return array{0:string,1:array<string,mixed>}
      */
-    private function missingDataCondition(string $alias): array
+    private function missingDataCondition(string $alias, string $paramPrefix = 'miss'): array
     {
         $parts = [];
         $params = [];
@@ -1977,8 +1990,8 @@ final class MemberService
             if ((int) ($def['is_required'] ?? 0) !== 1 && !in_array($key, self::REGISTRY_IDENTITY_KEYS, true)) {
                 continue;
             }
-            $param = 'miss' . $index;
-            $table = 'mfv' . $index;
+            $param = $paramPrefix . $index;
+            $table = 'mfv_' . $param;
             $params[$param] = $fieldId;
             $present = $type === MemberFieldTypes::CHECKBOX
                 ? "{$table}.`value` IN ('1','on','yes')"
@@ -1992,6 +2005,92 @@ final class MemberService
             return ['1=0', []];
         }
         return ['(' . implode(' OR ', $parts) . ')', $params];
+    }
+
+    /**
+     * Payments recorded for the member but not aligned with the first cash book:
+     * no linked movement, a different amount, or a movement still waiting for approval.
+     * Same rule as paymentIssueMap().
+     */
+    private function paymentAnomalyCondition(string $alias): string
+    {
+        return "EXISTS (SELECT 1 FROM payments p
+                 LEFT JOIN treasury_movements tm ON tm.payment_id = p.id AND tm.superseded_at IS NULL
+                 WHERE p.member_id = {$alias}.id
+                   AND p.revoked_at IS NULL
+                   AND p.type IN ('membership', 'debt')
+                   AND (tm.id IS NULL OR ABS(tm.amount - p.amount) > 0.005
+                        OR (tm.approved_at IS NULL AND tm.account <> 'cash')))";
+    }
+
+    /**
+     * Minor members (junior/minor member type or under 18) without a linked parent/guardian.
+     * Mirrors memberNeedsGuardian() in SQL; the outer query must join `member_types mt`.
+     */
+    private function guardianAnomalyCondition(string $alias): string
+    {
+        return "(({$alias}.guardian_member_id IS NULL OR {$alias}.guardian_member_id = 0)
+                 AND (LOWER(mt.name_json) LIKE '%junior%'
+                      OR LOWER(mt.name_json) LIKE '%minoren%'
+                      OR EXISTS (SELECT 1 FROM member_field_values gv
+                                 INNER JOIN member_field_definitions gd
+                                         ON gd.id = gv.field_definition_id AND gd.`key` = 'birth_date'
+                                 WHERE gv.member_id = {$alias}.id
+                                   AND gv.`value` > DATE_SUB(CURDATE(), INTERVAL 18 YEAR))))";
+    }
+
+    /**
+     * “Any anomaly” rule shared by the members list filter and the banner counter:
+     * missing mandatory data, missing enrollment attestation, unlinked guardian for
+     * minors and payments not aligned with the first cash book.
+     *
+     * @param string $alias Member table alias (the outer query must join `member_types mt`).
+     * @param string $paramPrefix Placeholder prefix forwarded to missingDataCondition().
+     * @return array{0:string,1:array<string,mixed>}
+     */
+    private function anomalyCondition(string $alias, string $paramPrefix = 'miss'): array
+    {
+        [$dataCondition, $params] = $this->missingDataCondition($alias, $paramPrefix);
+        $parts = $dataCondition === '1=0' ? [] : [$dataCondition];
+
+        $enrollment = null;
+        try {
+            $enrollment = app(EnrollmentService::class);
+        } catch (\Throwable) {
+            $enrollment = null;
+        }
+        if ((is_object($enrollment) ? $enrollment->method() : 'none') !== 'none') {
+            $parts[] = "NOT EXISTS (SELECT 1 FROM member_enrollment_artifacts ea WHERE ea.member_id = {$alias}.id)";
+        }
+
+        $parts[] = $this->guardianAnomalyCondition($alias);
+        $parts[] = $this->paymentAnomalyCondition($alias);
+
+        return ['(' . implode(' OR ', $parts) . ')', $params];
+    }
+
+    /**
+     * Counter for the anomaly banner/filter, in one aggregate query.
+     *
+     * @return array{any:int,data:int,payment:int}
+     */
+    private function anomalyCounts(): array
+    {
+        $data = $this->missingDataCondition('m', 'cntData');
+        $any = $this->anomalyCondition('m', 'cntAny');
+        $payment = $this->paymentAnomalyCondition('m');
+        $row = $this->db->fetch(
+            "SELECT SUM(CASE WHEN {$data[0]} THEN 1 ELSE 0 END) AS data_count,
+                    SUM(CASE WHEN {$payment} THEN 1 ELSE 0 END) AS payment_count,
+                    SUM(CASE WHEN {$any[0]} THEN 1 ELSE 0 END) AS any_count
+             FROM members m INNER JOIN member_types mt ON mt.id = m.member_type_id",
+            $data[1] + $any[1]
+        );
+        return [
+            'any' => (int) ($row['any_count'] ?? 0),
+            'data' => (int) ($row['data_count'] ?? 0),
+            'payment' => (int) ($row['payment_count'] ?? 0),
+        ];
     }
 
     /** @return array<string,string|null> */

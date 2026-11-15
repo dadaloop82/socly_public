@@ -40,6 +40,9 @@ use Socly\Services\SettingsService;
 
 final class MemberController extends BaseController
 {
+    /** Endless member list: five rows per batch, so the feed grows while scrolling. */
+    private const MEMBERS_PER_PAGE = 5;
+
     public function __construct(
         View $view,
         private readonly MemberService $members,
@@ -88,12 +91,12 @@ final class MemberController extends BaseController
             'payment' => (string) $request->input('payment', ''),
             'sort' => (string) $request->input('sort', ''),
             'dir' => (string) $request->input('dir', ''),
-            'issues' => (string) $request->input('issues', ''),
+            'issues' => $this->normalizeIssuesFilter((string) $request->input('issues', '')),
             // “New members this year”: the dashboard KPI links here.
             'joined' => (string) $request->input('joined', ''),
         ];
         $page = max(1, (int) $request->input('page', 1));
-        $result = $this->members->search($filters, $page, 10);
+        $result = $this->members->search($filters, $page, self::MEMBERS_PER_PAGE);
         $this->render('members/index', [
             'title' => __('members.title'),
             'result' => $result,
@@ -573,5 +576,18 @@ final class MemberController extends BaseController
             redirect('/members');
         }
         echo $this->view->render('members/registry_print', $context, null);
+    }
+
+    /**
+     * Whitelist for the member-list anomaly filter.
+     * Legacy links (`issues=1`) keep working and mean “any anomaly”.
+     */
+    private function normalizeIssuesFilter(string $value): string
+    {
+        if ($value === '1') {
+            return 'any';
+        }
+
+        return in_array($value, ['any', 'data', 'payment'], true) ? $value : '';
     }
 }
