@@ -90,6 +90,9 @@ final class TreasuryCsvService
     /** @var array<string,array<string,string>>|null */
     private ?array $valueMapCache = null;
 
+    /** @var array<string,string|null> compiled user patterns (pattern => PCRE string or null) */
+    private array $regexCache = [];
+
     public function __construct(
         private readonly Database $db,
         private readonly TreasuryService $treasury,
@@ -378,6 +381,7 @@ final class TreasuryCsvService
             'encoding' => $reader->encoding(),
             'has_header' => $reader->hasHeader($rows),
             'map' => [],
+            'transforms' => [],
             'options' => $this->normalizeOptions([]),
             'created_at' => date('c'),
         ]);
@@ -585,17 +589,202 @@ final class TreasuryCsvService
                 ];
             }
         }
+        $rawTransforms = is_array($rawOptions['regex'] ?? null) ? $rawOptions['regex'] : [];
+        $transforms = $this->normalizeTransforms($rawTransforms);
+        if (empty($transforms['ok'])) {
+            return [
+                'ok' => false,
+                'error' => 'treasury.import.error_regex',
+                'field' => $this->columnLabel((int) ($transforms['index'] ?? 0)),
+            ];
+        }
         $previousMap = is_array($state['map'] ?? null) ? $state['map'] : [];
+        $previousTransforms = is_array($state['transforms'] ?? null) ? $state['transforms'] : [];
         $state['map'] = $map;
+        $state['transforms'] = $transforms['transforms'];
         $state['options'] = $this->normalizeOptions($rawOptions);
-        // A changed mapping invalidates the previous value normalisation.
-        if ($previousMap !== $map) {
+        // A changed mapping or a changed rule invalidates the previous value normalisation.
+        if ($previousMap !== $map || $previousTransforms !== $transforms['transforms']) {
             $state['value_map'] = [];
             $this->valueMapCache = null;
         }
         $this->saveState($state);
 
         return ['ok' => true];
+    }
+
+    /**
+     * Optional regex rules per CSV column: the value is transformed before the import.
+     *
+     * @return array<int,array{pattern:string,replacement:string}>
+     */
+    public function transforms(): array
+    {
+        $state = $this->state();
+        $raw = is_array($state['transforms'] ?? null) ? $state['transforms'] : [];
+        $out = [];
+        foreach ($raw as $index => $transform) {
+            if (!is_array($transform)) {
+                continue;
+            }
+            $pattern = trim((string) ($transform['pattern'] ?? ''));
+            if ($pattern === '') {
+                continue;
+            }
+            $out[(int) $index] = [
+                'pattern' => $pattern,
+                'replacement' => (string) ($transform['replacement'] ?? ''),
+            ];
+        }
+
+        return $out;
+    }
+
+    /**
+     * Raw and transformed sample values for the columns that have a rule (mapping preview).
+     *
+     * @param array{headers:list<string>,rows:list<array{line:int,cells:list<string>}>} $table
+     * @return array<int,list<array{raw:string,value:string}>>
+     */
+    public function transformPreviews(array $table, int $limit = 3): array
+    {
+        $transforms = $this->transforms();
+        if ($transforms === []) {
+            return [];
+        }
+        $out = [];
+        foreach (array_keys($transforms) as $index) {
+            $samples = [];
+            foreach (array_slice($table['rows'] ?? [], 0, max(1, $limit)) as $row) {
+                $raw = trim((string) ($row['cells'][$index] ?? ''));
+                if ($raw === '') {
+                    continue;
+                }
+                $samples[] = ['raw' => $raw, 'value' => $this->applyTransforms($transforms, (int) $index, $raw)];
+            }
+            $out[(int) $index] = $samples;
+        }
+
+        return $out;
+    }
+
+    /**
+     * Validates the rules submitted with the mapping (empty pattern = no rule).
+     *
+     * @param array<string|int,mixed> $raw
+     * @return array{ok:bool,transforms:array<int,array{pattern:string,replacement:string}>,index?:int}
+     */
+    private function normalizeTransforms(array $raw): array
+    {
+        $transforms = [];
+        foreach ($raw as $index => $entry) {
+            $index = (int) $index;
+            if ($index < 0 || !is_array($entry)) {
+                continue;
+            }
+            $pattern = trim((string) ($entry['pattern'] ?? ''));
+            if ($pattern === '') {
+                continue;
+            }
+            $replacement = trim((string) ($entry['replacement'] ?? ''));
+            if (mb_strlen($pattern) > 500 || mb_strlen($replacement) > 500) {
+                return ['ok' => false, 'transforms' => [], 'index' => $index];
+            }
+            if ($this->compileRegex($pattern) === null) {
+                return ['ok' => false, 'transforms' => [], 'index' => $index];
+            }
+            $transforms[$index] = ['pattern' => $pattern, 'replacement' => $replacement];
+        }
+
+        return ['ok' => true, 'transforms' => $transforms];
+    }
+
+    /**
+     * Applies the rule of a column to a raw cell value. An empty replacement extracts the first
+     * capture group (or the whole match); rows where the pattern does not match stay unchanged.
+     *
+     * @param array<int,array{pattern:string,replacement:string}> $transforms
+     */
+    private function applyTransforms(array $transforms, int $index, string $value): string
+    {
+        $transform = $transforms[$index] ?? null;
+        if ($transform === null || $value === '') {
+            return $value;
+        }
+        $regex = $this->compileRegex($transform['pattern']);
+        if ($regex === null) {
+            return $value;
+        }
+        if ($transform['replacement'] !== '') {
+            return preg_replace($regex, $transform['replacement'], $value) ?? $value;
+        }
+        $matched = $this->runRegex($regex, $value, $matches);
+        if ($matched !== 1) {
+            return $value;
+        }
+        $extracted = (string) ($matches[1] ?? '');
+
+        return $extracted !== '' ? $extracted : (string) ($matches[0] ?? $value);
+    }
+
+    /**
+     * Compiles a user pattern into a PCRE string. A bare body gets `~…~u`; a delimited pattern
+     * (`/…/i`, `#…#`) keeps its own flags (only i, m, s, x and u are honoured).
+     */
+    private function compileRegex(string $pattern): ?string
+    {
+        if (array_key_exists($pattern, $this->regexCache)) {
+            return $this->regexCache[$pattern];
+        }
+        $body = $pattern;
+        $flags = '';
+        if (preg_match('/^([\/#~%!@])(.+)\1([a-z]*)$/s', $pattern, $matches) === 1) {
+            $body = (string) $matches[2];
+            $flags = (string) $matches[3];
+        }
+        if ($body === '') {
+            return $this->regexCache[$pattern] = null;
+        }
+        $flags = preg_replace('/[^imsxu]/', '', $flags) ?? '';
+        $flags = implode('', array_unique(str_split($flags)));
+        if (!str_contains($flags, 'u')) {
+            $flags .= 'u';
+        }
+        $regex = '~' . (preg_replace('/(?<!\\\\)~/', '\\\\~', $body) ?? $body) . '~' . $flags;
+
+        return $this->regexCache[$pattern] = $this->runRegex($regex, '') === false ? null : $regex;
+    }
+
+    /**
+     * preg_match() without the PHP warning of an invalid user pattern.
+     *
+     * @param array<int|string,string>|null $matches
+     * @return int|false
+     */
+    private function runRegex(string $regex, string $subject, ?array &$matches = null): int|false
+    {
+        set_error_handler(static fn (): bool => true);
+        try {
+            return preg_match($regex, $subject, $matches);
+        } finally {
+            restore_error_handler();
+        }
+    }
+
+    /** Name of a CSV column, as shown in the mapping table. */
+    private function columnLabel(int $index): string
+    {
+        $state = $this->state();
+        if (!empty($state['has_header'])) {
+            $reader = $this->reader();
+            $first = $reader !== null ? $reader->rows(1) : [];
+            $header = trim((string) ($first[0]['cells'][$index] ?? ''));
+            if ($header !== '') {
+                return $header;
+            }
+        }
+
+        return (string) __('treasury.import.column_n', ['n' => (string) ($index + 1)]);
     }
 
     /**
@@ -690,6 +879,7 @@ final class TreasuryCsvService
         }
 
         $labels = $this->headers();
+        $transforms = $this->transforms();
         foreach (self::NORMALIZATION_FIELDS as $field) {
             $index = array_search($field, $map, true);
             if ($index === false) {
@@ -700,7 +890,7 @@ final class TreasuryCsvService
             $counts = [];
             $variants = [];
             foreach ($table['rows'] as $row) {
-                $raw = trim((string) ($row['cells'][(int) $index] ?? ''));
+                $raw = trim($this->applyTransforms($transforms, (int) $index, (string) ($row['cells'][(int) $index] ?? '')));
                 if ($raw === '') {
                     continue;
                 }
@@ -1195,6 +1385,7 @@ final class TreasuryCsvService
         $existing = $options['skip_duplicates'] === '1' ? $this->existingFingerprints() : [];
         $choices = $this->rowChoices();
         $batchSeen = [];
+        $transforms = $this->transforms();
 
         $result['ok'] = true;
         $rows = [];
@@ -1204,7 +1395,11 @@ final class TreasuryCsvService
                 if ((string) $target === ImportValueNormalizer::TARGET_IGNORE) {
                     continue;
                 }
-                $values[(string) $target] = trim((string) ($raw['cells'][(int) $index] ?? ''));
+                $values[(string) $target] = trim($this->applyTransforms(
+                    $transforms,
+                    (int) $index,
+                    (string) ($raw['cells'][(int) $index] ?? '')
+                ));
             }
             $line = (int) ($raw['line'] ?? 0);
             // Manual corrections applied in the dry run replace the CSV cells before parsing.

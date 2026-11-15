@@ -126,6 +126,8 @@ final class TreasuryCsvController extends BaseController
             'columns' => $this->csv->columns($table),
             'targetGroups' => $this->csv->targetGroups(),
             'map' => $this->csv->mappedTargets(),
+            'transforms' => $this->csv->transforms(),
+            'regexPreviews' => $this->csv->transformPreviews($table),
             'options' => $this->csv->options(),
             'accounts' => $this->treasury->accountOptions(false),
             'categories' => $this->treasury->categoryOptions(),

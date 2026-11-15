@@ -27,6 +27,8 @@
  * @var list<array{index:int,header:string,suggested:string,sample:string,kind:string,filled:int,rows:int}> $columns
  * @var list<array{label:string,options:list<array{value:string,label:string}>}> $targetGroups
  * @var array<int,string> $map
+ * @var array<int,array{pattern:string,replacement:string}> $transforms
+ * @var array<int,list<array{raw:string,value:string}>> $regexPreviews
  * @var array<string,string> $options
  * @var list<array{key:string,label:string,active:bool}> $accounts
  * @var list<array{key:string,label:string,builtin:bool}> $categories
@@ -34,6 +36,8 @@
  * @var string $sourceName
  */
 $map = is_array($map ?? null) ? $map : [];
+$transforms = is_array($transforms ?? null) ? $transforms : [];
+$regexPreviews = is_array($regexPreviews ?? null) ? $regexPreviews : [];
 $options = is_array($options ?? null) ? $options : [];
 $accountOptions = [];
 foreach (($accounts ?? []) as $account) {
@@ -141,6 +145,7 @@ $kindLabels = [
                 <th><?= e(__('treasury.import.col_source')) ?></th>
                 <th><?= e(__('treasury.import.col_sample')) ?></th>
                 <th><?= e(__('treasury.import.col_target')) ?></th>
+                <th><?= e(__('treasury.import.col_rule')) ?></th>
             </tr>
             </thead>
             <tbody>
@@ -149,6 +154,13 @@ $kindLabels = [
                 $index = (int) $column['index'];
                 $currentTarget = (string) ($map[$index] ?? $column['suggested']);
                 $kindKey = $kindLabels[(string) $column['kind']] ?? '';
+                $transform = is_array($transforms[$index] ?? null)
+                    ? $transforms[$index]
+                    : ['pattern' => '', 'replacement' => ''];
+                $rxSamples = [];
+                foreach (array_slice($table['rows'], 0, 3) as $rxRow) {
+                    $rxSamples[] = (string) ($rxRow['cells'][$index] ?? '');
+                }
                 ?>
                 <tr>
                     <td>
@@ -177,11 +189,60 @@ $kindLabels = [
                             'attrs' => ['data-import-map-select' => true],
                         ]) ?>
                     </td>
+                    <td class="import-col-rule">
+                        <?php $rxJson = json_encode($rxSamples, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_INVALID_UTF8_SUBSTITUTE); ?>
+                        <div class="import-rule" data-import-map-rx
+                             data-samples="<?= e($rxJson !== false ? $rxJson : '[]') ?>"
+                             data-invalid="<?= e(__('treasury.import.regex_invalid')) ?>">
+                            <?= field('text', [
+                                'name' => 'regex[' . $index . '][pattern]',
+                                'id' => 'treasury-import-regex-' . $index,
+                                'label' => '',
+                                'value' => (string) ($transform['pattern'] ?? ''),
+                                'context' => 'setup',
+                                'placeholder' => (string) __('treasury.import.regex_pattern_placeholder'),
+                                'wrapper_class' => 'import-rule-field',
+                                'input_class' => 'import-rule-input',
+                                'attrs' => [
+                                    'data-import-map-rx-pattern' => true,
+                                    'aria-label' => (string) __('treasury.import.regex_pattern_label'),
+                                    'autocomplete' => 'off',
+                                    'spellcheck' => 'false',
+                                ],
+                            ]) ?>
+                            <?= field('text', [
+                                'name' => 'regex[' . $index . '][replacement]',
+                                'id' => 'treasury-import-regex-replace-' . $index,
+                                'label' => '',
+                                'value' => (string) ($transform['replacement'] ?? ''),
+                                'context' => 'setup',
+                                'placeholder' => (string) __('treasury.import.regex_replace_placeholder'),
+                                'wrapper_class' => 'import-rule-field',
+                                'input_class' => 'import-rule-input',
+                                'attrs' => [
+                                    'data-import-map-rx-replace' => true,
+                                    'aria-label' => (string) __('treasury.import.regex_replace_label'),
+                                    'autocomplete' => 'off',
+                                    'spellcheck' => 'false',
+                                ],
+                            ]) ?>
+                            <ul class="import-rule-preview" data-import-map-rx-preview>
+                                <?php foreach (($regexPreviews[$index] ?? []) as $preview): ?>
+                                    <li>
+                                        <span class="import-rule-raw"><?= e(mb_strimwidth((string) $preview['raw'], 0, 60, '…')) ?></span>
+                                        <span class="import-rule-arrow" aria-hidden="true">→</span>
+                                        <span class="import-rule-value"><?= e(mb_strimwidth((string) $preview['value'], 0, 60, '…')) ?></span>
+                                    </li>
+                                <?php endforeach; ?>
+                            </ul>
+                        </div>
+                    </td>
                 </tr>
             <?php endforeach; ?>
             </tbody>
         </table>
     </div>
+    <p class="muted import-rule-hint"><?= e(__('treasury.import.regex_hint')) ?></p>
 </section>
 
 <section class="panel import-panel">

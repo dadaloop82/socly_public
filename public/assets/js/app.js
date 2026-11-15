@@ -17954,6 +17954,114 @@ function initBudgetGrid(scope = document) {
 })();
 
 /*
+ * Treasury import: optional regular expression per column with a live preview on the sample rows.
+ * The rule is authoritative on the server; here we only mirror it to show what the import will use.
+ */
+(() => {
+  const boxes = Array.from(document.querySelectorAll('[data-import-map-rx]'));
+  if (boxes.length === 0) return;
+
+  const delimiters = ['/', '#', '~', '%', '!', '@'];
+
+  const parsePattern = (raw) => {
+    const value = typeof raw === 'string' ? raw.trim() : '';
+    if (value === '') return null;
+    for (const delimiter of delimiters) {
+      if (!value.startsWith(delimiter)) continue;
+      const end = value.lastIndexOf(delimiter);
+      if (end <= 0) break;
+      const flags = value.slice(end + 1);
+      if (flags !== '' && !/^[a-z]+$/.test(flags)) break;
+      return { body: value.slice(1, end), flags };
+    }
+    return { body: value, flags: '' };
+  };
+
+  const buildFlags = (flags, extra) => {
+    const set = new Set((flags.replace(/[^imsxu]/g, '') + extra).split(''));
+    set.add('u');
+    return Array.from(set).join('');
+  };
+
+  const applyRule = (sample, pattern, replacement) => {
+    if (replacement !== '') {
+      const regex = new RegExp(pattern.body, buildFlags(pattern.flags, 'g'));
+      return sample.replace(regex, replacement);
+    }
+    const regex = new RegExp(pattern.body, buildFlags(pattern.flags, ''));
+    const match = regex.exec(sample);
+    if (!match) return sample;
+    return match[1] !== undefined && match[1] !== '' ? match[1] : match[0];
+  };
+
+  const item = (className, text) => {
+    const element = document.createElement('li');
+    element.className = className;
+    element.textContent = text;
+    return element;
+  };
+
+  const render = (box) => {
+    const output = box.querySelector('[data-import-map-rx-preview]');
+    const patternInput = box.querySelector('[data-import-map-rx-pattern]');
+    const replaceInput = box.querySelector('[data-import-map-rx-replace]');
+    if (!(output instanceof HTMLElement) || !(patternInput instanceof HTMLInputElement)) return;
+
+    let samples = [];
+    try {
+      samples = JSON.parse(box.dataset.samples || '[]');
+    } catch (error) {
+      samples = [];
+    }
+    if (!Array.isArray(samples)) samples = [];
+    samples = samples
+      .map((sample) => String(sample))
+      .filter((sample) => sample.trim() !== '');
+
+    output.textContent = '';
+    const pattern = parsePattern(patternInput.value);
+    if (pattern === null || samples.length === 0) {
+      output.hidden = true;
+      return;
+    }
+    output.hidden = false;
+    const replacement = replaceInput instanceof HTMLInputElement ? replaceInput.value.trim() : '';
+
+    let values = [];
+    try {
+      values = samples.map((sample) => applyRule(sample, pattern, replacement));
+    } catch (error) {
+      const label = box.dataset.invalid || 'Invalid regular expression';
+      output.appendChild(item('import-rule-invalid', label));
+      return;
+    }
+
+    samples.forEach((sample, index) => {
+      const row = document.createElement('li');
+      const raw = document.createElement('span');
+      raw.className = 'import-rule-raw';
+      raw.textContent = sample;
+      const arrow = document.createElement('span');
+      arrow.className = 'import-rule-arrow';
+      arrow.setAttribute('aria-hidden', 'true');
+      arrow.textContent = '→';
+      const value = document.createElement('span');
+      value.className = 'import-rule-value';
+      value.textContent = values[index];
+      row.append(raw, arrow, value);
+      output.appendChild(row);
+    });
+  };
+
+  boxes.forEach((box) => {
+    if (!(box instanceof HTMLElement)) return;
+    box.querySelectorAll('[data-import-map-rx-pattern], [data-import-map-rx-replace]')
+      .forEach((input) => input.addEventListener('input', () => render(box)));
+    render(box);
+  });
+})();
+
+/*
  * Import members: names in other languages ​​are compiled from the Italian name.
  */
 (() => {
