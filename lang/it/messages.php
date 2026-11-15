@@ -620,7 +620,7 @@ return [
         'group_treasury' => 'Prima cassa',
         'group_budgets' => 'Preventivi e bilanci',
         'group_org' => 'Organi e persone',
-        'plugin_hint' => 'Gli eventi dei plugin e degli add-on compaiono qui quando sono installati e attivi.',
+        'plugin_hint' => 'Gli eventi dei plugin e degli add-on compaiono qui quando l’add-on è disponibile (installato o nei sorgenti); le regole si eseguono quando l’add-on è attivo.',
         'event_user_updated' => 'Operatore modificato',
         'event_user_deleted' => 'Operatore eliminato',
         'event_member_created' => 'Nuovo socio creato',

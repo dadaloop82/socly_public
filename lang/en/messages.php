@@ -616,7 +616,7 @@ return [
         'group_treasury' => 'Treasury',
         'group_budgets' => 'Budgets & statements',
         'group_org' => 'Bodies & people',
-        'plugin_hint' => 'Plugin and add-on events appear here when they are installed and active.',
+        'plugin_hint' => 'Plugin and add-on events appear here when the add-on is available (installed or in the sources); rules run when the add-on is active.',
         'event_user_updated' => 'Operator updated',
         'event_user_deleted' => 'Operator deleted',
         'event_member_created' => 'New member created',

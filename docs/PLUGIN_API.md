@@ -130,6 +130,14 @@ final class MyPlugin implements PluginInterface, WorkflowEventProviderInterface
 ```
 
 - The groups and events appear in the Workflow picker **only while the plugin is enabled**.
+- Add-ons that do **not** implement the interface are still detected. `WorkflowService` scans every
+  add-on available on disk (`storage/addons/<id>/<version>/`, `addons/`, `addons-src/<id>/`) for
+  `$this->audit->log('namespace.action', …)` and `$this->workflow->dispatch('namespace.event', …)`,
+  including quoted actions passed through variables that share the audit namespace. One group per
+  add-on is cached in `storage/cache/workflow_addons.json`; the interface remains the way to provide
+  polished/localized labels and an explicit audit map.
+- Auto-discovered groups are listed for every available add-on, but their rules only fire when the
+  add-on is installed and active.
 - Labels must be final display strings (use the plugin's own `AddonText`); core labels are lang keys.
 - Event keys are stored in `workflow_rules.event_key` (max 80 chars, `[a-z0-9_.-]`).
 - The audit bridge is optional: the plugin can also emit explicitly:

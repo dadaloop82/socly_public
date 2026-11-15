@@ -34,6 +34,9 @@ final class WorkflowService
 {
     private static bool $dispatching = false;
 
+    /** Bump when add-on discovery logic changes, so the persistent cache is rebuilt. */
+    private const ADDON_EVENTS_CACHE_VERSION = 4;
+
     /** @var array<string, WorkflowEventProviderInterface>|null */
     private ?array $pluginProviders = null;
 
@@ -42,6 +45,9 @@ final class WorkflowService
 
     /** @var array<string, array<string, string>>|null */
     private ?array $eventGroupsCache = null;
+
+    /** @var array{groups:array<string,array<string,string>>,audit:array<string,string>}|null */
+    private ?array $addonEventsCache = null;
 
     public function __construct(
         private readonly Database $db,
@@ -162,6 +168,24 @@ final class WorkflowService
             }
         }
 
+        // Add-ons available on disk may not implement the provider interface yet (older packages):
+        // discover their actions from the source as a fallback.
+        $known = [];
+        foreach ($groups as $events) {
+            foreach ($events as $eventKey => $label) {
+                $known[$eventKey] = $label;
+            }
+        }
+        foreach ($this->addonEvents()['groups'] as $groupLabel => $events) {
+            foreach ($events as $eventKey => $label) {
+                if (!is_string($eventKey) || !is_string($label) || isset($known[$eventKey])) {
+                    continue;
+                }
+                $groups[$groupLabel][$eventKey] = $label;
+                $known[$eventKey] = $label;
+            }
+        }
+
         return $this->eventGroupsCache = $groups;
     }
 
@@ -244,6 +268,12 @@ final class WorkflowService
             }
         }
 
+        foreach ($this->addonEvents()['audit'] as $action => $eventKey) {
+            if (isset($events[$eventKey]) && !isset($map[$action])) {
+                $map[$action] = $eventKey;
+            }
+        }
+
         return $this->auditMap = $map;
     }
 
@@ -268,6 +298,466 @@ final class WorkflowService
         }
 
         return $this->pluginProviders = $out;
+    }
+
+    /**
+     * Workflow event for an audit action. Core actions return without scanning add-ons, so the
+     * audit bridge stays cheap for the vast majority of writes.
+     */
+    private function auditEventFor(string $action): string
+    {
+        $core = self::coreAuditMap();
+        if (isset($core[$action])) {
+            return $core[$action];
+        }
+        if ($this->isInternalAuditAction($action)) {
+            return '';
+        }
+
+        return $this->addonEvents()['audit'][$action] ?? '';
+    }
+
+    private function isInternalAuditAction(string $action): bool
+    {
+        foreach (['workflow.', 'settings.', 'login', 'logout', 'password.', 'plugin.', 'addon.', 'update.', 'install.', 'demo.'] as $prefix) {
+            if (str_starts_with($action, $prefix)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * Events discovered from all available add-ons: packages in storage/addons (installed or just
+     * copied), the addons/ drop-in and the addons-src/ sources. Older packages do not implement
+     * WorkflowEventProviderInterface, so their audit actions and explicit workflow dispatches are
+     * read from the PHP source and cached in storage/cache/workflow_addons.json.
+     *
+     * @return array{groups:array<string,array<string,string>>,audit:array<string,string>}
+     */
+    private function addonEvents(): array
+    {
+        if ($this->addonEventsCache !== null) {
+            return $this->addonEventsCache;
+        }
+        $empty = ['groups' => [], 'audit' => []];
+        $codePath = defined('SOCLY_CODE_PATH') ? SOCLY_CODE_PATH : dirname(__DIR__, 2);
+        $installRoot = function_exists('storage_path') ? storage_path('addons') : $codePath . '/storage/addons';
+        $candidates = $this->availableAddons((string) $installRoot, (string) $codePath);
+        if ($candidates === []) {
+            return $this->addonEventsCache = $empty;
+        }
+
+        $signature = $this->addonEventsSignature($candidates);
+        $cached = $this->readAddonEventsCache($signature);
+        if ($cached !== null) {
+            return $this->addonEventsCache = $cached;
+        }
+
+        $coreEvents = [];
+        foreach (self::coreEventGroups() as $events) {
+            foreach ($events as $eventKey => $label) {
+                $coreEvents[$eventKey] = true;
+            }
+        }
+        $coreAudit = self::coreAuditMap();
+        $groups = [];
+        $audit = [];
+        foreach ($candidates as $candidate) {
+            $id = $candidate['id'];
+            $name = $candidate['name'];
+            $real = realpath($candidate['dir']);
+            if ($real === false || !is_dir($real)) {
+                continue;
+            }
+            $found = $this->scanAddonEvents($real);
+            $labels = [];
+            foreach (array_keys($found['audit']) as $action) {
+                $action = (string) $action;
+                if (!$this->validEventKey($action) || isset($coreEvents[$action]) || isset($coreAudit[$action])
+                    || $this->isInternalAuditAction($action)) {
+                    continue;
+                }
+                $labels[$action] = $this->addonEventLabel($action, $id);
+                if (!isset($audit[$action])) {
+                    $audit[$action] = $action;
+                }
+            }
+            foreach (array_keys($found['dispatch']) as $eventKey) {
+                $eventKey = (string) $eventKey;
+                if (!$this->validEventKey($eventKey) || isset($coreEvents[$eventKey])
+                    || $this->isInternalAuditAction($eventKey)) {
+                    continue;
+                }
+                $labels[$eventKey] = $this->addonEventLabel($eventKey, $id);
+            }
+            if ($labels === []) {
+                continue;
+            }
+            if (!isset($groups[$name])) {
+                $groups[$name] = [];
+            }
+            foreach ($labels as $eventKey => $label) {
+                if (!isset($groups[$name][$eventKey])) {
+                    $groups[$name][$eventKey] = $label;
+                }
+            }
+        }
+
+        $data = ['groups' => $groups, 'audit' => $audit];
+        $this->writeAddonEventsCache($signature, $data);
+
+        return $this->addonEventsCache = $data;
+    }
+
+    /**
+     * @param list<array{id:string,version:string,name:string,entry:string,dir:string,source:string}> $candidates
+     */
+    private function addonEventsSignature(array $candidates): string
+    {
+        $parts = [];
+        foreach ($candidates as $candidate) {
+            $dir = rtrim($candidate['dir'], '/');
+            $fileParts = [];
+            foreach ($this->addonPhpFiles($dir) as $file) {
+                $relative = str_starts_with($file, $dir . '/') ? substr($file, strlen($dir) + 1) : $file;
+                $fileParts[] = $relative . ':' . (string) @filesize($file) . ':' . (string) @filemtime($file);
+            }
+            $parts[] = implode('|', [
+                $candidate['id'],
+                $candidate['version'],
+                $candidate['name'],
+                $candidate['entry'],
+                $candidate['source'],
+                hash('sha256', implode("\n", $fileParts)),
+            ]);
+        }
+
+        return hash('sha256', implode("\n", array_merge([(string) self::ADDON_EVENTS_CACHE_VERSION], $parts)));
+    }
+
+    /**
+     * Every add-on we can see on disk: installed packages, the legacy addons/ drop-in and the
+     * addons-src/ development sources. One candidate per add-on id, highest version wins.
+     *
+     * @return list<array{id:string,version:string,name:string,entry:string,dir:string,source:string}>
+     */
+    private function availableAddons(string $installRoot, string $codePath): array
+    {
+        $found = [];
+        foreach ([$installRoot, rtrim($codePath, '/') . '/addons'] as $root) {
+            if (!is_dir($root)) {
+                continue;
+            }
+            foreach (glob(rtrim($root, '/') . '/*', GLOB_ONLYDIR) ?: [] as $idDir) {
+                $id = basename($idDir);
+                if (in_array($id, ['incoming', 'keys'], true) || !$this->validAddonSegment($id)) {
+                    continue;
+                }
+                foreach (glob(rtrim($idDir, '/') . '/*', GLOB_ONLYDIR) ?: [] as $versionDir) {
+                    $version = basename($versionDir);
+                    if (!$this->validAddonSegment($version) || str_contains($version, '.bak-')) {
+                        continue;
+                    }
+                    $manifest = $this->addonManifest($versionDir);
+                    $entry = $this->addonEntry($manifest);
+                    if (!is_file(rtrim($versionDir, '/') . '/' . $entry)) {
+                        continue;
+                    }
+                    $name = trim((string) ($manifest['name'] ?? ''));
+                    $this->addAddonCandidate(
+                        $found,
+                        $id,
+                        $version,
+                        $name !== '' ? $name : $id,
+                        $entry,
+                        $versionDir,
+                        'package'
+                    );
+                }
+            }
+        }
+
+        $sourceRoot = rtrim($codePath, '/') . '/addons-src';
+        if (is_dir($sourceRoot)) {
+            foreach (glob($sourceRoot . '/*', GLOB_ONLYDIR) ?: [] as $dir) {
+                $manifest = $this->addonManifest($dir);
+                $id = trim((string) ($manifest['id'] ?? ''));
+                if ($id === '' || !$this->validAddonSegment($id)) {
+                    $id = basename($dir);
+                }
+                $version = trim((string) ($manifest['version'] ?? ''));
+                if ($version === '' || !$this->validAddonSegment($version)) {
+                    $version = '0.0.0';
+                }
+                $entry = $this->addonEntry($manifest);
+                if (!$this->validAddonSegment($id) || !is_file(rtrim($dir, '/') . '/' . $entry)) {
+                    continue;
+                }
+                $name = trim((string) ($manifest['name'] ?? ''));
+                $this->addAddonCandidate(
+                    $found,
+                    $id,
+                    $version,
+                    $name !== '' ? $name : $id,
+                    $entry,
+                    $dir,
+                    'source'
+                );
+            }
+        }
+
+        return array_values($found);
+    }
+
+    /**
+     * @param array<string,array{id:string,version:string,name:string,entry:string,dir:string,source:string}> $found
+     */
+    private function addAddonCandidate(
+        array &$found,
+        string $id,
+        string $version,
+        string $name,
+        string $entry,
+        string $dir,
+        string $source
+    ): void {
+        if (!$this->validAddonSegment($id) || !$this->validAddonSegment($version)
+            || !$this->validAddonEntry($entry) || !is_dir($dir)) {
+            return;
+        }
+        $candidate = [
+            'id' => $id,
+            'version' => $version,
+            'name' => $name !== '' ? $name : $id,
+            'entry' => $entry,
+            'dir' => rtrim($dir, '/'),
+            'source' => $source,
+        ];
+        if (!isset($found[$id]) || version_compare($version, $found[$id]['version'], '>')) {
+            $found[$id] = $candidate;
+        }
+    }
+
+    /** @return array<string,mixed> */
+    private function addonManifest(string $dir): array
+    {
+        $file = rtrim($dir, '/') . '/addon.json';
+        if (!is_file($file) || (int) @filesize($file) > 131_072) {
+            return [];
+        }
+        $raw = @file_get_contents($file);
+        if (!is_string($raw) || $raw === '') {
+            return [];
+        }
+        $data = json_decode($raw, true);
+
+        return is_array($data) ? $data : [];
+    }
+
+    /** @param array<string,mixed> $manifest */
+    private function addonEntry(array $manifest): string
+    {
+        $entry = (string) ($manifest['entry'] ?? 'plugin.php');
+
+        return $this->validAddonEntry($entry) ? $entry : 'plugin.php';
+    }
+
+    private function validAddonEntry(string $entry): bool
+    {
+        return preg_match('#^[A-Za-z0-9._/-]+\.php$#', $entry) === 1
+            && !str_contains($entry, '..');
+    }
+
+    /**
+     * Read audit actions and explicit dispatches from an add-on version directory. Actions passed
+     * through a variable are recovered from quoted literals sharing the same namespace prefix.
+     *
+     * @return array{audit:array<string,true>,dispatch:array<string,true>}
+     */
+    private function scanAddonEvents(string $dir): array
+    {
+        $audit = [];
+        $dispatch = [];
+        $literals = [];
+        $auditPattern = '/->audit\s*->\s*log\s*\(\s*[\'"]([A-Za-z0-9_.-]{3,80})[\'"]/';
+        $dispatchPattern = '/->workflow\s*->\s*dispatch\s*\(\s*[\'"]([A-Za-z0-9_.-]{3,80})[\'"]/';
+        $servicePattern = '/WorkflowService::class\s*\)\s*->\s*dispatch\s*\(\s*[\'"]([A-Za-z0-9_.-]{3,80})[\'"]/';
+        $literalPattern = '/[\'"]([a-z0-9][a-z0-9_.-]{2,79})[\'"]/';
+        foreach ($this->addonPhpFiles($dir) as $file) {
+            $source = @file_get_contents($file, false, null, 0, 2_000_000);
+            if (!is_string($source) || $source === '') {
+                continue;
+            }
+            if (preg_match_all($auditPattern, $source, $matches) > 0) {
+                foreach ($matches[1] as $action) {
+                    $audit[(string) $action] = true;
+                }
+            }
+            if (preg_match_all($dispatchPattern, $source, $matches) > 0) {
+                foreach ($matches[1] as $eventKey) {
+                    $dispatch[(string) $eventKey] = true;
+                }
+            }
+            if (preg_match_all($servicePattern, $source, $matches) > 0) {
+                foreach ($matches[1] as $eventKey) {
+                    $dispatch[(string) $eventKey] = true;
+                }
+            }
+            if (preg_match_all($literalPattern, $source, $matches) > 0) {
+                foreach ($matches[1] as $literal) {
+                    $literal = (string) $literal;
+                    if (str_contains($literal, '.')) {
+                        $literals[$literal] = true;
+                    }
+                }
+            }
+        }
+
+        $prefixes = [];
+        foreach (array_keys($audit) as $action) {
+            $dot = strpos($action, '.');
+            if ($dot !== false && $dot > 0) {
+                $prefixes[substr($action, 0, $dot + 1)] = true;
+            }
+        }
+        foreach (array_keys($literals) as $literal) {
+            foreach (array_keys($prefixes) as $prefix) {
+                if ($literal !== $prefix && str_starts_with($literal, $prefix)) {
+                    $audit[$literal] = true;
+                    break;
+                }
+            }
+        }
+
+        return ['audit' => $audit, 'dispatch' => $dispatch];
+    }
+
+    /** @return list<string> */
+    private function addonPhpFiles(string $dir): array
+    {
+        $files = [];
+        try {
+            $iterator = new \RecursiveIteratorIterator(
+                new \RecursiveDirectoryIterator($dir, \FilesystemIterator::SKIP_DOTS),
+                \RecursiveIteratorIterator::LEAVES_ONLY
+            );
+            foreach ($iterator as $file) {
+                if (!$file instanceof \SplFileInfo || !$file->isFile()) {
+                    continue;
+                }
+                if (strtolower($file->getExtension()) !== 'php') {
+                    continue;
+                }
+                $path = $file->getPathname();
+                if (str_contains($path, DIRECTORY_SEPARATOR . 'vendor' . DIRECTORY_SEPARATOR)) {
+                    continue;
+                }
+                if ($file->getSize() > 2_000_000) {
+                    continue;
+                }
+                $files[] = $path;
+                if (count($files) >= 500) {
+                    break;
+                }
+            }
+        } catch (\Throwable) {
+            return [];
+        }
+
+        return $files;
+    }
+
+    private function addonEventLabel(string $eventKey, string $addonId): string
+    {
+        $short = $eventKey;
+        if ($addonId !== '' && str_starts_with($short, $addonId . '.')) {
+            $short = substr($short, strlen($addonId) + 1);
+        }
+        $short = trim(str_replace(['.', '_', '-'], ' ', $short));
+
+        return $short !== '' ? ucfirst($short) : $eventKey;
+    }
+
+    /**
+     * @return array{groups:array<string,array<string,string>>,audit:array<string,string>}|null
+     */
+    private function readAddonEventsCache(string $signature): ?array
+    {
+        $path = $this->addonEventsCachePath();
+        if ($path === null || !is_file($path)) {
+            return null;
+        }
+        $raw = @file_get_contents($path);
+        if (!is_string($raw) || $raw === '') {
+            return null;
+        }
+        $data = json_decode($raw, true);
+        if (!is_array($data) || (string) ($data['signature'] ?? '') !== $signature) {
+            return null;
+        }
+        $groups = [];
+        foreach ((array) ($data['groups'] ?? []) as $label => $events) {
+            if (is_string($label) && is_array($events)) {
+                $groups[$label] = $events;
+            }
+        }
+        $audit = [];
+        foreach ((array) ($data['audit'] ?? []) as $action => $eventKey) {
+            if (is_string($action) && is_string($eventKey)) {
+                $audit[$action] = $eventKey;
+            }
+        }
+
+        return ['groups' => $groups, 'audit' => $audit];
+    }
+
+    /** @param array{groups:array<string,array<string,string>>,audit:array<string,string>} $data */
+    private function writeAddonEventsCache(string $signature, array $data): void
+    {
+        $path = $this->addonEventsCachePath();
+        if ($path === null) {
+            return;
+        }
+        $dir = dirname($path);
+        if (!is_dir($dir)) {
+            if (function_exists('ensure_directory')) {
+                ensure_directory($dir);
+            } else {
+                @mkdir($dir, 0775, true);
+            }
+        }
+        if (!is_dir($dir)) {
+            return;
+        }
+        $json = json_encode([
+            'signature' => $signature,
+            'groups' => $data['groups'],
+            'audit' => $data['audit'],
+        ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+        if (is_string($json)) {
+            @file_put_contents($path, $json, LOCK_EX);
+        }
+    }
+
+    private function addonEventsCachePath(): ?string
+    {
+        try {
+            if (!function_exists('storage_path')) {
+                return null;
+            }
+
+            return storage_path('cache/workflow_addons.json');
+        } catch (\Throwable) {
+            return null;
+        }
+    }
+
+    private function validAddonSegment(string $segment): bool
+    {
+        return preg_match('/^[A-Za-z0-9][A-Za-z0-9_.+-]{0,80}$/', $segment) === 1
+            && !str_contains($segment, '..');
     }
 
     private function validEventKey(string $key): bool
@@ -360,7 +850,7 @@ final class WorkflowService
             return 0;
         }
         try {
-            $eventKey = $this->auditEventMap()[$action] ?? '';
+            $eventKey = $this->auditEventFor($action);
             if ($eventKey === '') {
                 return 0;
             }

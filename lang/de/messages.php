@@ -616,7 +616,7 @@ return [
         'group_treasury' => 'Kasse',
         'group_budgets' => 'Voranschläge & Bilanzen',
         'group_org' => 'Organe & Personen',
-        'plugin_hint' => 'Ereignisse von Plugins und Add-ons erscheinen hier, sobald sie installiert und aktiv sind.',
+        'plugin_hint' => 'Ereignisse von Plugins und Add-ons erscheinen hier, sobald das Add-on verfügbar ist (installiert oder im Quellcode); die Regeln laufen, sobald das Add-on aktiv ist.',
         'event_user_updated' => 'Benutzer bearbeitet',
         'event_user_deleted' => 'Benutzer gelöscht',
         'event_member_created' => 'Neues Mitglied angelegt',

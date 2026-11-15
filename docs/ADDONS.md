@@ -225,6 +225,14 @@ from `/internal-forum` (permission `members.manage`, nested under “Soci”). E
 php tools/addons/addon-tool.php build addons-src/internal_forum dist/internal_forum-1.0.1.soclyaddon --incoming
 ```
 
+## Workflow events from add-ons
+
+Settings → Workflow lists a group for every add-on available on disk, even when the package does not
+implement `WorkflowEventProviderInterface`: core scans the add-on PHP sources for audit actions and
+explicit workflow dispatches, caches the result in `storage/cache/workflow_addons.json`, and forwards
+matching audit actions automatically. Implementing the interface is still recommended for localized
+labels and an explicit audit map. Rules only run while the add-on is installed and active.
+
 ## Instance workflow
 
 Settings → Add-ons (`/settings/addons`, permission `addons.manage`):
