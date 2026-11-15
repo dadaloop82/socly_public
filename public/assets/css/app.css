@@ -13233,6 +13233,17 @@ tr.doc-row-editable:focus-visible {
 .suppliers-name { font-weight: 700; color: var(--brand-primary-deep); text-decoration: none; }
 .suppliers-name:hover,
 .suppliers-name:focus-visible { text-decoration: underline; }
+/* “Socio” badge: this counterparty also exists in the member archive (green = active relation). */
+.suppliers-member-badge {
+  margin-left: 0.45rem;
+  background: color-mix(in srgb, var(--ok) 14%, white);
+  color: var(--ok);
+  text-decoration: none;
+  vertical-align: middle;
+}
+a.suppliers-member-badge:hover,
+a.suppliers-member-badge:focus-visible { text-decoration: underline; }
+.suppliers-members-count { margin-left: 0.4rem; font-size: 0.85rem; }
 .suppliers-actions { text-align: right; white-space: nowrap; }
 .tmf-similar-probe {
   position: relative;

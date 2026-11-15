@@ -21,23 +21,31 @@
  */
 
 /**
- * “Gestione fornitori”: the free-text counterparties of the register (suppliers, bodies, people)
- * with how much money came in and went out for each of them. The action links straight to the
- * ledger filtered on that supplier, so the single movements stay one click away.
+ * “Gestione controparti”: the free-text counterparties of the register (suppliers, bodies, people)
+ * with how much money came in and went out for each of them. A counterparty whose name matches a
+ * member profile gets the “Socio” badge (linked to the card when unambiguous), and the party filter
+ * narrows the list to members or to non-members. The action links straight to the ledger filtered on
+ * that counterparty, so the single movements stay one click away.
  *
- * @var list<array{name:string,movements:int,income:float,expense:float,net:float,last_date:string,last_date_formatted:string}> $suppliers
- * @var array{suppliers:int,movements:int,income:float,expense:float} $supplier_totals
+ * @var list<array{name:string,is_member:bool,member_id:int,movements:int,income:float,expense:float,net:float,last_date:string,last_date_formatted:string}> $suppliers
+ * @var array{suppliers:int,members:int,movements:int,income:float,expense:float} $supplier_totals
  * @var string $search_query
  * @var string $sort
+ * @var string $party
  * @var \Socly\Services\CurrencyService $currency
  */
 $suppliers = is_array($suppliers ?? null) ? $suppliers : [];
-$totals = is_array($supplier_totals ?? null) ? $supplier_totals : ['suppliers' => 0, 'movements' => 0, 'income' => 0, 'expense' => 0];
+$totals = is_array($supplier_totals ?? null) ? $supplier_totals : ['suppliers' => 0, 'members' => 0, 'movements' => 0, 'income' => 0, 'expense' => 0];
 $query = (string) ($search_query ?? '');
 $sortKey = (string) ($sort ?? 'volume') === 'name' ? 'name' : 'volume';
+$partyKey = in_array((string) ($party ?? ''), ['members', 'others'], true) ? (string) $party : '';
 $ledgerUrl = static fn (string $name): string => url('/treasury?' . http_build_query(['beneficiary' => $name]));
-$resetUrl = static function () use ($query, $sortKey): string {
-    $params = array_filter(['q' => $query, 'sort' => $sortKey === 'volume' ? '' : $sortKey]);
+$resetUrl = static function () use ($query, $sortKey, $partyKey): string {
+    $params = array_filter([
+        'q' => $query,
+        'sort' => $sortKey === 'volume' ? '' : $sortKey,
+        'party' => $partyKey,
+    ]);
     return url('/treasury/suppliers' . ($params === [] ? '' : '?' . http_build_query($params)));
 };
 ?>
@@ -56,6 +64,9 @@ $resetUrl = static function () use ($query, $sortKey): string {
         <div class="treasury-overview-balance">
             <span class="treasury-overview-label"><?= e(__('treasury.suppliers_count_label')) ?></span>
             <strong class="treasury-overview-value"><?= e((string) (int) $totals['suppliers']) ?></strong>
+            <?php if ((int) ($totals['members'] ?? 0) > 0): ?>
+                <span class="muted suppliers-members-count"><?= e(__('treasury.suppliers_members_count', ['count' => (string) (int) $totals['members']])) ?></span>
+            <?php endif; ?>
         </div>
         <div class="treasury-overview-flows">
             <span class="is-income"><span aria-hidden="true">↓</span> <?= e($currency->format((float) $totals['income'])) ?></span>
@@ -90,9 +101,22 @@ $resetUrl = static function () use ($query, $sortKey): string {
             'name' => (string) __('treasury.suppliers_sort_name'),
         ],
     ]) ?>
+    <?= field('select', [
+        'name' => 'party',
+        'id' => 'suppliers-party',
+        'label' => (string) __('treasury.suppliers_party'),
+        'value' => $partyKey,
+        'context' => 'filter',
+        'include_empty' => false,
+        'options' => [
+            '' => (string) __('treasury.suppliers_party_all'),
+            'members' => (string) __('treasury.suppliers_party_members'),
+            'others' => (string) __('treasury.suppliers_party_others'),
+        ],
+    ]) ?>
     <div class="suppliers-filter-actions">
         <button class="btn btn-sm" type="submit"><?= e(__('treasury.suppliers_search_action')) ?></button>
-        <?php if ($query !== ''): ?>
+        <?php if ($query !== '' || $partyKey !== ''): ?>
             <a class="btn btn-ghost btn-sm" href="<?= e($resetUrl()) ?>"><?= e(__('treasury.filter_reset')) ?></a>
         <?php endif; ?>
     </div>
@@ -102,7 +126,9 @@ $resetUrl = static function () use ($query, $sortKey): string {
 <div class="panel">
     <?php if ($suppliers === []): ?>
         <div class="empty-state">
-            <strong><?= e($query !== '' ? __('treasury.suppliers_empty_search') : __('treasury.suppliers_empty')) ?></strong>
+            <strong><?= e($query !== ''
+                ? __('treasury.suppliers_empty_search')
+                : ($partyKey !== '' ? __('treasury.suppliers_empty_party') : __('treasury.suppliers_empty'))) ?></strong>
             <?php if ($query !== ''): ?>
                 <p class="muted"><?= e(__('treasury.suppliers_empty_search_hint', ['q' => $query])) ?></p>
             <?php endif; ?>
@@ -125,12 +151,24 @@ $resetUrl = static function () use ($query, $sortKey): string {
                 <?php foreach ($suppliers as $supplier): ?>
                     <?php
                     $name = (string) ($supplier['name'] ?? '');
+                    $isMember = !empty($supplier['is_member']);
+                    $memberId = (int) ($supplier['member_id'] ?? 0);
                     $income = (float) ($supplier['income'] ?? 0);
                     $expense = (float) ($supplier['expense'] ?? 0);
                     $net = (float) ($supplier['net'] ?? 0);
                     ?>
                     <tr>
-                        <td><a class="suppliers-name" href="<?= e($ledgerUrl($name)) ?>"><?= e($name) ?></a></td>
+                        <td>
+                            <a class="suppliers-name" href="<?= e($ledgerUrl($name)) ?>"><?= e($name) ?></a>
+                            <?php if ($isMember): ?>
+                                <?php $memberHint = (string) __('treasury.suppliers_member_badge_hint'); ?>
+                                <?php if ($memberId > 0): ?>
+                                    <a class="badge suppliers-member-badge" href="<?= e(url('/members/' . $memberId)) ?>" title="<?= e($memberHint) ?>"><?= e(__('treasury.suppliers_member_badge')) ?></a>
+                                <?php else: ?>
+                                    <span class="badge suppliers-member-badge" title="<?= e($memberHint) ?>"><?= e(__('treasury.suppliers_member_badge')) ?></span>
+                                <?php endif; ?>
+                            <?php endif; ?>
+                        </td>
                         <td class="is-num"><?= e((string) (int) ($supplier['movements'] ?? 0)) ?></td>
                         <td class="is-num is-income"><?= $income > 0 ? e($currency->format($income)) : '—' ?></td>
                         <td class="is-num is-expense"><?= $expense > 0 ? e($currency->format($expense)) : '—' ?></td>

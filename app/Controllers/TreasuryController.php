@@ -866,8 +866,8 @@ final class TreasuryController extends BaseController
     }
 
     /**
-     * “Gestione fornitori”: every supplier of the register with its income/expense shares and a
-     * link to the ledger filtered on that supplier.
+     * “Gestione controparti”: every counterparty of the register with its income/expense shares,
+     * a member badge (and member filter) and a link to the ledger filtered on that counterparty.
      */
     public function suppliers(Request $request): void
     {
@@ -880,13 +880,19 @@ final class TreasuryController extends BaseController
         if (!in_array($sort, ['volume', 'name'], true)) {
             $sort = 'volume';
         }
-        $overview = $this->treasury->supplierOverview($query, $sort);
+        // Members in / members out: '' = all, 'members' = only members, 'others' = exclude them.
+        $party = (string) $request->input('party', '');
+        if (!in_array($party, ['members', 'others'], true)) {
+            $party = '';
+        }
+        $overview = $this->treasury->supplierOverview($query, $sort, $party);
         $this->render('treasury/suppliers', [
             'title' => __('treasury.suppliers_title'),
             'suppliers' => $overview['rows'],
             'supplier_totals' => $overview['totals'],
             'search_query' => $query,
             'sort' => $sort,
+            'party' => $party,
             'currency' => $this->currency,
         ]);
     }
@@ -1075,7 +1081,7 @@ final class TreasuryController extends BaseController
             $approval = '';
         }
         $anomaly = (string) $request->input('anomaly', '') === '1' ? '1' : '';
-        // Supplier drill-down from “Gestione fornitori”: exact name, case/space insensitive.
+        // Supplier drill-down from “Gestione Controparti”: exact name, case/space insensitive.
         $beneficiary = trim((string) preg_replace('/\s+/u', ' ', (string) $request->input('beneficiary', '')));
         if (mb_strlen($beneficiary) > 190) {
             $beneficiary = mb_substr($beneficiary, 0, 190);

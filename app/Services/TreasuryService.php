@@ -1927,18 +1927,24 @@ final class TreasuryService
     }
 
     /**
-     * Suppliers (the free-text counterparty of a movement) with their income/expense shares.
-     * The “Gestione fornitori” page reads this list and links every row to the filtered ledger;
+     * Counterparties (the free-text party of a movement) with their income/expense shares.
+     * The “Gestione controparti” page reads this list and links every row to the filtered ledger;
      * member-linked movements carry no beneficiary and therefore never show up here.
+     * A counterparty whose name matches a member profile gets `is_member`/`member_id`, so the page
+     * can show the “Socio” badge and filter members in or out.
      *
+     * @param string $party '' = all, 'members' = only members, 'others' = exclude members
      * @return array{
-     *     rows:list<array{name:string,movements:int,income:float,expense:float,net:float,last_date:string,last_date_formatted:string}>,
-     *     totals:array{suppliers:int,movements:int,income:float,expense:float}
+     *     rows:list<array{name:string,is_member:bool,member_id:int,movements:int,income:float,expense:float,net:float,last_date:string,last_date_formatted:string}>,
+     *     totals:array{suppliers:int,members:int,movements:int,income:float,expense:float}
      * }
      */
-    public function supplierOverview(string $query = '', string $sort = 'volume'): array
+    public function supplierOverview(string $query = '', string $sort = 'volume', string $party = ''): array
     {
         $query = trim($query);
+        if (!in_array($party, ['members', 'others'], true)) {
+            $party = '';
+        }
         $params = [];
         $where = "m.beneficiary IS NOT NULL AND TRIM(m.beneficiary) <> ''"
             . " AND m.direction IN ('income', 'expense')";
@@ -1986,16 +1992,27 @@ final class TreasuryService
             $merged[$key] = $entry;
         }
 
+        $counterpartyNames = [];
+        foreach ($merged as $entry) {
+            foreach (array_keys((array) $entry['spellings']) as $spelling) {
+                $counterpartyNames[] = (string) $spelling;
+            }
+        }
+        $memberIndex = $this->memberNameIndex($counterpartyNames);
         $list = [];
-        $totals = ['suppliers' => 0, 'movements' => 0, 'income' => 0.0, 'expense' => 0.0];
         foreach ($merged as $entry) {
             $spellings = (array) $entry['spellings'];
             arsort($spellings);
+            $name = (string) array_key_first($spellings);
+            $identity = $this->normalizePartyName($name);
+            $isMember = $identity !== '' && array_key_exists($identity, $memberIndex);
             $income = (float) $entry['income'];
             $expense = (float) $entry['expense'];
             $lastDate = (string) $entry['last_date'];
             $list[] = [
-                'name' => (string) array_key_first($spellings),
+                'name' => $name,
+                'is_member' => $isMember,
+                'member_id' => $isMember ? (int) $memberIndex[$identity] : 0,
                 'movements' => (int) $entry['movements'],
                 'income' => $income,
                 'expense' => $expense,
@@ -2003,10 +2020,24 @@ final class TreasuryService
                 'last_date' => $lastDate,
                 'last_date_formatted' => $lastDate !== '' ? (string) (format_date($lastDate) ?: $lastDate) : '',
             ];
+        }
+        // Members in / members out: filter before counting and sorting so the totals describe
+        // exactly the rows the operator is looking at.
+        if ($party !== '') {
+            $list = array_values(array_filter(
+                $list,
+                static fn (array $row): bool => $party === 'members' ? $row['is_member'] : !$row['is_member']
+            ));
+        }
+        $totals = ['suppliers' => 0, 'members' => 0, 'movements' => 0, 'income' => 0.0, 'expense' => 0.0];
+        foreach ($list as $row) {
             $totals['suppliers']++;
-            $totals['movements'] += (int) $entry['movements'];
-            $totals['income'] += $income;
-            $totals['expense'] += $expense;
+            if ($row['is_member']) {
+                $totals['members']++;
+            }
+            $totals['movements'] += (int) $row['movements'];
+            $totals['income'] += (float) $row['income'];
+            $totals['expense'] += (float) $row['expense'];
         }
         if ($sort === 'name') {
             usort($list, static fn (array $a, array $b): int => strnatcasecmp($a['name'], $b['name']));
@@ -2016,6 +2047,87 @@ final class TreasuryService
         }
 
         return ['rows' => $list, 'totals' => $totals];
+    }
+
+    /**
+     * Normalised member display names used to recognise a counterparty that is also a member.
+     * Only members whose first or last name shares a token with a counterparty are loaded, so the
+     * lookup stays small even on large archives. Both “first last” and “last first” forms are
+     * indexed; when two members share the same name the id becomes 0 (ambiguous) so the UI never
+     * links the wrong profile.
+     *
+     * @param list<string> $counterpartyNames
+     * @return array<string,int> normalised name => member id (0 = ambiguous)
+     */
+    private function memberNameIndex(array $counterpartyNames): array
+    {
+        $tokens = [];
+        foreach ($counterpartyNames as $name) {
+            $normalised = $this->normalizePartyName($name);
+            if ($normalised === '') {
+                continue;
+            }
+            foreach (explode(' ', $normalised) as $token) {
+                if ($token !== '' && mb_strlen($token) >= 2) {
+                    $tokens[$token] = true;
+                }
+            }
+        }
+        if ($tokens === []) {
+            return [];
+        }
+        $tokenList = array_keys($tokens);
+        $placeholders = implode(',', array_fill(0, count($tokenList), '?'));
+        $rows = $this->db->fetchAll(
+            "SELECT v.member_id, d.`key`, v.value
+             FROM member_field_values v
+             INNER JOIN member_field_definitions d ON d.id = v.field_definition_id
+             WHERE d.`key` IN ('first_name', 'last_name')
+               AND LOWER(TRIM(v.value)) IN ({$placeholders})",
+            $tokenList
+        );
+        $parts = [];
+        foreach ($rows as $row) {
+            $id = (int) ($row['member_id'] ?? 0);
+            if ($id < 1) {
+                continue;
+            }
+            $parts[$id] = $parts[$id] ?? ['first' => '', 'last' => ''];
+            if ((string) $row['key'] === 'first_name') {
+                $parts[$id]['first'] = trim((string) $row['value']);
+            } else {
+                $parts[$id]['last'] = trim((string) $row['value']);
+            }
+        }
+        $index = [];
+        foreach ($parts as $id => $nameParts) {
+            $first = $nameParts['first'];
+            $last = $nameParts['last'];
+            if ($first === '' || $last === '') {
+                continue;
+            }
+            foreach ([$first . ' ' . $last, $last . ' ' . $first] as $label) {
+                $key = $this->normalizePartyName($label);
+                if ($key === '') {
+                    continue;
+                }
+                if (!array_key_exists($key, $index)) {
+                    $index[$key] = $id;
+                } elseif ($index[$key] !== $id) {
+                    $index[$key] = 0;
+                }
+            }
+        }
+
+        return $index;
+    }
+
+    /** Case/space-insensitive key used to compare counterparty names with member names. */
+    private function normalizePartyName(string $name): string
+    {
+        $name = preg_replace('/\s+/u', ' ', trim($name)) ?? '';
+
+        return mb_strtolower($name);
     }
 
     /**
