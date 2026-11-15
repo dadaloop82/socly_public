@@ -184,8 +184,24 @@ final class ImportValueNormalizer
         if ($raw === '') {
             return null;
         }
+        // Accounting exports may use a Unicode minus, parentheses or a trailing sign.
+        $raw = str_replace(['−', '–', '—'], '-', $raw);
+        $negative = false;
+        if (str_starts_with($raw, '(') && str_ends_with($raw, ')')) {
+            $negative = true;
+            $raw = trim(substr($raw, 1, -1));
+        }
+        // Keep only digits, decimal/thousand separators and the sign: currency symbols, letters,
+        // spaces and every other decoration are ignored.
         $raw = (string) preg_replace('/[^\d,.\-]/u', '', $raw);
         if ($raw === '' || $raw === '-') {
+            return null;
+        }
+        if (str_contains($raw, '-')) {
+            $negative = true;
+            $raw = str_replace('-', '', $raw);
+        }
+        if ($raw === '') {
             return null;
         }
         $hasComma = str_contains($raw, ',');
@@ -207,7 +223,12 @@ final class ImportValueNormalizer
                 $raw = str_replace('.', '', $raw);
             }
         }
-        return is_numeric($raw) ? round((float) $raw, 2) : null;
+        if (!is_numeric($raw)) {
+            return null;
+        }
+        $amount = round((float) $raw, 2);
+
+        return $negative ? -$amount : $amount;
     }
 
     public static function toBool(?string $value): ?bool

@@ -1245,11 +1245,19 @@ final class TreasuryCsvService
 
             $amountRaw = (string) ($values['amount'] ?? '');
             $amount = ImportValueNormalizer::toAmount($amountRaw);
+            $amountNegative = $amount !== null && $amount < 0;
+            if ($amount !== null) {
+                // Treasury movements store the absolute value and the direction separately.
+                $amount = abs($amount);
+            }
             if ($amount === null || $amount <= 0) {
                 $errors[] = (string) __('treasury.import.error_amount', [
                     'line' => (string) $line,
                     'value' => $amountRaw !== '' ? $amountRaw : '—',
                 ]);
+            } elseif ($amountNegative && $directionRaw === '') {
+                // A signed amount without a direction column: the minus means “expense”.
+                $direction = 'expense';
             }
 
             $accountRaw = (string) ($values['account'] ?? '');
