@@ -4717,15 +4717,17 @@ function initMembersList() {
 
   collectDialog?.querySelector('[data-member-collect-cancel]')?.addEventListener('click', () => collectDialog.close());
 
-  // Members feed: five rows are already rendered; scroll near the end to append the next
-  // page. The footer shows a spinner while loading, how many members are still to come and
-  // when the list is finished; the classic pager stays as a no-JS fallback (hidden by CSS).
+  // Members feed: five rows are already rendered; the next page starts loading as soon as the
+  // footer gets near the viewport (and again after every batch while it stays near). The footer
+  // shows a spinner, a loaded/total progress bar and the counting text.
   const infiniteSentinel = root.querySelector('[data-members-infinite-sentinel]');
   const infiniteStatus = root.querySelector('[data-members-infinite-status]');
+  const infiniteProgress = root.querySelector('[data-endless-progress]');
   const membersTableBody = root.querySelector('.members-table tbody');
   const membersPager = root.querySelector('.list-pager');
   const infiniteTotal = Math.max(0, Number(root.getAttribute('data-members-total') || '0'));
   const infiniteMoreTemplate = root.getAttribute('data-msg-infinite-more') || '';
+  const infiniteLoadingTemplate = root.getAttribute('data-msg-infinite-loading') || '';
   const infiniteDoneTemplate = root.getAttribute('data-msg-infinite-done') || '';
   let nextPage = Math.max(1, Number(root.getAttribute('data-members-page') || '1')) + 1;
   const totalPages = Math.max(1, Number(root.getAttribute('data-members-pages') || '1'));
@@ -4733,10 +4735,18 @@ function initMembersList() {
   let infiniteDone = nextPage > totalPages;
   const loadedRows = () => (membersTableBody ? membersTableBody.querySelectorAll('tr').length : 0);
   const remainingRows = () => Math.max(0, infiniteTotal - loadedRows());
+  const fillCounts = (template) => template
+    .replace(':loaded', String(loadedRows()))
+    .replace(':total', String(infiniteTotal));
   const setInfiniteStatus = (text) => {
     if (!(infiniteStatus instanceof HTMLElement)) return;
     infiniteStatus.textContent = text || '';
     infiniteStatus.hidden = !text;
+  };
+  const setProgress = () => {
+    if (!(infiniteProgress instanceof HTMLElement)) return;
+    const pct = infiniteTotal > 0 ? Math.min(100, Math.round((loadedRows() / infiniteTotal) * 100)) : 0;
+    infiniteProgress.style.width = pct + '%';
   };
   const setInfiniteState = (state) => {
     if (!(infiniteSentinel instanceof HTMLElement)) return;
@@ -4744,25 +4754,30 @@ function initMembersList() {
     infiniteSentinel.classList.toggle('is-done', state === 'done');
     infiniteSentinel.classList.toggle('is-error', state === 'error');
   };
+  const nearViewport = () => {
+    if (!(infiniteSentinel instanceof HTMLElement)) return false;
+    return infiniteSentinel.getBoundingClientRect().top <= window.innerHeight + 900;
+  };
   const showRemainingMembers = () => {
-    const left = remainingRows();
-    if (left <= 0) {
+    setProgress();
+    if (remainingRows() <= 0) {
       setInfiniteStatus('');
       return;
     }
-    setInfiniteStatus(infiniteMoreTemplate.replace(':count', String(left)));
+    setInfiniteStatus(fillCounts(infiniteMoreTemplate));
   };
   const showMembersDone = () => {
     infiniteDone = true;
+    setProgress();
     if (membersPager) membersPager.classList.add('is-hidden');
     setInfiniteState('done');
-    setInfiniteStatus(infiniteDoneTemplate.replace(':total', String(infiniteTotal)));
+    setInfiniteStatus(fillCounts(infiniteDoneTemplate));
   };
   const loadMoreMembers = async () => {
     if (infiniteLoading || infiniteDone || !membersTableBody || !infiniteSentinel) return;
     infiniteLoading = true;
     setInfiniteState('loading');
-    setInfiniteStatus(root.getAttribute('data-msg-infinite-loading') || '');
+    setInfiniteStatus(fillCounts(infiniteLoadingTemplate));
     try {
       const target = new URL(root.getAttribute('data-members-infinite-url') || window.location.pathname, window.location.origin);
       target.search = new URLSearchParams(window.location.search).toString();
@@ -4788,6 +4803,9 @@ function initMembersList() {
         } else {
           setInfiniteState('');
           showRemainingMembers();
+          // The footer can still sit inside the preload zone after the append: the observer
+          // would not fire again (no state change), so keep the feed going until it moves away.
+          if (nearViewport()) setTimeout(() => loadMoreMembers(), 120);
         }
       }
     } catch (error) {
@@ -4811,13 +4829,19 @@ function initMembersList() {
       if ('IntersectionObserver' in window) {
         const observer = new IntersectionObserver((entries) => {
           if (entries.some((entry) => entry.isIntersecting)) loadMoreMembers();
-        }, { rootMargin: '600px 0px' });
+        }, { rootMargin: '900px 0px' });
         observer.observe(infiniteSentinel);
       } else {
         infiniteSentinel.addEventListener('click', loadMoreMembers);
         infiniteSentinel.setAttribute('role', 'button');
         infiniteSentinel.tabIndex = 0;
       }
+      // Scroll fallback: the observer only fires on state changes, the feed must keep loading
+      // while the footer is close to the viewport.
+      window.addEventListener('scroll', () => {
+        if (nearViewport()) loadMoreMembers();
+      }, { passive: true });
+      if (nearViewport()) loadMoreMembers();
     }
   }
 
@@ -4897,7 +4921,9 @@ function initEndlessLists() {
     let done = nextPage > totalPages;
     let loading = false;
     const total = Math.max(0, Number(root.getAttribute('data-endless-total') || '0'));
+    const progress = root.querySelector('[data-endless-progress]');
     const moreTemplate = root.getAttribute('data-msg-endless-more') || '';
+    const loadingTemplate = root.getAttribute('data-msg-endless-loading') || '';
     const doneTemplate = root.getAttribute('data-msg-endless-done') || '';
     const countRows = () => [...root.querySelectorAll(targetSelector)]
       .reduce((sum, el) => sum + el.querySelectorAll('tr').length, 0);
@@ -4908,25 +4934,38 @@ function initEndlessLists() {
       status.textContent = text || '';
       status.hidden = !text;
     };
+    const setProgress = () => {
+      if (!(progress instanceof HTMLElement)) return;
+      const pct = total > 0 ? Math.min(100, Math.round((countRows() / total) * 100)) : 0;
+      progress.style.width = pct + '%';
+    };
+    const fillCounts = (template) => template
+      .replace(':loaded', String(countRows()))
+      .replace(':total', String(total));
     const setState = (state) => {
       if (!(sentinel instanceof HTMLElement)) return;
       sentinel.classList.toggle('is-loading', state === 'loading');
       sentinel.classList.toggle('is-done', state === 'done');
       sentinel.classList.toggle('is-error', state === 'error');
     };
+    const nearViewport = () => {
+      if (!(sentinel instanceof HTMLElement)) return false;
+      return sentinel.getBoundingClientRect().top <= window.innerHeight + 900;
+    };
     const showRemaining = () => {
-      const left = remainingRows();
-      if (left <= 0) {
+      setProgress();
+      if (remainingRows() <= 0) {
         setStatus('');
         return;
       }
-      setStatus(moreTemplate.replace(':count', String(left)));
+      setStatus(fillCounts(moreTemplate));
     };
     const showDone = () => {
       done = true;
+      setProgress();
       if (pager) pager.classList.add('is-hidden');
       setState('done');
-      setStatus(doneTemplate.replace(':total', String(total)));
+      setStatus(fillCounts(doneTemplate));
     };
     if (done) {
       showDone();
@@ -4943,7 +4982,7 @@ function initEndlessLists() {
       if (loading || done) return;
       loading = true;
       setState('loading');
-      setStatus(root.getAttribute('data-msg-endless-loading') || '');
+      setStatus(fillCounts(loadingTemplate));
       try {
         const url = new URL(root.getAttribute('data-endless-url') || window.location.pathname, window.location.origin);
         url.search = new URLSearchParams(window.location.search).toString();
@@ -4995,6 +5034,7 @@ function initEndlessLists() {
           } else {
             setState('');
             showRemaining();
+            if (nearViewport()) setTimeout(() => loadMore(), 120);
           }
           if (typeof initDocumentRowLinks === 'function') initDocumentRowLinks(root);
           root.dispatchEvent(new CustomEvent('socly:rows-appended', { bubbles: true }));
@@ -5020,13 +5060,17 @@ function initEndlessLists() {
     if ('IntersectionObserver' in window) {
       const observer = new IntersectionObserver((entries) => {
         if (entries.some((entry) => entry.isIntersecting)) loadMore();
-      }, { rootMargin: '600px 0px' });
+      }, { rootMargin: '900px 0px' });
       observer.observe(sentinel);
     } else {
       sentinel.addEventListener('click', loadMore);
       sentinel.setAttribute('role', 'button');
       sentinel.tabIndex = 0;
     }
+    window.addEventListener('scroll', () => {
+      if (nearViewport()) loadMore();
+    }, { passive: true });
+    if (nearViewport()) loadMore();
   });
 }
 

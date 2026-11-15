@@ -507,6 +507,7 @@ $totalPages = max(1, (int) ceil(((int) $result['total']) / max(1, $perPage)));
             <div class="endless-more members-infinite-sentinel" data-members-infinite-sentinel>
                 <span class="endless-spinner" aria-hidden="true"></span>
                 <span class="endless-more-text" data-members-infinite-status aria-live="polite"></span>
+                <span class="endless-progress" aria-hidden="true"><span class="endless-progress-bar" data-endless-progress></span></span>
             </div>
             <?php
             // Pager retained as a no-JS/link fallback; the script hides it while infinite scroll runs.

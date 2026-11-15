@@ -276,6 +276,7 @@ foreach (($options['entities'] ?? []) as $entityType) {
         <div class="endless-more" data-endless-sentinel>
             <span class="endless-spinner" aria-hidden="true"></span>
             <span class="endless-more-text" data-endless-status aria-live="polite"></span>
+            <span class="endless-progress" aria-hidden="true"><span class="endless-progress-bar" data-endless-progress></span></span>
         </div>
         <?php
         // Pager: window of pages around the current one + first/last (same pattern as the lists).

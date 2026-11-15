@@ -1039,6 +1039,7 @@ if ($filterYear !== '' && !isset($yearFilterOptions[$filterYear])) {
         <div class="endless-more" data-endless-sentinel>
             <span class="endless-spinner" aria-hidden="true"></span>
             <span class="endless-more-text" data-endless-status aria-live="polite"></span>
+            <span class="endless-progress" aria-hidden="true"><span class="endless-progress-bar" data-endless-progress></span></span>
         </div>
         <nav class="list-pager" aria-label="<?= e(__('common.pager_aria')) ?>">
             <?php if ($currentPage > 1): ?>

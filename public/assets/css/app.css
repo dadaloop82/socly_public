@@ -3752,21 +3752,29 @@ tr.clickable-row:focus-visible {
 [data-endless-list].is-infinite .list-pager {
   display: none;
 }
-/* Endless feed footer: spinner + “scroll to load N more” + “you have reached the end”. */
+/* Endless feed footer: spinner + counting text + loaded/total progress bar. */
 .endless-more {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   justify-content: center;
-  gap: 0.55rem;
-  min-height: 2.6rem;
-  margin: 0.8rem 0 0;
-  padding: 0.55rem 0.75rem;
+  gap: 0.5rem 0.65rem;
+  min-height: 2.9rem;
+  margin: 0.85rem 0 0;
+  padding: 0.6rem 0.8rem;
   border-top: 1px dashed color-mix(in srgb, var(--line) 75%, transparent);
+  border-radius: 12px;
   color: var(--muted, #667085);
   font-size: 0.86rem;
   text-align: center;
+  transition: background-color 0.25s ease;
 }
-.endless-more-text { line-height: 1.35; }
+.endless-more.is-loading {
+  background: linear-gradient(90deg, transparent, color-mix(in srgb, var(--brand-primary) 9%, transparent), transparent);
+  background-size: 200% 100%;
+  animation: endless-shimmer 1.2s linear infinite;
+}
+.endless-more-text { line-height: 1.35; font-variant-numeric: tabular-nums; }
 .endless-spinner {
   display: none;
   width: 1rem;
@@ -3785,11 +3793,41 @@ tr.clickable-row:focus-visible {
 .endless-more.is-done .endless-more-text { color: var(--ok); font-weight: 600; }
 .endless-more.is-done .endless-more-text::before { content: '✓ '; }
 .endless-more.is-error .endless-more-text { color: #9a1c12; font-weight: 600; }
+.endless-progress {
+  flex: 1 0 100%;
+  height: 4px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--brand-primary) 10%, #fff);
+  overflow: hidden;
+}
+.endless-progress-bar {
+  display: block;
+  width: 0;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, var(--brand-primary), var(--brand-accent));
+  transition: width 0.35s ease;
+}
+.endless-more.is-loading .endless-progress-bar {
+  background: linear-gradient(90deg, var(--brand-primary), var(--brand-accent), var(--brand-primary));
+  background-size: 200% 100%;
+  animation: endless-progress-shine 1.1s linear infinite;
+}
 @keyframes endless-spin {
   to { transform: rotate(360deg); }
 }
+@keyframes endless-shimmer {
+  from { background-position: 200% 0; }
+  to { background-position: -200% 0; }
+}
+@keyframes endless-progress-shine {
+  from { background-position: 200% 0; }
+  to { background-position: -200% 0; }
+}
 @media (prefers-reduced-motion: reduce) {
   .endless-spinner { animation-duration: 2.4s; }
+  .endless-more.is-loading,
+  .endless-more.is-loading .endless-progress-bar { animation: none; }
 }
 .member-scheda-facts {
   display: grid;
