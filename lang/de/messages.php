@@ -3431,7 +3431,7 @@ return [
             'value_no_method' => 'Keine Methode',
             'value_default_category' => 'Standardkategorie verwenden',
             'value_new_category' => 'Neue Kategorie „:label“ erstellen',
-            'value_derive_runts' => 'Aus der Kategorie ableiten',
+            'value_derive_runts' => 'Keine Position im Modell D',
             'value_no_budget' => 'Keine Kostenstelle',
             'value_no_document_type' => 'Keine Belegart',
             'value_no_member' => 'Kein Mitglied',

@@ -1358,11 +1358,13 @@ final class TreasuryCsvService
                 } else {
                     $manualRunts = $this->matchRuntsLine($runtsRaw);
                 }
-                $runtsLine = RuntsReportService::normalizeLine(
-                    $manualRunts,
-                    $categoryKey === '__new__' ? 'other' : $categoryKey,
-                    $direction
-                );
+                // The category cannot tell which Model D line the association uses: during the
+                // import only an explicit CSV/value-map choice is accepted, otherwise the movement
+                // stays without a line and the operator can choose it later in the cash book.
+                $manualRunts = strtoupper(trim($manualRunts));
+                if ($manualRunts !== '' && RuntsReportService::isKnownLine($manualRunts, $direction)) {
+                    $runtsLine = $manualRunts;
+                }
             }
 
             $budgetRaw = (string) ($values['budget_item'] ?? '');
@@ -1541,7 +1543,9 @@ final class TreasuryCsvService
                     'payment_method' => $method,
                     'category' => $categoryKey,
                     'new_category' => $newCategory,
-                    'runts_line' => $runtsLine,
+                    // “__none__” tells TreasuryService not to derive a Model D line from the
+                    // category: imported rows stay unclassified until the operator chooses.
+                    'runts_line' => $runtsLine !== '' ? $runtsLine : '__none__',
                     'budget_item_id' => $budgetItemId > 0 ? (string) $budgetItemId : '',
                     'description' => $description,
                     'notes' => $notes,
@@ -1871,6 +1875,11 @@ final class TreasuryCsvService
      */
     private function createRecurringRule(array $series, ?int $userId, string $ip): int
     {
+        $runtsLine = (string) ($series['runts_line'] ?? '');
+        if ($runtsLine === '__none__') {
+            // Recurring rules store NULL when the import did not choose a Model D line.
+            $runtsLine = '';
+        }
         $result = $this->recurring->createFromInput([
             'direction' => (string) ($series['direction'] ?? 'expense'),
             'amount' => (float) ($series['amount'] ?? 0),
@@ -1881,7 +1890,7 @@ final class TreasuryCsvService
             'beneficiary' => (string) ($series['beneficiary'] ?? ''),
             'member_id' => (int) ($series['member_id'] ?? 0),
             'budget_item_id' => (int) ($series['budget_item_id'] ?? 0),
-            'runts_line' => (string) ($series['runts_line'] ?? ''),
+            'runts_line' => $runtsLine,
             'recurring_frequency' => (string) ($series['frequency'] ?? 'monthly'),
             'recurring_day' => (int) ($series['day'] ?? 1),
             'recurring_start' => (string) ($series['start'] ?? ''),

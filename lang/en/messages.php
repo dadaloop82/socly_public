@@ -3431,7 +3431,7 @@ return [
             'value_no_method' => 'No method',
             'value_default_category' => 'Use the default category',
             'value_new_category' => 'Create new category “:label”',
-            'value_derive_runts' => 'Derive from the category',
+            'value_derive_runts' => 'No Model D line',
             'value_no_budget' => 'No cost centre',
             'value_no_document_type' => 'No document type',
             'value_no_member' => 'No member',

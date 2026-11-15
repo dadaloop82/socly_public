@@ -2899,7 +2899,7 @@ return [
             'value_no_method' => 'Nessun metodo',
             'value_default_category' => 'Usa la tipologia predefinita',
             'value_new_category' => 'Crea nuova tipologia “:label”',
-            'value_derive_runts' => 'Deriva dalla tipologia',
+            'value_derive_runts' => 'Nessuna voce del Modello D',
             'value_no_budget' => 'Nessun centro di costo',
             'value_no_document_type' => 'Nessun tipo di documento',
             'value_no_member' => 'Nessun socio',

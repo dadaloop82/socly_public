@@ -769,10 +769,10 @@ final class TreasuryService
     }
 
     /**
-     * WHERE condition for one Model D item. It mirrors RuntsReportService::normalizeLine():
-     * the explicit item wins when it is valid for the movement direction, otherwise the item is
-     * derived from the treasury category (including the A-E5 / A-I10 fallback for custom categories).
-     * Without this, clicking a Model D row would show fewer movements than the report total.
+     * WHERE condition for one Model D item. The explicit item wins when it is valid for the movement
+     * direction; legacy rows with an invalid item still fall back to the treasury category. Rows
+     * without any explicit item are not assigned: they stay in the “no Model D line” filter until
+     * the operator chooses one, matching RuntsReportService::report().
      *
      * @param array<string,mixed> $params
      */
@@ -815,8 +815,8 @@ final class TreasuryService
             $known = $bindList(RuntsReportService::knownLines($direction), 'filter_runts_known_' . $suffix);
             $branches[] = "(m.direction = :{$directionParam}"
                 . " AND (UPPER(TRIM(m.runts_line)) = :{$lineParam}"
-                . " OR ((m.runts_line IS NULL OR TRIM(m.runts_line) = ''"
-                . " OR UPPER(TRIM(m.runts_line)) NOT IN ({$known}))"
+                . " OR ((m.runts_line IS NOT NULL AND TRIM(m.runts_line) <> ''"
+                . " AND UPPER(TRIM(m.runts_line)) NOT IN ({$known}))"
                 . ' AND (' . implode(' OR ', $fallback) . '))))';
         }
 
@@ -3754,11 +3754,17 @@ final class TreasuryService
             return ['ok' => false, 'errors' => ['category' => (string) ($categoryResult['error'] ?? __('validation.required'))]];
         }
         // RUNTS item (Model D) of the movement: explicit choice, otherwise suggested by the category.
-        $runtsLine = RuntsReportService::normalizeLine(
-            (string) ($input['runts_line'] ?? ''),
-            (string) ($categoryResult['key'] ?? ''),
-            $direction
-        );
+        // The CSV importer passes “__none__” because it cannot know the association's Model D line.
+        $runtsInput = trim((string) ($input['runts_line'] ?? ''));
+        $existingRunts = $existing !== null ? trim((string) ($existing['runts_line'] ?? '')) : null;
+        $runtsLine = $runtsInput === '__none__'
+            || ($runtsInput === '' && $existingRunts === '')
+            ? null
+            : RuntsReportService::normalizeLine(
+                $runtsInput,
+                (string) ($categoryResult['key'] ?? ''),
+                $direction
+            );
         // "Account" (wallet: where the money sits) and "method" (how it moved) are
         // two different things and therefore two different columns.
         $account = self::normalizeAccount((string) ($input['account'] ?? ''));

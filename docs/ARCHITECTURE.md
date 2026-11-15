@@ -261,9 +261,10 @@ from the approved cash-book movements: sections A–E with their official rows, 
 bank statement (opening + year balance = closing) and the optional figurative block; the sheet is
 printed with the browser (legal header, place/date and signature line).
 
-- Each movement carries `runts_line` (automatic from the treasury category, overridable in the form);
-  internal movements (transfers, deposits/withdrawals) are excluded from the statements but still
-  count in the cash balances.
+- Each movement carries `runts_line` (automatic from the treasury category for manual entries and
+  overridable in the form; CSV-imported rows without an explicit line stay unclassified until the
+  operator chooses one); internal movements (transfers, deposits/withdrawals) are excluded from the
+  statements but still count in the cash balances.
 - The “Pezze giustificative” column of the printed sheet lists only the movements that carry a
   document (invoice/receipt number or a document type), one line each — date · number · amount; a cost
   centre without documented movements shows “—”.

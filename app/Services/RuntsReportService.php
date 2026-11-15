@@ -32,8 +32,8 @@ use Socly\Core\Database;
  * The ministerial model is in Italian by law: the official labels of the items remain in Italian,
  * while the interface (titles, buttons, notes) is translated.
  * The amounts come from the approved cash book movements of the year: each movement is classified
- * in its own item (`treasury_movements.runts_line`), with fallback to the treasury category when
- * the explicit item is missing.
+ * in its own item (`treasury_movements.runts_line`); missing items stay unclassified, while legacy
+ * rows with an invalid item fall back to the treasury category.
  */
 final class RuntsReportService
 {
@@ -608,7 +608,12 @@ final class RuntsReportService
                 continue;
             }
             $category = (string) ($row['category'] ?? '');
-            $line = self::normalizeLine((string) ($row['runts_line'] ?? ''), $category, $direction);
+            $explicitLine = strtoupper(trim((string) ($row['runts_line'] ?? '')));
+            // A movement without an explicit Model D line (for example an imported row) stays
+            // unclassified: the category alone is not enough to decide how the association reports it.
+            $line = ($explicitLine !== '' && $explicitLine !== '__none__')
+                ? self::normalizeLine($explicitLine, $category, $direction)
+                : '';
             if ($line === self::INTERNAL_LINE) {
                 $internal += $amount;
                 continue;
