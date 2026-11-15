@@ -53,6 +53,21 @@ if (!function_exists('e')) {
     }
 }
 
+if (!function_exists('mb_ucfirst')) {
+    /**
+     * Upper-case the first character of a multi-byte string, leaving the rest untouched.
+     * Used for counterparty names and movement descriptions so free text reads consistently.
+     */
+    function mb_ucfirst(string $value): string
+    {
+        if ($value === '') {
+            return '';
+        }
+
+        return mb_strtoupper(mb_substr($value, 0, 1)) . mb_substr($value, 1);
+    }
+}
+
 if (!function_exists('view_partial')) {
     /** Render a view partial to string (no layout). */
     function view_partial(string $view, array $data = []): string

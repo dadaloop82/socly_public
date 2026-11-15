@@ -394,7 +394,7 @@ final class TreasuryService
             return '';
         }
 
-        return mb_strtoupper(mb_substr($description, 0, 1)) . mb_strtolower(mb_substr($description, 1));
+        return mb_ucfirst(mb_strtolower($description));
     }
 
     /**
@@ -518,6 +518,16 @@ final class TreasuryService
         $offset = max(0, $offset);
         $sql .= ' ORDER BY ' . $order . ' LIMIT ' . $limit . ' OFFSET ' . $offset;
         $movements = $this->db->fetchAll($sql, $params);
+        // Display fallback for legacy/plugin rows: the first letter of the description and of the
+        // counterparty is always upper case, even when the stored text predates the normalisation.
+        foreach ($movements as &$movement) {
+            $movement['description'] = mb_ucfirst((string) ($movement['description'] ?? ''));
+            $beneficiary = trim((string) ($movement['beneficiary'] ?? ''));
+            if ($beneficiary !== '') {
+                $movement['beneficiary'] = mb_ucfirst($beneficiary);
+            }
+        }
+        unset($movement);
 
         $balanceRow = $this->db->fetch(
             "SELECT
@@ -1833,10 +1843,13 @@ final class TreasuryService
             $methodKey = (string) ($row['payment_method'] ?? '');
             $memberId = (int) ($row['member_id'] ?? 0);
             $beneficiary = trim((string) ($row['beneficiary'] ?? ''));
+            if ($beneficiary !== '') {
+                $beneficiary = mb_ucfirst($beneficiary);
+            }
             $matches[] = [
                 'id' => (int) $row['id'],
                 'date' => (string) ($row['movement_date'] ?? ''),
-                'description' => mb_substr(trim((string) ($row['description'] ?? '')), 0, 160),
+                'description' => mb_ucfirst(mb_substr(trim((string) ($row['description'] ?? '')), 0, 160)),
                 'amount' => (float) ($row['amount'] ?? 0),
                 'amount_formatted' => $this->currency->format((float) ($row['amount'] ?? 0)),
                 'date_formatted' => (string) (format_date((string) ($row['movement_date'] ?? '')) ?: (string) ($row['movement_date'] ?? '')),
@@ -2004,6 +2017,7 @@ final class TreasuryService
             $spellings = (array) $entry['spellings'];
             arsort($spellings);
             $name = (string) array_key_first($spellings);
+            $name = mb_ucfirst($name);
             $identity = $this->normalizePartyName($name);
             $isMember = $identity !== '' && array_key_exists($identity, $memberIndex);
             $income = (float) $entry['income'];
@@ -2186,6 +2200,7 @@ final class TreasuryService
             if ($name === '') {
                 $name = (string) __('treasury.counterparty_missing');
             }
+            $name = mb_ucfirst($name);
             if ($needle !== '' && !str_contains(mb_strtolower($name), $needle)) {
                 continue;
             }
@@ -2812,7 +2827,7 @@ final class TreasuryService
                 'id' => (int) $candidateId,
                 'date' => (string) ($row['movement_date'] ?? ''),
                 'date_formatted' => (string) (format_date((string) ($row['movement_date'] ?? '')) ?: ($row['movement_date'] ?? '')),
-                'description' => mb_substr(trim((string) ($row['description'] ?? '')), 0, 160),
+                'description' => mb_ucfirst(mb_substr(trim((string) ($row['description'] ?? '')), 0, 160)),
                 'amount' => (float) ($row['amount'] ?? 0),
                 'amount_formatted' => $this->currency->format((float) ($row['amount'] ?? 0)),
                 'values' => $values,
@@ -2967,6 +2982,7 @@ final class TreasuryService
             if ($value === '') {
                 continue;
             }
+            $value = mb_ucfirst($value);
             $key = mb_strtolower($value);
             if (!isset($seen[$key])) {
                 $seen[$key] = $value;
@@ -2990,7 +3006,7 @@ final class TreasuryService
         if ($id < 1) {
             return null;
         }
-        return $this->db->fetch(
+        $row = $this->db->fetch(
             "SELECT m.*,
                     (SELECT v.value FROM member_field_values v
                      INNER JOIN member_field_definitions d ON d.id = v.field_definition_id AND d.`key` = 'first_name'
@@ -3010,6 +3026,15 @@ final class TreasuryService
              WHERE m.id = :id",
             ['id' => $id]
         );
+        if (is_array($row)) {
+            $row['description'] = mb_ucfirst((string) ($row['description'] ?? ''));
+            $beneficiary = trim((string) ($row['beneficiary'] ?? ''));
+            if ($beneficiary !== '') {
+                $row['beneficiary'] = mb_ucfirst($beneficiary);
+            }
+        }
+
+        return $row;
     }
 
     /**
@@ -3853,9 +3878,9 @@ final class TreasuryService
     }
 
     /**
-     * Counterparty name as it gets stored: trimmed, single-spaced, capped — and reusing the
-     * spelling the register already knows so “Municipality of Bolzano” and “municipality of
-     * bolzano” never become two different suppliers.
+     * Counterparty name as it gets stored: trimmed, single-spaced, capped with the first letter
+     * upper case — and reusing the spelling the register already knows so “Municipality of
+     * Bolzano” and “municipality of bolzano” never become two different suppliers.
      */
     private function normalizeBeneficiary(string $raw): string
     {
@@ -3872,10 +3897,10 @@ final class TreasuryService
             ['name' => $beneficiary]
         );
         if (is_array($existingName) && trim((string) ($existingName['beneficiary'] ?? '')) !== '') {
-            return (string) $existingName['beneficiary'];
+            return mb_ucfirst((string) $existingName['beneficiary']);
         }
 
-        return $beneficiary;
+        return mb_ucfirst($beneficiary);
     }
 
     /**

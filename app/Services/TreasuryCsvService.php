@@ -1399,12 +1399,12 @@ final class TreasuryCsvService
                     $approved = $bool;
                 }
             }
-            $description = ImportValueNormalizer::text((string) ($values['description'] ?? ''));
+            $description = mb_ucfirst(ImportValueNormalizer::text((string) ($values['description'] ?? '')));
             $notes = trim((string) ($values['notes'] ?? ''));
             if ($notes !== '') {
                 $notes = mb_substr($notes, 0, TreasuryService::NOTES_MAX_LENGTH);
             }
-            $beneficiary = ImportValueNormalizer::text((string) ($values['beneficiary'] ?? ''));
+            $beneficiary = mb_ucfirst(ImportValueNormalizer::text((string) ($values['beneficiary'] ?? '')));
             $invoiceNumber = mb_substr(trim((string) ($values['invoice_number'] ?? '')), 0, 120);
             $invoiceDate = '';
             $invoiceDateRaw = trim((string) ($values['invoice_date'] ?? ''));
@@ -2354,7 +2354,7 @@ final class TreasuryCsvService
             $out[$fingerprint] = [
                 'id' => (int) ($row['id'] ?? 0),
                 'date' => $date,
-                'description' => trim($description),
+                'description' => mb_ucfirst(trim($description)),
             ];
         }
 
