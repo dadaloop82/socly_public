@@ -44,12 +44,13 @@ final class PaymentService
     public function forMember(int $memberId): array
     {
         $rows = $this->db->fetchAll(
-            'SELECT p.*, u.name AS created_by_name,
+            'SELECT p.*, u.name AS created_by_name, ack.name AS cashbook_ack_by_name,
                     tm.id AS movement_id, tm.account AS movement_account,
                     tm.movement_date AS movement_date, tm.amount AS movement_amount,
                     tm.approved_at AS movement_approved_at
              FROM payments p
              LEFT JOIN users u ON u.id = p.created_by
+             LEFT JOIN users ack ON ack.id = p.cashbook_ack_by
              LEFT JOIN treasury_movements tm ON tm.payment_id = p.id AND tm.superseded_at IS NULL
              WHERE p.member_id = :id
              ORDER BY p.created_at DESC',
@@ -59,6 +60,7 @@ final class PaymentService
         // with no movement (or with a different amount) gets the warning mark and the fix action.
         foreach ($rows as &$row) {
             $row['revoked'] = trim((string) ($row['revoked_at'] ?? '')) !== '';
+            $row['cashbook_acknowledged'] = trim((string) ($row['cashbook_ack_at'] ?? '')) !== '';
             if ($row['revoked']) {
                 $row['treasury_state'] = 'revoked';
                 continue;
@@ -69,7 +71,9 @@ final class PaymentService
             $row['treasury_state'] = 'none';
             if (in_array($type, ['membership', 'debt'], true)) {
                 if ($movementId < 1) {
-                    $row['treasury_state'] = 'missing';
+                    // “Already collected”: the money reached the bank statement but no cash-book
+                    // movement is linked, so there is nothing to fix and no anomaly to report.
+                    $row['treasury_state'] = $row['cashbook_acknowledged'] ? 'acknowledged' : 'missing';
                 } elseif (abs((float) ($row['movement_amount'] ?? 0) - (float) ($row['amount'] ?? 0)) > 0.005) {
                     $row['treasury_state'] = 'mismatch';
                 } elseif (trim((string) ($row['movement_approved_at'] ?? '')) === ''
@@ -129,6 +133,11 @@ final class PaymentService
         if ($movement === null) {
             return ['ok' => false, 'message' => (string) __('payments.treasury_failed')];
         }
+        // A payment booked in the cash book is no longer “already collected outside it”.
+        $this->db->update('payments', [
+            'cashbook_ack_at' => null,
+            'cashbook_ack_by' => null,
+        ], 'id = :id', ['id' => $paymentId]);
         $this->audit->log('payment.treasury_registered', 'payment', (string) $paymentId, null, [
             'movement_id' => (int) $movement['id'],
             'amount' => (float) ($payment['amount'] ?? 0),
@@ -172,6 +181,84 @@ final class PaymentService
         ], null, $ip);
 
         return ['ok' => true, 'message' => (string) __('payments.treasury_deleted')];
+    }
+
+    /**
+     * “Già incassato”: the money is already in the bank statement (or otherwise collected)
+     * and no cash-book movement needs to be linked. The payment stays in the member history and
+     * stops being reported as an anomaly; nothing else changes (amount, balance, receipt).
+     *
+     * @return array{ok:bool,message:string}
+     */
+    public function acknowledgeCashbook(int $memberId, int $paymentId, string $ip): array
+    {
+        $payment = $this->db->fetch(
+            'SELECT * FROM payments WHERE id = :id AND member_id = :member',
+            ['id' => $paymentId, 'member' => $memberId]
+        );
+        if ($payment === null) {
+            return ['ok' => false, 'message' => (string) __('payments.not_found')];
+        }
+        if (trim((string) ($payment['revoked_at'] ?? '')) !== '') {
+            return ['ok' => false, 'message' => (string) __('payments.acknowledge_revoked')];
+        }
+        if (!in_array((string) ($payment['type'] ?? ''), ['membership', 'debt'], true)) {
+            return ['ok' => false, 'message' => (string) __('payments.acknowledge_not_applicable')];
+        }
+        if (trim((string) ($payment['cashbook_ack_at'] ?? '')) !== '') {
+            return ['ok' => true, 'message' => (string) __('payments.acknowledge_already')];
+        }
+        $movement = $this->db->fetch(
+            'SELECT id FROM treasury_movements
+              WHERE payment_id = :payment AND member_id = :member AND superseded_at IS NULL
+              LIMIT 1',
+            ['payment' => $paymentId, 'member' => $memberId]
+        );
+        if ($movement !== null) {
+            return ['ok' => false, 'message' => (string) __('payments.acknowledge_has_movement')];
+        }
+
+        $user = auth_user();
+        $userId = (int) ($user['id'] ?? 0) ?: null;
+        $this->db->update('payments', [
+            'cashbook_ack_at' => date('Y-m-d H:i:s'),
+            'cashbook_ack_by' => $userId,
+        ], 'id = :id', ['id' => $paymentId]);
+        $this->audit->log('payment.cashbook_acknowledged', 'payment', (string) $paymentId, null, [
+            'amount' => (float) ($payment['amount'] ?? 0),
+            'method' => (string) ($payment['method'] ?? ''),
+            'type' => (string) ($payment['type'] ?? ''),
+        ], $ip);
+
+        return ['ok' => true, 'message' => (string) __('payments.acknowledge_ok')];
+    }
+
+    /**
+     * Undo “Già incassato”: the payment returns to the missing-cash-book anomaly.
+     *
+     * @return array{ok:bool,message:string}
+     */
+    public function revertCashbookAcknowledgement(int $memberId, int $paymentId, string $ip): array
+    {
+        $payment = $this->db->fetch(
+            'SELECT * FROM payments WHERE id = :id AND member_id = :member',
+            ['id' => $paymentId, 'member' => $memberId]
+        );
+        if ($payment === null) {
+            return ['ok' => false, 'message' => (string) __('payments.not_found')];
+        }
+        if (trim((string) ($payment['cashbook_ack_at'] ?? '')) === '') {
+            return ['ok' => true, 'message' => (string) __('payments.acknowledge_undo_none')];
+        }
+        $this->db->update('payments', [
+            'cashbook_ack_at' => null,
+            'cashbook_ack_by' => null,
+        ], 'id = :id', ['id' => $paymentId]);
+        $this->audit->log('payment.cashbook_ack_reverted', 'payment', (string) $paymentId, [
+            'amount' => (float) ($payment['amount'] ?? 0),
+        ], null, $ip);
+
+        return ['ok' => true, 'message' => (string) __('payments.acknowledge_undo_ok')];
     }
 
     /**
@@ -244,6 +331,8 @@ final class PaymentService
                     'revoked_by' => $userId,
                     'revoked_note' => mb_substr($note, 0, 255),
                     'note' => mb_substr($combinedNote, 0, 255),
+                    'cashbook_ack_at' => null,
+                    'cashbook_ack_by' => null,
                 ], 'id = :id', ['id' => $paymentId]);
             } else {
                 $this->db->query('DELETE FROM payments WHERE id = :id AND member_id = :member', [

@@ -3730,6 +3730,19 @@ tr.clickable-row:focus-visible {
 .member-payment-actions {
   white-space: nowrap;
 }
+.member-payment-actions-row {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.35rem;
+}
+.member-payment-actions-row form { margin: 0; }
+.member-payment-ack-badge { white-space: nowrap; }
+.badge-ack {
+  background: color-mix(in srgb, var(--brand-socly) 12%, white);
+  color: var(--brand-socly);
+}
 .member-payment-revoked .member-payment-amount,
 .member-payment-revoked .member-payment-method,
 .member-payment-revoked .member-payment-type,

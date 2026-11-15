@@ -1675,6 +1675,7 @@ final class MemberService
              LEFT JOIN treasury_movements tm ON tm.payment_id = p.id AND tm.superseded_at IS NULL
              WHERE p.member_id IN ({$placeholders})
                AND p.revoked_at IS NULL
+               AND p.cashbook_ack_at IS NULL
                AND p.type IN ('membership', 'debt')
              GROUP BY p.member_id",
             $ids
@@ -2023,6 +2024,7 @@ final class MemberService
     /**
      * Payments recorded for the member but not aligned with the first cash book:
      * no linked movement, a different amount, or a movement still waiting for approval.
+     * Payments marked as “already collected” (cashbook_ack_at) are regular and excluded.
      * Same rule as paymentIssueMap().
      */
     private function paymentAnomalyCondition(string $alias): string
@@ -2031,6 +2033,7 @@ final class MemberService
                  LEFT JOIN treasury_movements tm ON tm.payment_id = p.id AND tm.superseded_at IS NULL
                  WHERE p.member_id = {$alias}.id
                    AND p.revoked_at IS NULL
+                   AND p.cashbook_ack_at IS NULL
                    AND p.type IN ('membership', 'debt')
                    AND (tm.id IS NULL OR ABS(tm.amount - p.amount) > 0.005
                         OR (tm.approved_at IS NULL AND tm.account <> 'cash')))";

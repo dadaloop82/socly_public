@@ -167,6 +167,8 @@ $router->post('/members/{id}/payments', [MemberController::class, 'storePayment'
 $router->post('/members/{id}/payments/{paymentId}/treasury', [MemberController::class, 'registerPaymentMovement'], 'payments.manage', ['mw.locale', 'mw.install', 'mw.auth', 'mw.csrf']);
 $router->post('/members/{id}/payments/{paymentId}/treasury/delete', [MemberController::class, 'deletePaymentMovement'], 'payments.manage', ['mw.locale', 'mw.install', 'mw.auth', 'mw.csrf']);
 $router->post('/members/{id}/payments/{paymentId}/revoke', [MemberController::class, 'revokePayment'], 'payments.manage', ['mw.locale', 'mw.install', 'mw.auth', 'mw.csrf']);
+$router->post('/members/{id}/payments/{paymentId}/acknowledge', [MemberController::class, 'acknowledgePaymentCashbook'], 'payments.manage', ['mw.locale', 'mw.install', 'mw.auth', 'mw.csrf']);
+$router->post('/members/{id}/payments/{paymentId}/acknowledge/undo', [MemberController::class, 'revertPaymentCashbook'], 'payments.manage', ['mw.locale', 'mw.install', 'mw.auth', 'mw.csrf']);
 $router->post('/members/{id}/remind-payment', [MemberController::class, 'remindPayment'], 'members.manage', ['mw.locale', 'mw.install', 'mw.auth', 'mw.csrf']);
 $router->post('/members/{id}/autofix', [MemberController::class, 'autoFix'], 'members.manage', ['mw.locale', 'mw.install', 'mw.auth', 'mw.csrf']);
 

@@ -485,6 +485,32 @@ final class MemberController extends BaseController
         redirect('/members/' . (int) $id . '#payments');
     }
 
+    /** “Già incassato”: money already in the bank statement, no cash-book movement needed. */
+    public function acknowledgePaymentCashbook(Request $request, string $id, string $paymentId): void
+    {
+        $this->guardMembers();
+        $result = $this->payments->acknowledgeCashbook((int) $id, (int) $paymentId, $request->ip());
+        if ($result['ok']) {
+            $this->flash('success', $result['message']);
+        } else {
+            $this->flash('errors', ['payment' => $result['message']]);
+        }
+        redirect('/members/' . (int) $id . '#payments');
+    }
+
+    /** Undo “Già incassato”: the payment returns to the cash-book anomaly. */
+    public function revertPaymentCashbook(Request $request, string $id, string $paymentId): void
+    {
+        $this->guardMembers();
+        $result = $this->payments->revertCashbookAcknowledgement((int) $id, (int) $paymentId, $request->ip());
+        if ($result['ok']) {
+            $this->flash('success', $result['message']);
+        } else {
+            $this->flash('errors', ['payment' => $result['message']]);
+        }
+        redirect('/members/' . (int) $id . '#payments');
+    }
+
     public function remindPayment(Request $request, string $id): void
     {
         $this->guardMembers();

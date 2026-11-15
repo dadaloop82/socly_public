@@ -3652,6 +3652,11 @@ final class TreasuryService
             'approved_at' => $approved ? date('Y-m-d H:i:s') : null,
             'approved_by' => $approved ? $userId : null,
         ]);
+        // The payment now has a cash-book movement: drop a previous “already collected” flag.
+        $this->db->update('payments', [
+            'cashbook_ack_at' => null,
+            'cashbook_ack_by' => null,
+        ], 'id = :id', ['id' => $paymentId]);
     }
 
     /**

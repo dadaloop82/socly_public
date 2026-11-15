@@ -662,6 +662,12 @@ $paymentIssues = array_values(array_filter(
                             $treasuryState = (string) ($p['treasury_state'] ?? 'none');
                             $paymentRevoked = !empty($p['revoked']);
                             $paymentBase = '/members/' . (int) $member['id'] . '/payments/' . $paymentId;
+                            $ackAt = trim((string) ($p['cashbook_ack_at'] ?? ''));
+                            $ackDateLabel = $ackAt !== '' ? (string) (format_date(substr($ackAt, 0, 10)) ?: substr($ackAt, 0, 10)) : '';
+                            // “Già incassato” is only for quota/debt rows with no linked cash-book movement.
+                            $canAcknowledge = !$paymentRevoked
+                                && $movementId < 1
+                                && in_array((string) ($p['type'] ?? ''), ['membership', 'debt'], true);
                             ?>
                             <tr class="<?= $paymentRevoked ? 'member-payment-revoked' : '' ?>">
                                 <td class="num">
@@ -676,6 +682,12 @@ $paymentIssues = array_values(array_filter(
                                 <td class="member-payment-treasury">
                                     <?php if ($paymentRevoked): ?>
                                         <span class="badge badge-muted" title="<?= e((string) ($p['revoked_note'] ?? '')) ?>"><?= e(__('payments.revoked')) ?></span>
+                                    <?php elseif ($treasuryState === 'acknowledged'): ?>
+                                        <span class="badge badge-ack member-payment-ack-badge" title="<?= e(__('payments.treasury_acknowledged_hint')) ?>">
+                                            <?= e($ackDateLabel !== ''
+                                                ? __('payments.treasury_acknowledged_on', ['date' => $ackDateLabel])
+                                                : __('payments.treasury_acknowledged')) ?>
+                                        </span>
                                     <?php elseif ($treasuryState === 'none'): ?>
                                         <span class="muted">—</span>
                                     <?php else: ?>
@@ -702,7 +714,9 @@ $paymentIssues = array_values(array_filter(
                                         </div>
                                         <?php if ($canPayments || $canTreasuryManage): ?>
                                         <div class="member-payment-treasury-actions">
-                                            <?php if ($treasuryState === 'missing'): ?>
+                                            <?php if ($treasuryState === 'acknowledged'): ?>
+                                                <?php // Nothing to do: the money is already in the bank statement. ?>
+                                            <?php elseif ($treasuryState === 'missing'): ?>
                                                 <?php if ($treasuryActive && $canPayments): ?>
                                                     <form method="post" action="<?= e(url($paymentBase . '/treasury')) ?>">
                                                         <?= csrf_field() ?>
@@ -732,13 +746,30 @@ $paymentIssues = array_values(array_filter(
                                 </td>
                                 <td class="member-payment-actions" data-label="<?= e(__('payments.actions')) ?>" data-stop-row-nav>
                                     <?php if (!$paymentRevoked && $canPayments): ?>
-                                        <form method="post"
-                                              action="<?= e(url($paymentBase . '/revoke')) ?>"
-                                              data-confirm="<?= e(__('payments.revoke_confirm')) ?>"
-                                              data-confirm-danger="1">
-                                            <?= csrf_field() ?>
-                                            <button class="btn btn-ghost btn-sm is-danger" type="submit"><?= e(__('payments.revoke')) ?></button>
-                                        </form>
+                                        <div class="member-payment-actions-row">
+                                            <?php if ($treasuryState === 'acknowledged'): ?>
+                                                <form method="post"
+                                                      action="<?= e(url($paymentBase . '/acknowledge/undo')) ?>"
+                                                      data-confirm="<?= e(__('payments.acknowledge_undo_confirm')) ?>">
+                                                    <?= csrf_field() ?>
+                                                    <button class="btn btn-ghost btn-sm" type="submit"><?= e(__('payments.acknowledge_undo')) ?></button>
+                                                </form>
+                                            <?php elseif ($canAcknowledge): ?>
+                                                <form method="post"
+                                                      action="<?= e(url($paymentBase . '/acknowledge')) ?>"
+                                                      data-confirm="<?= e(__('payments.acknowledge_confirm')) ?>">
+                                                    <?= csrf_field() ?>
+                                                    <button class="btn btn-ghost btn-sm" type="submit"><?= e(__('payments.acknowledge')) ?></button>
+                                                </form>
+                                            <?php endif; ?>
+                                            <form method="post"
+                                                  action="<?= e(url($paymentBase . '/revoke')) ?>"
+                                                  data-confirm="<?= e(__('payments.revoke_confirm')) ?>"
+                                                  data-confirm-danger="1">
+                                                <?= csrf_field() ?>
+                                                <button class="btn btn-ghost btn-sm is-danger" type="submit"><?= e(__('payments.revoke')) ?></button>
+                                            </form>
+                                        </div>
                                     <?php else: ?>
                                         <span class="muted">—</span>
                                     <?php endif; ?>
