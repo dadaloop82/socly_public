@@ -2339,6 +2339,8 @@ return [
         'suppliers_filter' => 'Filtra i movimenti',
         'suppliers_filter_active' => 'Controparte: :name · :count movimenti',
         'suppliers_filter_clear' => 'Mostra tutti i movimenti',
+        'no_counterparty_filter_active' => 'Movimenti senza controparte: :count',
+        'no_counterparty_filter_clear' => 'Mostra tutti i movimenti',
         'suppliers_member_badge' => 'Socio',
         'suppliers_member_badge_hint' => 'Controparte presente anche nell’archivio soci',
         'suppliers_empty' => 'Nessuna controparte registrata: compila il campo “Soggetto (Fornitore, Ente, Persona)” nei movimenti.',

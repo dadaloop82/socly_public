@@ -49,6 +49,7 @@ $filterRunts = (string) ($filters['runts_line'] ?? '');
 $filterApproval = (string) ($filters['approval'] ?? '');
 $filterAnomaly = (string) ($filters['anomaly'] ?? '');
 $filterBeneficiary = (string) ($filters['beneficiary'] ?? '');
+$filterNoCounterparty = (string) ($filters['no_counterparty'] ?? '');
 $hasActiveFilters = trim((string) ($search_query ?? '')) !== ''
     || $filterPeriod !== ''
     || $filterDirection !== ''
@@ -60,7 +61,8 @@ $hasActiveFilters = trim((string) ($search_query ?? '')) !== ''
     || $filterRunts !== ''
     || $filterApproval !== ''
     || $filterAnomaly !== ''
-    || $filterBeneficiary !== '';
+    || $filterBeneficiary !== ''
+    || $filterNoCounterparty !== '';
 // Pager: keep search, filters and sort when moving between pages (cost centre and Model D line too:
 // the drill-down from budgets opens the ledger already filtered).
 $pagerQuery = array_filter([
@@ -76,6 +78,7 @@ $pagerQuery = array_filter([
     'budget_item_id' => $filterBudget,
     'runts_line' => $filterRunts,
     'beneficiary' => $filterBeneficiary,
+    'no_counterparty' => $filterNoCounterparty,
     'sort' => $sort,
     'group' => !empty($group_by_category) ? '1' : '0',
 ], static fn ($value): bool => (string) $value !== '');
@@ -147,6 +150,9 @@ if ($filterAnomaly !== '') {
 if ($filterBeneficiary !== '') {
     $ledgerParams['beneficiary'] = $filterBeneficiary;
 }
+if ($filterNoCounterparty !== '') {
+    $ledgerParams['no_counterparty'] = '1';
+}
 if ($sort !== 'date_desc') {
     $ledgerParams['sort'] = $sort;
 }
@@ -159,8 +165,12 @@ $accountFilterUrl = static function (string $accountKey) use ($ledgerParams): st
 };
 // Supplier drill-down: “show every movement again” keeps the other filters.
 $supplierResetParams = $ledgerParams;
-unset($supplierResetParams['beneficiary']);
+unset($supplierResetParams['beneficiary'], $supplierResetParams['no_counterparty']);
 $supplierResetUrl = url('/treasury') . ($supplierResetParams !== [] ? '?' . http_build_query($supplierResetParams) : '');
+// Register drill-down for a row without any counterparty: clearing the filter keeps the rest.
+$noCounterpartyResetParams = $ledgerParams;
+unset($noCounterpartyResetParams['no_counterparty'], $noCounterpartyResetParams['beneficiary']);
+$noCounterpartyResetUrl = url('/treasury') . ($noCounterpartyResetParams !== [] ? '?' . http_build_query($noCounterpartyResetParams) : '');
 ?>
 <div class="page-header">
     <div class="titles">
@@ -469,6 +479,13 @@ if ($filterYear !== '' && !isset($yearFilterOptions[$filterYear])) {
             'count' => (string) (int) ($total_rows ?? 0),
         ])) ?></span>
         <a class="btn btn-ghost btn-sm" href="<?= e($supplierResetUrl) ?>"><?= e(__('treasury.suppliers_filter_clear')) ?></a>
+    </div>
+<?php endif; ?>
+
+<?php if ($filterNoCounterparty === '1'): ?>
+    <div class="setup-hint muted treasury-no-counterparty-notice">
+        <span><?= e(__('treasury.no_counterparty_filter_active', ['count' => (string) (int) ($total_rows ?? 0)])) ?></span>
+        <a class="btn btn-ghost btn-sm" href="<?= e($noCounterpartyResetUrl) ?>"><?= e(__('treasury.no_counterparty_filter_clear')) ?></a>
     </div>
 <?php endif; ?>
 

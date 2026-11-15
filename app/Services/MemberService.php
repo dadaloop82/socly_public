@@ -2398,6 +2398,20 @@ final class MemberService
         if (!$before) {
             return false;
         }
+        // Free-text movements linked to the member keep the name in the counterparty column:
+        // the FK then sets member_id to NULL, but the register must not show “no counterparty”.
+        $fields = is_array($before['fields'] ?? null) ? $before['fields'] : [];
+        $label = trim((string) ($fields['last_name'] ?? '') . ' ' . (string) ($fields['first_name'] ?? ''));
+        if ($label === '') {
+            $label = trim((string) ($before['member_number'] ?? ''));
+        }
+        if ($label !== '') {
+            $this->db->query(
+                'UPDATE treasury_movements SET beneficiary = :name
+                 WHERE member_id = :id AND (beneficiary IS NULL OR TRIM(beneficiary) = \'\')',
+                ['name' => mb_substr(mb_ucfirst($label), 0, 190), 'id' => $id]
+            );
+        }
         $this->deleteMemberPhoto($id, (string) ($before['fields']['photo'] ?? ''));
         $this->db->query('DELETE FROM members WHERE id = :id', ['id' => $id]);
         $this->audit->log('member.deleted', 'member', (string) $id, $before, null, $ip);

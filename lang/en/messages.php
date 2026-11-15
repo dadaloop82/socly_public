@@ -2871,6 +2871,8 @@ return [
         'suppliers_filter' => 'Filter the movements',
         'suppliers_filter_active' => 'Counterparty: :name · :count movements',
         'suppliers_filter_clear' => 'Show every movement',
+        'no_counterparty_filter_active' => 'Movements without a counterparty: :count',
+        'no_counterparty_filter_clear' => 'Show every movement',
         'suppliers_member_badge' => 'Member',
         'suppliers_member_badge_hint' => 'This counterparty is also in the member archive',
         'suppliers_empty' => 'No counterparty yet: fill in “Counterparty (supplier, body, person)” on the movements.',

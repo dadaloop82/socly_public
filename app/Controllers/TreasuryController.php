@@ -1122,6 +1122,7 @@ final class TreasuryController extends BaseController
             'approval' => $approval,
             'anomaly' => $anomaly,
             'beneficiary' => $beneficiary,
+            'no_counterparty' => (string) $request->input('no_counterparty', '') === '1' ? '1' : '',
         ];
         if ($anomaly === '1') {
             $filters['pattern_ids'] = $this->treasury->classificationAnomalyIds();
@@ -1170,7 +1171,7 @@ final class TreasuryController extends BaseController
             parse_str($query, $parsed);
         }
         $clean = [];
-        foreach (['q', 'period', 'direction', 'category', 'account', 'approval', 'anomaly', 'month', 'year', 'sort', 'group', 'page', 'runts_line', 'budget_item_id', 'beneficiary'] as $key) {
+        foreach (['q', 'period', 'direction', 'category', 'account', 'approval', 'anomaly', 'month', 'year', 'sort', 'group', 'page', 'runts_line', 'budget_item_id', 'beneficiary', 'no_counterparty'] as $key) {
             $value = $parsed[$key] ?? null;
             if (!is_scalar($value)) {
                 continue;

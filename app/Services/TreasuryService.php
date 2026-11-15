@@ -758,6 +758,12 @@ final class TreasuryService
             $where[] = 'LOWER(TRIM(m.beneficiary)) = LOWER(:filter_beneficiary)';
             $params['filter_beneficiary'] = $beneficiary;
         }
+        // Drill-down from a register row without any counterparty (no linked member and no
+        // free-text beneficiary, e.g. after a member was deleted).
+        if ((string) ($filters['no_counterparty'] ?? '') === '1') {
+            $where[] = "(m.member_id IS NULL OR m.member_id = 0)"
+                . " AND (m.beneficiary IS NULL OR TRIM(m.beneficiary) = '')";
+        }
 
         return [$where, $params];
     }
@@ -2197,7 +2203,8 @@ final class TreasuryService
             if ($name === '') {
                 $name = trim((string) preg_replace('/\s+/u', ' ', (string) ($row['beneficiary'] ?? '')));
             }
-            if ($name === '') {
+            $counterpartyMissing = $name === '';
+            if ($counterpartyMissing) {
                 $name = (string) __('treasury.counterparty_missing');
             }
             $name = mb_ucfirst($name);
@@ -2208,6 +2215,7 @@ final class TreasuryService
             $entry = $groups[$key] ?? [
                 'name' => $name,
                 'member_id' => 0,
+                'counterparty_missing' => false,
                 'movements' => 0,
                 'income' => 0.0,
                 'expense' => 0.0,
@@ -2215,6 +2223,9 @@ final class TreasuryService
             ];
             if ($entry['member_id'] === 0 && $memberId > 0) {
                 $entry['member_id'] = $memberId;
+            }
+            if ($counterpartyMissing) {
+                $entry['counterparty_missing'] = true;
             }
             $entry['movements']++;
             if ((string) ($row['direction'] ?? '') === 'income') {
@@ -2236,6 +2247,7 @@ final class TreasuryService
             $list[] = [
                 'name' => (string) $entry['name'],
                 'member_id' => (int) $entry['member_id'],
+                'counterparty_missing' => (bool) ($entry['counterparty_missing'] ?? false),
                 'movements' => (int) $entry['movements'],
                 'income' => $income,
                 'expense' => $expense,

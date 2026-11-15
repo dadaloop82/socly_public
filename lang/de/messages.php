@@ -2871,6 +2871,8 @@ return [
         'suppliers_filter' => 'Buchungen filtern',
         'suppliers_filter_active' => 'Gegenpartei: :name · :count Buchungen',
         'suppliers_filter_clear' => 'Alle Buchungen anzeigen',
+        'no_counterparty_filter_active' => 'Buchungen ohne Gegenpartei: :count',
+        'no_counterparty_filter_clear' => 'Alle Buchungen anzeigen',
         'suppliers_member_badge' => 'Mitglied',
         'suppliers_member_badge_hint' => 'Diese Gegenpartei ist auch im Mitgliederarchiv vorhanden',
         'suppliers_empty' => 'Noch keine Gegenpartei: das Feld „Gegenpartei (Lieferant, Körperschaft, Person)“ in den Buchungen ausfüllen.',

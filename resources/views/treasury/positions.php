@@ -46,9 +46,12 @@ $listPath = '/treasury/' . ($isLoan ? 'loans' : 'deposits');
 $ledgerUrl = static function (array $row) use ($category): string {
     // Free-text counterparties drill down to their own movements. Member-linked ones have no
     // beneficiary text: the ledger opens on the whole category (the member name is not a ledger
-    // filter), which is still the useful next screen.
+    // filter), which is still the useful next screen. A row without any counterparty must NOT
+    // filter on the “Senza controparte” label (that matches nothing): use the dedicated filter.
     $params = ['category' => $category];
-    if ((int) ($row['member_id'] ?? 0) < 1) {
+    if (!empty($row['counterparty_missing'])) {
+        $params['no_counterparty'] = '1';
+    } elseif ((int) ($row['member_id'] ?? 0) < 1) {
         $params['beneficiary'] = (string) ($row['name'] ?? '');
     }
     return url('/treasury?' . http_build_query($params));
