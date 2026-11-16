@@ -1010,13 +1010,13 @@ if ($filterYear !== '' && !isset($yearFilterOptions[$filterYear])) {
                                         <?php if ($rowCategoryLabel !== '' || $rowRuntsLabel !== '' || $rowBudgetLabel !== ''): ?>
                                             <div class="treasury-row-classification">
                                                 <?php if ($rowCategoryLabel !== ''): ?>
-                                                    <div><span class="treasury-row-classification-label"><?= e(__('treasury.category')) ?>:</span> <?= e($rowCategoryLabel) ?></div>
+                                                    <div class="treasury-row-classification-item"><span class="treasury-row-classification-label"><?= e(__('treasury.category')) ?>:</span> <?= e($rowCategoryLabel) ?></div>
                                                 <?php endif; ?>
                                                 <?php if ($rowRuntsLabel !== ''): ?>
-                                                    <div><span class="treasury-row-classification-label"><?= e(__('runts.line_label')) ?>:</span> <?= e($rowRuntsLabel) ?></div>
+                                                    <div class="treasury-row-classification-item"><span class="treasury-row-classification-label"><?= e(__('runts.line_label')) ?>:</span> <?= e($rowRuntsLabel) ?></div>
                                                 <?php endif; ?>
                                                 <?php if ($rowBudgetLabel !== ''): ?>
-                                                    <div><span class="treasury-row-classification-label"><?= e(__('treasury.budget_item')) ?>:</span> <?= e($rowBudgetLabel) ?></div>
+                                                    <div class="treasury-row-classification-item"><span class="treasury-row-classification-label"><?= e(__('treasury.budget_item')) ?>:</span> <?= e($rowBudgetLabel) ?></div>
                                                 <?php endif; ?>
                                             </div>
                                         <?php endif; ?>

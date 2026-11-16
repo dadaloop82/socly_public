@@ -13205,15 +13205,21 @@ tr.doc-row-editable:focus-visible {
 .treasury-row-notes { font-size: 0.78rem; margin-top: 0.15rem; font-style: italic; }
 .treasury-row-classification {
   display: grid;
-  gap: 0.1rem;
-  margin-bottom: 0.3rem;
+  gap: 0.15rem;
+  margin: 0 0 0.35rem;
+}
+.treasury-row-classification-item,
+.treasury-row-classification-label {
+  margin: 0;
 }
 .treasury-row-classification,
-.treasury-row-classification > div,
+.treasury-row-classification-item,
 .treasury-row-classification-label {
-  /* Fixed small size for every line of the block: nothing inherits the (larger) cell size. */
-  font-size: 12px;
-  line-height: 1.35;
+  /* One fixed, small size for every line: nothing inherits the (larger) table cell size. */
+  font-size: 12px !important;
+  line-height: 1.35 !important;
+  font-weight: 400;
+  letter-spacing: 0;
 }
 .treasury-row-classification-label { color: var(--muted); }
 /*
