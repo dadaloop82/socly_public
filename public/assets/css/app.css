@@ -13223,6 +13223,19 @@ tr.doc-row-editable:focus-visible {
 }
 .treasury-row-classification-label { color: var(--muted); }
 /*
+ * The whole “Dettagli” cell shares the same small, fixed text size: classification, counterparty,
+ * document data and attachment links must not jump between 12px and the larger cell size.
+ */
+.treasury-row-details,
+.treasury-row-details > div,
+.treasury-row-details > div span,
+.treasury-row-details a {
+  font-size: 12px !important;
+  line-height: 1.35 !important;
+  letter-spacing: 0;
+}
+.treasury-row-details a { text-decoration: underline; }
+/*
  * “Target Account” picker in the action bar: same visual language as the site fields, only compact
  * to fit next to the buttons.
  */

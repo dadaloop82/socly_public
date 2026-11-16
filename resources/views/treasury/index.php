@@ -1006,7 +1006,7 @@ if ($filterYear !== '' && !isset($yearFilterOptions[$filterYear])) {
                                             <?= e($methodCell) ?>
                                         <?php endif; ?>
                                     </td>
-                                    <td>
+                                    <td class="treasury-row-details">
                                         <?php if ($rowCategoryLabel !== '' || $rowRuntsLabel !== '' || $rowBudgetLabel !== ''): ?>
                                             <div class="treasury-row-classification">
                                                 <?php if ($rowCategoryLabel !== ''): ?>
