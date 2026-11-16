@@ -10260,6 +10260,7 @@ button.setup-scrape-logo-frame:focus-visible .setup-scrape-logo-overlay {
 .setup-exit-snooze input {
   margin: 0.15rem 0 0;
   flex: 0 0 auto;
+  accent-color: var(--brand-primary);
 }
 .setup-exit-actions {
   display: flex;
