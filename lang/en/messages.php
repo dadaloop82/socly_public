@@ -2588,6 +2588,7 @@ return [
         'leave_save' => 'Save and continue',
         'leave_discard' => 'Leave without saving',
         'leave_stay' => 'Stay here',
+        'confirm_snooze' => 'Don’t ask again for the next 30 minutes',
         'cancel' => 'Cancel',
         'close' => 'Close',
         'error_generic' => 'The operation failed. Please try again.',

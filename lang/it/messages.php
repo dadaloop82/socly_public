@@ -3646,6 +3646,7 @@ return [
         'leave_save' => 'Salva e continua',
         'leave_discard' => 'Esci senza salvare',
         'leave_stay' => 'Resta qui',
+        'confirm_snooze' => 'Non chiedere più per i prossimi 30 minuti',
         'cancel' => 'Annulla',
         'close' => 'Chiudi',
         'error_generic' => 'Operazione non riuscita. Riprova.',

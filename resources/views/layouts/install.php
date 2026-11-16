@@ -26,6 +26,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <?= view_partial('partials/password_i18n_meta') ?>
+    <?= view_partial('partials/confirm_i18n_meta') ?>
     <title><?= e($title ?? __('install.title')) ?></title>
     <link rel="icon" href="<?= e(socly_icon_url()) ?>" type="image/png">
     <link rel="preconnect" href="https://fonts.googleapis.com">

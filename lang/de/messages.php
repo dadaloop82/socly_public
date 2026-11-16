@@ -2588,6 +2588,7 @@ return [
         'leave_save' => 'Speichern und weiter',
         'leave_discard' => 'Ohne Speichern verlassen',
         'leave_stay' => 'Hier bleiben',
+        'confirm_snooze' => 'Nicht mehr für die nächsten 30 Minuten fragen',
         'cancel' => 'Abbrechen',
         'close' => 'Schließen',
         'error_generic' => 'Die Operation ist fehlgeschlagen. Bitte erneut versuchen.',

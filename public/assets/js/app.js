@@ -22,14 +22,44 @@
 /** Styled in-app confirm — never uses the browser native dialog. */
 let appConfirmDialog = null;
 
+/** “Do not ask again” window shared by the in-app confirmations. */
+const APP_CONFIRM_SNOOZE_MS = 30 * 60 * 1000;
+const APP_CONFIRM_SNOOZE_STORAGE = 'socly.confirmSnoozeUntil';
+
+function appConfirmSnoozeUntil() {
+  try {
+    const raw = window.localStorage.getItem(APP_CONFIRM_SNOOZE_STORAGE);
+    const until = Number(raw || 0);
+    if (!Number.isFinite(until) || until <= Date.now()) {
+      if (raw !== null) window.localStorage.removeItem(APP_CONFIRM_SNOOZE_STORAGE);
+      return 0;
+    }
+    return until;
+  } catch (error) {
+    return 0;
+  }
+}
+
+function snoozeAppConfirm() {
+  try {
+    window.localStorage.setItem(APP_CONFIRM_SNOOZE_STORAGE, String(Date.now() + APP_CONFIRM_SNOOZE_MS));
+  } catch (error) {
+    /* Private mode / storage disabled: the dialog simply keeps asking. */
+  }
+}
+
 function appConfirmLabels() {
   const lang = (document.documentElement.lang || 'it').slice(0, 2);
   const map = {
-    it: { confirm: 'Conferma', cancel: 'Annulla' },
-    en: { confirm: 'Confirm', cancel: 'Cancel' },
-    de: { confirm: 'Bestätigen', cancel: 'Abbrechen' },
+    it: { confirm: 'Conferma', cancel: 'Annulla', snooze: 'Non chiedere più per i prossimi 30 minuti' },
+    en: { confirm: 'Confirm', cancel: 'Cancel', snooze: 'Don’t ask again for the next 30 minutes' },
+    de: { confirm: 'Bestätigen', cancel: 'Abbrechen', snooze: 'Nicht mehr für die nächsten 30 Minuten fragen' },
   };
-  return map[lang] || map.it;
+  const labels = { ...(map[lang] || map.it) };
+  const meta = document.querySelector('meta[name="confirm-snooze-label"]');
+  const metaLabel = meta?.getAttribute('content')?.trim();
+  if (metaLabel) labels.snooze = metaLabel;
+  return labels;
 }
 
 function ensureAppConfirmDialog() {
@@ -40,6 +70,10 @@ function ensureAppConfirmDialog() {
   appConfirmDialog.innerHTML = `
     <div class="setup-exit-shell">
       <p class="setup-exit-text" data-app-confirm-text></p>
+      <label class="setup-exit-snooze" data-app-confirm-snooze-wrap hidden>
+        <input type="checkbox" data-app-confirm-snooze>
+        <span data-app-confirm-snooze-label></span>
+      </label>
       <div class="setup-exit-actions">
         <button type="button" class="btn btn-ghost" data-app-confirm-cancel></button>
         <button type="button" class="btn" data-app-confirm-ok></button>
@@ -55,9 +89,19 @@ function appConfirm(message, options = {}) {
   const textEl = dialog.querySelector('[data-app-confirm-text]');
   const okBtn = dialog.querySelector('[data-app-confirm-ok]');
   const cancelBtn = dialog.querySelector('[data-app-confirm-cancel]');
+  const snoozeWrap = dialog.querySelector('[data-app-confirm-snooze-wrap]');
+  const snoozeInput = dialog.querySelector('[data-app-confirm-snooze]');
+  const snoozeLabel = dialog.querySelector('[data-app-confirm-snooze-label]');
   const confirmLabel = options.confirmLabel || labels.confirm;
   const cancelLabel = options.cancelLabel || labels.cancel;
   const danger = !!options.danger;
+  // Alerts only acknowledge something, they are not questions: never snoozed.
+  // Callers can opt out (e.g. “leave this page with unsaved changes?”).
+  const snoozeEnabled = !options.alert && options.snooze !== false;
+
+  if (snoozeEnabled && appConfirmSnoozeUntil() > Date.now()) {
+    return Promise.resolve(true);
+  }
 
   if (textEl) {
     textEl.textContent = String(message || '').trim();
@@ -71,6 +115,9 @@ function appConfirm(message, options = {}) {
     cancelBtn.textContent = cancelLabel;
     cancelBtn.hidden = !!options.alert;
   }
+  if (snoozeInput instanceof HTMLInputElement) snoozeInput.checked = false;
+  if (snoozeLabel) snoozeLabel.textContent = labels.snooze || '';
+  if (snoozeWrap instanceof HTMLElement) snoozeWrap.hidden = !snoozeEnabled;
 
   return new Promise((resolve) => {
     let settled = false;
@@ -83,7 +130,12 @@ function appConfirm(message, options = {}) {
       dialog.close();
       resolve(result);
     };
-    const onOk = () => finish(true);
+    const onOk = () => {
+      if (snoozeEnabled && snoozeInput instanceof HTMLInputElement && snoozeInput.checked) {
+        snoozeAppConfirm();
+      }
+      finish(true);
+    };
     const onCancel = () => finish(false);
     const onCancelEvent = (event) => {
       event.preventDefault();
@@ -3335,7 +3387,7 @@ function initSetupWizard() {
       return;
     }
     const text = exitDialog?.querySelector('.setup-exit-text')?.textContent?.trim() || '';
-    if (await appConfirm(text)) {
+    if (await appConfirm(text, { snooze: false })) {
       keepAndExit();
     } else {
       logoutNow();
@@ -3346,7 +3398,7 @@ function initSetupWizard() {
     const confirmMsg =
       exitDialog.querySelector('[data-setup-exit-discard]')?.dataset.confirm ||
       '';
-    if (confirmMsg && !(await appConfirm(confirmMsg, { danger: true }))) {
+    if (confirmMsg && !(await appConfirm(confirmMsg, { danger: true, snooze: false }))) {
       return;
     }
     exitDialog.close();
@@ -5485,7 +5537,7 @@ function initMemberLeaveGuard(form) {
     const text = dialog?.querySelector('.member-leave-text')?.textContent?.trim()
       || shared?.getAttribute('data-msg-leave-text')
       || '';
-    if (await appConfirm(text)) {
+    if (await appConfirm(text, { snooze: false })) {
       allowLeave = true;
       if (pendingHref) window.location.href = pendingHref;
     }
@@ -5612,7 +5664,7 @@ function initLeaveGuards(scope = document) {
     const askLeave = (href) => {
       state.pendingHref = href || '';
       if (openDialog(state, href)) return;
-      appConfirm(fallbackText, { confirmLabel: fallbackSave, cancelLabel: fallbackStay }).then((ok) => {
+      appConfirm(fallbackText, { confirmLabel: fallbackSave, cancelLabel: fallbackStay, snooze: false }).then((ok) => {
         if (ok) state.submitAndLeave();
       });
     };

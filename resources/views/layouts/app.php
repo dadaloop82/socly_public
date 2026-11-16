@@ -63,6 +63,7 @@ foreach ($pluginMenu as $item) {
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="csrf-token" content="<?= e(csrf_token()) ?>">
     <?= view_partial('partials/password_i18n_meta') ?>
+    <?= view_partial('partials/confirm_i18n_meta') ?>
     <meta name="session-ping-url" content="<?= e(url('/session/ping')) ?>">
     <meta name="login-url" content="<?= e(url('/login')) ?>">
     <title><?= e(($title ?? 'SOCLY') . ' · ' . $assocName) ?></title>

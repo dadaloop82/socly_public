@@ -10245,6 +10245,22 @@ button.setup-scrape-logo-frame:focus-visible .setup-scrape-logo-overlay {
   color: var(--brand-primary-deep);
   white-space: pre-line;
 }
+.setup-exit-snooze {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+  font-size: 0.86rem;
+  line-height: 1.35;
+  color: var(--muted);
+  cursor: pointer;
+}
+.setup-exit-snooze[hidden] {
+  display: none;
+}
+.setup-exit-snooze input {
+  margin: 0.15rem 0 0;
+  flex: 0 0 auto;
+}
 .setup-exit-actions {
   display: flex;
   justify-content: flex-end;
