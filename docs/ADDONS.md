@@ -234,6 +234,28 @@ Every write is audited (`internal_forum.*`) and the add-on publishes the Workflo
 php tools/addons/addon-tool.php build addons-src/internal_forum dist/internal_forum-1.1.0.soclyaddon --incoming
 ```
 
+## Bank statement import (`bank_statement_import`)
+
+Imports the movements of a bank statement PDF into the first cash book, under “Prima cassa”. The
+operator picks an **immutable bank model** shipped with the package (`templates/*.json`), uploads the
+statement and reviews the result next to the rendered page: hovering a movement highlights its lines
+on the document and every row must be confirmed (or corrected) before the summary. The first model
+covers **Intesa Sanpaolo** (Conto Business Insieme): native text provides dates and descriptions, a
+narrow OCR pass over the amount columns fills in the numbers, and scanned PDFs fall back to a
+full-page OCR. The parser follows movements across page breaks, skips repeated headers/footnotes,
+reconciles the declared totals with the sum of the detected rows and flags duplicates already in the
+ledger. Writes go through `TreasuryService::create()` (audit, approval queue, RUNTS `__none__`) and
+the import is logged as `treasury.bank_statement_imported`. Files live in
+`storage/uploads/bank-statements/<run>/` and are deleted on commit, on cancel or after 24 hours.
+
+Requirements: `poppler-utils`, `tesseract-ocr` (+ `ita` language data) and ImageMagick. A new bank
+model is a new JSON file in `templates/`; it never changes the PHP code. Source:
+`addons-src/bank_statement_import/` (private repo; `addons-src/` is not part of the public export).
+
+```bash
+php tools/addons/addon-tool.php build addons-src/bank_statement_import dist/bank_statement_import-1.0.0.soclyaddon --incoming
+```
+
 ## Workflow events from add-ons
 
 Settings → Workflow lists a group for every add-on available on disk, even when the package does not
