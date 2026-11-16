@@ -132,7 +132,7 @@ final class TreasuryCsvController extends BaseController
             'accounts' => $this->treasury->accountOptions(false),
             'categories' => $this->treasury->categoryOptions(),
             'methodGroups' => $this->methodGroups(),
-            'runtsGroups' => $this->runtsFilterGroups(),
+            'runtsGroups' => $this->runtsGroups(),
             'budgetGroups' => $this->treasury->budgetItemFilterGroups(),
             'sourceName' => (string) ($state['source_name'] ?? ''),
         ]);
@@ -367,6 +367,27 @@ final class TreasuryCsvController extends BaseController
             }
             if ($options !== []) {
                 $groups[] = ['label' => (string) ($group['label'] ?? ''), 'options' => $options];
+            }
+        }
+
+        return $groups;
+    }
+
+    /**
+     * Model D lines grouped by section, for the import default select: the same groups used by the
+     * cash book filter, with expenses first.
+     *
+     * @return list<array{label:string,options:list<array{value:string,label:string}>}>
+     */
+    private function runtsGroups(): array
+    {
+        $groups = [];
+        foreach (['expense' => 'runts.expenses', 'income' => 'runts.incomes'] as $direction => $headingKey) {
+            foreach (\Socly\Services\RuntsReportService::selectGroups((string) $direction) as $group) {
+                $groups[] = [
+                    'label' => (string) __($headingKey) . ' · ' . (string) ($group['label'] ?? ''),
+                    'options' => $group['options'] ?? [],
+                ];
             }
         }
 
