@@ -132,6 +132,8 @@ final class TreasuryCsvController extends BaseController
             'accounts' => $this->treasury->accountOptions(false),
             'categories' => $this->treasury->categoryOptions(),
             'methodGroups' => $this->methodGroups(),
+            'runtsGroups' => $this->runtsFilterGroups(),
+            'budgetGroups' => $this->treasury->budgetItemFilterGroups(),
             'sourceName' => (string) ($state['source_name'] ?? ''),
         ]);
     }

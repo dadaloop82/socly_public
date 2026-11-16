@@ -83,6 +83,8 @@ final class TreasuryCsvService
      */
     private const PREVIEW_ROWS = 200;
     private const SAMPLE_ROWS = 40;
+    /** Unique draft signatures matched against existing movements for the “Intuisci” switches. */
+    private const GUESS_SIGNATURES = 800;
 
     /** @var array{by_key:array<string,int>,labels:array<int,string>}|null */
     private ?array $memberLookupCache = null;
@@ -644,7 +646,7 @@ final class TreasuryCsvService
      * Raw and transformed sample values for the columns that have a rule (mapping preview).
      *
      * @param array{headers:list<string>,rows:list<array{line:int,cells:list<string>}>} $table
-     * @return array<int,list<array{raw:string,value:string}>>
+     * @return array<int,list<array{raw:string,value:string,segments:list<array{text:string,keep:bool}>}>>
      */
     public function transformPreviews(array $table, int $limit = 3): array
     {
@@ -660,9 +662,166 @@ final class TreasuryCsvService
                 if ($raw === '') {
                     continue;
                 }
-                $samples[] = ['raw' => $raw, 'value' => $this->applyTransforms($transforms, (int) $index, $raw)];
+                $samples[] = [
+                    'raw' => $raw,
+                    'value' => $this->applyTransforms($transforms, (int) $index, $raw),
+                    'segments' => $this->previewSegments($raw, $transforms[(int) $index]) ?? [],
+                ];
             }
             $out[(int) $index] = $samples;
+        }
+
+        return $out;
+    }
+
+    /**
+     * Preview of a rule as text segments: `keep` true is the text the import keeps (highlighted),
+     * false is the text the rule drops (struck through). Mirrored by the live preview in app.js.
+     *
+     * @param array{pattern:string,replacement:string} $transform
+     * @return list<array{text:string,keep:bool}>|null null when the pattern is not valid
+     */
+    public function previewSegments(string $value, array $transform): ?array
+    {
+        $regex = $this->compileRegex((string) ($transform['pattern'] ?? ''));
+        if ($regex === null) {
+            return null;
+        }
+        if ($value === '') {
+            return [];
+        }
+        $replacement = (string) ($transform['replacement'] ?? '');
+        if ($replacement === '') {
+            $matched = $this->runRegex($regex, $value, $matches, PREG_OFFSET_CAPTURE);
+            if ($matched === false) {
+                return null;
+            }
+            if ($matched !== 1) {
+                // No match: the import keeps the original value.
+                return [['text' => $value, 'keep' => true]];
+            }
+            $whole = (string) ($matches[0][0] ?? '');
+            $withGroup = isset($matches[1][0]) && (string) $matches[1][0] !== '';
+            $kept = $withGroup ? (string) $matches[1][0] : $whole;
+            $keptAt = $withGroup ? (int) $matches[1][1] : (int) ($matches[0][1] ?? 0);
+            $segments = [];
+            if ($keptAt > 0) {
+                $segments[] = ['text' => substr($value, 0, $keptAt), 'keep' => false];
+            }
+            $segments[] = ['text' => $kept, 'keep' => true];
+            $after = $keptAt + strlen($kept);
+            if ($after < strlen($value)) {
+                $segments[] = ['text' => substr($value, $after), 'keep' => false];
+            }
+
+            return $segments;
+        }
+        $count = $this->runRegexAll($regex, $value, $matches);
+        if ($count === false) {
+            return null;
+        }
+        if ($count === 0) {
+            return [['text' => $value, 'keep' => true]];
+        }
+        $segments = [];
+        $cursor = 0;
+        foreach ($matches as $match) {
+            $matchText = (string) ($match[0][0] ?? '');
+            $offset = (int) ($match[0][1] ?? 0);
+            if ($offset > $cursor) {
+                $segments[] = ['text' => substr($value, $cursor, $offset - $cursor), 'keep' => false];
+            }
+            $segments[] = [
+                'text' => preg_replace($regex, $replacement, $matchText) ?? $matchText,
+                'keep' => true,
+            ];
+            $cursor = $offset + strlen($matchText);
+        }
+        if ($cursor < strlen($value)) {
+            $segments[] = ['text' => substr($value, $cursor), 'keep' => false];
+        }
+
+        return $segments;
+    }
+
+    /**
+     * Unique signature of a row for the import guesses: description + counterparty, normalised.
+     */
+    private function guessKey(string $description, string $beneficiary): string
+    {
+        $norm = static function (string $value): string {
+            $value = mb_strtolower(ImportValueNormalizer::text($value));
+
+            return trim((string) preg_replace('/[^a-z0-9]+/u', ' ', $value));
+        };
+        $description = $norm($description);
+        $beneficiary = $norm($beneficiary);
+
+        return $description !== '' || $beneficiary !== '' ? $description . '|' . $beneficiary : '';
+    }
+
+    /**
+     * “Intuisci”: typical category / Model D line / cost centre of the movements similar to each
+     * unique draft of the file. De-duplicated and capped so a big CSV stays responsive.
+     *
+     * @param array{headers:list<string>,rows:list<array{line:int,cells:list<string>}>} $table
+     * @param array<int|string,string> $map
+     * @param array<int,array{pattern:string,replacement:string}> $transforms
+     * @return array<string,array{category:string,runts_line:string,budget_item_id:int}>
+     */
+    private function classificationGuesses(array $table, array $map, array $transforms): array
+    {
+        $drafts = [];
+        foreach ($table['rows'] ?? [] as $row) {
+            $description = '';
+            $beneficiary = '';
+            foreach ($map as $index => $target) {
+                $target = (string) $target;
+                if ($target !== 'description' && $target !== 'beneficiary') {
+                    continue;
+                }
+                $value = ImportValueNormalizer::text($this->applyTransforms(
+                    $transforms,
+                    (int) $index,
+                    (string) ($row['cells'][(int) $index] ?? '')
+                ));
+                if ($target === 'description') {
+                    $description = $value;
+                } else {
+                    $beneficiary = $value;
+                }
+            }
+            $key = $this->guessKey($description, $beneficiary);
+            if ($key === '' || isset($drafts[$key])) {
+                continue;
+            }
+            $drafts[$key] = ['description' => $description, 'beneficiary' => $beneficiary];
+            if (count($drafts) >= self::GUESS_SIGNATURES) {
+                break;
+            }
+        }
+        if ($drafts === []) {
+            return [];
+        }
+        $payload = [];
+        $keys = [];
+        $index = 0;
+        foreach ($drafts as $key => $draft) {
+            $index++;
+            $keys[$index] = (string) $key;
+            $payload[] = [
+                'id' => $index,
+                'direction' => 'expense',
+                'description' => $draft['description'],
+                'beneficiary' => $draft['beneficiary'],
+            ];
+        }
+        $suggestions = $this->treasury->suggestClassification($payload);
+        $out = [];
+        foreach ($keys as $id => $key) {
+            if (isset($suggestions[$id])) {
+                $out[$key] = $suggestions[$id];
+            }
         }
 
         return $out;
@@ -761,11 +920,27 @@ final class TreasuryCsvService
      * @param array<int|string,string>|null $matches
      * @return int|false
      */
-    private function runRegex(string $regex, string $subject, ?array &$matches = null): int|false
+    private function runRegex(string $regex, string $subject, ?array &$matches = null, int $flags = 0): int|false
     {
         set_error_handler(static fn (): bool => true);
         try {
-            return preg_match($regex, $subject, $matches);
+            return preg_match($regex, $subject, $matches, $flags);
+        } finally {
+            restore_error_handler();
+        }
+    }
+
+    /**
+     * preg_match_all() with ordered matches and byte offsets (global replacement preview).
+     *
+     * @param list<array<int,array{0:string,1:int}>>|null $matches
+     * @return int|false
+     */
+    private function runRegexAll(string $regex, string $subject, ?array &$matches = null): int|false
+    {
+        set_error_handler(static fn (): bool => true);
+        try {
+            return preg_match_all($regex, $subject, $matches, PREG_SET_ORDER | PREG_OFFSET_CAPTURE);
         } finally {
             restore_error_handler();
         }
@@ -790,7 +965,7 @@ final class TreasuryCsvService
     /**
      * Default values used when a column is not in the file.
      *
-     * @return array{default_direction:string,default_account:string,default_category:string,default_payment_method:string,approve:string,skip_duplicates:string}
+     * @return array{default_direction:string,default_account:string,default_category:string,default_runts_line:string,default_budget_item:string,default_payment_method:string,guess_category:string,guess_runts:string,guess_budget:string,approve:string,skip_duplicates:string}
      */
     public function options(): array
     {
@@ -802,7 +977,7 @@ final class TreasuryCsvService
 
     /**
      * @param array<string,mixed> $raw
-     * @return array{default_direction:string,default_account:string,default_category:string,default_payment_method:string,approve:string,skip_duplicates:string}
+     * @return array{default_direction:string,default_account:string,default_category:string,default_runts_line:string,default_budget_item:string,default_payment_method:string,guess_category:string,guess_runts:string,guess_budget:string,approve:string,skip_duplicates:string}
      */
     private function normalizeOptions(array $raw): array
     {
@@ -814,9 +989,19 @@ final class TreasuryCsvService
         if ($account === '' || !in_array($account, $validAccounts, true)) {
             $account = $activeAccount;
         }
+        // No category is assigned unless the operator asks for one (or for the guess).
         $category = trim((string) ($raw['default_category'] ?? ''));
         if (!in_array($category, array_column($this->treasury->categoryOptions(), 'key'), true)) {
-            $category = 'other';
+            $category = '';
+        }
+        $runts = strtoupper(trim((string) ($raw['default_runts_line'] ?? '')));
+        if ($runts !== '' && !RuntsReportService::isKnownLine($runts, 'income')
+            && !RuntsReportService::isKnownLine($runts, 'expense')) {
+            $runts = '';
+        }
+        $budget = (string) max(0, (int) ($raw['default_budget_item'] ?? 0));
+        if ($budget === '0' || $this->treasury->budgetItemLabel((int) $budget) === '') {
+            $budget = '';
         }
         $direction = (string) ($raw['default_direction'] ?? '');
         if (!in_array($direction, ['income', 'expense'], true)) {
@@ -827,7 +1012,12 @@ final class TreasuryCsvService
             'default_direction' => $direction,
             'default_account' => $account,
             'default_category' => $category,
+            'default_runts_line' => $runts,
+            'default_budget_item' => $budget,
             'default_payment_method' => $this->matchMethod((string) ($raw['default_payment_method'] ?? '')),
+            'guess_category' => !empty($raw['guess_category']) ? '1' : '0',
+            'guess_runts' => !empty($raw['guess_runts']) ? '1' : '0',
+            'guess_budget' => !empty($raw['guess_budget']) ? '1' : '0',
             'approve' => array_key_exists('approve', $raw) && (string) $raw['approve'] === '0' ? '0' : '1',
             'skip_duplicates' => array_key_exists('skip_duplicates', $raw) && (string) $raw['skip_duplicates'] === '0' ? '0' : '1',
         ];
@@ -1386,6 +1576,12 @@ final class TreasuryCsvService
         $choices = $this->rowChoices();
         $batchSeen = [];
         $transforms = $this->transforms();
+        $guessCategory = (string) ($options['guess_category'] ?? '0') === '1';
+        $guessRunts = (string) ($options['guess_runts'] ?? '0') === '1';
+        $guessBudget = (string) ($options['guess_budget'] ?? '0') === '1';
+        $guesses = ($guessCategory || $guessRunts || $guessBudget)
+            ? $this->classificationGuesses($table, $map, $transforms)
+            : [];
 
         $result['ok'] = true;
         $rows = [];
@@ -1401,6 +1597,12 @@ final class TreasuryCsvService
                     (string) ($raw['cells'][(int) $index] ?? '')
                 ));
             }
+            $guess = $guesses !== []
+                ? ($guesses[$this->guessKey(
+                    (string) ($values['description'] ?? ''),
+                    (string) ($values['beneficiary'] ?? '')
+                )] ?? [])
+                : [];
             $line = (int) ($raw['line'] ?? 0);
             // Manual corrections applied in the dry run replace the CSV cells before parsing.
             $fixes = $choices['fixes'][$line] ?? [];
@@ -1514,7 +1716,7 @@ final class TreasuryCsvService
             }
 
             $categoryRaw = (string) ($values['category'] ?? '');
-            $categoryKey = (string) $options['default_category'];
+            $categoryKey = '';
             $newCategory = '';
             $mappedCategory = $this->mappedValue('category', $categoryRaw);
             if ($direction === 'transfer') {
@@ -1524,8 +1726,6 @@ final class TreasuryCsvService
                 $categoryKey = '__new__';
                 $newCategory = mb_substr($categoryRaw, 0, 80);
                 $warnings[] = (string) __('treasury.import.warning_new_category', ['label' => $newCategory]);
-            } elseif ($mappedCategory['none']) {
-                $categoryKey = (string) $options['default_category'];
             } elseif ($mappedCategory['value'] !== '') {
                 $categoryKey = $mappedCategory['value'];
             } elseif ($categoryRaw !== '') {
@@ -1538,9 +1738,22 @@ final class TreasuryCsvService
                     $warnings[] = (string) __('treasury.import.warning_new_category', ['label' => $newCategory]);
                 }
             }
-            $categoryLabel = $categoryKey === '__new__'
-                ? $newCategory
-                : (string) ($categories[$categoryKey] ?? $this->treasury->categoryLabel($categoryKey));
+            if ($categoryKey === '') {
+                if ($guessCategory) {
+                    $guessedCategory = (string) ($guess['category'] ?? '');
+                    if ($guessedCategory !== '' && isset($categories[$guessedCategory])) {
+                        $categoryKey = $guessedCategory;
+                    }
+                } else {
+                    // No category is assigned by default: the operator can classify it later.
+                    $categoryKey = (string) $options['default_category'];
+                }
+            }
+            $categoryLabel = $categoryKey === ''
+                ? ''
+                : ($categoryKey === '__new__'
+                    ? $newCategory
+                    : (string) ($categories[$categoryKey] ?? $this->treasury->categoryLabel($categoryKey)));
 
             $runtsLine = '';
             if ($direction === 'income' || $direction === 'expense') {
@@ -1554,9 +1767,21 @@ final class TreasuryCsvService
                     $manualRunts = $this->matchRuntsLine($runtsRaw);
                 }
                 // The category cannot tell which Model D line the association uses: during the
-                // import only an explicit CSV/value-map choice is accepted, otherwise the movement
-                // stays without a line and the operator can choose it later in the cash book.
+                // import only an explicit CSV/value-map choice, the “Intuisci” guess or the chosen
+                // default is accepted, otherwise the movement stays without a line.
                 $manualRunts = strtoupper(trim($manualRunts));
+                if ($manualRunts === '' && $guessRunts) {
+                    $guessedRunts = strtoupper(trim((string) ($guess['runts_line'] ?? '')));
+                    if ($guessedRunts !== '' && RuntsReportService::isKnownLine($guessedRunts, $direction)) {
+                        $manualRunts = $guessedRunts;
+                    }
+                }
+                if ($manualRunts === '' && !$guessRunts) {
+                    $defaultRunts = strtoupper(trim((string) $options['default_runts_line']));
+                    if ($defaultRunts !== '' && RuntsReportService::isKnownLine($defaultRunts, $direction)) {
+                        $manualRunts = $defaultRunts;
+                    }
+                }
                 if ($manualRunts !== '' && RuntsReportService::isKnownLine($manualRunts, $direction)) {
                     $runtsLine = $manualRunts;
                 }
@@ -1570,6 +1795,19 @@ final class TreasuryCsvService
                 $budgetItemId = 0;
             } else {
                 $budgetItemId = $this->matchBudgetItem($budgetRaw, $budgetOptions, substr($date, 0, 4));
+            }
+            if ($budgetRaw === '' && $budgetItemId < 1) {
+                if ($guessBudget) {
+                    $guessedBudget = (int) ($guess['budget_item_id'] ?? 0);
+                    if ($guessedBudget > 0 && isset($budgetLabels[$guessedBudget])) {
+                        $budgetItemId = $guessedBudget;
+                    }
+                } elseif ((string) $options['default_budget_item'] !== '') {
+                    $defaultBudget = (int) $options['default_budget_item'];
+                    if (isset($budgetLabels[$defaultBudget])) {
+                        $budgetItemId = $defaultBudget;
+                    }
+                }
             }
             $budgetItemLabel = $budgetItemId > 0 ? (string) ($budgetLabels[$budgetItemId] ?? '') : '';
 
@@ -1738,6 +1976,8 @@ final class TreasuryCsvService
                     'payment_method' => $method,
                     'category' => $categoryKey,
                     'new_category' => $newCategory,
+                    // Imports may leave the category empty on purpose: the operator classifies later.
+                    'allow_empty_category' => '1',
                     // “__none__” tells TreasuryService not to derive a Model D line from the
                     // category: imported rows stay unclassified until the operator chooses.
                     'runts_line' => $runtsLine !== '' ? $runtsLine : '__none__',

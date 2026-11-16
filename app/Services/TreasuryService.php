@@ -2339,6 +2339,33 @@ final class TreasuryService
     }
 
     /**
+     * Typical classification of “similar movements” for a batch of drafts: used by the CSV import
+     * “Intuisci” switches. Drafts are de-duplicated by the caller; this method only matches them
+     * against the same recent candidate pool the form hints use.
+     *
+     * @param list<array{id:int,direction:string,description:string,beneficiary:string}> $drafts
+     * @return array<int,array{category:string,runts_line:string,budget_item_id:int}>
+     */
+    public function suggestClassification(array $drafts, int $sampleLimit = 8): array
+    {
+        if ($drafts === []) {
+            return [];
+        }
+        $profiles = $this->classificationProfiles($drafts, $sampleLimit);
+        $out = [];
+        foreach ($profiles as $id => $profile) {
+            $fields = is_array($profile['fields'] ?? null) ? $profile['fields'] : [];
+            $out[(int) $id] = [
+                'category' => trim((string) ($fields['category']['typical'] ?? '')),
+                'runts_line' => strtoupper(trim((string) ($fields['runts_line']['typical'] ?? ''))),
+                'budget_item_id' => max(0, (int) ($fields['budget_item_id']['typical'] ?? 0)),
+            ];
+        }
+
+        return $out;
+    }
+
+    /**
      * IDs of movements with at least one unacknowledged classification anomaly.
      *
      * @return list<int>
@@ -4172,6 +4199,10 @@ final class TreasuryService
             $valid[] = $current;
         }
         if ($selected === '' || !in_array($selected, $valid, true)) {
+            if ($selected === '' && (string) ($input['allow_empty_category'] ?? '') === '1') {
+                // CSV import with “no default category”: the row stays unclassified.
+                return ['ok' => true, 'key' => ''];
+            }
             return ['ok' => false, 'error' => __('validation.in')];
         }
         return ['ok' => true, 'key' => $selected];

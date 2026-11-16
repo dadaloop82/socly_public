@@ -291,6 +291,60 @@ final class TreasuryController extends BaseController
         ]);
     }
 
+    public function copy(Request $request, string $id): void
+    {
+        require_component('treasury');
+        $this->clearOld();
+        $movement = $this->treasury->find((int) $id);
+        if ($movement === null) {
+            http_response_code(404);
+            $this->flash('errors', ['treasury' => __('errors.404')]);
+            redirect('/treasury');
+        }
+        $returnPath = $this->listReturnPath($request);
+        $categories = $this->treasury->categoryOptions();
+        $catKey = trim((string) ($movement['category'] ?? ''));
+        if ($catKey !== '' && !in_array($catKey, array_column($categories, 'key'), true)) {
+            $categories[] = [
+                'key' => $catKey,
+                'label' => $this->treasury->categoryLabel($catKey),
+                'builtin' => false,
+            ];
+        }
+        // A copy is a new movement dated today: the original document/attachment is never carried.
+        $copy = $movement;
+        $copy['id'] = 0;
+        $copy['movement_date'] = date('Y-m-d');
+        $copy['attachment_path'] = '';
+        $copy['document_id'] = null;
+        $copy['payment_id'] = null;
+        $direction = (string) ($movement['direction'] ?? '');
+        $this->render('treasury/form', [
+            'title' => __('treasury.copy_movement'),
+            'isEdit' => false,
+            'copy_source' => (int) $movement['id'],
+            'action' => url('/treasury'),
+            'return_url' => url($returnPath),
+            'return_path' => $returnPath,
+            'movement' => $copy,
+            'default_category' => (string) ($movement['category'] ?? ''),
+            'default_direction' => in_array($direction, ['income', 'expense', 'transfer'], true) ? $direction : 'income',
+            'categories' => $categories,
+            'category_groups' => $this->treasury->categoryGroups(),
+            'accounts' => $this->treasury->accountOptions(),
+            'account_balances' => $this->treasury->accountBalances(),
+            'payment_method_groups' => $this->treasury->paymentMethodGroups(),
+            'members' => $this->members->listForSelect(),
+            'config' => $this->components->config('treasury', ['auto_from_payments' => true]),
+            'beneficiaries' => $this->treasury->beneficiaries(),
+            'currency' => $this->currency,
+            'budget_items' => $this->budgets->itemOptionsForMovement(
+                (int) date('Y'),
+                (int) ($movement['budget_item_id'] ?? 0)
+            ),
+        ]);
+    }
+
     public function update(Request $request, string $id): void
     {
         require_component('treasury');

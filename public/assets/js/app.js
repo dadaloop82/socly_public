@@ -1518,10 +1518,16 @@ function initPresence() {
   const toasts = root.querySelector('[data-presence-toasts]');
   if (!url || !avatars) return;
   // Installation prefix ('' when the app lives at the web root): the page path travels relative to it,
-  // so the server can rebuild the URL with url() regardless of the sub-folder.
+  // so the server can rebuild the URL with url() regardless of the sub-folder. url() returns an
+  // absolute URL (scheme + host), so only its pathname may be compared with location.pathname.
   const presenceBase = (() => {
-    const idx = url.indexOf('/presence/state');
-    return idx > 0 ? url.slice(0, idx) : '';
+    try {
+      const pathname = new URL(url, window.location.origin).pathname;
+      const idx = pathname.indexOf('/presence/state');
+      return idx > 0 ? pathname.slice(0, idx) : '';
+    } catch (error) {
+      return '';
+    }
   })();
 
   let since = 0;
@@ -1814,8 +1820,9 @@ function initPresence() {
     root.classList.toggle('is-visible', users.length > 1);
   };
 
-  // Clicking the badge of another operator opens exactly the record they are working in: the link
-  // is built server-side (behind the same permission) and travels with the heartbeat.
+  // Clicking the badge of another operator opens exactly the record they are working in, or the
+  // screen they are on when no record is open: the link is built server-side (behind the same
+  // permission) and travels with the heartbeat.
   const jumpTo = (dot) => {
     const target = dot?.getAttribute('data-presence-url') || '';
     if (target !== '') window.location.assign(target);
@@ -14341,16 +14348,24 @@ function initTreasuryCategory(root = document) {
     const memberSelect = form.querySelector('[data-treasury-member-select]');
     const beneficiaryInput = form.querySelector('[data-treasury-beneficiary-input]');
     const beneficiaryList = document.getElementById('treasury-beneficiaries');
-    const msgBeneficiarySuggest = beneficiaryWrap?.dataset?.msgSuggest || 'Did you mean “:name”?';
+    const msgBeneficiarySuggest = beneficiaryWrap?.dataset?.msgSuggest || 'Did you type “:typed”? Did you mean “:name”?';
+    const msgBeneficiaryYes = beneficiaryWrap?.dataset?.msgYes || 'Yes, fix it';
+    const msgBeneficiaryNo = beneficiaryWrap?.dataset?.msgNo || 'No, keep “:typed”';
+    const beneficiarySuggest = beneficiaryWrap?.querySelector('[data-treasury-beneficiary-suggest]');
+    const beneficiarySuggestText = beneficiarySuggest?.querySelector('[data-treasury-beneficiary-suggest-text]');
+    const beneficiarySuggestYes = beneficiarySuggest?.querySelector('[data-treasury-beneficiary-accept]');
+    const beneficiarySuggestNo = beneficiarySuggest?.querySelector('[data-treasury-beneficiary-keep]');
+    let beneficiaryPending = '';
 
-    // Free-text counterparty: normalise spacing/case and offer the existing
-    // spelling when a near-duplicate is typed (server stores the canonical one).
+    // Free-text counterparty: normalise spacing/case/punctuation and offer the existing
+    // spelling when a near-duplicate (including abbreviations like “B.ca” → “Banca”) is typed.
     const normalizeName = (value) => String(value || '')
       .normalize('NFD')
       .replace(/[\u0300-\u036f]/g, '')
       .toLowerCase()
       .replace(/\s+/g, ' ')
       .trim();
+    const compactName = (value) => normalizeName(value).replace(/[^a-z0-9]+/g, '');
     const distance = (a, b) => {
       const prev = Array.from({ length: b.length + 1 }, (_, i) => i);
       for (let i = 1; i <= a.length; i += 1) {
@@ -14364,28 +14379,70 @@ function initTreasuryCategory(root = document) {
       }
       return prev[b.length];
     };
+    const isAbbreviation = (short, long) => {
+      if (short.length < 3 || short.length >= long.length) return false;
+      // Only a real abbreviation: same first letter and at least ~55% of the length, otherwise
+      // unrelated short words would match long names.
+      if (short[0] !== long[0] || short.length < long.length * 0.55) return false;
+      let index = 0;
+      for (const char of long) {
+        if (index < short.length && short[index] === char) index += 1;
+      }
+      return index === short.length;
+    };
+    const hideBeneficiarySuggest = () => {
+      beneficiaryPending = '';
+      if (beneficiarySuggest instanceof HTMLElement) beneficiarySuggest.hidden = true;
+    };
+    const showBeneficiarySuggest = (typed, suggested) => {
+      if (!(beneficiarySuggest instanceof HTMLElement)) return;
+      beneficiaryPending = suggested;
+      if (beneficiarySuggestText) {
+        beneficiarySuggestText.textContent = msgBeneficiarySuggest
+          .replace(':typed', typed)
+          .replace(':name', suggested);
+      }
+      if (beneficiarySuggestYes) beneficiarySuggestYes.textContent = msgBeneficiaryYes;
+      if (beneficiarySuggestNo) beneficiarySuggestNo.textContent = msgBeneficiaryNo.replace(':typed', typed);
+      beneficiarySuggest.hidden = false;
+    };
+    beneficiarySuggestYes?.addEventListener('click', () => {
+      if (beneficiaryInput instanceof HTMLInputElement && beneficiaryPending !== '') {
+        beneficiaryInput.value = beneficiaryPending;
+        beneficiaryInput.dispatchEvent(new Event('change', { bubbles: true }));
+      }
+      hideBeneficiarySuggest();
+    });
+    beneficiarySuggestNo?.addEventListener('click', hideBeneficiarySuggest);
+    beneficiaryInput?.addEventListener('input', hideBeneficiarySuggest);
     beneficiaryInput?.addEventListener('change', () => {
       if (!(beneficiaryInput instanceof HTMLInputElement) || !(beneficiaryList instanceof HTMLDataListElement)) return;
-      const value = normalizeName(beneficiaryInput.value);
+      const typed = beneficiaryInput.value.trim();
+      const value = normalizeName(typed);
       if (!value) return;
-      const options = [...beneficiaryList.options]
-        .map((option) => ({ value: option.value, key: normalizeName(option.value) }))
-        .filter((option) => option.key !== '');
-      if (options.some((option) => option.key === value)) return;
-      let best = null;
+      const known = [...beneficiaryList.options].some((option) => normalizeName(option.value) === value);
+      if (known) {
+        hideBeneficiarySuggest();
+        return;
+      }
+      const compactTyped = compactName(typed);
+      let best = '';
       let bestScore = 0;
-      options.forEach((option) => {
-        const score = 1 - distance(value, option.key) / Math.max(value.length, option.key.length);
+      [...beneficiaryList.options].forEach((option) => {
+        const candidate = option.value;
+        const key = normalizeName(candidate);
+        if (key === '' || key === value) return;
+        const compactCandidate = compactName(candidate);
+        if (compactCandidate === '') return;
+        let score = 1 - distance(compactTyped, compactCandidate) / Math.max(compactTyped.length, compactCandidate.length);
+        if (isAbbreviation(compactTyped, compactCandidate)) score = Math.max(score, 0.86);
         if (score > bestScore) {
           bestScore = score;
-          best = option.value;
+          best = candidate;
         }
       });
-      if (best && bestScore >= 0.82) {
-        const message = msgBeneficiarySuggest.replace(':name', best);
-        if (window.confirm(message)) {
-          beneficiaryInput.value = best;
-        }
+      if (best !== '' && bestScore >= 0.78) {
+        showBeneficiarySuggest(typed, best);
       }
     });
 
@@ -17978,20 +18035,81 @@ function initBudgetGrid(scope = document) {
   };
 
   const buildFlags = (flags, extra) => {
-    const set = new Set((flags.replace(/[^imsxu]/g, '') + extra).split(''));
+    const set = new Set((flags.replace(/[^imsxud]/g, '') + extra).split(''));
     set.add('u');
     return Array.from(set).join('');
   };
 
-  const applyRule = (sample, pattern, replacement) => {
+  /*
+   * Same segmentation as the PHP preview: keep=true is imported, keep=false is dropped.
+   */
+  const segmentsFor = (sample, pattern, replacement) => {
+    if (sample === '') return [];
     if (replacement !== '') {
-      const regex = new RegExp(pattern.body, buildFlags(pattern.flags, 'g'));
-      return sample.replace(regex, replacement);
+      const global = new RegExp(pattern.body, buildFlags(pattern.flags, 'g'));
+      const single = new RegExp(pattern.body, buildFlags(pattern.flags, ''));
+      const out = [];
+      let cursor = 0;
+      let match;
+      let guard = 0;
+      while ((match = global.exec(sample)) !== null && guard < 2000) {
+        guard += 1;
+        const start = match.index;
+        const text = match[0];
+        if (start > cursor) out.push({ text: sample.slice(cursor, start), keep: false });
+        out.push({ text: text.replace(single, replacement), keep: true });
+        cursor = start + text.length;
+        if (text.length === 0) global.lastIndex += 1;
+      }
+      if (cursor < sample.length) out.push({ text: sample.slice(cursor), keep: false });
+      return out.length > 0 ? out : [{ text: sample, keep: true }];
     }
-    const regex = new RegExp(pattern.body, buildFlags(pattern.flags, ''));
-    const match = regex.exec(sample);
-    if (!match) return sample;
-    return match[1] !== undefined && match[1] !== '' ? match[1] : match[0];
+    let match;
+    try {
+      match = new RegExp(pattern.body, buildFlags(pattern.flags, 'd')).exec(sample);
+    } catch (error) {
+      match = new RegExp(pattern.body, buildFlags(pattern.flags, '')).exec(sample);
+    }
+    if (!match) return [{ text: sample, keep: true }];
+    const grouped = match[1] !== undefined && match[1] !== '';
+    const kept = grouped ? match[1] : match[0];
+    let keptAt = match.index;
+    if (grouped) {
+      if (match.indices && match.indices[1]) {
+        keptAt = match.indices[1][0];
+      } else {
+        const found = match[0].indexOf(kept);
+        keptAt = found >= 0 ? match.index + found : match.index;
+      }
+    }
+    const out = [];
+    if (keptAt > 0) out.push({ text: sample.slice(0, keptAt), keep: false });
+    out.push({ text: kept, keep: true });
+    const after = keptAt + kept.length;
+    if (after < sample.length) out.push({ text: sample.slice(after), keep: false });
+    return out;
+  };
+
+  const appendSegments = (output, sample, pattern, replacement) => {
+    const row = document.createElement('li');
+    row.className = 'import-rule-preview-row';
+    segmentsFor(sample, pattern, replacement).forEach((segment) => {
+      const text = document.createTextNode(segment.text);
+      if (segment.keep) {
+        const mark = document.createElement('mark');
+        mark.className = 'import-rule-keep';
+        const strong = document.createElement('strong');
+        strong.appendChild(text);
+        mark.appendChild(strong);
+        row.appendChild(mark);
+        return;
+      }
+      const dropped = document.createElement('del');
+      dropped.className = 'import-rule-drop';
+      dropped.appendChild(text);
+      row.appendChild(dropped);
+    });
+    output.appendChild(row);
   };
 
   const item = (className, text) => {
@@ -18027,30 +18145,12 @@ function initBudgetGrid(scope = document) {
     output.hidden = false;
     const replacement = replaceInput instanceof HTMLInputElement ? replaceInput.value.trim() : '';
 
-    let values = [];
     try {
-      values = samples.map((sample) => applyRule(sample, pattern, replacement));
+      samples.forEach((sample) => appendSegments(output, sample, pattern, replacement));
     } catch (error) {
       const label = box.dataset.invalid || 'Invalid regular expression';
       output.appendChild(item('import-rule-invalid', label));
-      return;
     }
-
-    samples.forEach((sample, index) => {
-      const row = document.createElement('li');
-      const raw = document.createElement('span');
-      raw.className = 'import-rule-raw';
-      raw.textContent = sample;
-      const arrow = document.createElement('span');
-      arrow.className = 'import-rule-arrow';
-      arrow.setAttribute('aria-hidden', 'true');
-      arrow.textContent = '→';
-      const value = document.createElement('span');
-      value.className = 'import-rule-value';
-      value.textContent = values[index];
-      row.append(raw, arrow, value);
-      output.appendChild(row);
-    });
   };
 
   boxes.forEach((box) => {
@@ -18058,6 +18158,25 @@ function initBudgetGrid(scope = document) {
     box.querySelectorAll('[data-import-map-rx-pattern], [data-import-map-rx-replace]')
       .forEach((input) => input.addEventListener('input', () => render(box)));
     render(box);
+  });
+})();
+
+/*
+ * Treasury import: the “Intuisci” checkbox takes over the matching default select, which is
+ * disabled (and therefore not submitted) while the guess is on.
+ */
+(() => {
+  const toggles = Array.from(document.querySelectorAll('[data-import-guess]'));
+  if (toggles.length === 0) return;
+  toggles.forEach((toggle) => {
+    const name = toggle.getAttribute('data-import-guess') || '';
+    const select = document.querySelector('[data-import-guess-select="' + name + '"]');
+    if (!(select instanceof HTMLSelectElement) || !(toggle instanceof HTMLInputElement)) return;
+    const sync = () => {
+      select.disabled = toggle.checked;
+    };
+    toggle.addEventListener('change', sync);
+    sync();
   });
 })();
 

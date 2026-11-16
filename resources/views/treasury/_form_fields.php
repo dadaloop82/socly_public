@@ -325,7 +325,9 @@ foreach ($members as $member) {
             'attrs' => ['data-treasury-member-toggle' => true],
         ]) ?>
         <div data-treasury-beneficiary-wrap <?= $memberInvolved ? 'hidden' : '' ?>
-             data-msg-suggest="<?= e(__('treasury.counterparty_suggest')) ?>">
+             data-msg-suggest="<?= e(__('treasury.counterparty_suggest')) ?>"
+             data-msg-yes="<?= e(__('treasury.counterparty_suggest_yes')) ?>"
+             data-msg-no="<?= e(__('treasury.counterparty_suggest_no')) ?>">
             <?= field('text', [
                 'name' => 'beneficiary',
                 'label' => (string) __('treasury.counterparty'),
@@ -342,6 +344,13 @@ foreach ($members as $member) {
                     <option value="<?= e($beneficiary) ?>">
                 <?php endforeach; ?>
             </datalist>
+            <div class="treasury-counterparty-suggest" data-treasury-beneficiary-suggest hidden role="status" aria-live="polite">
+                <p data-treasury-beneficiary-suggest-text></p>
+                <div class="treasury-counterparty-suggest-actions">
+                    <button class="btn btn-sm" type="button" data-treasury-beneficiary-accept></button>
+                    <button class="btn btn-sm btn-ghost" type="button" data-treasury-beneficiary-keep></button>
+                </div>
+            </div>
         </div>
         <div data-treasury-member-fields <?= $memberInvolved ? '' : 'hidden' ?>>
             <?= field('select', [

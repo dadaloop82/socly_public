@@ -1481,6 +1481,7 @@ if (!function_exists('row_action_icon_svg')) {
             'download' => '<path d="M12 3v12"/><path d="m7 10 5 5 5-5"/><path d="M4 19h16"/>',
             'sheet' => '<rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 9h18"/><path d="M3 14h18"/><path d="M9 9v11"/>',
             'image' => '<rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="9" cy="10" r="1.6"/><path d="m5 18 5-5 3 3 2-2 4 4"/>',
+            'copy' => '<rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/>',
         ];
         $path = $icons[$key] ?? $icons['view'];
         return '<svg class="row-action-icon" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' . $path . '</svg>';
@@ -1789,6 +1790,25 @@ if (!function_exists('treasury_account_label')) {
         return $translated !== 'treasury.account_' . $key
             ? $translated
             : sentence_case(str_replace('_', ' ', $key));
+    }
+}
+
+if (!function_exists('treasury_category_label')) {
+    /**
+     * Readable name of a first-note category from its key: built-in and custom categories keep their
+     * own label, unknown imported slugs are humanised — the raw slug must never reach the UI.
+     */
+    function treasury_category_label(string $key): string
+    {
+        $key = trim($key);
+        if ($key === '') {
+            return '';
+        }
+        try {
+            return trim((string) app(\Socly\Services\TreasuryService::class)->categoryLabel($key));
+        } catch (\Throwable) {
+            return sentence_case(str_replace('_', ' ', $key));
+        }
     }
 }
 

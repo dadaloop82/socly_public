@@ -668,6 +668,14 @@ a:hover { text-decoration: underline; color: var(--brand-primary-deep); }
   color: #fff;
   text-decoration: none;
 }
+.nav-history-version {
+  display: block;
+  margin: -0.15rem 0 0.35rem;
+  padding: 0 0.85rem;
+  font-size: 0.68rem;
+  letter-spacing: 0.02em;
+  color: color-mix(in srgb, var(--brand-paper) 55%, transparent);
+}
 .audit-filter-actions {
   display: flex;
   flex-wrap: wrap;
@@ -13194,6 +13202,14 @@ tr.doc-row-editable:focus-visible {
 .treasury-superseded-note { font-size: 0.78rem; margin-top: 0.15rem; }
 /* Internal memo of a movement: one compact line under the description, full text in the tooltip. */
 .treasury-row-notes { font-size: 0.78rem; margin-top: 0.15rem; font-style: italic; }
+.treasury-row-classification {
+  display: grid;
+  gap: 0.1rem;
+  margin-bottom: 0.3rem;
+  font-size: 0.78rem;
+  line-height: 1.35;
+}
+.treasury-row-classification-label { color: var(--muted); }
 /*
  * “Target Account” picker in the action bar: same visual language as the site fields, only compact
  * to fit next to the buttons.
@@ -14364,6 +14380,23 @@ select.is-remote-choice {
   grid-template-columns: repeat(auto-fit, minmax(min(190px, 100%), 1fr));
   gap: 0.85rem 1rem;
 }
+.import-option { display: grid; gap: 0.35rem; align-content: start; }
+.import-option .sf-field { margin: 0; }
+.import-flag--guess { font-size: 0.82rem; }
+.import-flag--guess input { width: 1rem; height: 1rem; }
+/* Counterparty typo suggestion: inline question with explicit “yes / keep” actions. */
+.treasury-counterparty-suggest {
+  margin-top: 0.6rem;
+  padding: 0.65rem 0.8rem;
+  border: 1px solid color-mix(in srgb, var(--brand-primary) 28%, var(--line));
+  border-radius: var(--radius-sm);
+  background: color-mix(in srgb, var(--brand-primary) 7%, white);
+  display: grid;
+  gap: 0.5rem;
+}
+.treasury-counterparty-suggest[hidden] { display: none; }
+.treasury-counterparty-suggest p { margin: 0; font-size: 0.9rem; }
+.treasury-counterparty-suggest-actions { display: flex; flex-wrap: wrap; gap: 0.45rem; }
 .import-flags {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(min(260px, 100%), 1fr));
@@ -14416,18 +14449,26 @@ select.is-remote-choice {
 .import-rule-preview { list-style: none; margin: 0; padding: 0; display: grid; gap: 0.2rem; font-size: 0.75rem; }
 .import-rule-preview[hidden] { display: none; }
 .import-rule-preview li {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: baseline;
-  gap: 0.25rem;
+  display: block;
   padding: 0.15rem 0.35rem;
   border-left: 2px solid color-mix(in srgb, var(--brand-primary) 35%, transparent);
   border-radius: var(--radius-sm);
   background: color-mix(in srgb, var(--brand-paper) 45%, white);
 }
-.import-rule-raw { color: var(--muted); word-break: break-word; }
-.import-rule-arrow { color: var(--muted); }
-.import-rule-value { font-weight: 600; word-break: break-word; }
+.import-rule-preview-row { word-break: break-word; line-height: 1.45; }
+.import-rule-drop {
+  color: var(--muted);
+  text-decoration: line-through;
+  text-decoration-color: color-mix(in srgb, var(--muted) 70%, transparent);
+}
+.import-rule-keep {
+  background: #fff2a8;
+  color: inherit;
+  padding: 0 0.15rem;
+  border-radius: 4px;
+  box-shadow: inset 0 0 0 1px #ecd97a;
+}
+.import-rule-keep strong { font-weight: 800; }
 .import-rule-preview .import-rule-invalid { color: var(--danger); }
 .import-rule-hint { margin: 0.6rem 0 0; font-size: 0.8rem; }
 .import-stats { margin-bottom: 1rem; }

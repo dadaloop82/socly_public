@@ -38,6 +38,8 @@
  * @var \Socly\Services\CurrencyService $currency
  */
 $movementId = $isEdit ? (int) ($movement['id'] ?? 0) : 0;
+// “Copia movimento”: the form opens pre-filled like an edit page, but saves a new movement.
+$isCopy = !$isEdit && is_array($movement);
 $old = old_input();
 // Only a resubmission of the same form (after an error) can reuse the entered values: a `_old` left over from
 // another screen must not empty the tab being edited.
@@ -46,7 +48,7 @@ if ($old !== [] && ($movementId > 0 ? !isset($old['direction']) : !array_key_exi
 }
 if ($old !== []) {
     $values = $old;
-} elseif ($isEdit && $movement !== null) {
+} elseif ($movement !== null) {
     $values = [
         'direction' => (string) ($movement['direction'] ?? 'income'),
         'amount' => (string) ($movement['amount'] ?? ''),
@@ -107,7 +109,9 @@ $values['document_edit_url'] = $isEdit && !empty($movement['document_id'])
     ? url('/documents/' . (int) $movement['document_id'])
     : '';
 
-$pageTitle = $isEdit ? __('treasury.edit') : __('treasury.add_movement');
+$pageTitle = $isCopy
+    ? __('treasury.copy_movement')
+    : ($isEdit ? __('treasury.edit') : __('treasury.add_movement'));
 $pageLede = $isEdit ? __('treasury.edit_lede') : __('treasury.add_lede');
 $submitLabel = $isEdit ? __('treasury.update') : __('treasury.submit');
 $adjacent = is_array($adjacent ?? null) ? $adjacent : ['prev' => null, 'next' => null];

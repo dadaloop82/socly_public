@@ -934,6 +934,12 @@ if ($filterYear !== '' && !isset($yearFilterOptions[$filterYear])) {
                                 if ($isTransfer && $transferRaw !== '') {
                                     $transferLabel = treasury_account_label($transferRaw);
                                 }
+                                // Classification of the row, stacked in one small block in “Dettagli”.
+                                $rowCategoryKey = trim((string) ($row['category'] ?? ''));
+                                $rowCategoryLabel = $rowCategoryKey !== '' ? treasury_category_label($rowCategoryKey) : '';
+                                $rowRuntsKey = strtoupper(trim((string) ($row['runts_line'] ?? '')));
+                                $rowRuntsLabel = $rowRuntsKey !== '' ? \Socly\Services\RuntsReportService::lineLabelWithSection($rowRuntsKey) : '';
+                                $rowBudgetLabel = trim((string) ($row['budget_item_label'] ?? ''));
                                 ?>
                                 <tr
                                     class="treasury-row treasury-row-<?= $isTransfer ? 'transfer' : ($isIncome ? 'income' : 'expense') ?><?= $canManage && !$isSuperseded ? ' doc-row-editable' : '' ?><?= $isSuperseded ? ' is-superseded' : '' ?>"
@@ -1001,17 +1007,29 @@ if ($filterYear !== '' && !isset($yearFilterOptions[$filterYear])) {
                                         <?php endif; ?>
                                     </td>
                                     <td>
+                                        <?php if ($rowCategoryLabel !== '' || $rowRuntsLabel !== '' || $rowBudgetLabel !== ''): ?>
+                                            <div class="treasury-row-classification">
+                                                <?php if ($rowCategoryLabel !== ''): ?>
+                                                    <div><span class="treasury-row-classification-label"><?= e(__('treasury.category')) ?>:</span> <?= e($rowCategoryLabel) ?></div>
+                                                <?php endif; ?>
+                                                <?php if ($rowRuntsLabel !== ''): ?>
+                                                    <div><span class="treasury-row-classification-label"><?= e(__('runts.line_label')) ?>:</span> <?= e($rowRuntsLabel) ?></div>
+                                                <?php endif; ?>
+                                                <?php if ($rowBudgetLabel !== ''): ?>
+                                                    <div><span class="treasury-row-classification-label"><?= e(__('treasury.budget_item')) ?>:</span> <?= e($rowBudgetLabel) ?></div>
+                                                <?php endif; ?>
+                                            </div>
+                                        <?php endif; ?>
                                         <?php if ($memberLabel !== ''): ?><div><?= e($memberLabel) ?></div><?php endif; ?>
                                         <?php if (!empty($row['beneficiary'])): ?><div><?= e(__('treasury.supplier')) ?>: <?= e((string) $row['beneficiary']) ?></div><?php endif; ?>
                                         <?php if ($invoiceTitle !== '' && $invoiceTitle !== $desc): ?><div><?= e(__('treasury.invoice_title')) ?>: <?= e($invoiceTitle) ?></div><?php endif; ?>
                                         <?php if ($documentTypeLabel !== ''): ?><div><?= e(__('treasury.document_type')) ?>: <?= e($documentTypeLabel) ?></div><?php endif; ?>
                                         <?php if (!empty($row['invoice_number'])): ?><div><?= e(__('treasury.doc_number')) ?>: <?= e((string) $row['invoice_number']) ?></div><?php endif; ?>
                                         <?php if (!empty($row['invoice_date'])): ?><div><?= e(__('treasury.doc_date')) ?>: <?= e(format_date($row['invoice_date']) ?: (string) $row['invoice_date']) ?></div><?php endif; ?>
-                                        <?php if (!empty($row['budget_item_label'])): ?><div><?= e(__('treasury.budget_item')) ?>: <?= e((string) $row['budget_item_label']) ?></div><?php endif; ?>
                                         <?php if (!empty($row['invoice_due_date'])): ?><div><?= e(__('treasury.invoice_due_date')) ?>: <?= e(format_date($row['invoice_due_date']) ?: (string) $row['invoice_due_date']) ?></div><?php endif; ?>
                                         <?php if (!empty($row['amount_entered']) && !empty($row['amount_currency'])): ?><div><?= e(__('treasury.amount_original')) ?>: <?= e(number_format((float) $row['amount_entered'], 2, ',', '.')) ?> <?= e((string) $row['amount_currency']) ?></div><?php endif; ?>
                                         <?php if (!empty($row['attachment_path'])): ?><div><a href="<?= e(url('/treasury/' . $rowId . '/attachment')) ?>" target="_blank" rel="noopener"><?= e(__('treasury.upload_document')) ?></a></div><?php endif; ?>
-                                        <?php if (empty($row['member_id']) && empty($row['beneficiary']) && empty($row['invoice_number']) && empty($row['invoice_title']) && empty($row['budget_item_label']) && empty($row['invoice_date']) && empty($row['attachment_path']) && $documentTypeLabel === ''): ?><?= e(__('treasury.none')) ?><?php endif; ?>
+                                        <?php if (empty($row['member_id']) && empty($row['beneficiary']) && empty($row['invoice_number']) && empty($row['invoice_title']) && $rowBudgetLabel === '' && $rowCategoryLabel === '' && $rowRuntsLabel === '' && empty($row['invoice_date']) && empty($row['attachment_path']) && $documentTypeLabel === ''): ?><?= e(__('treasury.none')) ?><?php endif; ?>
                                     </td>
                                     <td class="<?= $isTransfer ? 'amount-transfer' : 'amount-income' ?>"><?= $isIncome || $isTransfer ? ($isTransfer ? '↔ ' : '') . e($currency->format($amount)) : '—' ?></td>
                                     <td class="amount-expense"><?= $isIncome || $isTransfer ? '—' : e($currency->format($amount)) ?></td>
@@ -1034,6 +1052,12 @@ if ($filterYear !== '' && !isset($yearFilterOptions[$filterYear])) {
                                                 'href' => !empty($row['attachment_path']) ? url('/treasury/' . $rowId . '/attachment') : '',
                                                 'target' => '_blank',
                                                 'rel' => 'noopener',
+                                            ],
+                                            [
+                                                'icon' => 'copy',
+                                                'label' => __('treasury.copy_movement'),
+                                                'show' => $canManage && !$isSuperseded,
+                                                'href' => $canManage && !$isSuperseded ? url('/treasury/' . $rowId . '/copy') . $retSuffix : '',
                                             ],
                                             [
                                                 'icon' => 'edit',

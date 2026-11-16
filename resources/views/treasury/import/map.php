@@ -28,11 +28,13 @@
  * @var list<array{label:string,options:list<array{value:string,label:string}>}> $targetGroups
  * @var array<int,string> $map
  * @var array<int,array{pattern:string,replacement:string}> $transforms
- * @var array<int,list<array{raw:string,value:string}>> $regexPreviews
+ * @var array<int,list<array{raw:string,value:string,segments:list<array{text:string,keep:bool}>}>> $regexPreviews
  * @var array<string,string> $options
  * @var list<array{key:string,label:string,active:bool}> $accounts
  * @var list<array{key:string,label:string,builtin:bool}> $categories
  * @var list<array{label:string,options:list<array{value:string,label:string}>}> $methodGroups
+ * @var list<array{label:string,options:list<array{value:string,label:string}>}> $runtsGroups
+ * @var list<array{label:string,options:list<array{value:string,label:string}>}> $budgetGroups
  * @var string $sourceName
  */
 $map = is_array($map ?? null) ? $map : [];
@@ -228,10 +230,14 @@ $kindLabels = [
                             ]) ?>
                             <ul class="import-rule-preview" data-import-map-rx-preview>
                                 <?php foreach (($regexPreviews[$index] ?? []) as $preview): ?>
-                                    <li>
-                                        <span class="import-rule-raw"><?= e(mb_strimwidth((string) $preview['raw'], 0, 60, '…')) ?></span>
-                                        <span class="import-rule-arrow" aria-hidden="true">→</span>
-                                        <span class="import-rule-value"><?= e(mb_strimwidth((string) $preview['value'], 0, 60, '…')) ?></span>
+                                    <li class="import-rule-preview-row">
+                                        <?php foreach (($preview['segments'] ?? []) as $segment): ?>
+                                            <?php if (!empty($segment['keep'])): ?>
+                                                <mark class="import-rule-keep"><strong><?= e(mb_strimwidth((string) $segment['text'], 0, 90, '…')) ?></strong></mark>
+                                            <?php else: ?>
+                                                <del class="import-rule-drop"><?= e(mb_strimwidth((string) $segment['text'], 0, 90, '…')) ?></del>
+                                            <?php endif; ?>
+                                        <?php endforeach; ?>
                                     </li>
                                 <?php endforeach; ?>
                             </ul>
@@ -273,14 +279,63 @@ $kindLabels = [
             'empty_label' => (string) __('treasury.import.opt_no_default'),
             'options' => $accountOptions,
         ]) ?>
-        <?= field('select', [
-            'name' => 'default_category',
-            'label' => (string) __('treasury.import.opt_default_category'),
-            'value' => (string) ($options['default_category'] ?? 'other'),
-            'context' => 'setup',
-            'include_empty' => false,
-            'options' => $categoryOptions,
-        ]) ?>
+        <div class="import-option">
+            <?= field('select', [
+                'name' => 'default_category',
+                'label' => (string) __('treasury.import.opt_default_category'),
+                'value' => (string) ($options['default_category'] ?? ''),
+                'context' => 'setup',
+                'include_empty' => true,
+                'empty_label' => (string) __('treasury.import.opt_category_none'),
+                'options' => $categoryOptions,
+                'attrs' => ['data-import-guess-select' => 'category'],
+            ]) ?>
+            <input type="hidden" name="guess_category" value="0">
+            <label class="import-flag import-flag--guess">
+                <input type="checkbox" name="guess_category" value="1"
+                       data-import-guess="category"
+                    <?= (string) ($options['guess_category'] ?? '0') === '1' ? 'checked' : '' ?>>
+                <span><?= e(__('treasury.import.guess')) ?></span>
+            </label>
+        </div>
+        <div class="import-option">
+            <?= field('select', [
+                'name' => 'default_runts_line',
+                'label' => (string) __('treasury.import.opt_default_runts'),
+                'value' => (string) ($options['default_runts_line'] ?? ''),
+                'context' => 'setup',
+                'include_empty' => true,
+                'empty_label' => (string) __('treasury.import.opt_no_default'),
+                'groups' => is_array($runtsGroups ?? null) ? $runtsGroups : [],
+                'attrs' => ['data-import-guess-select' => 'runts'],
+            ]) ?>
+            <input type="hidden" name="guess_runts" value="0">
+            <label class="import-flag import-flag--guess">
+                <input type="checkbox" name="guess_runts" value="1"
+                       data-import-guess="runts"
+                    <?= (string) ($options['guess_runts'] ?? '0') === '1' ? 'checked' : '' ?>>
+                <span><?= e(__('treasury.import.guess')) ?></span>
+            </label>
+        </div>
+        <div class="import-option">
+            <?= field('select', [
+                'name' => 'default_budget_item',
+                'label' => (string) __('treasury.import.opt_default_budget'),
+                'value' => (string) ($options['default_budget_item'] ?? ''),
+                'context' => 'setup',
+                'include_empty' => true,
+                'empty_label' => (string) __('treasury.import.opt_no_default'),
+                'groups' => is_array($budgetGroups ?? null) ? $budgetGroups : [],
+                'attrs' => ['data-import-guess-select' => 'budget'],
+            ]) ?>
+            <input type="hidden" name="guess_budget" value="0">
+            <label class="import-flag import-flag--guess">
+                <input type="checkbox" name="guess_budget" value="1"
+                       data-import-guess="budget"
+                    <?= (string) ($options['guess_budget'] ?? '0') === '1' ? 'checked' : '' ?>>
+                <span><?= e(__('treasury.import.guess')) ?></span>
+            </label>
+        </div>
         <?= field('select', [
             'name' => 'default_payment_method',
             'label' => (string) __('treasury.import.opt_default_method'),

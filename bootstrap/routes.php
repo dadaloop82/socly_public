@@ -192,6 +192,7 @@ $router->post('/treasury/pattern', [TreasuryController::class, 'pattern'], 'trea
 $router->post('/treasury/pattern/ack', [TreasuryController::class, 'acknowledgePattern'], 'treasury.manage', ['mw.locale', 'mw.install', 'mw.auth', 'mw.csrf']);
 $router->get('/treasury/{id}/attachment', [TreasuryController::class, 'attachment'], 'treasury.view', ['mw.locale', 'mw.install', 'mw.auth']);
 $router->get('/treasury/{id}/edit', [TreasuryController::class, 'edit'], 'treasury.manage', ['mw.locale', 'mw.install', 'mw.auth']);
+$router->get('/treasury/{id}/copy', [TreasuryController::class, 'copy'], 'treasury.manage', ['mw.locale', 'mw.install', 'mw.auth']);
 $router->post('/treasury/{id}', [TreasuryController::class, 'update'], 'treasury.manage', ['mw.locale', 'mw.install', 'mw.auth', 'mw.csrf']);
 
 $router->get('/budgets', [BudgetController::class, 'index'], 'treasury.view', ['mw.locale', 'mw.install', 'mw.auth']);

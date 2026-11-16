@@ -272,10 +272,11 @@ final class PresenceService
 
     /**
      * Where an operator is working right now: the record they have open (entity + id) and the link
-     * that opens exactly that page. An inactive session, or one that is just browsing, carries none.
+     * that opens exactly that page. Without an open record the link points to the screen they are on;
+     * an inactive session carries none.
      *
      * @param array<string,mixed> $row
-     * @return array{entity:string,id:int,url:string}
+     * @return array{entity:string,id:int,page:string,url:string}
      */
     private function location(array $row): array
     {
@@ -350,6 +351,21 @@ final class PresenceService
             if ($pathname === $prefix || str_starts_with($pathname, $prefix . '/')) {
                 return $rule;
             }
+        }
+        // Add-on screens: the menu entry registered by the plugin carries the same permission that
+        // guards its pages, so the badge can open them without a 403.
+        try {
+            foreach (app('plugins')->menuItems() as $item) {
+                $path = rtrim((string) ($item['path'] ?? ''), '/');
+                if ($path === '' || $path === '/') {
+                    continue;
+                }
+                if ($pathname === $path || str_starts_with($pathname, $path . '/')) {
+                    return ['', (string) ($item['permission'] ?? '')];
+                }
+            }
+        } catch (\Throwable) {
+            // No plugin manager (CLI/tests): keep the core map only.
         }
 
         return null;
