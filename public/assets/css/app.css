@@ -13206,7 +13206,12 @@ tr.doc-row-editable:focus-visible {
   display: grid;
   gap: 0.1rem;
   margin-bottom: 0.3rem;
-  font-size: 0.78rem;
+}
+.treasury-row-classification,
+.treasury-row-classification > div,
+.treasury-row-classification-label {
+  /* Fixed small size for every line of the block: nothing inherits the (larger) cell size. */
+  font-size: 12px;
   line-height: 1.35;
 }
 .treasury-row-classification-label { color: var(--muted); }
