@@ -16,7 +16,7 @@
 12. **Charts & statistics** — chart cards on the dashboard (members and treasury tabs) and on the
     statistics page with per-user order, visibility and width on a three-column grid. The treasury tab
     ships income vs expense, month-by-month flow, running balance, liquidity per account, top
-    beneficiaries and the approval queue. Legends disappear above three entries (the tooltip names
+    counterparties and the approval queue. Legends disappear above three entries (the tooltip names
     every series). Statistics page with demographics, registrations, cards, finances and a members map
     whose places are geocoded automatically.
 13. **Organization chart** — association bodies and appointments (members or external people) with role compatibility checks; outstanding membership fees never block an appointment.

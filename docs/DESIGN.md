@@ -84,7 +84,7 @@ Rules:
   series, and a longer legend takes more room than the plot. Keep the tooltip readable instead
   (`label` always carries the series/row name and the formatted amount).
 - Donuts are for compositions (2–3 slices); use horizontal bars for ranked lists (liquidity per
-  account, top beneficiaries) and grouped bars for comparisons over time.
+  account, top counterparties) and grouped bars for comparisons over time.
 - Money axes and tooltips use the same server format as the rest of the UI (`formatMoney()` mirrors
   `CurrencyService::format`), never `Intl.NumberFormat`.
 - Charts never invent a colour: the fixed teal/copper palette is reused, negative values switch to the
