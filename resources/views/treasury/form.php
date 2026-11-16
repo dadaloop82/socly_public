@@ -235,3 +235,17 @@ if ($probe !== null && $movementId > 0) {
         <?= view_partial('partials/record_trail', ['entity' => 'treasury', 'id' => (int) ($movement['id'] ?? 0)]) ?>
     <?php endif; ?>
 </form>
+<?php if ($isEdit): ?>
+    <section class="panel treasury-danger-zone">
+        <div>
+            <h2 class="section-title"><?= e(__('treasury.delete_title')) ?></h2>
+            <p class="muted"><?= e(__('treasury.delete_hint')) ?></p>
+        </div>
+        <form method="post" action="<?= e(url('/treasury/' . $movementId . '/delete')) ?>"
+              data-confirm="<?= e(__('treasury.delete_confirm')) ?>" data-confirm-danger="1">
+            <?= csrf_field() ?>
+            <?= field('hidden', ['name' => 'ret', 'value' => $returnPath]) ?>
+            <button class="btn btn-ghost is-danger" type="submit"><?= e(__('treasury.delete')) ?></button>
+        </form>
+    </section>
+<?php endif; ?>

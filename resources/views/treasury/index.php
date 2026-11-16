@@ -1065,6 +1065,18 @@ if ($filterYear !== '' && !isset($yearFilterOptions[$filterYear])) {
                                                 'show' => $canManage,
                                                 'href' => $editUrl,
                                             ],
+                                            [
+                                                'icon' => 'delete',
+                                                'label' => __('treasury.delete'),
+                                                'show' => $canManage && !$isSuperseded,
+                                                'danger' => true,
+                                                'form_action' => $canManage && !$isSuperseded ? url('/treasury/' . $rowId . '/delete') : '',
+                                                'form_attrs' => [
+                                                    'data-confirm' => __('treasury.delete_confirm'),
+                                                    'data-confirm-danger' => '1',
+                                                ],
+                                                'hidden' => ['ret' => $listPath],
+                                            ],
                                         ]) ?>
                                     </td>
                                 </tr>

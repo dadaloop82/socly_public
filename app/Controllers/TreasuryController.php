@@ -345,6 +345,24 @@ final class TreasuryController extends BaseController
         ]);
     }
 
+    public function delete(Request $request, string $id): void
+    {
+        require_component('treasury');
+        $returnPath = $this->listReturnPath($request);
+        $movement = $this->treasury->find((int) $id);
+        if ($movement === null) {
+            $this->flash('errors', ['treasury' => __('errors.404')]);
+            redirect($returnPath);
+        }
+        $deleted = $this->treasury->delete((int) $id, $request->ip(), auth_user()['id'] ?? null);
+        if ($deleted) {
+            $this->flash('success', __('treasury.deleted'));
+        } else {
+            $this->flash('errors', ['treasury' => __('errors.404')]);
+        }
+        redirect($returnPath);
+    }
+
     public function update(Request $request, string $id): void
     {
         require_component('treasury');
