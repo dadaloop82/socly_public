@@ -235,10 +235,6 @@ $showVersionFooter = !$showVersionInline;
             <?php foreach ($componentMenu as $item): ?>
                 <?php if (!empty($item['permission']) && !can($item['permission'])) continue; ?>
                 <a href="<?= e(url($item['path'])) ?>" class="<?= e($navActive($item['path'])) ?>"><?= e(__($item['label'])) ?></a>
-                <?php if (($item['key'] ?? '') === 'treasury' && can('treasury.view')): ?>
-                    <?php $budgetNavClass = trim($navActive('/budgets') . ' ' . $navActive('/rendiconto')); ?>
-                    <a href="<?= e(url('/budgets')) ?>" class="<?= e($budgetNavClass) ?>"><?= e(__('nav.bilanci')) ?></a>
-                <?php endif; ?>
                 <?php foreach ($pluginSubItems[(string) ($item['key'] ?? '')] ?? [] as $sub): ?>
                     <a class="nav-sub nav-addon <?= e($navActive($sub['path'])) ?>" href="<?= e(url($sub['path'])) ?>">
                         <svg class="nav-addon-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
@@ -247,6 +243,10 @@ $showVersionFooter = !$showVersionInline;
                         <span><?= e(__($sub['label'])) ?></span>
                     </a>
                 <?php endforeach; ?>
+                <?php if (($item['key'] ?? '') === 'treasury' && can('treasury.view')): ?>
+                    <?php $budgetNavClass = trim($navActive('/budgets') . ' ' . $navActive('/rendiconto')); ?>
+                    <a href="<?= e(url('/budgets')) ?>" class="<?= e($budgetNavClass) ?>"><?= e(__('nav.bilanci')) ?></a>
+                <?php endif; ?>
             <?php endforeach; ?>
             <?php foreach ($pluginStandalone as $item): ?>
                 <a class="nav-addon <?= e($navActive($item['path'])) ?>" href="<?= e(url($item['path'])) ?>">

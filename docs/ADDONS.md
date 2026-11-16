@@ -244,9 +244,16 @@ covers **Intesa Sanpaolo** (Conto Business Insieme): native text provides dates 
 narrow OCR pass over the amount columns fills in the numbers, and scanned PDFs fall back to a
 full-page OCR. The parser follows movements across page breaks, skips repeated headers/footnotes,
 reconciles the declared totals with the sum of the detected rows and flags duplicates already in the
-ledger. Writes go through `TreasuryService::create()` (audit, approval queue, RUNTS `__none__`) and
+ledger. Writes go through `TreasuryService::create()` (audit, approval queue, RUNTS line) and
 the import is logged as `treasury.bank_statement_imported`. Files live in
 `storage/uploads/bank-statements/<run>/` and are deleted on commit, on cancel or after 24 hours.
+
+The summary mirrors the cash-book list (same columns and client-side filters) and lets the operator
+skip or overwrite movements already present; a check-only screen compares those rows with the
+ledger, confirms the correct ones and aligns a row to the existing movement without importing
+anything. Data, amount and beneficiary are mandatory before a row can be confirmed; the beneficiary
+is inferred from the movements already imported or from the description when the statement does not
+print it.
 
 Requirements: `poppler-utils`, `tesseract-ocr` (+ `ita` language data) and ImageMagick. A new bank
 model is a new JSON file in `templates/`; it never changes the PHP code. Source:
