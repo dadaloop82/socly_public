@@ -14390,6 +14390,15 @@ function initTreasuryCategory(root = document) {
       }
       return index === short.length;
     };
+    // “Banc Intesa” must complete to “Banca Intesa San Paolo”: every typed word
+    // is a prefix of the candidate word in the same position. Starting from the
+    // first word only, so typing “Paolo” alone never suggests a bank name.
+    const isWordPrefix = (typed, candidate) => {
+      const typedWords = normalizeName(typed).split(' ').filter(Boolean);
+      const candidateWords = normalizeName(candidate).split(' ').filter(Boolean);
+      if (typedWords.length === 0 || typedWords.length > candidateWords.length) return false;
+      return typedWords.every((word, index) => candidateWords[index].startsWith(word));
+    };
     const hideBeneficiarySuggest = () => {
       beneficiaryPending = '';
       if (beneficiarySuggest instanceof HTMLElement) beneficiarySuggest.hidden = true;
@@ -14426,21 +14435,36 @@ function initTreasuryCategory(root = document) {
         return;
       }
       const compactTyped = compactName(typed);
+      const candidates = [...beneficiaryList.options]
+        .filter((option) => option.value.trim() !== '')
+        .map((option) => ({
+          value: option.value,
+          key: normalizeName(option.value),
+          compact: compactName(option.value),
+        }))
+        .filter((entry) => entry.key !== '' && entry.key !== value && entry.compact !== '');
       let best = '';
       let bestScore = 0;
-      [...beneficiaryList.options].forEach((option) => {
-        const candidate = option.value;
-        const key = normalizeName(candidate);
-        if (key === '' || key === value) return;
-        const compactCandidate = compactName(candidate);
-        if (compactCandidate === '') return;
-        let score = 1 - distance(compactTyped, compactCandidate) / Math.max(compactTyped.length, compactCandidate.length);
-        if (isAbbreviation(compactTyped, compactCandidate)) score = Math.max(score, 0.86);
+      candidates.forEach((entry) => {
+        let score = 1 - distance(compactTyped, entry.compact) / Math.max(compactTyped.length, entry.compact.length);
+        if (isAbbreviation(compactTyped, entry.compact)) score = Math.max(score, 0.86);
         if (score > bestScore) {
           bestScore = score;
-          best = candidate;
+          best = entry.value;
         }
       });
+      // Prefix completion: "Banc" must point to an existing "Banca Intesa San
+      // Paolo", not only to a name one typo away. Kept conservative: the
+      // suggestion appears only when exactly one known counterparty starts
+      // with the typed text, so an ambiguous prefix never guesses.
+      const prefixMatches = compactTyped.length >= 3
+        ? candidates.filter((entry) => (entry.compact.length > compactTyped.length && entry.compact.startsWith(compactTyped))
+          || isWordPrefix(typed, entry.value))
+        : [];
+      if (prefixMatches.length === 1) {
+        best = prefixMatches[0].value;
+        bestScore = Math.max(bestScore, 0.9);
+      }
       if (best !== '' && bestScore >= 0.78) {
         showBeneficiarySuggest(typed, best);
       }
