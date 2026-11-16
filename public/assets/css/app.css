@@ -13266,6 +13266,26 @@ tr.doc-row-editable:focus-visible {
 }
 .treasury-row-details a { text-decoration: underline; }
 /*
+ * Row just saved from the ledger (a copied movement included): the script scrolls to it and adds
+ * `is-flashing` for a few seconds, then removes the class.
+ */
+@keyframes treasury-row-flash {
+  0%, 100% { background-color: transparent; box-shadow: inset 0 0 0 0 transparent; }
+  12%, 44%, 76% {
+    background-color: color-mix(in srgb, var(--brand-accent) 24%, var(--card));
+    box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--brand-accent) 60%, transparent);
+  }
+  28%, 60% { background-color: transparent; box-shadow: inset 0 0 0 0 transparent; }
+}
+.treasury-row.is-flashing { animation: treasury-row-flash 1.6s ease-in-out 3; }
+@media (prefers-reduced-motion: reduce) {
+  .treasury-row.is-flashing {
+    animation: none;
+    background-color: color-mix(in srgb, var(--brand-accent) 16%, var(--card));
+    box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--brand-accent) 60%, transparent);
+  }
+}
+/*
  * “Target Account” picker in the action bar: same visual language as the site fields, only compact
  * to fit next to the buttons.
  */

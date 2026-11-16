@@ -287,6 +287,7 @@ document.addEventListener('DOMContentLoaded', () => {
   initMemberWizard();
   initMembersList();
   initEndlessLists();
+  initTreasuryHighlights();
   initTreasuryBulk();
   initLegalDocs();
   initSetupSmtp(document);
@@ -5110,6 +5111,10 @@ function initEndlessLists() {
       }
     };
 
+    // The post-save highlight can ask for the next batch even before the sentinel enters the
+    // viewport (the row may be further down the current sort).
+    root.addEventListener('socly:endless-load-more', () => loadMore());
+
     root.classList.add('is-infinite');
     if (done) {
       showDone();
@@ -5132,6 +5137,56 @@ function initEndlessLists() {
     }, { passive: true });
     if (nearViewport()) loadMore();
   });
+}
+
+/**
+ * After a save the ledger comes back with `?highlight=<id>`: scroll to that movement and let it
+ * blink. When the row is not in the loaded batch yet (endless feed), the next pages are requested
+ * one at a time; the attempt cap stops an unrelated filter from walking the whole archive.
+ */
+function initTreasuryHighlights() {
+  const params = new URLSearchParams(window.location.search);
+  const raw = params.get('highlight') || '';
+  const id = Number(raw);
+  if (raw === '' || !Number.isFinite(id) || id < 1) return;
+  const selector = `tr[data-treasury-row="${id}"]`;
+  const list = document.querySelector('[data-treasury-list]');
+  let attempts = 0;
+  let done = false;
+
+  const forgetParam = () => {
+    params.delete('highlight');
+    const query = params.toString();
+    window.history.replaceState(
+      null,
+      '',
+      window.location.pathname + (query !== '' ? `?${query}` : '') + window.location.hash
+    );
+  };
+
+  const flash = (row) => {
+    if (done) return;
+    done = true;
+    row.classList.add('is-flashing');
+    row.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    window.setTimeout(() => row.classList.remove('is-flashing'), 5200);
+    forgetParam();
+  };
+
+  const seek = () => {
+    if (done) return;
+    const row = document.querySelector(selector);
+    if (row instanceof HTMLElement) {
+      flash(row);
+      return;
+    }
+    if (!(list instanceof HTMLElement) || attempts >= 40) return;
+    attempts += 1;
+    list.dispatchEvent(new CustomEvent('socly:endless-load-more'));
+  };
+
+  seek();
+  list?.addEventListener('socly:rows-appended', seek);
 }
 
 function personNameCase(raw) {

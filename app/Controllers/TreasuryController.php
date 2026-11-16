@@ -493,8 +493,14 @@ final class TreasuryController extends BaseController
             || trim((string) $request->input('runts_line', '')) !== ''
             || (int) $request->input('budget_item_id', 0) > 0;
         $newId = (int) ($result['id'] ?? 0);
-        if ($classified && $newId > 0) {
-            redirect(self::withQuery($returnPath, ['similar' => (string) $newId]));
+        if ($newId > 0) {
+            // Back to the ledger pointing at the new row (copies included): the list scrolls to it
+            // and blinks it. The page is dropped so the first batch really contains it.
+            redirect(self::ledgerFocusPath(
+                $returnPath,
+                $newId,
+                $classified ? ['similar' => (string) $newId] : []
+            ));
         }
         redirect($returnPath);
     }
@@ -1320,5 +1326,31 @@ final class TreasuryController extends BaseController
         }
 
         return $path . (str_contains($path, '?') ? '&' : '?') . http_build_query($params);
+    }
+
+    /**
+     * Ledger URL after a save, pointing at the row that was just created: the current filters and
+     * sort are kept, the page is dropped (the new movement sits in the first batch) and
+     * `highlight=<id>` drives the scroll + blink in the ledger script. Other return paths (e.g. the
+     * member card) are left untouched: there is no ledger row to point at.
+     *
+     * @param array<string,string> $extra
+     */
+    private static function ledgerFocusPath(string $returnPath, int $movementId, array $extra = []): string
+    {
+        if ($movementId < 1 || !str_starts_with($returnPath, '/treasury')) {
+            return $returnPath;
+        }
+        $path = $returnPath;
+        $query = [];
+        $mark = strpos($path, '?');
+        if ($mark !== false) {
+            parse_str(substr($path, $mark + 1), $query);
+            $path = substr($path, 0, $mark);
+        }
+        unset($query['page']);
+        $query = array_merge($query, $extra, ['highlight' => (string) $movementId]);
+
+        return $path . '?' . http_build_query($query);
     }
 }
