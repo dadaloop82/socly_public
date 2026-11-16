@@ -616,9 +616,10 @@ final class TreasuryCsvService
     }
 
     /**
-     * Optional regex rules per CSV column: the value is transformed before the import.
+     * Optional regex rules per CSV column: the value is transformed before the import by keeping
+     * the first capture group (or the whole match when the pattern has no groups).
      *
-     * @return array<int,array{pattern:string,replacement:string}>
+     * @return array<int,array{pattern:string}>
      */
     public function transforms(): array
     {
@@ -633,10 +634,7 @@ final class TreasuryCsvService
             if ($pattern === '') {
                 continue;
             }
-            $out[(int) $index] = [
-                'pattern' => $pattern,
-                'replacement' => (string) ($transform['replacement'] ?? ''),
-            ];
+            $out[(int) $index] = ['pattern' => $pattern];
         }
 
         return $out;
@@ -678,7 +676,7 @@ final class TreasuryCsvService
      * Preview of a rule as text segments: `keep` true is the text the import keeps (highlighted),
      * false is the text the rule drops (struck through). Mirrored by the live preview in app.js.
      *
-     * @param array{pattern:string,replacement:string} $transform
+     * @param array{pattern:string} $transform
      * @return list<array{text:string,keep:bool}>|null null when the pattern is not valid
      */
     public function previewSegments(string $value, array $transform): ?array
@@ -690,55 +688,26 @@ final class TreasuryCsvService
         if ($value === '') {
             return [];
         }
-        $replacement = (string) ($transform['replacement'] ?? '');
-        if ($replacement === '') {
-            $matched = $this->runRegex($regex, $value, $matches, PREG_OFFSET_CAPTURE);
-            if ($matched === false) {
-                return null;
-            }
-            if ($matched !== 1) {
-                // No match: the import keeps the original value.
-                return [['text' => $value, 'keep' => true]];
-            }
-            $whole = (string) ($matches[0][0] ?? '');
-            $withGroup = isset($matches[1][0]) && (string) $matches[1][0] !== '';
-            $kept = $withGroup ? (string) $matches[1][0] : $whole;
-            $keptAt = $withGroup ? (int) $matches[1][1] : (int) ($matches[0][1] ?? 0);
-            $segments = [];
-            if ($keptAt > 0) {
-                $segments[] = ['text' => substr($value, 0, $keptAt), 'keep' => false];
-            }
-            $segments[] = ['text' => $kept, 'keep' => true];
-            $after = $keptAt + strlen($kept);
-            if ($after < strlen($value)) {
-                $segments[] = ['text' => substr($value, $after), 'keep' => false];
-            }
-
-            return $segments;
-        }
-        $count = $this->runRegexAll($regex, $value, $matches);
-        if ($count === false) {
+        $matched = $this->runRegex($regex, $value, $matches, PREG_OFFSET_CAPTURE);
+        if ($matched === false) {
             return null;
         }
-        if ($count === 0) {
+        if ($matched !== 1) {
+            // No match: the import keeps the original value.
             return [['text' => $value, 'keep' => true]];
         }
+        $whole = (string) ($matches[0][0] ?? '');
+        $withGroup = isset($matches[1][0]) && (string) $matches[1][0] !== '';
+        $kept = $withGroup ? (string) $matches[1][0] : $whole;
+        $keptAt = $withGroup ? (int) $matches[1][1] : (int) ($matches[0][1] ?? 0);
         $segments = [];
-        $cursor = 0;
-        foreach ($matches as $match) {
-            $matchText = (string) ($match[0][0] ?? '');
-            $offset = (int) ($match[0][1] ?? 0);
-            if ($offset > $cursor) {
-                $segments[] = ['text' => substr($value, $cursor, $offset - $cursor), 'keep' => false];
-            }
-            $segments[] = [
-                'text' => preg_replace($regex, $replacement, $matchText) ?? $matchText,
-                'keep' => true,
-            ];
-            $cursor = $offset + strlen($matchText);
+        if ($keptAt > 0) {
+            $segments[] = ['text' => substr($value, 0, $keptAt), 'keep' => false];
         }
-        if ($cursor < strlen($value)) {
-            $segments[] = ['text' => substr($value, $cursor), 'keep' => false];
+        $segments[] = ['text' => $kept, 'keep' => true];
+        $after = $keptAt + strlen($kept);
+        if ($after < strlen($value)) {
+            $segments[] = ['text' => substr($value, $after), 'keep' => false];
         }
 
         return $segments;
@@ -766,7 +735,7 @@ final class TreasuryCsvService
      *
      * @param array{headers:list<string>,rows:list<array{line:int,cells:list<string>}>} $table
      * @param array<int|string,string> $map
-     * @param array<int,array{pattern:string,replacement:string}> $transforms
+     * @param array<int,array{pattern:string}> $transforms
      * @return array<string,array{category:string,runts_line:string,budget_item_id:int}>
      */
     private function classificationGuesses(array $table, array $map, array $transforms): array
@@ -831,7 +800,7 @@ final class TreasuryCsvService
      * Validates the rules submitted with the mapping (empty pattern = no rule).
      *
      * @param array<string|int,mixed> $raw
-     * @return array{ok:bool,transforms:array<int,array{pattern:string,replacement:string}>,index?:int}
+     * @return array{ok:bool,transforms:array<int,array{pattern:string}>,index?:int}
      */
     private function normalizeTransforms(array $raw): array
     {
@@ -845,24 +814,23 @@ final class TreasuryCsvService
             if ($pattern === '') {
                 continue;
             }
-            $replacement = trim((string) ($entry['replacement'] ?? ''));
-            if (mb_strlen($pattern) > 500 || mb_strlen($replacement) > 500) {
+            if (mb_strlen($pattern) > 500) {
                 return ['ok' => false, 'transforms' => [], 'index' => $index];
             }
             if ($this->compileRegex($pattern) === null) {
                 return ['ok' => false, 'transforms' => [], 'index' => $index];
             }
-            $transforms[$index] = ['pattern' => $pattern, 'replacement' => $replacement];
+            $transforms[$index] = ['pattern' => $pattern];
         }
 
         return ['ok' => true, 'transforms' => $transforms];
     }
 
     /**
-     * Applies the rule of a column to a raw cell value. An empty replacement extracts the first
-     * capture group (or the whole match); rows where the pattern does not match stay unchanged.
+     * Applies the rule of a column to a raw cell value: the first capture group of the pattern is
+     * kept (the whole match when the pattern has no groups); rows without a match stay unchanged.
      *
-     * @param array<int,array{pattern:string,replacement:string}> $transforms
+     * @param array<int,array{pattern:string}> $transforms
      */
     private function applyTransforms(array $transforms, int $index, string $value): string
     {
@@ -873,9 +841,6 @@ final class TreasuryCsvService
         $regex = $this->compileRegex($transform['pattern']);
         if ($regex === null) {
             return $value;
-        }
-        if ($transform['replacement'] !== '') {
-            return preg_replace($regex, $transform['replacement'], $value) ?? $value;
         }
         $matched = $this->runRegex($regex, $value, $matches);
         if ($matched !== 1) {
@@ -925,22 +890,6 @@ final class TreasuryCsvService
         set_error_handler(static fn (): bool => true);
         try {
             return preg_match($regex, $subject, $matches, $flags);
-        } finally {
-            restore_error_handler();
-        }
-    }
-
-    /**
-     * preg_match_all() with ordered matches and byte offsets (global replacement preview).
-     *
-     * @param list<array<int,array{0:string,1:int}>>|null $matches
-     * @return int|false
-     */
-    private function runRegexAll(string $regex, string $subject, ?array &$matches = null): int|false
-    {
-        set_error_handler(static fn (): bool => true);
-        try {
-            return preg_match_all($regex, $subject, $matches, PREG_SET_ORDER | PREG_OFFSET_CAPTURE);
         } finally {
             restore_error_handler();
         }

@@ -2800,8 +2800,6 @@ return [
             'col_rule' => 'Regola (facoltativa)',
             'regex_pattern_label' => 'Espressione regolare',
             'regex_pattern_placeholder' => 'es. \\[ Fatt\\. (\\d+/\\w+) \\]',
-            'regex_replace_label' => 'Sostituzione',
-            'regex_replace_placeholder' => 'es. $1',
             'regex_hint' => 'La regola è facoltativa: trasforma il valore della colonna prima dell’import. In anteprima la parte barrata non viene importata, quella evidenziata sì; le righe senza corrispondenza restano invariate.',
             'regex_invalid' => 'Espressione non valida',
             'col_status' => 'Esito',

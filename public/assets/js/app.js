@@ -18041,29 +18041,11 @@ function initBudgetGrid(scope = document) {
   };
 
   /*
-   * Same segmentation as the PHP preview: keep=true is imported, keep=false is dropped.
+   * Same segmentation as the PHP preview: keep=true is imported (first group, or the whole match
+   * when the pattern has no groups), keep=false is dropped.
    */
-  const segmentsFor = (sample, pattern, replacement) => {
+  const segmentsFor = (sample, pattern) => {
     if (sample === '') return [];
-    if (replacement !== '') {
-      const global = new RegExp(pattern.body, buildFlags(pattern.flags, 'g'));
-      const single = new RegExp(pattern.body, buildFlags(pattern.flags, ''));
-      const out = [];
-      let cursor = 0;
-      let match;
-      let guard = 0;
-      while ((match = global.exec(sample)) !== null && guard < 2000) {
-        guard += 1;
-        const start = match.index;
-        const text = match[0];
-        if (start > cursor) out.push({ text: sample.slice(cursor, start), keep: false });
-        out.push({ text: text.replace(single, replacement), keep: true });
-        cursor = start + text.length;
-        if (text.length === 0) global.lastIndex += 1;
-      }
-      if (cursor < sample.length) out.push({ text: sample.slice(cursor), keep: false });
-      return out.length > 0 ? out : [{ text: sample, keep: true }];
-    }
     let match;
     try {
       match = new RegExp(pattern.body, buildFlags(pattern.flags, 'd')).exec(sample);
@@ -18090,10 +18072,10 @@ function initBudgetGrid(scope = document) {
     return out;
   };
 
-  const appendSegments = (output, sample, pattern, replacement) => {
+  const appendSegments = (output, sample, pattern) => {
     const row = document.createElement('li');
     row.className = 'import-rule-preview-row';
-    segmentsFor(sample, pattern, replacement).forEach((segment) => {
+    segmentsFor(sample, pattern).forEach((segment) => {
       const text = document.createTextNode(segment.text);
       if (segment.keep) {
         const mark = document.createElement('mark');
@@ -18122,7 +18104,6 @@ function initBudgetGrid(scope = document) {
   const render = (box) => {
     const output = box.querySelector('[data-import-map-rx-preview]');
     const patternInput = box.querySelector('[data-import-map-rx-pattern]');
-    const replaceInput = box.querySelector('[data-import-map-rx-replace]');
     if (!(output instanceof HTMLElement) || !(patternInput instanceof HTMLInputElement)) return;
 
     let samples = [];
@@ -18143,10 +18124,9 @@ function initBudgetGrid(scope = document) {
       return;
     }
     output.hidden = false;
-    const replacement = replaceInput instanceof HTMLInputElement ? replaceInput.value.trim() : '';
 
     try {
-      samples.forEach((sample) => appendSegments(output, sample, pattern, replacement));
+      samples.forEach((sample) => appendSegments(output, sample, pattern));
     } catch (error) {
       const label = box.dataset.invalid || 'Invalid regular expression';
       output.appendChild(item('import-rule-invalid', label));
@@ -18155,7 +18135,7 @@ function initBudgetGrid(scope = document) {
 
   boxes.forEach((box) => {
     if (!(box instanceof HTMLElement)) return;
-    box.querySelectorAll('[data-import-map-rx-pattern], [data-import-map-rx-replace]')
+    box.querySelectorAll('[data-import-map-rx-pattern]')
       .forEach((input) => input.addEventListener('input', () => render(box)));
     render(box);
   });

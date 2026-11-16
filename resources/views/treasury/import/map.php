@@ -27,7 +27,7 @@
  * @var list<array{index:int,header:string,suggested:string,sample:string,kind:string,filled:int,rows:int}> $columns
  * @var list<array{label:string,options:list<array{value:string,label:string}>}> $targetGroups
  * @var array<int,string> $map
- * @var array<int,array{pattern:string,replacement:string}> $transforms
+ * @var array<int,array{pattern:string}> $transforms
  * @var array<int,list<array{raw:string,value:string,segments:list<array{text:string,keep:bool}>}>> $regexPreviews
  * @var array<string,string> $options
  * @var list<array{key:string,label:string,active:bool}> $accounts
@@ -158,7 +158,7 @@ $kindLabels = [
                 $kindKey = $kindLabels[(string) $column['kind']] ?? '';
                 $transform = is_array($transforms[$index] ?? null)
                     ? $transforms[$index]
-                    : ['pattern' => '', 'replacement' => ''];
+                    : ['pattern' => ''];
                 $rxSamples = [];
                 foreach (array_slice($table['rows'], 0, 3) as $rxRow) {
                     $rxSamples[] = (string) ($rxRow['cells'][$index] ?? '');
@@ -208,22 +208,6 @@ $kindLabels = [
                                 'attrs' => [
                                     'data-import-map-rx-pattern' => true,
                                     'aria-label' => (string) __('treasury.import.regex_pattern_label'),
-                                    'autocomplete' => 'off',
-                                    'spellcheck' => 'false',
-                                ],
-                            ]) ?>
-                            <?= field('text', [
-                                'name' => 'regex[' . $index . '][replacement]',
-                                'id' => 'treasury-import-regex-replace-' . $index,
-                                'label' => '',
-                                'value' => (string) ($transform['replacement'] ?? ''),
-                                'context' => 'setup',
-                                'placeholder' => (string) __('treasury.import.regex_replace_placeholder'),
-                                'wrapper_class' => 'import-rule-field',
-                                'input_class' => 'import-rule-input',
-                                'attrs' => [
-                                    'data-import-map-rx-replace' => true,
-                                    'aria-label' => (string) __('treasury.import.regex_replace_label'),
                                     'autocomplete' => 'off',
                                     'spellcheck' => 'false',
                                 ],

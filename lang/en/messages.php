@@ -3332,8 +3332,6 @@ return [
             'col_rule' => 'Rule (optional)',
             'regex_pattern_label' => 'Regular expression',
             'regex_pattern_placeholder' => 'e.g. \\[ Fatt\\. (\\d+/\\w+) \\]',
-            'regex_replace_label' => 'Replace with',
-            'regex_replace_placeholder' => 'e.g. $1',
             'regex_hint' => 'The rule is optional: it transforms the column value before the import. In the preview the struck-through part is not imported, the highlighted part is; rows without a match stay unchanged.',
             'regex_invalid' => 'Invalid expression',
             'col_status' => 'Result',

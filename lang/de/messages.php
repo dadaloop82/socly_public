@@ -3332,8 +3332,6 @@ return [
             'col_rule' => 'Regel (optional)',
             'regex_pattern_label' => 'Regulärer Ausdruck',
             'regex_pattern_placeholder' => 'z. B. \\[ Fatt\\. (\\d+/\\w+) \\]',
-            'regex_replace_label' => 'Ersetzen durch',
-            'regex_replace_placeholder' => 'z. B. $1',
             'regex_hint' => 'Die Regel ist optional: Sie wandelt den Spaltenwert vor dem Import um. In der Vorschau wird der durchgestrichene Teil nicht importiert, der hervorgehobene schon; Zeilen ohne Treffer bleiben unverändert.',
             'regex_invalid' => 'Ungültiger Ausdruck',
             'col_status' => 'Ergebnis',
