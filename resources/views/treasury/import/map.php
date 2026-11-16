@@ -243,26 +243,30 @@ $kindLabels = [
         </div>
     </header>
     <div class="import-options-grid">
-        <?= field('select', [
-            'name' => 'default_direction',
-            'label' => (string) __('treasury.import.opt_default_direction'),
-            'value' => (string) ($options['default_direction'] ?? 'expense'),
-            'context' => 'setup',
-            'include_empty' => false,
-            'options' => [
-                ['value' => 'expense', 'label' => (string) __('treasury.direction_sign_expense')],
-                ['value' => 'income', 'label' => (string) __('treasury.direction_sign_income')],
-            ],
-        ]) ?>
-        <?= field('select', [
-            'name' => 'default_account',
-            'label' => (string) __('treasury.import.opt_default_account'),
-            'value' => (string) ($options['default_account'] ?? ''),
-            'context' => 'setup',
-            'include_empty' => true,
-            'empty_label' => (string) __('treasury.import.opt_no_default'),
-            'options' => $accountOptions,
-        ]) ?>
+        <div class="import-option">
+            <?= field('select', [
+                'name' => 'default_direction',
+                'label' => (string) __('treasury.import.opt_default_direction'),
+                'value' => (string) ($options['default_direction'] ?? 'expense'),
+                'context' => 'setup',
+                'include_empty' => false,
+                'options' => [
+                    ['value' => 'expense', 'label' => (string) __('treasury.direction_sign_expense')],
+                    ['value' => 'income', 'label' => (string) __('treasury.direction_sign_income')],
+                ],
+            ]) ?>
+        </div>
+        <div class="import-option">
+            <?= field('select', [
+                'name' => 'default_account',
+                'label' => (string) __('treasury.import.opt_default_account'),
+                'value' => (string) ($options['default_account'] ?? ''),
+                'context' => 'setup',
+                'include_empty' => true,
+                'empty_label' => (string) __('treasury.import.opt_no_default'),
+                'options' => $accountOptions,
+            ]) ?>
+        </div>
         <div class="import-option">
             <?= field('select', [
                 'name' => 'default_category',
@@ -274,13 +278,6 @@ $kindLabels = [
                 'options' => $categoryOptions,
                 'attrs' => ['data-import-guess-select' => 'category'],
             ]) ?>
-            <input type="hidden" name="guess_category" value="0">
-            <label class="import-flag import-flag--guess">
-                <input type="checkbox" name="guess_category" value="1"
-                       data-import-guess="category"
-                    <?= (string) ($options['guess_category'] ?? '0') === '1' ? 'checked' : '' ?>>
-                <span><?= e(__('treasury.import.guess')) ?></span>
-            </label>
         </div>
         <div class="import-option">
             <?= field('select', [
@@ -293,13 +290,6 @@ $kindLabels = [
                 'groups' => is_array($runtsGroups ?? null) ? $runtsGroups : [],
                 'attrs' => ['data-import-guess-select' => 'runts'],
             ]) ?>
-            <input type="hidden" name="guess_runts" value="0">
-            <label class="import-flag import-flag--guess">
-                <input type="checkbox" name="guess_runts" value="1"
-                       data-import-guess="runts"
-                    <?= (string) ($options['guess_runts'] ?? '0') === '1' ? 'checked' : '' ?>>
-                <span><?= e(__('treasury.import.guess')) ?></span>
-            </label>
         </div>
         <div class="import-option">
             <?= field('select', [
@@ -312,23 +302,47 @@ $kindLabels = [
                 'groups' => is_array($budgetGroups ?? null) ? $budgetGroups : [],
                 'attrs' => ['data-import-guess-select' => 'budget'],
             ]) ?>
+        </div>
+        <div class="import-option">
+            <?= field('select', [
+                'name' => 'default_payment_method',
+                'label' => (string) __('treasury.import.opt_default_method'),
+                'value' => (string) ($options['default_payment_method'] ?? ''),
+                'context' => 'setup',
+                'include_empty' => true,
+                'empty_label' => (string) __('treasury.import.opt_no_default'),
+                'groups' => $methodGroups,
+            ]) ?>
+        </div>
+    </div>
+    <div class="import-guess-grid">
+        <div class="import-guess-item">
+            <input type="hidden" name="guess_category" value="0">
+            <label class="import-flag import-flag--guess">
+                <input type="checkbox" name="guess_category" value="1"
+                       data-import-guess="category"
+                    <?= (string) ($options['guess_category'] ?? '0') === '1' ? 'checked' : '' ?>>
+                <span><?= e(__('treasury.import.guess_category')) ?></span>
+            </label>
+        </div>
+        <div class="import-guess-item">
+            <input type="hidden" name="guess_runts" value="0">
+            <label class="import-flag import-flag--guess">
+                <input type="checkbox" name="guess_runts" value="1"
+                       data-import-guess="runts"
+                    <?= (string) ($options['guess_runts'] ?? '0') === '1' ? 'checked' : '' ?>>
+                <span><?= e(__('treasury.import.guess_runts')) ?></span>
+            </label>
+        </div>
+        <div class="import-guess-item">
             <input type="hidden" name="guess_budget" value="0">
             <label class="import-flag import-flag--guess">
                 <input type="checkbox" name="guess_budget" value="1"
                        data-import-guess="budget"
                     <?= (string) ($options['guess_budget'] ?? '0') === '1' ? 'checked' : '' ?>>
-                <span><?= e(__('treasury.import.guess')) ?></span>
+                <span><?= e(__('treasury.import.guess_budget')) ?></span>
             </label>
         </div>
-        <?= field('select', [
-            'name' => 'default_payment_method',
-            'label' => (string) __('treasury.import.opt_default_method'),
-            'value' => (string) ($options['default_payment_method'] ?? ''),
-            'context' => 'setup',
-            'include_empty' => true,
-            'empty_label' => (string) __('treasury.import.opt_no_default'),
-            'groups' => $methodGroups,
-        ]) ?>
     </div>
     <div class="import-flags">
         <label class="import-flag">

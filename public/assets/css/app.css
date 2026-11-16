@@ -14407,8 +14407,19 @@ select.is-remote-choice {
 }
 .import-option { display: grid; gap: 0.35rem; align-content: start; }
 .import-option .sf-field { margin: 0; }
+/* Reserve two label lines so every select starts on the same baseline even when a label wraps. */
+.import-option .sf-field__label { min-height: 2.7em; }
+.import-guess-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(230px, 100%), 1fr));
+  gap: 0.5rem 1.25rem;
+  margin-top: 0.9rem;
+  padding-top: 0.8rem;
+  border-top: 1px dashed color-mix(in srgb, var(--line) 70%, transparent);
+}
 .import-flag--guess { font-size: 0.82rem; }
-.import-flag--guess input { width: 1rem; height: 1rem; }
+.import-flag--guess input[type="checkbox"] { width: 1rem; height: 1rem; }
+.import-guess-item { min-width: 0; }
 /* Counterparty typo suggestion: inline question with explicit “yes / keep” actions. */
 .treasury-counterparty-suggest {
   margin-top: 0.6rem;
