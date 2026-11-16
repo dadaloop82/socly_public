@@ -3898,5 +3898,8 @@ return [
         'activity_title' => 'Movement just touched',
         'activity_created' => 'This movement was just created by :user (:at).',
         'activity_updated' => 'This movement was just changed by :user (:at).',
+        'just_now' => 'just now',
+        'minute_ago' => '1 minute ago',
+        'minutes_ago' => ':count minutes ago',
     ],
 ];

@@ -29,7 +29,7 @@
  * @var int|null $version       versione da inviare (default: quella della riga)
  * @var int|null $recordId
  * @var array{user?:string,at?:string,current?:int,reload_url?:string}|null $conflict
- * @var array{kind?:string,user?:string,at?:string}|null $activity
+ * @var array{kind?:string,user?:string,at?:string,at_relative?:string}|null $activity
  */
 $entity = (string) ($entity ?? '');
 $row = is_array($row ?? null) ? $row : null;
@@ -41,7 +41,11 @@ $activityText = '';
 if ($activity !== null) {
     $activityText = (string) __(
         (string) ($activity['kind'] ?? '') === 'created' ? 'concurrency.activity_created' : 'concurrency.activity_updated',
-        ['user' => (string) ($activity['user'] ?? ''), 'at' => (string) ($activity['at'] ?? '')]
+        [
+            'user' => (string) ($activity['user'] ?? ''),
+            // Relative label (“3 minuti fa”) instead of the absolute date/time.
+            'at' => (string) ($activity['at_relative'] ?? $activity['at'] ?? ''),
+        ]
     );
 }
 $reloadUrl = (string) ($conflict['reload_url'] ?? '');

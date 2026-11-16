@@ -194,7 +194,7 @@ final class VersionService
      * “just created/modified by …” so two operators notice a change made a moment ago (the
      * client polls the freshness endpoint and keeps the box up to date).
      *
-     * @return array{kind:string,user:string,at:string,at_iso:string,minutes:int}|null
+     * @return array{kind:string,user:string,at:string,at_relative:string,at_iso:string,minutes:int}|null
      */
     public function recentActivity(string $entity, int $id, int $minutes = 15): ?array
     {
@@ -251,13 +251,21 @@ final class VersionService
         if ($time === false || (time() - $time) > $minutes * 60 || $time > time() + 60) {
             return null;
         }
+        $elapsed = (int) floor(max(0, time() - $time) / 60);
+        $relative = $elapsed <= 0
+            ? (string) __('concurrency.just_now')
+            : ($elapsed === 1
+                ? (string) __('concurrency.minute_ago')
+                : (string) __('concurrency.minutes_ago', ['count' => (string) $elapsed]));
 
         return [
             'kind' => $kind,
             'user' => $author !== '' ? $author : (string) __('presence.unknown_user'),
             'at' => (string) (format_datetime($raw) ?: $raw),
+            // Relative label for the “just created/modified” box: “adesso” / “3 minuti fa”.
+            'at_relative' => $relative,
             'at_iso' => date('c', $time),
-            'minutes' => (int) floor(max(0, time() - $time) / 60),
+            'minutes' => $elapsed,
         ];
     }
 

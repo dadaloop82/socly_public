@@ -3898,5 +3898,8 @@ return [
         'activity_title' => 'Buchung gerade bearbeitet',
         'activity_created' => 'Diese Buchung wurde gerade von :user angelegt (:at).',
         'activity_updated' => 'Diese Buchung wurde gerade von :user geändert (:at).',
+        'just_now' => 'gerade eben',
+        'minute_ago' => 'vor 1 Minute',
+        'minutes_ago' => 'vor :count Minuten',
     ],
 ];

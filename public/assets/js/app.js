@@ -441,7 +441,7 @@ function initFreshnessGuard() {
     }
     activityText.textContent = template
       .replace(':user', String(activity.user || ''))
-      .replace(':at', String(activity.at || ''));
+      .replace(':at', String(activity.at_relative || activity.at || ''));
     activityBox.dataset.activityKind = String(activity.kind || '');
     activityBox.hidden = false;
   };
