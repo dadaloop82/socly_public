@@ -255,7 +255,12 @@ anything. Data, amount and beneficiary are mandatory before a row can be confirm
 is inferred from the movements already imported (same amount and direction on a nearby date, similar
 description) or from the description itself when the statement does not print it. The selected
 movement shares the same highlight colour on the PDF and on its card, and the amount is emphasised
-because it is the value that decides whether a row is correct.
+because it is the value that decides whether a row is correct. The counterparty field uses the same
+suggestions as the cash-book form: a datalist of the recorded counterparties plus a proposal when the
+typed name is a near-duplicate, an abbreviation or a unique prefix. When the statement does not name a
+counterparty the bank itself is used, preferring the closest spelling already in the ledger. An edit
+is propagated to later similar movements only where the target field is still empty, and “Salva e
+continua” stays disabled until every row to import is complete, issue-free and confirmed.
 
 Amounts get a second chance: a word sitting right on the column boundary is still accepted, and every
 row whose amount is still missing is re-read with a focused OCR pass on its own line (enlarged single
@@ -283,7 +288,7 @@ model is a new JSON file in `templates/`; it never changes the PHP code. Source:
 `addons-src/bank_statement_import/` (private repo; `addons-src/` is not part of the public export).
 
 ```bash
-php tools/addons/addon-tool.php build addons-src/bank_statement_import dist/bank_statement_import-1.2.5.soclyaddon --incoming
+php tools/addons/addon-tool.php build addons-src/bank_statement_import dist/bank_statement_import-1.2.6.soclyaddon --incoming
 ```
 
 ## Workflow events from add-ons
