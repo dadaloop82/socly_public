@@ -270,6 +270,14 @@ and jumps to the first one. A possible duplicate inside the same statement can b
 checks “Confermo che i movimenti verificati corrispondono all’estratto conto”. Hovering a movement
 switches the PDF to its page and scrolls the highlighted lines into view.
 
+The verification screen was reworked around the statement: “letto dall’estratto conto” wording,
+registered value before the statement value in the differences, a PDF excerpt for every row, a slider
+that shows position and remaining rows, a wide in-page editor for the recorded movement, and an
+unsaved-changes guard. The apply bar counts the movements being corrected (“Applica le modifiche ai
+X movimenti”) and “Usa valore Estratto conto” is a button. The ledger movements missing from the
+statement sit at the top and can be deleted after two confirmations. The upload button stays disabled
+until a valid PDF is selected and the reading-engine line is only shown when something is missing.
+
 Amounts get a second chance: a word sitting right on the column boundary is still accepted, and every
 row whose amount is still missing is re-read with a focused OCR pass on its own line (enlarged single
 line). A number that cannot be read stays at 0, disables the row and is reported as unreadable — a
@@ -296,7 +304,7 @@ model is a new JSON file in `templates/`; it never changes the PHP code. Source:
 `addons-src/bank_statement_import/` (private repo; `addons-src/` is not part of the public export).
 
 ```bash
-php tools/addons/addon-tool.php build addons-src/bank_statement_import dist/bank_statement_import-1.2.7.soclyaddon --incoming
+php tools/addons/addon-tool.php build addons-src/bank_statement_import dist/bank_statement_import-1.2.8.soclyaddon --incoming
 ```
 
 ## Workflow events from add-ons
