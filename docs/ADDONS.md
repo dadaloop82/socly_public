@@ -262,6 +262,14 @@ counterparty the bank itself is used, preferring the closest spelling already in
 is propagated to later similar movements only where the target field is still empty, and “Salva e
 continua” stays disabled until every row to import is complete, issue-free and confirmed.
 
+Counterparty extraction also understands the “Bonifico da Voi disposto a favore di: …” wording, and a
+member named in the counterparty or description is linked to the movement automatically. Rows to fix
+are highlighted until they are corrected; the blinking counter offers **Vedi movimenti da correggere**
+and jumps to the first one. A possible duplicate inside the same statement can be accepted with
+**Importa comunque**, and on the summary the **Importa** button stays disabled until the operator
+checks “Confermo che i movimenti verificati corrispondono all’estratto conto”. Hovering a movement
+switches the PDF to its page and scrolls the highlighted lines into view.
+
 Amounts get a second chance: a word sitting right on the column boundary is still accepted, and every
 row whose amount is still missing is re-read with a focused OCR pass on its own line (enlarged single
 line). A number that cannot be read stays at 0, disables the row and is reported as unreadable — a
@@ -288,7 +296,7 @@ model is a new JSON file in `templates/`; it never changes the PHP code. Source:
 `addons-src/bank_statement_import/` (private repo; `addons-src/` is not part of the public export).
 
 ```bash
-php tools/addons/addon-tool.php build addons-src/bank_statement_import dist/bank_statement_import-1.2.6.soclyaddon --incoming
+php tools/addons/addon-tool.php build addons-src/bank_statement_import dist/bank_statement_import-1.2.7.soclyaddon --incoming
 ```
 
 ## Workflow events from add-ons
