@@ -264,12 +264,17 @@ line). A number that cannot be read stays at 0, disables the row and is reported
 *inferred* badge, and a row missing from the cash book can be added straight away with **Aggiungi a
 Prima cassa** (bank account, confirmation, audit log).
 
+Reconciliation is checked explicitly: when the declared totals and the sum of the detected rows
+differ, the review shows a red alert with the per-direction difference and the import asks for an
+explicit confirmation; a declared total that was not detected is reported as a partial
+reconciliation.
+
 Requirements: `poppler-utils`, `tesseract-ocr` (+ `ita` language data) and ImageMagick. A new bank
 model is a new JSON file in `templates/`; it never changes the PHP code. Source:
 `addons-src/bank_statement_import/` (private repo; `addons-src/` is not part of the public export).
 
 ```bash
-php tools/addons/addon-tool.php build addons-src/bank_statement_import dist/bank_statement_import-1.2.2.soclyaddon --incoming
+php tools/addons/addon-tool.php build addons-src/bank_statement_import dist/bank_statement_import-1.2.3.soclyaddon --incoming
 ```
 
 ## Workflow events from add-ons
