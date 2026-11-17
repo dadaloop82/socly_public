@@ -257,12 +257,19 @@ description) or from the description itself when the statement does not print it
 movement shares the same highlight colour on the PDF and on its card, and the amount is emphasised
 because it is the value that decides whether a row is correct.
 
+Amounts get a second chance: a word sitting right on the column boundary is still accepted, and every
+row whose amount is still missing is re-read with a focused OCR pass on its own line (enlarged single
+line). A number that cannot be read stays at 0, disables the row and is reported as unreadable — a
+0,00 movement is never imported silently. In the check-only screen the suggested fields keep the
+*inferred* badge, and a row missing from the cash book can be added straight away with **Aggiungi a
+Prima cassa** (bank account, confirmation, audit log).
+
 Requirements: `poppler-utils`, `tesseract-ocr` (+ `ita` language data) and ImageMagick. A new bank
 model is a new JSON file in `templates/`; it never changes the PHP code. Source:
 `addons-src/bank_statement_import/` (private repo; `addons-src/` is not part of the public export).
 
 ```bash
-php tools/addons/addon-tool.php build addons-src/bank_statement_import dist/bank_statement_import-1.2.1.soclyaddon --incoming
+php tools/addons/addon-tool.php build addons-src/bank_statement_import dist/bank_statement_import-1.2.2.soclyaddon --incoming
 ```
 
 ## Workflow events from add-ons
