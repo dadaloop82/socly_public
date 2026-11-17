@@ -267,7 +267,8 @@ Prima cassa** (bank account, confirmation, audit log).
 Reconciliation is checked explicitly: when the declared totals and the sum of the detected rows
 differ, the review shows a red alert with the per-direction difference and the import asks for an
 explicit confirmation; a declared total that was not detected is reported as a partial
-reconciliation.
+reconciliation. The sum always includes every detected row, also the duplicates excluded from the
+import, so an already imported statement still reconciles.
 
 The parser joins amount fragments the text layer prints separately (`"108,"` + `"42"`) and reads the
 declared totals from the `Totale/Totali` line. When the text layer already carries readable amounts
@@ -282,7 +283,7 @@ model is a new JSON file in `templates/`; it never changes the PHP code. Source:
 `addons-src/bank_statement_import/` (private repo; `addons-src/` is not part of the public export).
 
 ```bash
-php tools/addons/addon-tool.php build addons-src/bank_statement_import dist/bank_statement_import-1.2.4.soclyaddon --incoming
+php tools/addons/addon-tool.php build addons-src/bank_statement_import dist/bank_statement_import-1.2.5.soclyaddon --incoming
 ```
 
 ## Workflow events from add-ons
