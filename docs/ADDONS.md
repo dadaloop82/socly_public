@@ -252,15 +252,17 @@ The summary mirrors the cash-book list (same columns and client-side filters) an
 skip or overwrite movements already present; a check-only screen compares those rows with the
 ledger, confirms the correct ones and aligns a row to the existing movement without importing
 anything. Data, amount and beneficiary are mandatory before a row can be confirmed; the beneficiary
-is inferred from the movements already imported or from the description when the statement does not
-print it.
+is inferred from the movements already imported (same amount and direction on a nearby date, similar
+description) or from the description itself when the statement does not print it. The selected
+movement shares the same highlight colour on the PDF and on its card, and the amount is emphasised
+because it is the value that decides whether a row is correct.
 
 Requirements: `poppler-utils`, `tesseract-ocr` (+ `ita` language data) and ImageMagick. A new bank
 model is a new JSON file in `templates/`; it never changes the PHP code. Source:
 `addons-src/bank_statement_import/` (private repo; `addons-src/` is not part of the public export).
 
 ```bash
-php tools/addons/addon-tool.php build addons-src/bank_statement_import dist/bank_statement_import-1.2.0.soclyaddon --incoming
+php tools/addons/addon-tool.php build addons-src/bank_statement_import dist/bank_statement_import-1.2.1.soclyaddon --incoming
 ```
 
 ## Workflow events from add-ons
