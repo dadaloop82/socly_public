@@ -49,8 +49,9 @@ interface PluginInterface
     /**
      * Menu entry: [label, path, permission?, group?].
      * `group` nests the entry under the core nav item with that key (e.g. `members`).
+     * The sidebar appends the plugin `version()` in small type at the end of each entry.
      *
-     * @return list<array{label:string,path:string,permission?:string,group?:string}>
+     * @return list<array{label:string,path:string,permission?:string,group?:string,version?:string}>
      */
     public function registerMenu(): array;
 

@@ -77,7 +77,7 @@ final class PluginManager
     /** @var array<string, PluginInterface> */
     private array $discovered = [];
 
-    /** @var list<array{label:string,path:string,permission?:string}> */
+    /** @var list<array{label:string,path:string,permission?:string,group?:string,version?:string}> */
     private array $menu = [];
 
     /** @var array<string,string> plugins that failed to load or boot (id/file => message) */
@@ -213,6 +213,10 @@ final class PluginManager
                     $router->add($method, $path, $action, $permission, array_values($middleware));
                 }
                 foreach ($plugin->registerMenu() as $item) {
+                    // The sidebar prints the add-on version at the end of its menu entry.
+                    if (!isset($item['version'])) {
+                        $item['version'] = $plugin->version();
+                    }
                     $this->menu[] = $item;
                 }
             } catch (\Throwable $e) {
@@ -237,7 +241,7 @@ final class PluginManager
         return $this->failed;
     }
 
-    /** @return list<array{label:string,path:string,permission?:string,group?:string}> */
+    /** @return list<array{label:string,path:string,permission?:string,group?:string,version?:string}> */
     public function menuItems(): array
     {
         return $this->menu;

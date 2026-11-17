@@ -519,6 +519,18 @@ a:hover { text-decoration: underline; color: var(--brand-primary-deep); }
 }
 .nav a.nav-addon:hover .nav-addon-icon,
 .nav a.nav-addon.active .nav-addon-icon { opacity: 1; }
+.nav a.nav-addon .nav-addon-version {
+  flex: 0 0 auto;
+  margin-left: auto;
+  padding-left: 0.35rem;
+  font-size: 0.68rem;
+  font-weight: 500;
+  letter-spacing: 0.01em;
+  opacity: 0.6;
+  white-space: nowrap;
+}
+.nav a.nav-addon:hover .nav-addon-version,
+.nav a.nav-addon.active .nav-addon-version { opacity: 0.85; }
 .sidebar-deadlines {
   flex: 0 0 auto;
   margin: 0.55rem 0 0.85rem;

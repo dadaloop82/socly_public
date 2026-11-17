@@ -241,6 +241,9 @@ $showVersionFooter = !$showVersionInline;
                             <path d="m7.5 4.27 9 5.15"/><path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"/><path d="m3.3 7 8.7 5 8.7-5"/><path d="M12 22V12"/>
                         </svg>
                         <span><?= e(__($sub['label'])) ?></span>
+                        <?php if (trim((string) ($sub['version'] ?? '')) !== ''): ?>
+                            <span class="nav-addon-version">(<?= e((string) $sub['version']) ?>)</span>
+                        <?php endif; ?>
                     </a>
                 <?php endforeach; ?>
                 <?php if (($item['key'] ?? '') === 'treasury' && can('treasury.view')): ?>
@@ -254,6 +257,9 @@ $showVersionFooter = !$showVersionInline;
                         <path d="m7.5 4.27 9 5.15"/><path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"/><path d="m3.3 7 8.7 5 8.7-5"/><path d="M12 22V12"/>
                     </svg>
                     <span><?= e(__($item['label'])) ?></span>
+                    <?php if (trim((string) ($item['version'] ?? '')) !== ''): ?>
+                        <span class="nav-addon-version">(<?= e((string) $item['version']) ?>)</span>
+                    <?php endif; ?>
                 </a>
             <?php endforeach; ?>
             <?php if (can('members.view')): ?>
