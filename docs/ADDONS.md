@@ -292,8 +292,10 @@ reconciliation. The sum always includes every detected row, also the duplicates 
 import, so an already imported statement still reconciles.
 
 The parser joins amount fragments the text layer prints separately (`"108,"` + `"42"`) and reads the
-declared totals from the `Totale/Totali` line. When the text layer already carries readable amounts
-the OCR pass is skipped (much faster analysis); the focused per-row OCR remains the fallback. Step 2
+declared totals from the `Totale/Totali` line. Thousands are handled too: Intesa hides the separator
+in a control character (`6<0x19>957,06`), which is normalised before the fragments are joined. When the
+text layer already carries readable amounts the OCR pass is skipped (much faster analysis); the focused
+per-row OCR remains the fallback. Step 2
 shows a live progress overlay (elapsed time and steps), marks every 0,00 row in red until a valid
 amount is typed, pulses the unreadable-amount alert and offers **Mostra log OCR**
 (`/treasury/bank-statements/ocr-log`, also downloadable) with the native text, the words found in the
@@ -304,7 +306,7 @@ model is a new JSON file in `templates/`; it never changes the PHP code. Source:
 `addons-src/bank_statement_import/` (private repo; `addons-src/` is not part of the public export).
 
 ```bash
-php tools/addons/addon-tool.php build addons-src/bank_statement_import dist/bank_statement_import-1.2.8.soclyaddon --incoming
+php tools/addons/addon-tool.php build addons-src/bank_statement_import dist/bank_statement_import-1.3.0.soclyaddon --incoming
 ```
 
 ## Workflow events from add-ons
