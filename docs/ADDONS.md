@@ -269,12 +269,20 @@ differ, the review shows a red alert with the per-direction difference and the i
 explicit confirmation; a declared total that was not detected is reported as a partial
 reconciliation.
 
+The parser joins amount fragments the text layer prints separately (`"108,"` + `"42"`) and reads the
+declared totals from the `Totale/Totali` line. When the text layer already carries readable amounts
+the OCR pass is skipped (much faster analysis); the focused per-row OCR remains the fallback. Step 2
+shows a live progress overlay (elapsed time and steps), marks every 0,00 row in red until a valid
+amount is typed, pulses the unreadable-amount alert and offers **Mostra log OCR**
+(`/treasury/bank-statements/ocr-log`, also downloadable) with the native text, the words found in the
+amount area, the OCR lines and the parsed movements.
+
 Requirements: `poppler-utils`, `tesseract-ocr` (+ `ita` language data) and ImageMagick. A new bank
 model is a new JSON file in `templates/`; it never changes the PHP code. Source:
 `addons-src/bank_statement_import/` (private repo; `addons-src/` is not part of the public export).
 
 ```bash
-php tools/addons/addon-tool.php build addons-src/bank_statement_import dist/bank_statement_import-1.2.3.soclyaddon --incoming
+php tools/addons/addon-tool.php build addons-src/bank_statement_import dist/bank_statement_import-1.2.4.soclyaddon --incoming
 ```
 
 ## Workflow events from add-ons
