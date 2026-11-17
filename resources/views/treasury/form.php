@@ -38,6 +38,8 @@
  * @var \Socly\Services\CurrencyService $currency
  */
 $movementId = $isEdit ? (int) ($movement['id'] ?? 0) : 0;
+// Embedded quick edit (add-on dialog): bare layout, no page actions and only the save button.
+$embed = !empty($embed ?? false);
 // “Copia movimento”: the form opens pre-filled like an edit page, but saves a new movement.
 $isCopy = !$isEdit && is_array($movement);
 $old = old_input();
@@ -127,6 +129,10 @@ $adjacentLabel = static function (array $entry, string $key): string {
 $returnPath = (string) ($return_path ?? '/treasury');
 $returnUrl = (string) ($return_url ?? url('/treasury'));
 $retSuffix = $returnPath === '/treasury' ? '' : '?ret=' . rawurlencode($returnPath);
+// Prev/next stay inside the dialog: they must keep the bare layout and the ledger return path.
+$navSuffix = $embed
+    ? '?embed=1' . ($returnPath === '/treasury' ? '' : '&ret=' . rawurlencode($returnPath))
+    : $retSuffix;
 $patternProfile = is_array($pattern_profile ?? null) ? $pattern_profile : [];
 $patternProfileJson = (string) json_encode(
     $patternProfile,
@@ -142,10 +148,11 @@ if ($patternProfileJson === '') {
         <p class="page-lede"><?= e($pageLede) ?></p>
     </div>
     <div class="actions">
+        <?php if (!$embed): ?>
         <?php if ($isEdit): ?>
             <div class="record-nav" role="group" aria-label="<?= e(__('treasury.nav_label')) ?>">
                 <?php if ($adjacentPrev !== null && (int) ($adjacentPrev['id'] ?? 0) > 0): ?>
-                    <a class="btn btn-ghost btn-sm record-nav-btn" href="<?= e(url('/treasury/' . (int) $adjacentPrev['id'] . '/edit') . $retSuffix) ?>"
+                    <a class="btn btn-ghost btn-sm record-nav-btn" href="<?= e(url('/treasury/' . (int) $adjacentPrev['id'] . '/edit') . $navSuffix) ?>"
                        title="<?= e($adjacentLabel($adjacentPrev, 'treasury.nav_prev_title')) ?>"
                        aria-label="<?= e($adjacentLabel($adjacentPrev, 'treasury.nav_prev_title')) ?>">‹</a>
                 <?php else: ?>
@@ -153,7 +160,7 @@ if ($patternProfileJson === '') {
                           title="<?= e(__('treasury.nav_prev_none')) ?>">‹</span>
                 <?php endif; ?>
                 <?php if ($adjacentNext !== null && (int) ($adjacentNext['id'] ?? 0) > 0): ?>
-                    <a class="btn btn-ghost btn-sm record-nav-btn" href="<?= e(url('/treasury/' . (int) $adjacentNext['id'] . '/edit') . $retSuffix) ?>"
+                    <a class="btn btn-ghost btn-sm record-nav-btn" href="<?= e(url('/treasury/' . (int) $adjacentNext['id'] . '/edit') . $navSuffix) ?>"
                        title="<?= e($adjacentLabel($adjacentNext, 'treasury.nav_next_title')) ?>"
                        aria-label="<?= e($adjacentLabel($adjacentNext, 'treasury.nav_next_title')) ?>">›</a>
                 <?php else: ?>
@@ -163,6 +170,7 @@ if ($patternProfileJson === '') {
             </div>
         <?php endif; ?>
         <a class="btn btn-ghost" href="<?= e($returnUrl) ?>"><?= e(__('common.back')) ?></a>
+        <?php endif; ?>
     </div>
 </div>
 
@@ -175,7 +183,7 @@ if ($probe !== null && $movementId > 0) {
         'probe' => $probe,
         'ret_path' => $returnPath,
         'back_path' => '/treasury/' . $movementId . '/edit',
-        'dismiss_url' => url('/treasury/' . $movementId . '/edit') . $retSuffix,
+        'dismiss_url' => url('/treasury/' . $movementId . '/edit') . $navSuffix,
     ]);
 }
 ?>
@@ -214,6 +222,9 @@ if ($probe !== null && $movementId > 0) {
       data-max-upload-bytes="<?= (int) upload_limit_bytes() ?>"
       data-msg-upload-too-large="<?= e(__('documents.upload_too_large', ['max' => upload_max_mb()])) ?>">
     <?= csrf_field() ?>
+    <?php if ($embed): ?>
+        <?= field('hidden', ['name' => 'embed', 'value' => '1']) ?>
+    <?php endif; ?>
     <?php if (!empty($isEdit)): ?>
         <?= field('hidden', ['name' => 'record_id', 'value' => (string) $movementId]) ?>
         <?= view_partial('partials/record_lock_notice', [
@@ -228,14 +239,16 @@ if ($probe !== null && $movementId > 0) {
     <?php require __DIR__ . '/_form_fields.php'; ?>
     <?= field('hidden', ['name' => 'ret', 'value' => $returnPath]) ?>
     <div class="form-actions form-actions-end">
-        <a class="btn btn-ghost" href="<?= e($returnUrl) ?>"><?= e(__('common.back')) ?></a>
+        <?php if (!$embed): ?>
+            <a class="btn btn-ghost" href="<?= e($returnUrl) ?>"><?= e(__('common.back')) ?></a>
+        <?php endif; ?>
         <button class="btn" type="submit"><?= e($submitLabel) ?></button>
     </div>
     <?php if ($isEdit): ?>
         <?= view_partial('partials/record_trail', ['entity' => 'treasury', 'id' => (int) ($movement['id'] ?? 0)]) ?>
     <?php endif; ?>
 </form>
-<?php if ($isEdit): ?>
+<?php if ($isEdit && !$embed): ?>
     <section class="panel treasury-danger-zone">
         <div>
             <h2 class="section-title"><?= e(__('treasury.delete_title')) ?></h2>

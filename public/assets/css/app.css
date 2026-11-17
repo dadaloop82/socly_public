@@ -950,6 +950,18 @@ a.sidebar-brand-home:hover {
   padding: 1.35rem clamp(1.25rem, 3vw, 2.25rem) 2.5rem;
   flex: 1;
 }
+/* Bare layout used inside add-on dialogs (iframe): no panel chrome, a single inner scrollbar. */
+body.app-embed {
+  min-height: 0;
+}
+body.app-embed .app-embed-main {
+  min-height: 0;
+  padding: 1rem 1.1rem 1.5rem;
+  flex: 0 0 auto;
+}
+body.app-embed .page-header {
+  margin-top: 0;
+}
 .app-footer {
   border-top: 1px solid var(--line);
   background: rgba(255,255,255,0.65);

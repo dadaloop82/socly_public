@@ -36,11 +36,13 @@ final class AuditService
     public function log(
         string $action,
         string $entityType,
-        ?string $entityId = null,
+        int|string|null $entityId = null,
         mixed $before = null,
         mixed $after = null,
         ?string $ip = null
     ): void {
+        // Add-ons may pass the numeric id of the row they changed: the audit column stores text.
+        $entityId = $entityId === null ? null : (string) $entityId;
         $userId = auth_user()['id'] ?? null;
         if ($userId !== null) {
             $alive = $this->db->fetch('SELECT id FROM users WHERE id = :id LIMIT 1', ['id' => (int) $userId]);

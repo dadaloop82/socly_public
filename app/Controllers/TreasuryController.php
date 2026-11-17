@@ -233,6 +233,10 @@ final class TreasuryController extends BaseController
         $conflictVersion = (int) $request->input('v', 0);
         $conflictActive = (string) $request->input('conflict', '') !== '' && $conflictVersion > 0;
         $returnPath = $this->listReturnPath($request);
+        // Quick edit inside an add-on dialog (`embed=1`): bare layout without the panel chrome and a
+        // “saved” marker so the parent page can refresh its data when the operator closes the popup.
+        $embed = trim((string) $request->input('embed', '')) === '1';
+        $embedSaved = $embed && (string) $request->input('saved', '') === '1';
         // The previous/next arrows follow the ledger the operator came from: same sort, filters,
         // search and grouping — not a fixed date order.
         $returnQuery = $this->listReturnQuery($request);
@@ -288,7 +292,9 @@ final class TreasuryController extends BaseController
                 (int) ($movement['budget_item_id'] ?? 0)
             ),
             'pattern_profile' => $this->treasury->classificationProfile($movement, (int) $movement['id'], 24),
-        ]);
+            'embed' => $embed,
+            'embed_saved' => $embedSaved,
+        ], $embed ? 'layouts/embed' : 'layouts/app');
     }
 
     public function copy(Request $request, string $id): void
@@ -369,12 +375,15 @@ final class TreasuryController extends BaseController
         // Ledger state to come back to (filters, sort, page) after the save or a validation error.
         $returnPath = $this->listReturnPath($request);
         $editPath = '/treasury/' . (int) $id . '/edit';
+        // `embed=1`: the form runs inside an add-on iframe, so every redirect keeps the bare layout.
+        $embed = trim((string) $request->input('embed', '')) === '1';
+        $embedParams = $embed ? ['embed' => '1'] : [];
         if (upload_post_too_large()) {
             $this->flash('errors', [
                 'invoice_pdf' => __('documents.upload_too_large', ['max' => upload_max_mb()]),
             ]);
             $this->rememberOld($request->all());
-            redirect(self::withQuery($editPath, ['retry' => '1', 'ret' => $returnPath]));
+            redirect(self::withQuery($editPath, ['retry' => '1', 'ret' => $returnPath] + $embedParams));
         }
         $posted = $request->all();
         $before = $this->treasury->find((int) $id);
@@ -399,10 +408,10 @@ final class TreasuryController extends BaseController
                     'conflict' => '1',
                     'v' => (string) (int) ($result['current_version'] ?? 0),
                     'ret' => $returnPath,
-                ]));
+                ] + $embedParams));
             }
             $this->flash('errors', $result['errors'] ?? []);
-            redirect(self::withQuery($editPath, ['retry' => '1', 'ret' => $returnPath]));
+            redirect(self::withQuery($editPath, ['retry' => '1', 'ret' => $returnPath] + $embedParams));
         }
         $this->clearOld();
         $this->flash('success', __('treasury.updated'));
@@ -441,13 +450,18 @@ final class TreasuryController extends BaseController
                 ],
             ];
             // Stay on the card: the “similar movements” proposal is shown right above the form.
-            redirect(self::withQuery($editPath, [
+            redirect(self::withQuery($editPath, array_merge([
                 'ret' => $returnPath,
                 'similar' => (string) (int) $id,
-            ]));
+            ], $embedParams)));
         }
-        // Stay on the card after saving: the operator keeps working on the same record.
-        redirect(self::withQuery($editPath, ['ret' => $returnPath]));
+        // Stay on the card after saving: the operator keeps working on the same record. An embedded
+        // quick edit marks the reload so the parent dialog can refresh the data it shows.
+        redirect(self::withQuery($editPath, array_merge(
+            ['ret' => $returnPath],
+            $embedParams,
+            $embed ? ['saved' => '1'] : []
+        )));
     }
 
     public function store(Request $request): void
