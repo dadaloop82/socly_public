@@ -311,7 +311,7 @@ php tools/addons/addon-tool.php build addons-src/bank_statement_import dist/bank
 
 ## Revenue Agency invoices (`agenzia_entrate_invoices`)
 
-v2.0.0 replaces the server-side Chromium (CDP) harvester with a **Chrome extension** that runs in the
+v2.0.0 replaced the server-side Chromium (CDP) harvester with a **Chrome extension** that runs in the
 operator's own profile, where the SPID session actually lives. Socly never sees the credentials and no
 browser process is executed on the host: the add-on exposes a token-protected JSON bridge
 (`/agenzia-entrate/api/...`) and a dashboard with the installation wizard, the live run and the
@@ -340,7 +340,7 @@ Chrome** button instead of the local install steps. The package builder allows `
 this case (extension pages).
 
 ```bash
-php tools/addons/addon-tool.php build addons-src/agenzia_entrate_invoices dist/agenzia_entrate_invoices-2.0.0.soclyaddon --incoming
+php tools/addons/addon-tool.php build addons-src/agenzia_entrate_invoices dist/agenzia_entrate_invoices-2.0.1.soclyaddon --incoming
 ```
 
 ## Workflow events from add-ons
