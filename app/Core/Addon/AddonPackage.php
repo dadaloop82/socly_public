@@ -47,7 +47,7 @@ final class AddonPackage
 
     /** @var list<string> */
     private const ALLOWED_EXTENSIONS = [
-        'php', 'js', 'css', 'json', 'txt', 'md', 'sql',
+        'php', 'js', 'css', 'json', 'txt', 'md', 'sql', 'html',
         'png', 'jpg', 'jpeg', 'webp', 'gif', 'svg', 'ico',
         'woff', 'woff2', 'ttf', 'otf',
     ];
