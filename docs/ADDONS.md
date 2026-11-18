@@ -333,8 +333,11 @@ invoices to confirm.
 
 The extension source is in `addons-src/agenzia_entrate_invoices/extension/` (MV3, no build step) and is
 also served as a ZIP from the add-on screen (`/agenzia-entrate/extension.zip`). Chrome warns that an
-extension loaded unpacked is not from the Web Store: the wizard and the bundled README explain it. The
-package builder allows `html` files for exactly this case (extension pages).
+extension loaded unpacked is not from the Web Store: the wizard and the bundled README explain it. If
+the extension is published on the Chrome Web Store (see `extension/STORE.md`), the operator pastes the
+listing URL in the add-on settings (`store_url` / `store_edge_url`) and step 2 shows the native **Add to
+Chrome** button instead of the local install steps. The package builder allows `html` files for exactly
+this case (extension pages).
 
 ```bash
 php tools/addons/addon-tool.php build addons-src/agenzia_entrate_invoices dist/agenzia_entrate_invoices-2.0.0.soclyaddon --incoming
