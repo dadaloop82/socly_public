@@ -301,12 +301,22 @@ amount is typed, pulses the unreadable-amount alert and offers **Mostra log OCR*
 (`/treasury/bank-statements/ocr-log`, also downloadable) with the native text, the words found in the
 amount area, the OCR lines and the parsed movements.
 
+Since v1.3.7 the review explains the excluded rows (already in the cash book / amount not read / other
+reasons) instead of a bare count, the save button says “Continua al prossimo step” and cannot post twice,
+and “Conferma tutti i movimenti” also confirms the rows that only need a look after an explicit
+confirmation. Corrections to payment method, RUNTS line and cost centre are propagated to the **later**
+similar rows of the same statement (never to previous ones) unless the operator changed them explicitly.
+On the verification page only amount/date/direction differences are “Da correggere”; descriptive-only
+differences are listed separately as “Da rivedere”, and “Questo movimento è corretto” stores a
+fingerprint of the recorded row so it is not flagged again until it changes
+(`addon_bank_statement_accepted`).
+
 Requirements: `poppler-utils`, `tesseract-ocr` (+ `ita` language data) and ImageMagick. A new bank
 model is a new JSON file in `templates/`; it never changes the PHP code. Source:
 `addons-src/bank_statement_import/` (private repo; `addons-src/` is not part of the public export).
 
 ```bash
-php tools/addons/addon-tool.php build addons-src/bank_statement_import dist/bank_statement_import-1.3.0.soclyaddon --incoming
+php tools/addons/addon-tool.php build addons-src/bank_statement_import dist/bank_statement_import-1.3.7.soclyaddon --incoming
 ```
 
 ## Revenue Agency invoices (`agenzia_entrate_invoices`)
