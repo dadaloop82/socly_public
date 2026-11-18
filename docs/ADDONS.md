@@ -311,14 +311,17 @@ differences are listed separately as “Da rivedere”, and “Questo movimento 
 fingerprint of the recorded row so it is not flagged again until it changes
 (`addon_bank_statement_accepted`). Every verification card is visible at once (the wizard only scrolls
 between them), and applying changes treats the movements left untouched as correct unless the operator
-unticks the option, so a skipped movement does not reappear on the next apply.
+unticks the option, so a skipped movement does not reappear on the next apply. Rows with readable date,
+amount and counterparty and no reading issue are confirmed automatically: “to review” is reserved for
+OCR doubts, missing/undated/duplicated rows and unreadable values, while a balanced statement is the
+proof that the rest is complete.
 
 Requirements: `poppler-utils`, `tesseract-ocr` (+ `ita` language data) and ImageMagick. A new bank
 model is a new JSON file in `templates/`; it never changes the PHP code. Source:
 `addons-src/bank_statement_import/` (private repo; `addons-src/` is not part of the public export).
 
 ```bash
-php tools/addons/addon-tool.php build addons-src/bank_statement_import dist/bank_statement_import-1.3.9.soclyaddon --incoming
+php tools/addons/addon-tool.php build addons-src/bank_statement_import dist/bank_statement_import-1.3.10.soclyaddon --incoming
 ```
 
 ## Revenue Agency invoices (`agenzia_entrate_invoices`)
