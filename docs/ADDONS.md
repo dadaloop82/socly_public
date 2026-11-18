@@ -314,14 +314,16 @@ between them), and applying changes treats the movements left untouched as corre
 unticks the option, so a skipped movement does not reappear on the next apply. Rows with readable date,
 amount and counterparty and no reading issue are confirmed automatically: “to review” is reserved for
 OCR doubts, missing/undated/duplicated rows and unreadable values, while a balanced statement is the
-proof that the rest is complete.
+proof that the rest is complete. After “Apply changes” every selected field is read back from the ledger
+and compared with the statement: a value that did not persist is reported as an error instead of being
+counted as applied.
 
 Requirements: `poppler-utils`, `tesseract-ocr` (+ `ita` language data) and ImageMagick. A new bank
 model is a new JSON file in `templates/`; it never changes the PHP code. Source:
 `addons-src/bank_statement_import/` (private repo; `addons-src/` is not part of the public export).
 
 ```bash
-php tools/addons/addon-tool.php build addons-src/bank_statement_import dist/bank_statement_import-1.3.10.soclyaddon --incoming
+php tools/addons/addon-tool.php build addons-src/bank_statement_import dist/bank_statement_import-1.3.11.soclyaddon --incoming
 ```
 
 ## Revenue Agency invoices (`agenzia_entrate_invoices`)
