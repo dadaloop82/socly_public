@@ -309,6 +309,37 @@ model is a new JSON file in `templates/`; it never changes the PHP code. Source:
 php tools/addons/addon-tool.php build addons-src/bank_statement_import dist/bank_statement_import-1.3.0.soclyaddon --incoming
 ```
 
+## Revenue Agency invoices (`agenzia_entrate_invoices`)
+
+v2.0.0 replaces the server-side Chromium (CDP) harvester with a **Chrome extension** that runs in the
+operator's own profile, where the SPID session actually lives. Socly never sees the credentials and no
+browser process is executed on the host: the add-on exposes a token-protected JSON bridge
+(`/agenzia-entrate/api/...`) and a dashboard with the installation wizard, the live run and the
+invoices to confirm.
+
+- **Pairing** — *Genera codice di collegamento* creates a one-time string (`SOCLYPAIR1.…` carrying the
+  base URL + token) shown once; only `sha256(token)` is stored in `addon_ade_agents`, revoking a browser
+  refuses its next call immediately.
+- **Run** — the operator (or the extension popup, or the automatic schedule `next_sync_at`) creates a
+  run; the extension **claims** it, opens `start_url` (SPID), detects the login page, reaches *Fatture e
+  corrispettivi*, applies the year/direction filters when present, reads table rows **and** the JSON
+  payloads captured by a page hook, then uploads each invoice (`/invoice`) and its XML/PDF/P7M
+  documents in base64 chunks (`/document/begin|chunk|complete`).
+- **Journal** — every step is posted to `/event` and stored in `addon_ade_agent_events`; the panel
+  polls `/agenzia-entrate/status` and shows the same progress (stage, counters, current invoice).
+- **Matching** — `MatchingService` keeps its logic (only the reason labels come from `AddonText`): a
+  suggestion never writes on the cash book until the operator confirms it; invoices/documents live in
+  `storage/addons/agenzia_entrate_invoices/`.
+
+The extension source is in `addons-src/agenzia_entrate_invoices/extension/` (MV3, no build step) and is
+also served as a ZIP from the add-on screen (`/agenzia-entrate/extension.zip`). Chrome warns that an
+extension loaded unpacked is not from the Web Store: the wizard and the bundled README explain it. The
+package builder allows `html` files for exactly this case (extension pages).
+
+```bash
+php tools/addons/addon-tool.php build addons-src/agenzia_entrate_invoices dist/agenzia_entrate_invoices-2.0.0.soclyaddon --incoming
+```
+
 ## Workflow events from add-ons
 
 Settings → Workflow lists a group for every add-on available on disk, even when the package does not
