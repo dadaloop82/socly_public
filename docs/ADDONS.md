@@ -350,6 +350,13 @@ rows and unreadable values, while a balanced statement is the proof that the res
 “Apply changes” every selected field is read back from the ledger and compared with the statement: a
 value that did not persist is reported as an error instead of being counted as applied.
 
+**Statement excerpts.** At the end of a successful import each movement gets a PNG crop of its
+statement line, stored in the central repository (`source_section = bank_statement_import`,
+`source_ref = movement:<id>`) and linked to the movement. Prima cassa shows it in the ledger row and
+in the movement card, and the same file is listed in Verbali e documenti. Generation is best effort
+and capped at 20 s: a missing ImageMagick or a very large statement never fails the import, it only
+skips the missing excerpts.
+
 **Learning.** “Applica le modifiche”, “Questo movimento è corretto” and confirmed review corrections
 teach the add-on: the significant words of the statement description plus the direction identify the
 kind of movement, and the decided category, payment method, RUNTS line and cost centre

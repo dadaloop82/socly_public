@@ -669,6 +669,29 @@ if (array_key_exists('has_document', $values)) {
         </div>
     </div>
 </section>
+<?php
+$statementCrops = is_array($statement_crops ?? null) ? $statement_crops : [];
+?>
+<?php if (!empty($isEdit) && $statementCrops !== []): ?>
+<section class="tmf-card treasury-statement-evidence">
+    <header class="tmf-card-head">
+        <h2 class="tmf-card-title"><?= e(__('treasury.statement_evidence_title')) ?></h2>
+    </header>
+    <p class="section-lede"><?= e(__('treasury.statement_evidence_hint')) ?></p>
+    <div class="treasury-statement-crops">
+        <?php foreach ($statementCrops as $statementCrop): ?>
+            <?php $statementCropId = (int) ($statementCrop['id'] ?? 0); ?>
+            <?php if ($statementCropId < 1) { continue; } ?>
+            <a class="treasury-statement-crop" href="<?= e(url('/documents/' . $statementCropId . '/file')) ?>" target="_blank" rel="noopener" title="<?= e(__('treasury.statement_evidence_preview')) ?>">
+                <img src="<?= e(url('/documents/' . $statementCropId . '/file')) ?>" alt="<?= e(__('treasury.statement_evidence_alt')) ?>" loading="lazy">
+            </a>
+        <?php endforeach; ?>
+    </div>
+    <p class="muted">
+        <a href="<?= e(url('/documents?section=bank_statement_import')) ?>" target="_blank" rel="noopener"><?= e(__('treasury.statement_evidence_open')) ?></a>
+    </p>
+</section>
+<?php endif; ?>
 <?php if (empty($isEdit)): ?>
 <section class="tmf-card" data-treasury-recurring-card <?= $isTransfer ? 'hidden' : '' ?>>
     <header class="tmf-card-head">

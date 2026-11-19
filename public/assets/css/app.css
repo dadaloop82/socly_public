@@ -15486,3 +15486,44 @@ select.is-remote-choice {
 .documents-hash code {
   word-break: break-all;
 }
+
+/* Bank statement excerpts shown inside the cash-book movement card/list */
+.treasury-statement-crops {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+  margin-top: 0.55rem;
+}
+.treasury-statement-crop {
+  display: block;
+  width: min(100%, 320px);
+  border: 1px solid var(--line, #d7e3df);
+  border-radius: 10px;
+  overflow: hidden;
+  background: #fff;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+.treasury-statement-crop:hover,
+.treasury-statement-crop:focus-visible {
+  border-color: var(--brand-primary, #0d6e66);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--brand-primary, #0d6e66) 12%, transparent);
+}
+.treasury-statement-crop img {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+.treasury-row-statement {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  margin-top: 0.4rem;
+}
+.treasury-row-statement img {
+  display: block;
+  width: 88px;
+  height: auto;
+  border: 1px solid var(--line, #d7e3df);
+  border-radius: 6px;
+  background: #fff;
+}

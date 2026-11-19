@@ -38,6 +38,9 @@ use Socly\Services\VersionService;
 
 final class TreasuryController extends BaseController
 {
+    /** Source section used by the bank-statement add-on for the excerpt images. */
+    private const STATEMENT_SOURCE_SECTION = 'bank_statement_import';
+
     public function __construct(
         View $view,
         private readonly TreasuryService $treasury,
@@ -81,6 +84,14 @@ final class TreasuryController extends BaseController
         $similarProbe = $this->similarProbe((int) $request->input('similar', 0));
         // Only the enabled wallets (+ deactivated ones with movements) are listed.
         $wallets = $this->treasury->overviewWallets();
+        // Statement excerpts stored by the bank-statement add-on, one reference per movement.
+        $statementRefs = [];
+        foreach ($ledger['movements'] as $ledgerMovement) {
+            $ledgerId = (int) ($ledgerMovement['id'] ?? 0);
+            if ($ledgerId > 0) {
+                $statementRefs[] = 'movement:' . $ledgerId;
+            }
+        }
         $this->render('treasury/index', [
             'title' => __('treasury.title'),
             'ledger' => $ledger,
@@ -120,6 +131,11 @@ final class TreasuryController extends BaseController
             'total_rows' => $totalRows,
             'recurring_rules' => $this->recurring->all(),
             'similar_probe' => $similarProbe,
+            'statement_crops' => $this->files->linkedDocumentsForRefs(
+                'treasury',
+                $statementRefs,
+                self::STATEMENT_SOURCE_SECTION
+            ),
         ]);
     }
 
@@ -301,6 +317,11 @@ final class TreasuryController extends BaseController
             'attachment_name' => (int) ($movement['document_id'] ?? 0) > 0
                 ? (string) (($this->files->fileInfo((int) $movement['document_id']) ?? [])['original_name'] ?? '')
                 : '',
+            'statement_crops' => $this->files->linkedDocumentsForRefs(
+                'treasury',
+                ['movement:' . (int) $movement['id']],
+                self::STATEMENT_SOURCE_SECTION
+            )['movement:' . (int) $movement['id']] ?? [],
         ], $embed ? 'layouts/embed' : 'layouts/app');
     }
 

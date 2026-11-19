@@ -427,6 +427,63 @@ final class FileRepositoryService
     }
 
     /**
+     * Documents linked to a context through `document_links`, grouped by `context_ref`.
+     * Used by the treasury ledger to show the statement excerpts attached to a movement without
+     * knowing which add-on produced them.
+     *
+     * @param list<string> $refs
+     * @return array<string,list<array<string,mixed>>>
+     */
+    public function linkedDocumentsForRefs(string $section, array $refs, string $sourceSection = ''): array
+    {
+        $section = $this->normalizeSection($section);
+        $clean = [];
+        foreach ($refs as $ref) {
+            $ref = mb_substr(trim((string) $ref), 0, 190);
+            if ($ref !== '') {
+                $clean[$ref] = true;
+            }
+        }
+        if ($clean === []) {
+            return [];
+        }
+        $clean = array_slice(array_keys($clean), 0, 500);
+        $placeholders = [];
+        $params = ['section' => $section];
+        foreach ($clean as $position => $ref) {
+            $placeholder = ':ref' . $position;
+            $placeholders[] = $placeholder;
+            $params[$placeholder] = $ref;
+        }
+        $sql = 'SELECT d.*, l.context_ref, l.section AS link_section, l.created_at AS linked_at
+                  FROM document_links l
+                  INNER JOIN association_documents d ON d.id = l.document_id
+                 WHERE l.section = :section
+                   AND l.context_ref IN (' . implode(', ', $placeholders) . ')
+                   AND d.deleted_at IS NULL';
+        if ($sourceSection !== '') {
+            $sql .= ' AND d.source_section = :source_section';
+            $params['source_section'] = $this->normalizeSection($sourceSection);
+        }
+        $sql .= ' ORDER BY d.created_at DESC, d.id DESC';
+        try {
+            $rows = $this->db->fetchAll($sql, $params);
+        } catch (\Throwable) {
+            return [];
+        }
+        $out = [];
+        foreach ($rows as $row) {
+            $ref = (string) ($row['context_ref'] ?? '');
+            if ($ref === '') {
+                continue;
+            }
+            $out[$ref][] = $row;
+        }
+
+        return $out;
+    }
+
+    /**
      * Files available in the picker of one section (searchable, bounded).
      *
      * @return list<array<string,mixed>>
@@ -741,6 +798,19 @@ final class FileRepositoryService
             $date = date('Y-m-d');
         }
         $now = date('Y-m-d H:i:s');
+        // `created_by` is a real users.id: CLI imports, add-ons and system tasks may pass an id
+        // that no longer exists, and the FK must never abort the archive.
+        $createdBy = null;
+        if ($who['type'] === 'operator' && $who['id'] !== null && $who['id'] > 0) {
+            try {
+                $userExists = $this->db->fetch('SELECT 1 AS x FROM users WHERE id = :id', ['id' => $who['id']]);
+                if ($userExists !== null) {
+                    $createdBy = $who['id'];
+                }
+            } catch (\Throwable) {
+                $createdBy = null;
+            }
+        }
         $id = $this->db->insert('association_documents', [
             'title' => $title,
             'document_number' => mb_substr(trim((string) ($context['document_number'] ?? '')), 0, 80) ?: null,
@@ -757,7 +827,7 @@ final class FileRepositoryService
             'visibility' => in_array((string) ($context['visibility'] ?? 'internal'), ['reserved', 'internal', 'public'], true)
                 ? (string) ($context['visibility'] ?? 'internal')
                 : 'internal',
-            'created_by' => $who['type'] === 'operator' ? $who['id'] : null,
+            'created_by' => $createdBy,
             'member_id' => isset($context['member_id']) ? (int) $context['member_id'] ?: null : null,
             'content_hash' => $args['hash'],
             'file_size' => $args['size'],
