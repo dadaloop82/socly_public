@@ -323,12 +323,21 @@ rows and unreadable values, while a balanced statement is the proof that the res
 “Apply changes” every selected field is read back from the ledger and compared with the statement: a
 value that did not persist is reported as an error instead of being counted as applied.
 
+**Learning.** “Applica le modifiche”, “Questo movimento è corretto” and confirmed review corrections
+teach the add-on: the significant words of the statement description plus the direction identify the
+kind of movement, and the decided beneficiary, category, payment method, RUNTS line and cost centre
+are stored in `addon_bank_statement_learned`. Next uploads — and the remaining cards of the same
+statement — start from those values: the latest decision per field wins, values read literally from
+the PDF are never overridden, and a learned value carries the “appreso / gelernt / learned” badge
+instead of “dedotto / abgeleitet / inferred”. Deductions therefore get more reliable as the operator
+works through the statements.
+
 Requirements: `poppler-utils`, `tesseract-ocr` (+ `ita` language data) and ImageMagick. A new bank
 model is a new JSON file in `templates/`; it never changes the PHP code. Source:
 `addons-src/bank_statement_import/` (private repo; `addons-src/` is not part of the public export).
 
 ```bash
-php tools/addons/addon-tool.php build addons-src/bank_statement_import dist/bank_statement_import-1.3.18.soclyaddon --incoming
+php tools/addons/addon-tool.php build addons-src/bank_statement_import dist/bank_statement_import-1.4.0.soclyaddon --incoming
 ```
 
 ## Revenue Agency invoices (`agenzia_entrate_invoices`)
