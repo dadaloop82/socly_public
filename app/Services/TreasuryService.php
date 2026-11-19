@@ -3894,7 +3894,11 @@ final class TreasuryService
                 }
             }
         }
-        $beneficiary = $this->normalizeBeneficiary((string) ($input['beneficiary'] ?? ''));
+        // A selected member is the counterparty: any free text typed before the member was chosen
+        // is ignored and cleared, never stored next to member_id.
+        $beneficiary = $memberId !== null
+            ? ''
+            : $this->normalizeBeneficiary((string) ($input['beneficiary'] ?? ''));
 
         $description = self::normalizeDescription((string) ($input['description'] ?? ''));
         $description = $description !== '' ? mb_substr($description, 0, 500) : '';

@@ -14602,6 +14602,12 @@ function initTreasuryCategory(root = document) {
       if (memberSelect && !involved) {
         memberSelect.value = '';
       }
+      if (involved && beneficiaryInput instanceof HTMLInputElement) {
+        // The member replaces whatever counterparty was typed before: clear it, do not keep a
+        // stale value hidden in the form (the server enforces the same rule).
+        beneficiaryInput.value = '';
+        hideBeneficiarySuggest();
+      }
     };
     memberToggle?.addEventListener('change', syncMember);
     syncMember();
