@@ -361,7 +361,11 @@ again on demand. Rows with readable date, amount and counterparty and no reading
 automatically in the review step: “to review” is reserved for OCR doubts, missing/undated/duplicated
 rows and unreadable values, while a balanced statement is the proof that the rest is complete. After
 “Apply changes” every selected field is read back from the ledger and compared with the statement: a
-value that did not persist is reported as an error instead of being counted as applied.
+value that did not persist is reported as an error instead of being counted as applied. The
+comparison uses the register's own normalisation: the counterparty is compared as the effective one
+(the linked member's label when the free text is cleared for a member, name order ignored) and the
+Model D line as `RuntsReportService::normalizeLine()` would store it; when a value still does not
+stick, the error names the fields.
 
 **Statement excerpts.** At the end of a successful import each movement gets a PNG crop of its
 statement line, stored in the central repository (`source_section = bank_statement_import`,
