@@ -10159,6 +10159,98 @@ button.setup-scrape-logo-frame:focus-visible .setup-scrape-logo-overlay {
   background: color-mix(in srgb, var(--brand-primary-deep) 50%, transparent);
   backdrop-filter: blur(4px);
 }
+
+/* “Gestione controparti”: the counterparty's movements open in a dialog with the bare list inside
+   an iframe (same pattern as the add-on movement editor). */
+.supplier-movements-dialog {
+  border: 0;
+  border-radius: 18px;
+  padding: 0;
+  max-width: min(1040px, 96vw);
+  width: 100%;
+  background: transparent;
+  z-index: 1000;
+}
+.supplier-movements-dialog::backdrop {
+  background: color-mix(in srgb, var(--brand-primary-deep) 50%, transparent);
+  backdrop-filter: blur(4px);
+}
+.supplier-movements-shell {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  max-height: min(88vh, 860px);
+  overflow: hidden;
+  border-radius: 18px;
+  background: var(--card);
+  box-shadow: var(--shadow);
+}
+.supplier-movements-dialog-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.8rem 1rem;
+  border-bottom: 1px solid var(--line);
+}
+.supplier-movements-dialog-title {
+  margin: 0;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 1.02rem;
+}
+.supplier-movements-frame {
+  display: block;
+  width: 100%;
+  height: min(76vh, 760px);
+  border: 0;
+  background: var(--card);
+}
+/* Bare page rendered by layouts/embed inside the iframe. */
+.supplier-movements-page {
+  display: grid;
+  gap: 0.85rem;
+}
+.supplier-movements-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 0.6rem;
+}
+.supplier-movements-head .supplier-movements-name {
+  margin: 0;
+  font-size: 1.1rem;
+  line-height: 1.25;
+}
+.supplier-movements-head p {
+  margin: 0.15rem 0 0;
+  font-size: 0.82rem;
+}
+.supplier-movements-table td {
+  vertical-align: top;
+}
+.supplier-movements-date {
+  white-space: nowrap;
+}
+.supplier-movements-description {
+  display: block;
+  font-weight: 600;
+}
+.supplier-movements-meta {
+  display: block;
+  font-size: 0.76rem;
+}
+.supplier-movements-more {
+  margin: 0;
+  font-size: 0.8rem;
+}
+@media (max-width: 720px) {
+  .supplier-movements-frame {
+    height: min(78vh, 640px);
+  }
+}
 .member-leave-shell,
 .setup-exit-shell,
 .camera-shell,

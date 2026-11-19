@@ -24,8 +24,9 @@
  * “Gestione controparti”: the free-text counterparties of the register (suppliers, bodies, people)
  * with how much money came in and went out for each of them. A counterparty whose name matches a
  * member profile gets the “Socio” badge (linked to the card when unambiguous), and the party filter
- * narrows the list to members or to non-members. The action links straight to the ledger filtered on
- * that counterparty, so the single movements stay one click away.
+ * narrows the list to members or to non-members. The action opens the counterparty's movements in a
+ * dialog (bare iframe, same pattern as the add-on movement editor), so the list stays behind it; the
+ * plain link still opens the ledger filtered on that counterparty.
  *
  * @var list<array{name:string,is_member:bool,member_id:int,movements:int,income:float,expense:float,net:float,last_date:string,last_date_formatted:string}> $suppliers
  * @var array{suppliers:int,members:int,movements:int,income:float,expense:float} $supplier_totals
@@ -40,6 +41,7 @@ $query = (string) ($search_query ?? '');
 $sortKey = (string) ($sort ?? 'volume') === 'name' ? 'name' : 'volume';
 $partyKey = in_array((string) ($party ?? ''), ['members', 'others'], true) ? (string) $party : '';
 $ledgerUrl = static fn (string $name): string => url('/treasury?' . http_build_query(['beneficiary' => $name]));
+$supplierMovementsUrl = static fn (string $name): string => url('/treasury/supplier-movements?' . http_build_query(['name' => $name]));
 $resetUrl = static function () use ($query, $sortKey, $partyKey): string {
     $params = array_filter([
         'q' => $query,
@@ -159,7 +161,10 @@ $resetUrl = static function () use ($query, $sortKey, $partyKey): string {
                     ?>
                     <tr>
                         <td>
-                            <a class="suppliers-name" href="<?= e($ledgerUrl($name)) ?>"><?= e($name) ?></a>
+                            <a class="suppliers-name" href="<?= e($ledgerUrl($name)) ?>"
+                               data-supplier-movements
+                               data-supplier-movements-url="<?= e($supplierMovementsUrl($name)) ?>"
+                               data-supplier-movements-name="<?= e($name) ?>"><?= e($name) ?></a>
                             <?php if ($isMember): ?>
                                 <?php $memberHint = (string) __('treasury.suppliers_member_badge_hint'); ?>
                                 <?php if ($memberId > 0): ?>
@@ -175,7 +180,10 @@ $resetUrl = static function () use ($query, $sortKey, $partyKey): string {
                         <td class="is-num<?= $net < 0 ? ' is-negative' : '' ?>"><?= e($currency->format($net)) ?></td>
                         <td><?= e((string) ($supplier['last_date_formatted'] ?? '')) ?></td>
                         <td class="suppliers-actions">
-                            <a class="btn btn-ghost btn-sm" href="<?= e($ledgerUrl($name)) ?>"><?= e(__('treasury.suppliers_filter')) ?></a>
+                            <a class="btn btn-ghost btn-sm" href="<?= e($ledgerUrl($name)) ?>"
+                               data-supplier-movements
+                               data-supplier-movements-url="<?= e($supplierMovementsUrl($name)) ?>"
+                               data-supplier-movements-name="<?= e($name) ?>"><?= e(__('treasury.suppliers_filter')) ?></a>
                         </td>
                     </tr>
                 <?php endforeach; ?>
@@ -184,3 +192,17 @@ $resetUrl = static function () use ($query, $sortKey, $partyKey): string {
         </div>
     <?php endif; ?>
 </div>
+
+<?php /* “Filtra i movimenti” dialog: the bare list runs in the iframe, the counterparty page stays behind. */ ?>
+<dialog class="supplier-movements-dialog" data-supplier-movements-dialog
+    data-msg-title="<?= e(__('treasury.supplier_movements_title', ['name' => ':name'])) ?>">
+    <div class="supplier-movements-shell">
+        <div class="supplier-movements-dialog-head">
+            <h2 class="supplier-movements-dialog-title" data-supplier-movements-title><?= e(__('treasury.suppliers_filter')) ?></h2>
+            <button type="button" class="btn btn-ghost btn-sm" data-supplier-movements-close><?= e(__('common.close')) ?></button>
+        </div>
+        <iframe class="supplier-movements-frame" data-supplier-movements-frame
+            title="<?= e(__('treasury.suppliers_filter')) ?>" loading="lazy"></iframe>
+    </div>
+</dialog>
+

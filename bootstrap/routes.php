@@ -176,9 +176,14 @@ $router->post('/members/{id}/autofix', [MemberController::class, 'autoFix'], 'me
 $router->get('/treasury', [TreasuryController::class, 'index'], 'treasury.view', ['mw.locale', 'mw.install', 'mw.auth']);
 $router->get('/treasury/create', [TreasuryController::class, 'create'], 'treasury.manage', ['mw.locale', 'mw.install', 'mw.auth']);
 $router->get('/treasury/suppliers', [TreasuryController::class, 'suppliers'], 'treasury.view', ['mw.locale', 'mw.install', 'mw.auth']);
+// Movements of one counterparty in the “Gestione controparti” dialog (bare layout, read-only).
+$router->get('/treasury/supplier-movements', [TreasuryController::class, 'supplierMovements'], 'treasury.view', ['mw.locale', 'mw.install', 'mw.auth']);
 $router->get('/treasury/loans', [TreasuryController::class, 'loans'], 'treasury.view', ['mw.locale', 'mw.install', 'mw.auth']);
 $router->get('/treasury/deposits', [TreasuryController::class, 'deposits'], 'treasury.view', ['mw.locale', 'mw.install', 'mw.auth']);
 $router->get('/treasury/accounts/balances', [TreasuryController::class, 'accountBalances'], 'treasury.view', ['mw.locale', 'mw.install', 'mw.auth']);
+// Bank-statement excerpts linked to a movement: readable with treasury.view, whatever the role's
+// access to the document archive.
+$router->get('/treasury/excerpt/{id}', [TreasuryController::class, 'statementExcerpt'], 'treasury.view', ['mw.locale', 'mw.install', 'mw.auth']);
 $router->post('/treasury/bulk', [TreasuryController::class, 'bulk'], 'treasury.manage', ['mw.locale', 'mw.install', 'mw.auth', 'mw.csrf']);
 $router->post('/treasury/{id}/approve', [TreasuryController::class, 'approve'], 'treasury.manage', ['mw.locale', 'mw.install', 'mw.auth', 'mw.csrf']);
 $router->post('/treasury/recurring/{id}/toggle', [TreasuryController::class, 'toggleRecurring'], 'treasury.manage', ['mw.locale', 'mw.install', 'mw.auth', 'mw.csrf']);

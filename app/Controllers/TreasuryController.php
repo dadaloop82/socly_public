@@ -956,6 +956,48 @@ final class TreasuryController extends BaseController
     }
 
     /**
+     * Serves the bank-statement excerpt linked to a cash-book movement. The crop is stored in the
+     * central document repository, but the document archive can be closed to the role that manages
+     * the cash book (e.g. the treasurer): this route keeps the evidence readable with treasury.view
+     * and exposes only the excerpts the add-on linked to a movement.
+     */
+    public function statementExcerpt(Request $request, string $id): void
+    {
+        require_component('treasury');
+        $documentId = (int) $id;
+        $row = $documentId > 0 ? $this->files->fileInfo($documentId) : null;
+        $path = $documentId > 0 ? $this->files->absolutePath($documentId) : null;
+        if ($row === null || $path === null || (string) ($row['source_section'] ?? '') !== self::STATEMENT_SOURCE_SECTION) {
+            http_response_code(404);
+            $this->render('errors/404');
+            return;
+        }
+        $linkedToMovement = false;
+        foreach ($this->files->linksFor($documentId) as $link) {
+            if ((string) ($link['section'] ?? '') === 'treasury'
+                && preg_match('/^movement:\d+$/', (string) ($link['context_ref'] ?? '')) === 1) {
+                $linkedToMovement = true;
+                break;
+            }
+        }
+        if (!$linkedToMovement) {
+            http_response_code(404);
+            $this->render('errors/404');
+            return;
+        }
+        $this->files->registerDownload($documentId);
+        $detected = mime_content_type($path);
+        $mime = is_string($detected) && $detected !== '' ? $detected : 'image/png';
+        $name = trim((string) ($row['original_name'] ?? '')) ?: basename($path);
+        $name = str_replace(['"', "\r", "\n"], '', $name);
+        header('Content-Type: ' . $mime);
+        header('Content-Disposition: inline; filename="' . $name . '"');
+        header('X-Content-Type-Options: nosniff');
+        header('Content-Length: ' . (string) (filesize($path) ?: 0));
+        readfile($path);
+    }
+
+    /**
      * Ledger filters from the query string (validated; period presets expand to a date range).
      *
      * @return array{direction:string,category:string,runts_line:string,budget_item_id:string,account:string,from:string,to:string,period:string,month:string,year:string,approval:string,anomaly:string,pattern_ids?:list<int>}
@@ -1023,6 +1065,38 @@ final class TreasuryController extends BaseController
             'party' => $party,
             'currency' => $this->currency,
         ]);
+    }
+
+    /**
+     * Movements of one counterparty, shown in the dialog opened from “Gestione controparti”.
+     * Read-only and compact: the operator keeps the counterparty list behind the popup, while the
+     * full ledger (filters, grouping, bulk actions) stays one click away.
+     */
+    public function supplierMovements(Request $request): void
+    {
+        require_component('treasury');
+        $name = trim((string) preg_replace('/\s+/u', ' ', (string) $request->input('name', '')));
+        if (mb_strlen($name) > 190) {
+            $name = mb_substr($name, 0, 190);
+        }
+        if ($name === '') {
+            http_response_code(404);
+            $this->render('errors/404');
+            return;
+        }
+        // Same filter the ledger drill-down uses, so the popup and “Apri in Prima cassa” agree.
+        $filters = $this->ledgerFilters(new Request('GET', '/treasury', ['beneficiary' => $name], [], [], []));
+        $limit = 100;
+        $total = $this->treasury->ledgerTotal('', $filters);
+        $ledger = $this->treasury->ledger($limit, '', 'date_desc', $filters, 0);
+        $this->render('treasury/supplier_movements', [
+            'title' => __('treasury.supplier_movements_title', ['name' => $name]),
+            'beneficiary' => $name,
+            'movements' => is_array($ledger['movements'] ?? null) ? $ledger['movements'] : [],
+            'total' => $total,
+            'currency' => $this->currency,
+            'ledger_url' => url('/treasury?' . http_build_query(['beneficiary' => $name])),
+        ], 'layouts/embed');
     }
 
     public function loans(Request $request): void

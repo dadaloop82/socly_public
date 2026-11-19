@@ -10,6 +10,20 @@ every 100 patches bump the series, and each bump is published to this rep come o
 
 ### Fixed
 
+- Bank-statement import: the excerpt of every statement line is now queued and archived **after** the
+  import response (newest movements first) instead of being generated inside the request with a 20 s
+  cap. The old budget dropped the later rows right before the temporary folder was deleted, so the
+  movements listed first in Prima cassa stayed without their crop. The run folder is kept until the
+  queue is empty, and the excerpts are served by a treasury-scoped route: the treasurer role reads
+  them without access to the document archive.
+- Bank-statement import: the counterparty of “Bonifico da Voi disposto a favore di …” is the name that
+  follows the phrase (on the same line or on the next one). The capture stops at the next statement
+  line, at a reference code (`COD.`, `BIC`, `MANDATO`, `NOTE`, `CAUSALE`) and at a date, and the
+  description is no longer concatenated with the raw text, so the rest of the movement is never glued
+  to the name.
+- Bank-statement verification: the “recorded movement” and “movement read from the statement” cards
+  now carry two clearly different, still soft backgrounds, repeated on the registered/statement
+  columns of the differences table.
 - Add-on licences are no longer replaced: an installation can hold several licences (one key each),
   activating a new key adds it instead of overwriting the others, every add-on stays licensed by the
   licence that actually grants it, the Add-ons page lists one row per licence (with removal) and
@@ -28,6 +42,9 @@ every 100 patches bump the series, and each bump is published to this rep come o
 
 ### Added
 
+- “Gestione controparti”: “Filtra i movimenti” (and the counterparty name) opens the counterparty's
+  movements in a dialog with a bare list inside an iframe — the counterparty page stays behind the
+  popup, while “Apri in Prima cassa” opens the full filtered ledger.
 - Add-on updates are checked by themselves, like the app updates: the signed catalogue is refreshed at most
   hourly, a sidebar badge lists the add-ons with a newer version (“Aggiornamenti add-on: N”, name and
   version range) and links to the Add-ons page. Opening a page no longer replaces an installed add-on

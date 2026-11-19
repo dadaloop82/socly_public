@@ -682,14 +682,16 @@ $statementCrops = is_array($statement_crops ?? null) ? $statement_crops : [];
         <?php foreach ($statementCrops as $statementCrop): ?>
             <?php $statementCropId = (int) ($statementCrop['id'] ?? 0); ?>
             <?php if ($statementCropId < 1) { continue; } ?>
-            <a class="treasury-statement-crop" href="<?= e(url('/documents/' . $statementCropId . '/file')) ?>" target="_blank" rel="noopener" title="<?= e(__('treasury.statement_evidence_preview')) ?>">
-                <img src="<?= e(url('/documents/' . $statementCropId . '/file')) ?>" alt="<?= e(__('treasury.statement_evidence_alt')) ?>" loading="lazy">
+            <a class="treasury-statement-crop" href="<?= e(url('/treasury/excerpt/' . $statementCropId)) ?>" target="_blank" rel="noopener" title="<?= e(__('treasury.statement_evidence_preview')) ?>">
+                <img src="<?= e(url('/treasury/excerpt/' . $statementCropId)) ?>" alt="<?= e(__('treasury.statement_evidence_alt')) ?>" loading="lazy">
             </a>
         <?php endforeach; ?>
     </div>
-    <p class="muted">
-        <a href="<?= e(url('/documents?section=bank_statement_import')) ?>" target="_blank" rel="noopener"><?= e(__('treasury.statement_evidence_open')) ?></a>
-    </p>
+    <?php if (can('documents.view')): ?>
+        <p class="muted">
+            <a href="<?= e(url('/documents?section=bank_statement_import')) ?>" target="_blank" rel="noopener"><?= e(__('treasury.statement_evidence_open')) ?></a>
+        </p>
+    <?php endif; ?>
 </section>
 <?php endif; ?>
 <?php if (empty($isEdit)): ?>

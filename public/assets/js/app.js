@@ -227,6 +227,7 @@ document.addEventListener('DOMContentLoaded', () => {
   initLiveFilters(document);
   initTreasuryCategory(document);
   initTreasuryEmbedSaved();
+  initSupplierMovements();
   initLeaveGuards(document);
   initConfirmForms(document);
   initConfirmLinks(document);
@@ -14331,6 +14332,57 @@ function initTreasuryEmbedSaved() {
       // Cross-window messaging is best effort: the popup still shows the updated card.
     }
   }, 0);
+}
+
+/**
+ * “Gestione controparti”: “Filtra i movimenti” opens the counterparty's movements in a dialog with
+ * the bare ledger list inside an iframe (the same pattern as the add-on movement editor), so the
+ * counterparty page stays behind the popup. Without JS the link opens the filtered ledger.
+ */
+function initSupplierMovements() {
+  const dialog = document.querySelector('[data-supplier-movements-dialog]');
+  if (!(dialog instanceof HTMLDialogElement)) return;
+  const frame = dialog.querySelector('[data-supplier-movements-frame]');
+  const title = dialog.querySelector('[data-supplier-movements-title]');
+  const closeButton = dialog.querySelector('[data-supplier-movements-close]');
+  const titleTemplate = dialog.getAttribute('data-msg-title') || '';
+  const closeDialog = () => {
+    if (frame instanceof HTMLIFrameElement) frame.src = 'about:blank';
+    if (typeof dialog.close === 'function') {
+      dialog.close();
+    } else {
+      dialog.removeAttribute('open');
+    }
+  };
+  document.querySelectorAll('[data-supplier-movements]').forEach((trigger) => {
+    if (!(trigger instanceof HTMLElement)) return;
+    trigger.addEventListener('click', (event) => {
+      const url = trigger.getAttribute('data-supplier-movements-url') || '';
+      if (url === '' || !(frame instanceof HTMLIFrameElement)) return;
+      event.preventDefault();
+      const name = trigger.getAttribute('data-supplier-movements-name') || '';
+      if (title instanceof HTMLElement) {
+        title.textContent = titleTemplate !== '' ? titleTemplate.replace(':name', name) : name;
+      }
+      frame.src = url;
+      if (typeof dialog.showModal === 'function') {
+        dialog.showModal();
+      } else {
+        dialog.setAttribute('open', 'open');
+      }
+    });
+  });
+  closeButton?.addEventListener('click', closeDialog);
+  dialog.addEventListener('cancel', (event) => {
+    event.preventDefault();
+    closeDialog();
+  });
+  dialog.addEventListener('click', (event) => {
+    if (event.target === dialog) closeDialog();
+  });
+  dialog.addEventListener('close', () => {
+    if (frame instanceof HTMLIFrameElement) frame.src = 'about:blank';
+  });
 }
 
 function initTreasuryCategory(root = document) {

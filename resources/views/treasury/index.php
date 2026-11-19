@@ -1036,10 +1036,12 @@ if ($filterYear !== '' && !isset($yearFilterOptions[$filterYear])) {
                                         <?php if (is_array($statementCrop) && (int) ($statementCrop['id'] ?? 0) > 0): ?>
                                             <?php $statementCropId = (int) $statementCrop['id']; ?>
                                             <div class="treasury-row-statement">
-                                                <a href="<?= e(url('/documents/' . $statementCropId . '/file')) ?>" target="_blank" rel="noopener" title="<?= e(__('treasury.statement_evidence_preview')) ?>">
-                                                    <img src="<?= e(url('/documents/' . $statementCropId . '/file')) ?>" alt="<?= e(__('treasury.statement_evidence_alt')) ?>" loading="lazy">
+                                                <a href="<?= e(url('/treasury/excerpt/' . $statementCropId)) ?>" target="_blank" rel="noopener" title="<?= e(__('treasury.statement_evidence_preview')) ?>">
+                                                    <img src="<?= e(url('/treasury/excerpt/' . $statementCropId)) ?>" alt="<?= e(__('treasury.statement_evidence_alt')) ?>" loading="lazy">
                                                 </a>
-                                                <a class="muted" href="<?= e(url('/documents/' . $statementCropId)) ?>" target="_blank" rel="noopener"><?= e(__('treasury.statement_evidence_open')) ?></a>
+                                                <?php if (can('documents.view')): ?>
+                                                    <a class="muted" href="<?= e(url('/documents/' . $statementCropId)) ?>" target="_blank" rel="noopener"><?= e(__('treasury.statement_evidence_open')) ?></a>
+                                                <?php endif; ?>
                                             </div>
                                         <?php endif; ?>
                                         <?php if (empty($row['member_id']) && empty($row['beneficiary']) && empty($row['invoice_number']) && empty($row['invoice_title']) && $rowBudgetLabel === '' && $rowCategoryLabel === '' && $rowRuntsLabel === '' && empty($row['invoice_date']) && empty($row['attachment_path']) && $documentTypeLabel === '' && !is_array($statementCrop)): ?><?= e(__('treasury.none')) ?><?php endif; ?>
@@ -1070,7 +1072,7 @@ if ($filterYear !== '' && !isset($yearFilterOptions[$filterYear])) {
                                                 'icon' => 'view',
                                                 'label' => __('treasury.statement_evidence_title'),
                                                 'show' => is_array($statementCrop) && (int) ($statementCrop['id'] ?? 0) > 0,
-                                                'href' => is_array($statementCrop) ? url('/documents/' . (int) $statementCrop['id']) : '',
+                                                'href' => is_array($statementCrop) ? url('/treasury/excerpt/' . (int) $statementCrop['id']) : '',
                                                 'target' => '_blank',
                                                 'rel' => 'noopener',
                                             ],

@@ -279,8 +279,12 @@ typed name is a near-duplicate, an abbreviation or a unique prefix. An edit
 is propagated to later similar movements only where the target field is still empty, and “Salva e
 continua” stays disabled until every row to import is complete, issue-free and confirmed.
 
-Counterparty extraction also understands the “Bonifico da Voi disposto a favore di: …” wording, and a
-member named in the counterparty or description is linked to the movement automatically. Rows to fix
+Counterparty extraction also understands the “Bonifico da Voi disposto a favore di …” wording: the
+counterparty is the name that follows the phrase (on the same line or on the next one) and the
+capture stops at the next statement line, at a reference marker (`COD.`, `BIC`, `MANDATO`, `NOTE`,
+`CAUSALE`) and at a date, so the rest of the movement is never glued to the name. Description and raw
+text are searched separately — never concatenated — for the same reason. A member named in the
+counterparty or description is linked to the movement automatically. Rows to fix
 are highlighted until they are corrected; the blinking counter offers **Vedi movimenti da correggere**
 and jumps to the first one. **Conferma e importa tutti** is repeated inside the card being fixed: it
 stays visible until the row is confirmed (correcting the anomaly does not hide it), and a click
@@ -359,9 +363,11 @@ value that did not persist is reported as an error instead of being counted as a
 **Statement excerpts.** At the end of a successful import each movement gets a PNG crop of its
 statement line, stored in the central repository (`source_section = bank_statement_import`,
 `source_ref = movement:<id>`) and linked to the movement. Prima cassa shows it in the ledger row and
-in the movement card, and the same file is listed in Verbali e documenti. Generation is best effort
-and capped at 20 s: a missing ImageMagick or a very large statement never fails the import, it only
-skips the missing excerpts.
+in the movement card, and the same file is listed in Verbali e documenti. The crops are **queued and
+generated after the HTTP response** (shutdown task with `fastcgi_finish_request`, session released
+first), newest movements first; the temporary run folder is kept until the queue is drained and only
+then deleted. Generation is best effort: a missing ImageMagick or a row without a highlight skips
+that excerpt without ever failing the import.
 
 **Learning.** “Applica le modifiche”, “Questo movimento è corretto” and confirmed review corrections
 teach the add-on: the significant words of the statement description plus the direction identify the
@@ -381,7 +387,7 @@ model is a new JSON file in `templates/`; it never changes the PHP code. Source:
 `addons-src/bank_statement_import/` (private repo; `addons-src/` is not part of the public export).
 
 ```bash
-php tools/addons/addon-tool.php build addons-src/bank_statement_import dist/bank_statement_import-1.4.18.soclyaddon --incoming
+php tools/addons/addon-tool.php build addons-src/bank_statement_import dist/bank_statement_import-1.4.20.soclyaddon --incoming
 ```
 
 ## Revenue Agency invoices (`agenzia_entrate_invoices`)
