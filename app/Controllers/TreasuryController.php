@@ -296,6 +296,7 @@ final class TreasuryController extends BaseController
             // “Similar movements” proposal (after an update that changed the classification): it is
             // rendered above the form so the operator can stay on the card.
             'similar_probe' => $this->similarProbe((int) $request->input('similar', 0)),
+            'just_saved' => (string) flash('treasury_saved') === (string) (int) ($movement['id'] ?? 0),
             'default_category' => (string) ($movement['category'] ?? 'membership_fee'),
             'categories' => $categories,
             'category_groups' => $this->treasury->categoryGroups(),
@@ -443,6 +444,9 @@ final class TreasuryController extends BaseController
         }
         $this->clearOld();
         $this->flash('success', __('treasury.updated'));
+        // One-shot marker for the persistent status next to the save button (the layout flash
+        // auto-dismisses and the operator is often scrolled to the bottom of the card).
+        $this->flash('treasury_saved', (string) (int) $id);
         // Modification with classification: the tab with the proposal on similar movements reopens.
         $classificationChanged = trim((string) ($posted['category'] ?? '')) !== trim((string) ($before['category'] ?? ''))
             || strtoupper(trim((string) ($posted['runts_line'] ?? ''))) !== strtoupper(trim((string) ($before['runts_line'] ?? '')))

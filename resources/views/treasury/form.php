@@ -38,6 +38,9 @@
  * @var \Socly\Services\CurrencyService $currency
  */
 $movementId = $isEdit ? (int) ($movement['id'] ?? 0) : 0;
+// The card was just saved: show a persistent status next to the action button (the top flash
+// disappears after a few seconds, and the operator is usually scrolled to the bottom).
+$justSaved = !empty($just_saved ?? false);
 // Embedded quick edit (add-on dialog): bare layout, no page actions and only the save button.
 $embed = !empty($embed ?? false);
 // “Copia movimento”: the form opens pre-filled like an edit page, but saves a new movement.
@@ -190,7 +193,8 @@ if ($probe !== null && $movementId > 0) {
 ?>
 <form id="treasury-form" class="panel treasury-movement-form" method="post" action="<?= e($action) ?>" enctype="multipart/form-data"
       <?php if (!empty($isEdit)): ?><?= version_attrs('treasury', ['id' => (int) ($movement['id'] ?? 0), 'row_version' => (int) ($movement_version ?? ($movement['row_version'] ?? 0))]) ?><?php endif; ?>
-      data-treasury-form data-leave-guard data-confirm-template="<?= e($isEdit ? __('treasury.confirm_summary_edit') : __('treasury.confirm_summary')) ?>"
+      data-treasury-form data-leave-guard
+      <?php if (!$isEdit): ?>data-confirm-template="<?= e(__('treasury.confirm_summary')) ?>"<?php endif; ?>
       data-base-currency="<?= e($currency->code()) ?>"
       data-account-balances-url="<?= e(url('/treasury/accounts/balances')) ?>"
       data-msg-account-option="<?= e(__('treasury.account_option_balance')) ?>"
@@ -240,6 +244,11 @@ if ($probe !== null && $movementId > 0) {
     <?php require __DIR__ . '/_form_fields.php'; ?>
     <?= field('hidden', ['name' => 'ret', 'value' => $returnPath]) ?>
     <div class="form-actions form-actions-end">
+        <?php if ($justSaved): ?>
+            <p class="treasury-save-status" role="status" data-treasury-save-status>
+                <span aria-hidden="true">✓</span> <?= e(__('treasury.updated')) ?>
+            </p>
+        <?php endif; ?>
         <?php if (!$embed): ?>
             <a class="btn btn-ghost" href="<?= e($returnUrl) ?>"><?= e(__('common.back')) ?></a>
         <?php endif; ?>
