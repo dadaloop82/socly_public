@@ -26,7 +26,9 @@ every 100 patches bump the series, and each bump is published to this rep come o
   columns of the differences table. Selecting a statement value disables that card's “this movement
   is correct” button with a note, until the selected values are applied (or the selection cleared).
   Applying reads the values back with the register's own normalisation (effective counterparty, name
-  order ignored; Model D line as stored) and a value that still does not stick names the field.
+  order ignored; Model D line as stored) and a value that still does not stick names the field. The
+  counterparty can now link, keep or drop the member link: the statement names a member → it is
+  linked; a non-member counterparty → the link is removed and the free text is stored.
 - Add-on licences are no longer replaced: an installation can hold several licences (one key each),
   activating a new key adds it instead of overwriting the others, every add-on stays licensed by the
   licence that actually grants it, the Add-ons page lists one row per licence (with removal) and
