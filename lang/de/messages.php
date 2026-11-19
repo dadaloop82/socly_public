@@ -2920,6 +2920,7 @@ return [
         'supplier_movements_none' => 'Keine Bewegungen für diese Gegenpartei.',
         'supplier_movements_open' => 'In der Kassa öffnen',
         'supplier_movements_limited' => 'Die ersten :shown von :total Bewegungen werden angezeigt: die Kassa enthält die vollständige Liste.',
+        'supplier_movements_back' => 'Zurück zu den Bewegungen',
         'no_counterparty_filter_active' => 'Buchungen ohne Gegenpartei: :count',
         'no_counterparty_filter_clear' => 'Alle Buchungen anzeigen',
         'suppliers_member_badge' => 'Mitglied',

@@ -2387,6 +2387,7 @@ return [
         'supplier_movements_none' => 'Nessun movimento per questa controparte.',
         'supplier_movements_open' => 'Apri in Prima cassa',
         'supplier_movements_limited' => 'Mostrati i primi :shown movimenti su :total: apri Prima cassa per l’elenco completo.',
+        'supplier_movements_back' => 'Torna ai movimenti',
         'no_counterparty_filter_active' => 'Movimenti senza controparte: :count',
         'no_counterparty_filter_clear' => 'Mostra tutti i movimenti',
         'suppliers_member_badge' => 'Socio',

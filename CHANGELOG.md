@@ -44,7 +44,8 @@ every 100 patches bump the series, and each bump is published to this rep come o
 
 - “Gestione controparti”: “Filtra i movimenti” (and the counterparty name) opens the counterparty's
   movements in a dialog with a bare list inside an iframe — the counterparty page stays behind the
-  popup, while “Apri in Prima cassa” opens the full filtered ledger.
+  popup, while “Apri in Prima cassa” opens the full filtered ledger. The movement card opens in the
+  same dialog (`embed=1`) with a “back to the movements” link, so editing never replaces the window.
 - Add-on updates are checked by themselves, like the app updates: the signed catalogue is refreshed at most
   hourly, a sidebar badge lists the add-ons with a newer version (“Aggiornamenti add-on: N”, name and
   version range) and links to the Add-ons page. Opening a page no longer replaces an installed add-on

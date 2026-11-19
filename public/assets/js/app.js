@@ -14337,7 +14337,9 @@ function initTreasuryEmbedSaved() {
 /**
  * “Gestione controparti”: “Filtra i movimenti” opens the counterparty's movements in a dialog with
  * the bare ledger list inside an iframe (the same pattern as the add-on movement editor), so the
- * counterparty page stays behind the popup. Without JS the link opens the filtered ledger.
+ * counterparty page stays behind the popup. The movement card opens in the same iframe with
+ * `embed=1`; a “back” button in the dialog head returns to the list, and the counterparty figures
+ * are refreshed when the popup closes after an edit. Without JS the links open the normal pages.
  */
 function initSupplierMovements() {
   const dialog = document.querySelector('[data-supplier-movements-dialog]');
@@ -14345,13 +14347,25 @@ function initSupplierMovements() {
   const frame = dialog.querySelector('[data-supplier-movements-frame]');
   const title = dialog.querySelector('[data-supplier-movements-title]');
   const closeButton = dialog.querySelector('[data-supplier-movements-close]');
+  const backButton = dialog.querySelector('[data-supplier-movements-back]');
   const titleTemplate = dialog.getAttribute('data-msg-title') || '';
+  let listUrl = '';
+  let dirty = false;
+  const showBack = (visible) => {
+    if (backButton instanceof HTMLElement) backButton.hidden = !visible;
+  };
   const closeDialog = () => {
     if (frame instanceof HTMLIFrameElement) frame.src = 'about:blank';
+    showBack(false);
     if (typeof dialog.close === 'function') {
       dialog.close();
     } else {
       dialog.removeAttribute('open');
+    }
+    // A movement was edited inside the popup: the counterparty figures behind it are stale.
+    if (dirty) {
+      dirty = false;
+      window.location.reload();
     }
   };
   document.querySelectorAll('[data-supplier-movements]').forEach((trigger) => {
@@ -14360,6 +14374,9 @@ function initSupplierMovements() {
       const url = trigger.getAttribute('data-supplier-movements-url') || '';
       if (url === '' || !(frame instanceof HTMLIFrameElement)) return;
       event.preventDefault();
+      listUrl = url;
+      dirty = false;
+      showBack(false);
       const name = trigger.getAttribute('data-supplier-movements-name') || '';
       if (title instanceof HTMLElement) {
         title.textContent = titleTemplate !== '' ? titleTemplate.replace(':name', name) : name;
@@ -14371,6 +14388,28 @@ function initSupplierMovements() {
         dialog.setAttribute('open', 'open');
       }
     });
+  });
+  backButton?.addEventListener('click', () => {
+    if (!(frame instanceof HTMLIFrameElement) || listUrl === '') return;
+    showBack(false);
+    frame.src = listUrl;
+  });
+  // Same-origin iframe: the edit card keeps the popup, and the head offers the way back to the list.
+  frame?.addEventListener('load', () => {
+    if (!(frame instanceof HTMLIFrameElement)) return;
+    try {
+      const path = frame.contentWindow?.location?.pathname || '';
+      showBack(/^\/treasury\/\d+\/edit$/.test(path));
+    } catch (error) {
+      showBack(false);
+    }
+  });
+  // The embedded card announces its save from app.js: keep the popup open, refresh on close.
+  window.addEventListener('message', (event) => {
+    if (!(frame instanceof HTMLIFrameElement) || event.source !== frame.contentWindow) return;
+    const data = event.data;
+    if (!data || data.type !== 'socly:treasury-embed-saved') return;
+    dirty = true;
   });
   closeButton?.addEventListener('click', closeDialog);
   dialog.addEventListener('cancel', (event) => {

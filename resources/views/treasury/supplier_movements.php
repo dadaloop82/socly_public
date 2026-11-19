@@ -22,7 +22,8 @@
 
 /**
  * Movements of one counterparty, rendered with `layouts/embed` inside the dialog opened from
- * “Gestione controparti”. Read-only: editing stays on the movement card, opened in the parent window.
+ * “Gestione controparti”. The list is read-only; the movement card opens in this same popup
+ * (`embed=1`) and the dialog head brings the operator back to the list.
  *
  * @var string $beneficiary
  * @var list<array<string,mixed>> $movements
@@ -35,6 +36,13 @@ $movements = is_array($movements ?? null) ? $movements : [];
 $total = (int) ($total ?? 0);
 $ledgerUrl = (string) ($ledger_url ?? url('/treasury'));
 $canManage = can('treasury.manage');
+// The movement card opens inside this same popup (`embed=1`, bare layout); its ledger return state
+// keeps the counterparty filter, while the dialog head brings the operator back to this list.
+$ledgerReturnPath = '/treasury?' . http_build_query(['beneficiary' => $beneficiary]);
+$editUrl = static fn (int $id): string => url('/treasury/' . $id . '/edit?' . http_build_query([
+    'embed' => '1',
+    'ret' => $ledgerReturnPath,
+]));
 ?>
 <div class="supplier-movements-page">
     <header class="supplier-movements-head">
@@ -92,7 +100,7 @@ $canManage = can('treasury.manage');
                         <?php if ($canManage): ?>
                             <td class="supplier-movements-actions">
                                 <?php if ($movementId > 0): ?>
-                                    <a class="btn btn-sm btn-ghost" href="<?= e(url('/treasury/' . $movementId . '/edit')) ?>" target="_top"><?= e(__('treasury.edit')) ?></a>
+                                    <a class="btn btn-sm btn-ghost" href="<?= e($editUrl($movementId)) ?>"><?= e(__('treasury.edit')) ?></a>
                                 <?php endif; ?>
                             </td>
                         <?php endif; ?>

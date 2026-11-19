@@ -198,7 +198,10 @@ $resetUrl = static function () use ($query, $sortKey, $partyKey): string {
     data-msg-title="<?= e(__('treasury.supplier_movements_title', ['name' => ':name'])) ?>">
     <div class="supplier-movements-shell">
         <div class="supplier-movements-dialog-head">
-            <h2 class="supplier-movements-dialog-title" data-supplier-movements-title><?= e(__('treasury.suppliers_filter')) ?></h2>
+            <div class="supplier-movements-dialog-lead">
+                <button type="button" class="btn btn-ghost btn-sm" data-supplier-movements-back hidden>‹ <?= e(__('treasury.supplier_movements_back')) ?></button>
+                <h2 class="supplier-movements-dialog-title" data-supplier-movements-title><?= e(__('treasury.suppliers_filter')) ?></h2>
+            </div>
             <button type="button" class="btn btn-ghost btn-sm" data-supplier-movements-close><?= e(__('common.close')) ?></button>
         </div>
         <iframe class="supplier-movements-frame" data-supplier-movements-frame

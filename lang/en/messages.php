@@ -2920,6 +2920,7 @@ return [
         'supplier_movements_none' => 'No movements for this counterparty.',
         'supplier_movements_open' => 'Open in the cash book',
         'supplier_movements_limited' => 'Showing the first :shown of :total movements: open the cash book for the full list.',
+        'supplier_movements_back' => 'Back to the movements',
         'no_counterparty_filter_active' => 'Movements without a counterparty: :count',
         'no_counterparty_filter_clear' => 'Show every movement',
         'suppliers_member_badge' => 'Member',

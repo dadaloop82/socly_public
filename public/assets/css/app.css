@@ -10192,6 +10192,12 @@ button.setup-scrape-logo-frame:focus-visible .setup-scrape-logo-overlay {
   padding: 0.8rem 1rem;
   border-bottom: 1px solid var(--line);
 }
+.supplier-movements-dialog-lead {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  min-width: 0;
+}
 .supplier-movements-dialog-title {
   margin: 0;
   min-width: 0;
