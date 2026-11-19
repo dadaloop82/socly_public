@@ -440,6 +440,10 @@ with the status. The licence key never appears in a message or in the log.
   handler), and the site stores it in `bug_reports` (Admin → Reports) **before** trying GitHub: a
   disabled relay or a revoked token no longer hides crashes. The error page shows the message and
   whether the report went out (`SOCLY_REPORT_PROBLEMS=0` disables sending on the instance).
+- Crashes raised by scripts that live **outside the application tree** (a hand-run file in `/tmp`, a
+  foreign cron job) are written to the local log only and never become GitHub issues: they are not
+  actionable product bugs. The check compares `$_SERVER['SCRIPT_FILENAME']` with `base_path()`,
+  `code_path()` and `SOCLY_INSTANCE_PATH`; unreadable paths are still reported.
 
 ## Package lint and PHP-FPM
 

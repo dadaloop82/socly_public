@@ -117,6 +117,22 @@ final class GitHubIssueService
             if (!$this->isConfigured()) {
                 return ['ok' => false, 'skipped' => true, 'error' => 'not_configured', 'code' => 'not_configured'];
             }
+            // A crash raised by a script that does not belong to the application (an ad-hoc file in
+            // /tmp, a foreign CLI cron, a one-off migration run by hand) is not a product bug: log it
+            // locally and never open an issue for it.
+            if (!$this->runsFromApplication()) {
+                try {
+                    if (function_exists('app')) {
+                        app('logger')->warning('github_issue.crash_report_skipped', [
+                            'reason' => 'external_script',
+                            'script' => (string) ($_SERVER['SCRIPT_FILENAME'] ?? ''),
+                            'error' => $e->getMessage(),
+                        ]);
+                    }
+                } catch (\Throwable) {
+                }
+                return ['ok' => false, 'skipped' => true, 'error' => 'external_script', 'code' => 'external_script'];
+            }
 
             $sig = hash('sha256', $e::class . '|' . $e->getMessage() . '|' . $e->getFile() . '|' . $e->getLine());
             $dedupKey = 'report-crash:' . $sig;
@@ -194,6 +210,49 @@ final class GitHubIssueService
             }
             return ['ok' => false, 'error' => 'exception', 'code' => 'exception'];
         }
+    }
+
+    /**
+     * True when the running entry script lives inside the application tree (public/index.php, bin/…).
+     * Ad-hoc scripts (e.g. /tmp/socly_mig.php) must not open GitHub issues: their errors are not
+     * actionable product crashes. When the path cannot be resolved the report is kept.
+     */
+    private function runsFromApplication(): bool
+    {
+        $raw = (string) ($_SERVER['SCRIPT_FILENAME'] ?? '');
+        if ($raw === '') {
+            return true;
+        }
+        $script = realpath($raw);
+        if ($script === false) {
+            // Relative or virtual paths (some FPM setups): do not silence real crashes.
+            return true;
+        }
+        $roots = [];
+        if (function_exists('base_path')) {
+            try {
+                $roots[] = (string) base_path();
+            } catch (\Throwable) {
+            }
+        }
+        if (function_exists('code_path')) {
+            try {
+                $roots[] = (string) code_path();
+            } catch (\Throwable) {
+            }
+        }
+        if (defined('SOCLY_INSTANCE_PATH')) {
+            $roots[] = (string) SOCLY_INSTANCE_PATH;
+        }
+        $normalized = str_replace('\\', '/', $script);
+        foreach (array_unique($roots) as $root) {
+            $root = rtrim(str_replace('\\', '/', $root), '/');
+            if ($root !== '' && str_starts_with($normalized, $root . '/')) {
+                return true;
+            }
+        }
+
+        return $roots === [];
     }
 
     /**
