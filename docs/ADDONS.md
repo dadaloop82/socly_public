@@ -259,7 +259,12 @@ operator must fill it before confirming. Statement lines that only carry referen
 tokens, long digit runs) do not become a counterparty, and the comparison ignores case, punctuation
 and symbols (`AMAZON*` = `Amazon`). The selected
 movement shares the same highlight colour on the PDF and on its card, and the amount is emphasised
-because it is the value that decides whether a row is correct. The counterparty field uses the same
+because it is the value that decides whether a row is correct. When the counterparty is a **member**
+(first + last name, either order, punctuation ignored) the row is linked to the member profile
+automatically — also after a correction in the review — and the link badge shows the member name.
+The “Intendevi …” suggestion (Yes / No, like the cash-book form) compares the typed name with both
+recorded counterparties and member names; it runs while typing (debounced) and on blur, so a
+mistyped name is corrected before the row is saved. The counterparty field uses the same
 suggestions as the cash-book form: a datalist of the recorded counterparties plus a proposal when the
 typed name is a near-duplicate, an abbreviation or a unique prefix. An edit
 is propagated to later similar movements only where the target field is still empty, and “Salva e
@@ -341,7 +346,7 @@ model is a new JSON file in `templates/`; it never changes the PHP code. Source:
 `addons-src/bank_statement_import/` (private repo; `addons-src/` is not part of the public export).
 
 ```bash
-php tools/addons/addon-tool.php build addons-src/bank_statement_import dist/bank_statement_import-1.4.2.soclyaddon --incoming
+php tools/addons/addon-tool.php build addons-src/bank_statement_import dist/bank_statement_import-1.4.3.soclyaddon --incoming
 ```
 
 ## Revenue Agency invoices (`agenzia_entrate_invoices`)
