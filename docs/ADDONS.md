@@ -244,7 +244,13 @@ covers **Intesa Sanpaolo** (Conto Business Insieme): native text provides dates 
 narrow OCR pass over the amount columns fills in the numbers, and scanned PDFs fall back to a
 full-page OCR. The parser follows movements across page breaks, skips repeated headers/footnotes,
 reconciles the declared totals with the sum of the detected rows and flags duplicates already in the
-ledger. Writes go through `TreasuryService::create()` (audit, approval queue, RUNTS line) and
+ledger. Pairing is not greedy: every statement row is matched with the ledger movement of the same
+direction and amount using **same day → same month and year → same year** (never another year), and
+all plausible pairs are scored first (tier, date distance, description/counterparty similarity) and
+assigned globally, so an earlier row cannot steal the movement that belongs to a later one. Runs
+created with the old greedy pairing are re-matched once on their next read (`match_version` in
+`run.json`); rows excluded only by the previous pairing become available again. Writes go through
+`TreasuryService::create()` (audit, approval queue, RUNTS line) and
 the import is logged as `treasury.bank_statement_imported`. Files live in
 `storage/uploads/bank-statements/<run>/` and are deleted on commit, on cancel or after 24 hours.
 
@@ -351,7 +357,7 @@ model is a new JSON file in `templates/`; it never changes the PHP code. Source:
 `addons-src/bank_statement_import/` (private repo; `addons-src/` is not part of the public export).
 
 ```bash
-php tools/addons/addon-tool.php build addons-src/bank_statement_import dist/bank_statement_import-1.4.4.soclyaddon --incoming
+php tools/addons/addon-tool.php build addons-src/bank_statement_import dist/bank_statement_import-1.4.5.soclyaddon --incoming
 ```
 
 ## Revenue Agency invoices (`agenzia_entrate_invoices`)
