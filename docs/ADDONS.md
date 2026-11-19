@@ -318,10 +318,13 @@ amount area, the OCR lines and the parsed movements.
 Since v1.3.7 the review explains the excluded rows (already in the cash book / amount not read / other
 reasons) instead of a bare count, the save button says “Continua al prossimo step” and cannot post twice,
 and “Conferma ed importa tutti i movimenti” confirms every importable row (after an explicit
-confirmation for rows with reading issues) and continues to the summary/import step. When some rows
+confirmation for rows with reading issues) and continues to the summary/import step. Rows already in
+the cash book are confirmed as well — the confirmation is what enables “overwrite” on the summary —
+but they stay excluded, so the button also works on a statement that was already imported and the
+summary then offers to skip or overwrite them. When some rows
 lack a valid date, amount or counterparty it confirms the others, lists the reasons in a branded
 popup (“Ho capito”) and jumps to the first row to fix. Movements that still need a fix and are not
-confirmed are outlined in red on the PDF and update while editing. Corrections to payment method,
+confirmed are outlined in red on the PDF and update while editing.
 Continuing with excluded or included-but-unconfirmed rows opens a branded warning (never snoozed)
 that lists how many will not be considered; on confirmation those included rows are excluded for
 real, so the summary and the import only consider the confirmed ones. Corrections to payment method,
@@ -359,7 +362,7 @@ model is a new JSON file in `templates/`; it never changes the PHP code. Source:
 `addons-src/bank_statement_import/` (private repo; `addons-src/` is not part of the public export).
 
 ```bash
-php tools/addons/addon-tool.php build addons-src/bank_statement_import dist/bank_statement_import-1.4.6.soclyaddon --incoming
+php tools/addons/addon-tool.php build addons-src/bank_statement_import dist/bank_statement_import-1.4.7.soclyaddon --incoming
 ```
 
 ## Revenue Agency invoices (`agenzia_entrate_invoices`)
