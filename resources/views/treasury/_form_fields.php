@@ -69,7 +69,9 @@ foreach (\Socly\Services\TreasuryService::DOCUMENT_TYPES as $documentTypeKey) {
     ];
 }
 $hasAttachment = !empty($values['attachment_path']) && empty($values['detach_invoice_pdf']);
-$attachmentName = $hasAttachment ? basename((string) $values['attachment_path']) : '';
+$attachmentName = $hasAttachment
+    ? (trim((string) ($values['attachment_name'] ?? '')) ?: basename((string) $values['attachment_path']))
+    : '';
 $attachmentPreviewUrl = trim((string) ($values['attachment_preview_url'] ?? ''));
 $attachmentIsImage = $hasAttachment
     && preg_match('/\.(?:jpe?g|png|webp)$/i', (string) ($values['attachment_path'] ?? '')) === 1;
@@ -619,6 +621,33 @@ if (array_key_exists('has_document', $values)) {
                     <?php endif; ?>
                 </div>
             </div>
+            <?php
+            $repositoryPickerOptions = [];
+            foreach ((array) ($repository_documents ?? []) as $repositoryDoc) {
+                $repositoryDocId = (int) ($repositoryDoc['id'] ?? 0);
+                if ($repositoryDocId < 1) {
+                    continue;
+                }
+                $repositoryLabel = (string) ($repositoryDoc['title'] ?? '');
+                if ((int) ($repositoryDoc['reference_year'] ?? 0) > 0) {
+                    $repositoryLabel .= ' · ' . (int) $repositoryDoc['reference_year'];
+                }
+                if ((string) ($repositoryDoc['uploaded_by_name'] ?? '') !== '') {
+                    $repositoryLabel .= ' · ' . (string) $repositoryDoc['uploaded_by_name'];
+                }
+                $repositoryPickerOptions[(string) $repositoryDocId] = $repositoryLabel;
+            }
+            ?>
+            <?php if ($repositoryPickerOptions !== []): ?>
+                <?= field('select', [
+                    'name' => 'attachment_document_id',
+                    'label' => (string) __('documents.reuse_existing'),
+                    'value' => (string) ($values['attachment_document_id'] ?? ''),
+                    'hint' => (string) __('documents.reuse_existing_hint'),
+                    'empty_label' => (string) __('documents.reuse_existing_none'),
+                    'options' => $repositoryPickerOptions,
+                ]) ?>
+            <?php endif; ?>
         </div>
     </div>
 </section>

@@ -15439,3 +15439,50 @@ select.is-remote-choice {
     padding: 1rem 0.85rem;
   }
 }
+
+/* Central file repository (Verbali e documenti) */
+.documents-repository-stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.65rem 1.35rem;
+  align-items: baseline;
+}
+.documents-repository-stat {
+  color: var(--text-muted, #5b6470);
+  font-size: 0.92rem;
+}
+.documents-repository-stat strong {
+  color: var(--text, #1f2733);
+  font-size: 1.05rem;
+  margin-right: 0.2rem;
+}
+.documents-repository-stat.is-warning strong,
+.documents-repository-stat.is-warning {
+  color: var(--danger, #b42318);
+}
+.documents-section-badge {
+  display: inline-block;
+  padding: 0.1rem 0.45rem;
+  border-radius: 999px;
+  background: var(--surface-muted, #eef1f5);
+  color: var(--text, #1f2733);
+  font-size: 0.78rem;
+  line-height: 1.35;
+  white-space: nowrap;
+}
+.documents-uploader {
+  display: block;
+  font-weight: 600;
+}
+.documents-repository-links {
+  margin: 0.35rem 0 0;
+  padding-left: 1.1rem;
+  display: grid;
+  gap: 0.25rem;
+}
+.documents-repository-links li {
+  list-style: disc;
+}
+.documents-hash code {
+  word-break: break-all;
+}

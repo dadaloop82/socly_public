@@ -37,19 +37,24 @@ $query = trim((string) ($search_query ?? ''));
 $filterStatus = (string) ($filters['status'] ?? '');
 $filterCategory = (string) ($filters['category'] ?? '');
 $filterExpiring = !empty($filters['expiring']);
+$filterSection = (string) ($filters['section'] ?? '');
+$filterYear = (int) ($filters['year'] ?? 0);
+$filterUploader = (string) ($filters['uploader'] ?? '');
 // “Expiring” is an item in the same Status menu (no steering wheel control).
 $statusParam = $filterExpiring ? 'expiring' : $filterStatus;
-$hasActiveFilters = $query !== '' || $statusParam !== '' || $filterCategory !== '';
+$hasActiveFilters = $query !== '' || $statusParam !== '' || $filterCategory !== ''
+    || $filterSection !== '' || $filterYear > 0 || $filterUploader !== '';
 
 $categoryLabels = [];
 foreach ($categories as $category) {
     $categoryLabels[(string) $category['key']] = (string) $category['label'];
 }
+$sectionLabels = is_array($repository_sections ?? null) ? $repository_sections : [];
 $today = date('Y-m-d');
 $soon = date('Y-m-d', strtotime('+30 days'));
 
 // Keeps the other filters when one of them changes.
-$filterUrl = static function (array $overrides = []) use ($query, $statusParam, $filterCategory): string {
+$filterUrl = static function (array $overrides = []) use ($query, $statusParam, $filterCategory, $filterSection, $filterYear, $filterUploader): string {
     $params = [];
     if ($query !== '') {
         $params['q'] = $query;
@@ -59,6 +64,15 @@ $filterUrl = static function (array $overrides = []) use ($query, $statusParam, 
     }
     if ($filterCategory !== '') {
         $params['category'] = $filterCategory;
+    }
+    if ($filterSection !== '') {
+        $params['section'] = $filterSection;
+    }
+    if ($filterYear > 0) {
+        $params['year'] = (string) $filterYear;
+    }
+    if ($filterUploader !== '') {
+        $params['uploader'] = $filterUploader;
     }
     foreach ($overrides as $key => $value) {
         if ($value === '' || $value === null || $value === false) {
@@ -107,7 +121,7 @@ foreach ($documents as $doc) {
     </div>
     <div class="actions">
         <?php if ($hasActiveFilters): ?>
-            <a class="btn btn-ghost" href="<?= e($filterUrl(['q' => '', 'status' => '', 'category' => ''])) ?>"><?= e(__('documents.filter_reset')) ?></a>
+            <a class="btn btn-ghost" href="<?= e($filterUrl(['q' => '', 'status' => '', 'category' => '', 'section' => '', 'year' => '', 'uploader' => ''])) ?>"><?= e(__('documents.filter_reset')) ?></a>
         <?php endif; ?>
         <?php if ($canManage): ?>
             <a class="btn<?= ($documents === [] && !$hasActiveFilters) ? ' is-first-cta' : '' ?>" href="<?= e(url('/documents/create')) ?>"><?= e(__('documents.add')) ?></a>
@@ -133,6 +147,37 @@ foreach ($documents as $doc) {
         <div class="value<?= (int) ($counts['expiring'] ?? 0) > 0 ? ' stat-negative' : '' ?>"><?= (int) ($counts['expiring'] ?? 0) ?></div>
     </a>
 </div>
+
+<?php
+$repoStats = is_array($repository_stats ?? null) ? $repository_stats : [];
+$repoSize = (int) ($repoStats['size'] ?? 0);
+$repoSizeLabel = $repoSize >= 1048576
+    ? number_format($repoSize / 1048576, 1, ',', '.') . ' MB'
+    : (string) max(0, (int) round($repoSize / 1024)) . ' KB';
+?>
+<section class="panel documents-repository">
+    <div class="panel-header">
+        <div>
+            <h2 class="section-title"><?= e(__('documents.repository_title')) ?></h2>
+            <p class="section-lede"><?= e(__('documents.repository_lede')) ?></p>
+        </div>
+        <?php if ($canManage): ?>
+            <form method="post" action="<?= e(url('/documents/reindex')) ?>" data-confirm="<?= e(__('documents.reindex_confirm')) ?>">
+                <?= csrf_field() ?>
+                <button class="btn btn-ghost btn-sm" type="submit"><?= e(__('documents.reindex')) ?></button>
+            </form>
+        <?php endif; ?>
+    </div>
+    <div class="documents-repository-stats">
+        <span class="documents-repository-stat"><strong><?= (int) ($repoStats['files'] ?? 0) ?></strong> <?= e(__('documents.repository_files')) ?></span>
+        <span class="documents-repository-stat"><strong><?= e($repoSizeLabel) ?></strong> <?= e(__('documents.repository_size')) ?></span>
+        <span class="documents-repository-stat"><strong><?= (int) ($repoStats['linked'] ?? 0) ?></strong> <?= e(__('documents.repository_links')) ?></span>
+        <span class="documents-repository-stat"><strong><?= (int) ($repoStats['current_year'] ?? 0) ?></strong> <?= e(__('documents.repository_current_year')) ?></span>
+        <?php if ((int) ($repoStats['duplicates'] ?? 0) > 0): ?>
+            <span class="documents-repository-stat is-warning"><strong><?= (int) $repoStats['duplicates'] ?></strong> <?= e(__('documents.repository_duplicates')) ?></span>
+        <?php endif; ?>
+    </div>
+</section>
 
 <?php if ($documents !== [] || $hasActiveFilters): ?>
 <form class="panel filter-bar members-filter documents-filter" method="get" action="<?= e(url('/documents')) ?>" role="search" data-documents-filter>
@@ -167,8 +212,42 @@ foreach ($documents as $doc) {
             'empty_label' => (string) __('documents.filter_all'),
             'options' => $statusFilterOptions,
         ]) ?>
+        <?= field('select', [
+            'name' => 'section',
+            'id' => 'documents-section-filter',
+            'label' => (string) __('documents.filter_section'),
+            'value' => $filterSection,
+            'context' => 'filter',
+            'empty_label' => (string) __('documents.filter_all'),
+            'options' => (array) ($repository_sections ?? []),
+        ]) ?>
+        <?php
+        $yearOptions = [];
+        foreach ((array) ($repository_years ?? []) as $repositoryYear) {
+            $yearOptions[(string) (int) $repositoryYear] = (string) (int) $repositoryYear;
+        }
+        ?>
+        <?= field('select', [
+            'name' => 'year',
+            'id' => 'documents-year-filter',
+            'label' => (string) __('documents.filter_year'),
+            'value' => $filterYear > 0 ? (string) $filterYear : '',
+            'context' => 'filter',
+            'empty_label' => (string) __('documents.filter_all'),
+            'options' => $yearOptions,
+        ]) ?>
+        <?= field('text', [
+            'name' => 'uploader',
+            'id' => 'documents-uploader-filter',
+            'label' => (string) __('documents.filter_uploader'),
+            'value' => $filterUploader,
+            'context' => 'filter',
+            'placeholder' => (string) __('documents.filter_uploader_placeholder'),
+            'maxlength' => 120,
+            'attrs' => ['autocomplete' => 'off'],
+        ]) ?>
         <?php if ($hasActiveFilters): ?>
-            <a class="btn btn-ghost btn-sm documents-filter-reset" href="<?= e($filterUrl(['q' => '', 'status' => '', 'category' => ''])) ?>"><?= e(__('documents.filter_reset')) ?></a>
+            <a class="btn btn-ghost btn-sm documents-filter-reset" href="<?= e($filterUrl(['q' => '', 'status' => '', 'category' => '', 'section' => '', 'year' => '', 'uploader' => ''])) ?>"><?= e(__('documents.filter_reset')) ?></a>
         <?php endif; ?>
     </div>
 </form>
@@ -242,6 +321,8 @@ foreach ($documents as $doc) {
                                 <th><?= e(__('documents.date')) ?></th>
                                 <th><?= e(__('documents.title_field')) ?></th>
                                 <th><?= e(__('documents.number')) ?></th>
+                                <th><?= e(__('documents.filter_section')) ?></th>
+                                <th><?= e(__('documents.uploaded_by')) ?></th>
                                 <th><?= e(__('documents.status')) ?></th>
                                 <th><?= e(__('documents.actions')) ?></th>
                             </tr>
@@ -303,6 +384,25 @@ foreach ($documents as $doc) {
                                     </td>
 
                                     <td data-label="<?= e(__('documents.number')) ?>"><?= e($docNumber !== '' ? $docNumber : '—') ?></td>
+                                    <td data-label="<?= e(__('documents.filter_section')) ?>">
+                                        <?php $docSection = (string) ($doc['source_section'] ?? 'documents'); ?>
+                                        <span class="documents-section-badge"><?= e((string) ($sectionLabels[$docSection] ?? ucfirst(str_replace('_', ' ', $docSection)))) ?></span>
+                                        <?php $docYear = (int) ($doc['reference_year'] ?? 0); ?>
+                                        <?php if ($docYear > 0): ?><span class="documents-lang"><?= (int) $docYear ?></span><?php endif; ?>
+                                    </td>
+                                    <td data-label="<?= e(__('documents.uploaded_by')) ?>">
+                                        <?php
+                                        $docUploader = trim((string) ($doc['uploaded_by_name'] ?? ''));
+                                        if ($docUploader === '') {
+                                            $docUploader = trim((string) ($doc['author_name'] ?? ''));
+                                        }
+                                        ?>
+                                        <span class="documents-uploader"><?= e($docUploader !== '' ? $docUploader : '—') ?></span>
+                                        <?php $docCreated = trim((string) ($doc['created_at'] ?? '')); ?>
+                                        <?php if ($docCreated !== ''): ?>
+                                            <span class="muted documents-summary"><?= e(format_datetime($docCreated)) ?></span>
+                                        <?php endif; ?>
+                                    </td>
                                     <td data-label="<?= e(__('documents.status')) ?>">
                                         <span class="doc-status doc-status-<?= e($docStatus) ?>"><?= e(__('documents.status_' . $docStatus)) ?></span>
                                     </td>

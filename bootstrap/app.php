@@ -33,6 +33,7 @@ use Socly\Controllers\RendicontoController;
 use Socly\Controllers\DashboardController;
 use Socly\Controllers\DeadlinesController;
 use Socly\Controllers\DocumentsController;
+use Socly\Controllers\FilesController;
 use Socly\Controllers\InstallController;
 use Socly\Controllers\MemberController;
 use Socly\Controllers\MemberImportController;
@@ -88,6 +89,7 @@ use Socly\Services\ComponentService;
 use Socly\Services\CurrencyService;
 use Socly\Services\DeadlineService;
 use Socly\Services\DocumentService;
+use Socly\Services\FileRepositoryService;
 use Socly\Services\EmailTemplateService;
 use Socly\Services\MemberRegistryService;
 use Socly\Services\EnrollmentFormService;
@@ -264,7 +266,8 @@ $app->bind(MemberService::class, fn (App $a) => new MemberService(
     $a->get(Validator::class),
     $a->get(PluginManager::class),
     $a->get(TreasuryService::class),
-    $a->get(VersionService::class)
+    $a->get(VersionService::class),
+    $a->get(FileRepositoryService::class)
 ));
 $app->bind(PaymentService::class, fn (App $a) => new PaymentService(
     $a->get(Database::class),
@@ -393,7 +396,8 @@ $app->bind(TreasuryService::class, fn (App $a) => new TreasuryService(
     $a->get(ComponentService::class),
     $a->get(DocumentService::class),
     $a->get(CurrencyService::class),
-    $a->get(VersionService::class)
+    $a->get(VersionService::class),
+    $a->get(FileRepositoryService::class)
 ));
 $app->bind(TreasuryCsvController::class, fn (App $a) => new TreasuryCsvController(
     $a->get(View::class),
@@ -417,11 +421,16 @@ $app->bind(DeadlineService::class, fn (App $a) => new DeadlineService(
     $a->get(Validator::class),
     $a->get(ComponentService::class)
 ));
+$app->bind(FileRepositoryService::class, fn (App $a) => new FileRepositoryService(
+    $a->get(Database::class),
+    $a->get(AuditService::class)
+));
 $app->bind(DocumentService::class, fn (App $a) => new DocumentService(
     $a->get(Database::class),
     $a->get(AuditService::class),
     $a->get(Validator::class),
-    $a->get(ComponentService::class)
+    $a->get(ComponentService::class),
+    $a->get(FileRepositoryService::class)
 ));
 $app->bind(UpdateService::class, fn (App $a) => new UpdateService(
     $a->get(Migrator::class),
@@ -509,7 +518,8 @@ $app->bind(EnrollmentService::class, fn (App $a) => new EnrollmentService(
     $a->get(Database::class),
     $a->get(SettingsService::class),
     $a->get(AuditService::class),
-    $a->get(WorkflowService::class)
+    $a->get(WorkflowService::class),
+    $a->get(FileRepositoryService::class)
 ));
 $app->bind(MemberController::class, fn (App $a) => new MemberController(
     $a->get(View::class),
@@ -558,7 +568,8 @@ $app->bind(TreasuryController::class, fn (App $a) => new TreasuryController(
     $a->get(CurrencyService::class),
     $a->get(BudgetService::class),
     $a->get(VersionService::class),
-    $a->get(RecurringService::class)
+    $a->get(RecurringService::class),
+    $a->get(FileRepositoryService::class)
 ));
 $app->bind(BudgetController::class, fn (App $a) => new BudgetController(
     $a->get(View::class),
@@ -589,7 +600,12 @@ $app->bind(DeadlinesController::class, fn (App $a) => new DeadlinesController(
 $app->bind(DocumentsController::class, fn (App $a) => new DocumentsController(
     $a->get(View::class),
     $a->get(DocumentService::class),
-    $a->get(MemberService::class)
+    $a->get(MemberService::class),
+    $a->get(FileRepositoryService::class)
+));
+$app->bind(FilesController::class, fn (App $a) => new FilesController(
+    $a->get(View::class),
+    $a->get(FileRepositoryService::class)
 ));
 $app->bind(OrgController::class, fn (App $a) => new OrgController(
     $a->get(View::class),

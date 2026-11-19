@@ -49,7 +49,31 @@ $languageLabel = $language !== '' ? __('documents.language_' . $language) : '—
         <div><span class="muted"><?= e(__('documents.category')) ?></span><br><span class="doc-category-badge"><?= e($category_label) ?></span></div>
         <div><span class="muted"><?= e(__('documents.language')) ?></span><br><strong><?= e($languageLabel) ?></strong></div>
         <div><span class="muted"><?= e(__('documents.status')) ?></span><br><span class="doc-status doc-status-<?= e((string) ($document['status'] ?? 'draft')) ?>"><?= e(__('documents.status_' . (string) ($document['status'] ?? 'draft'))) ?></span></div>
+        <div><span class="muted"><?= e(__('documents.filter_section')) ?></span><br><a href="<?= e(url('/documents?section=' . rawurlencode((string) ($document['source_section'] ?? 'documents')))) ?>"><?= e((string) ($section_label ?? '—')) ?></a></div>
+        <div><span class="muted"><?= e(__('documents.uploaded_by')) ?></span><br><strong><?= e((string) (($document['uploaded_by_name'] ?? '') ?: ($document['author_name'] ?? '—'))) ?></strong><br><span class="muted"><?= e(format_datetime($document['created_at'] ?? null) ?: '—') ?></span></div>
+        <div><span class="muted"><?= e(__('documents.reference_year')) ?></span><br><strong><?= (int) ($document['reference_year'] ?? 0) ?: '—' ?></strong></div>
+        <div><span class="muted"><?= e(__('documents.file_size')) ?></span><br><strong><?= (int) ($document['file_size'] ?? 0) > 0 ? e(number_format((int) $document['file_size'] / 1024, 0, ',', '.') . ' KB') : '—' ?></strong></div>
+        <div><span class="muted"><?= e(__('documents.downloads')) ?></span><br><strong><?= (int) ($document['download_count'] ?? 0) ?></strong></div>
     </div>
+    <?php if (trim((string) ($document['content_hash'] ?? '')) !== ''): ?>
+        <p class="muted documents-hash"><?= e(__('documents.content_hash')) ?>: <code><?= e(substr((string) $document['content_hash'], 0, 16)) ?>…</code></p>
+    <?php endif; ?>
+    <?php if (!empty($repository_links)): ?>
+        <div style="margin-top:1rem">
+            <span class="muted"><?= e(__('documents.repository_links_title')) ?></span>
+            <ul class="documents-repository-links">
+                <?php foreach ($repository_links as $repoLink): ?>
+                    <li>
+                        <span class="documents-section-badge"><?= e((string) ($repoLink['section'] ?? '')) ?></span>
+                        <?php if (trim((string) ($repoLink['context_ref'] ?? '')) !== ''): ?>
+                            <code><?= e((string) $repoLink['context_ref']) ?></code>
+                        <?php endif; ?>
+                        <span class="muted"><?= e(format_datetime($repoLink['created_at'] ?? null) ?: '') ?></span>
+                    </li>
+                <?php endforeach; ?>
+            </ul>
+        </div>
+    <?php endif; ?>
     <?php if (trim((string) ($document['summary'] ?? '')) !== ''): ?>
         <div style="margin-top:1rem">
             <span class="muted"><?= e(__('documents.summary')) ?></span>
@@ -64,6 +88,9 @@ $languageLabel = $language !== '' ? __('documents.language_' . $language) : '—
                 'label' => (string) __('documents.download_file'),
                 'href' => url('/documents/' . $docId . '/download'),
             ]) ?>
+            <?php if (trim((string) ($signed_url ?? '')) !== ''): ?>
+                <a class="btn btn-ghost" href="<?= e((string) $signed_url) ?>" target="_blank" rel="noopener"><?= e(__('documents.signed_link')) ?></a>
+            <?php endif; ?>
         </div>
     <?php else: ?>
         <p class="muted" style="margin-top:1rem"><?= e(__('documents.no_file')) ?></p>

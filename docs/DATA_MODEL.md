@@ -96,7 +96,35 @@ Treasury categories are the built-in list plus `treasury.custom_categories` in t
 (`[{slug, label}]`). New categories can be created on the fly from movements, documents, deadlines
 and budget lines; the label is shared by every feature that offers the same picker.
 
+### association_documents / document_links — central file repository
+
+`association_documents` is the **only** registry of uploaded files: every upload of the app and of the
+add-ons is stored here, not only the documents of the archive.
+
+| Column | Notes |
+|--------|-------|
+| `file_path` | relative path under `storage/uploads/`; canonical repository files live in `users/YYYY/MM/repository/` |
+| `content_hash` | SHA-256 of the bytes — one physical file per hash |
+| `file_size`, `original_name`, `file_mime` | metadata of the uploaded file |
+| `source_section` | origin: `documents`, `treasury`, `members`, `enrollment`, `internal_forum`, `board_voting`, `bank_statement_import`, `agenzia_entrate_invoices`, … |
+| `source_ref` | context inside the section (`movement:42`, `member:7`, `forum:3`, `poll:12`, `run:<token>`, …) |
+| `reference_year` | document date year, auto-detected from the name/context when not provided |
+| `uploaded_by_type` / `uploaded_by_id` / `uploaded_by_name` | `operator`, `member`, `participant`, `addon`, `public` or `system`; participant uploads record the forum/voting identity |
+| `uploaded_ip`, `download_count`, `last_downloaded_at` | audit and usage |
+| `deleted_at` | soft delete; `FileRepositoryService` never returns deleted rows |
+
+`document_links` records every section/context that references the same file
+(`document_id`, `section`, `context_ref`, who linked it, when). Re-uploading the same bytes anywhere
+returns the existing document and just adds a link: no duplicate files on disk.
+
+`FileRepositoryService` is the API used by the sections and the add-ons: `storeUpload()` (dedupe +
+metadata), `registerStoredFile()` (file already written on disk), `registerContent()` (raw bytes),
+`listForPicker()` (the “choose an already uploaded document” control), `signedUrl()` (login-free
+access for add-ons with their own token) and `backfill()` (hash/size/year of legacy rows and merge of
+physical duplicates, exposed by “Recompute fingerprints” in the archive).
+
 ### budgets / budget_sections / budget_items
+
 Yearly forecast budget, one per fiscal year (`budgets.fiscal_year` unique; `status` `draft` / `approved`).
 Only one document per year is allowed: the create form proposes just the free years and, while a draft
 is open, it points to that draft instead of offering another document.

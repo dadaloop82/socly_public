@@ -89,7 +89,8 @@ final class DocumentService
         private readonly Database $db,
         private readonly AuditService $audit,
         private readonly Validator $validator,
-        private readonly ComponentService $components
+        private readonly ComponentService $components,
+        private readonly FileRepositoryService $files
     ) {
     }
 
@@ -103,7 +104,8 @@ final class DocumentService
         $limitSql = ' LIMIT ' . max(1, min(500, $limit));
         $base = 'SELECT d.*, u.name AS author_name
              FROM association_documents d
-             LEFT JOIN users u ON u.id = d.created_by';
+             LEFT JOIN users u ON u.id = d.created_by
+             WHERE d.deleted_at IS NULL';
 
         $where = [];
         $params = [];
@@ -120,6 +122,21 @@ final class DocumentService
             $where[] = 'd.category = :filter_category';
             $params['filter_category'] = $category;
         }
+        $section = trim((string) ($filters['section'] ?? ''));
+        if ($section !== '') {
+            $where[] = 'd.source_section = :filter_section';
+            $params['filter_section'] = $section;
+        }
+        $year = (int) ($filters['year'] ?? 0);
+        if ($year > 0) {
+            $where[] = 'd.reference_year = :filter_year';
+            $params['filter_year'] = $year;
+        }
+        $uploader = trim((string) ($filters['uploader'] ?? ''));
+        if ($uploader !== '') {
+            $where[] = 'd.uploaded_by_name LIKE :filter_uploader';
+            $params['filter_uploader'] = '%' . $this->escapeLike($uploader) . '%';
+        }
         if (!empty($filters['expiring'])) {
             $where[] = 'd.expires_at IS NOT NULL AND d.expires_at >= :expires_from AND d.expires_at <= :expires_to';
             $params['expires_from'] = date('Y-m-d');
@@ -127,7 +144,7 @@ final class DocumentService
         }
         $sql = $base;
         if ($where !== []) {
-            $sql .= ' WHERE ' . implode(' AND ', $where);
+            $sql .= ' AND ' . implode(' AND ', $where);
         }
         $sql .= ' ORDER BY COALESCE(d.document_date, d.created_at) DESC, d.id DESC' . $limitSql;
         return $this->db->fetchAll($sql, $params);
@@ -192,7 +209,8 @@ final class DocumentService
                     SUM(CASE WHEN status = \'draft\' THEN 1 ELSE 0 END) AS draft,
                     SUM(CASE WHEN status IN (\'approved\', \'signed\') THEN 1 ELSE 0 END) AS approved,
                     SUM(CASE WHEN expires_at IS NOT NULL AND expires_at >= :expires_from AND expires_at <= :expires_to THEN 1 ELSE 0 END) AS expiring
-             FROM association_documents',
+             FROM association_documents
+             WHERE deleted_at IS NULL',
             [
                 'expires_from' => date('Y-m-d'),
                 'expires_to' => date('Y-m-d', strtotime('+30 days')),
@@ -442,15 +460,19 @@ final class DocumentService
     }
 
     /**
-     * Immediate upload used by the document form (AJAX).
+     * Immediate upload used by the document form (AJAX). The bytes land in the central
+     * repository folder; the document row is written when the form is submitted.
      *
      * @param array{name?:string,type?:string,tmp_name?:string,error?:int,size?:int} $file
-     * @return array{ok:bool,error?:string,path?:string,mime?:string,name?:string}
+     * @return array{ok:bool,error?:string,path?:string,mime?:string,name?:string,hash?:string}
      */
-    public function upload(array $file): array
+    public function upload(array $file, array $context = []): array
     {
-        $stored = $this->storeFile($file);
-        if (!$stored['ok']) {
+        $stored = $this->files->stageUpload($file, $context + [
+            'section' => 'documents',
+            'allowed_mimes' => ['application/pdf', 'image/jpeg', 'image/png', 'image/webp'],
+        ], '');
+        if (empty($stored['ok'])) {
             return ['ok' => false, 'error' => (string) ($stored['error'] ?? __('documents.upload_fail'))];
         }
         return [
@@ -458,12 +480,25 @@ final class DocumentService
             'path' => (string) $stored['path'],
             'mime' => (string) $stored['mime'],
             'name' => (string) ($file['name'] ?? basename((string) $stored['path'])),
+            'hash' => (string) ($stored['hash'] ?? ''),
         ];
     }
 
     /** @param array<string,mixed> $input */
     public function create(array $input, ?array $file, string $ip, ?int $userId = null): array
     {
+        // Linking an existing repository file: prefill the title so the form can be submitted
+        // without retyping the metadata of a document that is already archived.
+        $reuseId = (int) ($input['reuse_document_id'] ?? 0);
+        if ($reuseId > 0 && trim((string) ($input['title'] ?? '')) === '') {
+            $reuseRow = $this->files->fileInfo($reuseId);
+            if ($reuseRow !== null) {
+                $input['title'] = (string) ($reuseRow['title'] ?? '');
+                if (trim((string) ($input['category'] ?? '')) === '') {
+                    $input['category'] = (string) ($reuseRow['category'] ?? 'other');
+                }
+            }
+        }
         $parsed = $this->parseDocumentInput($input, $file, null);
         if (empty($parsed['ok'])) {
             return ['ok' => false, 'errors' => $parsed['errors'] ?? ['title' => __('validation.required')]];
@@ -471,16 +506,69 @@ final class DocumentService
         /** @var array<string,mixed> $data */
         $data = $parsed['data'];
         $data['created_by'] = $userId;
+        $actor = auth_user();
+        $data['uploaded_by_type'] = 'operator';
+        $data['uploaded_by_id'] = $userId ?? (int) ($actor['id'] ?? 0) ?: null;
+        $data['uploaded_by_name'] = is_array($actor)
+            ? mb_substr((string) ($actor['name'] ?? ($actor['email'] ?? '')), 0, 190)
+            : null;
+        $data['uploaded_ip'] = $ip !== '' ? mb_substr($ip, 0, 45) : null;
+
+        // “Choose an already uploaded document”: reuse the repository file instead of a copy.
+        $reuseId = (int) ($input['reuse_document_id'] ?? 0);
+        if ($reuseId > 0 && trim((string) ($data['file_path'] ?? '')) === '') {
+            $reused = $this->files->pick($reuseId);
+            if ($reused === null) {
+                return ['ok' => false, 'errors' => ['reuse_document_id' => __('documents.upload_missing')]];
+            }
+            $this->files->link($reuseId, (string) ($data['source_section'] ?? 'documents'), (string) ($data['source_ref'] ?? ''), [
+                'actor_type' => 'operator',
+                'actor_id' => $userId,
+            ]);
+
+            return ['ok' => true, 'id' => $reuseId, 'reused' => true];
+        }
+
+        // One single physical file in the repository: the same bytes are never archived twice.
+        $hash = trim((string) ($data['content_hash'] ?? ''));
+        if ($hash !== '') {
+            $existing = $this->files->findByHash($hash);
+            if ($existing !== null) {
+                // The file is already archived: accept the upload but do not create a second
+                // document. Drop a copy staged under another year folder, if any.
+                $stagedPath = trim((string) ($data['file_path'] ?? ''));
+                $existingPath = trim((string) ($existing['file_path'] ?? ''));
+                if ($stagedPath !== '' && $stagedPath !== $existingPath && str_contains($stagedPath, '/repository/')) {
+                    $stagedAbsolute = resolve_upload_absolute_path($stagedPath);
+                    if ($stagedAbsolute !== null) {
+                        @unlink($stagedAbsolute);
+                    }
+                }
+                $this->files->link((int) $existing['id'], (string) ($data['source_section'] ?? 'documents'), (string) ($data['source_ref'] ?? ''), [
+                    'actor_type' => 'operator',
+                    'actor_id' => $userId,
+                ]);
+
+                return ['ok' => true, 'id' => (int) $existing['id'], 'reused' => true];
+            }
+        }
+
         if (trim((string) ($data['document_number'] ?? '')) === '') {
             $data['document_number'] = $this->suggestProtocolNumber((string) $data['category'], $data['document_date'] ?? null);
         }
         $id = $this->db->insert('association_documents', $data);
+        $this->files->link((int) $id, (string) ($data['source_section'] ?? 'documents'), (string) ($data['source_ref'] ?? ''), [
+            'actor_type' => 'operator',
+            'actor_id' => $userId,
+        ]);
         $this->syncExpiryDeadline((int) $id, $data, $ip);
         $this->audit->log('document.created', 'document', (string) $id, null, [
             'title' => $data['title'],
             'document_number' => $data['document_number'],
             'category' => $data['category'],
             'language' => $data['language'],
+            'source_section' => $data['source_section'] ?? 'documents',
+            'content_hash' => $data['content_hash'] ?? null,
         ], $ip);
         return ['ok' => true, 'id' => $id];
     }
@@ -495,7 +583,7 @@ final class DocumentService
             'SELECT d.*, u.name AS author_name
              FROM association_documents d
              LEFT JOIN users u ON u.id = d.created_by
-             WHERE d.id = :id',
+             WHERE d.id = :id AND d.deleted_at IS NULL',
             ['id' => $id]
         );
     }
@@ -517,10 +605,18 @@ final class DocumentService
         $this->syncExpiryDeadline($id, $data, $ip);
         $oldPath = trim((string) ($existing['file_path'] ?? ''));
         $newPath = trim((string) ($data['file_path'] ?? ''));
-        if ($oldPath !== '' && $newPath !== $oldPath && $this->isSafeStoredPath($oldPath)) {
-            $oldFullPath = storage_path($oldPath);
-            if (is_file($oldFullPath)) {
-                @unlink($oldFullPath);
+        if ($oldPath !== $newPath && $newPath !== '') {
+            // The old bytes are never deleted here: in the central repository they can be used by
+            // another section (treasury, forum, poll). Orphan cleanup runs from the archive page.
+            $absolute = resolve_upload_absolute_path($newPath);
+            if ($absolute !== null) {
+                $hash = hash_file('sha256', $absolute);
+                $patch = [
+                    'content_hash' => is_string($hash) ? $hash : null,
+                    'file_size' => (int) (@filesize($absolute) ?: 0),
+                ];
+                $this->db->update('association_documents', $patch, 'id = :id', ['id' => $id]);
+                $data = array_merge($data, $patch);
             }
         }
         $this->audit->log('document.updated', 'document', (string) $id, [
@@ -604,6 +700,30 @@ final class DocumentService
 
         $documentNumber = mb_substr(trim((string) ($input['document_number'] ?? '')), 0, 80);
 
+        // Repository metadata: hash, size, original name, origin section and reference year.
+        $contentHash = null;
+        $fileSize = null;
+        $storedPath = trim((string) ($attachment['path'] ?? ''));
+        if ($storedPath !== '') {
+            $absolute = resolve_upload_absolute_path($storedPath);
+            if ($absolute !== null) {
+                $hash = hash_file('sha256', $absolute);
+                $contentHash = is_string($hash) ? $hash : null;
+                $fileSize = (int) (@filesize($absolute) ?: 0);
+            }
+        }
+        $originalName = trim((string) ($input['uploaded_name'] ?? ''));
+        if ($originalName === '') {
+            $originalName = (string) ($file['name'] ?? '');
+        }
+        if ($originalName === '' && $storedPath !== '') {
+            $originalName = basename($storedPath);
+        }
+        $sourceSection = strtolower(trim((string) ($input['source_section'] ?? 'documents')));
+        $sourceSection = preg_replace('/[^a-z0-9_]/', '_', $sourceSection) ?: 'documents';
+        $sourceRef = mb_substr(trim((string) ($input['source_ref'] ?? '')), 0, 190);
+        $referenceYear = $docDate !== '' ? (int) substr($docDate, 0, 4) : (int) date('Y');
+
         return [
             'ok' => true,
             'data' => [
@@ -620,6 +740,12 @@ final class DocumentService
                 'visibility' => $visibility,
                 'member_id' => $memberId !== '' ? (int) $memberId : null,
                 'sibling_document_id' => $siblingId !== '' ? (int) $siblingId : null,
+                'content_hash' => $contentHash,
+                'file_size' => $fileSize,
+                'original_name' => $originalName !== '' ? mb_substr($originalName, 0, 255) : null,
+                'source_section' => $sourceSection,
+                'source_ref' => $sourceRef !== '' ? $sourceRef : null,
+                'reference_year' => max(1900, min(2100, $referenceYear)),
             ],
         ];
     }
@@ -743,54 +869,29 @@ final class DocumentService
         return ['ok' => true, 'path' => null, 'mime' => null];
     }
 
-    /** @param array{name?:string,type?:string,tmp_name?:string,error?:int,size?:int} $file */
+    /**
+     * @param array{name?:string,type?:string,tmp_name?:string,error?:int,size?:int} $file
+     * @return array{ok:bool,error?:string,path?:string,mime?:string,hash?:string,size?:int,original_name?:string}
+     */
     private function storeFile(array $file, ?string $referenceDate = null): array
     {
-        $err = (int) ($file['error'] ?? UPLOAD_ERR_NO_FILE);
-        $maxBytes = $this->uploadMaxBytes();
-        $maxMb = max(1, (int) ceil($maxBytes / (1024 * 1024)));
+        $staged = $this->files->stageUpload($file, [
+            'section' => 'documents',
+            'date' => $referenceDate,
+            'allowed_mimes' => ['application/pdf', 'image/jpeg', 'image/png', 'image/webp'],
+        ], '');
+        if (empty($staged['ok'])) {
+            return ['ok' => false, 'error' => (string) ($staged['error'] ?? __('documents.upload_fail'))];
+        }
 
-        if ($err === UPLOAD_ERR_INI_SIZE || $err === UPLOAD_ERR_FORM_SIZE) {
-            return ['ok' => false, 'error' => __('documents.upload_too_large', ['max' => (string) $maxMb])];
-        }
-        if ($err === UPLOAD_ERR_NO_FILE) {
-            return ['ok' => false, 'error' => __('documents.upload_required')];
-        }
-        if ($err !== UPLOAD_ERR_OK) {
-            return ['ok' => false, 'error' => __('documents.upload_fail')];
-        }
-        if (($file['size'] ?? 0) > $maxBytes) {
-            return ['ok' => false, 'error' => __('documents.upload_too_large', ['max' => (string) $maxMb])];
-        }
-        $tmp = (string) ($file['tmp_name'] ?? '');
-        if ($tmp === '' || !is_file($tmp)) {
-            return ['ok' => false, 'error' => __('documents.upload_fail')];
-        }
-        $finfo = new \finfo(FILEINFO_MIME_TYPE);
-        $mime = $finfo->file($tmp) ?: '';
-        $original = strtolower((string) ($file['name'] ?? ''));
-        // Some clients send PDF as application/octet-stream.
-        if ($mime === 'application/octet-stream' && str_ends_with($original, '.pdf')) {
-            $mime = 'application/pdf';
-        }
-        $allowed = ['application/pdf', 'image/jpeg', 'image/png', 'image/webp'];
-        if (!in_array($mime, $allowed, true)) {
-            return ['ok' => false, 'error' => __('documents.upload_type')];
-        }
-        $ext = match ($mime) {
-            'application/pdf' => 'pdf',
-            'image/jpeg' => 'jpg',
-            'image/png' => 'png',
-            'image/webp' => 'webp',
-            default => 'bin',
-        };
-        $name = bin2hex(random_bytes(8)) . '.' . $ext;
-        $paths = user_upload_paths('documents', $referenceDate, $name);
-        if (!move_uploaded_file($tmp, $paths['absolute'])) {
-            return ['ok' => false, 'error' => __('documents.upload_storage')];
-        }
-        @chmod($paths['absolute'], 0664);
-        return ['ok' => true, 'path' => $paths['relative'], 'mime' => $mime];
+        return [
+            'ok' => true,
+            'path' => (string) $staged['path'],
+            'mime' => (string) $staged['mime'],
+            'hash' => (string) ($staged['hash'] ?? ''),
+            'size' => (int) ($staged['size'] ?? 0),
+            'original_name' => (string) ($staged['original_name'] ?? ''),
+        ];
     }
 
     /**
@@ -933,7 +1034,7 @@ final class DocumentService
 
     public function filePath(int $id): ?string
     {
-        $row = $this->db->fetch('SELECT file_path FROM association_documents WHERE id = :id', ['id' => $id]);
+        $row = $this->db->fetch('SELECT file_path FROM association_documents WHERE id = :id AND deleted_at IS NULL', ['id' => $id]);
         $rel = trim((string) ($row['file_path'] ?? ''));
         if ($rel === '' || !$this->isSafeStoredPath($rel)) {
             return null;

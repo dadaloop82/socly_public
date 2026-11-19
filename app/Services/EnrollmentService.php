@@ -40,7 +40,8 @@ final class EnrollmentService
         private readonly Database $db,
         private readonly SettingsService $settings,
         private readonly AuditService $audit,
-        private readonly WorkflowService $workflow
+        private readonly WorkflowService $workflow,
+        private readonly FileRepositoryService $files
     ) {
     }
 
@@ -311,14 +312,22 @@ final class EnrollmentService
      */
     private function storeUpload(int $memberId, array $file, string $prefix): array
     {
-        $ext = strtolower(pathinfo((string) $file['name'], PATHINFO_EXTENSION) ?: 'bin');
-        $ext = preg_replace('/[^a-z0-9]/', '', $ext) ?: 'bin';
-        $name = $prefix . '_' . bin2hex(random_bytes(8)) . '.' . $ext;
-        $paths = user_upload_paths('enrollment/' . $memberId, null, $name);
-        if (!move_uploaded_file((string) $file['tmp_name'], $paths['absolute'])) {
+        $stored = $this->files->storeUpload($file, [
+            'section' => 'enrollment',
+            'ref' => 'member:' . $memberId,
+            'category' => 'members_register',
+            'title' => __('members.enrollment_scan') . ' #' . $memberId,
+            'actor_type' => 'operator',
+            'actor_id' => auth_user()['id'] ?? null,
+        ], '');
+        if (empty($stored['ok'])) {
             return [];
         }
-        return ['path' => $paths['relative'], 'hash' => hash_file('sha256', $paths['absolute']) ?: null];
+
+        return [
+            'path' => (string) $stored['path'],
+            'hash' => (string) ($stored['hash'] ?? '') ?: null,
+        ];
     }
 
     /** @return array{path?:string,hash?:string} */
@@ -332,11 +341,27 @@ final class EnrollmentService
             return [];
         }
         $ext = $m[1] === 'jpeg' ? 'jpg' : 'png';
-        $name = $prefix . '_' . bin2hex(random_bytes(8)) . '.' . $ext;
-        $paths = user_upload_paths('enrollment/' . $memberId, null, $name);
-        if (file_put_contents($paths['absolute'], $bin) === false) {
+        $stored = $this->files->registerContent(
+            $bin,
+            $prefix . '_' . $memberId . '.' . $ext,
+            [
+                'section' => 'enrollment',
+                'ref' => 'member:' . $memberId,
+                'category' => 'members_register',
+                'title' => __('members.enrollment_scan') . ' #' . $memberId,
+                'mime' => $m[1] === 'jpeg' ? 'image/jpeg' : 'image/png',
+                'actor_type' => 'operator',
+                'actor_id' => auth_user()['id'] ?? null,
+            ],
+            ''
+        );
+        if (empty($stored['ok'])) {
             return [];
         }
-        return ['path' => $paths['relative'], 'hash' => hash('sha256', $bin)];
+
+        return [
+            'path' => (string) $stored['path'],
+            'hash' => (string) ($stored['hash'] ?? '') ?: null,
+        ];
     }
 }

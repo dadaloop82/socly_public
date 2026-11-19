@@ -32,6 +32,7 @@ use Socly\Controllers\RendicontoController;
 use Socly\Controllers\DashboardController;
 use Socly\Controllers\DeadlinesController;
 use Socly\Controllers\DocumentsController;
+use Socly\Controllers\FilesController;
 use Socly\Controllers\InstallController;
 use Socly\Controllers\MemberController;
 use Socly\Controllers\MemberImportController;
@@ -238,6 +239,9 @@ $router->post('/deadlines/{id}/renew', [DeadlinesController::class, 'renew'], 'd
 
 $router->get('/documents', [DocumentsController::class, 'index'], 'documents.view', ['mw.locale', 'mw.install', 'mw.auth']);
 $router->get('/documents/create', [DocumentsController::class, 'create'], 'documents.manage', ['mw.locale', 'mw.install', 'mw.auth']);
+// Repository picker: JSON list of the files already uploaded in a section (declared before {id}).
+$router->get('/documents/picker', [DocumentsController::class, 'picker'], 'documents.view', ['mw.locale', 'mw.install', 'mw.auth']);
+$router->post('/documents/reindex', [DocumentsController::class, 'reindex'], 'documents.manage', ['mw.locale', 'mw.install', 'mw.auth', 'mw.csrf']);
 $router->post('/documents', [DocumentsController::class, 'store'], 'documents.manage', ['mw.locale', 'mw.install', 'mw.auth', 'mw.csrf']);
 $router->post('/documents/upload', [DocumentsController::class, 'upload'], 'documents.manage', ['mw.locale', 'mw.install', 'mw.auth', 'mw.csrf']);
 $router->get('/documents/{id}', [DocumentsController::class, 'show'], 'documents.view', ['mw.locale', 'mw.install', 'mw.auth']);
@@ -245,6 +249,10 @@ $router->get('/documents/{id}/edit', [DocumentsController::class, 'edit'], 'docu
 $router->post('/documents/{id}', [DocumentsController::class, 'update'], 'documents.manage', ['mw.locale', 'mw.install', 'mw.auth', 'mw.csrf']);
 $router->get('/documents/{id}/file', [DocumentsController::class, 'download'], 'documents.view', ['mw.locale', 'mw.install', 'mw.auth']);
 $router->get('/documents/{id}/download', [DocumentsController::class, 'forceDownload'], 'documents.view', ['mw.locale', 'mw.install', 'mw.auth']);
+
+// Signed repository URL: add-on pages (internal forum, board voting) have their own login and
+// still open the central file without an operator session.
+$router->get('/files/{id}', [FilesController::class, 'show'], null, ['mw.locale', 'mw.install']);
 
 $router->get('/org', [OrgController::class, 'index'], 'org.view', ['mw.locale', 'mw.install', 'mw.auth']);
 $router->get('/org/history', [OrgController::class, 'history'], 'org.view', ['mw.locale', 'mw.install', 'mw.auth']);

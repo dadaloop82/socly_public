@@ -388,7 +388,8 @@ final class MemberService
         private readonly Validator $validator,
         private readonly PluginManager $plugins,
         private readonly TreasuryService $treasury,
-        private readonly VersionService $versions
+        private readonly VersionService $versions,
+        private readonly FileRepositoryService $files
     ) {
     }
 
@@ -2659,46 +2660,38 @@ final class MemberService
         if ($error) {
             return ['ok' => false, 'error' => $error];
         }
-        $finfo = new \finfo(FILEINFO_MIME_TYPE);
-        $mime = $finfo->file($file['tmp_name']) ?: '';
-        $ext = match ($mime) {
-            'image/jpeg' => 'jpg',
-            'image/png' => 'png',
-            'image/webp' => 'webp',
-            default => null,
-        };
-        if ($ext === null) {
-            return ['ok' => false, 'error' => __('validation.photo')];
+        $actor = auth_user();
+        $stored = $this->files->storeUpload($file, [
+            'section' => 'members',
+            'ref' => 'member:' . $memberId,
+            'category' => 'other',
+            'title' => __('members.profile_block_photo') . ' #' . $memberId,
+            'actor_type' => 'operator',
+            'actor_id' => is_array($actor) ? (int) ($actor['id'] ?? 0) : null,
+            'actor_name' => is_array($actor) ? (string) ($actor['name'] ?? '') : '',
+        ], '');
+        if (empty($stored['ok'])) {
+            return ['ok' => false, 'error' => (string) ($stored['error'] ?? __('validation.photo'))];
         }
-
-        $paths = user_upload_paths('members/' . $memberId, null, 'photo.' . $ext);
-        $relative = $paths['relative'];
-        $absolute = $paths['absolute'];
-        if (!move_uploaded_file($file['tmp_name'], $absolute)) {
-            return ['ok' => false, 'error' => __('validation.photo')];
-        }
-        @chmod($absolute, 0644);
+        $relative = (string) $stored['path'];
 
         if ($previous !== '' && $previous !== $relative) {
             $this->deleteMemberPhoto($memberId, $previous);
         }
 
-        return ['ok' => true, 'path' => $paths['relative']];
+        return ['ok' => true, 'path' => $relative];
     }
 
+    /**
+     * The bytes stay in the central repository (another record may use them): only the link to
+     * this member is released.
+     */
     private function deleteMemberPhoto(int $memberId, string $relative): void
     {
         if ($relative === '' || str_contains($relative, '..')) {
             return;
         }
-        $absolute = resolve_upload_absolute_path(ltrim($relative, '/'));
-        if ($absolute !== null) {
-            @unlink($absolute);
-            $dir = dirname($absolute);
-            if (is_dir($dir)) {
-                @rmdir($dir);
-            }
-        }
+        $this->files->unlinkByPath(ltrim($relative, '/'), 'members', 'member:' . $memberId);
     }
 
     public function memberPhotoAbsolutePath(string $relative): ?string

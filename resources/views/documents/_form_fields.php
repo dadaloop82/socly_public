@@ -245,6 +245,33 @@ foreach (($sibling_options ?? []) as $sib) {
     'value' => (string) ($values['summary'] ?? ''),
     'rows' => 3,
 ]) ?>
+<?php
+$reuseOptions = [];
+foreach ((array) ($reuse_options ?? []) as $reuseRow) {
+    $reuseId = (int) ($reuseRow['id'] ?? 0);
+    if ($reuseId < 1) {
+        continue;
+    }
+    $reuseLabel = (string) ($reuseRow['title'] ?? '');
+    if ((int) ($reuseRow['reference_year'] ?? 0) > 0) {
+        $reuseLabel .= ' · ' . (int) $reuseRow['reference_year'];
+    }
+    if ((string) ($reuseRow['uploaded_by_name'] ?? '') !== '') {
+        $reuseLabel .= ' · ' . (string) $reuseRow['uploaded_by_name'];
+    }
+    $reuseOptions[(string) $reuseId] = $reuseLabel;
+}
+?>
+<?php if ($reuseOptions !== []): ?>
+    <?= field('select', [
+        'name' => 'reuse_document_id',
+        'label' => (string) __('documents.reuse_existing'),
+        'value' => (string) ($values['reuse_document_id'] ?? ''),
+        'hint' => (string) __('documents.reuse_existing_hint'),
+        'empty_label' => (string) __('documents.reuse_existing_none'),
+        'options' => $reuseOptions,
+    ]) ?>
+<?php endif; ?>
 <?php if (!empty($document_id) && (int) $document_id > 0 && component_enabled('treasury') && can('treasury.manage')): ?>
     <p class="muted" style="margin-top:0.75rem">
         <a href="<?= e(url('/treasury?document_id=' . (int) $document_id)) ?>"><?= e(__('documents.link_treasury')) ?></a>

@@ -110,6 +110,7 @@ $values['attachment_preview_url'] = $isEdit && $movementId > 0
 $values['document_edit_url'] = $isEdit && !empty($movement['document_id'])
     ? url('/documents/' . (int) $movement['document_id'])
     : '';
+$values['attachment_name'] = trim((string) ($attachment_name ?? ''));
 
 $pageTitle = $isCopy
     ? __('treasury.copy_movement')

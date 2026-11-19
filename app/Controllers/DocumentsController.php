@@ -28,6 +28,7 @@ namespace Socly\Controllers;
 use Socly\Core\Http\Request;
 use Socly\Core\View;
 use Socly\Services\DocumentService;
+use Socly\Services\FileRepositoryService;
 use Socly\Services\MemberService;
 
 final class DocumentsController extends BaseController
@@ -35,7 +36,8 @@ final class DocumentsController extends BaseController
     public function __construct(
         View $view,
         private readonly DocumentService $documents,
-        private readonly MemberService $members
+        private readonly MemberService $members,
+        private readonly FileRepositoryService $files
     ) {
         parent::__construct($view);
     }
@@ -48,6 +50,10 @@ final class DocumentsController extends BaseController
             $query = mb_substr($query, 0, 120);
         }
         $filters = $this->listFilters($request);
+        $sections = [];
+        foreach ($this->files->sections() as $sectionKey) {
+            $sections[$sectionKey] = $this->files->sectionLabel($sectionKey);
+        }
         $this->render('documents/index', [
             'title' => __('documents.title'),
             'documents' => $this->documents->all(200, $query, $filters),
@@ -62,6 +68,9 @@ final class DocumentsController extends BaseController
             'members' => $this->members->listForSelect(),
             'sibling_options' => $this->documents->all(100),
             'search_query' => $query,
+            'repository_sections' => $sections,
+            'repository_years' => $this->files->years(),
+            'repository_stats' => $this->files->stats(),
         ]);
     }
 
@@ -90,6 +99,7 @@ final class DocumentsController extends BaseController
             'members' => $this->members->listForSelect(),
             'sibling_options' => $this->documents->all(100),
             'document_id' => 0,
+            'reuse_options' => $this->files->listForPicker('documents', '', null, 80),
         ]);
     }
 
@@ -132,6 +142,10 @@ final class DocumentsController extends BaseController
             'members' => $this->members->listForSelect(),
             'sibling_options' => $siblings,
             'document_id' => (int) $id,
+            'reuse_options' => array_values(array_filter(
+                $this->files->listForPicker('documents', '', null, 80),
+                static fn (array $row): bool => (int) ($row['id'] ?? 0) !== (int) $id
+            )),
         ]);
     }
 
@@ -144,10 +158,15 @@ final class DocumentsController extends BaseController
             $this->flash('errors', ['document' => __('errors.404')]);
             redirect('/documents');
         }
+        $repoId = (int) ($doc['id'] ?? 0);
+        $signed = $this->files->signedUrl($repoId, 900);
         $this->render('documents/show', [
             'title' => (string) ($doc['title'] ?? __('documents.title')),
             'document' => $doc,
             'category_label' => $this->documents->categoryLabel((string) ($doc['category'] ?? 'other')),
+            'section_label' => $this->files->sectionLabel((string) ($doc['source_section'] ?? 'documents')),
+            'repository_links' => $this->files->linksFor($repoId),
+            'signed_url' => $signed,
         ]);
     }
 
@@ -188,7 +207,10 @@ final class DocumentsController extends BaseController
             echo json_encode(['ok' => false, 'error' => __('documents.upload_required')], JSON_UNESCAPED_UNICODE);
             return;
         }
-        $result = $this->documents->upload($file);
+        $result = $this->documents->upload($file, [
+            'section' => 'documents',
+            'ref' => trim((string) $request->input('source_ref', '')),
+        ]);
         if (empty($result['ok'])) {
             http_response_code(422);
             echo json_encode([
@@ -202,6 +224,7 @@ final class DocumentsController extends BaseController
             'path' => $result['path'],
             'mime' => $result['mime'],
             'name' => $result['name'],
+            'hash' => $result['hash'] ?? '',
             'message' => __('documents.upload_ok'),
         ], JSON_UNESCAPED_UNICODE);
     }
@@ -221,14 +244,14 @@ final class DocumentsController extends BaseController
             $this->rememberOld($request->all());
             redirect('/documents/create');
         }
-        $this->flash('success', __('documents.saved'));
-        redirect('/documents');
+        $this->flash('success', !empty($result['reused']) ? __('documents.reused_existing') : __('documents.saved'));
+        redirect('/documents/' . (int) ($result['id'] ?? 0));
     }
 
     /**
      * Archive filters from the query string (validated).
      *
-     * @return array{status:string,category:string,expiring:bool}
+     * @return array{status:string,category:string,expiring:bool,section:string,year:int,uploader:string}
      */
     private function listFilters(Request $request): array
     {
@@ -243,10 +266,23 @@ final class DocumentsController extends BaseController
         if ($category !== '' && !in_array($category, array_column($this->documents->categoryOptions(), 'key'), true)) {
             $category = '';
         }
+        $section = preg_replace('/[^a-z0-9_]/', '_', strtolower(trim((string) $request->input('section', '')))) ?? '';
+        if ($section !== '' && !in_array($section, $this->files->sections(), true)) {
+            $section = '';
+        }
+        $year = (int) $request->input('year', '0');
+        if ($year > 0 && !in_array($year, $this->files->years(), true)) {
+            $year = 0;
+        }
+        $uploader = mb_substr(trim((string) $request->input('uploader', '')), 0, 120);
+
         return [
             'status' => $status,
             'category' => $category,
             'expiring' => $expiring,
+            'section' => $section,
+            'year' => $year,
+            'uploader' => $uploader,
         ];
     }
 
@@ -263,15 +299,80 @@ final class DocumentsController extends BaseController
     private function serveFile(int $id, bool $attachment): void
     {
         require_component('documents');
-        $path = $this->documents->filePath($id);
-        if ($path === null) {
+        $row = $this->files->fileInfo($id);
+        $path = $this->files->absolutePath($id);
+        if ($row === null || $path === null) {
             http_response_code(404);
             echo 'Not found';
             return;
         }
-        $mime = mime_content_type($path) ?: 'application/octet-stream';
+        $this->files->registerDownload($id);
+        $mime = trim((string) ($row['file_mime'] ?? '')) ?: (mime_content_type($path) ?: 'application/octet-stream');
+        $name = trim((string) ($row['original_name'] ?? '')) ?: basename($path);
+        $name = str_replace(['"', "\r", "\n"], '', $name);
         header('Content-Type: ' . $mime);
-        header('Content-Disposition: ' . ($attachment ? 'attachment' : 'inline') . '; filename="' . basename($path) . '"');
+        header('Content-Disposition: ' . ($attachment ? 'attachment' : 'inline') . '; filename="' . $name . '"');
+        header('X-Content-Type-Options: nosniff');
+        header('Content-Length: ' . (string) (filesize($path) ?: 0));
         readfile($path);
+    }
+
+    /**
+     * Search the central repository for the “choose an already uploaded document” control
+     * used by every section and by the add-ons.
+     */
+    public function picker(Request $request): void
+    {
+        require_component('documents');
+        header('Content-Type: application/json; charset=utf-8');
+        $section = trim((string) $request->input('section', ''));
+        if ($section !== '' && !in_array($section, $this->files->sections(), true)) {
+            $section = '';
+        }
+        $year = (int) $request->input('year', '0');
+        $rows = $this->files->listForPicker(
+            $section,
+            trim((string) $request->input('q', '')),
+            $year > 0 ? $year : null,
+            60
+        );
+        $out = [];
+        foreach ($rows as $row) {
+            $id = (int) ($row['id'] ?? 0);
+            $out[] = [
+                'id' => $id,
+                'title' => (string) ($row['title'] ?? ''),
+                'number' => (string) ($row['document_number'] ?? ''),
+                'year' => (int) ($row['reference_year'] ?? 0),
+                'date' => (string) ($row['document_date'] ?? ''),
+                'section' => (string) ($row['source_section'] ?? 'documents'),
+                'section_label' => $this->files->sectionLabel((string) ($row['source_section'] ?? 'documents')),
+                'uploaded_by' => (string) ($row['uploaded_by_name'] ?? ''),
+                'name' => (string) ($row['original_name'] ?? ''),
+                'mime' => (string) ($row['file_mime'] ?? ''),
+                'size' => (int) ($row['file_size'] ?? 0),
+                'open_url' => url('/documents/' . $id . '/file'),
+                'download_url' => url('/documents/' . $id . '/download'),
+                'signed_url' => $this->files->signedUrl($id, 1800),
+            ];
+        }
+        echo json_encode(['ok' => true, 'documents' => $out], JSON_UNESCAPED_UNICODE);
+    }
+
+    /**
+     * Compute hash/size/year for the files uploaded before the repository existed and merge
+     * physical duplicates (same bytes, different copies).
+     */
+    public function reindex(Request $request): void
+    {
+        require_component('documents');
+        $result = $this->files->backfill();
+        app(\Socly\Services\AuditService::class)->log('document.repository_reindexed', 'document', null, null, $result, $request->ip());
+        $this->flash('success', __('documents.reindex_done', [
+            'scanned' => (string) $result['scanned'],
+            'merged' => (string) $result['merged'],
+            'pruned' => (string) ($result['pruned'] ?? 0),
+        ]));
+        redirect('/documents');
     }
 }

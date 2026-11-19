@@ -30,6 +30,7 @@ use Socly\Core\View;
 use Socly\Services\BudgetService;
 use Socly\Services\ComponentService;
 use Socly\Services\CurrencyService;
+use Socly\Services\FileRepositoryService;
 use Socly\Services\MemberService;
 use Socly\Services\RecurringService;
 use Socly\Services\TreasuryService;
@@ -45,7 +46,8 @@ final class TreasuryController extends BaseController
         private readonly CurrencyService $currency,
         private readonly BudgetService $budgets,
         private readonly VersionService $versions,
-        private readonly RecurringService $recurring
+        private readonly RecurringService $recurring,
+        private readonly FileRepositoryService $files
     ) {
         parent::__construct($view);
     }
@@ -206,6 +208,7 @@ final class TreasuryController extends BaseController
             'beneficiaries' => $this->treasury->beneficiaries(),
             'currency' => $this->currency,
             'budget_items' => $this->budgets->itemOptionsForMovement((int) date('Y')),
+            'repository_documents' => $this->files->listForPicker('treasury', '', null, 80),
         ]);
     }
 
@@ -294,6 +297,10 @@ final class TreasuryController extends BaseController
             'pattern_profile' => $this->treasury->classificationProfile($movement, (int) $movement['id'], 24),
             'embed' => $embed,
             'embed_saved' => $embedSaved,
+            'repository_documents' => $this->files->listForPicker('treasury', '', null, 80),
+            'attachment_name' => (int) ($movement['document_id'] ?? 0) > 0
+                ? (string) (($this->files->fileInfo((int) $movement['document_id']) ?? [])['original_name'] ?? '')
+                : '',
         ], $embed ? 'layouts/embed' : 'layouts/app');
     }
 

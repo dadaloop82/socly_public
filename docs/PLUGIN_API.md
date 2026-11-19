@@ -151,6 +151,36 @@ final class MyPlugin implements PluginInterface, WorkflowEventProviderInterface
 
 Keys returned by `registerSettings()` appear under Configuration when the plugin is enabled. Encrypted flags use the same Encryptor as core settings.
 
-## Security
+## Files and documents
+
+Every file uploaded by a plugin/add-on must be stored and registered in the central repository
+(“Verbali e documenti”), never as a loose file:
+
+```php
+$repository = $ctx->get(\Socly\Services\FileRepositoryService::class);
+$stored = $repository->storeUpload($_FILES['attachment'], [
+    'section' => 'my_addon',
+    'ref' => 'request:' . $requestId,
+    'category' => 'other',
+    'title' => $originalName,
+    'actor_type' => 'operator',       // or participant/member/addon/public
+    'actor_id' => $userId,
+    'actor_name' => $displayName,
+]);
+// $stored['document_id'], $stored['path'], $stored['mime'], $stored['size'], $stored['hash']
+```
+
+- `storeUpload()` dedupes by SHA-256: the same bytes already archived are reused and linked to the new
+  section/context, no copy is written.
+- A file generated on disk goes through `registerStoredFile()`; base64/raw bytes through
+  `registerContent()`.
+- Offer the “already uploaded document” choice with `listForPicker($section, $q, $year, $limit, $contextRef)`
+  and validate the choice with `pick($documentId, $section)` before writing your own row.
+- Store the returned relative path in your own table (it stays valid after dedupe) and use
+  `signedUrl($documentId)` when the add-on authenticates with its own token instead of the operator
+  session (the `/files/{id}` route validates the HMAC signature).
+- `$repository->link($documentId, $section, $ref, $identity)` records an additional context without
+  touching the bytes; `unlink()` releases it.
+
 
 Plugin code runs with full application privileges. Only install plugins from trusted sources.

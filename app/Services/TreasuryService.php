@@ -144,7 +144,8 @@ final class TreasuryService
         private readonly ComponentService $components,
         private readonly DocumentService $documents,
         private readonly CurrencyService $currency,
-        private readonly VersionService $versions
+        private readonly VersionService $versions,
+        private readonly FileRepositoryService $files
     ) {
     }
 
@@ -3180,12 +3181,14 @@ final class TreasuryService
     {
         $row = $this->find($id);
         $relative = trim((string) ($row['attachment_path'] ?? ''));
-        if ($relative === '' || str_contains($relative, '..') || str_contains($relative, '\\')
-            || preg_match('#^documents/[a-zA-Z0-9._-]+\.(?:pdf|jpe?g|png|webp)$#i', $relative) !== 1) {
+        if ($relative === '' || str_contains($relative, '..') || str_contains($relative, '\\')) {
             return null;
         }
-        $path = storage_path($relative);
-        return is_file($path) ? $path : null;
+        if (!is_user_upload_relative_path($relative)) {
+            return null;
+        }
+        $path = resolve_upload_absolute_path($relative);
+        return $path !== null && is_file($path) ? $path : null;
     }
 
     /**
@@ -3235,7 +3238,8 @@ final class TreasuryService
         // “This movement has a document” off ⇒ no attachment either (the whole box is hidden).
         $detach = !empty($input['detach_invoice_pdf'])
             || (array_key_exists('has_document', $input) && empty($input['has_document']));
-        $attachment = $this->syncInvoiceDocument($data, $file, $ip, $userId, null, $detach);
+        $pickedDocumentId = (int) ($input['attachment_document_id'] ?? $input['repository_document_id'] ?? 0);
+        $attachment = $this->syncInvoiceDocument($data, $file, $ip, $userId, null, $detach, $pickedDocumentId);
         if (empty($attachment['ok'])) {
             return ['ok' => false, 'errors' => ['invoice_pdf' => (string) ($attachment['error'] ?? __('documents.upload_fail'))]];
         }
@@ -3246,6 +3250,12 @@ final class TreasuryService
         $data['approved_at'] = date('Y-m-d H:i:s');
         $data['approved_by'] = $userId;
         $id = $this->db->insert('treasury_movements', $data);
+        if ((int) ($data['document_id'] ?? 0) > 0) {
+            $this->files->link((int) $data['document_id'], 'treasury', 'movement:' . $id, [
+                'actor_type' => 'operator',
+                'actor_id' => $userId,
+            ]);
+        }
         $this->syncJustificationCode($id);
         $this->audit->log('treasury.created', 'treasury', (string) $id, null, $input, $ip);
         return ['ok' => true, 'id' => $id];
@@ -3280,7 +3290,8 @@ final class TreasuryService
         // “This movement has a document” off ⇒ the attachment is detached with the rest.
         $detach = !empty($input['detach_invoice_pdf'])
             || (array_key_exists('has_document', $input) && empty($input['has_document']));
-        $attachment = $this->syncInvoiceDocument($data, $file, $ip, $userId, $existing, $detach);
+        $pickedDocumentId = (int) ($input['attachment_document_id'] ?? $input['repository_document_id'] ?? 0);
+        $attachment = $this->syncInvoiceDocument($data, $file, $ip, $userId, $existing, $detach, $pickedDocumentId);
         if (empty($attachment['ok'])) {
             return ['ok' => false, 'errors' => ['invoice_pdf' => (string) ($attachment['error'] ?? __('documents.upload_fail'))]];
         }
@@ -3300,6 +3311,14 @@ final class TreasuryService
                 'editor' => $this->versions->lastEditor('treasury', $id),
                 'errors' => [],
             ];
+        }
+        if ($detach && (int) ($existing['document_id'] ?? 0) > 0) {
+            $this->files->unlink((int) $existing['document_id'], 'treasury', 'movement:' . $id);
+        } elseif ((int) ($data['document_id'] ?? 0) > 0) {
+            $this->files->link((int) $data['document_id'], 'treasury', 'movement:' . $id, [
+                'actor_type' => 'operator',
+                'actor_id' => $userId,
+            ]);
         }
         $this->syncJustificationCode($id);
         $this->audit->log('treasury.updated', 'treasury', (string) $id, [
@@ -3962,18 +3981,20 @@ final class TreasuryService
         string $ip,
         ?int $userId,
         ?array $existing = null,
-        bool $detach = false
+        bool $detach = false,
+        int $pickedDocumentId = 0
     ): array {
         if ($detach) {
             return ['ok' => true, 'path' => null, 'document_id' => null];
         }
         $hasUpload = is_array($file) && (int) ($file['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_NO_FILE;
         $documentId = isset($existing['document_id']) ? (int) $existing['document_id'] : 0;
-        if (!$hasUpload && ($documentId < 1 || !$this->components->isEnabled('documents'))) {
+        $actor = ['actor_type' => 'operator', 'actor_id' => $userId];
+        if (!$hasUpload && $pickedDocumentId < 1 && $documentId < 1) {
             return [
                 'ok' => true,
                 'path' => $existing['attachment_path'] ?? null,
-                'document_id' => $documentId > 0 ? $documentId : null,
+                'document_id' => null,
             ];
         }
 
@@ -3985,17 +4006,33 @@ final class TreasuryService
             if (!in_array($uploadMime, $allowedMimes, true) && !in_array($uploadExt, $allowedExts, true)) {
                 return ['ok' => false, 'error' => __('treasury.invoice_pdf_invalid')];
             }
-            $uploaded = $this->documents->upload($file);
-            if (empty($uploaded['ok'])) {
-                return ['ok' => false, 'error' => (string) ($uploaded['error'] ?? __('documents.upload_fail'))];
+            $stored = $this->files->storeUpload($file, [
+                'section' => 'treasury',
+                'ref' => '',
+                'category' => 'invoice',
+                'title' => (string) ($data['invoice_title'] ?? ''),
+                'date' => (string) ($data['invoice_date'] ?? ($data['movement_date'] ?? '')),
+            ] + $actor, $ip);
+            if (empty($stored['ok'])) {
+                return ['ok' => false, 'error' => (string) ($stored['error'] ?? __('documents.upload_fail'))];
             }
-            $path = (string) $uploaded['path'];
-            $mime = (string) ($uploaded['mime'] ?? ($uploadMime !== '' ? $uploadMime : 'application/pdf'));
+            $path = (string) $stored['path'];
+            $mime = (string) ($stored['mime'] ?? 'application/pdf');
+            $documentId = (int) ($stored['document_id'] ?? 0);
+        } elseif ($pickedDocumentId > 0) {
+            $picked = $this->files->pick($pickedDocumentId, 'treasury');
+            if ($picked === null) {
+                return ['ok' => false, 'error' => __('documents.upload_missing')];
+            }
+            $path = (string) ($picked['file_path'] ?? '');
+            $mime = (string) ($picked['file_mime'] ?? 'application/pdf');
+            $documentId = $pickedDocumentId;
         } else {
             $path = trim((string) ($existing['attachment_path'] ?? ''));
             $mime = 'application/pdf';
         }
-        if ($this->components->isEnabled('documents')) {
+
+        if ($documentId > 0) {
             $description = trim((string) ($data['description'] ?? ''));
             $beneficiary = trim((string) ($data['beneficiary'] ?? ''));
             $invoice = trim((string) ($data['invoice_number'] ?? ''));
@@ -4009,30 +4046,17 @@ final class TreasuryService
             } elseif ($beneficiary !== '') {
                 $titleParts[] = $beneficiary;
             }
-            $docInput = [
+            $this->files->annotate($documentId, [
                 'title' => implode(' - ', $titleParts),
                 'category' => 'invoice',
                 'document_date' => trim((string) ($data['invoice_date'] ?? '')) !== ''
                     ? (string) $data['invoice_date']
                     : (string) ($data['movement_date'] ?? ''),
-                'language' => '',
-                'status' => 'approved',
                 'summary' => $description !== '' ? $description : $invoiceTitle,
-                'uploaded_path' => $path,
-                'uploaded_mime' => $mime,
-            ];
-            $result = $documentId > 0
-                ? $this->documents->update($documentId, $docInput, null, $ip)
-                : $this->documents->create($docInput, null, $ip, $userId);
-            if (empty($result['ok'])) {
-                if ($hasUpload) {
-                    @unlink(storage_path($path));
-                }
-                $errors = $result['errors'] ?? [];
-                return ['ok' => false, 'error' => (string) (reset($errors) ?: __('documents.upload_fail'))];
-            }
-            $documentId = (int) ($result['id'] ?? $documentId);
+                'source_section' => 'treasury',
+            ], $ip);
         }
+
         return ['ok' => true, 'path' => $path, 'document_id' => $documentId > 0 ? $documentId : null];
     }
 
