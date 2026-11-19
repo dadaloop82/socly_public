@@ -1984,6 +1984,7 @@ function initTreasurySimilar() {
 
   const description = form.querySelector('[name="description"]');
   const beneficiary = form.querySelector('[name="beneficiary"]');
+  const memberIdField = form.querySelector('[name="member_id"]');
   const category = form.querySelector('[name="category"]');
   const runts = form.querySelector('[name="runts_line"]');
   const budgetItem = form.querySelector('[name="budget_item_id"]');
@@ -2012,6 +2013,9 @@ function initTreasurySimilar() {
     direction: direction(),
     description: description instanceof HTMLTextAreaElement ? description.value : '',
     beneficiary: beneficiary instanceof HTMLInputElement ? beneficiary.value : '',
+    member_id: memberIdField instanceof HTMLSelectElement || memberIdField instanceof HTMLInputElement
+      ? memberIdField.value
+      : '',
     category: category instanceof HTMLSelectElement ? category.value : '',
     runts_line: runts instanceof HTMLSelectElement ? runts.value : '',
     budget_item_id: budgetItem instanceof HTMLSelectElement ? budgetItem.value : '',

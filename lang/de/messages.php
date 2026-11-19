@@ -2879,7 +2879,7 @@ return [
         'recurring_variable_hint' => 'Der Betrag ist eine Schätzung: die erzeugte Buchung muss ergänzt und genehmigt werden.',
         'recurring_approval_hint' => 'Bar: die Buchung ist sofort genehmigt. Bank und Karten: bleibt zu genehmigen, bis jemand sie bestätigt.',
         'similar_title' => 'Ich habe :count ähnliche Buchungen gefunden',
-        'similar_hint' => 'Gleiches Vorzeichen, ähnliche Beschreibung und das Feld noch leer. Dieselben Änderungen auch dort anwenden?',
+        'similar_hint' => 'Gleiches Vorzeichen, gleiche Gegenpartei, ähnliche Beschreibung und das Feld noch leer. Dieselben Änderungen auch dort anwenden?',
         'similar_summary' => ':count Buchungen · :range',
         'similar_total' => 'Summe :amount',
         'similar_fields' => 'Auszufüllen: :fields',

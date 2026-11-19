@@ -2346,7 +2346,7 @@ return [
         'recurring_variable_hint' => 'L\'importo indicato è solo una stima: il movimento generato va completato e approvato.',
         'recurring_approval_hint' => 'Cassa: il movimento è approvato subito. Banca e carte: resta da approvare finché qualcuno non lo conferma.',
         'similar_title' => 'Ho notato :count movimenti simili a questo',
-        'similar_hint' => 'Stesso segno, descrizione simile e campo ancora vuoto. Vuoi applicare anche a loro le stesse modifiche?',
+        'similar_hint' => 'Stesso segno, stessa controparte, descrizione simile e campo ancora vuoto. Vuoi applicare anche a loro le stesse modifiche?',
         'similar_summary' => ':count movimenti · :range',
         'similar_total' => 'Totale :amount',
         'similar_fields' => 'Da compilare: :fields',

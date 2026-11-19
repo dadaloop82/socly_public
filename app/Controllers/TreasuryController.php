@@ -584,6 +584,7 @@ final class TreasuryController extends BaseController
             'direction' => (string) ($data['direction'] ?? ''),
             'description' => (string) ($data['description'] ?? ''),
             'beneficiary' => (string) ($data['beneficiary'] ?? ''),
+            'member_id' => (int) ($data['member_id'] ?? 0),
         ], 3, (int) ($data['exclude_id'] ?? 0), $fieldsToApply, $this->originals($data));
 
         $this->jsonResponse([
@@ -1102,6 +1103,7 @@ final class TreasuryController extends BaseController
             'direction' => (string) ($movement['direction'] ?? ''),
             'description' => (string) ($movement['description'] ?? ''),
             'beneficiary' => (string) ($movement['beneficiary'] ?? ''),
+            'member_id' => (int) ($movement['member_id'] ?? 0),
         ], TreasuryService::SIMILAR_LIST_LIMIT, $movementId, $fields, $originals);
         if (($result['total'] ?? 0) < 1) {
             return null;

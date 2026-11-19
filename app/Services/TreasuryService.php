@@ -1722,11 +1722,11 @@ final class TreasuryService
     }
 
     /**
-     * Movements "similar" to the one being compiled: same direction (entry/exit) and similar
-     * description. The scoring is deterministic (similarity between keywords), without external
-     * services.
+     * Movements "similar" to the one being compiled: same direction (entry/exit), same counterparty
+     * and similar description. The scoring is deterministic (similarity between keywords), without
+     * external services.
      *
-     * @param array{direction?:string,description?:string,beneficiary?:string} $criteria
+     * @param array{direction?:string,description?:string,beneficiary?:string,member_id?:int} $criteria
      * @return array{count:int,total:int,ids:list<int>,matches:list<array<string,mixed>>,score_min:float}
      */
     public function similarMovements(array $criteria, int $limit = 3, int $excludeId = 0, array $applying = [], array $originals = []): array
@@ -1746,6 +1746,18 @@ final class TreasuryService
         if ($candidate === '') {
             $candidate = trim((string) ($criteria['beneficiary'] ?? ''));
         }
+        // The counterparty is part of the identity: movements with different members or different
+        // free-text counterparties are never proposed for a batch update, even when the description
+        // looks alike (e.g. dozens of “Bonifico” rows from different people).
+        $criteriaMemberId = max(0, (int) ($criteria['member_id'] ?? 0));
+        $criteriaBeneficiary = trim((string) ($criteria['beneficiary'] ?? ''));
+        $criteriaMemberName = '';
+        if ($criteriaMemberId > 0) {
+            $criteriaMemberName = (string) ($this->memberNames([$criteriaMemberId])[$criteriaMemberId] ?? '');
+        }
+        $criteriaParty = $this->normalizeCounterpartyName(
+            $criteriaMemberId > 0 ? $criteriaMemberName : $criteriaBeneficiary
+        );
         $tokens = $this->similarityTokens($candidate);
         if ($tokens === []) {
             return $empty;
@@ -1763,7 +1775,31 @@ final class TreasuryService
         );
 
         $scored = [];
+        $memberNames = $this->memberNames(array_map(
+            static fn (array $row): int => (int) ($row['member_id'] ?? 0),
+            $rows
+        ));
         foreach ($rows as $row) {
+            $rowMemberId = (int) ($row['member_id'] ?? 0);
+            if ($criteriaMemberId > 0 && $rowMemberId > 0) {
+                if ($criteriaMemberId !== $rowMemberId) {
+                    continue;
+                }
+            } else {
+                $rowParty = $this->normalizeCounterpartyName(
+                    $rowMemberId > 0
+                        ? (string) ($memberNames[$rowMemberId] ?? '')
+                        : (string) ($row['beneficiary'] ?? '')
+                );
+                if ($criteriaParty !== $rowParty) {
+                    continue;
+                }
+                // A member whose name is not available cannot be matched to free text, and vice
+                // versa: the batch would otherwise touch an unknown counterparty.
+                if (($criteriaMemberId > 0 || $rowMemberId > 0) && ($criteriaParty === '' || $rowParty === '')) {
+                    continue;
+                }
+            }
             $score = $this->similarityScore($tokens, $this->similarityTokens((string) ($row['description'] ?? '')));
             if (!empty($row['beneficiary'])) {
                 $score = max($score, $this->similarityScore($tokens, $this->similarityTokens((string) $row['beneficiary'])) - 0.05);
@@ -2527,6 +2563,27 @@ final class TreasuryService
         }
 
         return $updated;
+    }
+
+    /**
+     * Counterparty name used for identity checks: lowercase, no accents, single spaces. Unlike
+     * similarityTokens() it keeps every word, so “Al” or “Srls” still count.
+     */
+    private function normalizeCounterpartyName(string $name): string
+    {
+        $name = mb_strtolower(trim((string) preg_replace('/\s+/u', ' ', $name)));
+        if ($name === '') {
+            return '';
+        }
+        if (function_exists('iconv')) {
+            $trans = @iconv('UTF-8', 'ASCII//TRANSLIT//IGNORE', $name);
+            if (is_string($trans) && $trans !== '') {
+                $name = $trans;
+            }
+        }
+        $name = (string) (preg_replace('/[^a-z0-9]+/', ' ', $name) ?? $name);
+
+        return trim((string) preg_replace('/\s+/', ' ', $name));
     }
 
     /**

@@ -2879,7 +2879,7 @@ return [
         'recurring_variable_hint' => 'The amount is an estimate: the generated entry must be completed and approved.',
         'recurring_approval_hint' => 'Cash: the entry is approved immediately. Bank and cards: it stays to approve until someone confirms it.',
         'similar_title' => 'I noticed :count similar entries',
-        'similar_hint' => 'Same sign, similar description and the field still empty. Apply the same changes to them too?',
+        'similar_hint' => 'Same sign, same counterparty, similar description and the field still empty. Apply the same changes to them too?',
         'similar_summary' => ':count movements · :range',
         'similar_total' => 'Total :amount',
         'similar_fields' => 'To fill in: :fields',
