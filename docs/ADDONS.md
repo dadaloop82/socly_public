@@ -301,7 +301,10 @@ unsaved-changes guard. On desktop the movement panel is as tall as the viewport 
 column): the counters/actions toolbar and the footer stay in place and **only the movement cards
 scroll**; below 1100 px the page scrolls normally again. The apply bar counts the movements being
 corrected (“Applica le modifiche ai
-X movimenti”) and “Usa valore Estratto conto” is a button. The ledger movements missing from the
+X movimenti”) and “Usa valore Estratto conto” is a button. While a card has selected statement
+values, its “Questo movimento è corretto” button is disabled with a note explaining why: the
+selected values must be applied first (or the selection cleared), because the recorded movement is
+no longer correct as it is. The ledger movements missing from the
 statement sit at the top and can be deleted after two confirmations. The upload button stays disabled
 until a valid PDF is selected and the reading-engine line is only shown when something is missing.
 
