@@ -268,6 +268,9 @@ movement shares the same highlight colour on the PDF and on its card, and the am
 because it is the value that decides whether a row is correct. When the counterparty is a **member**
 (first + last name, either order, punctuation ignored) the row is linked to the member profile
 automatically — also after a correction in the review — and the link badge shows the member name.
+On the verification page the recorded card shows that member name when the ledger row's free-text
+counterparty is empty (the PDF card still shows only what the statement prints), and the duplicate
+matcher uses the same effective name.
 The “Intendevi …” suggestion (Yes / No, like the cash-book form) compares the typed name with both
 recorded counterparties and member names; it runs while typing (debounced) and on blur, so a
 mistyped name is corrected before the row is saved. The counterparty field uses the same
