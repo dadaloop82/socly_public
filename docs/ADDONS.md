@@ -306,24 +306,26 @@ reasons) instead of a bare count, the save button says “Continua al prossimo s
 and “Conferma tutti i movimenti” also confirms the rows that only need a look after an explicit
 confirmation. Corrections to payment method, RUNTS line and cost centre are propagated to the **later**
 similar rows of the same statement (never to previous ones) unless the operator changed them explicitly.
-On the verification page only amount/date/direction differences are “Da correggere”; descriptive-only
-differences are listed separately as “Da rivedere”, and “Questo movimento è corretto” stores a
-fingerprint of the recorded row so it is not flagged again until it changes
-(`addon_bank_statement_accepted`). Every verification card is visible at once (the wizard only scrolls
-between them), and applying changes treats the movements left untouched as correct unless the operator
-unticks the option, so a skipped movement does not reappear on the next apply. Rows with readable date,
-amount and counterparty and no reading issue are confirmed automatically: “to review” is reserved for
-OCR doubts, missing/undated/duplicated rows and unreadable values, while a balanced statement is the
-proof that the rest is complete. After “Apply changes” every selected field is read back from the ledger
-and compared with the statement: a value that did not persist is reported as an error instead of being
-counted as applied.
+On the verification page any difference from the statement — amount, date, direction and the
+descriptive fields (description, counterparty, category, cost centre) — is “Da correggere” and appears
+in the one-card wizard (Previous/Next or the arrow keys). A movement leaves the list only when its
+stored values match the statement or when the operator explicitly declares it correct with “Questo
+movimento è corretto”, which stores a fingerprint of the recorded row so it is not flagged again until
+it changes (`addon_bank_statement_accepted`). Applying changes stores only the values explicitly
+selected: untouched cards stay “Da correggere”. The 1.3.12 upgrade cleared the fingerprints that
+earlier releases had stored for untouched movements, and “Riapri i movimenti confermati” clears them
+again on demand. Rows with readable date, amount and counterparty and no reading issue are confirmed
+automatically in the review step: “to review” is reserved for OCR doubts, missing/undated/duplicated
+rows and unreadable values, while a balanced statement is the proof that the rest is complete. After
+“Apply changes” every selected field is read back from the ledger and compared with the statement: a
+value that did not persist is reported as an error instead of being counted as applied.
 
 Requirements: `poppler-utils`, `tesseract-ocr` (+ `ita` language data) and ImageMagick. A new bank
 model is a new JSON file in `templates/`; it never changes the PHP code. Source:
 `addons-src/bank_statement_import/` (private repo; `addons-src/` is not part of the public export).
 
 ```bash
-php tools/addons/addon-tool.php build addons-src/bank_statement_import dist/bank_statement_import-1.3.12.soclyaddon --incoming
+php tools/addons/addon-tool.php build addons-src/bank_statement_import dist/bank_statement_import-1.3.13.soclyaddon --incoming
 ```
 
 ## Revenue Agency invoices (`agenzia_entrate_invoices`)
