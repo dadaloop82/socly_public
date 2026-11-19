@@ -350,8 +350,11 @@ value that did not persist is reported as an error instead of being counted as a
 **Learning.** “Applica le modifiche”, “Questo movimento è corretto” and confirmed review corrections
 teach the add-on: the significant words of the statement description plus the direction identify the
 kind of movement, and the decided category, payment method, RUNTS line and cost centre
-are stored in `addon_bank_statement_learned`. The counterparty is **not** part of this learning: it
-must always come from the statement. Next uploads — and the remaining cards of the same
+are stored in `addon_bank_statement_learned`. The counterparty is not guessed: it is still read from
+the statement, but when the operator **renames** a raw counterparty (e.g. “AMZN Mktp” → “Amazon”) the
+add-on stores that alias in the same table (`beneficiary`, keyed by the normalised raw text). The alias
+is applied to the following rows of the current statement and to the next uploads; rows that carry a
+different literal counterparty are never overwritten. Next uploads — and the remaining cards of the same
 statement — start from those values: the latest decision per field wins, values read literally from
 the PDF are never overridden, and a learned value carries the “appreso / gelernt / learned” badge
 instead of “dedotto / abgeleitet / inferred”. Deductions therefore get more reliable as the operator
