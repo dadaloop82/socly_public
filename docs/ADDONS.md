@@ -251,14 +251,15 @@ the import is logged as `treasury.bank_statement_imported`. Files live in
 The summary mirrors the cash-book list (same columns and client-side filters) and lets the operator
 skip or overwrite movements already present; a check-only screen compares those rows with the
 ledger, confirms the correct ones and aligns a row to the existing movement without importing
-anything. Data, amount and beneficiary are mandatory before a row can be confirmed; the beneficiary
-is inferred from the movements already imported (same amount and direction on a nearby date, similar
-description) or from the description itself when the statement does not print it. The selected
+anything. Data, amount and beneficiary are mandatory before a row can be confirmed. The counterparty
+is **always read from the statement** — the printed counterparty field when present, otherwise the
+description text and the bank model rules: it is never guessed from previous movements, from the
+amount or from the bank name. When the statement does not name it the field stays empty and the
+operator must fill it before confirming. The selected
 movement shares the same highlight colour on the PDF and on its card, and the amount is emphasised
 because it is the value that decides whether a row is correct. The counterparty field uses the same
 suggestions as the cash-book form: a datalist of the recorded counterparties plus a proposal when the
-typed name is a near-duplicate, an abbreviation or a unique prefix. When the statement does not name a
-counterparty the bank itself is used, preferring the closest spelling already in the ledger. An edit
+typed name is a near-duplicate, an abbreviation or a unique prefix. An edit
 is propagated to later similar movements only where the target field is still empty, and “Salva e
 continua” stays disabled until every row to import is complete, issue-free and confirmed.
 
@@ -325,8 +326,9 @@ value that did not persist is reported as an error instead of being counted as a
 
 **Learning.** “Applica le modifiche”, “Questo movimento è corretto” and confirmed review corrections
 teach the add-on: the significant words of the statement description plus the direction identify the
-kind of movement, and the decided beneficiary, category, payment method, RUNTS line and cost centre
-are stored in `addon_bank_statement_learned`. Next uploads — and the remaining cards of the same
+kind of movement, and the decided category, payment method, RUNTS line and cost centre
+are stored in `addon_bank_statement_learned`. The counterparty is **not** part of this learning: it
+must always come from the statement. Next uploads — and the remaining cards of the same
 statement — start from those values: the latest decision per field wins, values read literally from
 the PDF are never overridden, and a learned value carries the “appreso / gelernt / learned” badge
 instead of “dedotto / abgeleitet / inferred”. Deductions therefore get more reliable as the operator
@@ -337,7 +339,7 @@ model is a new JSON file in `templates/`; it never changes the PHP code. Source:
 `addons-src/bank_statement_import/` (private repo; `addons-src/` is not part of the public export).
 
 ```bash
-php tools/addons/addon-tool.php build addons-src/bank_statement_import dist/bank_statement_import-1.4.0.soclyaddon --incoming
+php tools/addons/addon-tool.php build addons-src/bank_statement_import dist/bank_statement_import-1.4.1.soclyaddon --incoming
 ```
 
 ## Revenue Agency invoices (`agenzia_entrate_invoices`)
