@@ -131,6 +131,7 @@ $assetVer = (string) max(
     </footer>
     <?= view_partial('partials/leave_guard_dialog') ?>
 </div>
+<script src="<?= e(asset('js/confirm.js')) ?>?v=<?= e($assetVer) ?>"></script>
 <script src="<?= e(asset('js/app.js')) ?>?v=<?= e($assetVer) ?>"></script>
 </body>
 </html>

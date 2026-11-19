@@ -19,138 +19,10 @@
  *
  */
 
-/** Styled in-app confirm — never uses the browser native dialog. */
-let appConfirmDialog = null;
-
-/** “Do not ask again” window shared by the in-app confirmations. */
-const APP_CONFIRM_SNOOZE_MS = 30 * 60 * 1000;
-const APP_CONFIRM_SNOOZE_STORAGE = 'socly.confirmSnoozeUntil';
-
-function appConfirmSnoozeUntil() {
-  try {
-    const raw = window.localStorage.getItem(APP_CONFIRM_SNOOZE_STORAGE);
-    const until = Number(raw || 0);
-    if (!Number.isFinite(until) || until <= Date.now()) {
-      if (raw !== null) window.localStorage.removeItem(APP_CONFIRM_SNOOZE_STORAGE);
-      return 0;
-    }
-    return until;
-  } catch (error) {
-    return 0;
-  }
-}
-
-function snoozeAppConfirm() {
-  try {
-    window.localStorage.setItem(APP_CONFIRM_SNOOZE_STORAGE, String(Date.now() + APP_CONFIRM_SNOOZE_MS));
-  } catch (error) {
-    /* Private mode / storage disabled: the dialog simply keeps asking. */
-  }
-}
-
-function appConfirmLabels() {
-  const lang = (document.documentElement.lang || 'it').slice(0, 2);
-  const map = {
-    it: { confirm: 'Conferma', cancel: 'Annulla', snooze: 'Non chiedere più per i prossimi 30 minuti' },
-    en: { confirm: 'Confirm', cancel: 'Cancel', snooze: 'Don’t ask again for the next 30 minutes' },
-    de: { confirm: 'Bestätigen', cancel: 'Abbrechen', snooze: 'Nicht mehr für die nächsten 30 Minuten fragen' },
-  };
-  const labels = { ...(map[lang] || map.it) };
-  const meta = document.querySelector('meta[name="confirm-snooze-label"]');
-  const metaLabel = meta?.getAttribute('content')?.trim();
-  if (metaLabel) labels.snooze = metaLabel;
-  return labels;
-}
-
-function ensureAppConfirmDialog() {
-  if (appConfirmDialog) return appConfirmDialog;
-  appConfirmDialog = document.createElement('dialog');
-  appConfirmDialog.className = 'setup-exit-dialog';
-  appConfirmDialog.dataset.appConfirm = '1';
-  appConfirmDialog.innerHTML = `
-    <div class="setup-exit-shell">
-      <p class="setup-exit-text" data-app-confirm-text></p>
-      <label class="setup-exit-snooze" data-app-confirm-snooze-wrap hidden>
-        <input type="checkbox" data-app-confirm-snooze>
-        <span data-app-confirm-snooze-label></span>
-      </label>
-      <div class="setup-exit-actions">
-        <button type="button" class="btn btn-ghost" data-app-confirm-cancel></button>
-        <button type="button" class="btn" data-app-confirm-ok></button>
-      </div>
-    </div>`;
-  document.body.appendChild(appConfirmDialog);
-  return appConfirmDialog;
-}
-
-function appConfirm(message, options = {}) {
-  const labels = appConfirmLabels();
-  const dialog = ensureAppConfirmDialog();
-  const textEl = dialog.querySelector('[data-app-confirm-text]');
-  const okBtn = dialog.querySelector('[data-app-confirm-ok]');
-  const cancelBtn = dialog.querySelector('[data-app-confirm-cancel]');
-  const snoozeWrap = dialog.querySelector('[data-app-confirm-snooze-wrap]');
-  const snoozeInput = dialog.querySelector('[data-app-confirm-snooze]');
-  const snoozeLabel = dialog.querySelector('[data-app-confirm-snooze-label]');
-  const confirmLabel = options.confirmLabel || labels.confirm;
-  const cancelLabel = options.cancelLabel || labels.cancel;
-  const danger = !!options.danger;
-  // Alerts only acknowledge something, they are not questions: never snoozed.
-  // Callers can opt out (e.g. “leave this page with unsaved changes?”).
-  const snoozeEnabled = !options.alert && options.snooze !== false;
-
-  if (snoozeEnabled && appConfirmSnoozeUntil() > Date.now()) {
-    return Promise.resolve(true);
-  }
-
-  if (textEl) {
-    textEl.textContent = String(message || '').trim();
-    textEl.style.whiteSpace = 'pre-line';
-  }
-  if (okBtn) {
-    okBtn.textContent = confirmLabel;
-    okBtn.className = danger ? 'btn btn-danger' : 'btn';
-  }
-  if (cancelBtn) {
-    cancelBtn.textContent = cancelLabel;
-    cancelBtn.hidden = !!options.alert;
-  }
-  if (snoozeInput instanceof HTMLInputElement) snoozeInput.checked = false;
-  if (snoozeLabel) snoozeLabel.textContent = labels.snooze || '';
-  if (snoozeWrap instanceof HTMLElement) snoozeWrap.hidden = !snoozeEnabled;
-
-  return new Promise((resolve) => {
-    let settled = false;
-    const finish = (result) => {
-      if (settled) return;
-      settled = true;
-      okBtn?.removeEventListener('click', onOk);
-      cancelBtn?.removeEventListener('click', onCancel);
-      dialog.removeEventListener('cancel', onCancelEvent);
-      dialog.close();
-      resolve(result);
-    };
-    const onOk = () => {
-      if (snoozeEnabled && snoozeInput instanceof HTMLInputElement && snoozeInput.checked) {
-        snoozeAppConfirm();
-      }
-      finish(true);
-    };
-    const onCancel = () => finish(false);
-    const onCancelEvent = (event) => {
-      event.preventDefault();
-      finish(false);
-    };
-    okBtn?.addEventListener('click', onOk);
-    cancelBtn?.addEventListener('click', onCancel);
-    dialog.addEventListener('cancel', onCancelEvent);
-    if (typeof dialog.showModal === 'function') {
-      dialog.showModal();
-    } else {
-      finish(false);
-    }
-  });
-}
+/*
+ * The in-app confirmation dialog lives in js/confirm.js: the public add-on layouts do not load
+ * this file, and they must show the very same popup. Every layout includes confirm.js first.
+ */
 
 function initConfirmForms(scope = document) {
   scope.querySelectorAll('form[data-confirm]').forEach((form) => {
@@ -159,9 +31,9 @@ function initConfirmForms(scope = document) {
     form.addEventListener('submit', async (event) => {
       if (form.dataset.confirmed === '1') return;
       event.preventDefault();
-      const ok = await appConfirm(form.dataset.confirm || '', {
-        danger: form.dataset.confirmDanger === '1',
-      });
+      const danger = form.dataset.confirmDanger === '1';
+      // Destructive confirmations are never snoozed: a 30-minute bypass could delete data silently.
+      const ok = await appConfirm(form.dataset.confirm || '', { danger, snooze: !danger });
       if (!ok) return;
       form.dataset.confirmed = '1';
       HTMLFormElement.prototype.submit.call(form);
@@ -179,9 +51,9 @@ function initConfirmLinks(scope = document) {
         return;
       }
       event.preventDefault();
-      const ok = await appConfirm(link.dataset.confirm || '', {
-        danger: link.dataset.confirmDanger === '1',
-      });
+      const danger = link.dataset.confirmDanger === '1';
+      // Destructive confirmations are never snoozed: a 30-minute bypass could delete data silently.
+      const ok = await appConfirm(link.dataset.confirm || '', { danger, snooze: !danger });
       if (!ok) return;
       link.dataset.confirmed = '1';
       if (link.target && link.target !== '_self') {
@@ -2075,14 +1947,23 @@ function initBudgetCategoryRename() {
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok || !data.ok) {
-        window.alert(String(data.error || genericError));
+        const errorText = String(data.error || genericError);
+        if (typeof appConfirm === 'function') {
+          await appConfirm(errorText, { alert: true, confirmLabel: 'OK' });
+        } else {
+          window.alert(errorText);
+        }
         return;
       }
       document.querySelectorAll(`option[value="${slug}"]`).forEach((option) => {
         option.textContent = String(data.label || label);
       });
     } catch (err) {
-      window.alert(genericError);
+      if (typeof appConfirm === 'function') {
+        await appConfirm(genericError, { alert: true, confirmLabel: 'OK' });
+      } else {
+        window.alert(genericError);
+      }
     }
   });
 }
@@ -2400,21 +2281,24 @@ function initTreasuryPatternHints() {
     }
     return title;
   };
-  const confirmChange = (from, to) => {
+  const confirmChange = async (from, to) => {
     const text = String(messages.confirm)
       .replace(':from', from || '—')
       .replace(':to', to || '—')
       .replace(':amount', amountLabel());
+    if (typeof appConfirm === 'function') {
+      return appConfirm(text);
+    }
     return window.confirm(text);
   };
-  const applyValue = (field, data, ask) => {
+  const applyValue = async (field, data, ask) => {
     const el = fields[field];
     if (!el || !data || !data.typical) return;
     if (el instanceof HTMLSelectElement && !Array.from(el.options).some((option) => option.value === data.typical)) {
       return;
     }
     const from = data.current_label || valueOf(el) || '—';
-    if (ask && !confirmChange(from, data.typical_label || data.typical)) return;
+    if (ask && !(await confirmChange(from, data.typical_label || data.typical))) return;
     el.value = data.typical;
     lastValues[field] = el.value;
     if (profile && profile.fields && profile.fields[field]) {
@@ -4341,8 +4225,10 @@ function initTreasuryBulk() {
         }
       }
       if (message !== '') {
+        const danger = action === 'delete';
+        // Deletions cannot be snoozed: the 30-minute bypass would delete without asking.
         const ok = typeof appConfirm === 'function'
-          ? await appConfirm(message, { danger: action === 'delete' })
+          ? await appConfirm(message, { danger, snooze: !danger })
           : window.confirm(message);
         if (!ok) return;
       }
@@ -4741,8 +4627,10 @@ function initMembersList() {
       if (action === 'mass_renewal' || action === 'delete') {
         const message = btn.dataset.confirm || '';
         if (message !== '') {
+          const danger = action === 'delete';
+          // Deletions cannot be snoozed: the 30-minute bypass would delete without asking.
           const ok = typeof appConfirm === 'function'
-            ? await appConfirm(message, { danger: action === 'delete' })
+            ? await appConfirm(message, { danger, snooze: !danger })
             : window.confirm(message);
           if (!ok) return;
         }
@@ -6791,7 +6679,11 @@ function initLegalDocEditors(scope = document) {
     translateBtn.addEventListener('click', async () => {
       const text = String(source.value || '').trim();
       if (!text) {
-        window.alert(emptyMsg || failMsg);
+        if (typeof appConfirm === 'function') {
+          await appConfirm(emptyMsg || failMsg, { alert: true, confirmLabel: 'OK' });
+        } else {
+          window.alert(emptyMsg || failMsg);
+        }
         return;
       }
       const original = translateBtn.textContent;
@@ -6825,7 +6717,12 @@ function initLegalDocEditors(scope = document) {
         }
       } catch {
         // Aborted by our own timer => the document is too long to translate.
-        window.alert(controller.signal.aborted ? timeoutMsg : failMsg);
+        const failure = controller.signal.aborted ? timeoutMsg : failMsg;
+        if (typeof appConfirm === 'function') {
+          await appConfirm(failure, { alert: true, confirmLabel: 'OK' });
+        } else {
+          window.alert(failure);
+        }
       } finally {
         window.clearTimeout(timer);
         translateBtn.disabled = false;
@@ -17788,7 +17685,20 @@ function initBudgetGrid(scope = document) {
       const section = removeSectionButton.closest('[data-budget-section]');
       if (!section) return;
       const message = form.dataset.msgRemoveSection || '';
-      if (message && !window.confirm(message)) return;
+      if (message) {
+        const removeSection = () => {
+          section.remove();
+          recalc();
+        };
+        if (typeof appConfirm === 'function') {
+          appConfirm(message, { danger: true, snooze: false }).then((ok) => {
+            if (ok) removeSection();
+          });
+        } else if (window.confirm(message)) {
+          removeSection();
+        }
+        return;
+      }
       section.remove();
       recalc();
     }

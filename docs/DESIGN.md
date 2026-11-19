@@ -118,3 +118,19 @@ Rules:
 2. Keep cycles slow (~2 s) and amplitudes small: a gentle pulse, never a hard flash.
 3. Always honour `prefers-reduced-motion: reduce` with a static ring / plain opacity.
 4. Never animate content that carries data or status only (numbers, tables, alerts).
+
+## Confirmation dialogs
+
+Never call `window.confirm()` or `window.alert()`: the browser dialog ignores the brand and the
+shared “do not ask again” option.
+
+- The single implementation is `public/assets/js/confirm.js` (`appConfirm()`); every layout loads
+  it before `app.js`, and the public add-on layouts (board voting, forum, tablet) load it too.
+- Usage: `await appConfirm(message, { danger: true })`; `confirmLabel` / `cancelLabel` override the
+  buttons, `alert: true` renders a single-acknowledge dialog without the snooze checkbox.
+- The snooze checkbox (“Non chiedere più per i prossimi 30 minuti”, 30 minutes, shared via
+  `localStorage`) is on by default for questions. Pass `snooze: false` for **destructive or
+  irreversible** actions (deletions, revokes, vote submission, discarding unsaved data): a snoozed
+  destructive confirmation would act without asking again.
+- `form[data-confirm]` / `a[data-confirm]` are wired by `initConfirmForms()` / `initConfirmLinks()`
+  in `app.js`; add-ons must use `appConfirm()` for buttons they handle in their own JS.

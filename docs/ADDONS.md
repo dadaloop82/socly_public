@@ -180,7 +180,7 @@ Behaviour:
 Build and publish (private tooling):
 
 ```bash
-php tools/addons/addon-tool.php build addons-src/tablet_enrollment dist/tablet_enrollment-1.0.0.soclyaddon --incoming
+php tools/addons/addon-tool.php build addons-src/tablet_enrollment dist/tablet_enrollment-1.0.9.soclyaddon --incoming
 php tools/addons/addon-tool.php verify-package dist/tablet_enrollment-1.0.0.soclyaddon
 ```
 
@@ -208,7 +208,7 @@ login (same fiscal code, same browser). The add-on also publishes the Workflow e
 `addons-src/board_voting/` (private repo; `addons-src/` is not part of the public export).
 
 ```bash
-php tools/addons/addon-tool.php build addons-src/board_voting dist/board_voting-1.2.0.soclyaddon --incoming
+php tools/addons/addon-tool.php build addons-src/board_voting dist/board_voting-1.2.1.soclyaddon --incoming
 ```
 
 ## Internal forum add-on (`internal_forum`)
@@ -231,7 +231,7 @@ Every write is audited (`internal_forum.*`) and the add-on publishes the Workflo
 `addons-src/internal_forum/`.
 
 ```bash
-php tools/addons/addon-tool.php build addons-src/internal_forum dist/internal_forum-1.1.0.soclyaddon --incoming
+php tools/addons/addon-tool.php build addons-src/internal_forum dist/internal_forum-1.1.1.soclyaddon --incoming
 ```
 
 ## Bank statement import (`bank_statement_import`)
@@ -325,7 +325,7 @@ model is a new JSON file in `templates/`; it never changes the PHP code. Source:
 `addons-src/bank_statement_import/` (private repo; `addons-src/` is not part of the public export).
 
 ```bash
-php tools/addons/addon-tool.php build addons-src/bank_statement_import dist/bank_statement_import-1.3.14.soclyaddon --incoming
+php tools/addons/addon-tool.php build addons-src/bank_statement_import dist/bank_statement_import-1.3.15.soclyaddon --incoming
 ```
 
 ## Revenue Agency invoices (`agenzia_entrate_invoices`)
@@ -359,7 +359,7 @@ Chrome** button instead of the local install steps. The package builder allows `
 this case (extension pages).
 
 ```bash
-php tools/addons/addon-tool.php build addons-src/agenzia_entrate_invoices dist/agenzia_entrate_invoices-2.0.1.soclyaddon --incoming
+php tools/addons/addon-tool.php build addons-src/agenzia_entrate_invoices dist/agenzia_entrate_invoices-2.0.4.soclyaddon --incoming
 ```
 
 ## Workflow events from add-ons

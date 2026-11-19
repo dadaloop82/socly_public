@@ -583,6 +583,7 @@ $showVersionFooter = !$showVersionInline;
 <?php else: ?>
 <main class="main"><?= $content ?></main>
 <?php endif; ?>
+<script src="<?= e(asset('js/confirm.js')) ?>?v=<?= e((string) (@filemtime(base_path('public/assets/js/confirm.js')) ?: time())) ?>"></script>
 <script src="<?= e(asset('js/app.js')) ?>?v=<?= e((string) (@filemtime(base_path('public/assets/js/app.js')) ?: time())) ?>"></script>
 </body>
 </html>
