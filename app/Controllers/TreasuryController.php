@@ -450,10 +450,12 @@ final class TreasuryController extends BaseController
                 ],
             ];
             // Stay on the card: the “similar movements” proposal is shown right above the form.
+            // The embedded quick edit must still mark the reload, otherwise the add-on dialog stays
+            // open after a save that changed the classification.
             redirect(self::withQuery($editPath, array_merge([
                 'ret' => $returnPath,
                 'similar' => (string) (int) $id,
-            ], $embedParams)));
+            ], $embedParams, $embed ? ['saved' => '1'] : [])));
         }
         // Stay on the card after saving: the operator keeps working on the same record. An embedded
         // quick edit marks the reload so the parent dialog can refresh the data it shows.

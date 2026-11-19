@@ -255,7 +255,9 @@ anything. Data, amount and beneficiary are mandatory before a row can be confirm
 is **always read from the statement** — the printed counterparty field when present, otherwise the
 description text and the bank model rules: it is never guessed from previous movements, from the
 amount or from the bank name. When the statement does not name it the field stays empty and the
-operator must fill it before confirming. The selected
+operator must fill it before confirming. Statement lines that only carry reference codes (IBAN-like
+tokens, long digit runs) do not become a counterparty, and the comparison ignores case, punctuation
+and symbols (`AMAZON*` = `Amazon`). The selected
 movement shares the same highlight colour on the PDF and on its card, and the amount is emphasised
 because it is the value that decides whether a row is correct. The counterparty field uses the same
 suggestions as the cash-book form: a datalist of the recorded counterparties plus a proposal when the
@@ -339,7 +341,7 @@ model is a new JSON file in `templates/`; it never changes the PHP code. Source:
 `addons-src/bank_statement_import/` (private repo; `addons-src/` is not part of the public export).
 
 ```bash
-php tools/addons/addon-tool.php build addons-src/bank_statement_import dist/bank_statement_import-1.4.1.soclyaddon --incoming
+php tools/addons/addon-tool.php build addons-src/bank_statement_import dist/bank_statement_import-1.4.2.soclyaddon --incoming
 ```
 
 ## Revenue Agency invoices (`agenzia_entrate_invoices`)
