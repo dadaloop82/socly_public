@@ -46,22 +46,9 @@ $assocName = (string) ($branding['name'] ?? 'SOCLY');
       <?= brand_root_style_decls($branding['primary'] ?? null, $branding['accent'] ?? null) ?>
     }</style>
 </head>
-<body class="app-embed">
+<body class="app-embed"<?= !empty($embed_saved) ? ' data-embed-saved="1"' : '' ?>>
 <main class="main app-embed-main"><?= $content ?></main>
 <script src="<?= e(asset('js/confirm.js')) ?>?v=<?= e((string) (@filemtime(base_path('public/assets/js/confirm.js')) ?: time())) ?>"></script>
 <script src="<?= e(asset('js/app.js')) ?>?v=<?= e((string) (@filemtime(base_path('public/assets/js/app.js')) ?: time())) ?>"></script>
-<?php if (!empty($embed_saved)): ?>
-<script>
-    (function () {
-        // Only when the page really runs inside the add-on dialog: a direct visit must not loop.
-        if (!window.parent || window.parent === window) return;
-        try {
-            window.parent.postMessage({ type: 'socly:treasury-embed-saved' }, window.location.origin);
-        } catch (error) {
-            // Cross-window messaging is best effort: the popup still shows the updated card.
-        }
-    })();
-</script>
-<?php endif; ?>
 </body>
 </html>

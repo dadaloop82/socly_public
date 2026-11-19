@@ -226,6 +226,7 @@ document.addEventListener('DOMContentLoaded', () => {
   initDeadlineTemplates(document);
   initLiveFilters(document);
   initTreasuryCategory(document);
+  initTreasuryEmbedSaved();
   initLeaveGuards(document);
   initConfirmForms(document);
   initConfirmLinks(document);
@@ -14307,6 +14308,25 @@ function initAuthUpdateCheck() {
   });
 
   void autoCheck();
+}
+
+/**
+ * Embedded pages (add-on dialogs) tell their parent that the quick edit was saved. The signal
+ * lives here, in the external app.js, because the CSP allows `script-src 'self'` only: an inline
+ * <script> in the embed layout would be blocked and the dialog would never close.
+ */
+function initTreasuryEmbedSaved() {
+  const body = document.body;
+  if (!(body instanceof HTMLElement) || body.dataset.embedSaved !== '1') return;
+  if (!window.parent || window.parent === window) return;
+  window.setTimeout(() => {
+    try {
+      // The parent validates the message source (its own iframe), so `*` is safe here.
+      window.parent.postMessage({ type: 'socly:treasury-embed-saved' }, '*');
+    } catch (error) {
+      // Cross-window messaging is best effort: the popup still shows the updated card.
+    }
+  }, 0);
 }
 
 function initTreasuryCategory(root = document) {
