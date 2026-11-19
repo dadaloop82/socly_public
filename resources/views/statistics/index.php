@@ -158,7 +158,11 @@ $chartCard = static function (string $id, string $titleKey, string $ledeKey, boo
 </div>
 
 
-<div class="dashboard-tabs" data-statistics-tabs data-default-tab="demographics">
+<div class="dashboard-tabs" data-statistics-tabs data-default-tab="demographics"
+    data-msg-stats-show="<?= e(__('dashboard.stats_show_all')) ?>"
+    data-msg-stats-less="<?= e(__('dashboard.stats_show_less')) ?>"
+    data-msg-charts-show="<?= e(__('dashboard.charts_show_all')) ?>"
+    data-msg-charts-less="<?= e(__('dashboard.charts_show_less')) ?>">
     <div class="dashboard-tablist-wrap">
         <div class="dashboard-tablist" role="tablist" aria-label="<?= e(__('statistics.title')) ?>">
             <button type="button" class="dashboard-tab" role="tab" data-statistics-tab="demographics"

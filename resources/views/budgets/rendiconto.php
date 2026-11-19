@@ -113,6 +113,20 @@ $brandStyle = brand_root_style_decls($brandPrimary ?? null, $brandAccent ?? null
         .sign { margin-top: 2.2rem; display: flex; justify-content: space-between; gap: 2rem; }
         .sign div { flex: 1; border-top: 1px solid #333; padding-top: 0.4rem; font-size: 0.82rem; }
         .doc-note { margin-top: 1.2rem; font-size: 0.72rem; color: #666; }
+        /* Phones: keep the accounting columns readable via horizontal scroll. */
+        @media screen and (max-width: 720px) {
+          body { padding: 10px 8px 18px; }
+          .toolbar { flex-wrap: wrap; justify-content: flex-start; }
+          .sheet {
+            padding: 0.85rem 0.7rem 1rem;
+            border-radius: 12px;
+            overflow-x: auto;
+            -webkit-overflow-scrolling: touch;
+          }
+          table { min-width: 44rem; }
+          .evidence span { white-space: normal; }
+          .sign { flex-direction: column; gap: 1.2rem; }
+        }
         @media print {
           body { background: #fff; padding: 0; }
           .sheet { border: none; border-radius: 0; padding: 0; max-width: none; }

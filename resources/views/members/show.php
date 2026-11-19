@@ -643,7 +643,7 @@ $paymentIssues = array_values(array_filter(
             </div>
             <?php if (!empty($payments)): ?>
                 <div class="table-wrap embedded">
-                    <table>
+                    <table class="member-payments-table">
                         <thead>
                         <tr>
                             <th><?= e(__('payments.amount')) ?></th>
@@ -670,16 +670,16 @@ $paymentIssues = array_values(array_filter(
                                 && in_array((string) ($p['type'] ?? ''), ['membership', 'debt'], true);
                             ?>
                             <tr class="<?= $paymentRevoked ? 'member-payment-revoked' : '' ?>">
-                                <td class="num">
+                                <td class="num" data-label="<?= e(__('payments.amount')) ?>">
                                     <span class="member-payment-amount"><?= e(number_format((float) $p['amount'], 2, ',', '.')) ?>&nbsp;€</span>
                                     <?php if ($paymentRevoked && trim((string) ($p['revoked_note'] ?? '')) !== ''): ?>
                                         <span class="member-payment-revoked-note"><?= e((string) $p['revoked_note']) ?></span>
                                     <?php endif; ?>
                                 </td>
-                                <td class="member-payment-method"><?= e(__('payments.' . $p['method'])) ?></td>
-                                <td class="member-payment-type"><?= e(__('payments.' . $p['type'])) ?></td>
-                                <td class="member-payment-date"><?= e(format_datetime((string) ($p['created_at'] ?? '')) ?: (string) ($p['created_at'] ?? '')) ?></td>
-                                <td class="member-payment-treasury">
+                                <td class="member-payment-method" data-label="<?= e(__('payments.method')) ?>"><?= e(__('payments.' . $p['method'])) ?></td>
+                                <td class="member-payment-type" data-label="<?= e(__('payments.type')) ?>"><?= e(__('payments.' . $p['type'])) ?></td>
+                                <td class="member-payment-date" data-label="<?= e(__('members.enrollment_recorded_at')) ?>"><?= e(format_datetime((string) ($p['created_at'] ?? '')) ?: (string) ($p['created_at'] ?? '')) ?></td>
+                                <td class="member-payment-treasury" data-label="<?= e(__('payments.treasury')) ?>">
                                     <?php if ($paymentRevoked): ?>
                                         <span class="badge badge-muted" title="<?= e((string) ($p['revoked_note'] ?? '')) ?>"><?= e(__('payments.revoked')) ?></span>
                                     <?php elseif ($treasuryState === 'acknowledged'): ?>

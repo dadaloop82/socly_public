@@ -156,6 +156,15 @@ $privacyBlock = $clipText((string) ($privacy_text ?? ''));
             word-break: break-word;
         }
         .meta { color: #666; font-size: 0.85rem; margin-top: 1.5rem; }
+        /* Phones: readable paddings and stacked signature boxes (screen only). */
+        @media screen and (max-width: 640px) {
+            body { padding: 12px 10px 20px; }
+            .toolbar { flex-wrap: wrap; gap: 0.5rem; }
+            th { width: 40%; }
+            th, td { padding: 0.35rem 0.4rem; font-size: 13px; }
+            .signatures { grid-template-columns: 1fr; gap: 1rem; }
+            .sign-box { margin-top: 1.5rem; }
+        }
         @media print {
             .toolbar { display: none; }
             body { padding: 0; }

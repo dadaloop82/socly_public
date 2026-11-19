@@ -307,6 +307,13 @@ $personName = static function (array $person): string {
         }
         .meta { margin-top: 1rem; color: #666; font-size: 11px; }
         .legal { margin-top: 0.5rem; font-size: 10.5px; color: #555; }
+        /* Phones: tighter sheet and stackable signatures (screen only). */
+        @media screen and (max-width: 720px) {
+          body { padding: 10px 8px 18px; }
+          .sheet { padding: 0.85rem 0.7rem 1rem; border-radius: 12px; }
+          .signature { flex-direction: column; align-items: flex-start; gap: 1.2rem; }
+          .signature-line { width: 100%; min-width: 0; }
+        }
         @page {
           size: A4 portrait;
           margin: 12mm 12mm 14mm;

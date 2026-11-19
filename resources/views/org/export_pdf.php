@@ -199,6 +199,18 @@ $generatedAt = $generatedAt !== '' ? $generatedAt : date('d/m/Y H:i');
         @media screen {
           tr.row-incomplete td { background: #fffdf5; }
         }
+        /* Phones: the fixed-width report columns stay readable via horizontal scroll. */
+        @media screen and (max-width: 960px) {
+          body { padding: 10px 8px 18px; }
+          .sheet {
+            padding: 0.85rem 0.7rem 1rem;
+            border-radius: 12px;
+            overflow-x: auto;
+            -webkit-overflow-scrolling: touch;
+          }
+          table { table-layout: auto; min-width: 42rem; }
+          .signature { flex-direction: column; align-items: flex-start; gap: 1.2rem; }
+        }
         @page {
           size: A4 portrait;
           margin: 12mm 12mm 14mm;

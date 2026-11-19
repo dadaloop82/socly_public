@@ -7144,8 +7144,23 @@ html.enter-anim .will-enter.is-entered {
   .cf-row { grid-template-columns: 1fr; }
   .photo-actions .btn { width: 100%; }
 
+  /*
+   * The mobile bar is sticky: it must paint an opaque surface, otherwise the
+   * page scrolls behind the hamburger/logo and the text becomes unreadable.
+   */
   .topbar {
     padding: 0.35rem 0.9rem;
+    background: color-mix(in srgb, var(--brand-paper) 94%, transparent);
+    -webkit-backdrop-filter: blur(12px) saturate(1.08);
+    backdrop-filter: blur(12px) saturate(1.08);
+    border-bottom: 1px solid color-mix(in srgb, var(--brand-primary) 14%, var(--line));
+    box-shadow: 0 6px 18px color-mix(in srgb, var(--brand-primary-deep) 8%, transparent);
+  }
+  /* Floating presence badges sit inside the sticky bar, not under it. */
+  .presence {
+    top: 0.5rem;
+    right: 0.75rem;
+    z-index: 45;
   }
   .topbar-menu {
     display: inline-flex;
@@ -10899,22 +10914,29 @@ button.setup-scrape-logo-frame:focus-visible .setup-scrape-logo-overlay {
     box-shadow: var(--shadow-soft);
   }
   .documents-table td {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 0.75rem;
+    display: grid;
+    grid-template-columns: minmax(5.5rem, 38%) minmax(0, 1fr);
+    align-items: start;
+    gap: 0.1rem 0.75rem;
     padding: 0;
     border: 0;
     font-size: 0.95rem;
     min-width: 0;
+    text-align: right;
   }
   .documents-table td::before {
     content: attr(data-label);
+    grid-column: 1;
+    grid-row: 1;
     color: var(--muted);
     font-size: 0.78rem;
     font-weight: 700;
-    flex: 0 0 auto;
-    max-width: 42%;
+    text-align: left;
+  }
+  /* Every value child stays in the right column, stacked (no label/value overlap). */
+  .documents-table td > * {
+    grid-column: 2;
+    min-width: 0;
   }
   .documents-table td:first-child {
     display: block;
@@ -10946,22 +10968,29 @@ button.setup-scrape-logo-frame:focus-visible .setup-scrape-logo-overlay {
     box-shadow: var(--shadow-soft);
   }
   .deadlines-table td {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 0.75rem;
+    display: grid;
+    grid-template-columns: minmax(5.5rem, 38%) minmax(0, 1fr);
+    align-items: start;
+    gap: 0.1rem 0.75rem;
     padding: 0;
     border: 0;
     font-size: 0.95rem;
     min-width: 0;
+    text-align: right;
   }
   .deadlines-table td::before {
     content: attr(data-label);
+    grid-column: 1;
+    grid-row: 1;
     color: var(--muted);
     font-size: 0.78rem;
     font-weight: 700;
-    flex: 0 0 auto;
-    max-width: 42%;
+    text-align: left;
+  }
+  /* Title + notes (and date + badge) stack inside the value column. */
+  .deadlines-table td > * {
+    grid-column: 2;
+    min-width: 0;
   }
   .deadlines-table td:first-child {
     display: block;
@@ -11837,6 +11866,9 @@ a.org-mandate-badge--soon:hover {
   border-radius: 10px;
   background: color-mix(in srgb, var(--brand-primary, #0D6E66) 5%, #fff);
   border: 1px solid transparent;
+  /* Grid item: without this the nowrap label sets a min-content width wider
+     than the popover, which then overflows the viewport on phones. */
+  min-width: 0;
 }
 .widget-manager-item.is-dragging {
   opacity: 0.5;
@@ -12702,6 +12734,12 @@ tr.doc-row-editable:focus-visible {
   }
 }
 @media (max-width: 560px) {
+  .stats-context-documents {
+    /* 2×2 keeps the four archive KPIs visible without a long scroll. */
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+@media (max-width: 380px) {
   .stats-context-documents {
     grid-template-columns: 1fr;
   }
@@ -15153,3 +15191,251 @@ select.is-remote-choice {
 }
 
 .member-card-qr-text { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem; }
+
+/* ═══ Mobile ergonomics (phones / small tablets) ════════════════════════════
+ * Cross-screen safety net. It only fixes sizes and wrapping, never a specific
+ * layout: view-specific rules keep living in their own section above.
+ * It also covers add-on screens, which reuse the core shell + form classes.
+ *   - 16px form controls: iOS Safari zooms the page when a focused field is
+ *     smaller, which used to make every create/edit form unusable.
+ *   - ~44px touch targets for buttons and icon actions.
+ *   - Toolbars, form actions and overlays wrap inside the viewport.
+ *   - Wide content never gets clipped: tables scroll, media shrinks.
+ * ------------------------------------------------------------------------- */
+@media (max-width: 960px) {
+  .main input:not([type="checkbox"]):not([type="radio"]):not([type="hidden"]):not([type="file"]),
+  .main select,
+  .main textarea,
+  .main .sf-field__control,
+  .app-embed input:not([type="checkbox"]):not([type="radio"]):not([type="hidden"]):not([type="file"]),
+  .app-embed select,
+  .app-embed textarea,
+  .app-embed .sf-field__control {
+    font-size: 16px;
+  }
+  .main img,
+  .main video,
+  .app-embed img,
+  .app-embed video {
+    /* Width stays capped to the column; do NOT force height:auto here — the
+       tessera / avatar thumbnails size their images with height:100%. */
+    max-width: 100%;
+  }
+  .main .table-wrap,
+  .app-embed .table-wrap {
+    max-width: 100%;
+  }
+  /* Anchor targets (settings sections, in-page links) must clear the sticky bar. */
+  html {
+    scroll-padding-top: 4.25rem;
+  }
+}
+
+@media (max-width: 640px) {
+  /* Touch targets: at least 40px high, 44px for primary/icon actions. */
+  .main .btn,
+  .main a.btn,
+  .main button.btn,
+  .app-embed .btn,
+  .app-embed a.btn,
+  .app-embed button.btn {
+    min-height: 2.75rem;
+  }
+  .main .btn-sm,
+  .app-embed .btn-sm {
+    min-height: 2.5rem;
+  }
+  .main .btn-icon,
+  .main .btn-action-icon,
+  .app-embed .btn-icon,
+  .app-embed .btn-action-icon {
+    min-width: 2.5rem;
+    min-height: 2.5rem;
+    justify-content: center;
+  }
+  .main .btn-action-icon svg,
+  .app-embed .btn-action-icon svg {
+    width: 1.35em;
+    height: 1.35em;
+  }
+  /* Inline controls that stayed under the 40px touch target. */
+  .main .password-toggle {
+    width: 2.5rem;
+    height: 2.5rem;
+    right: 0.35rem;
+  }
+  .main .password-input-wrap input[type="password"],
+  .main .password-input-wrap input[type="text"] {
+    padding-right: 3.1rem;
+  }
+  .main .geo-foreign-pill {
+    min-height: 2.25rem;
+    padding: 0.3rem 0.7rem;
+  }
+  .main .deadlines-template {
+    min-height: 2.25rem;
+    padding: 0.45rem 0.85rem;
+  }
+  .main .dashboard-tab {
+    padding-top: 0.72rem;
+    padding-bottom: 0.72rem;
+  }
+
+  /* Toolbars and action rows: wrap instead of pushing past the edge. */
+  .main .actions,
+  .main .form-actions,
+  .main .form-actions-end,
+  .app-embed .actions,
+  .app-embed .form-actions,
+  .app-embed .form-actions-end {
+    flex-wrap: wrap;
+  }
+  .main .form-actions-end > .btn,
+  .main .form-actions > .btn,
+  .app-embed .form-actions-end > .btn,
+  .app-embed .form-actions > .btn {
+    flex: 1 1 auto;
+    justify-content: center;
+  }
+
+  /* Chart widget controls: readable and tappable on a phone. */
+  .chart-widget-btn {
+    width: 2.25rem;
+    height: 2.25rem;
+  }
+  .chart-widget-btn svg {
+    width: 1.05rem;
+    height: 1.05rem;
+  }
+  .chart-widget-controls {
+    top: 0.4rem;
+    right: 0.4rem;
+    gap: 0.3rem;
+  }
+  .charts .chart-panel[data-chart-widget] > .panel-header {
+    padding-right: 7.75rem;
+  }
+  /* The chart grid is a single column on phones: resizing the widget is
+     pointless and the bottom-right handle would sit on the X-axis labels. */
+  .chart-widget-resize-tools {
+    display: none;
+  }
+  /* Dragging a card inside a scrolled page fights the touch scroll. */
+  .chart-widget-drag {
+    display: none;
+  }
+  .widget-manager-move {
+    width: 2rem;
+    height: 2rem;
+  }
+  /* The manager popover can never be wider than the viewport. */
+  .widget-manager-body {
+    width: min(22rem, calc(100vw - 1.5rem));
+    max-width: calc(100vw - 1.5rem);
+    box-sizing: border-box;
+  }
+
+  /*
+   * Members list (mobile cards): the bulk-select checkbox is the first cell.
+   * It must not open the card with a lone divider — the separator belongs
+   * under the identity row instead.
+   */
+  .members-table td.members-col-check {
+    padding-bottom: 0.1rem;
+    margin-bottom: 0;
+    border-bottom: 0;
+  }
+  .members-table td.members-col-check + td {
+    padding-bottom: 0.45rem;
+    margin-bottom: 0.15rem;
+    border-bottom: 1px solid var(--line);
+  }
+
+  /*
+   * Member detail → payments: the six-column ledger becomes one card per
+   * payment so amount, method and actions stay readable without scrolling.
+   */
+  .member-payments-table {
+    min-width: 0 !important;
+  }
+  .member-payments-table thead {
+    display: none;
+  }
+  .member-payments-table tbody {
+    display: grid;
+    gap: 0.75rem;
+  }
+  .member-payments-table tr {
+    display: grid;
+    gap: 0.4rem;
+    padding: 0.85rem 0.95rem;
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    background: color-mix(in srgb, var(--brand-paper) 55%, #fff);
+    box-shadow: var(--shadow-soft);
+  }
+  .member-payments-table td {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 0.75rem;
+    padding: 0;
+    border: 0;
+    min-width: 0;
+    font-size: 0.92rem;
+    text-align: right;
+  }
+  .member-payments-table td::before {
+    content: attr(data-label);
+    flex: 0 0 auto;
+    max-width: 45%;
+    color: var(--muted);
+    font-size: 0.76rem;
+    font-weight: 700;
+    text-align: left;
+  }
+  .member-payments-table td.member-payment-treasury,
+  .member-payments-table td.member-payment-actions {
+    display: block;
+    padding-top: 0.45rem;
+    border-top: 1px solid var(--line);
+  }
+  .member-payments-table td.member-payment-treasury::before,
+  .member-payments-table td.member-payment-actions::before {
+    display: block;
+    max-width: none;
+    margin-bottom: 0.3rem;
+  }
+  .member-payments-table td.member-payment-treasury .member-payment-treasury-actions,
+  .member-payments-table td.member-payment-actions .member-payment-actions-row {
+    flex-wrap: wrap;
+    justify-content: flex-end;
+  }
+  .member-payments-table td.member-payment-treasury .btn,
+  .member-payments-table td.member-payment-actions .btn {
+    flex: 1 1 auto;
+    justify-content: center;
+  }
+}
+
+@media (max-width: 420px) {
+  /* Very narrow phones: keep the sticky bar compact and the title readable. */
+  .topbar {
+    gap: 0.5rem;
+    padding: 0.3rem 0.7rem;
+  }
+  .topbar-brand {
+    gap: 0.45rem;
+  }
+  .topbar-mark {
+    max-width: min(38vw, 8rem);
+  }
+  .main {
+    padding-left: 0.75rem;
+    padding-right: 0.75rem;
+  }
+  .panel,
+  .form-card {
+    padding: 1rem 0.85rem;
+  }
+}

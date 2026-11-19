@@ -212,6 +212,21 @@ $generatedAt = $generatedAt !== '' ? $generatedAt : date('d/m/Y H:i');
         }
         .meta { margin-top: 1rem; color: #666; font-size: 11px; }
         .legal { margin-top: 0.5rem; font-size: 10.5px; color: #555; }
+        /*
+         * Screen only: a landscape register cannot shrink to a phone. The sheet
+         * scrolls horizontally so every column stays readable instead of being
+         * squeezed to a few characters.
+         */
+        @media screen and (max-width: 960px) {
+          body { padding: 10px 8px 18px; }
+          .sheet {
+            padding: 0.85rem 0.7rem 1rem;
+            border-radius: 12px;
+            overflow-x: auto;
+            -webkit-overflow-scrolling: touch;
+          }
+          table { table-layout: auto; min-width: 56rem; }
+        }
         @page {
           size: A4 landscape;
           margin: 10mm 10mm 12mm;
