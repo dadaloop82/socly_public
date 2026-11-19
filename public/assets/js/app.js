@@ -14427,8 +14427,8 @@ function initTreasuryCategory(root = document) {
       hideBeneficiarySuggest();
     });
     beneficiarySuggestNo?.addEventListener('click', hideBeneficiarySuggest);
-    beneficiaryInput?.addEventListener('input', hideBeneficiarySuggest);
-    beneficiaryInput?.addEventListener('change', () => {
+    let beneficiaryTimer = 0;
+    const evaluateBeneficiarySuggestion = () => {
       if (!(beneficiaryInput instanceof HTMLInputElement) || !(beneficiaryList instanceof HTMLDataListElement)) return;
       const typed = beneficiaryInput.value.trim();
       const value = normalizeName(typed);
@@ -14472,6 +14472,21 @@ function initTreasuryCategory(root = document) {
       if (best !== '' && bestScore >= 0.78) {
         showBeneficiarySuggest(typed, best);
       }
+    };
+    // Live feedback, like the import rows: typing pauses → the suggestion appears without
+    // leaving the field. `change`/`blur` keep the immediate check (datalist pick, tab away).
+    beneficiaryInput?.addEventListener('input', () => {
+      hideBeneficiarySuggest();
+      window.clearTimeout(beneficiaryTimer);
+      beneficiaryTimer = window.setTimeout(evaluateBeneficiarySuggestion, 450);
+    });
+    beneficiaryInput?.addEventListener('change', () => {
+      window.clearTimeout(beneficiaryTimer);
+      evaluateBeneficiarySuggestion();
+    });
+    beneficiaryInput?.addEventListener('blur', () => {
+      window.clearTimeout(beneficiaryTimer);
+      evaluateBeneficiarySuggestion();
     });
 
     // Shared show/hide: a hidden block must never submit its (stale) values.

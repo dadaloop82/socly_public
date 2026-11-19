@@ -342,8 +342,26 @@ foreach ($members as $member) {
                 ],
             ]) ?>
             <datalist id="treasury-beneficiaries">
-                <?php foreach ($beneficiaries as $beneficiary): ?>
-                    <option value="<?= e($beneficiary) ?>">
+                <?php
+                // Same candidate sources as the bank-statement review: counterparties already used
+                // in the cash book + member names. Without this the typo suggestion is inert on an
+                // installation whose movements have no free-text counterparty yet.
+                $beneficiaryOptions = [];
+                foreach ((array) $beneficiaries as $beneficiaryName) {
+                    $beneficiaryName = trim((string) $beneficiaryName);
+                    if ($beneficiaryName !== '') {
+                        $beneficiaryOptions[mb_strtolower($beneficiaryName)] = $beneficiaryName;
+                    }
+                }
+                foreach ((array) ($members ?? []) as $memberRow) {
+                    $memberName = trim((string) ($memberRow['last_name'] ?? '') . ' ' . (string) ($memberRow['first_name'] ?? ''));
+                    if ($memberName !== '') {
+                        $beneficiaryOptions[mb_strtolower($memberName)] ??= $memberName;
+                    }
+                }
+                ?>
+                <?php foreach ($beneficiaryOptions as $beneficiary): ?>
+                    <option value="<?= e((string) $beneficiary) ?>">
                 <?php endforeach; ?>
             </datalist>
             <div class="treasury-counterparty-suggest" data-treasury-beneficiary-suggest hidden role="status" aria-live="polite">
