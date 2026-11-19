@@ -293,7 +293,10 @@ switches the PDF to its page and scrolls the highlighted lines into view.
 The verification screen was reworked around the statement: “letto dall’estratto conto” wording,
 registered value before the statement value in the differences, a PDF excerpt for every row, a slider
 that shows position and remaining rows, a wide in-page editor for the recorded movement, and an
-unsaved-changes guard. The apply bar counts the movements being corrected (“Applica le modifiche ai
+unsaved-changes guard. On desktop the movement panel is as tall as the viewport (like the PDF
+column): the counters/actions toolbar and the footer stay in place and **only the movement cards
+scroll**; below 1100 px the page scrolls normally again. The apply bar counts the movements being
+corrected (“Applica le modifiche ai
 X movimenti”) and “Usa valore Estratto conto” is a button. The ledger movements missing from the
 statement sit at the top and can be deleted after two confirmations. The upload button stays disabled
 until a valid PDF is selected and the reading-engine line is only shown when something is missing.
@@ -378,7 +381,7 @@ model is a new JSON file in `templates/`; it never changes the PHP code. Source:
 `addons-src/bank_statement_import/` (private repo; `addons-src/` is not part of the public export).
 
 ```bash
-php tools/addons/addon-tool.php build addons-src/bank_statement_import dist/bank_statement_import-1.4.17.soclyaddon --incoming
+php tools/addons/addon-tool.php build addons-src/bank_statement_import dist/bank_statement_import-1.4.18.soclyaddon --incoming
 ```
 
 ## Revenue Agency invoices (`agenzia_entrate_invoices`)
