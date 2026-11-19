@@ -282,7 +282,10 @@ continua” stays disabled until every row to import is complete, issue-free and
 Counterparty extraction also understands the “Bonifico da Voi disposto a favore di: …” wording, and a
 member named in the counterparty or description is linked to the movement automatically. Rows to fix
 are highlighted until they are corrected; the blinking counter offers **Vedi movimenti da correggere**
-and jumps to the first one. A possible duplicate inside the same statement can be accepted with
+and jumps to the first one. **Conferma e importa tutti** is repeated inside the card being fixed: it
+stays visible until the row is confirmed (correcting the anomaly does not hide it), and a click
+continues with the next blocked card — or with the summary once every row is complete. A possible
+duplicate inside the same statement can be accepted with
 **Importa comunque**, and on the summary the **Importa** button stays disabled until the operator
 checks “Confermo che i movimenti verificati corrispondono all’estratto conto”. Hovering a movement
 switches the PDF to its page and scrolls the highlighted lines into view.
@@ -375,7 +378,7 @@ model is a new JSON file in `templates/`; it never changes the PHP code. Source:
 `addons-src/bank_statement_import/` (private repo; `addons-src/` is not part of the public export).
 
 ```bash
-php tools/addons/addon-tool.php build addons-src/bank_statement_import dist/bank_statement_import-1.4.7.soclyaddon --incoming
+php tools/addons/addon-tool.php build addons-src/bank_statement_import dist/bank_statement_import-1.4.17.soclyaddon --incoming
 ```
 
 ## Revenue Agency invoices (`agenzia_entrate_invoices`)
