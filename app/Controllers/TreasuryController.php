@@ -84,14 +84,6 @@ final class TreasuryController extends BaseController
         $similarProbe = $this->similarProbe((int) $request->input('similar', 0));
         // Only the enabled wallets (+ deactivated ones with movements) are listed.
         $wallets = $this->treasury->overviewWallets();
-        // Statement excerpts stored by the bank-statement add-on, one reference per movement.
-        $statementRefs = [];
-        foreach ($ledger['movements'] as $ledgerMovement) {
-            $ledgerId = (int) ($ledgerMovement['id'] ?? 0);
-            if ($ledgerId > 0) {
-                $statementRefs[] = 'movement:' . $ledgerId;
-            }
-        }
         $this->render('treasury/index', [
             'title' => __('treasury.title'),
             'ledger' => $ledger,
@@ -134,11 +126,6 @@ final class TreasuryController extends BaseController
             'total_rows' => $totalRows,
             'recurring_rules' => $this->recurring->all(),
             'similar_probe' => $similarProbe,
-            'statement_crops' => $this->files->linkedDocumentsForRefs(
-                'treasury',
-                $statementRefs,
-                self::STATEMENT_SOURCE_SECTION
-            ),
         ]);
     }
 
