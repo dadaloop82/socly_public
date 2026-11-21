@@ -680,23 +680,8 @@ final class BudgetService
         // centre are linked to the unique matching budget line for this fiscal year.
         $this->treasury->imputeUnallocatedByCategory($fiscalYear);
 
-        $itemIds = array_map(static fn (array $item): int => (int) $item['id'], $budget['items']);
-        $actuals = [];
-        if ($itemIds !== []) {
-            $in = implode(', ', array_map('intval', $itemIds));
-            foreach ($this->db->fetchAll(
-                "SELECT budget_item_id, direction, COALESCE(SUM(amount), 0) AS total
-                 FROM treasury_movements
-                 WHERE approved_at IS NOT NULL AND superseded_at IS NULL AND budget_item_id IN (" . $in . ")
-                 GROUP BY budget_item_id, direction"
-            ) as $row) {
-                $actuals[(int) $row['budget_item_id']][(string) $row['direction']] = (float) ($row['total'] ?? 0);
-            }
-        }
-
-        // Read-time safety net: if a category uniquely identifies one line in this budget,
-        // still count unallocated movements of that category toward the consuntivo (and they
-        // should already have been persisted by impute above).
+        // Association rule: the skeleton is the preventivo. Consuntivo only fills those lines,
+        // aggregating approved cash/bank movements of THIS fiscal year (never invents chapters).
         $uniqueByCategory = [];
         foreach ($budget['items'] as $item) {
             $cat = trim((string) ($item['category'] ?? ''));
@@ -704,8 +689,7 @@ final class BudgetService
                 continue;
             }
             $dir = (string) $item['direction'] === 'income' ? 'income' : 'expense';
-            $key = $dir . '|' . $cat;
-            $uniqueByCategory[$key][] = (int) $item['id'];
+            $uniqueByCategory[$dir . '|' . $cat][] = (int) $item['id'];
         }
         $uniqueMap = [];
         foreach ($uniqueByCategory as $key => $ids) {
@@ -713,6 +697,26 @@ final class BudgetService
                 $uniqueMap[$key] = $ids[0];
             }
         }
+
+        $itemIds = array_map(static fn (array $item): int => (int) $item['id'], $budget['items']);
+        $actuals = [];
+        if ($itemIds !== [] && $fiscalYear >= 2000) {
+            $in = implode(', ', array_map('intval', $itemIds));
+            foreach ($this->db->fetchAll(
+                "SELECT budget_item_id, direction, COALESCE(SUM(amount), 0) AS total
+                 FROM treasury_movements
+                 WHERE approved_at IS NOT NULL AND superseded_at IS NULL
+                   AND budget_item_id IN (" . $in . ")
+                   AND YEAR(movement_date) = :y
+                   AND direction IN ('income', 'expense')
+                 GROUP BY budget_item_id, direction",
+                ['y' => $fiscalYear]
+            ) as $row) {
+                $actuals[(int) $row['budget_item_id']][(string) $row['direction']] = (float) ($row['total'] ?? 0);
+            }
+        }
+
+        // Category fallback (same year): still count unallocated movements toward the unique line.
         if ($uniqueMap !== [] && $fiscalYear >= 2000) {
             foreach ($this->db->fetchAll(
                 "SELECT direction, category, COALESCE(SUM(amount), 0) AS total
@@ -794,7 +798,10 @@ final class BudgetService
             $totals['actual_income'] += $actualIncome;
         }
 
+        // Movements of the year still outside every preventivo chapter (no matching line / ambiguous).
         $unallocated = [];
+        $missingIncomeLines = 0;
+        $missingExpenseLines = 0;
         foreach ($this->db->fetchAll(
             "SELECT direction, category, COUNT(*) AS movements, COALESCE(SUM(amount), 0) AS total
              FROM treasury_movements
@@ -809,21 +816,29 @@ final class BudgetService
             $direction = (string) $row['direction'];
             $category = trim((string) ($row['category'] ?? ''));
             $total = (float) ($row['total'] ?? 0);
-            // Already folded into the matching budget line above: do not list them again.
             if ($category !== '' && isset($uniqueMap[$direction . '|' . $category])) {
                 continue;
             }
+            $hasBudgetLine = $category !== '' && isset($uniqueByCategory[$direction . '|' . $category]);
             $unallocated[] = [
                 'direction' => $direction,
                 'category' => $category,
                 'label' => $category !== '' ? $this->treasury->categoryLabel($category) : (string) __('treasury.category_other'),
                 'movements' => (int) ($row['movements'] ?? 0),
                 'total' => $total,
+                // Ambiguous = several preventivo lines share the category; missing = no line at all.
+                'reason' => $hasBudgetLine ? 'ambiguous' : 'missing_line',
             ];
             if ($direction === 'income') {
                 $totals['unallocated_income'] += $total;
+                if (!$hasBudgetLine) {
+                    $missingIncomeLines++;
+                }
             } else {
                 $totals['unallocated_expense'] += $total;
+                if (!$hasBudgetLine) {
+                    $missingExpenseLines++;
+                }
             }
         }
 
@@ -835,6 +850,15 @@ final class BudgetService
         $totals['expense_percent'] = $totals['planned_expense'] > 0
             ? ($totals['actual_expense'] / $totals['planned_expense']) * 100
             : 0.0;
+        $totals['income_percent'] = $totals['planned_income'] > 0
+            ? ($totals['actual_income'] / $totals['planned_income']) * 100
+            : 0.0;
+        // What the board asks: do this year’s actual incomes cover actual expenses?
+        $totals['coverage'] = $totals['actual_expense'] > 0
+            ? ($totals['actual_income'] / $totals['actual_expense']) * 100
+            : ($totals['actual_income'] > 0 ? 100.0 : 0.0);
+        $totals['missing_income_lines'] = $missingIncomeLines;
+        $totals['missing_expense_lines'] = $missingExpenseLines;
 
         return [
             'budget' => $budget,

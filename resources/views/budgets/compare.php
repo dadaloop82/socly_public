@@ -115,6 +115,12 @@ $categoryText = static function (string $key) use ($categoryLabels): string {
     <div class="budget-kpi">
         <span class="budget-kpi-label"><?= e(__('budget.actual_income')) ?></span>
         <strong><?= e($currency->format((float) ($totals['actual_income'] ?? 0))) ?></strong>
+        <span class="budget-kpi-meta"><?= e($percentLabel((float) ($totals['income_percent'] ?? 0))) ?></span>
+    </div>
+    <div class="budget-kpi">
+        <span class="budget-kpi-label"><?= e(__('budget.compare_coverage')) ?></span>
+        <strong><?= e($percentLabel((float) ($totals['coverage'] ?? 0))) ?></strong>
+        <span class="budget-kpi-meta"><?= e(__('budget.compare_coverage_meta')) ?></span>
     </div>
     <div class="budget-kpi budget-kpi-need">
         <span class="budget-kpi-label"><?= e(__('budget.need_residual')) ?></span>
@@ -189,18 +195,28 @@ $categoryText = static function (string $key) use ($categoryLabels): string {
             <h2 class="section-title"><?= e(__('budget.unallocated_title', ['year' => (string) ($budget['fiscal_year'] ?? '')])) ?></h2>
             <p class="section-lede"><?= e(__('budget.unallocated_lede')) ?></p>
         </header>
+        <?php if ((int) ($totals['missing_income_lines'] ?? 0) > 0 || (int) ($totals['missing_expense_lines'] ?? 0) > 0): ?>
+            <p class="budget-alerts-note" role="status"><?= e(__('budget.unallocated_missing_line_note')) ?></p>
+        <?php endif; ?>
         <div class="table-wrap embedded">
             <table class="budget-compare-table">
                 <thead>
                 <tr>
                     <th><?= e(__('treasury.category')) ?></th>
                     <th><?= e(__('budget.direction')) ?></th>
+                    <th><?= e(__('budget.unallocated_reason')) ?></th>
                     <th class="budget-th-amount"><?= e(__('budget.movements')) ?></th>
                     <th class="budget-th-amount"><?= e(__('budget.actual')) ?></th>
                 </tr>
                 </thead>
                 <tbody>
                 <?php foreach ($unallocated as $row): ?>
+                    <?php
+                    $reason = (string) ($row['reason'] ?? 'missing_line');
+                    $reasonLabel = $reason === 'ambiguous'
+                        ? (string) __('budget.unallocated_reason_ambiguous')
+                        : (string) __('budget.unallocated_reason_missing');
+                    ?>
                     <tr class="clickable-row"
                         data-href="<?= e(ledger_url([
                             'category' => (string) ($row['category'] ?? '') !== '' ? (string) $row['category'] : '__none__',
@@ -211,6 +227,7 @@ $categoryText = static function (string $key) use ($categoryLabels): string {
                         tabindex="0" role="link" title="<?= e($openTitle) ?>">
                         <td><?= e((string) $row['label']) ?></td>
                         <td><?= e((string) $row['direction'] === 'income' ? __('budget.direction_income') : __('budget.direction_expense')) ?></td>
+                        <td class="muted"><?= e($reasonLabel) ?></td>
                         <td class="budget-th-amount"><?= e((string) $row['movements']) ?></td>
                         <td class="budget-th-amount"><?= e($currency->format((float) $row['total'])) ?></td>
                     </tr>
@@ -225,8 +242,11 @@ $categoryText = static function (string $key) use ($categoryLabels): string {
 <div class="budget-compare-footer">
     <p class="muted">
         <?= e(__('budget.reconcile_note', [
-            'allocated' => $currency->format((float) ($totals['actual_expense_all'] ?? 0)),
-            'unallocated' => $currency->format((float) ($totals['unallocated_expense'] ?? 0)),
+            'expense' => $currency->format((float) ($totals['actual_expense_all'] ?? 0)),
+            'income' => $currency->format((float) ($totals['actual_income_all'] ?? 0)),
+            'unallocated' => $currency->format(
+                (float) ($totals['unallocated_expense'] ?? 0) + (float) ($totals['unallocated_income'] ?? 0)
+            ),
         ])) ?>
     </p>
 </div>
