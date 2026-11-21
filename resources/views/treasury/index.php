@@ -548,7 +548,7 @@ if ($filterYear !== '' && !isset($yearFilterOptions[$filterYear])) {
                         }
                         ?>
                         <tr>
-                            <td>
+                            <td title="<?= e($ruleLabel) ?>">
                                 <?= e($ruleLabel) ?>
                                 <?php if (!empty($rule['amount_variable'])): ?>
                                     <span class="badge badge-muted"><?= e(__('treasury.recurring_variable_badge')) ?></span>
@@ -1007,7 +1007,7 @@ if ($filterYear !== '' && !isset($yearFilterOptions[$filterYear])) {
                                         <div class="treasury-row-desc">
                                         <?php if ($rowAnomalyLabels !== []): ?>
                                             <span
-                                                class="member-anomaly-mark"
+                                                class="member-anomaly-mark is-static"
                                                 tabindex="0"
                                                 role="img"
                                                 data-stop-row-nav

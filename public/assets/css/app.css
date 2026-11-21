@@ -2953,6 +2953,7 @@ table { width: 100%; border-collapse: collapse; min-width: 36rem; }
   overflow: auto;
   -webkit-overflow-scrolling: touch;
   overscroll-behavior-x: contain;
+  scrollbar-gutter: stable;
 }
 .table-wrap.embedded { box-shadow: none; border: 0; border-radius: 0; }
 th, td { text-align: left; padding: 0.9rem 1rem; border-bottom: 1px solid var(--line); vertical-align: top; }
@@ -3358,12 +3359,9 @@ button.btn-icon:hover:not(:disabled) {
   visibility: visible;
 }
 /*
- * Prevent table overflow from cutting popup under header/menu
+ * Do NOT flip .table-wrap overflow on hover: showing/hiding the scrollbar
+ * resizes the page and makes the whole list “shake”.
  */
-.panel:has(.member-anomaly-mark:hover) .table-wrap,
-.panel:has(.member-anomaly-mark:focus-within) .table-wrap {
-  overflow: visible;
-}
 .member-anomaly-banner-head {
   display: flex;
   align-items: flex-start;
@@ -10765,9 +10763,20 @@ button.setup-scrape-logo-frame:focus-visible .setup-scrape-logo-overlay {
 }
 .treasury-row-desc-body { min-width: 0; flex: 1 1 auto; }
 .treasury-row-anomaly-actions { margin-top: 0.3rem; }
-.panel:has(.member-anomaly-mark:hover) .table-wrap,
-.panel:has(.member-anomaly-mark:focus-within) .table-wrap {
-  overflow: visible;
+/* Tooltip opens downward so it stays inside the row area without touching overflow. */
+.treasury-row-desc .member-anomaly-mark .member-anomaly-tooltip {
+  top: calc(100% + 0.4rem);
+  bottom: auto;
+}
+.treasury-recurring .table-wrap {
+  overflow-x: auto;
+  max-width: 100%;
+}
+.treasury-recurring td:first-child {
+  max-width: min(28rem, 55vw);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .budget-annual-toolbar-panel { padding: 0.85rem 1rem; }
 .budget-annual-toolbar {
