@@ -16367,9 +16367,16 @@ function initRepairExcerpts() {
       el.textContent = value || '';
     }
   };
+  let lockedTotal = 0;
   const paint = (current, total, eta, workingTpl, etaTpl) => {
-    const safeTotal = Math.max(1, total || 1);
-    const safeCurrent = Math.max(0, Math.min(safeTotal, current || 0));
+    // Keep a stable ceiling: the total may rise when more crops are discovered, but must never
+    // crawl as “12 di 12 → 13 di 13” just because current advanced.
+    const reported = Math.max(0, Number(total) || 0);
+    if (reported > lockedTotal) {
+      lockedTotal = reported;
+    }
+    const safeTotal = Math.max(1, lockedTotal || reported || 1);
+    const safeCurrent = Math.max(0, Math.min(safeTotal, Number(current) || 0));
     setText('[data-update-text]', (workingTpl || '')
       .replace(':current', String(safeCurrent))
       .replace(':total', String(safeTotal)));
@@ -16460,6 +16467,7 @@ function initRepairExcerpts() {
     const token = csrfTokenFromPage();
     let finished = false;
     let last = { stored: 0, failed: 0, total: missing };
+    lockedTotal = Math.max(0, missing);
     try {
       const startData = await postJson(startUrl, new URLSearchParams({ _token: token }), 2);
       if (!startData?.ok || !startData.job) {
@@ -16472,7 +16480,8 @@ function initRepairExcerpts() {
       const job = String(startData.job);
       const workingTpl = button.getAttribute('data-repair-working') || '';
       const etaTpl = button.getAttribute('data-repair-eta') || '';
-      paint(0, Number(startData.total || last.total || 1), Number(startData.total || 1) * 2, workingTpl, etaTpl);
+      lockedTotal = Math.max(lockedTotal, Number(startData.total || last.total || 1));
+      paint(0, lockedTotal, lockedTotal * 2, workingTpl, etaTpl);
 
       while (!finished) {
         const tickData = await postJson(tickUrl, new URLSearchParams({ _token: token, job }), 4);
@@ -16480,10 +16489,11 @@ function initRepairExcerpts() {
           throw new Error(tickData.error || networkMsg());
         }
         if (tickData && (tickData.current != null || tickData.stored != null)) {
+          const tickTotal = Number(tickData.total || last.total || 1);
           last = {
             ...last,
             ...tickData,
-            total: Number(tickData.total || last.total || 1),
+            total: Math.max(last.total || 1, tickTotal),
             stored: Number(tickData.stored != null ? tickData.stored : last.stored || 0),
             failed: Number(tickData.failed != null ? tickData.failed : last.failed || 0),
           };
