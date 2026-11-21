@@ -29,7 +29,7 @@
  * @var int $default_year
  * @var list<array{year:int,income:float,can_generate:bool}> $rendiconto_years
  * @var float $runts_limit
- * @var array<string,mixed> $statistics
+ * @var array<string,mixed> $annual_report
  * @var int $model_d_year
  * @var list<int> $model_d_years
  * @var array<string,mixed>|null $model_d_report
@@ -40,11 +40,24 @@ $canManage = can('treasury.manage');
 $drafts = is_array($drafts ?? null) ? $drafts : [];
 $rendicontoYears = is_array($rendiconto_years ?? null) ? $rendiconto_years : [];
 $runtsLimit = (float) ($runts_limit ?? 0);
-$statistics = is_array($statistics ?? null) ? $statistics : [];
+$annualReport = is_array($annual_report ?? null) ? $annual_report : [];
+$annualYear = (int) ($annualReport['year'] ?? 0);
+$annualAvailableYears = is_array($annualReport['available_years'] ?? null) ? $annualReport['available_years'] : [];
+if ($annualAvailableYears === [] && $annualYear > 0) {
+    $annualAvailableYears = [$annualYear];
+}
+$annualBudget = is_array($annualReport['budget'] ?? null) ? $annualReport['budget'] : null;
+$annualPlanned = is_array($annualReport['planned'] ?? null) ? $annualReport['planned'] : ['expense' => 0.0, 'income' => 0.0];
+$annualActual = is_array($annualReport['actual'] ?? null) ? $annualReport['actual'] : ['expense' => 0.0, 'income' => 0.0];
+$annualCategories = is_array($annualReport['categories'] ?? null) ? $annualReport['categories'] : ['expense' => [], 'income' => []];
+$annualCharts = is_array($annualReport['charts'] ?? null) ? $annualReport['charts'] : [];
+$annualHistory = is_array($annualReport['history'] ?? null) ? $annualReport['history'] : [];
+$annualRuntsSections = is_array($annualReport['runts_sections'] ?? null) ? $annualReport['runts_sections'] : [];
+$annualAccounts = is_array($annualReport['accounts'] ?? null) ? $annualReport['accounts'] : [];
 $modelDYears = is_array($model_d_years ?? null) ? $model_d_years : [];
 $modelDYear = (int) ($model_d_year ?? 0);
 $modelDReport = is_array($model_d_report ?? null) ? $model_d_report : null;
-$budgetDefaultTab = in_array((string) ($default_tab ?? ''), ['preventivo', 'consuntivo', 'model_d', 'statistiche'], true)
+$budgetDefaultTab = in_array((string) ($default_tab ?? ''), ['preventivo', 'consuntivo', 'model_d', 'bilancio'], true)
     ? (string) $default_tab
     : 'preventivo';
 $modelDSections = [];
@@ -58,16 +71,9 @@ if ($modelDReport !== null) {
         $modelDSections[] = $modelDReport['investments'];
     }
 }
-$statsYears = is_array($statistics['years'] ?? null) ? $statistics['years'] : [];
-$latestYear = (int) ($statistics['latest_year'] ?? 0);
-$latestStats = [];
-foreach ($statsYears as $statsRow) {
-    if ((int) ($statsRow['year'] ?? 0) === $latestYear) {
-        $latestStats = $statsRow;
-    }
-}
-$topExpense = is_array($statistics['categories']['expense'] ?? null) ? $statistics['categories']['expense'] : [];
-$topIncome = is_array($statistics['categories']['income'] ?? null) ? $statistics['categories']['income'] : [];
+$annualYear = $annualYear > 0 ? $annualYear : (int) ($annualAvailableYears[0] ?? date('Y'));
+$annualCategoriesExpense = is_array($annualCategories['expense'] ?? null) ? $annualCategories['expense'] : [];
+$annualCategoriesIncome = is_array($annualCategories['income'] ?? null) ? $annualCategories['income'] : [];
 ?>
 <div class="page-header">
     <div class="titles">
@@ -97,9 +103,9 @@ $topIncome = is_array($statistics['categories']['income'] ?? null) ? $statistics
                 aria-controls="budget-panel-model_d" aria-selected="false" tabindex="-1">
                 <?= e(__('budget.tab_model_d')) ?>
             </button>
-            <button type="button" class="dashboard-tab" role="tab" data-budget-tab="statistiche"
-                aria-controls="budget-panel-statistiche" aria-selected="false" tabindex="-1">
-                <?= e(__('budget.tab_statistics')) ?>
+            <button type="button" class="dashboard-tab" role="tab" data-budget-tab="bilancio"
+                aria-controls="budget-panel-bilancio" aria-selected="false" tabindex="-1">
+                <?= e(__('budget.tab_annual')) ?>
             </button>
         </div>
     </div>
@@ -457,36 +463,314 @@ $topIncome = is_array($statistics['categories']['income'] ?? null) ? $statistics
         <?php endif; ?>
     </section>
 
-    <section class="dashboard-panel" id="budget-panel-statistiche" role="tabpanel" data-budget-panel="statistiche" hidden>
-        <?php if ($statsYears === []): ?>
-            <div class="panel">
-                <div class="empty-state">
-                    <strong><?= e(__('budget.stats_empty')) ?></strong>
-                    <p><?= e(__('budget.stats_empty_text')) ?></p>
-                </div>
+    <section class="dashboard-panel" id="budget-panel-bilancio" role="tabpanel" data-budget-panel="bilancio" hidden>
+        <div class="panel">
+            <div class="budget-model-d-toolbar">
+                <form class="filter-bar" method="get" action="<?= e(url('/budgets')) ?>">
+                    <input type="hidden" name="tab" value="bilancio">
+                    <label class="field">
+                        <span><?= e(__('runts.year')) ?></span>
+                        <select name="year">
+                            <?php foreach ($annualAvailableYears as $optionYear): ?>
+                                <option value="<?= (int) $optionYear ?>" <?= (int) $optionYear === $annualYear ? 'selected' : '' ?>>
+                                    <?= (int) $optionYear ?>
+                                </option>
+                            <?php endforeach; ?>
+                        </select>
+                    </label>
+                    <button class="btn btn-sm" type="submit"><?= e(__('budget.annual_show')) ?></button>
+                    <a class="btn btn-ghost btn-sm" href="<?= e(url('/budgets/annual/' . $annualYear . '/pdf')) ?>" target="_blank" rel="noopener">
+                        <?= e(__('budget.annual_export_pdf')) ?>
+                    </a>
+                </form>
             </div>
-        <?php else: ?>
-            <div class="stats">
-                <div class="stat">
-                    <div class="label"><?= e(__('budget.stats_coverage')) ?></div>
-                    <div class="value"><?= e(number_format((float) ($latestStats['coverage'] ?? 0), 1, ',', '.')) ?>%</div>
-                    <div class="stat-hint"><?= e(__('budget.stats_year', ['year' => (string) $latestYear])) ?></div>
-                </div>
-                <div class="stat">
-                    <div class="label"><?= e(__('budget.stats_need')) ?></div>
-                    <div class="value"><?= e($currency->format((float) ($latestStats['need'] ?? 0))) ?></div>
-                    <div class="stat-hint"><?= e(__('budget.stats_year', ['year' => (string) $latestYear])) ?></div>
-                </div>
-                <div class="stat">
-                    <div class="label"><?= e(__('budget.stats_fees')) ?></div>
-                    <div class="value"><?= e($currency->format((float) ($statistics['fees'] ?? 0))) ?></div>
-                    <div class="stat-hint"><?= e(__('budget.stats_fees_share', [
-                        'percent' => number_format((float) ($statistics['fees_share'] ?? 0), 1, ',', '.'),
-                    ])) ?></div>
-                </div>
-            </div>
+            <p class="section-lede"><?= e(__('budget.annual_lede')) ?></p>
+        </div>
 
+        <div class="stats">
+            <div class="stat">
+                <div class="label"><?= e(__('budget.annual_income')) ?></div>
+                <div class="value"><?= e($currency->format((float) ($annualActual['income'] ?? 0))) ?></div>
+                <div class="stat-hint"><?= e(__('budget.annual_year_hint', ['year' => (string) $annualYear])) ?></div>
+            </div>
+            <div class="stat">
+                <div class="label"><?= e(__('budget.annual_expense')) ?></div>
+                <div class="value"><?= e($currency->format((float) ($annualActual['expense'] ?? 0))) ?></div>
+                <div class="stat-hint"><?= e(__('budget.annual_year_hint', ['year' => (string) $annualYear])) ?></div>
+            </div>
+            <div class="stat">
+                <div class="label"><?= e(__('budget.annual_result')) ?></div>
+                <div class="value"><?= e($currency->format((float) ($annualReport['result'] ?? 0))) ?></div>
+                <div class="stat-hint"><?= e(__('budget.annual_year_hint', ['year' => (string) $annualYear])) ?></div>
+            </div>
+            <div class="stat">
+                <div class="label"><?= e(__('budget.annual_coverage')) ?></div>
+                <div class="value"><?= e(number_format((float) ($annualReport['coverage'] ?? 0), 1, ',', '.')) ?>%</div>
+                <div class="stat-hint"><?= e(__('budget.annual_year_hint', ['year' => (string) $annualYear])) ?></div>
+            </div>
+            <div class="stat">
+                <div class="label"><?= e(__('budget.annual_fees')) ?></div>
+                <div class="value"><?= e($currency->format((float) ($annualReport['fees'] ?? 0))) ?></div>
+                <div class="stat-hint"><?= e(__('budget.annual_year_hint', ['year' => (string) $annualYear])) ?></div>
+            </div>
+            <div class="stat">
+                <div class="label"><?= e(__('budget.annual_opening')) ?></div>
+                <div class="value"><?= e($currency->format((float) ($annualReport['opening_balance'] ?? 0))) ?></div>
+                <div class="stat-hint"><?= e(__('budget.annual_year_hint', ['year' => (string) $annualYear])) ?></div>
+            </div>
+            <div class="stat">
+                <div class="label"><?= e(__('budget.annual_closing')) ?></div>
+                <div class="value"><?= e($currency->format((float) ($annualReport['closing_balance'] ?? 0))) ?></div>
+                <div class="stat-hint"><?= e(__('budget.annual_year_hint', ['year' => (string) $annualYear])) ?></div>
+            </div>
+        </div>
+
+        <div class="panel">
+            <header class="panel-header">
+                <div>
+                    <h2 class="section-title"><?= e(__('budget.annual_planned_vs_actual')) ?></h2>
+                    <p class="section-lede"><?= e(($annualBudget['title'] ?? '') !== '' ? (string) $annualBudget['title'] : __('budget.card_title_default')) ?></p>
+                </div>
+            </header>
+            <div class="table-wrap embedded">
+                <table class="data-table statistics-table">
+                    <thead>
+                    <tr>
+                        <th><?= e(__('runts.year')) ?></th>
+                        <th><?= e(__('budget.planned_expense')) ?></th>
+                        <th><?= e(__('budget.actual_expense')) ?></th>
+                        <th><?= e(__('budget.planned_income')) ?></th>
+                        <th><?= e(__('budget.actual_income')) ?></th>
+                        <th><?= e(__('budget.annual_result')) ?></th>
+                        <th><?= e(__('budget.annual_coverage')) ?></th>
+                    </tr>
+                    </thead>
+                    <tbody>
+                    <tr>
+                        <td><strong><?= e((string) $annualYear) ?></strong></td>
+                        <td class="num"><?= e($currency->format((float) ($annualPlanned['expense'] ?? 0))) ?></td>
+                        <td class="num"><?= e($currency->format((float) ($annualActual['expense'] ?? 0))) ?></td>
+                        <td class="num"><?= e($currency->format((float) ($annualPlanned['income'] ?? 0))) ?></td>
+                        <td class="num"><?= e($currency->format((float) ($annualActual['income'] ?? 0))) ?></td>
+                        <td class="num"><?= e($currency->format((float) ($annualReport['result'] ?? 0))) ?></td>
+                        <td class="num"><?= e(number_format((float) ($annualReport['coverage'] ?? 0), 1, ',', '.')) ?>%</td>
+                    </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <div class="grid-2" data-budget-annual-charts='<?= e(json_encode($annualCharts, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES)) ?>' data-budget-annual-chart-i18n='<?= e(json_encode(["currency" => $currency->display(), "income" => __('budget.annual_income'), "expense" => __('budget.annual_expense')], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES)) ?>'>
             <div class="panel">
+                <header class="panel-header">
+                    <div>
+                        <h2 class="section-title"><?= e(__('budget.annual_flow')) ?></h2>
+                        <p class="section-lede"><?= e(__('budget.annual_year_hint', ['year' => (string) $annualYear])) ?></p>
+                    </div>
+                </header>
+                <div class="chart-panel">
+                    <canvas id="chart-budget-annual-flow" height="220"></canvas>
+                </div>
+            </div>
+            <div class="panel">
+                <header class="panel-header">
+                    <div>
+                        <h2 class="section-title"><?= e(__('budget.annual_categories')) ?></h2>
+                        <p class="section-lede"><?= e(__('budget.direction_expense')) ?></p>
+                    </div>
+                </header>
+                <div class="chart-panel">
+                    <canvas id="chart-budget-annual-expense" height="220"></canvas>
+                </div>
+            </div>
+            <div class="panel">
+                <header class="panel-header">
+                    <div>
+                        <h2 class="section-title"><?= e(__('budget.annual_categories_income')) ?></h2>
+                        <p class="section-lede"><?= e(__('budget.direction_income')) ?></p>
+                    </div>
+                </header>
+                <div class="chart-panel">
+                    <canvas id="chart-budget-annual-income" height="220"></canvas>
+                </div>
+            </div>
+            <div class="panel">
+                <header class="panel-header">
+                    <div>
+                        <h2 class="section-title"><?= e(__('budget.annual_monthly')) ?></h2>
+                        <p class="section-lede"><?= e(__('budget.annual_year_hint', ['year' => (string) $annualYear])) ?></p>
+                    </div>
+                </header>
+                <div class="chart-panel">
+                    <canvas id="chart-budget-annual-monthly" height="220"></canvas>
+                </div>
+            </div>
+        </div>
+
+        <div class="grid-2">
+            <div class="panel">
+                <header class="panel-header">
+                    <div>
+                        <h2 class="section-title"><?= e(__('budget.annual_categories')) ?></h2>
+                        <p class="section-lede"><?= e(__('budget.direction_expense')) ?></p>
+                    </div>
+                </header>
+                <?php if ($annualCategoriesExpense === []): ?>
+                    <div class="empty-state compact">—</div>
+                <?php else: ?>
+                    <div class="table-wrap embedded">
+                        <table class="data-table statistics-table">
+                            <thead>
+                            <tr>
+                                <th><?= e(__('budget.category_label')) ?></th>
+                                <th><?= e(__('budget.amount')) ?></th>
+                                <th>%</th>
+                            </tr>
+                            </thead>
+                            <tbody>
+                            <?php foreach ($annualCategoriesExpense as $cat): ?>
+                                <?php $catKey = trim((string) ($cat['key'] ?? '')); ?>
+                                <tr class="clickable-row"
+                                    data-href="<?= e(ledger_url([
+                                        'category' => $catKey !== '' ? $catKey : '__none__',
+                                        'direction' => 'expense',
+                                        'year' => $annualYear,
+                                    ])) ?>"
+                                    tabindex="0" role="link" title="<?= e(__('budget.open_movements')) ?>">
+                                    <td><?= e((string) ($cat['label'] ?? '')) ?></td>
+                                    <td class="num"><?= e($currency->format((float) ($cat['amount'] ?? 0))) ?></td>
+                                    <td class="num"><?= e(number_format((float) ($cat['percent'] ?? 0), 1, ',', '.')) ?>%</td>
+                                </tr>
+                            <?php endforeach; ?>
+                            </tbody>
+                        </table>
+                    </div>
+                <?php endif; ?>
+            </div>
+            <div class="panel">
+                <header class="panel-header">
+                    <div>
+                        <h2 class="section-title"><?= e(__('budget.annual_categories_income')) ?></h2>
+                        <p class="section-lede"><?= e(__('budget.direction_income')) ?></p>
+                    </div>
+                </header>
+                <?php if ($annualCategoriesIncome === []): ?>
+                    <div class="empty-state compact">—</div>
+                <?php else: ?>
+                    <div class="table-wrap embedded">
+                        <table class="data-table statistics-table">
+                            <thead>
+                            <tr>
+                                <th><?= e(__('budget.category_label')) ?></th>
+                                <th><?= e(__('budget.amount')) ?></th>
+                                <th>%</th>
+                            </tr>
+                            </thead>
+                            <tbody>
+                            <?php foreach ($annualCategoriesIncome as $cat): ?>
+                                <?php $catKey = trim((string) ($cat['key'] ?? '')); ?>
+                                <tr class="clickable-row"
+                                    data-href="<?= e(ledger_url([
+                                        'category' => $catKey !== '' ? $catKey : '__none__',
+                                        'direction' => 'income',
+                                        'year' => $annualYear,
+                                    ])) ?>"
+                                    tabindex="0" role="link" title="<?= e(__('budget.open_movements')) ?>">
+                                    <td><?= e((string) ($cat['label'] ?? '')) ?></td>
+                                    <td class="num"><?= e($currency->format((float) ($cat['amount'] ?? 0))) ?></td>
+                                    <td class="num"><?= e(number_format((float) ($cat['percent'] ?? 0), 1, ',', '.')) ?>%</td>
+                                </tr>
+                            <?php endforeach; ?>
+                            </tbody>
+                        </table>
+                    </div>
+                <?php endif; ?>
+            </div>
+        </div>
+
+        <div class="grid-2">
+            <div class="panel">
+                <header class="panel-header">
+                    <div>
+                        <h2 class="section-title"><?= e(__('budget.annual_runts_summary')) ?></h2>
+                        <p class="section-lede"><?= e(__('budget.annual_year_hint', ['year' => (string) $annualYear])) ?></p>
+                    </div>
+                </header>
+                <?php if ($annualRuntsSections === []): ?>
+                    <div class="empty-state compact">—</div>
+                <?php else: ?>
+                    <div class="table-wrap embedded">
+                        <table class="data-table statistics-table">
+                            <thead>
+                            <tr>
+                                <th><?= e(__('setup.runts_field_section')) ?></th>
+                                <th><?= e(__('budget.annual_expense')) ?></th>
+                                <th><?= e(__('budget.annual_income')) ?></th>
+                            </tr>
+                            </thead>
+                            <tbody>
+                            <?php foreach ($annualRuntsSections as $section): ?>
+                                <tr>
+                                    <td><strong><?= e((string) ($section['label'] ?? $section['letter'] ?? '')) ?></strong></td>
+                                    <td class="num"><?= e($currency->format((float) ($section['expense'] ?? 0))) ?></td>
+                                    <td class="num"><?= e($currency->format((float) ($section['income'] ?? 0))) ?></td>
+                                </tr>
+                            <?php endforeach; ?>
+                            </tbody>
+                        </table>
+                    </div>
+                <?php endif; ?>
+            </div>
+            <div class="panel">
+                <header class="panel-header">
+                    <div>
+                        <h2 class="section-title"><?= e(__('budget.annual_accounts')) ?></h2>
+                        <p class="section-lede"><?= e(__('budget.annual_year_hint', ['year' => (string) $annualYear])) ?></p>
+                    </div>
+                </header>
+                <?php if ($annualAccounts === []): ?>
+                    <div class="empty-state compact">—</div>
+                <?php else: ?>
+                    <div class="table-wrap embedded">
+                        <table class="data-table statistics-table">
+                            <thead>
+                            <tr>
+                                <th><?= e(__('treasury.account')) ?></th>
+                                <th><?= e(__('budget.annual_income')) ?></th>
+                                <th><?= e(__('budget.annual_expense')) ?></th>
+                                <th><?= e(__('budget.transfer_in')) ?></th>
+                                <th><?= e(__('budget.transfer_out')) ?></th>
+                                <th><?= e(__('treasury.balance')) ?></th>
+                            </tr>
+                            </thead>
+                            <tbody>
+                            <?php foreach ($annualAccounts as $account): ?>
+                                <tr>
+                                    <td><?= e((string) ($account['label'] ?? $account['key'] ?? '')) ?></td>
+                                    <td class="num"><?= e($currency->format((float) ($account['income'] ?? 0))) ?></td>
+                                    <td class="num"><?= e($currency->format((float) ($account['expense'] ?? 0))) ?></td>
+                                    <td class="num"><?= e($currency->format((float) ($account['transfer_in'] ?? 0))) ?></td>
+                                    <td class="num"><?= e($currency->format((float) ($account['transfer_out'] ?? 0))) ?></td>
+                                    <td class="num"><?= e($currency->format((float) ($account['balance'] ?? 0))) ?></td>
+                                </tr>
+                            <?php endforeach; ?>
+                            </tbody>
+                        </table>
+                    </div>
+                <?php endif; ?>
+            </div>
+        </div>
+
+        <div class="panel">
+            <header class="panel-header">
+                <div>
+                    <h2 class="section-title"><?= e(__('budget.annual_history')) ?></h2>
+                    <p class="section-lede"><?= e(__('budget.annual_year_hint', ['year' => (string) $annualYear])) ?></p>
+                </div>
+            </header>
+            <?php if ($annualHistory === []): ?>
+                <div class="empty-state compact">—</div>
+            <?php else: ?>
                 <div class="table-wrap embedded">
                     <table class="data-table statistics-table">
                         <thead>
@@ -496,109 +780,33 @@ $topIncome = is_array($statistics['categories']['income'] ?? null) ? $statistics
                             <th><?= e(__('budget.actual_expense')) ?></th>
                             <th><?= e(__('budget.planned_income')) ?></th>
                             <th><?= e(__('budget.actual_income')) ?></th>
-                            <th><?= e(__('budget.stats_coverage')) ?></th>
-                            <th><?= e(__('budget.stats_need')) ?></th>
+                            <th><?= e(__('budget.annual_result')) ?></th>
+                            <th><?= e(__('budget.annual_coverage')) ?></th>
                         </tr>
                         </thead>
                         <tbody>
-                        <?php foreach ($statsYears as $row): ?>
+                        <?php foreach ($annualHistory as $row): ?>
+                            <?php $historyYear = (int) ($row['year'] ?? 0); ?>
                             <tr class="clickable-row"
-                                data-href="<?= e(ledger_url(['year' => (int) $row['year']])) ?>"
+                                data-href="<?= e(ledger_url(['year' => $historyYear])) ?>"
                                 tabindex="0" role="link"
-                                title="<?= e(__('budget.open_year_movements', ['year' => (string) (int) $row['year']])) ?>">
-                                <td><strong><?= e((string) (int) $row['year']) ?></strong></td>
-                                <td class="num"><?= e($currency->format((float) $row['planned_expense'])) ?></td>
-                                <td class="num"><?= e($currency->format((float) $row['actual_expense'])) ?></td>
-                                <td class="num"><?= e($currency->format((float) $row['planned_income'])) ?></td>
-                                <td class="num"><?= e($currency->format((float) $row['actual_income'])) ?></td>
-                                <td class="num"><?= e(number_format((float) $row['coverage'], 1, ',', '.')) ?>%</td>
-                                <td class="num"><?= e($currency->format((float) $row['need'])) ?></td>
+                                title="<?= e(__('budget.open_year_movements', ['year' => (string) $historyYear])) ?>">
+                                <td><strong><?= e((string) $historyYear) ?></strong></td>
+                                <td class="num"><?= e($currency->format((float) ($row['planned_expense'] ?? 0))) ?></td>
+                                <td class="num"><?= e($currency->format((float) ($row['actual_expense'] ?? 0))) ?></td>
+                                <td class="num"><?= e($currency->format((float) ($row['planned_income'] ?? 0))) ?></td>
+                                <td class="num"><?= e($currency->format((float) ($row['actual_income'] ?? 0))) ?></td>
+                                <td class="num"><?= e($currency->format((float) ($row['actual_income'] ?? 0) - (float) ($row['actual_expense'] ?? 0))) ?></td>
+                                <td class="num"><?= e(number_format((float) ($row['coverage'] ?? 0), 1, ',', '.')) ?>%</td>
                             </tr>
                         <?php endforeach; ?>
                         </tbody>
                     </table>
                 </div>
-            </div>
-
-            <div class="grid-2">
-                <div class="panel">
-                    <header class="panel-header">
-                        <div>
-                            <h2 class="section-title"><?= e(__('budget.stats_top_expense')) ?></h2>
-                            <p class="section-lede"><?= e(__('budget.stats_year', ['year' => (string) $latestYear])) ?></p>
-                        </div>
-                    </header>
-                    <?php if ($topExpense === []): ?>
-                        <div class="empty-state compact">—</div>
-                    <?php else: ?>
-                        <div class="table-wrap embedded">
-                            <table class="data-table statistics-table">
-                                <thead>
-                                <tr>
-                                    <th><?= e(__('budget.category_label')) ?></th>
-                                    <th><?= e(__('budget.amount')) ?></th>
-                                    <th>%</th>
-                                </tr>
-                                </thead>
-                                <tbody>
-                                <?php foreach ($topExpense as $cat): ?>
-                                    <tr class="clickable-row"
-                                        data-href="<?= e(ledger_url([
-                                            'category' => (string) ($cat['key'] ?? '') !== '' ? (string) $cat['key'] : '__none__',
-                                            'direction' => 'expense',
-                                            'year' => $latestYear,
-                                        ])) ?>"
-                                        tabindex="0" role="link" title="<?= e(__('budget.open_movements')) ?>">
-                                        <td><?= e((string) $cat['label']) ?></td>
-                                        <td class="num"><?= e($currency->format((float) $cat['amount'])) ?></td>
-                                        <td class="num"><?= e(number_format((float) $cat['percent'], 1, ',', '.')) ?>%</td>
-                                    </tr>
-                                <?php endforeach; ?>
-                                </tbody>
-                            </table>
-                        </div>
-                    <?php endif; ?>
-                </div>
-                <div class="panel">
-                    <header class="panel-header">
-                        <div>
-                            <h2 class="section-title"><?= e(__('budget.stats_top_income')) ?></h2>
-                            <p class="section-lede"><?= e(__('budget.stats_year', ['year' => (string) $latestYear])) ?></p>
-                        </div>
-                    </header>
-                    <?php if ($topIncome === []): ?>
-                        <div class="empty-state compact">—</div>
-                    <?php else: ?>
-                        <div class="table-wrap embedded">
-                            <table class="data-table statistics-table">
-                                <thead>
-                                <tr>
-                                    <th><?= e(__('budget.category_label')) ?></th>
-                                    <th><?= e(__('budget.amount')) ?></th>
-                                    <th>%</th>
-                                </tr>
-                                </thead>
-                                <tbody>
-                                <?php foreach ($topIncome as $cat): ?>
-                                    <tr class="clickable-row"
-                                        data-href="<?= e(ledger_url([
-                                            'category' => (string) ($cat['key'] ?? '') !== '' ? (string) $cat['key'] : '__none__',
-                                            'direction' => 'income',
-                                            'year' => $latestYear,
-                                        ])) ?>"
-                                        tabindex="0" role="link" title="<?= e(__('budget.open_movements')) ?>">
-                                        <td><?= e((string) $cat['label']) ?></td>
-                                        <td class="num"><?= e($currency->format((float) $cat['amount'])) ?></td>
-                                        <td class="num"><?= e(number_format((float) $cat['percent'], 1, ',', '.')) ?>%</td>
-                                    </tr>
-                                <?php endforeach; ?>
-                                </tbody>
-                            </table>
-                        </div>
-                    <?php endif; ?>
-                </div>
-            </div>
-        <?php endif; ?>
+            <?php endif; ?>
+        </div>
     </section>
 </div>
+
+<script src="<?= e(asset('js/chart.umd.min.js')) ?>"></script>
 

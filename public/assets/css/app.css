@@ -10758,6 +10758,10 @@ button.setup-scrape-logo-frame:focus-visible .setup-scrape-logo-overlay {
 .treasury-col-check { width: 2.25rem; }
 .treasury-pending-badge { margin-left: 0.35rem; }
 .treasury-pending-banner { margin: 0 0 0.85rem; }
+.treasury-health-banner { margin: 0 0 0.85rem; }
+.treasury-health-list { margin: 0.55rem 0 0; padding-left: 1.15rem; display: grid; gap: 0.65rem; }
+.treasury-health-item > div { margin: 0.15rem 0 0.35rem; }
+.treasury-health-item form { margin-top: 0.25rem; }
 .treasury-ledger .treasury-row-expense { background: color-mix(in srgb, #b42318 5%, transparent); }
 /* Internal transfer: liquidity moved between own accounts — neutral, balance-safe row. */
 .treasury-ledger .treasury-row-transfer { background: color-mix(in srgb, #5b6472 7%, transparent); }

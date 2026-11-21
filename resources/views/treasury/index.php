@@ -584,6 +584,35 @@ if ($filterYear !== '' && !isset($yearFilterOptions[$filterYear])) {
             </div>
         </div>
     <?php endif; ?>
+    <?php if (!empty($health_alerts)): ?>
+        <div class="alert alert-warn treasury-health-banner" role="region" aria-labelledby="treasury-health-banner-title">
+            <strong id="treasury-health-banner-title"><?= e(__('treasury.health_title')) ?></strong>
+            <ul class="treasury-health-list">
+                <?php foreach ($health_alerts as $alert): ?>
+                    <li class="treasury-health-item">
+                        <strong><?= e((string) ($alert['title'] ?? '')) ?></strong>
+                        <?php if ((int) ($alert['count'] ?? 0) > 0): ?>
+                            <span class="muted">(<?= e((string) (int) ($alert['count'] ?? 0)) ?>)</span>
+                        <?php endif; ?>
+                        <div><?= e((string) ($alert['detail'] ?? '')) ?></div>
+                        <?php if (!empty($alert['href'])): ?>
+                            <div>
+                                <a class="btn btn-sm btn-ghost" href="<?= e((string) $alert['href']) ?>"><?= e(__('treasury.health_open_filter')) ?></a>
+                            </div>
+                        <?php endif; ?>
+                        <?php if (!empty($alert['dismissable'])): ?>
+                            <form method="post" action="<?= e(url('/treasury/health/dismiss')) ?>" style="display:inline">
+                                <?= csrf_field() ?>
+                                <input type="hidden" name="issue_key" value="<?= e((string) ($alert['key'] ?? '')) ?>">
+                                <input type="hidden" name="fingerprint" value="<?= e((string) ($alert['fingerprint'] ?? '')) ?>">
+                                <button class="btn btn-ghost btn-sm" type="submit"><?= e(__('treasury.health_dismiss')) ?></button>
+                            </form>
+                        <?php endif; ?>
+                    </li>
+                <?php endforeach; ?>
+            </ul>
+        </div>
+    <?php endif; ?>
     <?php $pendingCount = (int) ($pending_count ?? 0); ?>
     <?php if ($pendingCount > 0): ?>
         <div class="alert alert-warn treasury-pending-banner" role="status" data-treasury-pending-banner>

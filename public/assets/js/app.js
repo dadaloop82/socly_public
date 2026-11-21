@@ -204,6 +204,7 @@ document.addEventListener('DOMContentLoaded', () => {
   initBudgetGrid(document);
   initBudgetCreateForm(document);
   initBudgetTabs();
+  initBudgetAnnualCharts();
   initEmailTemplateEditor(document);
   initFieldsSortable(document);
   initComponentCards(document);
@@ -17781,6 +17782,203 @@ function initFieldsSortable(scope = document) {
 }
 
 /* ── Financial statements: Budget / Actuals / Statistics tabs ── */
+function initBudgetAnnualCharts() {
+  const root = document.querySelector('[data-budget-annual-charts]');
+  if (!root || typeof Chart === 'undefined') {
+    return;
+  }
+  registerSoclyPiePercentPlugin();
+  const panel = root.closest('[data-budget-panel]');
+  if (panel && panel.hidden) {
+    return;
+  }
+  if (root.dataset.chartsReady === '1') {
+    root.querySelectorAll('canvas').forEach((canvas) => {
+      const chart = Chart.getChart(canvas);
+      if (chart) {
+        chart.resize();
+      }
+    });
+    return;
+  }
+
+  root.querySelectorAll('canvas').forEach((canvas) => {
+    const mounted = Chart.getChart(canvas);
+    if (mounted) mounted.destroy();
+  });
+
+  let data;
+  let i18n;
+  try {
+    data = JSON.parse(root.getAttribute('data-budget-annual-charts') || '{}');
+    i18n = JSON.parse(root.getAttribute('data-budget-annual-chart-i18n') || '{}');
+  } catch (err) {
+    return;
+  }
+
+  const brand = '#0D6E66';
+  const accent = '#B84A1B';
+  const palette = [brand, accent, '#2A8F85', '#C56A3A', '#4A6B66', '#8B3A16', '#6FA8A1', '#E08A5C'];
+  const currency = i18n.currency || '€';
+  const moneyTooltip = {
+    backgroundColor: '#084B46',
+    titleColor: '#F4FBF9',
+    bodyColor: '#D7E8E4',
+    padding: 12,
+    cornerRadius: 10,
+    callbacks: {
+      label(ctx) {
+        const label = ctx.label || ctx.dataset.label || '';
+        const value = ctx.parsed?.y ?? ctx.parsed ?? 0;
+        return `${label}: ${formatMoney(value, currency)}${soclyShareSuffix(ctx)}`;
+      },
+    },
+  };
+
+  const flowValues = data.flow?.values || [];
+  const flowLabels = data.flow?.labels || [];
+  const flowEl = document.getElementById('chart-budget-annual-flow');
+  if (flowEl) {
+    new Chart(flowEl, {
+      type: 'doughnut',
+      data: {
+        labels: flowLabels,
+        datasets: [{
+          data: flowValues,
+          backgroundColor: [brand, accent],
+          borderColor: '#fff',
+          borderWidth: 3,
+          hoverOffset: 6,
+        }],
+      },
+      options: {
+        ...donutOptions(flowValues.length),
+        plugins: {
+          ...donutOptions(flowValues.length).plugins,
+          tooltip: moneyTooltip,
+        },
+      },
+    });
+  }
+
+  const expenseValues = data.expense_by_category?.values || [];
+  const expenseEl = document.getElementById('chart-budget-annual-expense');
+  if (expenseEl) {
+    new Chart(expenseEl, {
+      type: 'doughnut',
+      data: {
+        labels: data.expense_by_category?.labels || [],
+        datasets: [{
+          data: expenseValues,
+          backgroundColor: expenseValues.map((_, i) => palette[i % palette.length]),
+          borderColor: '#fff',
+          borderWidth: 3,
+          hoverOffset: 6,
+        }],
+      },
+      options: {
+        ...donutOptions(expenseValues.length),
+        plugins: {
+          ...donutOptions(expenseValues.length).plugins,
+          tooltip: moneyTooltip,
+        },
+      },
+    });
+  }
+
+  const incomeValues = data.income_by_category?.values || [];
+  const incomeEl = document.getElementById('chart-budget-annual-income');
+  if (incomeEl) {
+    new Chart(incomeEl, {
+      type: 'doughnut',
+      data: {
+        labels: data.income_by_category?.labels || [],
+        datasets: [{
+          data: incomeValues,
+          backgroundColor: incomeValues.map((_, i) => palette[(i + 2) % palette.length]),
+          borderColor: '#fff',
+          borderWidth: 3,
+          hoverOffset: 6,
+        }],
+      },
+      options: {
+        ...donutOptions(incomeValues.length),
+        plugins: {
+          ...donutOptions(incomeValues.length).plugins,
+          tooltip: moneyTooltip,
+        },
+      },
+    });
+  }
+
+  const monthly = data.monthly || {};
+  const monthlyEl = document.getElementById('chart-budget-annual-monthly');
+  if (monthlyEl) {
+    new Chart(monthlyEl, {
+      type: 'bar',
+      data: {
+        labels: monthly.labels || [],
+        datasets: [
+          {
+            label: i18n.income || 'Income',
+            data: monthly.income || [],
+            backgroundColor: 'rgba(13, 110, 102, 0.82)',
+            hoverBackgroundColor: '#084B46',
+            borderRadius: 6,
+            borderSkipped: false,
+            maxBarThickness: 26,
+          },
+          {
+            label: i18n.expense || 'Expense',
+            data: monthly.expense || [],
+            backgroundColor: 'rgba(184, 74, 27, 0.78)',
+            hoverBackgroundColor: '#8B3A16',
+            borderRadius: 6,
+            borderSkipped: false,
+            maxBarThickness: 26,
+          },
+        ],
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        interaction: { mode: 'index', intersect: false },
+        plugins: {
+          legend: chartLegendOptions(2, 'top'),
+          tooltip: {
+            ...moneyTooltip,
+            callbacks: {
+              label(ctx) {
+                const label = ctx.dataset.label || '';
+                return `${label}: ${formatMoney(ctx.parsed?.y ?? 0, currency)}`;
+              },
+            },
+          },
+        },
+        scales: {
+          x: {
+            grid: { display: false },
+            ticks: { maxRotation: 0, autoSkipPadding: 8 },
+            border: { display: false },
+          },
+          y: {
+            beginAtZero: true,
+            grid: { color: 'rgba(13, 110, 102, 0.08)' },
+            border: { display: false },
+            ticks: {
+              callback(value) {
+                return formatMoney(value, currency, true);
+              },
+            },
+          },
+        },
+      },
+    });
+  }
+
+  root.dataset.chartsReady = '1';
+}
+
 function initBudgetTabs() {
   const root = document.querySelector('[data-budget-tabs]');
   if (!root) return;
@@ -17799,6 +17997,9 @@ function initBudgetTabs() {
     panels.forEach((panel) => {
       panel.hidden = panel.getAttribute('data-budget-panel') !== target;
     });
+    if (target === 'bilancio') {
+      initBudgetAnnualCharts();
+    }
     if (updateHash) {
       const nextHash = `#bil-${target}`;
       if (location.hash !== nextHash) {

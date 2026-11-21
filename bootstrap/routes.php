@@ -186,6 +186,7 @@ $router->get('/treasury/accounts/balances', [TreasuryController::class, 'account
 $router->get('/treasury/excerpt/{id}', [TreasuryController::class, 'statementExcerpt'], 'treasury.view', ['mw.locale', 'mw.install', 'mw.auth']);
 $router->post('/treasury/bulk', [TreasuryController::class, 'bulk'], 'treasury.manage', ['mw.locale', 'mw.install', 'mw.auth', 'mw.csrf']);
 $router->post('/treasury/{id}/approve', [TreasuryController::class, 'approve'], 'treasury.manage', ['mw.locale', 'mw.install', 'mw.auth', 'mw.csrf']);
+$router->post('/treasury/health/dismiss', [TreasuryController::class, 'dismissHealthAlert'], 'treasury.manage', ['mw.locale', 'mw.install', 'mw.auth', 'mw.csrf']);
 $router->post('/treasury/recurring/{id}/toggle', [TreasuryController::class, 'toggleRecurring'], 'treasury.manage', ['mw.locale', 'mw.install', 'mw.auth', 'mw.csrf']);
 $router->post('/treasury/recurring/{id}/delete', [TreasuryController::class, 'deleteRecurring'], 'treasury.manage', ['mw.locale', 'mw.install', 'mw.auth', 'mw.csrf']);
 $router->post('/treasury', [TreasuryController::class, 'store'], 'treasury.manage', ['mw.locale', 'mw.install', 'mw.auth', 'mw.csrf']);
@@ -204,6 +205,7 @@ $router->post('/treasury/{id}', [TreasuryController::class, 'update'], 'treasury
 
 $router->get('/budgets', [BudgetController::class, 'index'], 'treasury.view', ['mw.locale', 'mw.install', 'mw.auth']);
 $router->post('/budgets', [BudgetController::class, 'store'], 'treasury.manage', ['mw.locale', 'mw.install', 'mw.auth', 'mw.csrf']);
+$router->get('/budgets/annual/{year}/pdf', [BudgetController::class, 'annualPdf'], 'treasury.view', ['mw.locale', 'mw.install', 'mw.auth']);
 $router->get('/budgets/{id}', [BudgetController::class, 'show'], 'treasury.view', ['mw.locale', 'mw.install', 'mw.auth']);
 $router->post('/budgets/{id}', [BudgetController::class, 'save'], 'treasury.manage', ['mw.locale', 'mw.install', 'mw.auth', 'mw.csrf']);
 $router->post('/budgets/{id}/approve', [BudgetController::class, 'approve'], 'treasury.manage', ['mw.locale', 'mw.install', 'mw.auth', 'mw.csrf']);

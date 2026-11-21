@@ -55,6 +55,19 @@ final class BudgetController extends BaseController
     {
         require_component('treasury');
         $currentYear = (int) date('Y');
+        $availableReportYears = $this->budgets->availableReportYears();
+        $requestedYear = (int) $request->input('year', 0);
+        $year = $requestedYear > 0 ? $requestedYear : (int) ($availableReportYears[0] ?? $currentYear);
+        if ($availableReportYears !== [] && !in_array($year, $availableReportYears, true)) {
+            $year = (int) $availableReportYears[0];
+        }
+        if ($year < 2000) {
+            $year = (int) ($availableReportYears[0] ?? $currentYear);
+        }
+        $requestedTab = strtolower(trim((string) $request->input('tab', '')));
+        if ($requestedTab === 'statistiche') {
+            $requestedTab = 'bilancio';
+        }
         $budgets = $this->budgets->listDocuments();
         // One budget per social year, and one open draft at a time: until the existing draft is
         // completed (approved) or deleted, the page does not propose creating another one.
@@ -66,10 +79,10 @@ final class BudgetController extends BaseController
         $defaultYear = in_array($currentYear + 1, $years, true) ? $currentYear + 1 : ($years[0] ?? $currentYear + 1);
         $rendicontoYears = [];
         $modelDYears = $this->runts->years();
-        foreach ($modelDYears as $year) {
-            $income = $this->runts->totalIncome($year);
+        foreach ($modelDYears as $runtsYear) {
+            $income = $this->runts->totalIncome($runtsYear);
             $rendicontoYears[] = [
-                'year' => $year,
+                'year' => $runtsYear,
                 'income' => $income,
                 'can_generate' => $income < RuntsReportService::CASH_LIMIT,
             ];
@@ -81,19 +94,25 @@ final class BudgetController extends BaseController
                 ? $currentYear
                 : (int) ($modelDYears[0] ?? $currentYear);
         }
+        $defaultTab = 'preventivo';
+        if ($requestedTab === 'bilancio') {
+            $defaultTab = 'bilancio';
+        } elseif ($requestedModelDYear > 0) {
+            $defaultTab = 'model_d';
+        }
         $this->render('budgets/index', [
             'title' => __('budget.title'),
             'budgets' => $budgets,
             'drafts' => $drafts,
             'years' => $years,
             'default_year' => $defaultYear,
+            'annual_report' => $this->budgets->annualReport($year, $this->runts),
             'rendiconto_years' => $rendicontoYears,
             'runts_limit' => RuntsReportService::CASH_LIMIT,
-            'statistics' => $this->budgets->statistics(),
             'model_d_year' => $modelDYear,
             'model_d_years' => $modelDYears,
             'model_d_report' => $modelDYears === [] ? null : $this->runts->report($modelDYear),
-            'default_tab' => $requestedModelDYear > 0 ? 'model_d' : 'preventivo',
+            'default_tab' => $defaultTab,
             'currency' => $this->currency,
         ]);
     }
@@ -341,6 +360,34 @@ final class BudgetController extends BaseController
         $this->render('budgets/rendiconto', [
             'comparison' => $comparison,
             'evidence' => $this->budgets->evidence((int) $id),
+            'currency' => $this->currency,
+            'assocName' => assoc_capitalize_name((string) ($branding['name'] ?? 'SOCLY')),
+            'assocLegalCode' => $legalCode,
+            'assocLegalLabel' => $legalLabel,
+            'assocFiscalCode' => trim((string) $this->settings->get('association.fiscal_code', '')),
+            'assocCity' => trim((string) $this->settings->get('association.city', '')),
+            'brandPrimary' => (string) ($branding['primary'] ?? ''),
+            'brandAccent' => (string) ($branding['accent'] ?? ''),
+            'generatedAt' => date('d/m/Y H:i'),
+        ], null);
+    }
+
+    public function annualPdf(Request $request, string $year): void
+    {
+        require_component('treasury');
+        $branding = app()->branding();
+        $legalCode = strtoupper(trim((string) ($branding['legal_name'] ?? '')));
+        $legalLabel = '';
+        if ($legalCode !== '') {
+            $forms = \Socly\Setup\AssociationLegalForms::all();
+            if (isset($forms[$legalCode])) {
+                $legalLabel = (string) __($forms[$legalCode]);
+            }
+        }
+        $annualReport = $this->budgets->annualReport((int) $year, $this->runts);
+        $this->render('budgets/annual_pdf', [
+            'annual_report' => $annualReport,
+            'year' => (int) ($annualReport['year'] ?? $year),
             'currency' => $this->currency,
             'assocName' => assoc_capitalize_name((string) ($branding['name'] ?? 'SOCLY')),
             'assocLegalCode' => $legalCode,

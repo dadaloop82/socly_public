@@ -125,6 +125,7 @@ final class TreasuryController extends BaseController
             'filter_years' => $this->treasury->movementYears(),
             'advanced_filters_count' => $this->advancedFilterCount($filters),
             'pending_count' => $this->treasury->pendingCount(),
+            'health_alerts' => $this->treasury->ledgerHealthAlerts(),
             'page' => $page,
             'pages' => $pages,
             'per_page' => $perPage,
@@ -769,6 +770,30 @@ final class TreasuryController extends BaseController
             $this->flash('errors', [(string) ($result['message'] ?? __('validation.required'))]);
         } else {
             $this->flash('success', __('treasury.approved'));
+        }
+        redirect('/treasury');
+    }
+
+    public function dismissHealthAlert(Request $request): void
+    {
+        require_component('treasury');
+        if (!can('treasury.manage')) {
+            http_response_code(403);
+            $this->render('errors/403');
+            return;
+        }
+        $issueKey = trim((string) $request->input('issue_key', ''));
+        $fingerprint = trim((string) $request->input('fingerprint', ''));
+        $ok = $this->treasury->dismissHealthAlert(
+            $issueKey,
+            $fingerprint,
+            auth_user()['id'] ?? null,
+            $request->ip()
+        );
+        if ($ok) {
+            $this->flash('success', __('treasury.health_dismissed'));
+        } else {
+            $this->flash('errors', ['treasury' => __('treasury.health_dismiss_failed')]);
         }
         redirect('/treasury');
     }

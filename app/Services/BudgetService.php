@@ -1376,5 +1376,217 @@ final class BudgetService
             'fees_share' => $incomeTotal > 0 ? round($fees * 100 / $incomeTotal, 1) : 0.0,
         ];
     }
+
+    /**
+     * Full annual balance for a fiscal year: preventivo vs consuntivo, categories, fees, monthly
+     * flow, account snapshot and RUNTS section totals — material suitable for a public presentation.
+     *
+     * @return array<string,mixed>
+     */
+    public function annualReport(int $year, ?RuntsReportService $runts = null): array
+    {
+        $available = $this->availableReportYears();
+        if ($year < 2000) {
+            $year = (int) ($available[0] ?? date('Y'));
+        }
+        if ($available !== [] && !in_array($year, $available, true)) {
+            $year = (int) $available[0];
+        }
+
+        $planned = ['expense' => 0.0, 'income' => 0.0];
+        $budget = $this->findByYear($year);
+        if ($budget !== null) {
+            $plannedRow = $this->db->fetch(
+                "SELECT
+                    COALESCE(SUM(CASE WHEN direction = 'expense' THEN amount ELSE 0 END), 0) AS expense,
+                    COALESCE(SUM(CASE WHEN direction = 'income' THEN amount ELSE 0 END), 0) AS income
+                 FROM budget_items WHERE budget_id = :id",
+                ['id' => (int) $budget['id']]
+            );
+            $planned = [
+                'expense' => round((float) ($plannedRow['expense'] ?? 0), 2),
+                'income' => round((float) ($plannedRow['income'] ?? 0), 2),
+            ];
+        }
+
+        $actualRow = $this->db->fetch(
+            "SELECT
+                COALESCE(SUM(CASE WHEN direction = 'income' THEN amount ELSE 0 END), 0) AS income,
+                COALESCE(SUM(CASE WHEN direction = 'expense' THEN amount ELSE 0 END), 0) AS expense,
+                COUNT(*) AS movements
+             FROM treasury_movements
+             WHERE approved_at IS NOT NULL AND superseded_at IS NULL
+               AND direction IN ('income', 'expense') AND YEAR(movement_date) = :y",
+            ['y' => $year]
+        );
+        $actual = [
+            'income' => round((float) ($actualRow['income'] ?? 0), 2),
+            'expense' => round((float) ($actualRow['expense'] ?? 0), 2),
+            'movements' => (int) ($actualRow['movements'] ?? 0),
+        ];
+        $result = round($actual['income'] - $actual['expense'], 2);
+        $coverage = $actual['expense'] > 0
+            ? round($actual['income'] * 100 / $actual['expense'], 1)
+            : ($actual['income'] > 0 ? 100.0 : 0.0);
+
+        $categories = ['expense' => [], 'income' => []];
+        foreach ($this->db->fetchAll(
+            "SELECT category, direction, COALESCE(SUM(amount), 0) AS total, COUNT(*) AS cnt
+             FROM treasury_movements
+             WHERE approved_at IS NOT NULL AND superseded_at IS NULL
+               AND direction IN ('income', 'expense') AND YEAR(movement_date) = :y
+             GROUP BY category, direction
+             ORDER BY total DESC",
+            ['y' => $year]
+        ) as $row) {
+            $direction = (string) $row['direction'] === 'income' ? 'income' : 'expense';
+            $amount = (float) ($row['total'] ?? 0);
+            if ($amount <= 0) {
+                continue;
+            }
+            $key = trim((string) ($row['category'] ?? ''));
+            $categories[$direction][] = [
+                'key' => $key,
+                'label' => $key !== '' ? $this->treasury->categoryLabel($key) : (string) __('treasury.category_other'),
+                'amount' => round($amount, 2),
+                'count' => (int) ($row['cnt'] ?? 0),
+            ];
+        }
+        foreach (['expense', 'income'] as $direction) {
+            $total = array_sum(array_column($categories[$direction], 'amount'));
+            foreach ($categories[$direction] as &$category) {
+                $category['percent'] = $total > 0 ? round($category['amount'] * 100 / $total, 1) : 0.0;
+            }
+            unset($category);
+        }
+
+        $fees = (float) ($this->db->fetch(
+            "SELECT COALESCE(SUM(amount), 0) AS total
+             FROM treasury_movements
+             WHERE approved_at IS NOT NULL AND superseded_at IS NULL AND direction = 'income'
+               AND category = 'membership_fee' AND YEAR(movement_date) = :y",
+            ['y' => $year]
+        )['total'] ?? 0);
+
+        $monthly = ['labels' => [], 'income' => [], 'expense' => []];
+        $byMonth = [];
+        foreach ($this->db->fetchAll(
+            "SELECT MONTH(movement_date) AS m,
+                    COALESCE(SUM(CASE WHEN direction = 'income' THEN amount ELSE 0 END), 0) AS inc,
+                    COALESCE(SUM(CASE WHEN direction = 'expense' THEN amount ELSE 0 END), 0) AS exp
+             FROM treasury_movements
+             WHERE approved_at IS NOT NULL AND superseded_at IS NULL
+               AND direction IN ('income', 'expense') AND YEAR(movement_date) = :y
+             GROUP BY m",
+            ['y' => $year]
+        ) as $row) {
+            $byMonth[(int) ($row['m'] ?? 0)] = [(float) ($row['inc'] ?? 0), (float) ($row['exp'] ?? 0)];
+        }
+        for ($month = 1; $month <= 12; $month++) {
+            $monthly['labels'][] = (string) __('common.month_' . $month);
+            $monthly['income'][] = round($byMonth[$month][0] ?? 0.0, 2);
+            $monthly['expense'][] = round($byMonth[$month][1] ?? 0.0, 2);
+        }
+
+        $opening = (float) ($this->db->fetch(
+            "SELECT COALESCE(SUM(CASE WHEN direction = 'income' THEN amount WHEN direction = 'expense' THEN -amount ELSE 0 END), 0) AS net
+             FROM treasury_movements
+             WHERE approved_at IS NOT NULL AND superseded_at IS NULL AND movement_date < :from",
+            ['from' => sprintf('%04d-01-01', $year)]
+        )['net'] ?? 0);
+        $closing = round($opening + $actual['income'] - $actual['expense'], 2);
+
+        $accounts = $this->treasury->accountBalances([
+            'from' => sprintf('%04d-01-01', $year),
+            'to' => sprintf('%04d-12-31', $year),
+        ]);
+
+        $runtsSections = [];
+        if ($runts instanceof RuntsReportService) {
+            try {
+                $report = $runts->report($year);
+                foreach (($report['sections'] ?? []) as $letter => $section) {
+                    if (!is_array($section)) {
+                        continue;
+                    }
+                    $totals = is_array($section['totals'] ?? null) ? $section['totals'] : [];
+                    $runtsSections[] = [
+                        'letter' => (string) $letter,
+                        'label' => (string) ($section['label'] ?? $letter),
+                        'expense' => round((float) ($totals['expense'] ?? 0), 2),
+                        'income' => round((float) ($totals['income'] ?? 0), 2),
+                    ];
+                }
+            } catch (\Throwable) {
+                $runtsSections = [];
+            }
+        }
+
+        $charts = [
+            'flow' => [
+                'labels' => [__('treasury.direction_income'), __('treasury.direction_expense')],
+                'values' => [$actual['income'], $actual['expense']],
+            ],
+            'expense_by_category' => [
+                'labels' => array_column(array_slice($categories['expense'], 0, 8), 'label'),
+                'values' => array_column(array_slice($categories['expense'], 0, 8), 'amount'),
+            ],
+            'income_by_category' => [
+                'labels' => array_column(array_slice($categories['income'], 0, 8), 'label'),
+                'values' => array_column(array_slice($categories['income'], 0, 8), 'amount'),
+            ],
+            'monthly' => $monthly,
+        ];
+
+        return [
+            'year' => $year,
+            'available_years' => $available,
+            'budget' => $budget,
+            'planned' => $planned,
+            'actual' => $actual,
+            'result' => $result,
+            'coverage' => $coverage,
+            'need' => round($actual['expense'] - $actual['income'], 2),
+            'fees' => round($fees, 2),
+            'fees_share' => $actual['income'] > 0 ? round($fees * 100 / $actual['income'], 1) : 0.0,
+            'categories' => $categories,
+            'monthly' => $monthly,
+            'opening_balance' => round($opening, 2),
+            'closing_balance' => $closing,
+            'accounts' => $accounts,
+            'runts_sections' => $runtsSections,
+            'charts' => $charts,
+            'history' => $this->statistics(5)['years'],
+        ];
+    }
+
+    /**
+     * Years that have a budget and/or approved cash movements.
+     *
+     * @return list<int>
+     */
+    public function availableReportYears(): array
+    {
+        $years = [];
+        foreach ($this->db->fetchAll('SELECT DISTINCT fiscal_year AS y FROM budgets ORDER BY y DESC') as $row) {
+            $year = (int) ($row['y'] ?? 0);
+            if ($year >= 2000) {
+                $years[$year] = true;
+            }
+        }
+        foreach ($this->db->fetchAll(
+            'SELECT DISTINCT YEAR(movement_date) AS y FROM treasury_movements
+             WHERE approved_at IS NOT NULL AND superseded_at IS NULL ORDER BY y DESC'
+        ) as $row) {
+            $year = (int) ($row['y'] ?? 0);
+            if ($year >= 2000) {
+                $years[$year] = true;
+            }
+        }
+        $list = array_keys($years);
+        rsort($list);
+
+        return $list;
+    }
 }
 
