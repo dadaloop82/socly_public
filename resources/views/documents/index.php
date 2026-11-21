@@ -145,6 +145,7 @@ foreach ($documents as $doc) {
                 data-repair-failed="<?= e(__('documents.repair_excerpts_failed')) ?>"
                 data-repair-synced="<?= e(__('documents.repair_excerpts_synced')) ?>"
                 data-repair-unavailable="<?= e(__('documents.repair_excerpts_unavailable')) ?>"
+                data-repair-retry="<?= e(__('documents.repair_excerpts_retry')) ?>"
                 title="<?= e($excerptMissing > 0
                     ? __('documents.repair_excerpts_hint', ['count' => (string) $excerptMissing])
                     : __('documents.repair_excerpts_synced')) ?>"

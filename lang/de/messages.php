@@ -3797,6 +3797,7 @@ return [
         'repair_excerpts_empty' => 'Keine fehlenden Ausschnitte zu erzeugen.',
         'repair_excerpts_synced' => 'Alle Kassabuchungen zu den Kontoauszügen haben bereits einen Ausschnitt.',
         'repair_excerpts_unavailable' => 'Das Add-on Kontoauszüge importieren ist nicht verfügbar.',
+        'repair_excerpts_retry' => 'Die Ausschnitt-Erzeugung wurde unterbrochen (keine gültige JSON-Antwort). Erneut versuchen — bereits gespeicherte Ausschnitte bleiben erhalten.',
         'section_documents' => 'Protokolle und Dokumente',
         'section_treasury' => 'Kassa',
         'section_members' => 'Mitglieder',

@@ -16379,6 +16379,59 @@ function initRepairExcerpts() {
       bar.style.width = `${Math.round((safeCurrent / safeTotal) * 100)}%`;
     }
   };
+  const networkMsg = () => button.getAttribute('data-repair-retry')
+    || button.getAttribute('data-repair-unavailable')
+    || 'Error';
+  const readJson = async (response) => {
+    const raw = await response.text();
+    const trimmed = (raw || '').trim();
+    if (trimmed === '') {
+      throw new Error(networkMsg());
+    }
+    if (trimmed.charAt(0) === '<') {
+      // Proxy/login/error HTML instead of the expected JSON payload.
+      throw new Error(networkMsg());
+    }
+    try {
+      return JSON.parse(trimmed);
+    } catch (err) {
+      throw new Error(networkMsg());
+    }
+  };
+  const postJson = async (url, body, attempts = 3) => {
+    let lastError = null;
+    for (let attempt = 1; attempt <= attempts; attempt += 1) {
+      try {
+        const response = await fetch(url, {
+          method: 'POST',
+          credentials: 'same-origin',
+          redirect: 'manual',
+          headers: {
+            Accept: 'application/json',
+            'Content-Type': 'application/x-www-form-urlencoded',
+            'X-Requested-With': 'XMLHttpRequest',
+          },
+          body,
+        });
+        if (response.type === 'opaqueredirect' || (response.status >= 300 && response.status < 400)) {
+          throw new Error(networkMsg());
+        }
+        const data = await readJson(response);
+        if (data && data.retryable && attempt < attempts) {
+          await new Promise((resolve) => window.setTimeout(resolve, 400 * attempt));
+          continue;
+        }
+        return data;
+      } catch (err) {
+        lastError = err;
+        if (attempt >= attempts) {
+          break;
+        }
+        await new Promise((resolve) => window.setTimeout(resolve, 400 * attempt));
+      }
+    }
+    throw lastError || new Error(networkMsg());
+  };
 
   button.addEventListener('click', async () => {
     if (button.disabled) {
@@ -16408,17 +16461,7 @@ function initRepairExcerpts() {
     let finished = false;
     let last = { stored: 0, failed: 0, total: missing };
     try {
-      const startRes = await fetch(startUrl, {
-        method: 'POST',
-        credentials: 'same-origin',
-        headers: {
-          Accept: 'application/json',
-          'Content-Type': 'application/x-www-form-urlencoded',
-          'X-Requested-With': 'XMLHttpRequest',
-        },
-        body: new URLSearchParams({ _token: token }),
-      });
-      const startData = await startRes.json();
+      const startData = await postJson(startUrl, new URLSearchParams({ _token: token }), 2);
       if (!startData?.ok || !startData.job) {
         const emptyMsg = button.getAttribute('data-repair-synced')
           || button.getAttribute('data-repair-unavailable')
@@ -16432,20 +16475,21 @@ function initRepairExcerpts() {
       paint(0, Number(startData.total || last.total || 1), Number(startData.total || 1) * 2, workingTpl, etaTpl);
 
       while (!finished) {
-        const tickRes = await fetch(tickUrl, {
-          method: 'POST',
-          credentials: 'same-origin',
-          headers: {
-            Accept: 'application/json',
-            'Content-Type': 'application/x-www-form-urlencoded',
-            'X-Requested-With': 'XMLHttpRequest',
-          },
-          body: new URLSearchParams({ _token: token, job }),
-        });
-        const tickData = await tickRes.json();
-        last = tickData || last;
+        const tickData = await postJson(tickUrl, new URLSearchParams({ _token: token, job }), 4);
+        if (tickData?.ok === false && tickData?.finished) {
+          throw new Error(tickData.error || networkMsg());
+        }
+        if (tickData && (tickData.current != null || tickData.stored != null)) {
+          last = {
+            ...last,
+            ...tickData,
+            total: Number(tickData.total || last.total || 1),
+            stored: Number(tickData.stored != null ? tickData.stored : last.stored || 0),
+            failed: Number(tickData.failed != null ? tickData.failed : last.failed || 0),
+          };
+        }
         paint(
-          Number(tickData?.current || 0),
+          Number(tickData?.current || last.current || 0),
           Number(tickData?.total || last.total || 1),
           Number(tickData?.eta_seconds || 0),
           workingTpl,
@@ -16453,7 +16497,7 @@ function initRepairExcerpts() {
         );
         finished = !!tickData?.finished;
         if (!finished) {
-          await new Promise((resolve) => window.setTimeout(resolve, 120));
+          await new Promise((resolve) => window.setTimeout(resolve, 80));
         }
       }
 
@@ -16476,7 +16520,7 @@ function initRepairExcerpts() {
       overlay.hidden = true;
       document.documentElement.classList.remove('is-busy');
       button.disabled = false;
-      window.alert(err?.message || 'Error');
+      window.alert(err?.message || networkMsg());
     }
   });
 }

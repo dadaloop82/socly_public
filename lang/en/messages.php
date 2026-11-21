@@ -3797,6 +3797,7 @@ return [
         'repair_excerpts_empty' => 'No missing excerpts to generate.',
         'repair_excerpts_synced' => 'Every cash movement linked to a bank statement already has its excerpt.',
         'repair_excerpts_unavailable' => 'The bank-statement import add-on is not available.',
+        'repair_excerpts_retry' => 'Excerpt generation stopped (the server returned a non-JSON response). Try again — crops already stored are kept.',
         'section_documents' => 'Minutes & documents',
         'section_treasury' => 'Cash book',
         'section_members' => 'Members',

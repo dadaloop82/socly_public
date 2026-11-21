@@ -385,29 +385,43 @@ final class DocumentsController extends BaseController
     {
         require_component('documents');
         header('Content-Type: application/json; charset=utf-8');
-        $service = $this->statementImportService();
-        if ($service === null) {
-            http_response_code(503);
-            echo json_encode(['ok' => false, 'error' => __('documents.repair_excerpts_unavailable')], JSON_UNESCAPED_UNICODE);
-            return;
-        }
-        $result = $service->startExcerptRepair($request->ip(), auth_user()['id'] ?? null);
-        if (empty($result['ok'])) {
-            $error = (string) ($result['error'] ?? 'empty');
+        try {
+            $service = $this->statementImportService();
+            if ($service === null) {
+                http_response_code(503);
+                echo json_encode(['ok' => false, 'error' => __('documents.repair_excerpts_unavailable')], JSON_UNESCAPED_UNICODE);
+                return;
+            }
+            $result = $service->startExcerptRepair($request->ip(), auth_user()['id'] ?? null);
+            if (empty($result['ok'])) {
+                $error = (string) ($result['error'] ?? 'empty');
+                echo json_encode([
+                    'ok' => false,
+                    'error' => $error === 'empty'
+                        ? __('documents.repair_excerpts_synced')
+                        : __('documents.repair_excerpts_unavailable'),
+                    'synced' => $error === 'empty',
+                ], JSON_UNESCAPED_UNICODE);
+                return;
+            }
+            echo json_encode([
+                'ok' => true,
+                'job' => (string) ($result['job'] ?? ''),
+                'total' => (int) ($result['total'] ?? 0),
+            ], JSON_UNESCAPED_UNICODE);
+        } catch (\Throwable $e) {
+            try {
+                app('logger')->error('documents.repair_excerpts_start_failed', [
+                    'error' => $e->getMessage(),
+                ]);
+            } catch (\Throwable) {
+            }
+            http_response_code(500);
             echo json_encode([
                 'ok' => false,
-                'error' => $error === 'empty'
-                    ? __('documents.repair_excerpts_synced')
-                    : __('documents.repair_excerpts_unavailable'),
-                'synced' => $error === 'empty',
+                'error' => __('documents.repair_excerpts_unavailable'),
             ], JSON_UNESCAPED_UNICODE);
-            return;
         }
-        echo json_encode([
-            'ok' => true,
-            'job' => (string) ($result['job'] ?? ''),
-            'total' => (int) ($result['total'] ?? 0),
-        ], JSON_UNESCAPED_UNICODE);
     }
 
     /** Advance one unit of the excerpt-repair job (polled by the documents overlay). */
@@ -415,15 +429,38 @@ final class DocumentsController extends BaseController
     {
         require_component('documents');
         header('Content-Type: application/json; charset=utf-8');
-        $service = $this->statementImportService();
-        if ($service === null) {
-            http_response_code(503);
-            echo json_encode(['ok' => false, 'finished' => true, 'error' => __('documents.repair_excerpts_unavailable')], JSON_UNESCAPED_UNICODE);
-            return;
+        try {
+            $service = $this->statementImportService();
+            if ($service === null) {
+                http_response_code(503);
+                echo json_encode(['ok' => false, 'finished' => true, 'error' => __('documents.repair_excerpts_unavailable')], JSON_UNESCAPED_UNICODE);
+                return;
+            }
+            $job = trim((string) $request->input('job', ''));
+            $progress = $service->tickExcerptRepair($job);
+            echo json_encode($progress, JSON_UNESCAPED_UNICODE);
+        } catch (\Throwable $e) {
+            try {
+                app('logger')->error('documents.repair_excerpts_tick_failed', [
+                    'error' => $e->getMessage(),
+                    'job' => trim((string) $request->input('job', '')),
+                ]);
+            } catch (\Throwable) {
+            }
+            // Keep finished=false so the browser can retry the same job instead of aborting.
+            http_response_code(500);
+            echo json_encode([
+                'ok' => false,
+                'finished' => false,
+                'retryable' => true,
+                'current' => 0,
+                'total' => 0,
+                'stored' => 0,
+                'failed' => 0,
+                'eta_seconds' => 0,
+                'error' => __('documents.repair_excerpts_retry'),
+            ], JSON_UNESCAPED_UNICODE);
         }
-        $job = trim((string) $request->input('job', ''));
-        $progress = $service->tickExcerptRepair($job);
-        echo json_encode($progress, JSON_UNESCAPED_UNICODE);
     }
 
     public function repairExcerptsStatus(Request $request): void

@@ -3265,6 +3265,7 @@ return [
         'repair_excerpts_empty' => 'Nessun ritaglio mancante da generare.',
         'repair_excerpts_synced' => 'Tutti i movimenti relativi agli estratti conto hanno già il ritaglio.',
         'repair_excerpts_unavailable' => 'L’add-on Import estratti conto non è disponibile.',
+        'repair_excerpts_retry' => 'La generazione dei ritagli si è interrotta (risposta non valida dal server). Riprova: i ritagli già fatti restano.',
         'section_documents' => 'Verbali e documenti',
         'section_treasury' => 'Prima cassa',
         'section_members' => 'Soci',

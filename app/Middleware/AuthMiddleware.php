@@ -46,6 +46,18 @@ final class AuthMiddleware
             $this->auth->attemptRememberLogin($request->ip());
         }
         if (!auth_user()) {
+            $wantsJson = strtolower((string) ($request->header('X-Requested-With') ?? '')) === 'xmlhttprequest'
+                || str_contains(strtolower((string) ($request->header('Accept') ?? '')), 'application/json');
+            if ($wantsJson) {
+                http_response_code(401);
+                header('Content-Type: application/json; charset=utf-8');
+                echo json_encode([
+                    'ok' => false,
+                    'error' => 'unauthenticated',
+                    'redirect' => url('/login'),
+                ], JSON_UNESCAPED_UNICODE);
+                return false;
+            }
             redirect('/login');
         }
         if (!$this->idle->handle($request)) {
