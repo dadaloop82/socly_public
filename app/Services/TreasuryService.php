@@ -92,8 +92,8 @@ final class TreasuryService
     private const PATTERN_MIN_SCORE = 0.45;
     /** Maximum number of similar movements kept for one fingerprint. */
     private const PATTERN_SAMPLE_LIMIT = 24;
-    /** A field needs at least two similar examples before it can be reported as an anomaly. */
-    private const PATTERN_MIN_ANOMALY_SAMPLES = 2;
+    /** A field needs enough similar examples before it can be reported as an anomaly. */
+    private const PATTERN_MIN_ANOMALY_SAMPLES = 5;
     /** Candidate pool used by the fingerprint scan (newest movements first). */
     private const PATTERN_CANDIDATE_LIMIT = 4000;
 
@@ -175,98 +175,74 @@ final class TreasuryService
      *
      * @return list<array<string,mixed>>
      */
-    public function ledgerHealthAlerts(): array
-    {
-        $alerts = [];
-        $dismissed = $this->healthDismissalMap();
+    /**
+     * Structural + classification anomalies keyed by movement id.
+     * Used for the ledger warning mark and the “Solo anomalie” filter.
+     *
+     * @param list<int> $onlyIds when non-empty, only those ids are returned
+     * @return array<int, list<array{code:string,message:string,peer_ids?:list<int>}>>
+     */
+    /** @var array<int, list<array{code:string,message:string,peer_ids?:list<int>}>>|null */
+    private ?array $ledgerAnomalyCache = null;
 
-        try {
-            $rows = $this->db->fetchAll(
-                'SELECT YEAR(movement_date) AS y, MONTH(movement_date) AS m
-                 FROM treasury_movements
-                 WHERE approved_at IS NOT NULL
-                   AND superseded_at IS NULL
-                   AND movement_date IS NOT NULL
-                 GROUP BY y, m
-                 ORDER BY y DESC, m ASC'
-            );
-            $byYear = [];
-            foreach ($rows as $row) {
-                $year = (int) ($row['y'] ?? 0);
-                $month = (int) ($row['m'] ?? 0);
-                if ($year < 1 || $month < 1 || $month > 12) {
-                    continue;
-                }
-                $byYear[$year][$month] = true;
+    public function ledgerAnomaliesById(array $onlyIds = []): array
+    {
+        if ($this->ledgerAnomalyCache === null) {
+            $this->ledgerAnomalyCache = $this->buildLedgerAnomaliesById();
+        }
+        if ($onlyIds === []) {
+            return $this->ledgerAnomalyCache;
+        }
+        $out = [];
+        foreach ($onlyIds as $id) {
+            $id = (int) $id;
+            if ($id > 0 && isset($this->ledgerAnomalyCache[$id])) {
+                $out[$id] = $this->ledgerAnomalyCache[$id];
             }
-            $currentYear = (int) date('Y');
-            $currentMonth = (int) date('n');
-            foreach ($byYear as $year => $monthsMap) {
-                if ($year > $currentYear) {
-                    continue;
-                }
-                $limitMonth = $year === $currentYear ? max(1, $currentMonth) : 12;
-                $missing = [];
-                $missingLabels = [];
-                for ($month = 1; $month <= $limitMonth; $month++) {
-                    if (!isset($monthsMap[$month])) {
-                        $missing[] = $month;
-                        $missingLabels[] = (string) __('common.month_' . $month);
-                    }
-                }
-                if ($missing === []) {
-                    continue;
-                }
-                $fingerprint = $this->healthFingerprint('missing_months', [(string) $year, implode(',', $missing)]);
-                if ($this->healthAlertDismissed($dismissed, 'missing_months', $fingerprint)) {
-                    continue;
-                }
-                $alerts[] = [
-                    'key' => 'missing_months',
-                    'fingerprint' => $fingerprint,
-                    'severity' => 'warn',
-                    'title' => __('treasury.health_missing_months', ['year' => (string) $year]),
-                    'detail' => __('treasury.health_missing_months_detail', [
-                        'year' => (string) $year,
-                        'months' => implode(', ', $missingLabels),
-                    ]),
-                    'count' => count($missing),
-                    'href' => url('/treasury?year=' . $year),
-                    'dismissable' => true,
-                    'meta' => [
-                        'year' => $year,
-                        'months' => $missing,
-                    ],
-                ];
-            }
-        } catch (\Throwable) {
         }
 
+        return $out;
+    }
+
+    /**
+     * @return array<int, list<array{code:string,message:string,peer_ids?:list<int>}>>
+     */
+    private function buildLedgerAnomaliesById(): array
+    {
+        $map = [];
+        $add = static function (array &$map, int $id, string $code, string $message, array $peerIds = []): void {
+            if ($id < 1) {
+                return;
+            }
+            $entry = ['code' => $code, 'message' => $message];
+            if ($peerIds !== []) {
+                $entry['peer_ids'] = array_values($peerIds);
+            }
+            $map[$id][] = $entry;
+        };
+
+        // Perfect twins: same date, wallet, direction, amount, description, beneficiary,
+        // linked member and payment method. Anything different is not a duplicate.
         try {
-            // Perfect twins only: same date, wallet, direction, amount, description AND beneficiary.
             $rows = $this->db->fetchAll(
                 "SELECT movement_date, account, direction, ROUND(amount, 2) AS amount,
                         TRIM(COALESCE(description, '')) AS description,
                         TRIM(COALESCE(beneficiary, '')) AS beneficiary,
+                        COALESCE(member_id, 0) AS member_id,
+                        TRIM(COALESCE(payment_method, '')) AS payment_method,
                         COUNT(*) AS cnt,
                         GROUP_CONCAT(id ORDER BY id ASC) AS ids
                  FROM treasury_movements
                  WHERE superseded_at IS NULL
                    AND movement_date >= DATE_SUB(CURDATE(), INTERVAL 3 YEAR)
                  GROUP BY movement_date, account, direction, ROUND(amount, 2),
-                          TRIM(COALESCE(description, '')), TRIM(COALESCE(beneficiary, ''))
+                          TRIM(COALESCE(description, '')), TRIM(COALESCE(beneficiary, '')),
+                          COALESCE(member_id, 0), TRIM(COALESCE(payment_method, ''))
                  HAVING cnt > 1
                  ORDER BY movement_date DESC
-                 LIMIT 30"
+                 LIMIT 80"
             );
-            $groupKeys = [];
-            $allIds = [];
-            $items = [];
             foreach ($rows as $row) {
-                $cnt = (int) ($row['cnt'] ?? 0);
-                if ($cnt < 2) {
-                    continue;
-                }
                 $ids = array_values(array_filter(array_map(
                     static fn (string $id): int => (int) $id,
                     explode(',', (string) ($row['ids'] ?? ''))
@@ -274,71 +250,21 @@ final class TreasuryService
                 if (count($ids) < 2) {
                     continue;
                 }
-                $description = trim((string) ($row['description'] ?? ''));
-                $beneficiary = trim((string) ($row['beneficiary'] ?? ''));
-                $text = $description !== '' ? $description : ($beneficiary !== '' ? $beneficiary : '—');
-                $groupKeys[] = implode('|', [
-                    (string) ($row['movement_date'] ?? ''),
-                    mb_strtolower(trim((string) ($row['account'] ?? ''))),
-                    mb_strtolower(trim((string) ($row['direction'] ?? ''))),
-                    number_format((float) ($row['amount'] ?? 0), 2, '.', ''),
-                    mb_strtolower($description),
-                    mb_strtolower($beneficiary),
-                ]);
+                $peersLabel = implode(', ', array_map(static fn (int $id): string => '#' . $id, $ids));
                 foreach ($ids as $id) {
-                    $allIds[$id] = $id;
-                }
-                $links = [];
-                foreach ($ids as $id) {
-                    $links[] = [
-                        'href' => url('/treasury/' . $id . '/edit'),
-                        'label' => '#' . $id,
-                    ];
-                }
-                $items[] = [
-                    'label' => __('treasury.health_duplicates_item', [
-                        'date' => (string) ($row['movement_date'] ?? ''),
-                        'amount' => number_format((float) ($row['amount'] ?? 0), 2, ',', '.'),
-                        'account' => trim((string) ($row['account'] ?? '')),
-                        'text' => mb_substr($text, 0, 80),
+                    $peers = array_values(array_filter($ids, static fn (int $other): bool => $other !== $id));
+                    $add($map, $id, 'duplicate', (string) __('treasury.anomaly_duplicate', [
+                        'peers' => $peersLabel,
                         'count' => (string) count($ids),
-                    ]),
-                    'links' => $links,
-                ];
-            }
-            if ($groupKeys !== []) {
-                sort($groupKeys);
-                $fingerprint = $this->healthFingerprint('duplicates', $groupKeys);
-                if (!$this->healthAlertDismissed($dismissed, 'duplicates', $fingerprint)) {
-                    $idList = array_values($allIds);
-                    sort($idList);
-                    $alerts[] = [
-                        'key' => 'duplicates',
-                        'fingerprint' => $fingerprint,
-                        'severity' => 'warn',
-                        'title' => __('treasury.health_duplicates'),
-                        'detail' => __('treasury.health_duplicates_detail', [
-                            'groups' => (string) count($groupKeys),
-                            'count' => (string) count($idList),
-                        ]),
-                        'count' => count($groupKeys),
-                        'href' => url('/treasury?ids=' . implode(',', $idList)),
-                        'href_label' => __('treasury.health_open_duplicates'),
-                        'dismissable' => true,
-                        'items' => array_slice($items, 0, 12),
-                        'meta' => [
-                            'groups' => count($groupKeys),
-                            'ids' => $idList,
-                        ],
-                    ];
+                    ]), $peers);
                 }
             }
         } catch (\Throwable) {
         }
 
         try {
-            $countRow = $this->db->fetch(
-                "SELECT COUNT(*) AS c
+            $rows = $this->db->fetchAll(
+                "SELECT m.id
                    FROM treasury_movements m
                   WHERE m.superseded_at IS NULL
                     AND (
@@ -357,54 +283,8 @@ final class TreasuryService
                            AND (d.file_mime LIKE 'image/%' OR LOWER(COALESCE(d.original_name, '')) LIKE '%.png')
                     )"
             );
-            $missingExcerptCount = (int) ($countRow['c'] ?? 0);
-            if ($missingExcerptCount > 0) {
-                $fingerprint = $this->healthFingerprint('missing_excerpts', [(string) $missingExcerptCount]);
-                // Stable-ish: re-show when the count changes after a repair tick.
-                if (!$this->healthAlertDismissed($dismissed, 'missing_excerpts', $fingerprint)) {
-                    $alerts[] = [
-                        'key' => 'missing_excerpts',
-                        'fingerprint' => $fingerprint,
-                        'severity' => 'warn',
-                        'title' => __('treasury.health_missing_excerpts'),
-                        'detail' => __('treasury.health_missing_excerpts_detail', [
-                            'count' => (string) $missingExcerptCount,
-                        ]),
-                        'count' => $missingExcerptCount,
-                        'href' => url('/treasury/bank-statements'),
-                        'dismissable' => true,
-                        'meta' => [
-                            'count' => $missingExcerptCount,
-                        ],
-                    ];
-                }
-            }
-        } catch (\Throwable) {
-        }
-
-        try {
-            $ids = array_values(array_filter(array_map('intval', $this->classificationAnomalyIds())));
-            if ($ids !== []) {
-                sort($ids);
-                $fingerprint = $this->healthFingerprint('classification', [implode(',', $ids)]);
-                if (!$this->healthAlertDismissed($dismissed, 'classification', $fingerprint)) {
-                    $alerts[] = [
-                        'key' => 'classification',
-                        'fingerprint' => $fingerprint,
-                        'severity' => 'warn',
-                        'title' => __('treasury.health_classification'),
-                        'detail' => __('treasury.health_classification_detail', [
-                            'count' => (string) count($ids),
-                        ]),
-                        'count' => count($ids),
-                        'href' => url('/treasury?anomaly=1'),
-                        'href_label' => __('treasury.health_open_filter'),
-                        'dismissable' => true,
-                        'meta' => [
-                            'ids' => $ids,
-                        ],
-                    ];
-                }
+            foreach ($rows as $row) {
+                $add($map, (int) ($row['id'] ?? 0), 'missing_excerpt', (string) __('treasury.anomaly_missing_excerpt'));
             }
         } catch (\Throwable) {
         }
@@ -416,31 +296,10 @@ final class TreasuryService
                   WHERE approved_at IS NOT NULL
                     AND superseded_at IS NULL
                     AND direction IN ('income', 'expense')
-                    AND (runts_line IS NULL OR runts_line = '')
-                  ORDER BY movement_date DESC, id DESC"
+                    AND (runts_line IS NULL OR runts_line = '')"
             );
-            $ids = array_values(array_filter(array_map(static fn (array $row): int => (int) ($row['id'] ?? 0), $rows)));
-            if ($ids !== []) {
-                sort($ids);
-                $fingerprint = $this->healthFingerprint('runts_line', [implode(',', $ids)]);
-                if (!$this->healthAlertDismissed($dismissed, 'runts_line', $fingerprint)) {
-                    $alerts[] = [
-                        'key' => 'runts_line',
-                        'fingerprint' => $fingerprint,
-                        'severity' => 'warn',
-                        'title' => __('treasury.health_no_runts'),
-                        'detail' => __('treasury.health_no_runts_detail', [
-                            'count' => (string) count($ids),
-                        ]),
-                        'count' => count($ids),
-                        'href' => url('/treasury?runts_line=__none__&approval=approved'),
-                        'href_label' => __('treasury.health_open_filter'),
-                        'dismissable' => true,
-                        'meta' => [
-                            'ids' => $ids,
-                        ],
-                    ];
-                }
+            foreach ($rows as $row) {
+                $add($map, (int) ($row['id'] ?? 0), 'no_runts', (string) __('treasury.anomaly_no_runts'));
             }
         } catch (\Throwable) {
         }
@@ -450,36 +309,41 @@ final class TreasuryService
                 'SELECT id
                    FROM treasury_movements
                   WHERE superseded_at IS NULL
-                    AND movement_date > CURDATE()
-                  ORDER BY movement_date ASC, id ASC'
+                    AND movement_date > CURDATE()'
             );
-            $ids = array_values(array_filter(array_map(static fn (array $row): int => (int) ($row['id'] ?? 0), $rows)));
-            if ($ids !== []) {
-                sort($ids);
-                $fingerprint = $this->healthFingerprint('future_dates', [implode(',', $ids)]);
-                if (!$this->healthAlertDismissed($dismissed, 'future_dates', $fingerprint)) {
-                    $alerts[] = [
-                        'key' => 'future_dates',
-                        'fingerprint' => $fingerprint,
-                        'severity' => 'warn',
-                        'title' => __('treasury.health_future_dates'),
-                        'detail' => __('treasury.health_future_dates_detail', [
-                            'count' => (string) count($ids),
-                        ]),
-                        'count' => count($ids),
-                        'href' => url('/treasury?ids=' . implode(',', $ids)),
-                        'href_label' => __('treasury.health_open_filter'),
-                        'dismissable' => true,
-                        'meta' => [
-                            'ids' => $ids,
-                        ],
-                    ];
-                }
+            foreach ($rows as $row) {
+                $add($map, (int) ($row['id'] ?? 0), 'future_date', (string) __('treasury.anomaly_future_date'));
             }
         } catch (\Throwable) {
         }
 
-        return $alerts;
+        // Classification anomalies (noisy): keep a higher bar than the form hint.
+        try {
+            foreach ($this->classificationAnomalyIds() as $id) {
+                $add($map, (int) $id, 'classification', (string) __('treasury.anomaly_classification'));
+            }
+        } catch (\Throwable) {
+        }
+
+        ksort($map);
+
+        return $map;
+    }
+
+    /**
+     * Movement ids that should appear under the “Solo anomalie” filter.
+     *
+     * @return list<int>
+     */
+    public function ledgerAnomalyIds(): array
+    {
+        return array_map('intval', array_keys($this->ledgerAnomaliesById()));
+    }
+
+    /** @deprecated Banner removed; kept for dismiss route compatibility. */
+    public function ledgerHealthAlerts(): array
+    {
+        return [];
     }
 
     public function dismissHealthAlert(string $issueKey, string $fingerprint, ?int $userId, string $ip): bool
@@ -520,49 +384,6 @@ final class TreasuryService
         ], $ip, $userId);
 
         return true;
-    }
-
-    /**
-     * @return array<string,array<string,true>>
-     */
-    private function healthDismissalMap(): array
-    {
-        try {
-            $rows = $this->db->fetchAll(
-                'SELECT issue_key, fingerprint
-                   FROM treasury_health_dismissals
-                  ORDER BY issue_key ASC, fingerprint ASC'
-            );
-        } catch (\Throwable) {
-            return [];
-        }
-        $map = [];
-        foreach ($rows as $row) {
-            $issueKey = trim((string) ($row['issue_key'] ?? ''));
-            $fingerprint = trim((string) ($row['fingerprint'] ?? ''));
-            if ($issueKey === '' || $fingerprint === '') {
-                continue;
-            }
-            $map[$issueKey][$fingerprint] = true;
-        }
-
-        return $map;
-    }
-
-    /**
-     * @param array<string,array<string,true>> $dismissed
-     */
-    private function healthAlertDismissed(array $dismissed, string $issueKey, string $fingerprint): bool
-    {
-        return isset($dismissed[$issueKey][$fingerprint]);
-    }
-
-    /**
-     * @param list<string> $parts
-     */
-    private function healthFingerprint(string $issueKey, array $parts): string
-    {
-        return sha1($issueKey . '|' . implode('|', $parts));
     }
 
     /** @return list<string> */

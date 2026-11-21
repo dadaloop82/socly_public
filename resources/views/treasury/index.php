@@ -51,6 +51,8 @@ $filterApproval = (string) ($filters['approval'] ?? '');
 $filterAnomaly = (string) ($filters['anomaly'] ?? '');
 $filterBeneficiary = (string) ($filters['beneficiary'] ?? '');
 $filterNoCounterparty = (string) ($filters['no_counterparty'] ?? '');
+$rowAnomaliesMap = is_array($row_anomalies ?? null) ? $row_anomalies : [];
+$filterIds = trim((string) ($filters['ids'] ?? ''));
 $hasActiveFilters = trim((string) ($search_query ?? '')) !== ''
     || $filterPeriod !== ''
     || $filterDirection !== ''
@@ -63,7 +65,8 @@ $hasActiveFilters = trim((string) ($search_query ?? '')) !== ''
     || $filterApproval !== ''
     || $filterAnomaly !== ''
     || $filterBeneficiary !== ''
-    || $filterNoCounterparty !== '';
+    || $filterNoCounterparty !== ''
+    || $filterIds !== '';
 // Pager: keep search, filters and sort when moving between pages (cost centre and Model D line too:
 // the drill-down from budgets opens the ledger already filtered).
 $pagerQuery = array_filter([
@@ -584,59 +587,6 @@ if ($filterYear !== '' && !isset($yearFilterOptions[$filterYear])) {
             </div>
         </div>
     <?php endif; ?>
-    <?php if (!empty($health_alerts)): ?>
-        <div class="alert alert-warn treasury-health-banner" role="region" aria-labelledby="treasury-health-banner-title">
-            <strong id="treasury-health-banner-title"><?= e(__('treasury.health_title')) ?></strong>
-            <ul class="treasury-health-list">
-                <?php foreach ($health_alerts as $alert): ?>
-                    <?php
-                    $alertItems = is_array($alert['items'] ?? null) ? $alert['items'] : [];
-                    $hrefLabel = trim((string) ($alert['href_label'] ?? '')) !== ''
-                        ? (string) $alert['href_label']
-                        : (string) __('treasury.health_open_filter');
-                    ?>
-                    <li class="treasury-health-item">
-                        <strong><?= e((string) ($alert['title'] ?? '')) ?></strong>
-                        <?php if ((int) ($alert['count'] ?? 0) > 0): ?>
-                            <span class="muted">(<?= e((string) (int) ($alert['count'] ?? 0)) ?>)</span>
-                        <?php endif; ?>
-                        <div><?= e((string) ($alert['detail'] ?? '')) ?></div>
-                        <?php if ($alertItems !== []): ?>
-                            <ul class="treasury-health-dupes">
-                                <?php foreach ($alertItems as $item): ?>
-                                    <li>
-                                        <span><?= e((string) ($item['label'] ?? '')) ?></span>
-                                        <?php if (!empty($item['links']) && is_array($item['links'])): ?>
-                                            <span class="treasury-health-dupes-links">
-                                                <?php foreach ($item['links'] as $link): ?>
-                                                    <a href="<?= e((string) ($link['href'] ?? '#')) ?>"><?= e((string) ($link['label'] ?? '')) ?></a>
-                                                <?php endforeach; ?>
-                                            </span>
-                                        <?php endif; ?>
-                                    </li>
-                                <?php endforeach; ?>
-                            </ul>
-                        <?php endif; ?>
-                        <?php if (!empty($alert['href']) || !empty($alert['dismissable'])): ?>
-                            <div class="treasury-health-actions">
-                                <?php if (!empty($alert['href'])): ?>
-                                    <a class="btn btn-sm btn-ghost" href="<?= e((string) $alert['href']) ?>"><?= e($hrefLabel) ?></a>
-                                <?php endif; ?>
-                                <?php if (!empty($alert['dismissable'])): ?>
-                                    <form method="post" action="<?= e(url('/treasury/health/dismiss')) ?>">
-                                        <?= csrf_field() ?>
-                                        <input type="hidden" name="issue_key" value="<?= e((string) ($alert['key'] ?? '')) ?>">
-                                        <input type="hidden" name="fingerprint" value="<?= e((string) ($alert['fingerprint'] ?? '')) ?>">
-                                        <button class="btn btn-ghost btn-sm" type="submit"><?= e(__('treasury.health_dismiss')) ?></button>
-                                    </form>
-                                <?php endif; ?>
-                            </div>
-                        <?php endif; ?>
-                    </li>
-                <?php endforeach; ?>
-            </ul>
-        </div>
-    <?php endif; ?>
     <?php $pendingCount = (int) ($pending_count ?? 0); ?>
     <?php if ($pendingCount > 0): ?>
         <div class="alert alert-warn treasury-pending-banner" role="status" data-treasury-pending-banner>
@@ -997,9 +947,33 @@ if ($filterYear !== '' && !isset($yearFilterOptions[$filterYear])) {
                                 $rowRuntsKey = strtoupper(trim((string) ($row['runts_line'] ?? '')));
                                 $rowRuntsLabel = $rowRuntsKey !== '' ? \Socly\Services\RuntsReportService::lineLabelWithSection($rowRuntsKey) : '';
                                 $rowBudgetLabel = trim((string) ($row['budget_item_label'] ?? ''));
+                                $rowAnomalies = is_array($rowAnomaliesMap[$rowId] ?? null) ? $rowAnomaliesMap[$rowId] : [];
+                                $rowAnomalyLabels = [];
+                                $rowDuplicatePeerIds = [];
+                                foreach ($rowAnomalies as $issue) {
+                                    if (!is_array($issue)) {
+                                        continue;
+                                    }
+                                    $message = trim((string) ($issue['message'] ?? ''));
+                                    if ($message !== '') {
+                                        $rowAnomalyLabels[] = $message;
+                                    }
+                                    if ((string) ($issue['code'] ?? '') === 'duplicate') {
+                                        foreach ((array) ($issue['peer_ids'] ?? []) as $peerId) {
+                                            $peerId = (int) $peerId;
+                                            if ($peerId > 0) {
+                                                $rowDuplicatePeerIds[$peerId] = $peerId;
+                                            }
+                                        }
+                                        $rowDuplicatePeerIds[$rowId] = $rowId;
+                                    }
+                                }
+                                $rowAnomalyText = implode(' · ', $rowAnomalyLabels);
+                                $rowDuplicateIds = array_values($rowDuplicatePeerIds);
+                                sort($rowDuplicateIds);
                                 ?>
                                 <tr
-                                    class="treasury-row treasury-row-<?= $isTransfer ? 'transfer' : ($isIncome ? 'income' : 'expense') ?><?= $canManage && !$isSuperseded ? ' doc-row-editable' : '' ?><?= $isSuperseded ? ' is-superseded' : '' ?>"
+                                    class="treasury-row treasury-row-<?= $isTransfer ? 'transfer' : ($isIncome ? 'income' : 'expense') ?><?= $canManage && !$isSuperseded ? ' doc-row-editable' : '' ?><?= $isSuperseded ? ' is-superseded' : '' ?><?= $rowAnomalyLabels !== [] ? ' has-anomaly' : '' ?>"
                                     data-treasury-row="<?= $rowId ?>" data-treasury-approved="<?= $isPending ? '0' : '1' ?>" data-treasury-account="<?= e($accountKey) ?>"
                                     data-treasury-amount="<?= e(number_format($amount, 2, '.', '')) ?>"
                                     data-treasury-direction="<?= $isTransfer ? 'transfer' : ($isIncome ? 'income' : 'expense') ?>"
@@ -1030,7 +1004,31 @@ if ($filterYear !== '' && !isset($yearFilterOptions[$filterYear])) {
                                         <?php endif; ?>
                                     </td>
                                     <td>
+                                        <div class="treasury-row-desc">
+                                        <?php if ($rowAnomalyLabels !== []): ?>
+                                            <span
+                                                class="member-anomaly-mark"
+                                                tabindex="0"
+                                                role="img"
+                                                data-stop-row-nav
+                                                aria-label="<?= e(__('treasury.anomaly_aria') . ': ' . $rowAnomalyText) ?>"
+                                                title="<?= e($rowAnomalyText) ?>"
+                                            >
+                                                <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true" focusable="false">
+                                                    <path fill="currentColor" d="M12 3.2 22 20.5H2L12 3.2zm0 5.3c-.7 0-1.2.5-1.1 1.2l.4 5.1h1.4l.4-5.1c.1-.7-.4-1.2-1.1-1.2zm0 8.3a1.15 1.15 0 1 0 0 2.3 1.15 1.15 0 0 0 0-2.3z"/>
+                                                </svg>
+                                                <span class="member-anomaly-tooltip"><?= e($rowAnomalyText) ?></span>
+                                            </span>
+                                        <?php endif; ?>
+                                        <div class="treasury-row-desc-body">
                                         <?= e($desc !== '' ? $desc : '—') ?>
+                                        <?php if (count($rowDuplicateIds) > 1): ?>
+                                            <div class="treasury-row-anomaly-actions" data-stop-row-nav>
+                                                <a class="btn btn-ghost btn-sm" href="<?= e(url('/treasury?ids=' . implode(',', $rowDuplicateIds))) ?>">
+                                                    <?= e(__('treasury.anomaly_open_group')) ?>
+                                                </a>
+                                            </div>
+                                        <?php endif; ?>
                                         <?php if ($rowNotes !== ''): ?>
                                             <div class="muted treasury-row-notes" title="<?= e($rowNotes) ?>">
                                                 <?= e(__('treasury.notes')) ?>: <?= e(mb_strimwidth($rowNotes, 0, 120, '…')) ?>
@@ -1055,6 +1053,8 @@ if ($filterYear !== '' && !isset($yearFilterOptions[$filterYear])) {
                                                 'date' => format_date($row['transfer_origin_date'] ?? null) ?: (string) ($row['transfer_origin_date'] ?? ''),
                                             ])) ?></div>
                                         <?php endif; ?>
+                                        </div>
+                                        </div>
                                     </td>
                                     <td>
                                         <?php if ($isTransfer && $transferLabel !== ''): ?>

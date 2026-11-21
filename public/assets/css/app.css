@@ -10758,29 +10758,16 @@ button.setup-scrape-logo-frame:focus-visible .setup-scrape-logo-overlay {
 .treasury-col-check { width: 2.25rem; }
 .treasury-pending-badge { margin-left: 0.35rem; }
 .treasury-pending-banner { margin: 0 0 0.85rem; }
-.treasury-health-banner { margin: 0 0 0.85rem; }
-.treasury-health-list { margin: 0.55rem 0 0; padding-left: 1.15rem; display: grid; gap: 0.65rem; }
-.treasury-health-item > div { margin: 0.15rem 0 0.35rem; }
-.treasury-health-actions {
+.treasury-row-desc {
   display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 0.35rem 0.5rem;
-  margin-top: 0.35rem;
-}
-.treasury-health-actions form { margin: 0; display: inline; }
-.treasury-health-dupes {
-  margin: 0.35rem 0 0;
-  padding-left: 1rem;
-  display: grid;
-  gap: 0.25rem;
-  font-size: 0.9em;
-}
-.treasury-health-dupes-links {
-  display: inline-flex;
-  flex-wrap: wrap;
+  align-items: flex-start;
   gap: 0.35rem;
-  margin-left: 0.35rem;
+}
+.treasury-row-desc-body { min-width: 0; flex: 1 1 auto; }
+.treasury-row-anomaly-actions { margin-top: 0.3rem; }
+.panel:has(.member-anomaly-mark:hover) .table-wrap,
+.panel:has(.member-anomaly-mark:focus-within) .table-wrap {
+  overflow: visible;
 }
 .budget-annual-toolbar-panel { padding: 0.85rem 1rem; }
 .budget-annual-toolbar {

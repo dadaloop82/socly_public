@@ -125,7 +125,9 @@ final class TreasuryController extends BaseController
             'filter_years' => $this->treasury->movementYears(),
             'advanced_filters_count' => $this->advancedFilterCount($filters),
             'pending_count' => $this->treasury->pendingCount(),
-            'health_alerts' => $this->treasury->ledgerHealthAlerts(),
+            'row_anomalies' => $this->treasury->ledgerAnomaliesById(
+                array_map(static fn (array $row): int => (int) ($row['id'] ?? 0), $ledger['movements'])
+            ),
             'page' => $page,
             'pages' => $pages,
             'per_page' => $perPage,
@@ -1335,6 +1337,20 @@ final class TreasuryController extends BaseController
                 default => [date('Y-m-d', strtotime('-30 days')), date('Y-m-d')],
             };
         }
+        // Explicit id list (Apri gruppo for identical duplicates).
+        $idsRaw = trim((string) $request->input('ids', ''));
+        $ids = [];
+        if ($idsRaw !== '') {
+            foreach (explode(',', $idsRaw) as $piece) {
+                $id = (int) trim($piece);
+                if ($id > 0) {
+                    $ids[$id] = $id;
+                }
+                if (count($ids) >= 200) {
+                    break;
+                }
+            }
+        }
         $filters = [
             'direction' => $direction,
             'category' => $category,
@@ -1350,26 +1366,12 @@ final class TreasuryController extends BaseController
             'anomaly' => $anomaly,
             'beneficiary' => $beneficiary,
             'no_counterparty' => (string) $request->input('no_counterparty', '') === '1' ? '1' : '',
+            'ids' => $ids !== [] ? implode(',', array_values($ids)) : '',
         ];
         if ($anomaly === '1') {
-            $filters['pattern_ids'] = $this->treasury->classificationAnomalyIds();
-        }
-        // Explicit id list (health banner: duplicates / future dates).
-        $idsRaw = trim((string) $request->input('ids', ''));
-        if ($idsRaw !== '' && empty($filters['pattern_ids'])) {
-            $ids = [];
-            foreach (explode(',', $idsRaw) as $piece) {
-                $id = (int) trim($piece);
-                if ($id > 0) {
-                    $ids[$id] = $id;
-                }
-                if (count($ids) >= 200) {
-                    break;
-                }
-            }
-            if ($ids !== []) {
-                $filters['pattern_ids'] = array_values($ids);
-            }
+            $filters['pattern_ids'] = $this->treasury->ledgerAnomalyIds();
+        } elseif ($ids !== []) {
+            $filters['pattern_ids'] = array_values($ids);
         }
 
         return $filters;
