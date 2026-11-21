@@ -1007,6 +1007,67 @@ if (!function_exists('format_date')) {
     }
 }
 
+if (!function_exists('document_period_label')) {
+    /**
+     * Year + optional month range for repository documents (e.g. bank statements).
+     *
+     * @param array<string,mixed> $doc
+     */
+    function document_period_label(array $doc, ?string $locale = null): string
+    {
+        $year = (int) ($doc['reference_year'] ?? 0);
+        if ($year < 1900) {
+            return '';
+        }
+        $from = (int) ($doc['reference_month_from'] ?? 0);
+        $to = (int) ($doc['reference_month_to'] ?? 0);
+        if ($from < 1 || $from > 12) {
+            return (string) $year;
+        }
+        if ($to < 1 || $to > 12) {
+            $to = $from;
+        }
+        $locale = $locale ?? (function_exists('app_locale') ? app_locale() : 'it');
+        $monthName = static function (int $month) use ($locale): string {
+            $fallback = [
+                'it' => ['gen', 'feb', 'mar', 'apr', 'mag', 'giu', 'lug', 'ago', 'set', 'ott', 'nov', 'dic'],
+                'de' => ['Jan', 'Feb', 'Mär', 'Apr', 'Mai', 'Jun', 'Jul', 'Aug', 'Sep', 'Okt', 'Nov', 'Dez'],
+                'en' => ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'],
+            ];
+            $list = $fallback[$locale] ?? $fallback['it'];
+            if (class_exists(\IntlDateFormatter::class)) {
+                $dt = \DateTimeImmutable::createFromFormat('!n', (string) $month);
+                if ($dt instanceof \DateTimeImmutable) {
+                    $formatter = new \IntlDateFormatter(
+                        match ($locale) {
+                            'de' => 'de_DE',
+                            'en' => 'en_GB',
+                            default => 'it_IT',
+                        },
+                        \IntlDateFormatter::NONE,
+                        \IntlDateFormatter::NONE,
+                        null,
+                        null,
+                        'MMM'
+                    );
+                    $label = $formatter->format($dt);
+                    if (is_string($label) && $label !== '') {
+                        return rtrim($label, '.');
+                    }
+                }
+            }
+
+            return $list[$month - 1] ?? (string) $month;
+        };
+        $fromLabel = $monthName($from);
+        if ($to === $from) {
+            return $fromLabel . ' ' . $year;
+        }
+
+        return $fromLabel . '–' . $monthName($to) . ' ' . $year;
+    }
+}
+
 if (!function_exists('localized')) {
     function localized(mixed $value, ?string $locale = null): string
     {

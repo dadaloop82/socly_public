@@ -51,7 +51,10 @@ $languageLabel = $language !== '' ? __('documents.language_' . $language) : '—
         <div><span class="muted"><?= e(__('documents.status')) ?></span><br><span class="doc-status doc-status-<?= e((string) ($document['status'] ?? 'draft')) ?>"><?= e(__('documents.status_' . (string) ($document['status'] ?? 'draft'))) ?></span></div>
         <div><span class="muted"><?= e(__('documents.filter_section')) ?></span><br><a href="<?= e(url('/documents?section=' . rawurlencode((string) ($document['source_section'] ?? 'documents')))) ?>"><?= e((string) ($section_label ?? '—')) ?></a></div>
         <div><span class="muted"><?= e(__('documents.uploaded_by')) ?></span><br><strong><?= e((string) (($document['uploaded_by_name'] ?? '') ?: ($document['author_name'] ?? '—'))) ?></strong><br><span class="muted"><?= e(format_datetime($document['created_at'] ?? null) ?: '—') ?></span></div>
-        <div><span class="muted"><?= e(__('documents.reference_year')) ?></span><br><strong><?= (int) ($document['reference_year'] ?? 0) ?: '—' ?></strong></div>
+        <div><span class="muted"><?= e(__('documents.reference_period')) ?></span><br><strong><?php
+            $periodLabel = document_period_label(is_array($document) ? $document : []);
+            echo e($periodLabel !== '' ? $periodLabel : '—');
+        ?></strong></div>
         <div><span class="muted"><?= e(__('documents.file_size')) ?></span><br><strong><?= (int) ($document['file_size'] ?? 0) > 0 ? e(number_format((int) $document['file_size'] / 1024, 0, ',', '.') . ' KB') : '—' ?></strong></div>
         <div><span class="muted"><?= e(__('documents.downloads')) ?></span><br><strong><?= (int) ($document['download_count'] ?? 0) ?></strong></div>
     </div>

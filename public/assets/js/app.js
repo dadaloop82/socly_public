@@ -178,6 +178,7 @@ document.addEventListener('DOMContentLoaded', () => {
   initStatisticsTabs();
   initStatisticsCharts();
   initUpdateProgress();
+  initRepairExcerpts();
   initTreasuryCharts();
   initTreasuryBudgetImpute(document);
   initAuthLoginI18nLive();
@@ -16323,6 +16324,150 @@ function initStatisticsTabs() {
 }
 
 /** Overlay with live progress while an update runs (server writes storage/cache/update_progress.json). */
+function createSoclyBusyOverlay() {
+  const overlay = document.createElement('div');
+  overlay.className = 'update-overlay';
+  overlay.hidden = true;
+  overlay.innerHTML = [
+    '<div class="update-overlay-card" role="status" aria-live="polite">',
+    '<div class="update-spinner" aria-hidden="true"></div>',
+    '<h2 class="update-overlay-title" data-update-title></h2>',
+    '<p class="update-overlay-text" data-update-text></p>',
+    '<div class="update-overlay-bar"><span data-update-bar></span></div>',
+    '<p class="update-overlay-hint" data-update-hint></p>',
+    '</div>',
+  ].join('');
+  document.body.appendChild(overlay);
+  return overlay;
+}
+
+function csrfTokenFromPage() {
+  const input = document.querySelector('input[name="_token"]');
+  if (input && input.value) {
+    return input.value;
+  }
+  const meta = document.querySelector('meta[name="csrf-token"]');
+  return meta ? (meta.getAttribute('content') || '') : '';
+}
+
+function initRepairExcerpts() {
+  const button = document.querySelector('[data-repair-excerpts]');
+  if (!button) {
+    return;
+  }
+  const startUrl = button.getAttribute('data-repair-start') || '';
+  const tickUrl = button.getAttribute('data-repair-tick') || '';
+  if (!startUrl || !tickUrl) {
+    return;
+  }
+  const overlay = createSoclyBusyOverlay();
+  const setText = (selector, value) => {
+    const el = overlay.querySelector(selector);
+    if (el) {
+      el.textContent = value || '';
+    }
+  };
+  const paint = (current, total, eta, workingTpl, etaTpl) => {
+    const safeTotal = Math.max(1, total || 1);
+    const safeCurrent = Math.max(0, Math.min(safeTotal, current || 0));
+    setText('[data-update-text]', (workingTpl || '')
+      .replace(':current', String(safeCurrent))
+      .replace(':total', String(safeTotal)));
+    setText('[data-update-hint]', (etaTpl || '').replace(':seconds', String(Math.max(1, eta || 1))));
+    const bar = overlay.querySelector('[data-update-bar]');
+    if (bar) {
+      bar.style.width = `${Math.round((safeCurrent / safeTotal) * 100)}%`;
+    }
+  };
+
+  button.addEventListener('click', async () => {
+    if (button.disabled) {
+      return;
+    }
+    button.disabled = true;
+    setText('[data-update-title]', button.getAttribute('data-repair-title') || '');
+    setText('[data-update-text]', button.getAttribute('data-repair-starting') || '');
+    setText('[data-update-hint]', '');
+    const bar = overlay.querySelector('[data-update-bar]');
+    if (bar) {
+      bar.style.width = '4%';
+    }
+    overlay.hidden = false;
+    document.documentElement.classList.add('is-busy');
+
+    const token = csrfTokenFromPage();
+    let finished = false;
+    let last = { stored: 0, failed: 0, total: Number(button.getAttribute('data-repair-missing') || 0) };
+    try {
+      const startRes = await fetch(startUrl, {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: {
+          Accept: 'application/json',
+          'Content-Type': 'application/x-www-form-urlencoded',
+          'X-Requested-With': 'XMLHttpRequest',
+        },
+        body: new URLSearchParams({ _token: token }),
+      });
+      const startData = await startRes.json();
+      if (!startData?.ok || !startData.job) {
+        throw new Error(startData?.error || 'start failed');
+      }
+      const job = String(startData.job);
+      const workingTpl = button.getAttribute('data-repair-working') || '';
+      const etaTpl = button.getAttribute('data-repair-eta') || '';
+      paint(0, Number(startData.total || last.total || 1), Number(startData.total || 1) * 2, workingTpl, etaTpl);
+
+      while (!finished) {
+        const tickRes = await fetch(tickUrl, {
+          method: 'POST',
+          credentials: 'same-origin',
+          headers: {
+            Accept: 'application/json',
+            'Content-Type': 'application/x-www-form-urlencoded',
+            'X-Requested-With': 'XMLHttpRequest',
+          },
+          body: new URLSearchParams({ _token: token, job }),
+        });
+        const tickData = await tickRes.json();
+        last = tickData || last;
+        paint(
+          Number(tickData?.current || 0),
+          Number(tickData?.total || last.total || 1),
+          Number(tickData?.eta_seconds || 0),
+          workingTpl,
+          etaTpl
+        );
+        finished = !!tickData?.finished;
+        if (!finished) {
+          await new Promise((resolve) => window.setTimeout(resolve, 120));
+        }
+      }
+
+      const doneTpl = button.getAttribute('data-repair-done') || '';
+      const failedTpl = button.getAttribute('data-repair-failed') || '';
+      setText('[data-update-text]', doneTpl.replace(':stored', String(last.stored || 0)));
+      setText(
+        '[data-update-hint]',
+        Number(last.failed || 0) > 0
+          ? failedTpl.replace(':failed', String(last.failed || 0))
+          : ''
+      );
+      if (bar) {
+        bar.style.width = '100%';
+      }
+      window.setTimeout(() => {
+        window.location.reload();
+      }, 900);
+    } catch (err) {
+      overlay.hidden = true;
+      document.documentElement.classList.remove('is-busy');
+      button.disabled = false;
+      window.alert(err?.message || 'Error');
+    }
+  });
+}
+
 function initUpdateProgress() {
   const forms = [...document.querySelectorAll('form[data-update-form]')];
   if (forms.length === 0) {
@@ -16336,18 +16481,7 @@ function initUpdateProgress() {
     if (overlay) {
       return overlay;
     }
-    overlay = document.createElement('div');
-    overlay.className = 'update-overlay';
-    overlay.innerHTML = [
-      '<div class="update-overlay-card" role="status" aria-live="polite">',
-      '<div class="update-spinner" aria-hidden="true"></div>',
-      '<h2 class="update-overlay-title" data-update-title></h2>',
-      '<p class="update-overlay-text" data-update-text></p>',
-      '<div class="update-overlay-bar"><span data-update-bar></span></div>',
-      '<p class="update-overlay-hint" data-update-hint></p>',
-      '</div>',
-    ].join('');
-    document.body.appendChild(overlay);
+    overlay = createSoclyBusyOverlay();
     return overlay;
   };
 

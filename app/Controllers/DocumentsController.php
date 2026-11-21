@@ -71,6 +71,7 @@ final class DocumentsController extends BaseController
             'repository_sections' => $sections,
             'repository_years' => $this->files->years(),
             'repository_stats' => $this->files->stats(),
+            'excerpt_repair' => $this->excerptRepairSummary(),
         ]);
     }
 
@@ -374,5 +375,96 @@ final class DocumentsController extends BaseController
             'pruned' => (string) ($result['pruned'] ?? 0),
         ]));
         redirect('/documents');
+    }
+
+    /**
+     * Start regenerating missing bank-statement excerpts for ledger movements in the period of
+     * the archived statement PDFs.
+     */
+    public function repairExcerptsStart(Request $request): void
+    {
+        require_component('documents');
+        header('Content-Type: application/json; charset=utf-8');
+        $service = $this->statementImportService();
+        if ($service === null) {
+            http_response_code(503);
+            echo json_encode(['ok' => false, 'error' => __('documents.repair_excerpts_unavailable')], JSON_UNESCAPED_UNICODE);
+            return;
+        }
+        $result = $service->startExcerptRepair($request->ip(), auth_user()['id'] ?? null);
+        if (empty($result['ok'])) {
+            $error = (string) ($result['error'] ?? 'empty');
+            echo json_encode([
+                'ok' => false,
+                'error' => $error === 'empty'
+                    ? __('documents.repair_excerpts_empty')
+                    : __('documents.repair_excerpts_unavailable'),
+            ], JSON_UNESCAPED_UNICODE);
+            return;
+        }
+        echo json_encode([
+            'ok' => true,
+            'job' => (string) ($result['job'] ?? ''),
+            'total' => (int) ($result['total'] ?? 0),
+        ], JSON_UNESCAPED_UNICODE);
+    }
+
+    /** Advance one unit of the excerpt-repair job (polled by the documents overlay). */
+    public function repairExcerptsTick(Request $request): void
+    {
+        require_component('documents');
+        header('Content-Type: application/json; charset=utf-8');
+        $service = $this->statementImportService();
+        if ($service === null) {
+            http_response_code(503);
+            echo json_encode(['ok' => false, 'finished' => true, 'error' => __('documents.repair_excerpts_unavailable')], JSON_UNESCAPED_UNICODE);
+            return;
+        }
+        $job = trim((string) $request->input('job', ''));
+        $progress = $service->tickExcerptRepair($job);
+        echo json_encode($progress, JSON_UNESCAPED_UNICODE);
+    }
+
+    public function repairExcerptsStatus(Request $request): void
+    {
+        require_component('documents');
+        header('Content-Type: application/json; charset=utf-8');
+        $service = $this->statementImportService();
+        if ($service === null) {
+            echo json_encode(['ok' => true, 'finished' => true, 'current' => 0, 'total' => 0, 'stored' => 0, 'failed' => 0, 'eta_seconds' => 0], JSON_UNESCAPED_UNICODE);
+            return;
+        }
+        $job = trim((string) $request->input('job', ''));
+        echo json_encode($service->excerptRepairStatus($job), JSON_UNESCAPED_UNICODE);
+    }
+
+    /**
+     * @return array{available:bool,missing:int,statements:int}
+     */
+    private function excerptRepairSummary(): array
+    {
+        $service = $this->statementImportService();
+        if ($service === null) {
+            return ['available' => false, 'missing' => 0, 'statements' => 0];
+        }
+        try {
+            return $service->missingExcerptsSummary();
+        } catch (\Throwable) {
+            return ['available' => false, 'missing' => 0, 'statements' => 0];
+        }
+    }
+
+    private function statementImportService(): ?object
+    {
+        if (!class_exists(\Socly\Addons\BankStatementImport\StatementImportService::class)) {
+            return null;
+        }
+        try {
+            $service = app(\Socly\Addons\BankStatementImport\StatementImportService::class);
+        } catch (\Throwable) {
+            return null;
+        }
+
+        return is_object($service) ? $service : null;
     }
 }

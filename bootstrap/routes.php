@@ -247,6 +247,9 @@ $router->get('/documents/create', [DocumentsController::class, 'create'], 'docum
 // Repository picker: JSON list of the files already uploaded in a section (declared before {id}).
 $router->get('/documents/picker', [DocumentsController::class, 'picker'], 'documents.view', ['mw.locale', 'mw.install', 'mw.auth']);
 $router->post('/documents/reindex', [DocumentsController::class, 'reindex'], 'documents.manage', ['mw.locale', 'mw.install', 'mw.auth', 'mw.csrf']);
+$router->post('/documents/repair-excerpts', [DocumentsController::class, 'repairExcerptsStart'], 'documents.manage', ['mw.locale', 'mw.install', 'mw.auth', 'mw.csrf']);
+$router->post('/documents/repair-excerpts/tick', [DocumentsController::class, 'repairExcerptsTick'], 'documents.manage', ['mw.locale', 'mw.install', 'mw.auth', 'mw.csrf']);
+$router->get('/documents/repair-excerpts/status', [DocumentsController::class, 'repairExcerptsStatus'], 'documents.manage', ['mw.locale', 'mw.install', 'mw.auth']);
 $router->post('/documents', [DocumentsController::class, 'store'], 'documents.manage', ['mw.locale', 'mw.install', 'mw.auth', 'mw.csrf']);
 $router->post('/documents/upload', [DocumentsController::class, 'upload'], 'documents.manage', ['mw.locale', 'mw.install', 'mw.auth', 'mw.csrf']);
 $router->get('/documents/{id}', [DocumentsController::class, 'show'], 'documents.view', ['mw.locale', 'mw.install', 'mw.auth']);

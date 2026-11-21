@@ -123,6 +123,28 @@ foreach ($documents as $doc) {
         <?php if ($hasActiveFilters): ?>
             <a class="btn btn-ghost" href="<?= e($filterUrl(['q' => '', 'status' => '', 'category' => '', 'section' => '', 'year' => '', 'uploader' => ''])) ?>"><?= e(__('documents.filter_reset')) ?></a>
         <?php endif; ?>
+        <?php
+        $excerptRepair = is_array($excerpt_repair ?? null) ? $excerpt_repair : [];
+        $excerptMissing = (int) ($excerptRepair['missing'] ?? 0);
+        $excerptAvailable = !empty($excerptRepair['available']) && (int) ($excerptRepair['statements'] ?? 0) > 0 && $excerptMissing > 0;
+        ?>
+        <?php if ($canManage && $excerptAvailable): ?>
+            <button
+                type="button"
+                class="btn btn-ghost"
+                data-repair-excerpts
+                data-repair-start="<?= e(url('/documents/repair-excerpts')) ?>"
+                data-repair-tick="<?= e(url('/documents/repair-excerpts/tick')) ?>"
+                data-repair-missing="<?= (int) $excerptMissing ?>"
+                data-repair-title="<?= e(__('documents.repair_excerpts_title')) ?>"
+                data-repair-starting="<?= e(__('documents.repair_excerpts_starting')) ?>"
+                data-repair-working="<?= e(__('documents.repair_excerpts_working')) ?>"
+                data-repair-eta="<?= e(__('documents.repair_excerpts_eta')) ?>"
+                data-repair-done="<?= e(__('documents.repair_excerpts_done')) ?>"
+                data-repair-failed="<?= e(__('documents.repair_excerpts_failed')) ?>"
+                title="<?= e(__('documents.repair_excerpts_hint', ['count' => (string) $excerptMissing])) ?>"
+            ><?= e(__('documents.repair_excerpts')) ?></button>
+        <?php endif; ?>
         <?php if ($canManage): ?>
             <a class="btn<?= ($documents === [] && !$hasActiveFilters) ? ' is-first-cta' : '' ?>" href="<?= e(url('/documents/create')) ?>"><?= e(__('documents.add')) ?></a>
         <?php endif; ?>
@@ -309,11 +331,24 @@ $repoSizeLabel = $repoSize >= 1048576
             <?php foreach ($groupOrder as $groupKey): ?>
                 <?php $groupItems = $groups[$groupKey] ?? []; ?>
                 <?php if ($groupItems === []) { continue; } ?>
-                <section class="doc-archive-group">
-                    <header class="doc-archive-group-head">
-                        <h3 class="doc-archive-group-title"><?= e($categoryLabels[$groupKey] ?? $groupKey) ?></h3>
-                        <span class="doc-archive-group-count"><?= count($groupItems) ?></span>
-                    </header>
+                <?php
+                // “Altro” holds bank-statement excerpts and misc files — keep it collapsed by default.
+                $isOtherGroup = $groupKey === 'other';
+                $otherOpen = $isOtherGroup && $filterCategory === 'other';
+                $groupTag = $isOtherGroup ? 'details' : 'section';
+                ?>
+                <<?= $groupTag ?> class="doc-archive-group<?= $isOtherGroup ? ' doc-archive-group--collapsible' : '' ?>"<?= $otherOpen ? ' open' : '' ?>>
+                    <?php if ($isOtherGroup): ?>
+                        <summary class="doc-archive-group-head">
+                            <h3 class="doc-archive-group-title"><?= e($categoryLabels[$groupKey] ?? $groupKey) ?></h3>
+                            <span class="doc-archive-group-count"><?= count($groupItems) ?></span>
+                        </summary>
+                    <?php else: ?>
+                        <header class="doc-archive-group-head">
+                            <h3 class="doc-archive-group-title"><?= e($categoryLabels[$groupKey] ?? $groupKey) ?></h3>
+                            <span class="doc-archive-group-count"><?= count($groupItems) ?></span>
+                        </header>
+                    <?php endif; ?>
                     <div class="table-wrap embedded">
                         <table class="documents-table">
                             <thead>
@@ -387,8 +422,8 @@ $repoSizeLabel = $repoSize >= 1048576
                                     <td data-label="<?= e(__('documents.filter_section')) ?>">
                                         <?php $docSection = (string) ($doc['source_section'] ?? 'documents'); ?>
                                         <span class="documents-section-badge"><?= e((string) ($sectionLabels[$docSection] ?? ucfirst(str_replace('_', ' ', $docSection)))) ?></span>
-                                        <?php $docYear = (int) ($doc['reference_year'] ?? 0); ?>
-                                        <?php if ($docYear > 0): ?><span class="documents-lang"><?= (int) $docYear ?></span><?php endif; ?>
+                                        <?php $docPeriod = document_period_label($doc); ?>
+                                        <?php if ($docPeriod !== ''): ?><span class="documents-lang"><?= e($docPeriod) ?></span><?php endif; ?>
                                     </td>
                                     <td data-label="<?= e(__('documents.uploaded_by')) ?>">
                                         <?php
@@ -435,7 +470,7 @@ $repoSizeLabel = $repoSize >= 1048576
                             </tbody>
                         </table>
                     </div>
-                </section>
+                </<?= $groupTag ?>>
             <?php endforeach; ?>
         </div>
     <?php endif; ?>

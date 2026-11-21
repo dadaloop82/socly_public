@@ -2648,6 +2648,14 @@ body.app-embed .page-header {
 .update-overlay[hidden] {
   display: none;
 }
+html.is-busy,
+html.is-busy body {
+  cursor: progress;
+  overflow: hidden;
+}
+html.is-busy .update-overlay {
+  pointer-events: all;
+}
 .update-overlay-card {
   width: min(26rem, 92vw);
   padding: 1.6rem 1.6rem 1.35rem;
@@ -12673,6 +12681,44 @@ a.org-mandate-badge--soon:hover {
   justify-content: space-between;
   gap: 0.75rem;
   margin-bottom: 0.55rem;
+}
+.doc-archive-group--collapsible > summary.doc-archive-group-head {
+  list-style: none;
+  cursor: pointer;
+  user-select: none;
+  justify-content: flex-start;
+  align-items: center;
+  gap: 0.65rem;
+  margin-bottom: 0;
+  padding: 0.4rem 0.45rem;
+  border-radius: 10px;
+}
+.doc-archive-group--collapsible > summary.doc-archive-group-head::-webkit-details-marker {
+  display: none;
+}
+.doc-archive-group--collapsible > summary.doc-archive-group-head .doc-archive-group-title {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.doc-archive-group--collapsible > summary.doc-archive-group-head::after {
+  content: "";
+  width: 0.55rem;
+  height: 0.55rem;
+  border-right: 2px solid color-mix(in srgb, var(--ink) 45%, transparent);
+  border-bottom: 2px solid color-mix(in srgb, var(--ink) 45%, transparent);
+  transform: rotate(45deg);
+  transition: transform 0.15s ease;
+  flex: 0 0 auto;
+}
+.doc-archive-group--collapsible[open] > summary.doc-archive-group-head {
+  margin-bottom: 0.55rem;
+}
+.doc-archive-group--collapsible[open] > summary.doc-archive-group-head::after {
+  transform: rotate(-135deg);
+  margin-top: 0.15rem;
+}
+.doc-archive-group--collapsible > summary.doc-archive-group-head:hover {
+  background: color-mix(in srgb, var(--brand-primary) 6%, transparent);
 }
 .doc-archive-group-title {
   margin: 0;

@@ -221,6 +221,8 @@ final class FileRepositoryService
         }
         $size = (int) (@filesize($absolute) ?: 0);
 
+        $months = $this->resolveMonths($context);
+
         return $this->insertRepositoryRow([
             'hash' => $hash,
             'path' => $relative,
@@ -229,6 +231,8 @@ final class FileRepositoryService
             'original_name' => $originalName,
             'context' => $context,
             'reference_year' => $referenceYear,
+            'reference_month_from' => $months['from'],
+            'reference_month_to' => $months['to'],
         ], $ip);
     }
 
@@ -774,7 +778,7 @@ final class FileRepositoryService
     }
 
     /**
-     * @param array{hash:string,path:string,mime:string,size:int,original_name:string,context:array<string,mixed>,reference_year:int} $args
+     * @param array{hash:string,path:string,mime:string,size:int,original_name:string,context:array<string,mixed>,reference_year:int,reference_month_from:?int,reference_month_to:?int} $args
      * @return array{ok:bool,document_id:int,path:string,mime:string,size:int,hash:string,original_name:string,duplicated:bool,reused:bool}
      */
     private function insertRepositoryRow(array $args, string $ip): array
@@ -811,6 +815,8 @@ final class FileRepositoryService
                 $createdBy = null;
             }
         }
+        $monthFrom = isset($args['reference_month_from']) ? (int) $args['reference_month_from'] : 0;
+        $monthTo = isset($args['reference_month_to']) ? (int) $args['reference_month_to'] : 0;
         $id = $this->db->insert('association_documents', [
             'title' => $title,
             'document_number' => mb_substr(trim((string) ($context['document_number'] ?? '')), 0, 80) ?: null,
@@ -835,6 +841,8 @@ final class FileRepositoryService
             'source_section' => $section,
             'source_ref' => $contextRef !== '' ? $contextRef : null,
             'reference_year' => max(1900, min(2100, (int) $args['reference_year'])),
+            'reference_month_from' => ($monthFrom >= 1 && $monthFrom <= 12) ? $monthFrom : null,
+            'reference_month_to' => ($monthTo >= 1 && $monthTo <= 12) ? $monthTo : null,
             'uploaded_by_type' => $who['type'],
             'uploaded_by_id' => $who['id'],
             'uploaded_by_name' => $who['name'],
@@ -917,6 +925,77 @@ final class FileRepositoryService
         }
 
         return (int) date('Y');
+    }
+
+    /**
+     * Optional reference months (1–12) for period documents such as bank statements.
+     *
+     * @param array<string,mixed> $context
+     * @return array{from:?int,to:?int}
+     */
+    private function resolveMonths(array $context): array
+    {
+        $from = $this->normalizeMonth($context['month_from'] ?? $context['reference_month_from'] ?? null);
+        $to = $this->normalizeMonth($context['month_to'] ?? $context['reference_month_to'] ?? null);
+        if ($from === null && $to === null) {
+            $date = trim((string) ($context['date'] ?? ''));
+            if (preg_match('/^(\d{4})-(\d{2})-\d{2}$/', $date, $m) === 1) {
+                $from = (int) $m[2];
+                $to = $from;
+            }
+        }
+        if ($from !== null && $to === null) {
+            $to = $from;
+        }
+        if ($to !== null && $from === null) {
+            $from = $to;
+        }
+        if ($from !== null && $to !== null && $to < $from) {
+            [$from, $to] = [$to, $from];
+        }
+
+        return ['from' => $from, 'to' => $to];
+    }
+
+    private function normalizeMonth(mixed $value): ?int
+    {
+        if (is_int($value) || is_float($value) || (is_string($value) && ctype_digit($value))) {
+            $month = (int) $value;
+            if ($month >= 1 && $month <= 12) {
+                return $month;
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * Persist reference months on an existing repository document (used when a statement period
+     * is refined after re-parsing the PDF).
+     */
+    public function setReferencePeriod(int $documentId, int $year, ?int $monthFrom, ?int $monthTo): void
+    {
+        if ($documentId < 1) {
+            return;
+        }
+        $from = $this->normalizeMonth($monthFrom);
+        $to = $this->normalizeMonth($monthTo);
+        if ($from !== null && $to === null) {
+            $to = $from;
+        }
+        if ($to !== null && $from === null) {
+            $from = $to;
+        }
+        $data = [
+            'reference_year' => max(1900, min(2100, $year > 0 ? $year : (int) date('Y'))),
+            'reference_month_from' => $from,
+            'reference_month_to' => $to,
+        ];
+        try {
+            $this->db->update('association_documents', $data, 'id = :id', ['id' => $documentId]);
+        } catch (\Throwable) {
+            // Columns may be missing before migration 060: never break the archive.
+        }
     }
 
     private function canonicalRelativePath(string $hash, string $ext, int $year): string
