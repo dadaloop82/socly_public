@@ -3913,7 +3913,7 @@ return [
         'section_total_row' => 'Totale sezione',
         'unallocated_title' => 'Movimenti :year non imputati',
         'unallocated_lede' => 'Movimenti di cassa senza centro di costo: non entrano nel confronto per capitolo.',
-        'unallocated_hint' => 'Apri un movimento di prima cassa e scegli il progetto in “Centro di costo / Progetto” per imputarlo al preventivo.',
+        'unallocated_hint' => 'Apri un movimento di prima cassa e imposta la categoria (o il centro di costo): se la categoria corrisponde a una sola voce del preventivo, il consuntivo si aggiorna da solo.',
         'movements' => 'Movimenti',
         'reconcile_note' => 'Totale spese di cassa dell’anno: :allocated (di cui :unallocated non imputate).',
         'over_title' => 'Attenzione: budget superato',

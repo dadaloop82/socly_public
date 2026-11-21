@@ -2785,7 +2785,7 @@ return [
         'section_total_row' => 'Summe Abschnitt',
         'unallocated_title' => 'Nicht zugeordnete Bewegungen :year',
         'unallocated_lede' => 'Kassabewegungen ohne Kostenstelle: Sie fließen nicht in den Vergleich je Posten ein.',
-        'unallocated_hint' => 'Öffne eine Kassabewegung und wähle das Projekt unter „Kostenstelle / Projekt“, um sie dem Voranschlag zuzuordnen.',
+        'unallocated_hint' => 'Öffne eine Kassabewegung und setze die Kategorie (oder Kostenstelle): passt die Kategorie zu genau einer Voranschlagsposition, aktualisiert sich der Ist-Stand automatisch.',
         'movements' => 'Bewegungen',
         'reconcile_note' => 'Gesamtausgaben der Kassa im Jahr: :allocated (davon :unallocated nicht zugeordnet).',
         'over_title' => 'Achtung: Budget überschritten',

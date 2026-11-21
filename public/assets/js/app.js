@@ -18129,11 +18129,18 @@ function initTreasuryBudgetImpute(scope = document) {
   select.addEventListener('change', syncTitle);
   syncTitle();
   category.addEventListener('change', () => {
-    if (select.value) return; // never override a manual choice
-    const match = Array.from(select.options).find(
+    const current = select.options[select.selectedIndex];
+    const currentCat = current ? String(current.dataset.category || '') : '';
+    // Keep a manual cost centre only when it already matches this category; otherwise propose again.
+    if (select.value && currentCat && currentCat === category.value) return;
+    const matches = Array.from(select.options).filter(
       (option) => option.dataset.category && option.dataset.category === category.value
     );
-    if (match) select.value = match.value;
+    if (matches.length === 1) {
+      select.value = matches[0].value;
+    } else if (!select.value || (currentCat && currentCat !== category.value)) {
+      select.value = '';
+    }
     syncTitle();
   });
 }

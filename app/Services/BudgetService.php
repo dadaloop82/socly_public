@@ -675,6 +675,11 @@ final class BudgetService
         if ($budget === null) {
             return [];
         }
+        $fiscalYear = (int) ($budget['fiscal_year'] ?? 0);
+        // Keep consuntivo current: movements that already have the right category but no cost
+        // centre are linked to the unique matching budget line for this fiscal year.
+        $this->treasury->imputeUnallocatedByCategory($fiscalYear);
+
         $itemIds = array_map(static fn (array $item): int => (int) $item['id'], $budget['items']);
         $actuals = [];
         if ($itemIds !== []) {
@@ -686,6 +691,47 @@ final class BudgetService
                  GROUP BY budget_item_id, direction"
             ) as $row) {
                 $actuals[(int) $row['budget_item_id']][(string) $row['direction']] = (float) ($row['total'] ?? 0);
+            }
+        }
+
+        // Read-time safety net: if a category uniquely identifies one line in this budget,
+        // still count unallocated movements of that category toward the consuntivo (and they
+        // should already have been persisted by impute above).
+        $uniqueByCategory = [];
+        foreach ($budget['items'] as $item) {
+            $cat = trim((string) ($item['category'] ?? ''));
+            if ($cat === '') {
+                continue;
+            }
+            $dir = (string) $item['direction'] === 'income' ? 'income' : 'expense';
+            $key = $dir . '|' . $cat;
+            $uniqueByCategory[$key][] = (int) $item['id'];
+        }
+        $uniqueMap = [];
+        foreach ($uniqueByCategory as $key => $ids) {
+            if (count($ids) === 1) {
+                $uniqueMap[$key] = $ids[0];
+            }
+        }
+        if ($uniqueMap !== [] && $fiscalYear >= 2000) {
+            foreach ($this->db->fetchAll(
+                "SELECT direction, category, COALESCE(SUM(amount), 0) AS total
+                 FROM treasury_movements
+                 WHERE budget_item_id IS NULL
+                   AND approved_at IS NOT NULL AND superseded_at IS NULL
+                   AND YEAR(movement_date) = :y
+                   AND direction IN ('income', 'expense')
+                   AND category IS NOT NULL AND TRIM(category) <> ''
+                 GROUP BY direction, category",
+                ['y' => $fiscalYear]
+            ) as $row) {
+                $dir = (string) ($row['direction'] ?? '');
+                $cat = trim((string) ($row['category'] ?? ''));
+                $itemId = $uniqueMap[$dir . '|' . $cat] ?? 0;
+                if ($itemId < 1) {
+                    continue;
+                }
+                $actuals[$itemId][$dir] = (float) ($actuals[$itemId][$dir] ?? 0) + (float) ($row['total'] ?? 0);
             }
         }
 
@@ -758,11 +804,15 @@ final class BudgetService
                AND direction IN ('income', 'expense')
              GROUP BY direction, category
              ORDER BY direction ASC, total DESC",
-            ['y' => (int) $budget['fiscal_year']]
+            ['y' => $fiscalYear]
         ) as $row) {
             $direction = (string) $row['direction'];
             $category = trim((string) ($row['category'] ?? ''));
             $total = (float) ($row['total'] ?? 0);
+            // Already folded into the matching budget line above: do not list them again.
+            if ($category !== '' && isset($uniqueMap[$direction . '|' . $category])) {
+                continue;
+            }
             $unallocated[] = [
                 'direction' => $direction,
                 'category' => $category,

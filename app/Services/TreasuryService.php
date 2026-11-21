@@ -1906,6 +1906,88 @@ final class TreasuryService
     }
 
     /**
+     * Unique budget line for this category + direction in the movement’s fiscal year.
+     * Returns null when none or more than one line matches (never guess).
+     */
+    public function resolveBudgetItemId(string $category, string $direction, string $movementDate): ?int
+    {
+        $category = trim($category);
+        $direction = $direction === 'income' ? 'income' : ($direction === 'expense' ? 'expense' : '');
+        if ($category === '' || $direction === '' || preg_match('/^\d{4}-\d{2}-\d{2}$/', $movementDate) !== 1) {
+            return null;
+        }
+        $year = (int) substr($movementDate, 0, 4);
+        try {
+            $rows = $this->db->fetchAll(
+                'SELECT i.id
+                 FROM budget_items i
+                 INNER JOIN budgets b ON b.id = i.budget_id
+                 WHERE b.fiscal_year = :y
+                   AND i.direction = :dir
+                   AND i.category = :cat
+                 ORDER BY i.id ASC
+                 LIMIT 3',
+                ['y' => $year, 'dir' => $direction, 'cat' => $category]
+            );
+        } catch (\Throwable) {
+            return null;
+        }
+        if (count($rows) !== 1) {
+            return null;
+        }
+        $id = (int) ($rows[0]['id'] ?? 0);
+
+        return $id > 0 ? $id : null;
+    }
+
+    /**
+     * Link approved unallocated movements to the unique matching budget line for that year.
+     * Called when opening preventivo vs consuntivo so the actuals refresh without a manual re-save.
+     */
+    public function imputeUnallocatedByCategory(int $fiscalYear): int
+    {
+        if ($fiscalYear < 2000) {
+            return 0;
+        }
+        try {
+            $rows = $this->db->fetchAll(
+                "SELECT id, direction, category, movement_date
+                 FROM treasury_movements
+                 WHERE budget_item_id IS NULL
+                   AND approved_at IS NOT NULL AND superseded_at IS NULL
+                   AND YEAR(movement_date) = :y
+                   AND direction IN ('income', 'expense')
+                   AND category IS NOT NULL AND TRIM(category) <> ''
+                 ORDER BY id ASC
+                 LIMIT 5000",
+                ['y' => $fiscalYear]
+            );
+        } catch (\Throwable) {
+            return 0;
+        }
+        $updated = 0;
+        foreach ($rows as $row) {
+            $resolved = $this->resolveBudgetItemId(
+                (string) ($row['category'] ?? ''),
+                (string) ($row['direction'] ?? ''),
+                (string) ($row['movement_date'] ?? '')
+            );
+            if ($resolved === null) {
+                continue;
+            }
+            $this->db->update(
+                'treasury_movements',
+                ['budget_item_id' => $resolved],
+                'id = :id AND budget_item_id IS NULL',
+                ['id' => (int) ($row['id'] ?? 0)]
+            );
+            $updated++;
+        }
+
+        return $updated;
+    }
+
+    /**
      * “year · section · line” label of a budget line (summaries, movement card, similar changes):
      * the section always precedes the line, so two sections repeating a wording stay distinguishable.
      */
@@ -2733,7 +2815,8 @@ final class TreasuryService
                 continue;
             }
             $row = $this->db->fetch(
-                'SELECT id, direction, category, runts_line, budget_item_id FROM treasury_movements WHERE id = :id',
+                'SELECT id, direction, category, runts_line, budget_item_id, movement_date
+                 FROM treasury_movements WHERE id = :id',
                 ['id' => $id]
             );
             if ($row === null) {
@@ -2764,6 +2847,20 @@ final class TreasuryService
                 $original = (int) ($originals['budget_item_id'] ?? 0);
                 if ($current === 0 || $current === $original) {
                     $update['budget_item_id'] = $payload['budget_item_id'];
+                }
+            }
+            // Changing the category (or leaving the cost centre empty) should still feed the
+            // consuntivo when that category uniquely maps to one budget line for the year.
+            $nextBudget = (int) ($update['budget_item_id'] ?? ($row['budget_item_id'] ?? 0));
+            if ($nextBudget < 1 && (string) ($row['direction'] ?? '') !== 'transfer') {
+                $nextCategory = trim((string) ($update['category'] ?? ($row['category'] ?? '')));
+                $resolved = $this->resolveBudgetItemId(
+                    $nextCategory,
+                    (string) ($row['direction'] ?? 'expense'),
+                    (string) ($row['movement_date'] ?? '')
+                );
+                if ($resolved !== null) {
+                    $update['budget_item_id'] = $resolved;
                 }
             }
             if ($update !== []) {
@@ -3877,6 +3974,21 @@ final class TreasuryService
                 }
                 $update[$field] = $value;
             }
+            // Category set without a cost centre: link to the unique matching budget line for the year.
+            if (!$isTransfer && !array_key_exists('budget_item_id', $update)) {
+                $nextBudget = (int) ($row['budget_item_id'] ?? 0);
+                if ($nextBudget < 1) {
+                    $nextCategory = trim((string) ($update['category'] ?? ($row['category'] ?? '')));
+                    $resolved = $this->resolveBudgetItemId(
+                        $nextCategory,
+                        (string) ($row['direction'] ?? 'expense'),
+                        (string) ($row['movement_date'] ?? '')
+                    );
+                    if ($resolved !== null) {
+                        $update['budget_item_id'] = $resolved;
+                    }
+                }
+            }
             if ($update === []) {
                 $skipped++;
                 continue;
@@ -4187,6 +4299,14 @@ final class TreasuryService
             $exists = $this->db->fetch('SELECT id FROM budget_items WHERE id = :id', ['id' => $budgetItemId]);
             if ($exists === null) {
                 return ['ok' => false, 'errors' => ['budget_item_id' => __('validation.in')]];
+            }
+        }
+        // Category alone should drive the consuntivo when it uniquely identifies a budget line
+        // for that year (the form JS does the same; the server must not rely on it).
+        if (!$isTransfer && $budgetItemId < 1) {
+            $resolved = $this->resolveBudgetItemId((string) $categoryResult['key'], $direction, $date);
+            if ($resolved !== null) {
+                $budgetItemId = $resolved;
             }
         }
 

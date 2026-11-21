@@ -2785,7 +2785,7 @@ return [
         'section_total_row' => 'Section total',
         'unallocated_title' => 'Unallocated :year movements',
         'unallocated_lede' => 'Cash movements without a cost centre: they are not part of the per-line comparison.',
-        'unallocated_hint' => 'Open a cash movement and pick the project under “Cost centre / project” to allocate it to the forecast.',
+        'unallocated_hint' => 'Open a cash movement and set the category (or cost centre): if the category matches a single forecast line, the actuals update automatically.',
         'movements' => 'Movements',
         'reconcile_note' => 'Total cash expenses for the year: :allocated (of which :unallocated unallocated).',
         'over_title' => 'Warning: budget exceeded',
