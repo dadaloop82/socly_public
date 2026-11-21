@@ -94,12 +94,30 @@ final class Migrator
             if ($exists) {
                 continue;
             }
-            $this->db->pdo()->exec($sql);
+            $this->execPluginStatement((string) $sql);
             $this->db->insert('plugin_migrations', [
                 'plugin_id' => $pluginId,
                 'version' => (string) $version,
             ]);
         }
+    }
+
+    /**
+     * Run one plugin migration statement. SELECT/SHOW/... must be fully fetched: PDO::exec() on a
+     * result-producing query leaves an active cursor and the next query crashes with HY000/2014.
+     */
+    private function execPluginStatement(string $sql): void
+    {
+        $sql = trim($sql);
+        if ($sql === '') {
+            return;
+        }
+        if (preg_match('/^(SELECT|SHOW|DESCRIBE|DESC|EXPLAIN|WITH)\b/i', $sql) === 1) {
+            $this->db->fetchAll($sql);
+
+            return;
+        }
+        $this->db->pdo()->exec($sql);
     }
 
     /** Some installs applied treasury invoice columns under the old filename 015_treasury_invoice_details.sql. */

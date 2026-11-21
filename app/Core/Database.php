@@ -99,6 +99,10 @@ final class Database
                 PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
                 PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
                 PDO::ATTR_EMULATE_PREPARES => false,
+                // Native prepares + an unconsumed SELECT (e.g. plugin migration “SELECT 1” via
+                // PDO::exec) leave MySQL with an active result set and the next prepare fails with
+                // HY000/2014. Buffering keeps every statement self-contained.
+                PDO::MYSQL_ATTR_USE_BUFFERED_QUERY => true,
             ]);
             self::$reachableCache = true;
         }
