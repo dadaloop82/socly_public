@@ -204,6 +204,7 @@ document.addEventListener('DOMContentLoaded', () => {
   initBudgetGrid(document);
   initBudgetCreateForm(document);
   initBudgetTabs();
+  initBudgetAnnualYearSwitch();
   initBudgetAnnualCharts();
   initEmailTemplateEditor(document);
   initFieldsSortable(document);
@@ -17986,9 +17987,10 @@ function initBudgetTabs() {
   const panels = [...root.querySelectorAll('[data-budget-panel]')];
   if (tabs.length === 0 || panels.length === 0) return;
 
+  const isValidTab = (id) => tabs.some((tab) => tab.getAttribute('data-budget-tab') === id);
+
   const activate = (id, { updateHash = true } = {}) => {
-    const valid = tabs.some((tab) => tab.getAttribute('data-budget-tab') === id);
-    const target = valid ? id : tabs[0].getAttribute('data-budget-tab');
+    const target = isValidTab(id) ? id : tabs[0].getAttribute('data-budget-tab');
     tabs.forEach((tab) => {
       const selected = tab.getAttribute('data-budget-tab') === target;
       tab.setAttribute('aria-selected', selected ? 'true' : 'false');
@@ -18003,7 +18005,7 @@ function initBudgetTabs() {
     if (updateHash) {
       const nextHash = `#bil-${target}`;
       if (location.hash !== nextHash) {
-        history.replaceState(null, '', nextHash);
+        history.replaceState(null, '', `${location.pathname}${location.search}${nextHash}`);
       }
     }
   };
@@ -18012,11 +18014,33 @@ function initBudgetTabs() {
     tab.addEventListener('click', () => activate(tab.getAttribute('data-budget-tab')));
   });
 
+  // Year change submits ?tab=bilancio&year=YYYY: the query must win over a stale #bil-preventivo hash,
+  // otherwise the panel stays on Preventivo and it looks like the year did nothing.
+  const params = new URLSearchParams(location.search);
+  const fromQuery = (params.get('tab') || '').toLowerCase() === 'statistiche'
+    ? 'bilancio'
+    : (params.get('tab') || '');
   const hash = (location.hash || '').replace(/^#/, '');
-  activate(
-    hash.startsWith('bil-') ? hash.slice(4) : (root.getAttribute('data-default-tab') || tabs[0].getAttribute('data-budget-tab')),
-    { updateHash: false }
-  );
+  const fromHash = hash.startsWith('bil-') ? hash.slice(4) : '';
+  const fromAttr = root.getAttribute('data-default-tab') || '';
+  const initial = [fromQuery, fromAttr, fromHash, tabs[0].getAttribute('data-budget-tab')]
+    .find((id) => id && isValidTab(id));
+  activate(initial, { updateHash: true });
+}
+
+function initBudgetAnnualYearSwitch() {
+  const select = document.querySelector('[data-budget-annual-year]');
+  if (!select || select.dataset.bound === '1') return;
+  select.dataset.bound = '1';
+  select.addEventListener('change', () => {
+    const year = String(select.value || '').trim();
+    if (!/^\d{4}$/.test(year)) return;
+    const url = new URL(select.getAttribute('data-budget-annual-url') || location.pathname, location.origin);
+    url.searchParams.set('tab', 'bilancio');
+    url.searchParams.set('year', year);
+    url.hash = 'bil-bilancio';
+    location.assign(url.toString());
+  });
 }
 
 /*

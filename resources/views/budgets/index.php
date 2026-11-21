@@ -465,11 +465,15 @@ $annualCategoriesIncome = is_array($annualCategories['income'] ?? null) ? $annua
 
     <section class="dashboard-panel" id="budget-panel-bilancio" role="tabpanel" data-budget-panel="bilancio" hidden>
         <div class="panel budget-annual-toolbar-panel">
-            <form class="budget-annual-toolbar" method="get" action="<?= e(url('/budgets')) ?>">
-                <input type="hidden" name="tab" value="bilancio">
+            <div class="budget-annual-toolbar">
                 <label class="budget-annual-year">
                     <span><?= e(__('runts.year')) ?></span>
-                    <select name="year" onchange="this.form.submit()">
+                    <select
+                        name="year"
+                        data-budget-annual-year
+                        data-budget-annual-url="<?= e(url('/budgets')) ?>"
+                        aria-label="<?= e(__('runts.year')) ?>"
+                    >
                         <?php foreach ($annualAvailableYears as $optionYear): ?>
                             <option value="<?= (int) $optionYear ?>" <?= (int) $optionYear === $annualYear ? 'selected' : '' ?>>
                                 <?= (int) $optionYear ?>
@@ -480,7 +484,7 @@ $annualCategoriesIncome = is_array($annualCategories['income'] ?? null) ? $annua
                 <a class="btn btn-ghost btn-sm" href="<?= e(url('/budgets/annual/' . $annualYear . '/pdf')) ?>" target="_blank" rel="noopener">
                     <?= e(__('budget.annual_export_pdf')) ?>
                 </a>
-            </form>
+            </div>
             <p class="section-lede"><?= e(__('budget.annual_lede')) ?></p>
         </div>
 
