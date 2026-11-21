@@ -171,11 +171,10 @@ if ($user && app()->isInstalled() && !$temporaryInstance && can('addons.manage')
         $addonUpdates = ['count' => 0, 'items' => []];
     }
 }
-// The application version sits, small, under “Storico attività”: when a core/add-on update is
-// pending the notice already carries the versions, so the footer keeps the version instead.
-$updatesPending = !empty($updateInfo['available']) || (int) ($addonUpdates['count'] ?? 0) > 0;
-$showVersionInline = $user !== null && can('audit.view') && !$updatesPending;
-$showVersionFooter = !$showVersionInline;
+// App version is always visible in the sidebar for every signed-in user — not gated by role
+// (e.g. audit.view) and not hidden when an update notice is present.
+$showVersionInline = $user !== null;
+$showVersionFooter = true;
 ?>
 <?php if ($demoPreview): ?>
 <div class="demo-banner demo-banner--preview" data-demo-preview-banner>
@@ -353,9 +352,9 @@ $showVersionFooter = !$showVersionInline;
                 <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path fill="currentColor" d="M13 3a9 9 0 0 0-9 9H1l3.96 3.96L9 12H6a7 7 0 1 1 7 7 6.98 6.98 0 0 1-4.9-2.03l-1.42 1.42A8.98 8.98 0 0 0 13 21a9 9 0 0 0 0-18Zm-1 5v5l4.28 2.54.72-1.21-3.5-2.08V8H12Z"/></svg>
                 <span><?= e(__('audit.nav')) ?></span>
             </a>
-            <?php if ($showVersionInline): ?>
-                <span class="nav-history-version">v<?= e(app_version()) ?></span>
-            <?php endif; ?>
+        <?php endif; ?>
+        <?php if ($showVersionInline): ?>
+            <span class="nav-history-version">v<?= e(app_version()) ?></span>
         <?php endif; ?>
 
         <div class="sidebar-footer">
