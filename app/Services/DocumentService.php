@@ -40,6 +40,7 @@ final class DocumentService
         'constitutive_act',
         'runts_cert',
         'balance',
+        'statement_excerpt',
         'five_per_thousand',
         'receipt',
         'f24',
@@ -57,7 +58,7 @@ final class DocumentService
     public const CATEGORY_GROUPS = [
         'organs' => ['minutes', 'board_minutes', 'audit_minutes', 'members_register'],
         'legal' => ['statute', 'constitutive_act', 'runts_cert', 'regulation'],
-        'finance' => ['balance', 'five_per_thousand', 'receipt', 'f24', 'invoice'],
+        'finance' => ['balance', 'statement_excerpt', 'five_per_thousand', 'receipt', 'f24', 'invoice'],
         'contracts' => ['contract', 'insurance', 'lease', 'dvr', 'safeguarding'],
         'other' => ['other'],
     ];

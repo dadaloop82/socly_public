@@ -16384,6 +16384,15 @@ function initRepairExcerpts() {
     if (button.disabled) {
       return;
     }
+    if (button.getAttribute('data-repair-addon') !== '1') {
+      window.alert(button.getAttribute('data-repair-unavailable') || '');
+      return;
+    }
+    const missing = Number(button.getAttribute('data-repair-missing') || 0);
+    if (missing < 1) {
+      window.alert(button.getAttribute('data-repair-synced') || '');
+      return;
+    }
     button.disabled = true;
     setText('[data-update-title]', button.getAttribute('data-repair-title') || '');
     setText('[data-update-text]', button.getAttribute('data-repair-starting') || '');
@@ -16397,7 +16406,7 @@ function initRepairExcerpts() {
 
     const token = csrfTokenFromPage();
     let finished = false;
-    let last = { stored: 0, failed: 0, total: Number(button.getAttribute('data-repair-missing') || 0) };
+    let last = { stored: 0, failed: 0, total: missing };
     try {
       const startRes = await fetch(startUrl, {
         method: 'POST',
@@ -16411,7 +16420,11 @@ function initRepairExcerpts() {
       });
       const startData = await startRes.json();
       if (!startData?.ok || !startData.job) {
-        throw new Error(startData?.error || 'start failed');
+        const emptyMsg = button.getAttribute('data-repair-synced')
+          || button.getAttribute('data-repair-unavailable')
+          || startData?.error
+          || 'start failed';
+        throw new Error(emptyMsg);
       }
       const job = String(startData.job);
       const workingTpl = button.getAttribute('data-repair-working') || '';

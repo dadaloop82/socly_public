@@ -126,9 +126,9 @@ foreach ($documents as $doc) {
         <?php
         $excerptRepair = is_array($excerpt_repair ?? null) ? $excerpt_repair : [];
         $excerptMissing = (int) ($excerptRepair['missing'] ?? 0);
-        $excerptAvailable = !empty($excerptRepair['available']) && (int) ($excerptRepair['statements'] ?? 0) > 0 && $excerptMissing > 0;
+        $excerptAddon = !empty($excerptRepair['available']);
         ?>
-        <?php if ($canManage && $excerptAvailable): ?>
+        <?php if ($canManage): ?>
             <button
                 type="button"
                 class="btn btn-ghost"
@@ -136,13 +136,18 @@ foreach ($documents as $doc) {
                 data-repair-start="<?= e(url('/documents/repair-excerpts')) ?>"
                 data-repair-tick="<?= e(url('/documents/repair-excerpts/tick')) ?>"
                 data-repair-missing="<?= (int) $excerptMissing ?>"
+                data-repair-addon="<?= $excerptAddon ? '1' : '0' ?>"
                 data-repair-title="<?= e(__('documents.repair_excerpts_title')) ?>"
                 data-repair-starting="<?= e(__('documents.repair_excerpts_starting')) ?>"
                 data-repair-working="<?= e(__('documents.repair_excerpts_working')) ?>"
                 data-repair-eta="<?= e(__('documents.repair_excerpts_eta')) ?>"
                 data-repair-done="<?= e(__('documents.repair_excerpts_done')) ?>"
                 data-repair-failed="<?= e(__('documents.repair_excerpts_failed')) ?>"
-                title="<?= e(__('documents.repair_excerpts_hint', ['count' => (string) $excerptMissing])) ?>"
+                data-repair-synced="<?= e(__('documents.repair_excerpts_synced')) ?>"
+                data-repair-unavailable="<?= e(__('documents.repair_excerpts_unavailable')) ?>"
+                title="<?= e($excerptMissing > 0
+                    ? __('documents.repair_excerpts_hint', ['count' => (string) $excerptMissing])
+                    : __('documents.repair_excerpts_synced')) ?>"
             ><?= e(__('documents.repair_excerpts')) ?></button>
         <?php endif; ?>
         <?php if ($canManage): ?>
@@ -332,13 +337,13 @@ $repoSizeLabel = $repoSize >= 1048576
                 <?php $groupItems = $groups[$groupKey] ?? []; ?>
                 <?php if ($groupItems === []) { continue; } ?>
                 <?php
-                // “Altro” holds bank-statement excerpts and misc files — keep it collapsed by default.
-                $isOtherGroup = $groupKey === 'other';
-                $otherOpen = $isOtherGroup && $filterCategory === 'other';
-                $groupTag = $isOtherGroup ? 'details' : 'section';
+                // Dense secondary archives (misc files, statement crops) stay collapsed by default.
+                $isCollapsibleGroup = in_array($groupKey, ['other', 'statement_excerpt'], true);
+                $groupOpen = $isCollapsibleGroup && $filterCategory === $groupKey;
+                $groupTag = $isCollapsibleGroup ? 'details' : 'section';
                 ?>
-                <<?= $groupTag ?> class="doc-archive-group<?= $isOtherGroup ? ' doc-archive-group--collapsible' : '' ?>"<?= $otherOpen ? ' open' : '' ?>>
-                    <?php if ($isOtherGroup): ?>
+                <<?= $groupTag ?> class="doc-archive-group<?= $isCollapsibleGroup ? ' doc-archive-group--collapsible' : '' ?>"<?= $groupOpen ? ' open' : '' ?>>
+                    <?php if ($isCollapsibleGroup): ?>
                         <summary class="doc-archive-group-head">
                             <h3 class="doc-archive-group-title"><?= e($categoryLabels[$groupKey] ?? $groupKey) ?></h3>
                             <span class="doc-archive-group-count"><?= count($groupItems) ?></span>

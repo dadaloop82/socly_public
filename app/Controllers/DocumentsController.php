@@ -397,8 +397,9 @@ final class DocumentsController extends BaseController
             echo json_encode([
                 'ok' => false,
                 'error' => $error === 'empty'
-                    ? __('documents.repair_excerpts_empty')
+                    ? __('documents.repair_excerpts_synced')
                     : __('documents.repair_excerpts_unavailable'),
+                'synced' => $error === 'empty',
             ], JSON_UNESCAPED_UNICODE);
             return;
         }
