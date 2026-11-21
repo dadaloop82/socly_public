@@ -464,26 +464,23 @@ $annualCategoriesIncome = is_array($annualCategories['income'] ?? null) ? $annua
     </section>
 
     <section class="dashboard-panel" id="budget-panel-bilancio" role="tabpanel" data-budget-panel="bilancio" hidden>
-        <div class="panel">
-            <div class="budget-model-d-toolbar">
-                <form class="filter-bar" method="get" action="<?= e(url('/budgets')) ?>">
-                    <input type="hidden" name="tab" value="bilancio">
-                    <label class="field">
-                        <span><?= e(__('runts.year')) ?></span>
-                        <select name="year">
-                            <?php foreach ($annualAvailableYears as $optionYear): ?>
-                                <option value="<?= (int) $optionYear ?>" <?= (int) $optionYear === $annualYear ? 'selected' : '' ?>>
-                                    <?= (int) $optionYear ?>
-                                </option>
-                            <?php endforeach; ?>
-                        </select>
-                    </label>
-                    <button class="btn btn-sm" type="submit"><?= e(__('budget.annual_show')) ?></button>
-                    <a class="btn btn-ghost btn-sm" href="<?= e(url('/budgets/annual/' . $annualYear . '/pdf')) ?>" target="_blank" rel="noopener">
-                        <?= e(__('budget.annual_export_pdf')) ?>
-                    </a>
-                </form>
-            </div>
+        <div class="panel budget-annual-toolbar-panel">
+            <form class="budget-annual-toolbar" method="get" action="<?= e(url('/budgets')) ?>">
+                <input type="hidden" name="tab" value="bilancio">
+                <label class="budget-annual-year">
+                    <span><?= e(__('runts.year')) ?></span>
+                    <select name="year" onchange="this.form.submit()">
+                        <?php foreach ($annualAvailableYears as $optionYear): ?>
+                            <option value="<?= (int) $optionYear ?>" <?= (int) $optionYear === $annualYear ? 'selected' : '' ?>>
+                                <?= (int) $optionYear ?>
+                            </option>
+                        <?php endforeach; ?>
+                    </select>
+                </label>
+                <a class="btn btn-ghost btn-sm" href="<?= e(url('/budgets/annual/' . $annualYear . '/pdf')) ?>" target="_blank" rel="noopener">
+                    <?= e(__('budget.annual_export_pdf')) ?>
+                </a>
+            </form>
             <p class="section-lede"><?= e(__('budget.annual_lede')) ?></p>
         </div>
 

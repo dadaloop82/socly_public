@@ -243,40 +243,75 @@ final class TreasuryService
         }
 
         try {
-            // Same day + wallet + direction + amount + description/beneficiary: likely double imports.
+            // Perfect twins only: same date, wallet, direction, amount, description AND beneficiary.
             $rows = $this->db->fetchAll(
                 "SELECT movement_date, account, direction, ROUND(amount, 2) AS amount,
-                        COALESCE(NULLIF(TRIM(description), ''), TRIM(beneficiary), '') AS text_key,
+                        TRIM(COALESCE(description, '')) AS description,
+                        TRIM(COALESCE(beneficiary, '')) AS beneficiary,
                         COUNT(*) AS cnt,
                         GROUP_CONCAT(id ORDER BY id ASC) AS ids
                  FROM treasury_movements
                  WHERE superseded_at IS NULL
                    AND movement_date >= DATE_SUB(CURDATE(), INTERVAL 3 YEAR)
-                 GROUP BY movement_date, account, direction, ROUND(amount, 2), text_key
+                 GROUP BY movement_date, account, direction, ROUND(amount, 2),
+                          TRIM(COALESCE(description, '')), TRIM(COALESCE(beneficiary, ''))
                  HAVING cnt > 1
                  ORDER BY movement_date DESC
-                 LIMIT 40"
+                 LIMIT 30"
             );
             $groupKeys = [];
-            $movementTotal = 0;
+            $allIds = [];
+            $items = [];
             foreach ($rows as $row) {
                 $cnt = (int) ($row['cnt'] ?? 0);
                 if ($cnt < 2) {
                     continue;
                 }
+                $ids = array_values(array_filter(array_map(
+                    static fn (string $id): int => (int) $id,
+                    explode(',', (string) ($row['ids'] ?? ''))
+                )));
+                if (count($ids) < 2) {
+                    continue;
+                }
+                $description = trim((string) ($row['description'] ?? ''));
+                $beneficiary = trim((string) ($row['beneficiary'] ?? ''));
+                $text = $description !== '' ? $description : ($beneficiary !== '' ? $beneficiary : '—');
                 $groupKeys[] = implode('|', [
                     (string) ($row['movement_date'] ?? ''),
                     mb_strtolower(trim((string) ($row['account'] ?? ''))),
                     mb_strtolower(trim((string) ($row['direction'] ?? ''))),
                     number_format((float) ($row['amount'] ?? 0), 2, '.', ''),
-                    mb_strtolower(trim((string) ($row['text_key'] ?? ''))),
+                    mb_strtolower($description),
+                    mb_strtolower($beneficiary),
                 ]);
-                $movementTotal += $cnt;
+                foreach ($ids as $id) {
+                    $allIds[$id] = $id;
+                }
+                $links = [];
+                foreach ($ids as $id) {
+                    $links[] = [
+                        'href' => url('/treasury/' . $id . '/edit'),
+                        'label' => '#' . $id,
+                    ];
+                }
+                $items[] = [
+                    'label' => __('treasury.health_duplicates_item', [
+                        'date' => (string) ($row['movement_date'] ?? ''),
+                        'amount' => number_format((float) ($row['amount'] ?? 0), 2, ',', '.'),
+                        'account' => trim((string) ($row['account'] ?? '')),
+                        'text' => mb_substr($text, 0, 80),
+                        'count' => (string) count($ids),
+                    ]),
+                    'links' => $links,
+                ];
             }
             if ($groupKeys !== []) {
                 sort($groupKeys);
                 $fingerprint = $this->healthFingerprint('duplicates', $groupKeys);
                 if (!$this->healthAlertDismissed($dismissed, 'duplicates', $fingerprint)) {
+                    $idList = array_values($allIds);
+                    sort($idList);
                     $alerts[] = [
                         'key' => 'duplicates',
                         'fingerprint' => $fingerprint,
@@ -284,14 +319,16 @@ final class TreasuryService
                         'title' => __('treasury.health_duplicates'),
                         'detail' => __('treasury.health_duplicates_detail', [
                             'groups' => (string) count($groupKeys),
-                            'count' => (string) $movementTotal,
+                            'count' => (string) count($idList),
                         ]),
                         'count' => count($groupKeys),
-                        'href' => url('/treasury'),
+                        'href' => url('/treasury?ids=' . implode(',', $idList)),
+                        'href_label' => __('treasury.health_open_duplicates'),
                         'dismissable' => true,
+                        'items' => array_slice($items, 0, 12),
                         'meta' => [
                             'groups' => count($groupKeys),
-                            'movements' => $movementTotal,
+                            'ids' => $idList,
                         ],
                     ];
                 }
@@ -361,6 +398,7 @@ final class TreasuryService
                         ]),
                         'count' => count($ids),
                         'href' => url('/treasury?anomaly=1'),
+                        'href_label' => __('treasury.health_open_filter'),
                         'dismissable' => true,
                         'meta' => [
                             'ids' => $ids,
@@ -395,6 +433,8 @@ final class TreasuryService
                             'count' => (string) count($ids),
                         ]),
                         'count' => count($ids),
+                        'href' => url('/treasury?runts_line=__none__&approval=approved'),
+                        'href_label' => __('treasury.health_open_filter'),
                         'dismissable' => true,
                         'meta' => [
                             'ids' => $ids,
@@ -427,6 +467,8 @@ final class TreasuryService
                             'count' => (string) count($ids),
                         ]),
                         'count' => count($ids),
+                        'href' => url('/treasury?ids=' . implode(',', $ids)),
+                        'href_label' => __('treasury.health_open_filter'),
                         'dismissable' => true,
                         'meta' => [
                             'ids' => $ids,

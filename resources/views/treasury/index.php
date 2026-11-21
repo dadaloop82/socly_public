@@ -589,24 +589,48 @@ if ($filterYear !== '' && !isset($yearFilterOptions[$filterYear])) {
             <strong id="treasury-health-banner-title"><?= e(__('treasury.health_title')) ?></strong>
             <ul class="treasury-health-list">
                 <?php foreach ($health_alerts as $alert): ?>
+                    <?php
+                    $alertItems = is_array($alert['items'] ?? null) ? $alert['items'] : [];
+                    $hrefLabel = trim((string) ($alert['href_label'] ?? '')) !== ''
+                        ? (string) $alert['href_label']
+                        : (string) __('treasury.health_open_filter');
+                    ?>
                     <li class="treasury-health-item">
                         <strong><?= e((string) ($alert['title'] ?? '')) ?></strong>
                         <?php if ((int) ($alert['count'] ?? 0) > 0): ?>
                             <span class="muted">(<?= e((string) (int) ($alert['count'] ?? 0)) ?>)</span>
                         <?php endif; ?>
                         <div><?= e((string) ($alert['detail'] ?? '')) ?></div>
-                        <?php if (!empty($alert['href'])): ?>
-                            <div>
-                                <a class="btn btn-sm btn-ghost" href="<?= e((string) $alert['href']) ?>"><?= e(__('treasury.health_open_filter')) ?></a>
-                            </div>
+                        <?php if ($alertItems !== []): ?>
+                            <ul class="treasury-health-dupes">
+                                <?php foreach ($alertItems as $item): ?>
+                                    <li>
+                                        <span><?= e((string) ($item['label'] ?? '')) ?></span>
+                                        <?php if (!empty($item['links']) && is_array($item['links'])): ?>
+                                            <span class="treasury-health-dupes-links">
+                                                <?php foreach ($item['links'] as $link): ?>
+                                                    <a href="<?= e((string) ($link['href'] ?? '#')) ?>"><?= e((string) ($link['label'] ?? '')) ?></a>
+                                                <?php endforeach; ?>
+                                            </span>
+                                        <?php endif; ?>
+                                    </li>
+                                <?php endforeach; ?>
+                            </ul>
                         <?php endif; ?>
-                        <?php if (!empty($alert['dismissable'])): ?>
-                            <form method="post" action="<?= e(url('/treasury/health/dismiss')) ?>" style="display:inline">
-                                <?= csrf_field() ?>
-                                <input type="hidden" name="issue_key" value="<?= e((string) ($alert['key'] ?? '')) ?>">
-                                <input type="hidden" name="fingerprint" value="<?= e((string) ($alert['fingerprint'] ?? '')) ?>">
-                                <button class="btn btn-ghost btn-sm" type="submit"><?= e(__('treasury.health_dismiss')) ?></button>
-                            </form>
+                        <?php if (!empty($alert['href']) || !empty($alert['dismissable'])): ?>
+                            <div class="treasury-health-actions">
+                                <?php if (!empty($alert['href'])): ?>
+                                    <a class="btn btn-sm btn-ghost" href="<?= e((string) $alert['href']) ?>"><?= e($hrefLabel) ?></a>
+                                <?php endif; ?>
+                                <?php if (!empty($alert['dismissable'])): ?>
+                                    <form method="post" action="<?= e(url('/treasury/health/dismiss')) ?>">
+                                        <?= csrf_field() ?>
+                                        <input type="hidden" name="issue_key" value="<?= e((string) ($alert['key'] ?? '')) ?>">
+                                        <input type="hidden" name="fingerprint" value="<?= e((string) ($alert['fingerprint'] ?? '')) ?>">
+                                        <button class="btn btn-ghost btn-sm" type="submit"><?= e(__('treasury.health_dismiss')) ?></button>
+                                    </form>
+                                <?php endif; ?>
+                            </div>
                         <?php endif; ?>
                     </li>
                 <?php endforeach; ?>

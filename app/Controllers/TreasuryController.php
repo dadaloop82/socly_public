@@ -1354,6 +1354,23 @@ final class TreasuryController extends BaseController
         if ($anomaly === '1') {
             $filters['pattern_ids'] = $this->treasury->classificationAnomalyIds();
         }
+        // Explicit id list (health banner: duplicates / future dates).
+        $idsRaw = trim((string) $request->input('ids', ''));
+        if ($idsRaw !== '' && empty($filters['pattern_ids'])) {
+            $ids = [];
+            foreach (explode(',', $idsRaw) as $piece) {
+                $id = (int) trim($piece);
+                if ($id > 0) {
+                    $ids[$id] = $id;
+                }
+                if (count($ids) >= 200) {
+                    break;
+                }
+            }
+            if ($ids !== []) {
+                $filters['pattern_ids'] = array_values($ids);
+            }
+        }
 
         return $filters;
     }
@@ -1398,7 +1415,7 @@ final class TreasuryController extends BaseController
             parse_str($query, $parsed);
         }
         $clean = [];
-        foreach (['q', 'period', 'direction', 'category', 'account', 'approval', 'anomaly', 'month', 'year', 'sort', 'group', 'page', 'runts_line', 'budget_item_id', 'beneficiary', 'no_counterparty'] as $key) {
+        foreach (['q', 'period', 'direction', 'category', 'account', 'approval', 'anomaly', 'month', 'year', 'sort', 'group', 'page', 'runts_line', 'budget_item_id', 'beneficiary', 'no_counterparty', 'ids'] as $key) {
             $value = $parsed[$key] ?? null;
             if (!is_scalar($value)) {
                 continue;
