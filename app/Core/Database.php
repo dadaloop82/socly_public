@@ -40,28 +40,49 @@ final class Database
     /**
      * True when the failure is about reaching/authenticating to MySQL
      * (misconfigured .env), not a later SQL error on a live connection.
+     *
+     * Also matches ErrorException wrappers from the fatal handler
+     * ("Uncaught PDOException: … Access denied …").
+     *
+     * Note: SQLSTATE HY000 is *not* treated as a connection failure on its own —
+     * it also covers runtime SQL errors such as 2014 (unbuffered queries).
      */
     public static function isConnectionException(\Throwable $e): bool
     {
-        if (!$e instanceof \PDOException) {
-            return false;
-        }
-        $msg = $e->getMessage();
-        $sqlState = is_string($e->errorInfo[0] ?? null) ? (string) $e->errorInfo[0] : '';
-        $driverCode = (int) ($e->errorInfo[1] ?? 0);
-
-        // Common MySQL/MariaDB connect failures
-        if (in_array($driverCode, [1044, 1045, 1049, 2002, 2003, 2006, 2013], true)) {
-            return true;
-        }
-        if ($sqlState === 'HY000' || $sqlState === '28000' || $sqlState === '08006') {
-            return true;
+        $candidates = [$e];
+        $prev = $e->getPrevious();
+        if ($prev instanceof \Throwable) {
+            $candidates[] = $prev;
         }
 
-        return (bool) preg_match(
-            '/Access denied|Unknown database|Connection refused|Can\'t connect|could not find driver|No such file or directory|server has gone away|Connection timed out/i',
-            $msg
-        );
+        foreach ($candidates as $ex) {
+            if ($ex instanceof \PDOException) {
+                $sqlState = is_string($ex->errorInfo[0] ?? null) ? (string) $ex->errorInfo[0] : '';
+                $driverCode = (int) ($ex->errorInfo[1] ?? 0);
+
+                // Common MySQL/MariaDB connect / auth failures (not HY000/2014 etc.)
+                if (in_array($driverCode, [1044, 1045, 1049, 2002, 2003, 2006, 2013], true)) {
+                    return true;
+                }
+                if ($sqlState === '28000' || $sqlState === '08006') {
+                    return true;
+                }
+            }
+
+            $msg = $ex->getMessage();
+            // Driver codes embedded in wrapped fatal messages (ErrorException).
+            if (preg_match('/SQLSTATE\[[^\]]+\]\s*\[(1044|1045|1049|2002|2003|2006|2013)\]/', $msg) === 1) {
+                return true;
+            }
+            if (preg_match(
+                '/Access denied|Unknown database|Connection refused|Can\'t connect|could not find driver|No such file or directory|server has gone away|Connection timed out/i',
+                $msg
+            ) === 1) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /** Lightweight connect probe (cached per request). */

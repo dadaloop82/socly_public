@@ -134,6 +134,21 @@ final class GitHubIssueService
                 return ['ok' => false, 'skipped' => true, 'error' => 'external_script', 'code' => 'external_script'];
             }
 
+            // Misconfigured .env / unreachable MySQL is an ops issue, not a product crash.
+            // (php -r against a tree without password was opening GitHub #14 / ref 8549625B.)
+            if (\Socly\Core\Database::isConnectionException($e)) {
+                try {
+                    if (function_exists('app')) {
+                        app('logger')->warning('github_issue.crash_report_skipped', [
+                            'reason' => 'db_connection',
+                            'error' => $e->getMessage(),
+                        ]);
+                    }
+                } catch (\Throwable) {
+                }
+                return ['ok' => false, 'skipped' => true, 'error' => 'db_connection', 'code' => 'db_connection'];
+            }
+
             $sig = hash('sha256', $e::class . '|' . $e->getMessage() . '|' . $e->getFile() . '|' . $e->getLine());
             $dedupKey = 'report-crash:' . $sig;
             if ($this->limiter->tooManyAttempts($dedupKey, 1, self::CRASH_DEDUP_SECONDS)) {
@@ -215,13 +230,22 @@ final class GitHubIssueService
     /**
      * True when the running entry script lives inside the application tree (public/index.php, bin/…).
      * Ad-hoc scripts (e.g. /tmp/socly_mig.php) must not open GitHub issues: their errors are not
-     * actionable product crashes. When the path cannot be resolved the report is kept.
+     * actionable product crashes. When the path cannot be resolved the report is kept (web),
+     * except for CLI stdin / `php -r` which never have a product entrypoint.
      */
     private function runsFromApplication(): bool
     {
         $raw = (string) ($_SERVER['SCRIPT_FILENAME'] ?? '');
-        if ($raw === '') {
+        $isCli = \in_array(PHP_SAPI, ['cli', 'phpdbg'], true);
+        if ($raw === '' || $raw === '-') {
+            // php -r / piped stdin leave SCRIPT_FILENAME empty; those are diagnostic runs.
+            if ($isCli) {
+                return false;
+            }
             return true;
+        }
+        if ($isCli && (str_contains($raw, 'Standard input code') || basename($raw) === '-')) {
+            return false;
         }
         $script = realpath($raw);
         if ($script === false) {

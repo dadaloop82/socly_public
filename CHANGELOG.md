@@ -10,6 +10,11 @@ every 100 patches bump the series, and each bump is published to this rep come o
 
 ### Fixed
 
+- Automatic crash reports no longer open GitHub issues for MySQL connection/auth failures
+  (misconfigured `.env`, empty password, unreachable host) or for CLI `php -r` / stdin runs.
+  `Database::isConnectionException()` no longer treats every `HY000` as a connection error
+  (so real SQL faults such as unbuffered-query `2014` stay distinct) and also matches the
+  `ErrorException` wrappers produced by the fatal handler.
 - Bank-statement import: the excerpt of every statement line is now queued and archived **after** the
   import response (newest movements first) instead of being generated inside the request with a 20 s
   cap. The old budget dropped the later rows right before the temporary folder was deleted, so the
