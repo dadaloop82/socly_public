@@ -1175,9 +1175,23 @@ body.app-embed .page-header {
   font-weight: 700;
   max-width: 100%;
 }
+/* Login brand panel: long association names must wrap, never truncate into the form column. */
+.assoc-lockup-auth {
+  display: inline-flex !important;
+  flex-wrap: wrap !important;
+  white-space: normal !important;
+  overflow: visible;
+  max-width: 100%;
+}
 .assoc-lockup-auth .assoc-name {
   color: var(--brand-accent-on-dark);
   font-weight: 700;
+  white-space: normal;
+  overflow: visible;
+  text-overflow: unset;
+  overflow-wrap: break-word;
+  word-break: normal;
+  max-width: 100%;
 }
 .assoc-lockup-auth .assoc-legal {
   color: color-mix(in srgb, var(--brand-paper) 78%, var(--brand-accent-on-dark));
@@ -4213,9 +4227,15 @@ tr.clickable-row:focus-visible {
   font-size: clamp(1.15rem, 2.4vw, 1.45rem);
   letter-spacing: -0.03em;
   line-height: 1.25;
+  min-width: 0;
+  max-width: 100%;
 }
-.auth-product-line .assoc-lockup {
-  white-space: nowrap;
+.auth-product-line .assoc-lockup-auth {
+  flex: 1 1 100%;
+  white-space: normal;
+  overflow: visible;
+  min-width: 0;
+  max-width: 100%;
 }
 .auth-product .per {
   color: color-mix(in srgb, var(--brand-paper) 72%, var(--brand-accent));
