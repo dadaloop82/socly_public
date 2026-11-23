@@ -2958,7 +2958,7 @@ return [
         'suppliers_merge_lede' => 'Unterschiedlich geschriebene Gegenparteien, die dieselbe zu sein scheinen: Sie können sie unter einem Namen vereinheitlichen.',
         'suppliers_merge_also' => 'auch als :names',
         'suppliers_merge_meta' => ':count Bewegungen · :reason',
-        'suppliers_merge_action' => 'Zusammenführen',
+        'suppliers_merge_action' => 'Alle unter :name zusammenführen',
         'suppliers_merge_confirm' => ':count Varianten unter „:name“ zusammenführen? Die Bewegungen behalten diesen Namen.',
         'suppliers_merge_done' => ':count Bewegungen unter „:name“ zusammengeführt.',
         'suppliers_merge_failed' => 'Zusammenführung fehlgeschlagen. Bitte erneut versuchen.',

@@ -2958,7 +2958,7 @@ return [
         'suppliers_merge_lede' => 'Counterparties written differently that look like the same party: you can unify them under one name.',
         'suppliers_merge_also' => 'also as :names',
         'suppliers_merge_meta' => ':count movements · :reason',
-        'suppliers_merge_action' => 'Merge',
+        'suppliers_merge_action' => 'Merge all into :name',
         'suppliers_merge_confirm' => 'Merge :count variants under “:name”? Movements will keep this name.',
         'suppliers_merge_done' => 'Merged :count movements under “:name”.',
         'suppliers_merge_failed' => 'Merge failed. Please try again.',

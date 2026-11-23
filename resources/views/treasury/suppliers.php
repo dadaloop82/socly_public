@@ -182,7 +182,9 @@ $reasonLabel = static function (string $reason): string {
                         <?php foreach ($names as $fromName): ?>
                             <input type="hidden" name="from[]" value="<?= e($fromName) ?>">
                         <?php endforeach; ?>
-                        <button type="submit" class="btn btn-sm"><?= e(__('treasury.suppliers_merge_action')) ?></button>
+                        <button type="submit" class="btn btn-sm"><?= e(__('treasury.suppliers_merge_action', [
+                            'name' => $canonical,
+                        ])) ?></button>
                     </form>
                 <?php endif; ?>
             </li>

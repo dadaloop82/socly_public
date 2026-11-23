@@ -41,6 +41,8 @@ every 100 patches bump the series, and each bump is published to this rep come o
   cash-book movement (same image is reused; a different cut replaces the previous one).
 - Gestione Controparti: list ordered by number of movements; similar spellings are suggested
   for aggregation into one canonical name.
+- Gestione Controparti: merge button reads “Aggrega tutti con …” using the spelling that already
+  has the most movements (the canonical target).
 
 ### Fixed
 
