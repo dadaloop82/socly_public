@@ -1,6 +1,6 @@
 {
-    "version": "1.12.92",
-    "released_at": "2026-11-23T20:07:48+00:00",
+    "version": "1.12.94",
+    "released_at": "2026-11-23T20:14:29+00:00",
     "repository_url": "https://github.com/dadaloop82/socly_public",
     "notes_url": "https://github.com/dadaloop82/socly_public/blob/main/CHANGELOG.md",
     "download_url": "https://github.com/dadaloop82/socly_public/archive/refs/heads/main.zip",
@@ -17,6 +17,6 @@
         "Bank-statement ritagli: storing an excerpt is idempotent — at most one live crop per cash-book movement (same image is reused; a different cut replaces the previous one).",
         "Gestione Controparti: list ordered by number of movements; similar spellings are suggested for aggregation into one canonical name.",
         "Gestione Controparti: merge button reads “Aggrega tutti con …” using the spelling that already has the most movements (the canonical target).",
-        "Update dialog: shows publish date and inline changelog highlights again (from `latest.json`), including on the login page, instead of only “local vs available” version numbers."
+        "Gestione Controparti: each merge suggestion offers “Mostra questi movimenti” (secondary button) to open every spelling of the group in the movements dialog before aggregating."
     ]
 }

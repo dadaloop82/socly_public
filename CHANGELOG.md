@@ -43,6 +43,8 @@ every 100 patches bump the series, and each bump is published to this rep come o
   for aggregation into one canonical name.
 - Gestione Controparti: merge button reads “Aggrega tutti con …” using the spelling that already
   has the most movements (the canonical target).
+- Gestione Controparti: each merge suggestion offers “Mostra questi movimenti” (secondary button)
+  to open every spelling of the group in the movements dialog before aggregating.
 
 ### Fixed
 

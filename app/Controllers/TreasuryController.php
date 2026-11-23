@@ -1138,34 +1138,61 @@ final class TreasuryController extends BaseController
     }
 
     /**
-     * Movements of one counterparty, shown in the dialog opened from “Gestione controparti”.
-     * Read-only and compact: the operator keeps the counterparty list behind the popup, while the
-     * full ledger (filters, grouping, bulk actions) stays one click away.
+     * Movements of one counterparty (or several spellings from a merge suggestion), shown in the
+     * dialog opened from “Gestione controparti”. Read-only and compact: the operator keeps the
+     * counterparty list behind the popup, while the full ledger stays one click away.
      */
     public function supplierMovements(Request $request): void
     {
         require_component('treasury');
-        $name = trim((string) preg_replace('/\s+/u', ' ', (string) $request->input('name', '')));
-        if (mb_strlen($name) > 190) {
-            $name = mb_substr($name, 0, 190);
+        $names = [];
+        $rawNames = $request->input('names', []);
+        if (!is_array($rawNames)) {
+            $rawNames = [];
         }
-        if ($name === '') {
+        foreach ($rawNames as $piece) {
+            $piece = trim((string) preg_replace('/\s+/u', ' ', (string) $piece));
+            if ($piece === '') {
+                continue;
+            }
+            if (mb_strlen($piece) > 190) {
+                $piece = mb_substr($piece, 0, 190);
+            }
+            $names[mb_strtolower($piece)] = $piece;
+            if (count($names) >= 40) {
+                break;
+            }
+        }
+        $single = trim((string) preg_replace('/\s+/u', ' ', (string) $request->input('name', '')));
+        if ($single !== '') {
+            if (mb_strlen($single) > 190) {
+                $single = mb_substr($single, 0, 190);
+            }
+            $names[mb_strtolower($single)] = $single;
+        }
+        $names = array_values($names);
+        if ($names === []) {
             http_response_code(404);
             $this->render('errors/404');
             return;
         }
+        $label = count($names) === 1 ? $names[0] : implode(' · ', $names);
         // Same filter the ledger drill-down uses, so the popup and “Apri in Prima cassa” agree.
-        $filters = $this->ledgerFilters(new Request('GET', '/treasury', ['beneficiary' => $name], [], [], []));
+        $query = count($names) === 1
+            ? ['beneficiary' => $names[0]]
+            : ['names' => $names];
+        $filters = $this->ledgerFilters(new Request('GET', '/treasury', $query, [], [], []));
         $limit = 100;
         $total = $this->treasury->ledgerTotal('', $filters);
         $ledger = $this->treasury->ledger($limit, '', 'date_desc', $filters, 0);
         $this->render('treasury/supplier_movements', [
-            'title' => __('treasury.supplier_movements_title', ['name' => $name]),
-            'beneficiary' => $name,
+            'title' => __('treasury.supplier_movements_title', ['name' => $label]),
+            'beneficiary' => $label,
+            'beneficiaries' => $names,
             'movements' => is_array($ledger['movements'] ?? null) ? $ledger['movements'] : [],
             'total' => $total,
             'currency' => $this->currency,
-            'ledger_url' => url('/treasury?' . http_build_query(['beneficiary' => $name])),
+            'ledger_url' => url('/treasury?' . http_build_query($query)),
         ], 'layouts/embed');
     }
 
@@ -1355,10 +1382,30 @@ final class TreasuryController extends BaseController
         }
         $anomaly = (string) $request->input('anomaly', '') === '1' ? '1' : '';
         // Supplier drill-down from “Gestione Controparti”: exact name, case/space insensitive.
+        // Merge suggestions can pass several spellings (`names[]`) so the popup lists every variant.
         $beneficiary = trim((string) preg_replace('/\s+/u', ' ', (string) $request->input('beneficiary', '')));
         if (mb_strlen($beneficiary) > 190) {
             $beneficiary = mb_substr($beneficiary, 0, 190);
         }
+        $beneficiaries = [];
+        $rawNames = $request->input('names', []);
+        if (!is_array($rawNames)) {
+            $rawNames = [];
+        }
+        foreach ($rawNames as $piece) {
+            $piece = trim((string) preg_replace('/\s+/u', ' ', (string) $piece));
+            if ($piece === '') {
+                continue;
+            }
+            if (mb_strlen($piece) > 190) {
+                $piece = mb_substr($piece, 0, 190);
+            }
+            $beneficiaries[mb_strtolower($piece)] = $piece;
+            if (count($beneficiaries) >= 40) {
+                break;
+            }
+        }
+        $beneficiaries = array_values($beneficiaries);
         $from = $this->isoDate((string) $request->input('from', ''));
         $to = $this->isoDate((string) $request->input('to', ''));
         $month = (int) $request->input('month', 0);
@@ -1408,6 +1455,7 @@ final class TreasuryController extends BaseController
             'approval' => $approval,
             'anomaly' => $anomaly,
             'beneficiary' => $beneficiary,
+            'beneficiaries' => $beneficiaries,
             'no_counterparty' => (string) $request->input('no_counterparty', '') === '1' ? '1' : '',
             'ids' => $ids !== [] ? implode(',', array_values($ids)) : '',
         ];

@@ -13805,6 +13805,17 @@ a.suppliers-member-badge:focus-visible { text-decoration: underline; }
 .suppliers-merge-form {
   margin: 0;
 }
+.suppliers-merge-actions {
+  display: grid;
+  gap: 0.4rem;
+  justify-items: stretch;
+  align-content: start;
+}
+.suppliers-merge-actions .btn {
+  width: 100%;
+  text-align: center;
+  white-space: normal;
+}
 .tmf-similar-probe {
   position: relative;
   border: 2px solid color-mix(in srgb, var(--brand-primary) 55%, var(--line));

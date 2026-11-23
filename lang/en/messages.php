@@ -2959,6 +2959,7 @@ return [
         'suppliers_merge_also' => 'also as :names',
         'suppliers_merge_meta' => ':count movements · :reason',
         'suppliers_merge_action' => 'Merge all into :name',
+        'suppliers_merge_show' => 'Show these movements',
         'suppliers_merge_confirm' => 'Merge :count variants under “:name”? Movements will keep this name.',
         'suppliers_merge_done' => 'Merged :count movements under “:name”.',
         'suppliers_merge_failed' => 'Merge failed. Please try again.',

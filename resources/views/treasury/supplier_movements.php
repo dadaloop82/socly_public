@@ -26,19 +26,28 @@
  * (`embed=1`) and the dialog head brings the operator back to the list.
  *
  * @var string $beneficiary
+ * @var list<string> $beneficiaries
  * @var list<array<string,mixed>> $movements
  * @var int $total
  * @var \Socly\Services\CurrencyService $currency
  * @var string $ledger_url
  */
 $beneficiary = (string) ($beneficiary ?? '');
+$beneficiaries = array_values(array_filter(array_map('strval', (array) ($beneficiaries ?? []))));
+if ($beneficiaries === [] && $beneficiary !== '') {
+    $beneficiaries = [$beneficiary];
+}
+$showSpelling = count($beneficiaries) > 1;
 $movements = is_array($movements ?? null) ? $movements : [];
 $total = (int) ($total ?? 0);
 $ledgerUrl = (string) ($ledger_url ?? url('/treasury'));
 $canManage = can('treasury.manage');
 // The movement card opens inside this same popup (`embed=1`, bare layout); its ledger return state
 // keeps the counterparty filter, while the dialog head brings the operator back to this list.
-$ledgerReturnPath = '/treasury?' . http_build_query(['beneficiary' => $beneficiary]);
+$ledgerReturnQuery = count($beneficiaries) === 1
+    ? ['beneficiary' => $beneficiaries[0]]
+    : ['names' => $beneficiaries];
+$ledgerReturnPath = '/treasury?' . http_build_query($ledgerReturnQuery);
 $editUrl = static fn (int $id): string => url('/treasury/' . $id . '/edit?' . http_build_query([
     'embed' => '1',
     'ret' => $ledgerReturnPath,
@@ -61,6 +70,9 @@ $editUrl = static fn (int $id): string => url('/treasury/' . $id . '/edit?' . ht
                 <thead>
                 <tr>
                     <th><?= e(__('treasury.date')) ?></th>
+                    <?php if ($showSpelling): ?>
+                        <th><?= e(__('treasury.counterparty_short')) ?></th>
+                    <?php endif; ?>
                     <th><?= e(__('treasury.description')) ?></th>
                     <th><?= e(__('treasury.category')) ?></th>
                     <th class="is-num"><?= e(__('treasury.amount')) ?></th>
@@ -75,6 +87,7 @@ $editUrl = static fn (int $id): string => url('/treasury/' . $id . '/edit?' . ht
                     $movementId = (int) ($movement['id'] ?? 0);
                     $direction = (string) ($movement['direction'] ?? 'expense');
                     $amount = (float) ($movement['amount'] ?? 0);
+                    $rowBeneficiary = trim((string) ($movement['beneficiary'] ?? ''));
                     $description = trim((string) ($movement['description'] ?? ''));
                     if ($description === '') {
                         $description = trim((string) ($movement['invoice_title'] ?? ''));
@@ -87,6 +100,9 @@ $editUrl = static fn (int $id): string => url('/treasury/' . $id . '/edit?' . ht
                     ?>
                     <tr>
                         <td class="supplier-movements-date"><?= e(format_date($movement['movement_date'] ?? null) ?: (string) ($movement['movement_date'] ?? '')) ?></td>
+                        <?php if ($showSpelling): ?>
+                            <td><?= e($rowBeneficiary !== '' ? $rowBeneficiary : (string) __('treasury.none')) ?></td>
+                        <?php endif; ?>
                         <td>
                             <span class="supplier-movements-description"><?= e($description !== '' ? $description : (string) __('treasury.none')) ?></span>
                             <?php if ($accountLabel !== ''): ?>

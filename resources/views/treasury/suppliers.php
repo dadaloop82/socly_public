@@ -46,6 +46,7 @@ $partyKey = in_array((string) ($party ?? ''), ['members', 'others'], true) ? (st
 $canMerge = can('treasury.manage');
 $ledgerUrl = static fn (string $name): string => url('/treasury?' . http_build_query(['beneficiary' => $name]));
 $supplierMovementsUrl = static fn (string $name): string => url('/treasury/supplier-movements?' . http_build_query(['name' => $name]));
+$supplierGroupMovementsUrl = static fn (array $names): string => url('/treasury/supplier-movements?' . http_build_query(['names' => array_values($names)]));
 $resetUrl = static function () use ($query, $sortKey, $partyKey): string {
     $params = array_filter([
         'q' => $query,
@@ -171,22 +172,28 @@ $reasonLabel = static function (string $reason): string {
                         ])) ?>
                     </span>
                 </div>
-                <?php if ($canMerge): ?>
-                    <form method="post" action="<?= e(url('/treasury/suppliers/merge')) ?>" class="suppliers-merge-form"
-                        data-confirm="<?= e(__('treasury.suppliers_merge_confirm', [
-                            'name' => $canonical,
-                            'count' => (string) count($aliases),
-                        ])) ?>">
-                        <?= csrf_field() ?>
-                        <input type="hidden" name="canonical" value="<?= e($canonical) ?>">
-                        <?php foreach ($names as $fromName): ?>
-                            <input type="hidden" name="from[]" value="<?= e($fromName) ?>">
-                        <?php endforeach; ?>
-                        <button type="submit" class="btn btn-sm"><?= e(__('treasury.suppliers_merge_action', [
-                            'name' => $canonical,
-                        ])) ?></button>
-                    </form>
-                <?php endif; ?>
+                <div class="suppliers-merge-actions">
+                    <?php if ($canMerge): ?>
+                        <form method="post" action="<?= e(url('/treasury/suppliers/merge')) ?>" class="suppliers-merge-form"
+                            data-confirm="<?= e(__('treasury.suppliers_merge_confirm', [
+                                'name' => $canonical,
+                                'count' => (string) count($aliases),
+                            ])) ?>">
+                            <?= csrf_field() ?>
+                            <input type="hidden" name="canonical" value="<?= e($canonical) ?>">
+                            <?php foreach ($names as $fromName): ?>
+                                <input type="hidden" name="from[]" value="<?= e($fromName) ?>">
+                            <?php endforeach; ?>
+                            <button type="submit" class="btn btn-sm"><?= e(__('treasury.suppliers_merge_action', [
+                                'name' => $canonical,
+                            ])) ?></button>
+                        </form>
+                    <?php endif; ?>
+                    <a class="btn btn-sm btn-ghost" href="<?= e($supplierGroupMovementsUrl($names)) ?>"
+                       data-supplier-movements
+                       data-supplier-movements-url="<?= e($supplierGroupMovementsUrl($names)) ?>"
+                       data-supplier-movements-name="<?= e(implode(' · ', $names)) ?>"><?= e(__('treasury.suppliers_merge_show')) ?></a>
+                </div>
             </li>
         <?php endforeach; ?>
     </ul>

@@ -970,10 +970,37 @@ final class TreasuryService
             $where[] = "(m.approved_at IS NOT NULL OR m.account = 'cash')";
         }
         // Supplier drill-down: the stored spelling wins, comparison ignores case and extra spaces.
+        // A merge suggestion can pass several spellings at once (`beneficiaries`).
+        $beneficiaries = [];
+        if (is_array($filters['beneficiaries'] ?? null)) {
+            foreach ($filters['beneficiaries'] as $piece) {
+                $piece = trim((string) preg_replace('/\s+/u', ' ', (string) $piece));
+                if ($piece === '' || mb_strlen($piece) > 190) {
+                    continue;
+                }
+                $beneficiaries[mb_strtolower($piece)] = $piece;
+                if (count($beneficiaries) >= 40) {
+                    break;
+                }
+            }
+        }
         $beneficiary = trim((string) preg_replace('/\s+/u', ' ', (string) ($filters['beneficiary'] ?? '')));
-        if ($beneficiary !== '') {
+        if ($beneficiary !== '' && $beneficiaries === []) {
+            $beneficiaries[mb_strtolower($beneficiary)] = $beneficiary;
+        }
+        if (count($beneficiaries) === 1) {
             $where[] = 'LOWER(TRIM(m.beneficiary)) = LOWER(:filter_beneficiary)';
-            $params['filter_beneficiary'] = $beneficiary;
+            $params['filter_beneficiary'] = (string) array_values($beneficiaries)[0];
+        } elseif (count($beneficiaries) > 1) {
+            $placeholders = [];
+            $i = 0;
+            foreach ($beneficiaries as $key => $_name) {
+                $ph = 'filter_beneficiary_' . $i;
+                $placeholders[] = ':' . $ph;
+                $params[$ph] = $key;
+                $i++;
+            }
+            $where[] = 'LOWER(TRIM(m.beneficiary)) IN (' . implode(', ', $placeholders) . ')';
         }
         // Drill-down from a register row without any counterparty (no linked member and no
         // free-text beneficiary, e.g. after a member was deleted).

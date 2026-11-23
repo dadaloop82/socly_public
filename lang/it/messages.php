@@ -2394,6 +2394,7 @@ return [
         'suppliers_merge_also' => 'anche come :names',
         'suppliers_merge_meta' => ':count movimenti · :reason',
         'suppliers_merge_action' => 'Aggrega tutti con :name',
+        'suppliers_merge_show' => 'Mostra questi movimenti',
         'suppliers_merge_confirm' => 'Aggregare :count varianti sotto “:name”? I movimenti terranno questo nome.',
         'suppliers_merge_done' => 'Aggregate :count movimenti sotto “:name”.',
         'suppliers_merge_failed' => 'Aggregazione non riuscita. Riprova.',
