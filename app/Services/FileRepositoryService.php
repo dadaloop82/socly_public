@@ -797,6 +797,37 @@ final class FileRepositoryService
 
 
     /**
+     * Soft-delete a repository row. Bytes stay on disk until backfill/prune; live queries ignore it.
+     */
+    public function softDelete(int $documentId, string $ip = ''): bool
+    {
+        if ($documentId < 1) {
+            return false;
+        }
+        $row = $this->fileInfo($documentId);
+        if ($row === null) {
+            return false;
+        }
+        try {
+            $this->db->update(
+                'association_documents',
+                ['deleted_at' => date('Y-m-d H:i:s')],
+                'id = :id AND deleted_at IS NULL',
+                ['id' => $documentId]
+            );
+        } catch (\Throwable) {
+            return false;
+        }
+        $this->audit->log('document.repository_deleted', 'document', (string) $documentId, null, [
+            'title' => (string) ($row['title'] ?? ''),
+            'section' => (string) ($row['source_section'] ?? ''),
+            'path' => (string) ($row['file_path'] ?? ''),
+        ], $ip);
+
+        return true;
+    }
+
+    /**
      * Update descriptive metadata of a repository file (e.g. the invoice title typed in Treasury).
      *
      * @param array<string,mixed> $meta

@@ -37,6 +37,8 @@ every 100 patches bump the series, and each bump is published to this rep come o
 - Treasury movement edit: statement excerpt opens in a zoomable popup (same UX as statement
   verify) and the on-form preview is twice as large; open ledger anomalies show the triangle
   mark next to the relevant fields with the reason on hover.
+- Bank-statement ritagli: storing an excerpt is idempotent — at most one live crop per
+  cash-book movement (same image is reused; a different cut replaces the previous one).
 
 ### Fixed
 
