@@ -10,6 +10,17 @@ every 100 patches bump the series, and each bump is published to this rep come o
 
 ### Security
 
+- Install always generates `PLATFORM_MASTER_PASSWORD_HASH`, reloads it into the current request, and
+  refuses `loginAsPlatformMaster()` when the hash is missing. The one-shot password is shown once in
+  the setup UI (no durable plaintext file by default). CLI rotator prints to stdout; `--write-file`
+  is opt-in and the file is deleted on successful master login.
+- `.env` quoting for Argon2 hashes uses single quotes (escaping `$` as `\$` broke Dotenv). `chmod 0600`
+  is applied after every `writeEnv`.
+- Password-reset tokens are no longer written in cleartext to `app.log` when SMTP is missing.
+- Demo provisioner: platform master disabled on every demo, per-demo MySQL user (not shared app DB
+  credentials), `.env` mode `0600`, optional `DEMO_ALLOWED_IPS` for setup-wizard demos
+  (`demo.setup_wizard_allowed_ips`). Marketing admin supports `admin.allowed_ips` /
+  `SOCLY_ADMIN_ALLOWED_IPS` (covers demos wizard and all admin pages including login).
 - Platform master (`admin@socly.it`): the shared Argon2id password hash was removed from the
   repository. Each install now stores `PLATFORM_MASTER_PASSWORD_HASH` in `.env` only. Generate or
   rotate with `php bin/platform-master-password.php`. Set `SOCLY_DISABLE_PLATFORM_MASTER=true` to

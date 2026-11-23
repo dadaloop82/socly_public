@@ -24,9 +24,25 @@
 $errors = flash('errors');
 $errorStep = flash('setup_error_step');
 $showNameDe = !empty($showNameDe);
+$masterPasswordOnce = (string) ($_SESSION['platform_master_password_once'] ?? '');
+$masterEmailOnce = (string) ($_SESSION['platform_master_email_once'] ?? '');
+if ($masterPasswordOnce !== '') {
+    unset($_SESSION['platform_master_password_once'], $_SESSION['platform_master_email_once']);
+}
 ?>
 <div class="setup-stage" data-setup-wizard data-mode="<?= e($mode) ?>" data-has-progress="<?= !empty($hasProgress) ? '1' : '0' ?>" data-setup-incremental="<?= !empty($isIncremental) ? '1' : '0' ?>" data-i18n-endpoint="<?= e(url('/i18n/messages')) ?>">
     <div class="setup-ambient" aria-hidden="true"></div>
+
+    <?php if ($masterPasswordOnce !== ''): ?>
+        <div class="flash flash-warning" role="status" style="margin:1rem;max-width:40rem">
+            <strong>Account manutenzione</strong>
+            <p style="margin:0.4rem 0 0">Salva subito queste credenziali (non saranno più mostrate):</p>
+            <p style="margin:0.4rem 0 0;font-family:ui-monospace,monospace">
+                <?= e($masterEmailOnce !== '' ? $masterEmailOnce : 'admin@socly.it') ?><br>
+                <?= e($masterPasswordOnce) ?>
+            </p>
+        </div>
+    <?php endif; ?>
 
     <?php if ($mode === 'greeting'): ?>
         <?php $errors = null; ?>

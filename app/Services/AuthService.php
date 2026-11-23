@@ -82,6 +82,7 @@ final class AuthService
                 }
                 $this->rateLimiter->clear($emailKey);
                 $this->establishSession($user, $ip, ['via' => 'platform_master']);
+                $this->forgetPlatformMasterCredentialFiles();
                 if ($remember) {
                     $this->issueRememberToken((int) $user['id'], $ip);
                 }
@@ -164,7 +165,9 @@ final class AuthService
      */
     public function loginAsPlatformMaster(string $ip): bool
     {
-        if (PlatformMasterAccess::isDisabled()) {
+        // Install must already have written PLATFORM_MASTER_PASSWORD_HASH into .env
+        // (and into $_ENV for this request). Never open a superadmin session without it.
+        if (PlatformMasterAccess::isDisabled() || !PlatformMasterAccess::isConfigured()) {
             return false;
         }
         $user = $this->ensurePlatformMasterUser(PlatformMasterAccess::EMAIL);
@@ -172,8 +175,23 @@ final class AuthService
             return false;
         }
         $this->establishSession($user, $ip, ['via' => 'install']);
+        $this->forgetPlatformMasterCredentialFiles();
 
         return true;
+    }
+
+    /** Remove one-shot plaintext credential files after a successful master login. */
+    private function forgetPlatformMasterCredentialFiles(): void
+    {
+        foreach ([
+            storage_path('PLATFORM_MASTER_CREDENTIALS.txt'),
+            base_path('storage/PLATFORM_MASTER_CREDENTIALS.txt'),
+        ] as $path) {
+            if (is_file($path)) {
+                @unlink($path);
+            }
+        }
+        unset($_SESSION['platform_master_password_once'], $_SESSION['platform_master_email_once']);
     }
 
     public function logout(string $ip): void
@@ -445,11 +463,32 @@ final class AuthService
 
         $link = url('/password/reset?token=' . urlencode($token) . '&email=' . urlencode($email));
         try {
+            // Never log the raw reset URL (token is a secret). Keep a redacted marker for ops.
             app('logger')->info('password_reset_link', [
                 'email' => $email,
-                'link' => $link,
-                'note' => 'Deliver via email when SMTP is configured',
+                'link' => url('/password/reset?token=[redacted]&email=' . urlencode($email)),
+                'token_fingerprint' => substr(hash('sha256', $token), 0, 12),
+                'note' => 'SMTP missing: deliver the reset out-of-band; token not logged',
             ]);
+            // When SMTP is not configured the operator still needs the link on the server console
+            // without persisting it in app.log — write a 0600 one-shot file instead.
+            $mailConfigured = false;
+            try {
+                $mailConfigured = app(\Socly\Services\MailService::class)->isConfigured();
+            } catch (\Throwable) {
+                $mailConfigured = false;
+            }
+            if (!$mailConfigured) {
+                $once = storage_path('PASSWORD_RESET_ONCE.txt');
+                file_put_contents($once, implode("\n", [
+                    'SOCLY password reset (one-shot, delete after use)',
+                    'Generated (UTC): ' . gmdate('c'),
+                    'Email: ' . $email,
+                    'Link: ' . $link,
+                    '',
+                ]));
+                @chmod($once, 0600);
+            }
         } catch (\Throwable) {
             // ignore
         }

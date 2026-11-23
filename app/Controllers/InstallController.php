@@ -179,9 +179,12 @@ final class InstallController extends BaseController
     {
         try {
             $auth = new AuthService($database, $audit, app(RateLimiter::class));
-            $auth->loginAsPlatformMaster($ip);
+            // Requires PLATFORM_MASTER_PASSWORD_HASH already written + loaded into $_ENV by writeEnv().
+            if (!$auth->loginAsPlatformMaster($ip)) {
+                // Installation itself succeeded; operator can sign in with the one-shot password shown in setup.
+            }
         } catch (\Throwable $e) {
-            // Never block the installation: the maintenance login still works.
+            // Never block the installation on session bootstrap failure.
         }
     }
 

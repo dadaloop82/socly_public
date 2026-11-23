@@ -29,8 +29,9 @@ declare(strict_types=1);
  * Writes PLATFORM_MASTER_PASSWORD_HASH into .env and clears SOCLY_DISABLE_PLATFORM_MASTER.
  *
  * Usage:
- *   php bin/platform-master-password.php              # generate a random password
+ *   php bin/platform-master-password.php              # generate; print once to stdout (no file)
  *   php bin/platform-master-password.php --set '…'    # use the given plaintext once
+ *   php bin/platform-master-password.php --write-file # also write storage/PLATFORM_MASTER_CREDENTIALS.txt
  *   php bin/platform-master-password.php --disable    # refuse master login (kill-switch)
  *   php bin/platform-master-password.php --status     # show whether master auth is ready
  *
@@ -53,16 +54,19 @@ use Socly\Support\PlatformMasterAccess;
 $args = array_slice($argv ?? [], 1);
 $mode = 'generate';
 $password = '';
+$writeFile = false;
 foreach ($args as $i => $arg) {
     if ($arg === '--status') {
         $mode = 'status';
     } elseif ($arg === '--disable') {
         $mode = 'disable';
+    } elseif ($arg === '--write-file') {
+        $writeFile = true;
     } elseif ($arg === '--set') {
         $mode = 'set';
         $password = (string) ($args[$i + 1] ?? '');
     } elseif ($arg === '--help' || $arg === '-h') {
-        fwrite(STDOUT, "Usage: php bin/platform-master-password.php [--status|--disable|--set PASSWORD]\n");
+        fwrite(STDOUT, "Usage: php bin/platform-master-password.php [--status|--disable|--write-file|--set PASSWORD]\n");
         exit(0);
     }
 }
@@ -101,12 +105,7 @@ $writeEnvPairs = static function (array $pairs) use ($envPath): void {
         'SOCLY_DISABLE_PLATFORM_MASTER', 'PLATFORM_MASTER_PASSWORD_HASH',
         'UPDATE_NOTIFY', 'UPDATE_MANIFEST_URL', 'UPDATE_REPO', 'UPDATE_CHANNEL', 'UPDATE_ENABLED',
     ];
-    $escape = static function (string $value): string {
-        if ($value !== '' && preg_match('/[\s#"\'\\\\$]/', $value)) {
-            return '"' . str_replace(['\\', '"', '$'], ['\\\\', '\\"', '\\$'], $value) . '"';
-        }
-        return $value;
-    };
+    $escape = static fn (string $value): string => \Socly\Services\InstallerService::envEscape($value);
 
     $lines = ['# Socly system environment', ''];
     $written = [];
@@ -183,24 +182,26 @@ try {
         // .env is enough for auth; DB row is created on first successful login.
     }
 
-    $credPath = storage_path('PLATFORM_MASTER_CREDENTIALS.txt');
-    $cred = [
-        'SOCLY platform master credentials (one-shot)',
-        'Generated (UTC): ' . gmdate('c'),
-        'Email: ' . PlatformMasterAccess::EMAIL,
-        'Password: ' . $secret['password'],
-        '',
-        'Store offline and delete this file after login.',
-        '',
-    ];
-    file_put_contents($credPath, implode("\n", $cred));
-    @chmod($credPath, 0600);
-
     echo 'Email: ' . PlatformMasterAccess::EMAIL . PHP_EOL;
     echo 'Password: ' . $secret['password'] . PHP_EOL;
-    echo 'Saved to: ' . $credPath . PHP_EOL;
     echo "SOCLY_DISABLE_PLATFORM_MASTER=false\n";
-    echo "PLATFORM_MASTER_PASSWORD_HASH written to .env\n";
+    echo "PLATFORM_MASTER_PASSWORD_HASH written to .env (quoted safely for Dotenv)\n";
+    echo "Store the password offline — it will not be shown again.\n";
+
+    if ($writeFile) {
+        $credPath = storage_path('PLATFORM_MASTER_CREDENTIALS.txt');
+        file_put_contents($credPath, implode("\n", [
+            'SOCLY platform master credentials (one-shot)',
+            'Generated (UTC): ' . gmdate('c'),
+            'Email: ' . PlatformMasterAccess::EMAIL,
+            'Password: ' . $secret['password'],
+            '',
+            'Delete this file after login (also auto-removed on successful master login).',
+            '',
+        ]));
+        @chmod($credPath, 0600);
+        echo 'Also saved to: ' . $credPath . ' (mode 0600)' . PHP_EOL;
+    }
     exit(0);
 } catch (Throwable $e) {
     fwrite(STDERR, 'error: ' . $e->getMessage() . PHP_EOL);

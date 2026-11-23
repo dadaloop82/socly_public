@@ -127,36 +127,56 @@ final class InstallerService
             $lines[] = $key . '=' . self::envEscape((string) $value);
         }
         $lines[] = '';
-        file_put_contents($envPath, implode("\n", $lines));
+        if (file_put_contents($envPath, implode("\n", $lines)) === false) {
+            throw new \RuntimeException('Unable to write .env');
+        }
+        // Force restrictive mode even on filesystems that ignore chmod failures.
         @chmod($envPath, 0600);
+        clearstatcache(true, $envPath);
+
+        // Same request must see the new master hash (Dotenv already ran at boot).
+        foreach ([
+            'PLATFORM_MASTER_PASSWORD_HASH',
+            'SOCLY_DISABLE_PLATFORM_MASTER',
+            'APP_KEY',
+            'DB_HOST',
+            'DB_PORT',
+            'DB_DATABASE',
+            'DB_USERNAME',
+            'DB_PASSWORD',
+        ] as $key) {
+            if (!array_key_exists($key, $merged)) {
+                continue;
+            }
+            $val = (string) $merged[$key];
+            $_ENV[$key] = $val;
+            $_SERVER[$key] = $val;
+            putenv($key . '=' . $val);
+        }
+
         Database::clearReachableCache();
 
         if ($masterPlain !== '') {
-            $credPath = storage_path('PLATFORM_MASTER_CREDENTIALS.txt');
-            $credDir = dirname($credPath);
-            if (!is_dir($credDir)) {
-                @mkdir($credDir, 0775, true);
-            }
-            file_put_contents($credPath, implode("\n", [
-                'SOCLY platform master credentials (one-shot)',
-                'Generated (UTC): ' . gmdate('c'),
-                'Email: ' . \Socly\Support\PlatformMasterAccess::EMAIL,
-                'Password: ' . $masterPlain,
-                '',
-                'Store offline and delete this file after the first maintenance login.',
-                'Rotate anytime with: php bin/platform-master-password.php',
-                '',
-            ]));
-            @chmod($credPath, 0600);
+            // One-shot in session for the installing browser; no durable plaintext file by default.
+            $_SESSION['platform_master_password_once'] = $masterPlain;
+            $_SESSION['platform_master_email_once'] = \Socly\Support\PlatformMasterAccess::EMAIL;
         }
     }
 
-    private static function envEscape(string $value): string
+    /**
+     * Quote .env values safely for vlucas/phpdotenv.
+     * Argon2 hashes contain `$`: never write them as `\$` (Dotenv keeps the backslash).
+     * Prefer single quotes when the value has `$` or spaces.
+     */
+    public static function envEscape(string $value): string
     {
-        if ($value !== '' && preg_match('/[\s#"\'\\\\$]/', $value)) {
-            return '"' . str_replace(['\\', '"', '$'], ['\\\\', '\\"', '\\$'], $value) . '"';
+        if ($value === '' || !preg_match('/[\s#"\'\\\\$]/', $value)) {
+            return $value;
         }
-        return $value;
+        if (!str_contains($value, "'")) {
+            return "'" . $value . "'";
+        }
+        return '"' . str_replace(['\\', '"'], ['\\\\', '\\"'], $value) . '"';
     }
 
     public function runMigrations(): void

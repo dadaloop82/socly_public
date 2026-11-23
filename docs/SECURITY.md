@@ -87,6 +87,15 @@ Permission checks on routes and UI via stable keys in `Socly\Support\Permission`
 - `GET /i18n/messages` — required on the login language switcher; rate-limited per IP.
 - `public/_debug*` and `public/router.php` are blocked by `.htaccess` and must not be deployed.
 
+## Marketing admin / demos (socly.it)
+
+- Optional IP allowlist: setting `admin.allowed_ips` or env `SOCLY_ADMIN_ALLOWED_IPS`
+  (comma-separated IPs/CIDRs). When set, `/admin` login and every admin page (including demo
+  wizard creation) are forbidden outside the list.
+- Setup-wizard demos can be locked with setting `demo.setup_wizard_allowed_ips` → written as
+  `DEMO_ALLOWED_IPS` in the instance `.env` and enforced by `InstanceExpiredMiddleware`.
+- Each demo gets its own MySQL user (`sd_<code>`) and `SOCLY_DISABLE_PLATFORM_MASTER=true`.
+
 ## Outbound platform data
 
 - Anonymous telemetry (usage statistics) contains no personal data: version, locale, member range,

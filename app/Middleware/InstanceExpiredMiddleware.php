@@ -43,6 +43,15 @@ final class InstanceExpiredMiddleware
             return true;
         }
 
+        // Optional IP allowlist for internal setup-wizard demos (DEMO_ALLOWED_IPS in .env).
+        $allowedIps = trim((string) ($_ENV['DEMO_ALLOWED_IPS'] ?? getenv('DEMO_ALLOWED_IPS') ?: ''));
+        if ($allowedIps !== '' && !$this->clientIpAllowed($allowedIps, $request->ip())) {
+            http_response_code(403);
+            header('Content-Type: text/plain; charset=utf-8');
+            echo 'Forbidden';
+            return false;
+        }
+
         $expires = trim((string) $this->settings->get('app.instance_expires_at', ''));
         if ($expires === '') {
             return true;
@@ -80,5 +89,58 @@ final class InstanceExpiredMiddleware
         echo '<p><a href="https://socly.it">' . $link . '</a></p>';
         echo '</body></html>';
         return false;
+    }
+
+    private function clientIpAllowed(string $allowList, string $clientIp): bool
+    {
+        $clientIp = trim($clientIp);
+        if ($clientIp === '') {
+            return false;
+        }
+        foreach (preg_split('/[\s,;]+/', $allowList) ?: [] as $entry) {
+            $entry = trim($entry);
+            if ($entry === '') {
+                continue;
+            }
+            if (str_contains($entry, '/')) {
+                if ($this->ipInCidr($clientIp, $entry)) {
+                    return true;
+                }
+                continue;
+            }
+            if (hash_equals($entry, $clientIp)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private function ipInCidr(string $ip, string $cidr): bool
+    {
+        [$subnet, $mask] = array_pad(explode('/', $cidr, 2), 2, '');
+        if ($subnet === '' || $mask === '' || !is_numeric($mask)) {
+            return false;
+        }
+        $mask = (int) $mask;
+        $ipBin = @inet_pton($ip);
+        $subnetBin = @inet_pton($subnet);
+        if ($ipBin === false || $subnetBin === false || strlen($ipBin) !== strlen($subnetBin)) {
+            return false;
+        }
+        $len = strlen($ipBin);
+        $maxBits = $len * 8;
+        if ($mask < 0 || $mask > $maxBits) {
+            return false;
+        }
+        $bytes = intdiv($mask, 8);
+        $bits = $mask % 8;
+        if ($bytes > 0 && substr($ipBin, 0, $bytes) !== substr($subnetBin, 0, $bytes)) {
+            return false;
+        }
+        if ($bits === 0) {
+            return true;
+        }
+        $maskByte = chr((0xFF << (8 - $bits)) & 0xFF);
+        return ($ipBin[$bytes] & $maskByte) === ($subnetBin[$bytes] & $maskByte);
     }
 }
