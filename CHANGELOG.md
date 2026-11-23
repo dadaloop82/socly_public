@@ -19,6 +19,8 @@ every 100 patches bump the series, and each bump is published to this rep come o
 
 - Bank-statement “check all statements”: if a full audit finished less than an hour ago,
   the operator can reopen those results instead of re-running OCR on every PDF.
+- Bank-statement verify: bulk “fix all dates / amounts” with confirm, count and ETA;
+  ledger-only rows without a covering archived statement are listed as ignored (not actionable).
 
 ### Changed
 
