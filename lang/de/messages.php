@@ -2149,6 +2149,7 @@ return [
         'remote_label' => 'Neue Version',
         'released_label' => 'Veröffentlicht am',
         'changelog_label' => 'Neuigkeiten dieser Version',
+        'changelog_more' => 'und :count weitere — im Changelog ansehen',
         'commit_label' => 'Letzter Commit (öffentliches Repo)',
         'commit_develop_label' => 'Letzter Commit (Repository main)',
         'manual_hint' => 'Die automatische Aktualisierung ist nicht verfügbar: Laden Sie die neueste Version aus dem öffentlichen Repository.',

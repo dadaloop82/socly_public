@@ -2153,6 +2153,7 @@ return [
         'remote_label' => 'Nuova versione',
         'released_label' => 'Pubblicata il',
         'changelog_label' => 'Novità di questa versione',
+        'changelog_more' => 'e altre :count — scopri su changelog',
         'commit_label' => 'Ultimo commit (repo pubblico)',
         'commit_develop_label' => 'Ultimo commit (repository main)',
         'manual_hint' => 'L’aggiornamento automatico non è disponibile: scarica l’ultima versione dal repository pubblico.',

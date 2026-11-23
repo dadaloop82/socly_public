@@ -170,6 +170,7 @@ $year = date('Y');
         data-i18n-commit-develop-label="<?= e(__('updates.commit_develop_label')) ?>"
         data-i18n-released-label="<?= e(__('updates.released_label')) ?>"
         data-i18n-changelog-label="<?= e(__('updates.changelog_label')) ?>"
+        data-i18n-changelog-more="<?= e(__('updates.changelog_more')) ?>"
     >
         <div class="setup-exit-shell auth-updates-shell">
             <h2 class="setup-exit-title" data-auth-updates-title></h2>

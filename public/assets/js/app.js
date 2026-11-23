@@ -14483,17 +14483,26 @@ function initAuthUpdateCheck() {
     }
   };
 
-  const renderChangelog = (items) => {
+  const renderChangelog = (items, notesUrl = '') => {
     if (!(metaEl instanceof HTMLElement)) return '';
     if (!Array.isArray(items) || items.length === 0) return '';
-    const lis = items
+    const cleaned = items
       .map((item) => String(item || '').trim())
-      .filter((item) => item !== '')
-      .slice(0, 12)
-      .map((item) => `<li>${escapeHtml(item)}</li>`)
-      .join('');
-    if (lis === '') return '';
-    return `<div class="auth-updates-changelog"><dt>${escapeHtml(tpl('i18nChangelogLabel', 'Novità di questa versione'))}</dt><dd><ul>${lis}</ul></dd></div>`;
+      .filter((item) => item !== '');
+    if (cleaned.length === 0) return '';
+    const previewLimit = 3;
+    const preview = cleaned.slice(0, previewLimit);
+    const rest = cleaned.length - preview.length;
+    const lis = preview.map((item) => `<li>${escapeHtml(item)}</li>`).join('');
+    let more = '';
+    if (rest > 0) {
+      const moreLabel = tpl('i18nChangelogMore', 'e altre :count — scopri su changelog')
+        .replace(':count', String(rest));
+      more = notesUrl
+        ? `<p class="auth-updates-changelog-more"><a href="${escapeHtml(notesUrl)}" target="_blank" rel="noopener noreferrer">${escapeHtml(moreLabel)}</a></p>`
+        : `<p class="auth-updates-changelog-more">${escapeHtml(moreLabel)}</p>`;
+    }
+    return `<div class="auth-updates-changelog"><dt>${escapeHtml(tpl('i18nChangelogLabel', 'Novità di questa versione'))}</dt><dd><ul>${lis}</ul>${more}</dd></div>`;
   };
 
   const renderMeta = (data) => {
@@ -14528,7 +14537,7 @@ function initAuthUpdateCheck() {
         : `${sha}${sha && msg ? ' — ' : ''}${msg}`;
       rows.push(`<div><dt>${escapeHtml(label)}</dt><dd>${body}</dd></div>`);
     }
-    const changelogHtml = renderChangelog(data?.changelog);
+    const changelogHtml = renderChangelog(data?.changelog, String(data?.notes_url || ''));
     if (changelogHtml !== '') {
       rows.push(changelogHtml);
     }

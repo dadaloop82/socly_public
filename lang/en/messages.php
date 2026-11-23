@@ -2149,6 +2149,7 @@ return [
         'remote_label' => 'New version',
         'released_label' => 'Published on',
         'changelog_label' => 'What’s new in this version',
+        'changelog_more' => 'and :count more — see the changelog',
         'commit_label' => 'Latest commit (public repo)',
         'commit_develop_label' => 'Latest commit (repository main)',
         'manual_hint' => 'Automatic updates are not available: download the latest version from the public repository.',

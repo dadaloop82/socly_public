@@ -50,6 +50,8 @@ every 100 patches bump the series, and each bump is published to this rep come o
 
 - Update dialog: shows publish date and inline changelog highlights again (from `latest.json`),
   including on the login page, instead of only “local vs available” version numbers.
+- Update dialog: shows only the first three highlights, then “e altre N — scopri su changelog”
+  linking to the public CHANGELOG.
 - Bank-statement “check all statements”: percent and ETA cover both PDF compare and ritagli creation,
   so the overlay no longer looks finished after the last statement while excerpts are still running.
 - Bank-statement verify: “Add to cash book” opens the full Prima cassa movement form (prefilled)

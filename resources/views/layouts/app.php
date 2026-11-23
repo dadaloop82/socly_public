@@ -422,15 +422,36 @@ $showVersionFooter = true;
                             <p class="sidebar-update-released muted"><?= e(__('updates.released_label')) ?>: <?= e($releasedLabel) ?></p>
                         <?php endif; ?>
                         <?php if ($changelogItems !== []): ?>
+                            <?php
+                            $changelogPreview = [];
+                            foreach ($changelogItems as $changelogItem) {
+                                $changelogItem = trim((string) $changelogItem);
+                                if ($changelogItem === '') {
+                                    continue;
+                                }
+                                $changelogPreview[] = $changelogItem;
+                            }
+                            $changelogTotal = count($changelogPreview);
+                            $changelogShown = array_slice($changelogPreview, 0, 3);
+                            $changelogRest = max(0, $changelogTotal - count($changelogShown));
+                            ?>
                             <div class="sidebar-update-changelog">
                                 <strong><?= e(__('updates.changelog_label')) ?></strong>
                                 <ul>
-                                    <?php foreach (array_slice($changelogItems, 0, 8) as $changelogItem): ?>
-                                        <?php $changelogItem = trim((string) $changelogItem); ?>
-                                        <?php if ($changelogItem === '') { continue; } ?>
+                                    <?php foreach ($changelogShown as $changelogItem): ?>
                                         <li><?= e($changelogItem) ?></li>
                                     <?php endforeach; ?>
                                 </ul>
+                                <?php if ($changelogRest > 0): ?>
+                                    <?php $changelogMore = __('updates.changelog_more', ['count' => (string) $changelogRest]); ?>
+                                    <p class="sidebar-update-changelog-more">
+                                        <?php if ($notesUrl !== ''): ?>
+                                            <a href="<?= e($notesUrl) ?>" target="_blank" rel="noopener noreferrer"><?= e($changelogMore) ?></a>
+                                        <?php else: ?>
+                                            <?= e($changelogMore) ?>
+                                        <?php endif; ?>
+                                    </p>
+                                <?php endif; ?>
                             </div>
                         <?php endif; ?>
                         <?php if (!$canAutoUpdate): ?>

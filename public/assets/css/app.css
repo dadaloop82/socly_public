@@ -913,6 +913,14 @@ a.sidebar-brand-home:hover {
 .sidebar-update-changelog li + li {
   margin-top: 0.15rem;
 }
+.sidebar-update-changelog-more {
+  margin: 0.2rem 0 0;
+}
+.sidebar-update-changelog-more a {
+  color: inherit;
+  text-decoration: underline;
+  text-underline-offset: 0.12em;
+}
 .sidebar-update-actions {
   display: flex;
   flex-wrap: wrap;
@@ -4660,6 +4668,15 @@ tr.clickable-row:focus-visible {
 }
 .auth-updates-changelog li + li {
   margin-top: 0.25rem;
+}
+.auth-updates-changelog-more {
+  margin: 0.45rem 0 0;
+  font-size: 0.9em;
+}
+.auth-updates-changelog-more a {
+  color: inherit;
+  text-decoration: underline;
+  text-underline-offset: 0.12em;
 }
 .auth-updates-dialog .auth-updates-actions {
   display: flex;
