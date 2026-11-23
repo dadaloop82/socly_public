@@ -48,6 +48,8 @@ every 100 patches bump the series, and each bump is published to this rep come o
 
 ### Fixed
 
+- Gestione Controparti: “Aggrega tutti con …” actually rewrites the movements (PDO native prepares
+  rejected the UPDATE because `:canonical` was bound twice).
 - Update dialog: shows publish date and inline changelog highlights again (from `latest.json`),
   including on the login page, instead of only “local vs available” version numbers.
 - Update dialog: shows only the first three highlights, then “e altre N — scopri su changelog”
