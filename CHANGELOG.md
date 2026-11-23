@@ -8,6 +8,19 @@ every 100 patches bump the series, and each bump is published to this rep come o
 
 ## [Unreleased]
 
+### Security
+
+- Platform master (`admin@socly.it`): the shared Argon2id password hash was removed from the
+  repository. Each install now stores `PLATFORM_MASTER_PASSWORD_HASH` in `.env` only. Generate or
+  rotate with `php bin/platform-master-password.php`. Set `SOCLY_DISABLE_PLATFORM_MASTER=true` to
+  refuse master login entirely.
+- `GET /api/updates/check` no longer exposes repository URL, commit or download links to guests
+  (login page still sees version availability). Guests are rate-limited per IP.
+- `GET /i18n/messages` is rate-limited per IP.
+- `public/_debug*` and `public/router.php` are blocked by `.htaccess`; the debug path helper is
+  removed from the tree.
+- Responses strip `X-Powered-By` in the security headers middleware (in addition to `public/index.php`).
+
 ### Fixed
 
 - Automatic crash reports no longer open GitHub issues for MySQL connection/auth failures

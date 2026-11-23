@@ -3,6 +3,9 @@ RewriteEngine On
 # Deny access to hidden / sensitive patterns if ever mis-routed
 RewriteRule ^(storage|vendor|\.env|composer\.(json|lock)) - [F,L]
 
+# Debug helpers and the built-in PHP router must never be web-reachable
+RewriteRule ^(router\.php|_debug) - [F,L]
+
 RewriteCond %{REQUEST_FILENAME} !-f
 RewriteCond %{REQUEST_FILENAME} !-d
 RewriteRule ^ index.php [L]

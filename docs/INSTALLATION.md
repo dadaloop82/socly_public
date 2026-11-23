@@ -52,7 +52,8 @@ pre-existing MySQL user is never changed. On a shared server install into a new 
 dedicated database and user.
 
 Then open `http://127.0.0.1:8080/install` and complete the wizard (association, period/type, fields).
-Then sign in as `admin@socly.it` (maintenance password defined in code, never printed by the scripts)
+Then sign in as `admin@socly.it` (password written once to `storage/PLATFORM_MASTER_CREDENTIALS.txt`
+or set with `php bin/platform-master-password.php`)
 and complete the first-run **setup** at `/setup`, which creates the association **Admin** account.
 The built-in PHP server is for installation and evaluation: for production use Apache/Nginx + HTTPS
 as described below.
@@ -157,14 +158,15 @@ Open `https://socly.example.org/install` and complete the five steps:
 4. **Profile fields** — default fields to enable and the required ones.
 5. **Summary** — confirm: tables, permissions and `storage/installed.lock` are created.
 
-The **maintenance account** (the only SuperAdmin, `admin@socly.it`) is hardcoded in the application:
-it is not created by the wizard, cannot be edited or deleted from the UI, and no other user can be
-promoted to SuperAdmin. The password is stored only as an Argon2id hash in
-`app/Support/PlatformMasterAccess.php`. After installation sign in with that account and complete the
-**first-run wizard** at `/setup`: it creates the association **Admin** account and guides the
-configuration (association data, RUNTS or website lookup, logo and colours, statute and privacy
+The **maintenance account** (the only SuperAdmin, `admin@socly.it`) is fixed by email only: it is not
+created by the wizard, cannot be edited or deleted from the UI, and no other user can be promoted to
+SuperAdmin. The password hash lives in `.env` (`PLATFORM_MASTER_PASSWORD_HASH`), generated at install
+or via `php bin/platform-master-password.php`. After installation sign in with that account and
+complete the **first-run wizard** at `/setup`: it creates the association **Admin** account and guides
+the configuration (association data, RUNTS or website lookup, logo and colours, statute and privacy
 notice, treasury and deadlines). Setup is not anonymous: without the maintenance login nobody can
-create the association Admin.
+create the association Admin. On production instances that only use a local admin, set
+`SOCLY_DISABLE_PLATFORM_MASTER=true`.
 
 ## 6. Verify
 

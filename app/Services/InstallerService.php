@@ -81,12 +81,28 @@ final class InstallerService
             ? (!empty($data['update_enabled']) ? 'true' : 'false')
             : (string) ($existing['UPDATE_ENABLED'] ?? 'false');
 
+        // Platform master password: never ship a shared hash in the repository.
+        $masterPlain = '';
+        if (!empty($data['platform_master_password_hash'])) {
+            $merged['PLATFORM_MASTER_PASSWORD_HASH'] = (string) $data['platform_master_password_hash'];
+            $merged['SOCLY_DISABLE_PLATFORM_MASTER'] = (string) ($data['socly_disable_platform_master'] ?? 'false');
+        } elseif (empty($existing['PLATFORM_MASTER_PASSWORD_HASH'])) {
+            $secret = \Socly\Support\PlatformMasterAccess::generateSecret();
+            $merged['PLATFORM_MASTER_PASSWORD_HASH'] = $secret['hash'];
+            $merged['SOCLY_DISABLE_PLATFORM_MASTER'] = 'false';
+            $masterPlain = $secret['password'];
+        } else {
+            $merged['PLATFORM_MASTER_PASSWORD_HASH'] = (string) $existing['PLATFORM_MASTER_PASSWORD_HASH'];
+            $merged['SOCLY_DISABLE_PLATFORM_MASTER'] = (string) ($existing['SOCLY_DISABLE_PLATFORM_MASTER'] ?? 'false');
+        }
+
         // Preferred key order for readability; leftover keys (e.g. SOCLY_SITE_URL) kept after.
         $order = [
             'APP_NAME', 'APP_ENV', 'APP_DEBUG', 'APP_URL', 'APP_KEY',
             'DB_HOST', 'DB_PORT', 'DB_DATABASE', 'DB_USERNAME', 'DB_PASSWORD',
             'APP_LOCALE', 'SESSION_LIFETIME',
             'SOCLY_SITE_URL', 'SOCLY_PLATFORM_API_URL', 'SOCLY_REPORT_PROBLEMS',
+            'SOCLY_DISABLE_PLATFORM_MASTER', 'PLATFORM_MASTER_PASSWORD_HASH',
             'UPDATE_NOTIFY', 'UPDATE_MANIFEST_URL', 'UPDATE_REPO', 'UPDATE_CHANNEL', 'UPDATE_ENABLED',
         ];
         $lines = [
@@ -100,7 +116,7 @@ final class InstallerService
             }
             $lines[] = $key . '=' . self::envEscape((string) $merged[$key]);
             $written[$key] = true;
-            if (in_array($key, ['APP_KEY', 'DB_PASSWORD', 'SESSION_LIFETIME', 'UPDATE_ENABLED'], true)) {
+            if (in_array($key, ['APP_KEY', 'DB_PASSWORD', 'SESSION_LIFETIME', 'PLATFORM_MASTER_PASSWORD_HASH', 'UPDATE_ENABLED'], true)) {
                 $lines[] = '';
             }
         }
@@ -112,7 +128,27 @@ final class InstallerService
         }
         $lines[] = '';
         file_put_contents($envPath, implode("\n", $lines));
+        @chmod($envPath, 0600);
         Database::clearReachableCache();
+
+        if ($masterPlain !== '') {
+            $credPath = storage_path('PLATFORM_MASTER_CREDENTIALS.txt');
+            $credDir = dirname($credPath);
+            if (!is_dir($credDir)) {
+                @mkdir($credDir, 0775, true);
+            }
+            file_put_contents($credPath, implode("\n", [
+                'SOCLY platform master credentials (one-shot)',
+                'Generated (UTC): ' . gmdate('c'),
+                'Email: ' . \Socly\Support\PlatformMasterAccess::EMAIL,
+                'Password: ' . $masterPlain,
+                '',
+                'Store offline and delete this file after the first maintenance login.',
+                'Rotate anytime with: php bin/platform-master-password.php',
+                '',
+            ]));
+            @chmod($credPath, 0600);
+        }
     }
 
     private static function envEscape(string $value): string

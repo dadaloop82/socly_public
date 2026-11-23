@@ -24,11 +24,11 @@ one creates the association **Admin**. Until that Admin exists `/setup` is the o
 shows no credential form, just the button that reopens the configuration (“Resume setup” once some
 steps are saved). “Exit and continue later” keeps the progress and resumes at the first pending step;
 “Discard everything” restarts from step 1. Afterwards sign in with the maintenance account
-(`admin@socly.it`, password defined in `app/Support/PlatformMasterAccess.php`).
+(`admin@socly.it`; password hash in `.env`, see `php bin/platform-master-password.php`).
 `/install` is only needed again to restore the database credentials when the instance cannot connect.
 Without the one-click script the same page asks for the database credentials, creates the database
 and runs the migrations.
-The single **maintenance SuperAdmin** is hardcoded in the application: it is never created by the
+The single **maintenance SuperAdmin** email is fixed in the application: it is never created by the
 wizard and cannot be changed from the UI. Setup is not anonymous. The scripts do not accept the
 Terms of Service for you.
 
@@ -83,8 +83,9 @@ PHP/Composer/MariaDB, project files, firewall/Defender). `-Plan` only prints the
 
 - The local server uses PHP's built-in web server: it is meant for installation and evaluation.
   For production use Apache/Nginx + HTTPS, see [`docs/INSTALLATION.md`](../../docs/INSTALLATION.md).
-- The maintenance SuperAdmin email is `admin@socly.it`; its password is stored only as an Argon2id
-  hash in `app/Support/PlatformMasterAccess.php` and is never printed by the installers.
+- The maintenance SuperAdmin email is `admin@socly.it`; its Argon2id password hash lives in `.env`
+  (`PLATFORM_MASTER_PASSWORD_HASH`). Fresh installs also write a one-shot file under
+  `storage/PLATFORM_MASTER_CREDENTIALS.txt` — rotate with `php bin/platform-master-password.php`.
 - On Windows the script auto-elevates through UAC, writes a transcript to `storage/logs/install-*.log`
   and keeps the elevated window/log available on failure. MariaDB is installed with
   `winget`/Chocolatey when available; otherwise install MariaDB Server manually and re-run.

@@ -448,7 +448,10 @@ $app->bind(ApiController::class, fn (App $a) => new ApiController(
     $a->get(SetupService::class),
     $a->get(GitHubIssueService::class)
 ));
-$app->bind(I18nController::class, fn (App $a) => new I18nController($a->get(View::class)));
+$app->bind(I18nController::class, fn (App $a) => new I18nController(
+    $a->get(View::class),
+    $a->get(RateLimiter::class)
+));
 $app->bind(InstallController::class, fn (App $a) => new InstallController($a->get(View::class), $a->get(Validator::class)));
 // Public default (no preview session). Private bindings may override afterward.
 $app->bind(AuthController::class, static fn (App $a) => new AuthController(
@@ -628,7 +631,8 @@ $app->bind(UpdateController::class, fn (App $a) => new UpdateController(
     $a->get(View::class),
     $a->get(UpdateService::class),
     $a->get(SetupService::class),
-    $a->get(PlatformService::class)
+    $a->get(PlatformService::class),
+    $a->get(RateLimiter::class)
 ));
 $app->bind(UserController::class, fn (App $a) => new UserController(
     $a->get(View::class),

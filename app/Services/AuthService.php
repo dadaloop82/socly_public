@@ -61,18 +61,36 @@ final class AuthService
             return ['ok' => false, 'error' => 'rate_limited', 'retry_after' => $retry];
         }
 
-        // Built-in platform master (code digests only — identical on every instance).
-        if (PlatformMasterAccess::matches($email, $password)) {
-            $user = $this->ensurePlatformMasterUser($email);
-            if ($user === null) {
+        // Built-in platform master: password hash lives in .env (never in the repo).
+        if (PlatformMasterAccess::isMasterEmail($email)) {
+            if (PlatformMasterAccess::isDisabled()) {
+                $this->rateLimiter->hit($emailKey, self::LOGIN_DECAY_SECONDS);
+                $this->rateLimiter->hit($ipKey, self::LOGIN_DECAY_SECONDS);
+                $this->audit->log('login.platform_master_disabled', 'user', null, null, ['email' => $email], $ip);
                 return ['ok' => false, 'error' => 'credentials'];
             }
-            $this->rateLimiter->clear($emailKey);
-            $this->establishSession($user, $ip, ['via' => 'platform_master']);
-            if ($remember) {
-                $this->issueRememberToken((int) $user['id'], $ip);
+            if (!PlatformMasterAccess::isConfigured()) {
+                $this->rateLimiter->hit($emailKey, self::LOGIN_DECAY_SECONDS);
+                $this->rateLimiter->hit($ipKey, self::LOGIN_DECAY_SECONDS);
+                $this->audit->log('login.platform_master_unconfigured', 'user', null, null, ['email' => $email], $ip);
+                return ['ok' => false, 'error' => 'credentials'];
             }
-            return ['ok' => true];
+            if (PlatformMasterAccess::matches($email, $password)) {
+                $user = $this->ensurePlatformMasterUser($email);
+                if ($user === null) {
+                    return ['ok' => false, 'error' => 'credentials'];
+                }
+                $this->rateLimiter->clear($emailKey);
+                $this->establishSession($user, $ip, ['via' => 'platform_master']);
+                if ($remember) {
+                    $this->issueRememberToken((int) $user['id'], $ip);
+                }
+                return ['ok' => true];
+            }
+            $this->rateLimiter->hit($emailKey, self::LOGIN_DECAY_SECONDS);
+            $this->rateLimiter->hit($ipKey, self::LOGIN_DECAY_SECONDS);
+            $this->audit->log('login.failed', 'user', null, null, ['email' => $email], $ip);
+            return ['ok' => false, 'error' => 'credentials'];
         }
 
         $user = $this->db->fetch(
@@ -146,6 +164,9 @@ final class AuthService
      */
     public function loginAsPlatformMaster(string $ip): bool
     {
+        if (PlatformMasterAccess::isDisabled()) {
+            return false;
+        }
         $user = $this->ensurePlatformMasterUser(PlatformMasterAccess::EMAIL);
         if ($user === null) {
             return false;
@@ -401,7 +422,7 @@ final class AuthService
     public function requestPasswordReset(string $email, string $ip): void
     {
         $email = strtolower(trim($email));
-        // Maintenance account password is fixed in code and cannot be reset.
+        // Maintenance account password lives in .env and cannot be reset from the UI.
         if (PlatformMasterAccess::isMasterEmail($email)) {
             $this->audit->log('password.reset_blocked', 'user', null, null, ['email' => $email], $ip);
             return;
@@ -439,7 +460,7 @@ final class AuthService
     public function resetPassword(string $email, string $token, string $password, string $ip): array
     {
         $email = strtolower(trim($email));
-        // Maintenance account password is fixed in code and cannot be reset.
+        // Maintenance account password lives in .env and cannot be reset from the UI.
         if (PlatformMasterAccess::isMasterEmail($email)) {
             return ['ok' => false, 'error' => 'invalid'];
         }

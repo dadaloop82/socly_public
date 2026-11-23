@@ -27,17 +27,31 @@ namespace Socly\Controllers;
 
 use Socly\Core\Http\Request;
 use Socly\Core\View;
+use Socly\Services\RateLimiter;
 
 final class I18nController extends BaseController
 {
+    private const MAX_ATTEMPTS = 60;
+    private const DECAY_SECONDS = 60;
+
     public function __construct(
-        View $view
+        View $view,
+        private readonly RateLimiter $rateLimiter
     ) {
         parent::__construct($view);
     }
 
     public function messages(Request $request): void
     {
+        $ipKey = 'i18n.messages:ip:' . $request->ip();
+        if ($this->rateLimiter->tooManyAttempts($ipKey, self::MAX_ATTEMPTS, self::DECAY_SECONDS)) {
+            http_response_code(429);
+            header('Content-Type: application/json; charset=utf-8');
+            echo json_encode(['ok' => false, 'error' => 'rate_limited'], JSON_UNESCAPED_UNICODE);
+            return;
+        }
+        $this->rateLimiter->hit($ipKey, self::DECAY_SECONDS);
+
         $locale = (string) $request->input('lang', '');
         if (!in_array($locale, ['it', 'de', 'en'], true)) {
             $locale = (string) (app()->config('app.locale', 'it') ?: 'it');
@@ -48,7 +62,7 @@ final class I18nController extends BaseController
 
         http_response_code(200);
         header('Content-Type: application/json; charset=utf-8');
+        header('Cache-Control: private, max-age=300');
         echo json_encode(['ok' => true, 'locale' => $locale, 'messages' => $messages], JSON_UNESCAPED_UNICODE);
     }
 }
-

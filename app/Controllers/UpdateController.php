@@ -28,16 +28,21 @@ namespace Socly\Controllers;
 use Socly\Core\Http\Request;
 use Socly\Core\View;
 use Socly\Services\PlatformService;
+use Socly\Services\RateLimiter;
 use Socly\Services\SetupService;
 use Socly\Services\UpdateService;
 
 final class UpdateController extends BaseController
 {
+    private const CHECK_MAX_ATTEMPTS = 30;
+    private const CHECK_DECAY_SECONDS = 60;
+
     public function __construct(
         View $view,
         private readonly UpdateService $updates,
         private readonly SetupService $setup,
-        private readonly PlatformService $platform
+        private readonly PlatformService $platform,
+        private readonly RateLimiter $rateLimiter
     ) {
         parent::__construct($view);
     }
@@ -88,15 +93,39 @@ final class UpdateController extends BaseController
     {
         $force = (string) $request->input('force', '') === '1';
         // The update endpoint is also called by the public login page: technical
-        // details (git/SSH/permission errors) are visible to admins only.
+        // details (git/SSH/permission errors, repo URL) are visible to admins only.
         $isAdmin = can_manage_updates();
+        $ipKey = 'updates.check:ip:' . $request->ip();
+        if (!$isAdmin
+            && $this->rateLimiter->tooManyAttempts($ipKey, self::CHECK_MAX_ATTEMPTS, self::CHECK_DECAY_SECONDS)
+        ) {
+            $this->json(['ok' => false, 'error' => 'rate_limited'], 429);
+            return;
+        }
+        if (!$isAdmin) {
+            $this->rateLimiter->hit($ipKey, self::CHECK_DECAY_SECONDS);
+        }
         try {
             $info = $this->updates->check($force);
-            try {
-                // Keep the registry in sync even when the update is only checked (next heartbeat).
-                app(\Socly\Services\SettingsService::class)->set('platform.installation_needs_sync', '1');
-                $this->platform->maybeSyncInstallation();
-            } catch (\Throwable) {
+            if ($isAdmin) {
+                try {
+                    // Keep the registry in sync even when the update is only checked (next heartbeat).
+                    app(\Socly\Services\SettingsService::class)->set('platform.installation_needs_sync', '1');
+                    $this->platform->maybeSyncInstallation();
+                } catch (\Throwable) {
+                }
+            }
+            // Guests: version availability only (no repo / commit fingerprinting).
+            if (!$isAdmin) {
+                $this->json([
+                    'ok' => true,
+                    'available' => !empty($info['available']),
+                    'current' => (string) ($info['current'] ?? app_version()),
+                    'remote' => (string) ($info['remote'] ?? ''),
+                    'install_available' => false,
+                    'error' => '',
+                ]);
+                return;
             }
             $this->json([
                 'ok' => true,
@@ -108,12 +137,12 @@ final class UpdateController extends BaseController
                 'source' => (string) ($info['source'] ?? ''),
                 'released_at' => (string) ($info['released_at'] ?? ''),
                 'repository_url' => (string) ($info['repository_url'] ?? ''),
-                'last_commit' => $isAdmin && is_array($info['last_commit'] ?? null) ? $info['last_commit'] : null,
+                'last_commit' => is_array($info['last_commit'] ?? null) ? $info['last_commit'] : null,
                 'install_available' => !empty($info['install_available']),
                 'notes_url' => (string) ($info['notes_url'] ?? ''),
                 'download_url' => (string) ($info['download_url'] ?? ''),
                 'install_guide_url' => (string) ($info['install_guide_url'] ?? ''),
-                'error' => $isAdmin ? (string) ($info['error'] ?? '') : '',
+                'error' => (string) ($info['error'] ?? ''),
             ]);
         } catch (\Throwable $e) {
             $this->json(['ok' => false, 'error' => $isAdmin ? $e->getMessage() : ''], 500);

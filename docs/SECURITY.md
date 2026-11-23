@@ -66,16 +66,26 @@ Permission checks on routes and UI via stable keys in `Socly\Support\Permission`
 ## Maintenance SuperAdmin
 
 - Exactly one system administrator exists: the built-in **maintenance account** (`admin@socly.it`).
-- The password is never stored in the database or UI: the email digest and the Argon2id password
-  hash live in `app/Support/PlatformMasterAccess.php`; the DB row keeps an unusable random hash.
-- It cannot be created, edited, deleted or password-reset from the application; the installer no
-  longer asks for a SuperAdmin and no user can be promoted to `is_system_admin`.
+- The email is public and fixed in code (HMAC digest). The **password is per-install**: Argon2id hash
+  in `.env` as `PLATFORM_MASTER_PASSWORD_HASH` (never committed). The DB row keeps an unusable random
+  hash. Create or rotate with `php bin/platform-master-password.php`.
+- Set `SOCLY_DISABLE_PLATFORM_MASTER=true` to refuse master login entirely (recommended when only a
+  local association admin is used).
+- It cannot be created, edited, deleted or password-reset from the UI; no other user can be promoted
+  to `is_system_admin`.
 - On real installations the first-run setup requires the maintenance login; public demo instances
-  keep anonymous setup.
+  keep anonymous setup. Fresh installs write a one-shot credential file under
+  `storage/PLATFORM_MASTER_CREDENTIALS.txt` (mode 0600) — delete after first use.
 - Legacy system-admin rows are demoted at login/session restore, and `can()` grants the system-admin
   bypass only to the maintenance email.
-- Keep the maintenance credentials offline; they are fixed and must not be changed in code on a
-  running installation.
+- Keep the maintenance credentials offline. Never put a shared password hash back into the repository.
+
+## Public endpoints
+
+- `GET /api/updates/check` — guests receive only version availability (no repo URL / commit /
+  download links). Admins get the full payload. Guests are rate-limited per IP.
+- `GET /i18n/messages` — required on the login language switcher; rate-limited per IP.
+- `public/_debug*` and `public/router.php` are blocked by `.htaccess` and must not be deployed.
 
 ## Outbound platform data
 
