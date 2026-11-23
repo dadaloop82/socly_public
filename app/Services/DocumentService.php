@@ -147,7 +147,12 @@ final class DocumentService
         if ($where !== []) {
             $sql .= ' AND ' . implode(' AND ', $where);
         }
-        $sql .= ' ORDER BY COALESCE(d.document_date, d.created_at) DESC, d.id DESC' . $limitSql;
+        // Prefer the declared reference period (year + month) so bank statements and other
+        // period-bound files list newest first; fall back to document/upload date.
+        $sql .= ' ORDER BY COALESCE(d.reference_year, YEAR(COALESCE(d.document_date, d.created_at))) DESC,
+                         COALESCE(d.reference_month_to, d.reference_month_from, MONTH(COALESCE(d.document_date, d.created_at)), 0) DESC,
+                         COALESCE(d.document_date, d.created_at) DESC,
+                         d.id DESC' . $limitSql;
         return $this->db->fetchAll($sql, $params);
     }
 

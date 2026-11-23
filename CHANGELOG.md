@@ -8,6 +8,11 @@ every 100 patches bump the series, and each bump is published to this rep come o
 
 ## [Unreleased]
 
+### Changed
+
+- Documents: Estratti Conto list newest reference period first (year, then month).
+- Document repository: `annotate()` can update `original_name` so downloads match the archive title.
+
 ### Fixed
 
 - Bank-statement import: movement years follow the statement period (`DAL`/`AL`). Two-digit or

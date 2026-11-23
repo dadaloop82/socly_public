@@ -808,10 +808,15 @@ final class FileRepositoryService
             return;
         }
         $data = [];
-        foreach (['title', 'category', 'summary', 'source_section', 'source_ref'] as $key) {
+        foreach (['title', 'category', 'summary', 'source_section', 'source_ref', 'original_name'] as $key) {
             if (array_key_exists($key, $meta)) {
                 $value = trim((string) $meta[$key]);
-                $data[$key] = $value !== '' ? mb_substr($value, 0, $key === 'summary' ? 2000 : 190) : null;
+                $max = match ($key) {
+                    'summary' => 2000,
+                    'original_name' => 255,
+                    default => 190,
+                };
+                $data[$key] = $value !== '' ? mb_substr($value, 0, $max) : null;
             }
         }
         if (array_key_exists('document_date', $meta)) {

@@ -113,6 +113,41 @@ foreach ($documents as $doc) {
     }
     $groups[$key][] = $doc;
 }
+// Estratti conto: always newest period (year/month) first, regardless of upload order.
+if (($groups['balance'] ?? []) !== []) {
+    usort($groups['balance'], static function (array $a, array $b): int {
+        $yearA = (int) ($a['reference_year'] ?? 0);
+        $yearB = (int) ($b['reference_year'] ?? 0);
+        if ($yearA < 1900) {
+            $yearA = (int) substr((string) ($a['document_date'] ?? $a['created_at'] ?? ''), 0, 4);
+        }
+        if ($yearB < 1900) {
+            $yearB = (int) substr((string) ($b['document_date'] ?? $b['created_at'] ?? ''), 0, 4);
+        }
+        if ($yearA !== $yearB) {
+            return $yearB <=> $yearA;
+        }
+        $monthA = (int) ($a['reference_month_to'] ?? 0);
+        if ($monthA < 1 || $monthA > 12) {
+            $monthA = (int) ($a['reference_month_from'] ?? 0);
+        }
+        if ($monthA < 1 || $monthA > 12) {
+            $monthA = (int) substr((string) ($a['document_date'] ?? $a['created_at'] ?? ''), 5, 2);
+        }
+        $monthB = (int) ($b['reference_month_to'] ?? 0);
+        if ($monthB < 1 || $monthB > 12) {
+            $monthB = (int) ($b['reference_month_from'] ?? 0);
+        }
+        if ($monthB < 1 || $monthB > 12) {
+            $monthB = (int) substr((string) ($b['document_date'] ?? $b['created_at'] ?? ''), 5, 2);
+        }
+        if ($monthA !== $monthB) {
+            return $monthB <=> $monthA;
+        }
+
+        return ((int) ($b['id'] ?? 0)) <=> ((int) ($a['id'] ?? 0));
+    });
+}
 ?>
 <div class="page-header">
     <div class="titles">
