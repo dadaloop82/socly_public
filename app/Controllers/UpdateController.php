@@ -115,13 +115,22 @@ final class UpdateController extends BaseController
                 } catch (\Throwable) {
                 }
             }
-            // Guests: version availability only (no repo / commit fingerprinting).
+            // Guests: version availability + public release notes (no repo / commit / download fingerprinting).
+            $changelog = is_array($info['changelog'] ?? null)
+                ? array_values(array_filter(array_map(
+                    static fn ($line): string => trim((string) $line),
+                    $info['changelog']
+                ), static fn (string $line): bool => $line !== ''))
+                : [];
             if (!$isAdmin) {
                 $this->json([
                     'ok' => true,
                     'available' => !empty($info['available']),
                     'current' => (string) ($info['current'] ?? app_version()),
                     'remote' => (string) ($info['remote'] ?? ''),
+                    'released_at' => (string) ($info['released_at'] ?? ''),
+                    'notes_url' => (string) ($info['notes_url'] ?? ''),
+                    'changelog' => array_slice($changelog, 0, 12),
                     'install_available' => false,
                     'error' => '',
                 ]);
@@ -142,6 +151,7 @@ final class UpdateController extends BaseController
                 'notes_url' => (string) ($info['notes_url'] ?? ''),
                 'download_url' => (string) ($info['download_url'] ?? ''),
                 'install_guide_url' => (string) ($info['install_guide_url'] ?? ''),
+                'changelog' => array_slice($changelog, 0, 12),
                 'error' => (string) ($info['error'] ?? ''),
             ]);
         } catch (\Throwable $e) {

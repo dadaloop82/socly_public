@@ -414,7 +414,25 @@ $showVersionFooter = true;
                         $downloadUrl = trim((string) ($updateInfo['download_url'] ?? ''));
                         $guideUrl = trim((string) ($updateInfo['install_guide_url'] ?? ''));
                         $updateError = trim((string) ($updateInfo['error'] ?? ''));
+                        $releasedAt = trim((string) ($updateInfo['released_at'] ?? ''));
+                        $changelogItems = is_array($updateInfo['changelog'] ?? null) ? $updateInfo['changelog'] : [];
+                        $releasedLabel = $releasedAt !== '' ? (string) (format_datetime($releasedAt) ?: $releasedAt) : '';
                         ?>
+                        <?php if ($releasedLabel !== ''): ?>
+                            <p class="sidebar-update-released muted"><?= e(__('updates.released_label')) ?>: <?= e($releasedLabel) ?></p>
+                        <?php endif; ?>
+                        <?php if ($changelogItems !== []): ?>
+                            <div class="sidebar-update-changelog">
+                                <strong><?= e(__('updates.changelog_label')) ?></strong>
+                                <ul>
+                                    <?php foreach (array_slice($changelogItems, 0, 8) as $changelogItem): ?>
+                                        <?php $changelogItem = trim((string) $changelogItem); ?>
+                                        <?php if ($changelogItem === '') { continue; } ?>
+                                        <li><?= e($changelogItem) ?></li>
+                                    <?php endforeach; ?>
+                                </ul>
+                            </div>
+                        <?php endif; ?>
                         <?php if (!$canAutoUpdate): ?>
                             <p class="sidebar-update-hint"><?= e(__('updates.manual_hint')) ?></p>
                         <?php elseif ($updateError !== ''): ?>

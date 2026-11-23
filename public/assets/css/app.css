@@ -886,7 +886,8 @@ a.sidebar-brand-home:hover {
   padding: 0 0.65rem 0.65rem;
 }
 .sidebar-update-copy,
-.sidebar-update-hint {
+.sidebar-update-hint,
+.sidebar-update-released {
   margin: 0 0 0.45rem;
   font-size: 0.78rem;
   line-height: 1.4;
@@ -895,6 +896,22 @@ a.sidebar-brand-home:hover {
 }
 .sidebar-update-hint {
   opacity: 0.72;
+}
+.sidebar-update-changelog {
+  display: grid;
+  gap: 0.3rem;
+  margin: 0 0 0.55rem;
+  font-size: 0.76rem;
+  line-height: 1.35;
+  color: #fff;
+  opacity: 0.9;
+}
+.sidebar-update-changelog ul {
+  margin: 0;
+  padding-left: 1rem;
+}
+.sidebar-update-changelog li + li {
+  margin-top: 0.15rem;
 }
 .sidebar-update-actions {
   display: flex;
@@ -4633,6 +4650,16 @@ tr.clickable-row:focus-visible {
 }
 .auth-updates-meta a:hover {
   text-decoration: underline;
+}
+.auth-updates-changelog {
+  grid-column: 1 / -1;
+}
+.auth-updates-changelog ul {
+  margin: 0.25rem 0 0;
+  padding-left: 1.1rem;
+}
+.auth-updates-changelog li + li {
+  margin-top: 0.25rem;
 }
 .auth-updates-dialog .auth-updates-actions {
   display: flex;

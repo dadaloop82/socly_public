@@ -1,8 +1,22 @@
 {
-    "version": "1.12.88",
-    "released_at": "2026-11-23T20:01:31+00:00",
+    "version": "1.12.90",
+    "released_at": "2026-11-23T20:04:52+00:00",
     "repository_url": "https://github.com/dadaloop82/socly_public",
     "notes_url": "https://github.com/dadaloop82/socly_public/blob/main/CHANGELOG.md",
     "download_url": "https://github.com/dadaloop82/socly_public/archive/refs/heads/main.zip",
-    "install_guide_url": "https://github.com/dadaloop82/socly_public/blob/main/README.md#updates"
+    "install_guide_url": "https://github.com/dadaloop82/socly_public/blob/main/README.md#updates",
+    "changelog": [
+        "Resource busy lock: while an operator runs a heavy job (bank-statement anomaly check / excerpt repair, or an in-app update), other users and other browser tabs see a pause message with that person’s name until the job…",
+        "Bank-statement “check all statements”: if a full audit finished less than an hour ago, the operator can reopen those results instead of re-running OCR on every PDF.",
+        "Bank-statement verify: bulk “fix all dates / amounts” with confirm, count and ETA; ledger-only rows without a covering archived statement are listed as ignored (not actionable).",
+        "Session idle timeout no longer logs anyone out in the middle of a heavy job (statement audit, excerpt repair, in-app update): the holder’s session stays alive until the job ends.",
+        "Resource-busy pause shows the operation name first and “Started by … at …”, and hard-unlocks the instance after at most 30 minutes.",
+        "Documents: Estratti Conto list newest reference period first (year, then month).",
+        "Document repository: `annotate()` can update `original_name` so downloads match the archive title.",
+        "Treasury movement edit: statement excerpt opens in a zoomable popup (same UX as statement verify) and the on-form preview is twice as large; open ledger anomalies show the triangle mark next to the relevant fields wit…",
+        "Bank-statement ritagli: storing an excerpt is idempotent — at most one live crop per cash-book movement (same image is reused; a different cut replaces the previous one).",
+        "Gestione Controparti: list ordered by number of movements; similar spellings are suggested for aggregation into one canonical name.",
+        "Update dialog: shows publish date and inline changelog highlights again (from `latest.json`), including on the login page, instead of only “local vs available” version numbers.",
+        "Bank-statement “check all statements”: percent and ETA cover both PDF compare and ritagli creation, so the overlay no longer looks finished after the last statement while excerpts are still running."
+    ]
 }

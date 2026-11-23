@@ -82,8 +82,9 @@ Permission checks on routes and UI via stable keys in `Socly\Support\Permission`
 
 ## Public endpoints
 
-- `GET /api/updates/check` — guests receive only version availability (no repo URL / commit /
-  download links). Admins get the full payload. Guests are rate-limited per IP.
+- `GET /api/updates/check` — guests receive version availability plus public release metadata
+  (`released_at`, `notes_url`, short `changelog` highlights). Repo URL, commit fingerprint and
+  download links stay admin-only. Guests are rate-limited per IP.
 - `GET /i18n/messages` — required on the login language switcher; rate-limited per IP.
 - `public/_debug*` and `public/router.php` are blocked by `.htaccess` and must not be deployed.
 

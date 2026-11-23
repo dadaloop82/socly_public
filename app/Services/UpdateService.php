@@ -181,6 +181,8 @@ final class UpdateService
      *   notes_url?:string,
      *   download_url?:string,
      *   install_guide_url?:string,
+     *   released_at?:string,
+     *   changelog?:list<string>,
      *   error?:string
      * }
      */
@@ -225,6 +227,7 @@ final class UpdateService
                     $result['install_guide_url'] = (string) ($manifest['install_guide_url'] ?? '');
                     $result['released_at'] = (string) ($manifest['released_at'] ?? '');
                     $result['repository_url'] = (string) ($manifest['repository_url'] ?? '');
+                    $result['changelog'] = $this->normalizeChangelog($manifest['changelog'] ?? null);
                 } catch (\Throwable) {
                     // No network/manifest: it stays "no update".
                 }
@@ -314,6 +317,7 @@ final class UpdateService
             $result['install_guide_url'] = (string) ($manifest['install_guide_url'] ?? '');
             $result['released_at'] = (string) ($manifest['released_at'] ?? '');
             $result['repository_url'] = (string) ($manifest['repository_url'] ?? '');
+            $result['changelog'] = $this->normalizeChangelog($manifest['changelog'] ?? null);
         }
 
         if ($source === 'git') {
@@ -1075,6 +1079,34 @@ final class UpdateService
             return $m[1] . '/' . rtrim($m[2], '.git');
         }
         return null;
+    }
+
+    /**
+     * Public release highlights from latest.json (safe to show to guests).
+     *
+     * @return list<string>
+     */
+    private function normalizeChangelog(mixed $raw): array
+    {
+        if (!is_array($raw)) {
+            return [];
+        }
+        $out = [];
+        foreach ($raw as $item) {
+            $text = trim((string) preg_replace('/\s+/u', ' ', (string) $item));
+            if ($text === '') {
+                continue;
+            }
+            if (mb_strlen($text) > 280) {
+                $text = mb_substr($text, 0, 277) . '…';
+            }
+            $out[] = $text;
+            if (count($out) >= 12) {
+                break;
+            }
+        }
+
+        return $out;
     }
 
     /** @param array<string, mixed> $result @return array<string, mixed> */

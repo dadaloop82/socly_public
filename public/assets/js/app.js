@@ -14483,6 +14483,19 @@ function initAuthUpdateCheck() {
     }
   };
 
+  const renderChangelog = (items) => {
+    if (!(metaEl instanceof HTMLElement)) return '';
+    if (!Array.isArray(items) || items.length === 0) return '';
+    const lis = items
+      .map((item) => String(item || '').trim())
+      .filter((item) => item !== '')
+      .slice(0, 12)
+      .map((item) => `<li>${escapeHtml(item)}</li>`)
+      .join('');
+    if (lis === '') return '';
+    return `<div class="auth-updates-changelog"><dt>${escapeHtml(tpl('i18nChangelogLabel', 'Novità di questa versione'))}</dt><dd><ul>${lis}</ul></dd></div>`;
+  };
+
   const renderMeta = (data) => {
     if (!(metaEl instanceof HTMLElement)) return;
     const rows = [];
@@ -14514,6 +14527,10 @@ function initAuthUpdateCheck() {
         ? `<a href="${escapeHtml(commit.url)}" target="_blank" rel="noopener noreferrer">${sha}${sha && msg ? ' — ' : ''}${msg}</a>`
         : `${sha}${sha && msg ? ' — ' : ''}${msg}`;
       rows.push(`<div><dt>${escapeHtml(label)}</dt><dd>${body}</dd></div>`);
+    }
+    const changelogHtml = renderChangelog(data?.changelog);
+    if (changelogHtml !== '') {
+      rows.push(changelogHtml);
     }
     if (rows.length === 0) {
       metaEl.innerHTML = '';
