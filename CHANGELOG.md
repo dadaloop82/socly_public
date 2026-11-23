@@ -34,6 +34,8 @@ every 100 patches bump the series, and each bump is published to this rep come o
 
 ### Fixed
 
+- Bank-statement “check all statements”: percent and ETA cover both PDF compare and ritagli creation,
+  so the overlay no longer looks finished after the last statement while excerpts are still running.
 - Bank-statement verify: “Add to cash book” prefills from the statement; if date/amount/counterparty
   are still unusable (e.g. € 0,00 or empty payee) it opens a completion dialog instead of a dead-end error.
 - Bank-statement “check all statements”: after comparing every PDF, the same job also creates
