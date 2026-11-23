@@ -2577,7 +2577,11 @@ final class TreasuryService
         }
         $keys = array_keys($aliases);
         $placeholders = [];
-        $params = ['canonical' => mb_substr($canonical, 0, 190)];
+        // Native PDO prepares forbid reusing the same named placeholder twice.
+        $params = [
+            'canonical_set' => mb_substr($canonical, 0, 190),
+            'canonical_keep' => mb_strtolower(mb_substr($canonical, 0, 190)),
+        ];
         foreach ($keys as $i => $key) {
             $ph = 'a' . $i;
             $placeholders[] = ':' . $ph;
@@ -2586,12 +2590,12 @@ final class TreasuryService
         try {
             $stmt = $this->db->query(
                 'UPDATE treasury_movements
-                    SET beneficiary = :canonical
+                    SET beneficiary = :canonical_set
                   WHERE superseded_at IS NULL
                     AND beneficiary IS NOT NULL
                     AND TRIM(beneficiary) <> \'\'
                     AND LOWER(TRIM(beneficiary)) IN (' . implode(', ', $placeholders) . ')
-                    AND TRIM(beneficiary) <> :canonical',
+                    AND LOWER(TRIM(beneficiary)) <> :canonical_keep',
                 $params
             );
             $updated = (int) $stmt->rowCount();
