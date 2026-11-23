@@ -34,6 +34,9 @@ every 100 patches bump the series, and each bump is published to this rep come o
 
 ### Fixed
 
+- Bank-statement verify: “Fix all dates / amounts” now applies every open card on the server
+  (instead of posting hundreds of checkboxes that PHP’s `max_input_vars` silently truncated),
+  so the count cannot come back unchanged after a confirmed bulk.
 - Bank-statement import: movement years follow the statement period (`DAL`/`AL`). Two-digit or
   missing years, and OCR slips such as `30.09.2026` on a Sept 2025 statement, are aligned before
   review and again on confirm so Sept/Oct lines cannot land in the wrong calendar year.
