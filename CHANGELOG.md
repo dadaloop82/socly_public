@@ -8,6 +8,12 @@ every 100 patches bump the series, and each bump is published to this rep come o
 
 ## [Unreleased]
 
+### Added
+
+- Resource busy lock: while an operator runs a heavy job (bank-statement anomaly check /
+  excerpt repair, or an in-app update), other users see a pause page with that person’s name
+  until the job finishes or the lock expires.
+
 ### Changed
 
 - Documents: Estratti Conto list newest reference period first (year, then month).

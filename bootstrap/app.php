@@ -75,6 +75,8 @@ use Socly\Middleware\SetupOrAuthMiddleware;
 use Socly\Middleware\SessionIdleMiddleware;
 use Socly\Core\Logger;
 use Socly\Middleware\InstanceExpiredMiddleware;
+use Socly\Middleware\ResourceBusyMiddleware;
+use Socly\Services\ResourceBusyLock;
 use Socly\Middleware\SecurityHeadersMiddleware;
 use Socly\Controllers\SessionController;
 use Socly\Controllers\PresenceController;
@@ -317,6 +319,8 @@ $app->bind(LocaleMiddleware::class, fn (App $a) => new LocaleMiddleware(
 ));
 $app->bind(SecurityHeadersMiddleware::class, fn () => new SecurityHeadersMiddleware());
 $app->bind(InstanceExpiredMiddleware::class, fn (App $a) => new InstanceExpiredMiddleware($a->get(SettingsService::class)));
+$app->bind(ResourceBusyLock::class, fn () => new ResourceBusyLock());
+$app->bind(ResourceBusyMiddleware::class, fn (App $a) => new ResourceBusyMiddleware($a->get(ResourceBusyLock::class)));
 
 $app->bind('mw.install', fn (App $a) => $a->get(InstallGate::class));
 $app->bind('mw.auth', fn (App $a) => $a->get(AuthMiddleware::class));
@@ -326,6 +330,7 @@ $app->bind('mw.locale', fn (App $a) => $a->get(LocaleMiddleware::class));
 $app->bind('mw.security', fn (App $a) => $a->get(SecurityHeadersMiddleware::class));
 $app->bind('mw.idle', fn (App $a) => $a->get(SessionIdleMiddleware::class));
 $app->bind('mw.instance_expired', fn (App $a) => $a->get(InstanceExpiredMiddleware::class));
+$app->bind('mw.resource_busy', fn (App $a) => $a->get(ResourceBusyMiddleware::class));
 $app->bind(SessionController::class, fn (App $a) => new SessionController($a->get(View::class), $a->get(PlatformService::class)));
 $app->bind(PresenceController::class, fn (App $a) => new PresenceController($a->get(View::class), $a->get(PresenceService::class)));
 $app->bind(PresenceService::class, fn (App $a) => new PresenceService($a->get(Database::class)));

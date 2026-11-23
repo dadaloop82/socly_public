@@ -147,6 +147,11 @@ final class App
             return;
         }
 
+        // Heavy jobs (statement audit, excerpt repair, updates) pause everyone except the operator.
+        if ($dbReachable && $this->isInstalled() && $this->get('mw.resource_busy')->handle($request) !== true) {
+            return;
+        }
+
         if ($dbReachable && $this->isInstalled()) {
             try {
                 $this->get(Migrator::class)->migrate();

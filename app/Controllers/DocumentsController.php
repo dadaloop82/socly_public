@@ -395,6 +395,24 @@ final class DocumentsController extends BaseController
             $result = $service->startExcerptRepair($request->ip(), auth_user()['id'] ?? null);
             if (empty($result['ok'])) {
                 $error = (string) ($result['error'] ?? 'empty');
+                if ($error === 'resource_busy') {
+                    $busyName = trim((string) ($result['busy_name'] ?? '')) ?: __('resource_busy.someone');
+                    $op = (string) ($result['busy_operation'] ?? 'bank_statement_repair');
+                    try {
+                        $opLabel = app(\Socly\Services\ResourceBusyLock::class)->operationLabel($op);
+                    } catch (\Throwable) {
+                        $opLabel = __('resource_busy.operation_generic');
+                    }
+                    echo json_encode([
+                        'ok' => false,
+                        'error' => __('resource_busy.blocked_start', [
+                            'name' => $busyName,
+                            'operation' => $opLabel,
+                        ]),
+                        'resource_busy' => true,
+                    ], JSON_UNESCAPED_UNICODE);
+                    return;
+                }
                 echo json_encode([
                     'ok' => false,
                     'error' => $error === 'empty'

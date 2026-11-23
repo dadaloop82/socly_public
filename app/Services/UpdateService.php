@@ -375,6 +375,41 @@ final class UpdateService
         }
 
         file_put_contents($lock, date('c'));
+        $busyJob = bin2hex(random_bytes(12));
+        try {
+            $user = function_exists('auth_user') ? auth_user() : null;
+            $busyName = is_array($user)
+                ? (trim((string) ($user['name'] ?? '')) ?: trim((string) ($user['email'] ?? '')))
+                : '';
+            $busy = app(ResourceBusyLock::class)->acquire(
+                ResourceBusyLock::OP_SYSTEM_UPDATE,
+                $busyJob,
+                is_array($user) ? (int) ($user['id'] ?? 0) : 0,
+                $busyName,
+                session_status() === PHP_SESSION_ACTIVE ? (string) session_id() : '',
+                null,
+                1200
+            );
+            if (empty($busy['ok'])) {
+                @unlink($lock);
+                $status = is_array($busy['status'] ?? null) ? $busy['status'] : [];
+                $other = trim((string) ($status['user_name'] ?? '')) ?: __('resource_busy.someone');
+                $op = (string) ($status['operation'] ?? '');
+                $opLabel = $op !== ''
+                    ? app(ResourceBusyLock::class)->operationLabel($op)
+                    : __('resource_busy.operation_generic');
+
+                return [
+                    'ok' => false,
+                    'message' => __('resource_busy.blocked_start', [
+                        'name' => $other,
+                        'operation' => $opLabel,
+                    ]),
+                ];
+            }
+        } catch (\Throwable) {
+            $busyJob = '';
+        }
         $this->progress('starting');
         $before = $this->currentVersion();
         $beforeSha = '';
@@ -465,6 +500,12 @@ final class UpdateService
         } finally {
             if (is_file($lock)) {
                 @unlink($lock);
+            }
+            if ($busyJob !== '') {
+                try {
+                    app(ResourceBusyLock::class)->release($busyJob);
+                } catch (\Throwable) {
+                }
             }
         }
     }
