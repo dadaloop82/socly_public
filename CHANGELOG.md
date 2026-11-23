@@ -13,7 +13,8 @@ every 100 patches bump the series, and each bump is published to this rep come o
 - Bank-statement import: Intesa Sanpaolo “Operazioni di conto” / Lista movimenti model
   (signed single IMPORTO column; separate from the Conto Business Insieme estratto).
   Large Lista movimenti PDFs no longer re-OCR every date row (that step could hang the
-  upload on “Ricostruzione dei movimenti…” for many minutes).
+  upload on “Ricostruzione dei movimenti…” for many minutes). Upload analysis allows a
+  full 5-minute window; the progress UI is paced for that limit.
 - Resource busy lock: while an operator runs a heavy job (bank-statement anomaly check /
   excerpt repair, or an in-app update), other users and other browser tabs see a pause
   message with that person’s name until the job finishes or the lock expires. Presence
