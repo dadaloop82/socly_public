@@ -39,6 +39,8 @@ every 100 patches bump the series, and each bump is published to this rep come o
   mark next to the relevant fields with the reason on hover.
 - Bank-statement ritagli: storing an excerpt is idempotent — at most one live crop per
   cash-book movement (same image is reused; a different cut replaces the previous one).
+- Gestione Controparti: list ordered by number of movements; similar spellings are suggested
+  for aggregation into one canonical name.
 
 ### Fixed
 

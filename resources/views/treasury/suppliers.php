@@ -30,6 +30,7 @@
  *
  * @var list<array{name:string,is_member:bool,member_id:int,movements:int,income:float,expense:float,net:float,last_date:string,last_date_formatted:string}> $suppliers
  * @var array{suppliers:int,members:int,movements:int,income:float,expense:float} $supplier_totals
+ * @var list<array{canonical:string,names:list<string>,movements:int,reason:string}> $merge_suggestions
  * @var string $search_query
  * @var string $sort
  * @var string $party
@@ -37,18 +38,31 @@
  */
 $suppliers = is_array($suppliers ?? null) ? $suppliers : [];
 $totals = is_array($supplier_totals ?? null) ? $supplier_totals : ['suppliers' => 0, 'members' => 0, 'movements' => 0, 'income' => 0, 'expense' => 0];
+$mergeSuggestions = is_array($merge_suggestions ?? null) ? $merge_suggestions : [];
 $query = (string) ($search_query ?? '');
-$sortKey = (string) ($sort ?? 'volume') === 'name' ? 'name' : 'volume';
+$sortRaw = (string) ($sort ?? 'movements');
+$sortKey = in_array($sortRaw, ['movements', 'volume', 'name'], true) ? $sortRaw : 'movements';
 $partyKey = in_array((string) ($party ?? ''), ['members', 'others'], true) ? (string) $party : '';
+$canMerge = can('treasury.manage');
 $ledgerUrl = static fn (string $name): string => url('/treasury?' . http_build_query(['beneficiary' => $name]));
 $supplierMovementsUrl = static fn (string $name): string => url('/treasury/supplier-movements?' . http_build_query(['name' => $name]));
 $resetUrl = static function () use ($query, $sortKey, $partyKey): string {
     $params = array_filter([
         'q' => $query,
-        'sort' => $sortKey === 'volume' ? '' : $sortKey,
+        'sort' => $sortKey === 'movements' ? '' : $sortKey,
         'party' => $partyKey,
     ]);
     return url('/treasury/suppliers' . ($params === [] ? '' : '?' . http_build_query($params)));
+};
+$reasonLabel = static function (string $reason): string {
+    return match ($reason) {
+        'spelling' => (string) __('treasury.suppliers_merge_reason_spelling'),
+        'same_tokens' => (string) __('treasury.suppliers_merge_reason_same_tokens'),
+        'same_core' => (string) __('treasury.suppliers_merge_reason_same_core'),
+        'contained' => (string) __('treasury.suppliers_merge_reason_contained'),
+        'typo' => (string) __('treasury.suppliers_merge_reason_typo'),
+        default => (string) __('treasury.suppliers_merge_reason_similar'),
+    };
 };
 ?>
 <div class="page-header">
@@ -99,6 +113,7 @@ $resetUrl = static function () use ($query, $sortKey, $partyKey): string {
         'context' => 'filter',
         'include_empty' => false,
         'options' => [
+            'movements' => (string) __('treasury.suppliers_sort_movements'),
             'volume' => (string) __('treasury.suppliers_sort_volume'),
             'name' => (string) __('treasury.suppliers_sort_name'),
         ],
@@ -124,6 +139,57 @@ $resetUrl = static function () use ($query, $sortKey, $partyKey): string {
     </div>
 </form>
 
+<?php if ($mergeSuggestions !== []): ?>
+<section class="panel suppliers-merge" data-suppliers-merge>
+    <header class="suppliers-merge-head">
+        <div>
+            <h2 class="suppliers-merge-title"><?= e(__('treasury.suppliers_merge_title')) ?></h2>
+            <p class="muted suppliers-merge-lede"><?= e(__('treasury.suppliers_merge_lede')) ?></p>
+        </div>
+        <span class="badge"><?= e((string) count($mergeSuggestions)) ?></span>
+    </header>
+    <ul class="suppliers-merge-list">
+        <?php foreach ($mergeSuggestions as $suggestion): ?>
+            <?php
+            $canonical = (string) ($suggestion['canonical'] ?? '');
+            $names = array_values(array_filter(array_map('strval', (array) ($suggestion['names'] ?? []))));
+            if ($canonical === '' || count($names) < 2) {
+                continue;
+            }
+            $aliases = array_values(array_filter($names, static fn (string $name): bool => mb_strtolower($name) !== mb_strtolower($canonical)));
+            ?>
+            <li class="suppliers-merge-item">
+                <div class="suppliers-merge-body">
+                    <strong class="suppliers-merge-canonical"><?= e($canonical) ?></strong>
+                    <span class="muted"><?= e(__('treasury.suppliers_merge_also', [
+                        'names' => implode(' · ', $aliases),
+                    ])) ?></span>
+                    <span class="suppliers-merge-meta muted">
+                        <?= e(__('treasury.suppliers_merge_meta', [
+                            'count' => (string) (int) ($suggestion['movements'] ?? 0),
+                            'reason' => $reasonLabel((string) ($suggestion['reason'] ?? '')),
+                        ])) ?>
+                    </span>
+                </div>
+                <?php if ($canMerge): ?>
+                    <form method="post" action="<?= e(url('/treasury/suppliers/merge')) ?>" class="suppliers-merge-form"
+                        data-confirm="<?= e(__('treasury.suppliers_merge_confirm', [
+                            'name' => $canonical,
+                            'count' => (string) count($aliases),
+                        ])) ?>">
+                        <?= csrf_field() ?>
+                        <input type="hidden" name="canonical" value="<?= e($canonical) ?>">
+                        <?php foreach ($names as $fromName): ?>
+                            <input type="hidden" name="from[]" value="<?= e($fromName) ?>">
+                        <?php endforeach; ?>
+                        <button type="submit" class="btn btn-sm"><?= e(__('treasury.suppliers_merge_action')) ?></button>
+                    </form>
+                <?php endif; ?>
+            </li>
+        <?php endforeach; ?>
+    </ul>
+</section>
+<?php endif; ?>
 
 <div class="panel">
     <?php if ($suppliers === []): ?>

@@ -2293,14 +2293,25 @@ final class TreasuryService
      *     totals:array{suppliers:int,members:int,movements:int,income:float,expense:float}
      * }
      */
-    public function supplierOverview(string $query = '', string $sort = 'volume', string $party = ''): array
+    /**
+     * @return array{
+     *   rows:list<array{name:string,is_member:bool,member_id:int,movements:int,income:float,expense:float,net:float,last_date:string,last_date_formatted:string}>,
+     *   totals:array{suppliers:int,members:int,movements:int,income:float,expense:float},
+     *   merge_suggestions:list<array{canonical:string,names:list<string>,movements:int,reason:string}>
+     * }
+     */
+    public function supplierOverview(string $query = '', string $sort = 'movements', string $party = ''): array
     {
         $query = trim($query);
+        if (!in_array($sort, ['movements', 'volume', 'name'], true)) {
+            $sort = 'movements';
+        }
         if (!in_array($party, ['members', 'others'], true)) {
             $party = '';
         }
         $params = [];
-        $where = "m.beneficiary IS NOT NULL AND TRIM(m.beneficiary) <> ''"
+        $where = "m.superseded_at IS NULL"
+            . " AND m.beneficiary IS NOT NULL AND TRIM(m.beneficiary) <> ''"
             . " AND m.direction IN ('income', 'expense')";
         if ($query !== '') {
             $where .= ' AND LOWER(m.beneficiary) LIKE :q';
@@ -2396,12 +2407,272 @@ final class TreasuryService
         }
         if ($sort === 'name') {
             usort($list, static fn (array $a, array $b): int => strnatcasecmp($a['name'], $b['name']));
-        } else {
+        } elseif ($sort === 'volume') {
             usort($list, static fn (array $a, array $b): int => (($b['income'] + $b['expense']) <=> ($a['income'] + $a['expense']))
+                ?: strnatcasecmp($a['name'], $b['name']));
+        } else {
+            // Default: most movements first (then volume, then name).
+            usort($list, static fn (array $a, array $b): int => ((int) $b['movements'] <=> (int) $a['movements'])
+                ?: (($b['income'] + $b['expense']) <=> ($a['income'] + $a['expense']))
                 ?: strnatcasecmp($a['name'], $b['name']));
         }
 
-        return ['rows' => $list, 'totals' => $totals];
+        return [
+            'rows' => $list,
+            'totals' => $totals,
+            'merge_suggestions' => $this->counterpartyMergeSuggestions($list),
+        ];
+    }
+
+    /**
+     * Groups of similar free-text counterparties that look like the same party written differently
+     * (token order, containment, high word overlap, near-typos).
+     *
+     * @param list<array{name:string,movements:int}> $rows
+     * @return list<array{canonical:string,names:list<string>,movements:int,reason:string}>
+     */
+    public function counterpartyMergeSuggestions(array $rows): array
+    {
+        $items = [];
+        foreach ($rows as $row) {
+            if (!is_array($row)) {
+                continue;
+            }
+            $name = trim((string) ($row['name'] ?? ''));
+            if ($name === '') {
+                continue;
+            }
+            $items[] = [
+                'name' => $name,
+                'movements' => max(0, (int) ($row['movements'] ?? 0)),
+                'norm' => $this->normalizeCounterpartyName($name),
+                'tokens' => $this->counterpartyIdentityTokens($name),
+            ];
+        }
+        $n = count($items);
+        if ($n < 2) {
+            return [];
+        }
+        $parent = range(0, $n - 1);
+        $find = static function (int $i) use (&$parent, &$find): int {
+            if ($parent[$i] !== $i) {
+                $parent[$i] = $find($parent[$i]);
+            }
+
+            return $parent[$i];
+        };
+        $union = static function (int $a, int $b) use (&$parent, $find): void {
+            $ra = $find($a);
+            $rb = $find($b);
+            if ($ra !== $rb) {
+                $parent[$rb] = $ra;
+            }
+        };
+        $reasons = [];
+        for ($i = 0; $i < $n; $i++) {
+            for ($j = $i + 1; $j < $n; $j++) {
+                $reason = $this->counterpartyMergeReason($items[$i], $items[$j]);
+                if ($reason === null) {
+                    continue;
+                }
+                $union($i, $j);
+                $key = min($i, $j) . ':' . max($i, $j);
+                $reasons[$key] = $reason;
+            }
+        }
+        $clusters = [];
+        for ($i = 0; $i < $n; $i++) {
+            $root = $find($i);
+            $clusters[$root][] = $i;
+        }
+        $out = [];
+        foreach ($clusters as $indexes) {
+            if (count($indexes) < 2) {
+                continue;
+            }
+            usort($indexes, static function (int $a, int $b) use ($items): int {
+                return ($items[$b]['movements'] <=> $items[$a]['movements'])
+                    ?: strnatcasecmp($items[$a]['name'], $items[$b]['name']);
+            });
+            $names = [];
+            $movements = 0;
+            foreach ($indexes as $idx) {
+                $names[] = $items[$idx]['name'];
+                $movements += $items[$idx]['movements'];
+            }
+            $reason = 'similar';
+            for ($a = 0; $a < count($indexes); $a++) {
+                for ($b = $a + 1; $b < count($indexes); $b++) {
+                    $key = min($indexes[$a], $indexes[$b]) . ':' . max($indexes[$a], $indexes[$b]);
+                    if (isset($reasons[$key])) {
+                        $reason = $reasons[$key];
+                        break 2;
+                    }
+                }
+            }
+            $out[] = [
+                'canonical' => $names[0],
+                'names' => $names,
+                'movements' => $movements,
+                'reason' => $reason,
+            ];
+        }
+        usort($out, static fn (array $a, array $b): int => ((int) $b['movements'] <=> (int) $a['movements'])
+            ?: strnatcasecmp($a['canonical'], $b['canonical']));
+
+        return array_slice($out, 0, 40);
+    }
+
+    /**
+     * Rewrite every live movement whose counterparty is one of `$fromNames` to `$canonical`.
+     *
+     * @param list<string> $fromNames
+     * @return array{ok:bool,updated:int,error?:string}
+     */
+    public function mergeCounterparties(string $canonical, array $fromNames, string $ip, ?int $userId = null): array
+    {
+        $canonical = trim((string) preg_replace('/\s+/u', ' ', $canonical));
+        if ($canonical === '' || mb_strlen($canonical) > 190) {
+            return ['ok' => false, 'updated' => 0, 'error' => 'invalid'];
+        }
+        $canonical = mb_ucfirst($canonical);
+        $aliases = [];
+        foreach ($fromNames as $name) {
+            $name = trim((string) preg_replace('/\s+/u', ' ', (string) $name));
+            if ($name === '' || mb_strlen($name) > 190) {
+                continue;
+            }
+            $aliases[mb_strtolower($name)] = $name;
+        }
+        $aliases[mb_strtolower($canonical)] = $canonical;
+        if (count($aliases) < 2) {
+            return ['ok' => false, 'updated' => 0, 'error' => 'none'];
+        }
+        $keys = array_keys($aliases);
+        $placeholders = [];
+        $params = ['canonical' => mb_substr($canonical, 0, 190)];
+        foreach ($keys as $i => $key) {
+            $ph = 'a' . $i;
+            $placeholders[] = ':' . $ph;
+            $params[$ph] = $key;
+        }
+        try {
+            $stmt = $this->db->query(
+                'UPDATE treasury_movements
+                    SET beneficiary = :canonical
+                  WHERE superseded_at IS NULL
+                    AND beneficiary IS NOT NULL
+                    AND TRIM(beneficiary) <> \'\'
+                    AND LOWER(TRIM(beneficiary)) IN (' . implode(', ', $placeholders) . ')
+                    AND TRIM(beneficiary) <> :canonical',
+                $params
+            );
+            $updated = (int) $stmt->rowCount();
+        } catch (\Throwable) {
+            return ['ok' => false, 'updated' => 0, 'error' => 'failed'];
+        }
+        if ($updated > 0) {
+            $this->audit->log('treasury.counterparties_merged', 'treasury', null, null, [
+                'canonical' => $canonical,
+                'from' => array_values($aliases),
+                'updated' => $updated,
+                'user_id' => $userId,
+            ], $ip);
+        }
+
+        return ['ok' => true, 'updated' => max(0, $updated)];
+    }
+
+    /**
+     * @param array{name:string,norm:string,tokens:list<string>} $left
+     * @param array{name:string,norm:string,tokens:list<string>} $right
+     */
+    private function counterpartyMergeReason(array $left, array $right): ?string
+    {
+        $normA = (string) ($left['norm'] ?? '');
+        $normB = (string) ($right['norm'] ?? '');
+        if ($normA === '' || $normB === '') {
+            return null;
+        }
+        if ($normA === $normB) {
+            return 'spelling';
+        }
+        $tokensA = is_array($left['tokens'] ?? null) ? $left['tokens'] : [];
+        $tokensB = is_array($right['tokens'] ?? null) ? $right['tokens'] : [];
+        if ($tokensA !== [] && $tokensA === $tokensB) {
+            return 'same_tokens';
+        }
+        // One label is the other plus company suffixes / place words (“Amazon” vs “Amazon Italia Srl”).
+        $coreA = $this->counterpartyCoreTokens($tokensA);
+        $coreB = $this->counterpartyCoreTokens($tokensB);
+        if ($coreA !== [] && $coreA === $coreB) {
+            return 'same_core';
+        }
+        if ($coreA !== [] && $coreB !== []) {
+            $shorter = count($coreA) <= count($coreB) ? $coreA : $coreB;
+            $longer = count($coreA) <= count($coreB) ? $coreB : $coreA;
+            if (count($shorter) >= 1 && count(array_diff($shorter, $longer)) === 0) {
+                return 'contained';
+            }
+        }
+        $score = $this->similarityScore($tokensA, $tokensB);
+        if ($score >= 0.78 && count(array_intersect($tokensA, $tokensB)) >= 1) {
+            return 'similar';
+        }
+        // Near-typo on short normalised forms (“Rossi” / “Rossii”).
+        if (mb_strlen($normA) >= 5 && mb_strlen($normB) >= 5) {
+            $distance = levenshtein($normA, $normB);
+            $maxLen = max(mb_strlen($normA), mb_strlen($normB));
+            if ($distance > 0 && $distance <= 2 && $distance / $maxLen <= 0.25) {
+                return 'typo';
+            }
+        }
+
+        return null;
+    }
+
+    /** @return list<string> */
+    private function counterpartyIdentityTokens(string $name): array
+    {
+        $norm = $this->normalizeCounterpartyName($name);
+        if ($norm === '') {
+            return [];
+        }
+        $tokens = array_values(array_filter(
+            explode(' ', $norm),
+            static fn (string $token): bool => $token !== ''
+        ));
+        $tokens = array_values(array_unique($tokens));
+        sort($tokens);
+
+        return $tokens;
+    }
+
+    /**
+     * Drop legal-form / geographic noise so “Amazon Italia Srl” and “Amazon” share a core.
+     *
+     * @param list<string> $tokens
+     * @return list<string>
+     */
+    private function counterpartyCoreTokens(array $tokens): array
+    {
+        $noise = [
+            'srl', 'srls', 'spa', 'sas', 'snc', 'ss', 'soc', 'societa', 'cooperativa', 'coop',
+            'ltd', 'llc', 'inc', 'gmbh', 'ag', 'kg', 'ohg', 'bv', 'nv',
+            'italia', 'italy', 'italian', 'italiano', 'italiana', 'europe', 'europa', 'eu',
+            'di', 'del', 'della', 'dei', 'delle', 'e', 'and', 'und', 'the',
+        ];
+        $core = [];
+        foreach ($tokens as $token) {
+            $token = (string) $token;
+            if ($token === '' || in_array($token, $noise, true)) {
+                continue;
+            }
+            $core[] = $token;
+        }
+        sort($core);
+
+        return array_values(array_unique($core));
     }
 
     /**

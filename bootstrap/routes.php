@@ -177,6 +177,7 @@ $router->post('/members/{id}/autofix', [MemberController::class, 'autoFix'], 'me
 $router->get('/treasury', [TreasuryController::class, 'index'], 'treasury.view', ['mw.locale', 'mw.install', 'mw.auth']);
 $router->get('/treasury/create', [TreasuryController::class, 'create'], 'treasury.manage', ['mw.locale', 'mw.install', 'mw.auth']);
 $router->get('/treasury/suppliers', [TreasuryController::class, 'suppliers'], 'treasury.view', ['mw.locale', 'mw.install', 'mw.auth']);
+$router->post('/treasury/suppliers/merge', [TreasuryController::class, 'mergeSuppliers'], 'treasury.manage', ['mw.locale', 'mw.install', 'mw.auth', 'mw.csrf']);
 // Movements of one counterparty in the “Gestione controparti” dialog (bare layout, read-only).
 $router->get('/treasury/supplier-movements', [TreasuryController::class, 'supplierMovements'], 'treasury.view', ['mw.locale', 'mw.install', 'mw.auth']);
 $router->get('/treasury/loans', [TreasuryController::class, 'loans'], 'treasury.view', ['mw.locale', 'mw.install', 'mw.auth']);

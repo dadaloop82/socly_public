@@ -1081,9 +1081,9 @@ final class TreasuryController extends BaseController
         if (mb_strlen($query) > 120) {
             $query = mb_substr($query, 0, 120);
         }
-        $sort = (string) $request->input('sort', 'volume');
-        if (!in_array($sort, ['volume', 'name'], true)) {
-            $sort = 'volume';
+        $sort = (string) $request->input('sort', 'movements');
+        if (!in_array($sort, ['movements', 'volume', 'name'], true)) {
+            $sort = 'movements';
         }
         // Members in / members out: '' = all, 'members' = only members, 'others' = exclude them.
         $party = (string) $request->input('party', '');
@@ -1095,11 +1095,46 @@ final class TreasuryController extends BaseController
             'title' => __('treasury.suppliers_title'),
             'suppliers' => $overview['rows'],
             'supplier_totals' => $overview['totals'],
+            'merge_suggestions' => $overview['merge_suggestions'] ?? [],
             'search_query' => $query,
             'sort' => $sort,
             'party' => $party,
             'currency' => $this->currency,
         ]);
+    }
+
+    /**
+     * Aggregate similar free-text counterparties into one canonical spelling.
+     */
+    public function mergeSuppliers(Request $request): void
+    {
+        require_component('treasury');
+        if (!can('treasury.manage')) {
+            http_response_code(403);
+            $this->flash('errors', ['treasury' => __('errors.403')]);
+            redirect('/treasury/suppliers');
+        }
+        $canonical = trim((string) $request->input('canonical', ''));
+        $from = $request->input('from', []);
+        if (!is_array($from)) {
+            $from = [];
+        }
+        $result = $this->treasury->mergeCounterparties(
+            $canonical,
+            array_map('strval', $from),
+            $request->ip(),
+            auth_user()['id'] ?? null
+        );
+        if (empty($result['ok'])) {
+            $this->flash('errors', ['treasury' => __('treasury.suppliers_merge_failed')]);
+            redirect('/treasury/suppliers');
+        }
+        $updated = (int) ($result['updated'] ?? 0);
+        $this->flash('success', __('treasury.suppliers_merge_done', [
+            'count' => (string) $updated,
+            'name' => mb_ucfirst($canonical),
+        ]));
+        redirect('/treasury/suppliers');
     }
 
     /**
