@@ -186,6 +186,7 @@ document.addEventListener('DOMContentLoaded', () => {
   initBrokenImageGuards();
   initSessionHeartbeat();
   initPresence();
+  initResourceBusyWatch();
   initFreshnessGuard();
   initTreasuryRecurring();
   initTreasurySimilar();
@@ -1433,6 +1434,142 @@ function initPlatformConsents(scope) {
     });
     sync();
   });
+}
+
+/**
+ * Soft busy overlay for other browser tabs (localStorage) and other sessions (server lock).
+ * The tab that started the heavy job keeps working; everyone else sees a pause message.
+ */
+function initResourceBusyWatch() {
+  const root = document.querySelector('[data-presence-root]');
+  const statusUrl = root?.getAttribute('data-resource-busy-url') || '';
+  let overlay = null;
+  let localActive = false;
+  let serverActive = false;
+
+  const ensureOverlay = () => {
+    if (overlay) return overlay;
+    overlay = document.createElement('div');
+    overlay.className = 'update-overlay';
+    overlay.hidden = true;
+    overlay.dataset.resourceBusyOverlay = '1';
+    overlay.innerHTML = [
+      '<div class="update-overlay-card" role="status" aria-live="polite">',
+      '<div class="update-spinner" aria-hidden="true"></div>',
+      '<h2 class="update-overlay-title" data-resource-busy-title></h2>',
+      '<p class="update-overlay-text" data-resource-busy-text></p>',
+      '<p class="update-overlay-hint" data-resource-busy-hint></p>',
+      '<p><button type="button" class="btn" data-resource-busy-retry></button></p>',
+      '</div>',
+    ].join('');
+    document.body.appendChild(overlay);
+    overlay.querySelector('[data-resource-busy-retry]')?.addEventListener('click', () => {
+      window.location.reload();
+    });
+    return overlay;
+  };
+
+  const labels = (() => {
+    const lang = (document.documentElement.lang || 'it').slice(0, 2);
+    const map = {
+      it: {
+        title: 'Operazione impegnativa in corso',
+        hint: 'La pagina si aggiorna da sola. Potrai riprendere non appena l’operazione sarà terminata.',
+        retry: 'Controlla di nuovo',
+        fallback: 'Un collega sta eseguendo un’operazione che richiede molte risorse. L’uso dell’app è temporaneamente sospeso.',
+      },
+      en: {
+        title: 'A demanding operation is running',
+        hint: 'This page refreshes on its own. You can continue when the operation finishes.',
+        retry: 'Check again',
+        fallback: 'A colleague is running a resource-heavy operation. The app is temporarily paused.',
+      },
+      de: {
+        title: 'Anspruchsvoller Vorgang läuft',
+        hint: 'Diese Seite aktualisiert sich von selbst. Sie können fortfahren, sobald der Vorgang beendet ist.',
+        retry: 'Erneut prüfen',
+        fallback: 'Eine Kollegin / ein Kollege führt einen ressourcenintensiven Vorgang aus. Die App ist vorübergehend pausiert.',
+      },
+    };
+    return map[lang] || map.it;
+  })();
+
+  const sync = () => {
+    const active = localActive || serverActive;
+    const card = ensureOverlay();
+    if (!active) {
+      card.hidden = true;
+      if (!document.querySelector('.update-overlay:not([hidden])')) {
+        document.documentElement.classList.remove('is-busy');
+      }
+      return;
+    }
+    const titleEl = card.querySelector('[data-resource-busy-title]');
+    const textEl = card.querySelector('[data-resource-busy-text]');
+    const hintEl = card.querySelector('[data-resource-busy-hint]');
+    const retryEl = card.querySelector('[data-resource-busy-retry]');
+    if (titleEl) titleEl.textContent = labels.title;
+    if (textEl) textEl.textContent = card.dataset.message || labels.fallback;
+    if (hintEl) hintEl.textContent = labels.hint;
+    if (retryEl) retryEl.textContent = labels.retry;
+    card.hidden = false;
+    document.documentElement.classList.add('is-busy');
+  };
+
+  const readLocal = () => {
+    try {
+      const raw = window.localStorage.getItem('socly_resource_busy');
+      if (!raw) return null;
+      const data = JSON.parse(raw);
+      if (!data || !data.active) return null;
+      if (Date.now() - Number(data.at || 0) > 30 * 60 * 1000) {
+        window.localStorage.removeItem('socly_resource_busy');
+        return null;
+      }
+      return data;
+    } catch (error) {
+      return null;
+    }
+  };
+
+  const applyLocal = () => {
+    const data = readLocal();
+    localActive = !!data;
+    const card = ensureOverlay();
+    if (data) {
+      card.dataset.message = String(data.message || labels.fallback);
+    }
+    sync();
+  };
+
+  window.addEventListener('storage', (event) => {
+    if (event.key === 'socly_resource_busy') applyLocal();
+  });
+  applyLocal();
+
+  if (!statusUrl) return;
+
+  const poll = async () => {
+    try {
+      const response = await fetch(statusUrl, {
+        credentials: 'same-origin',
+        headers: { Accept: 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+      });
+      if (!response.ok) return;
+      const data = await response.json();
+      const busy = !!(data && data.busy && !data.holder);
+      serverActive = busy;
+      const card = ensureOverlay();
+      if (busy) {
+        card.dataset.message = String(data.message || labels.fallback);
+      }
+      sync();
+    } catch (error) {
+      /* ignore */
+    }
+  };
+  void poll();
+  window.setInterval(() => { void poll(); }, 8000);
 }
 
 /**

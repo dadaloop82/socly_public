@@ -488,7 +488,7 @@ $showVersionFooter = true;
     </aside>
 
     <div class="main-wrap">
-        <div class="presence" data-presence-root data-presence-url="<?= e(url('/presence/state')) ?>" aria-live="polite">
+        <div class="presence" data-presence-root data-presence-url="<?= e(url('/presence/state')) ?>" data-resource-busy-url="<?= e(url('/resource-busy/status')) ?>" aria-live="polite">
             <span class="visually-hidden"><?= e(__('presence.online_label')) ?></span>
             <div class="presence-avatars" data-presence-avatars></div>
             <div class="presence-toasts" data-presence-toasts></div>

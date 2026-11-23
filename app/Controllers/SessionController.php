@@ -28,6 +28,7 @@ namespace Socly\Controllers;
 use Socly\Core\Http\Request;
 use Socly\Core\View;
 use Socly\Services\PlatformService;
+use Socly\Services\ResourceBusyLock;
 
 final class SessionController extends BaseController
 {
@@ -51,5 +52,47 @@ final class SessionController extends BaseController
         }
         header('Content-Type: application/json; charset=utf-8');
         echo json_encode(['ok' => true, 'ts' => time()]);
+    }
+
+    /**
+     * Lightweight busy-lock probe for other browser tabs / users (never blocked by the lock).
+     */
+    public function resourceBusyStatus(Request $request): void
+    {
+        header('Content-Type: application/json; charset=utf-8');
+        header('Cache-Control: no-store');
+        try {
+            /** @var ResourceBusyLock $lock */
+            $lock = app(ResourceBusyLock::class);
+            $status = $lock->status();
+            if ($status === null) {
+                echo json_encode(['ok' => true, 'busy' => false], JSON_UNESCAPED_UNICODE);
+
+                return;
+            }
+            $user = auth_user();
+            $userId = is_array($user) ? (int) ($user['id'] ?? 0) : 0;
+            $sessionId = session_status() === PHP_SESSION_ACTIVE ? (string) session_id() : '';
+            $holder = $lock->isHolder($status, $userId > 0 ? $userId : null, $sessionId);
+            $name = trim((string) ($status['user_name'] ?? '')) ?: __('resource_busy.someone');
+            $op = (string) ($status['operation'] ?? '');
+            $opLabel = trim((string) ($status['label'] ?? ''));
+            if ($opLabel === '') {
+                $opLabel = $lock->operationLabel($op);
+            }
+            echo json_encode([
+                'ok' => true,
+                'busy' => true,
+                'holder' => $holder,
+                'user_name' => $name,
+                'operation' => $op,
+                'message' => __('resource_busy.message', [
+                    'name' => $name,
+                    'operation' => $opLabel,
+                ]),
+            ], JSON_UNESCAPED_UNICODE);
+        } catch (\Throwable) {
+            echo json_encode(['ok' => true, 'busy' => false], JSON_UNESCAPED_UNICODE);
+        }
     }
 }

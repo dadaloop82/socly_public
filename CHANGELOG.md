@@ -11,8 +11,14 @@ every 100 patches bump the series, and each bump is published to this rep come o
 ### Added
 
 - Resource busy lock: while an operator runs a heavy job (bank-statement anomaly check /
-  excerpt repair, or an in-app update), other users see a pause page with that person’s name
-  until the job finishes or the lock expires.
+  excerpt repair, or an in-app update), other users and other browser tabs see a pause
+  message with that person’s name until the job finishes or the lock expires. Presence
+  dots keep updating during the pause.
+
+### Changed
+
+- Bank-statement “check all statements”: if a full audit finished less than an hour ago,
+  the operator can reopen those results instead of re-running OCR on every PDF.
 
 ### Changed
 

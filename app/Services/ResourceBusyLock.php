@@ -241,8 +241,12 @@ final class ResourceBusyLock
         if (!is_string($json)) {
             return false;
         }
+        $ok = @file_put_contents($path, $json, LOCK_EX) !== false;
+        if ($ok) {
+            @chmod($path, 0664);
+        }
 
-        return @file_put_contents($path, $json, LOCK_EX) !== false;
+        return $ok;
     }
 
     private function clearFile(): void

@@ -93,6 +93,7 @@ if (is_file($privateRoutes)) {
 }
 $router->post('/logout', [AuthController::class, 'logout'], null, ['mw.locale', 'mw.install', 'mw.auth', 'mw.csrf']);
 $router->post('/session/ping', [SessionController::class, 'ping'], null, ['mw.locale', 'mw.install', 'mw.auth', 'mw.csrf']);
+$router->get('/resource-busy/status', [SessionController::class, 'resourceBusyStatus'], null, ['mw.locale', 'mw.install', 'mw.auth']);
 $router->get('/presence/state', [PresenceController::class, 'state'], null, ['mw.locale', 'mw.install', 'mw.auth']);
 $router->get('/freshness', [FreshnessController::class, 'state'], null, ['mw.locale', 'mw.install', 'mw.auth']);
 $router->get('/password/forgot', [AuthController::class, 'showForgot'], null, ['mw.locale', 'mw.install', 'mw.guest']);

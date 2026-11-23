@@ -91,6 +91,10 @@ final class ResourceBusyMiddleware
             '/reset-password',
             '/branding/logo',
             '/branding/favicon',
+            // Keep presence dots and idle heartbeat alive for everyone during a heavy job.
+            '/presence/state',
+            '/session/ping',
+            '/resource-busy/status',
         ];
         if (in_array($path, $exact, true)) {
             return true;
