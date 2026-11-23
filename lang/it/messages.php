@@ -2632,6 +2632,7 @@ return [
         'bulk_edit_beneficiary_hint' => 'Lascia vuoto per non cambiare',
         'bulk_edit_apply' => 'Applica',
         'bulk_edit_none' => 'Scegli almeno un campo da modificare.',
+        'bulk_edit_budget_mixed_years' => 'Il centro di costo è disponibile solo se i movimenti selezionati sono dello stesso anno.',
         'bulk_edit_confirm' => 'Stai per applicare :changes a :count movimenti. Procedo?',
         'bulk_edit_done' => 'Modificati :count movimenti.',
         'bulk_edit_done_skipped' => 'Modificati :count movimenti; :skipped ignorati (trasferimenti o movimenti storici).',

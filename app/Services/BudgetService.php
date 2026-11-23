@@ -996,18 +996,17 @@ final class BudgetService
     }
 
     /**
-     * Map a cost centre onto the preventivo of `$year` when that year has a budget.
-     * Same category (unique) wins; otherwise the same label in that year. Returns 0 when the year
-     * has a budget but no counterpart — never keep a 2026 line on a 2025 movement.
+     * Map a cost centre onto the preventivo of `$year` only. Same category (unique) wins; otherwise
+     * the same label in that year. Returns 0 when that year has no preventivo or no counterpart —
+     * never keep a line from another year.
      */
     public function alignItemToYear(int $itemId, int $year, string $category = '', string $direction = ''): int
     {
         if ($year < 1) {
-            return max(0, $itemId);
+            return 0;
         }
         if (!$this->hasBudgetForYear($year)) {
-            // No preventivo for the movement year: keep the (labelled) fallback choice.
-            return max(0, $itemId);
+            return 0;
         }
         if ($itemId > 0 && $this->itemYear($itemId) === $year) {
             return $itemId;
@@ -1080,66 +1079,27 @@ final class BudgetService
     }
 
     /**
-     * Cost centres offered on a movement of the given year.
-     *
-     * The preventivo of the movement year is used whenever it exists. Only when that year has no
-     * budget the closest one is offered instead (always labelled with its year). A cost centre
-     * already assigned is kept only when it belongs to the listed budget (or the year has none).
+     * Cost centres offered on a movement of the given year — only that year’s preventivo.
+     * No nearest-year fallback and no foreign lines: the select must never mix fiscal years.
      *
      * @return list<array{label:string,options:list<array{value:string,label:string,direction:string,category:string,year:string}>}>
      */
     public function itemOptionsForMovement(int $year, int $assignedItemId = 0): array
     {
-        $sourceYear = $year;
-        $groups = $this->itemOptions($year);
-        if ($groups === []) {
-            $fallbackYear = $this->nearestBudgetYear($year);
-            if ($fallbackYear > 0 && $fallbackYear !== $year) {
-                $sourceYear = $fallbackYear;
-                $groups = $this->itemOptions($fallbackYear);
-            }
+        if ($year < 1) {
+            return [];
         }
+        $groups = $this->itemOptions($year);
         foreach ($groups as $index => $group) {
             $section = trim((string) ($group['label'] ?? ''));
             $groups[$index]['label'] = $section !== ''
-                ? $sourceYear . ' · ' . $section
-                : (string) $sourceYear;
+                ? $year . ' · ' . $section
+                : (string) $year;
             foreach ($groups[$index]['options'] as $optIndex => $option) {
-                $groups[$index]['options'][$optIndex]['year'] = (string) $sourceYear;
+                $groups[$index]['options'][$optIndex]['year'] = (string) $year;
             }
         }
-        if ($assignedItemId < 1) {
-            return $groups;
-        }
-        foreach ($groups as $group) {
-            foreach ($group['options'] as $option) {
-                if ((int) ($option['value'] ?? 0) === $assignedItemId) {
-                    return $groups;
-                }
-            }
-        }
-        // Wrong-year assignment while this year has a preventivo: do not re-offer the foreign line.
-        if ($this->hasBudgetForYear($year) && $this->itemYear($assignedItemId) !== $year) {
-            return $groups;
-        }
-        // No preventivo for the year (fallback list) or the line vanished: keep it selectable.
-        $ownerYear = $this->itemYear($assignedItemId);
-        if ($ownerYear < 1) {
-            return $groups;
-        }
-        foreach ($this->itemOptions($ownerYear) as $group) {
-            foreach ($group['options'] as $option) {
-                if ((int) ($option['value'] ?? 0) === $assignedItemId) {
-                    $option['year'] = (string) $ownerYear;
-                    $section = trim((string) ($group['label'] ?? ''));
-                    $groups[] = [
-                        'label' => $section !== '' ? $ownerYear . ' · ' . $section : (string) $ownerYear,
-                        'options' => [$option],
-                    ];
-                    return $groups;
-                }
-            }
-        }
+        // $assignedItemId is ignored when it belongs to another year: the caller remaps first.
 
         return $groups;
     }

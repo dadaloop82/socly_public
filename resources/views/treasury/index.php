@@ -382,9 +382,24 @@ if ($filterYear !== '' && !isset($yearFilterOptions[$filterYear])) {
             'options' => [],
         ]) ?>
         <?php
-        // Cost centre: grouped like the “Voce del bilancio consuntivo (Modello D)” filter — one
-        // optgroup per budget and section, the lines inside.
+        // Cost centre filter: when the ledger already filters by year, only that preventivo.
         $budgetFilterGroups = is_array($budget_filter_groups ?? null) ? $budget_filter_groups : [];
+        $filterYearInt = (int) $filterYear;
+        if ($filterYearInt > 0) {
+            $budgetFilterGroups = array_values(array_filter(
+                $budgetFilterGroups,
+                static function (array $group) use ($filterYearInt): bool {
+                    foreach ((array) ($group['options'] ?? []) as $option) {
+                        if ((int) ($option['year'] ?? 0) === $filterYearInt) {
+                            return true;
+                        }
+                    }
+                    $label = trim((string) ($group['label'] ?? ''));
+
+                    return str_starts_with($label, (string) $filterYearInt);
+                }
+            ));
+        }
         $budgetNoneGroup = [['label' => (string) __('treasury.filter_none_group'), 'options' => [['value' => '__none__', 'label' => (string) __('treasury.filter_none')]]]];
         $budgetGroupsForFilter = array_merge([], $budgetFilterGroups, $budgetNoneGroup);
         ?>
@@ -702,6 +717,7 @@ if ($filterYear !== '' && !isset($yearFilterOptions[$filterYear])) {
             data-msg-beneficiary="<?= e(__('treasury.counterparty')) ?>"
             data-msg-confirm="<?= e(__('treasury.bulk_edit_confirm', ['changes' => ':changes', 'count' => ':count'])) ?>"
             data-msg-none="<?= e(__('treasury.bulk_edit_none')) ?>"
+            data-msg-budget-mixed-years="<?= e(__('treasury.bulk_edit_budget_mixed_years')) ?>"
         >
             <div class="member-leave-shell treasury-bulk-edit-shell">
                 <div class="treasury-bulk-edit-head">
@@ -753,7 +769,9 @@ if ($filterYear !== '' && !isset($yearFilterOptions[$filterYear])) {
                         'groups' => $bulkBudgetGroups,
                         'options' => [],
                         'attrs' => ['data-treasury-bulk-edit-budget' => true],
+                        'hint' => '',
                     ]) ?>
+                    <p class="muted treasury-bulk-edit-budget-hint" data-treasury-bulk-edit-budget-hint hidden></p>
                 </div>
                 <div class="treasury-bulk-edit-optional">
                     <?= field('checkbox', [
@@ -970,7 +988,10 @@ if ($filterYear !== '' && !isset($yearFilterOptions[$filterYear])) {
                                 ?>
                                 <tr
                                     class="treasury-row treasury-row-<?= $isTransfer ? 'transfer' : ($isIncome ? 'income' : 'expense') ?><?= $canManage && !$isSuperseded ? ' doc-row-editable' : '' ?><?= $isSuperseded ? ' is-superseded' : '' ?><?= $rowAnomalyLabels !== [] ? ' has-anomaly' : '' ?>"
-                                    data-treasury-row="<?= $rowId ?>" data-treasury-approved="<?= $isPending ? '0' : '1' ?>" data-treasury-account="<?= e($accountKey) ?>"
+                                    data-treasury-row="<?= $rowId ?>"
+                                    data-treasury-approved="<?= $isPending ? '0' : '1' ?>"
+                                    data-treasury-account="<?= e($accountKey) ?>"
+                                    data-movement-year="<?= e((string) (int) substr((string) ($row['movement_date'] ?? ''), 0, 4)) ?>"
                                     data-treasury-amount="<?= e(number_format($amount, 2, '.', '')) ?>"
                                     data-treasury-direction="<?= $isTransfer ? 'transfer' : ($isIncome ? 'income' : 'expense') ?>"
                                     <?php if ($canManage && !$isSuperseded): ?>

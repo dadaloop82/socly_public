@@ -1757,22 +1757,30 @@ final class TreasuryService
      *
      * @return list<array{label:string,options:list<array{value:string,label:string}>}>
      */
-    public function budgetItemFilterGroups(): array
+    /**
+     * @return list<array{label:string,options:list<array{value:string,label:string,year?:string}>}>
+     */
+    public function budgetItemFilterGroups(?int $year = null): array
     {
         $groups = [];
-        foreach ($this->db->fetchAll(
-            "SELECT i.id, b.fiscal_year, i.label, s.title AS section_title
+        $sql = "SELECT i.id, b.fiscal_year, i.label, s.title AS section_title
              FROM budget_items i
              INNER JOIN budgets b ON b.id = i.budget_id
-             LEFT JOIN budget_sections s ON s.id = i.section_id
-             ORDER BY b.fiscal_year DESC, s.sort_order ASC, i.sort_order ASC, i.id ASC"
-        ) as $row) {
+             LEFT JOIN budget_sections s ON s.id = i.section_id";
+        $params = [];
+        if ($year !== null && $year > 0) {
+            $sql .= ' WHERE b.fiscal_year = :y';
+            $params['y'] = $year;
+        }
+        $sql .= ' ORDER BY b.fiscal_year ASC, s.sort_order ASC, i.sort_order ASC, i.id ASC';
+        foreach ($this->db->fetchAll($sql, $params) as $row) {
             $item = mb_substr(trim((string) $row['label']), 0, 90);
             if ($item === '') {
                 continue;
             }
+            $fiscalYear = (string) ($row['fiscal_year'] ?? '');
             $groupLabel = implode(' · ', array_filter(
-                [(string) $row['fiscal_year'], trim((string) ($row['section_title'] ?? ''))],
+                [$fiscalYear, trim((string) ($row['section_title'] ?? ''))],
                 static fn (string $part): bool => $part !== ''
             ));
             if (!isset($groups[$groupLabel])) {
@@ -1781,6 +1789,8 @@ final class TreasuryService
             $groups[$groupLabel]['options'][] = [
                 'value' => (string) (int) $row['id'],
                 'label' => $item,
+                'year' => $fiscalYear,
+                'attrs' => ['data-year' => $fiscalYear],
             ];
         }
 
@@ -1982,7 +1992,8 @@ final class TreasuryService
         }
         $hasYearBudget = $this->db->fetch('SELECT id FROM budgets WHERE fiscal_year = :y', ['y' => $year]) !== null;
         if (!$hasYearBudget) {
-            return max(0, $budgetItemId);
+            // No preventivo for the movement year: never keep a foreign cost centre.
+            return 0;
         }
         $owner = null;
         if ($budgetItemId > 0) {

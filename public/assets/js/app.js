@@ -4634,6 +4634,8 @@ function initTreasuryBulk() {
     const methodSelect = editDialog.querySelector('[data-treasury-bulk-edit-method]');
     const runtsSelect = editDialog.querySelector('[data-treasury-bulk-edit-runts]');
     const budgetSelect = editDialog.querySelector('[data-treasury-bulk-edit-budget]');
+    const budgetHint = editDialog.querySelector('[data-treasury-bulk-edit-budget-hint]');
+    let budgetSelectSourceHtml = budgetSelect instanceof HTMLSelectElement ? budgetSelect.innerHTML : '';
     const descriptionToggle = editDialog.querySelector('[data-treasury-bulk-edit-description-toggle]');
     const descriptionBlock = editDialog.querySelector('[data-treasury-bulk-edit-description-block]');
     const descriptionField = editDialog.querySelector('[data-treasury-bulk-edit-description]');
@@ -4688,8 +4690,15 @@ function initTreasuryBulk() {
     });
     const reset = () => {
       [accountSelect, categorySelect, methodSelect, runtsSelect, budgetSelect].forEach((select) => {
-        if (select instanceof HTMLSelectElement) select.value = '';
+        if (select instanceof HTMLSelectElement) {
+          select.value = '';
+          select.disabled = false;
+        }
       });
+      if (budgetHint instanceof HTMLElement) {
+        budgetHint.hidden = true;
+        budgetHint.textContent = '';
+      }
       if (notesToggle instanceof HTMLInputElement) notesToggle.checked = false;
       if (descriptionToggle instanceof HTMLInputElement) descriptionToggle.checked = false;
       if (counterpartyToggle instanceof HTMLInputElement) counterpartyToggle.checked = false;
@@ -4707,10 +4716,53 @@ function initTreasuryBulk() {
       }
       if (applyBtn instanceof HTMLButtonElement) applyBtn.disabled = false;
     };
+    const syncBulkBudgetToMovementYear = () => {
+      if (!(budgetSelect instanceof HTMLSelectElement) || budgetSelectSourceHtml === '') return;
+      budgetSelect.innerHTML = budgetSelectSourceHtml;
+      const years = new Set();
+      selectedIds().forEach((id) => {
+        const row = root.querySelector(`[data-treasury-row="${id}"]`);
+        const year = row instanceof HTMLElement ? String(row.getAttribute('data-movement-year') || '').trim() : '';
+        if (/^\d{4}$/.test(year)) years.add(year);
+      });
+      if (years.size !== 1) {
+        [...budgetSelect.querySelectorAll('optgroup')].forEach((group) => group.remove());
+        budgetSelect.value = '';
+        budgetSelect.disabled = true;
+        if (budgetHint instanceof HTMLElement) {
+          budgetHint.hidden = false;
+          budgetHint.textContent = msg('data-msg-budget-mixed-years');
+        }
+        return;
+      }
+      const year = [...years][0];
+      [...budgetSelect.querySelectorAll('optgroup')].forEach((group) => {
+        const options = [...group.querySelectorAll('option')];
+        const keep = options.filter((option) => {
+          const optionYear = String(option.dataset.year || '').trim();
+          if (optionYear !== '') return optionYear === year;
+          return group.label.trim().startsWith(`${year} `) || group.label.trim() === year;
+        });
+        if (keep.length === 0) {
+          group.remove();
+          return;
+        }
+        options.forEach((option) => {
+          if (!keep.includes(option)) option.remove();
+        });
+      });
+      budgetSelect.disabled = false;
+      budgetSelect.value = '';
+      if (budgetHint instanceof HTMLElement) {
+        budgetHint.hidden = true;
+        budgetHint.textContent = '';
+      }
+    };
     bar.querySelector('[data-treasury-bulk-action="edit"]')?.addEventListener('click', () => {
       const ids = selectedIds();
       if (ids.length === 0) return;
       reset();
+      syncBulkBudgetToMovementYear();
       if (summary instanceof HTMLElement) {
         summary.textContent = msg('data-msg-summary').replace(':count', String(ids.length));
       }

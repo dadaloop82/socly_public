@@ -3198,6 +3198,7 @@ return [
         'bulk_edit_beneficiary_hint' => 'Leave empty to keep it',
         'bulk_edit_apply' => 'Apply',
         'bulk_edit_none' => 'Choose at least one field to change.',
+        'bulk_edit_budget_mixed_years' => 'The cost centre is available only when the selected movements share the same year.',
         'bulk_edit_confirm' => 'You are about to apply :changes to :count movements. Continue?',
         'bulk_edit_done' => ':count movements updated.',
         'bulk_edit_done_skipped' => ':count movements updated; :skipped skipped (transfers or historical movements).',

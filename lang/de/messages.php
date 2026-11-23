@@ -3198,6 +3198,7 @@ return [
         'bulk_edit_beneficiary_hint' => 'Leer lassen, um nichts zu ändern',
         'bulk_edit_apply' => 'Anwenden',
         'bulk_edit_none' => 'Mindestens ein Feld zum Ändern auswählen.',
+        'bulk_edit_budget_mixed_years' => 'Die Kostenstelle ist nur verfügbar, wenn die ausgewählten Bewegungen dasselbe Jahr haben.',
         'bulk_edit_confirm' => ':changes wird auf :count Bewegungen angewendet. Fortfahren?',
         'bulk_edit_done' => ':count Bewegungen geändert.',
         'bulk_edit_done_skipped' => ':count Bewegungen geändert; :skipped übersprungen (Umbuchungen oder historische Bewegungen).',

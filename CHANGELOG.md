@@ -50,9 +50,9 @@ every 100 patches bump the series, and each bump is published to this rep come o
 
 ### Fixed
 
-- Treasury cost centre: always prefer the preventivo of the movement year when it exists (never
-  propose a 2026 line on a 2025 operation); options refresh when the date year changes, and save
-  remaps a wrong-year line by category/label.
+- Treasury cost centre: every select shows only the preventivo of the movement year (no other
+  years, no nearest-year fallback). Bulk edit filters to that year (or disables the field when
+  years are mixed); options refresh when the date year changes; save remaps foreign lines.
 - Gestione Controparti: “Aggrega tutti con …” actually rewrites the movements (PDO native prepares
   rejected the UPDATE because `:canonical` was bound twice).
 - Update dialog: shows publish date and inline changelog highlights again (from `latest.json`),
