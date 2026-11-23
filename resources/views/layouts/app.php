@@ -502,8 +502,8 @@ $showVersionFooter = true;
             data-resource-busy-url="<?= e(url('/resource-busy/status')) ?>"
             data-resource-busy-self-name="<?= e($busySelfName) ?>"
             data-resource-busy-someone="<?= e(__('resource_busy.someone')) ?>"
-            data-resource-busy-who="<?= e(__('resource_busy.who', ['name' => ':name'])) ?>"
-            data-resource-busy-message="<?= e(__('resource_busy.message', ['name' => ':name', 'operation' => ':operation'])) ?>"
+            data-resource-busy-started-by="<?= e(__('resource_busy.started_by', ['name' => ':name', 'time' => ':time'])) ?>"
+            data-resource-busy-message="<?= e(__('resource_busy.message')) ?>"
             aria-live="polite">
             <span class="visually-hidden"><?= e(__('presence.online_label')) ?></span>
             <div class="presence-avatars" data-presence-avatars></div>

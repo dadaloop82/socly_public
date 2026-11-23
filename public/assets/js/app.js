@@ -1443,7 +1443,7 @@ function initPlatformConsents(scope) {
 function initResourceBusyWatch() {
   const root = document.querySelector('[data-presence-root]');
   const statusUrl = root?.getAttribute('data-resource-busy-url') || '';
-  const whoTpl = root?.getAttribute('data-resource-busy-who') || ':name';
+  const startedByTpl = root?.getAttribute('data-resource-busy-started-by') || 'Avviata da :name alle :time';
   const messageTpl = root?.getAttribute('data-resource-busy-message') || '';
   const someone = root?.getAttribute('data-resource-busy-someone') || '';
   let overlay = null;
@@ -1460,7 +1460,8 @@ function initResourceBusyWatch() {
       '<div class="update-overlay-card" role="status" aria-live="polite">',
       '<div class="update-spinner" aria-hidden="true"></div>',
       '<h2 class="update-overlay-title" data-resource-busy-title></h2>',
-      '<p class="update-overlay-who" data-resource-busy-who-line></p>',
+      '<p class="update-overlay-who" data-resource-busy-operation></p>',
+      '<p class="update-overlay-started" data-resource-busy-started></p>',
       '<p class="update-overlay-text" data-resource-busy-text></p>',
       '<p class="update-overlay-hint" data-resource-busy-hint></p>',
       '<p><button type="button" class="btn" data-resource-busy-retry></button></p>',
@@ -1478,27 +1479,30 @@ function initResourceBusyWatch() {
     const map = {
       it: {
         title: 'Operazione impegnativa in corso',
-        hint: 'La pagina si aggiorna da sola. Potrai riprendere non appena l’operazione sarà terminata.',
+        hint: 'La pagina si aggiorna da sola. Potrai riprendere non appena l’operazione sarà terminata (al massimo 30 minuti).',
         retry: 'Controlla di nuovo',
         someone: 'Un collega',
-        operation: 'un’operazione impegnativa',
-        fallback: 'Un collega sta eseguendo un’operazione che richiede molte risorse. L’uso dell’app è temporaneamente sospeso.',
+        operation: 'Operazione impegnativa',
+        fallback: 'Per non rallentare o interrompere il lavoro, l’uso dell’app è temporaneamente sospeso per gli altri.',
+        startedBy: 'Avviata da :name alle :time',
       },
       en: {
         title: 'A demanding operation is running',
-        hint: 'This page refreshes on its own. You can continue when the operation finishes.',
+        hint: 'This page refreshes on its own. You can continue as soon as the operation finishes (30 minutes maximum).',
         retry: 'Check again',
         someone: 'A colleague',
-        operation: 'a demanding operation',
-        fallback: 'A colleague is running a resource-heavy operation. The app is temporarily paused.',
+        operation: 'Demanding operation',
+        fallback: 'To avoid slowing or interrupting that work, the app is temporarily paused for everyone else.',
+        startedBy: 'Started by :name at :time',
       },
       de: {
         title: 'Anspruchsvoller Vorgang läuft',
-        hint: 'Diese Seite aktualisiert sich von selbst. Sie können fortfahren, sobald der Vorgang beendet ist.',
+        hint: 'Diese Seite aktualisiert sich von selbst. Sie können fortfahren, sobald der Vorgang beendet ist (höchstens 30 Minuten).',
         retry: 'Erneut prüfen',
         someone: 'Eine Kollegin / ein Kollege',
-        operation: 'einen anspruchsvollen Vorgang',
-        fallback: 'Eine Kollegin / ein Kollege führt einen ressourcenintensiven Vorgang aus. Die App ist vorübergehend pausiert.',
+        operation: 'Anspruchsvoller Vorgang',
+        fallback: 'Damit die Arbeit nicht ausgebremst oder unterbrochen wird, ist die App für alle anderen vorübergehend pausiert.',
+        startedBy: 'Gestartet von :name um :time',
       },
     };
     return map[lang] || map.it;
@@ -1512,17 +1516,29 @@ function initResourceBusyWatch() {
     return out;
   };
 
+  const formatStartedTime = (isoOrMs) => {
+    if (isoOrMs == null || isoOrMs === '') return '';
+    try {
+      const date = typeof isoOrMs === 'number' ? new Date(isoOrMs) : new Date(String(isoOrMs));
+      if (Number.isNaN(date.getTime())) return '';
+      return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    } catch (error) {
+      return '';
+    }
+  };
+
   const paintPayload = (card, data) => {
     const name = String(data?.user_name || '').trim() || someone || labels.someone;
     const operation = String(data?.operation_label || data?.label || '').trim() || labels.operation;
-    let message = String(data?.message || '').trim();
-    // Publishers sometimes send only the operation title: rebuild the full sentence with the name.
-    if (!message || (name && !message.includes(name))) {
-      message = messageTpl
-        ? fillTpl(messageTpl, { name, operation })
-        : labels.fallback;
-    }
-    card.dataset.who = String(data?.who || '').trim() || fillTpl(whoTpl, { name });
+    const startedTime = String(data?.started_time || '').trim()
+      || formatStartedTime(data?.started_at)
+      || formatStartedTime(data?.at)
+      || '—';
+    const startedBy = String(data?.started_by || '').trim()
+      || fillTpl(startedByTpl || labels.startedBy, { name, time: startedTime });
+    const message = String(data?.message || '').trim() || messageTpl || labels.fallback;
+    card.dataset.operation = operation;
+    card.dataset.startedBy = startedBy;
     card.dataset.message = message;
     card.dataset.userName = name;
   };
@@ -1538,14 +1554,19 @@ function initResourceBusyWatch() {
       return;
     }
     const titleEl = card.querySelector('[data-resource-busy-title]');
-    const whoEl = card.querySelector('[data-resource-busy-who-line]');
+    const opEl = card.querySelector('[data-resource-busy-operation]');
+    const startedEl = card.querySelector('[data-resource-busy-started]');
     const textEl = card.querySelector('[data-resource-busy-text]');
     const hintEl = card.querySelector('[data-resource-busy-hint]');
     const retryEl = card.querySelector('[data-resource-busy-retry]');
     if (titleEl) titleEl.textContent = labels.title;
-    if (whoEl) {
-      whoEl.textContent = card.dataset.who || fillTpl(whoTpl, { name: someone || labels.someone });
-      whoEl.hidden = !whoEl.textContent;
+    if (opEl) {
+      opEl.textContent = card.dataset.operation || labels.operation;
+      opEl.hidden = !opEl.textContent;
+    }
+    if (startedEl) {
+      startedEl.textContent = card.dataset.startedBy || '';
+      startedEl.hidden = !startedEl.textContent;
     }
     if (textEl) textEl.textContent = card.dataset.message || labels.fallback;
     if (hintEl) hintEl.textContent = labels.hint;
@@ -1560,6 +1581,7 @@ function initResourceBusyWatch() {
       if (!raw) return null;
       const data = JSON.parse(raw);
       if (!data || !data.active) return null;
+      // Soft tab signal: hard-expire after 30 minutes even if the holder tab crashed.
       if (Date.now() - Number(data.at || 0) > 30 * 60 * 1000) {
         window.localStorage.removeItem('socly_resource_busy');
         return null;
@@ -1603,8 +1625,15 @@ function initResourceBusyWatch() {
           user_name: data.user_name,
           operation: data.operation,
           operation_label: data.operation_label || data.label || '',
+          started_at: data.started_at,
+          started_time: data.started_time,
+          started_by: data.started_by,
           message: data.message,
         });
+      } else if (localActive) {
+        // Server lock gone (finished or hard-expired): drop the soft tab signal too.
+        try { window.localStorage.removeItem('socly_resource_busy'); } catch (error) { /* ignore */ }
+        localActive = false;
       }
       sync();
     } catch (error) {

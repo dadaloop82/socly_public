@@ -2697,17 +2697,27 @@ html.is-busy .update-overlay {
   letter-spacing: -0.01em;
 }
 .update-overlay-who {
-  margin: 0 0 0.75rem;
+  margin: 0 0 0.45rem;
   padding: 0.7rem 0.85rem;
   border-radius: 12px;
-  font-size: 0.95rem;
-  font-weight: 650;
-  line-height: 1.4;
+  font-size: 1rem;
+  font-weight: 700;
+  line-height: 1.35;
   color: var(--ink);
   background: color-mix(in srgb, var(--brand-primary) 8%, #ffffff);
   border: 1px solid color-mix(in srgb, var(--brand-primary) 18%, var(--line, #d7e3df));
 }
 .update-overlay-who[hidden] {
+  display: none !important;
+}
+.update-overlay-started {
+  margin: 0 0 0.75rem;
+  font-size: 0.92rem;
+  font-weight: 650;
+  line-height: 1.4;
+  color: var(--ink);
+}
+.update-overlay-started[hidden] {
   display: none !important;
 }
 .update-overlay-text {

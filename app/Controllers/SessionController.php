@@ -80,6 +80,15 @@ final class SessionController extends BaseController
             if ($opLabel === '') {
                 $opLabel = $lock->operationLabel($op);
             }
+            $startedAt = (string) ($status['started_at'] ?? '');
+            $startedTime = '';
+            if ($startedAt !== '') {
+                try {
+                    $startedTime = (new \DateTimeImmutable($startedAt))->format('H:i');
+                } catch (\Throwable) {
+                    $startedTime = '';
+                }
+            }
             echo json_encode([
                 'ok' => true,
                 'busy' => true,
@@ -87,11 +96,13 @@ final class SessionController extends BaseController
                 'user_name' => $name,
                 'operation' => $op,
                 'operation_label' => $opLabel,
-                'who' => __('resource_busy.who', ['name' => $name]),
-                'message' => __('resource_busy.message', [
+                'started_at' => $startedAt,
+                'started_time' => $startedTime,
+                'started_by' => __('resource_busy.started_by', [
                     'name' => $name,
-                    'operation' => $opLabel,
+                    'time' => $startedTime !== '' ? $startedTime : '—',
                 ]),
+                'message' => __('resource_busy.message'),
             ], JSON_UNESCAPED_UNICODE);
         } catch (\Throwable) {
             echo json_encode(['ok' => true, 'busy' => false], JSON_UNESCAPED_UNICODE);

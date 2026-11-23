@@ -111,21 +111,36 @@ final class ResourceBusyMiddleware
     }
 
     /** @param array<string,mixed> $status */
-    private function message(array $status): string
+    private function operationLabel(array $status): string
     {
-        $name = trim((string) ($status['user_name'] ?? ''));
-        if ($name === '') {
-            $name = __('resource_busy.someone');
-        }
-        $operation = (string) ($status['operation'] ?? '');
         $opLabel = trim((string) ($status['label'] ?? ''));
-        if ($opLabel === '') {
-            $opLabel = $this->lock->operationLabel($operation);
+        if ($opLabel !== '') {
+            return $opLabel;
         }
 
-        return __('resource_busy.message', [
-            'name' => $name,
-            'operation' => $opLabel,
+        return $this->lock->operationLabel((string) ($status['operation'] ?? ''));
+    }
+
+    /** @param array<string,mixed> $status */
+    private function startedByLine(array $status): string
+    {
+        $rawName = trim((string) ($status['user_name'] ?? ''));
+        if ($rawName === '') {
+            $rawName = __('resource_busy.someone');
+        }
+        $startedTime = '—';
+        $startedAt = (string) ($status['started_at'] ?? '');
+        if ($startedAt !== '') {
+            try {
+                $startedTime = (new \DateTimeImmutable($startedAt))->format('H:i');
+            } catch (\Throwable) {
+                $startedTime = '—';
+            }
+        }
+
+        return __('resource_busy.started_by', [
+            'name' => $rawName,
+            'time' => $startedTime,
         ]);
     }
 
@@ -150,14 +165,11 @@ final class ResourceBusyMiddleware
         $esc = static fn (string $v): string => htmlspecialchars($v, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
         $title = $esc(__('resource_busy.title'));
         $heading = $esc(__('resource_busy.heading'));
-        $body = $esc($this->message($status));
+        $operation = $esc($this->operationLabel($status));
+        $startedBy = $esc($this->startedByLine($status));
+        $body = $esc(__('resource_busy.message'));
         $hint = $esc(__('resource_busy.hint'));
         $retry = $esc(__('resource_busy.retry'));
-        $rawName = trim((string) ($status['user_name'] ?? ''));
-        if ($rawName === '') {
-            $rawName = __('resource_busy.someone');
-        }
-        $who = $esc(__('resource_busy.who', ['name' => $rawName]));
 
         echo '<!DOCTYPE html><html lang="' . $esc($locale) . '"><head><meta charset="utf-8">';
         echo '<meta name="viewport" content="width=device-width, initial-scale=1">';
@@ -172,8 +184,9 @@ final class ResourceBusyMiddleware
         echo 'padding:clamp(1.4rem,3vw,2rem);box-shadow:0 18px 40px rgba(20,42,40,.08)}';
         echo 'h1{font-size:clamp(1.35rem,3.2vw,1.75rem);line-height:1.2;margin:0 0 .85rem;letter-spacing:-.02em}';
         echo 'p{margin:0 0 1rem;line-height:1.55;color:var(--muted)}';
-        echo '.who{margin:0 0 1rem;padding:.85rem 1rem;border-radius:14px;background:color-mix(in srgb,var(--brand) 7%,#fff);';
-        echo 'border:1px solid color-mix(in srgb,var(--brand) 16%,var(--line));color:var(--ink);font-weight:600}';
+        echo '.op{margin:0 0 .55rem;padding:.85rem 1rem;border-radius:14px;background:color-mix(in srgb,var(--brand) 7%,#fff);';
+        echo 'border:1px solid color-mix(in srgb,var(--brand) 16%,var(--line));color:var(--ink);font-weight:700;font-size:1.05rem}';
+        echo '.started{margin:0 0 1rem;color:var(--ink);font-weight:600}';
         echo '.hint{font-size:.92rem;margin-bottom:1.25rem}';
         echo '.btn{appearance:none;border:0;border-radius:999px;padding:.72rem 1.15rem;font:inherit;font-weight:700;';
         echo 'cursor:pointer;background:var(--brand);color:#fff;text-decoration:none;display:inline-flex}';
@@ -183,7 +196,8 @@ final class ResourceBusyMiddleware
         echo '@keyframes pulse{0%,100%{opacity:.35;transform:scale(.85)}50%{opacity:1;transform:scale(1)}}';
         echo '</style></head><body><div class="card">';
         echo '<h1><span class="pulse" aria-hidden="true"></span>' . $heading . '</h1>';
-        echo '<p class="who">' . $who . '</p>';
+        echo '<p class="op">' . $operation . '</p>';
+        echo '<p class="started">' . $startedBy . '</p>';
         echo '<p>' . $body . '</p>';
         echo '<p class="hint">' . $hint . '</p>';
         echo '<p><button type="button" class="btn" onclick="location.reload()">' . $retry . '</button></p>';

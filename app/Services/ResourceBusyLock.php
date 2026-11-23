@@ -33,6 +33,9 @@ final class ResourceBusyLock
     /** Seconds without heartbeat before the lock is treated as abandoned. */
     public const TTL_SECONDS = 180;
 
+    /** Hard ceiling: no busy lock may block the instance longer than this. */
+    public const MAX_HOLD_SECONDS = 1800; // 30 minutes
+
     public const OP_BANK_STATEMENT_AUDIT = 'bank_statement_audit';
     public const OP_BANK_STATEMENT_REPAIR = 'bank_statement_repair';
     public const OP_SYSTEM_UPDATE = 'system_update';
@@ -114,7 +117,8 @@ final class ResourceBusyLock
         }
         // Same holder may replace their own lock (restart / repair after audit).
         $now = time();
-        $ttl = $ttlSeconds !== null ? max(60, min(3600, $ttlSeconds)) : self::TTL_SECONDS;
+        $ttl = $ttlSeconds !== null ? max(60, min(self::MAX_HOLD_SECONDS, $ttlSeconds)) : self::TTL_SECONDS;
+        $hardCap = $now + self::MAX_HOLD_SECONDS;
         $payload = [
             'operation' => $operation,
             'job' => $job,
@@ -122,8 +126,10 @@ final class ResourceBusyLock
             'user_name' => mb_substr(trim($userName) !== '' ? trim($userName) : __('resource_busy.someone'), 0, 120),
             'session_id' => mb_substr($sessionId, 0, 128),
             'started_at' => date('c', $now),
-            'expires_at' => date('c', $now + $ttl),
-            'label' => $label !== null ? mb_substr(trim($label), 0, 190) : '',
+            'expires_at' => date('c', min($now + $ttl, $hardCap)),
+            'label' => $label !== null && trim($label) !== ''
+                ? mb_substr(trim($label), 0, 190)
+                : $this->operationLabel($operation),
         ];
         if (!$this->write($payload)) {
             return ['ok' => false, 'error' => 'write_failed'];
@@ -132,7 +138,7 @@ final class ResourceBusyLock
         return ['ok' => true, 'status' => $payload];
     }
 
-    /** Extend TTL while the heavy job keeps ticking. */
+    /** Extend TTL while the heavy job keeps ticking (never past the 30-minute hard cap). */
     public function heartbeat(string $job, ?int $userId = null, string $sessionId = ''): bool
     {
         $lock = $this->read();
@@ -153,7 +159,15 @@ final class ResourceBusyLock
                 return false;
             }
         }
-        $lock['expires_at'] = date('c', time() + self::TTL_SECONDS);
+        $started = strtotime((string) ($lock['started_at'] ?? ''));
+        $hardCap = ($started !== false ? $started : time()) + self::MAX_HOLD_SECONDS;
+        $next = min(time() + self::TTL_SECONDS, $hardCap);
+        if ($next <= time()) {
+            $this->clearFile();
+
+            return false;
+        }
+        $lock['expires_at'] = date('c', $next);
 
         return $this->write($lock);
     }
@@ -260,11 +274,17 @@ final class ResourceBusyLock
     /** @param array<string,mixed> $data */
     private function isExpired(array $data): bool
     {
+        $now = time();
+        $started = strtotime((string) ($data['started_at'] ?? ''));
+        // Absolute ceiling: unlock the instance no matter how lively the heartbeat is.
+        if ($started !== false && ($now - $started) >= self::MAX_HOLD_SECONDS) {
+            return true;
+        }
         $expires = strtotime((string) ($data['expires_at'] ?? ''));
         if ($expires === false) {
             return true;
         }
 
-        return $expires < time();
+        return $expires < $now;
     }
 }

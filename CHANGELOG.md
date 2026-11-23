@@ -24,6 +24,8 @@ every 100 patches bump the series, and each bump is published to this rep come o
   ledger-only rows without a covering archived statement are listed as ignored (not actionable).
 - Session idle timeout no longer logs anyone out in the middle of a heavy job (statement
   audit, excerpt repair, in-app update): the holder’s session stays alive until the job ends.
+- Resource-busy pause shows the operation name first and “Started by … at …”, and hard-unlocks
+  the instance after at most 30 minutes.
 
 ### Changed
 
