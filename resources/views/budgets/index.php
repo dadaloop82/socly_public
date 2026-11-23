@@ -119,20 +119,28 @@ $annualCategoriesIncome = is_array($annualCategories['income'] ?? null) ? $annua
     </div>
 <?php else: ?>
     <div class="budget-list">
-        <?php foreach ($budgets as $row): ?>
-            <?php
+        <?php
+        $currentFiscalYear = (int) date('Y');
+        foreach ($budgets as $row):
             $budgetId = (int) ($row['id'] ?? 0);
+            $fiscalYear = (int) ($row['fiscal_year'] ?? 0);
             $isApproved = (string) ($row['status'] ?? '') === 'approved';
+            $isCurrentYear = $fiscalYear === $currentFiscalYear;
             ?>
-            <article class="panel budget-card">
+            <article class="panel budget-card<?= $isCurrentYear ? ' is-current-year' : '' ?>">
                 <header class="budget-card-head">
                     <div>
-                        <h2 class="budget-card-year"><?= e((string) ($row['fiscal_year'] ?? '')) ?></h2>
+                        <h2 class="budget-card-year"><?= e((string) $fiscalYear) ?></h2>
                         <p class="budget-card-title muted"><?= e((string) (($row['title'] ?? '') !== '' ? $row['title'] : __('budget.card_title_default'))) ?></p>
                     </div>
-                    <span class="budget-badge <?= $isApproved ? 'is-approved' : 'is-draft' ?>">
-                        <?= e($isApproved ? __('budget.status_approved') : __('budget.status_draft')) ?>
-                    </span>
+                    <div class="budget-card-badges">
+                        <?php if ($isCurrentYear): ?>
+                            <span class="budget-badge is-current"><?= e(__('budget.current_year_badge')) ?></span>
+                        <?php endif; ?>
+                        <span class="budget-badge <?= $isApproved ? 'is-approved' : 'is-draft' ?>">
+                            <?= e($isApproved ? __('budget.status_approved') : __('budget.status_draft')) ?>
+                        </span>
+                    </div>
                 </header>
                 <dl class="budget-card-kpis">
                     <div>

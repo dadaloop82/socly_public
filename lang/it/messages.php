@@ -3807,6 +3807,7 @@ return [
         'status_approved' => 'Approvato',
         'approved_meta' => 'Approvato il :date da :name.',
         'card_title_default' => 'Bilancio preventivo',
+        'current_year_badge' => 'Anno in corso',
         'planned_expense' => 'Spese previste',
         'planned_income' => 'Entrate previste',
         'planned_need' => 'Fabbisogno previsto',

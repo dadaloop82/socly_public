@@ -14421,7 +14421,6 @@ select.is-remote-choice {
 }
 .budget-badge {
   display: inline-block;
-  margin-left: 0.45rem;
   padding: 0.15rem 0.55rem;
   border-radius: 999px;
   font-size: 0.72rem;
@@ -14431,6 +14430,10 @@ select.is-remote-choice {
 }
 .budget-badge.is-draft { background: color-mix(in srgb, #b54708 14%, transparent); color: #92400e; }
 .budget-badge.is-approved { background: color-mix(in srgb, #12805c 14%, transparent); color: #0f6b4d; }
+.budget-badge.is-current {
+  background: color-mix(in srgb, var(--brand-primary, #c45c26) 18%, transparent);
+  color: color-mix(in srgb, var(--brand-primary, #c45c26) 70%, #3b2114);
+}
 .budget-header-actions { display: flex; gap: 0.5rem; flex-wrap: wrap; align-items: center; }
 .budget-header-actions form { margin: 0; }
 .budget-locked-note {
@@ -14451,7 +14454,24 @@ select.is-remote-choice {
   margin-bottom: 1.25rem;
 }
 .budget-card { display: grid; gap: 0.75rem; padding: 0.95rem 1.05rem; }
+.budget-card.is-current-year {
+  background:
+    linear-gradient(
+      165deg,
+      color-mix(in srgb, var(--brand-primary, #c45c26) 14%, var(--panel, #fff)) 0%,
+      color-mix(in srgb, var(--brand-primary, #c45c26) 6%, var(--panel, #fff)) 55%,
+      var(--panel, #fff) 100%
+    );
+  border-color: color-mix(in srgb, var(--brand-primary, #c45c26) 35%, var(--line, #e5e1d8));
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--brand-primary, #c45c26) 12%, transparent);
+}
 .budget-card-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 0.5rem; }
+.budget-card-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  justify-content: flex-end;
+}
 .budget-card-year { margin: 0; font-size: 1.35rem; line-height: 1.1; }
 .budget-card-title { margin: 0.15rem 0 0; font-size: 0.82rem; }
 .budget-card-kpis {

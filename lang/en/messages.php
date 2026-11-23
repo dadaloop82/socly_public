@@ -2659,6 +2659,7 @@ return [
         'status_approved' => 'Approved',
         'approved_meta' => 'Approved on :date by :name.',
         'card_title_default' => 'Forecast budget',
+        'current_year_badge' => 'Current year',
         'planned_expense' => 'Planned expenses',
         'planned_income' => 'Planned income',
         'planned_need' => 'Planned funding need',

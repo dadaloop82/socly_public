@@ -2659,6 +2659,7 @@ return [
         'status_approved' => 'Genehmigt',
         'approved_meta' => 'Genehmigt am :date von :name.',
         'card_title_default' => 'Haushaltsvoranschlag',
+        'current_year_badge' => 'Laufendes Jahr',
         'planned_expense' => 'Geplante Ausgaben',
         'planned_income' => 'Geplante Einnahmen',
         'planned_need' => 'Geplanter Finanzbedarf',

@@ -62,7 +62,7 @@ final class BudgetService
     }
 
     /**
-     * Budgets with planned totals, newest year first.
+     * Budgets with planned totals, oldest year first (left → right on the Preventivo cards).
      *
      * @return list<array<string,mixed>>
      */
@@ -77,7 +77,7 @@ final class BudgetService
                               WHERE i.budget_id = b.id AND i.direction = 'income'), 0) AS planned_income
              FROM budgets b
              LEFT JOIN users u ON u.id = b.approved_by
-             ORDER BY b.fiscal_year DESC, b.id DESC"
+             ORDER BY b.fiscal_year ASC, b.id ASC"
         );
         foreach ($rows as &$row) {
             $row['planned_expense'] = (float) ($row['planned_expense'] ?? 0);

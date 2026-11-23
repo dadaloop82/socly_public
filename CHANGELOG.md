@@ -45,6 +45,8 @@ every 100 patches bump the series, and each bump is published to this rep come o
   has the most movements (the canonical target).
 - Gestione Controparti: each merge suggestion offers “Mostra questi movimenti” (secondary button)
   to open every spelling of the group in the movements dialog before aggregating.
+- Bilancio Preventivo: year cards oldest → newest; the current calendar year is highlighted when
+  a preventivo exists for it.
 
 ### Fixed
 
