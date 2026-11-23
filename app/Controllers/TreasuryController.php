@@ -313,6 +313,8 @@ final class TreasuryController extends BaseController
                 ['movement:' . (int) $movement['id']],
                 self::STATEMENT_SOURCE_SECTION
             )['movement:' . (int) $movement['id']] ?? [],
+            // Same ledger anomalies as the list warning mark: shown next to the relevant fields.
+            'movement_anomalies' => $this->treasury->ledgerAnomaliesById([(int) $movement['id']])[(int) $movement['id']] ?? [],
         ], $embed ? 'layouts/embed' : 'layouts/app');
     }
 

@@ -32,6 +32,12 @@ every 100 patches bump the series, and each bump is published to this rep come o
 - Documents: Estratti Conto list newest reference period first (year, then month).
 - Document repository: `annotate()` can update `original_name` so downloads match the archive title.
 
+### Changed
+
+- Treasury movement edit: statement excerpt opens in a zoomable popup (same UX as statement
+  verify) and the on-form preview is twice as large; open ledger anomalies show the triangle
+  mark next to the relevant fields with the reason on hover.
+
 ### Fixed
 
 - Bank-statement “check all statements”: percent and ETA cover both PDF compare and ritagli creation,

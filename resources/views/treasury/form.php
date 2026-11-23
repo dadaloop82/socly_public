@@ -240,6 +240,30 @@ if ($probe !== null && $movementId > 0) {
             'conflict' => $movement_conflict ?? null,
             'activity' => $movement_activity ?? null,
         ]) ?>
+        <?php
+        $formAnomalies = is_array($movement_anomalies ?? null) ? $movement_anomalies : [];
+        $formAnomalyLabels = [];
+        foreach ($formAnomalies as $formAnomaly) {
+            if (!is_array($formAnomaly)) {
+                continue;
+            }
+            $label = trim((string) ($formAnomaly['message'] ?? ''));
+            if ($label !== '') {
+                $formAnomalyLabels[] = $label;
+            }
+        }
+        $formAnomalyLabels = array_values(array_unique($formAnomalyLabels));
+        ?>
+        <?php if ($formAnomalyLabels !== []): ?>
+            <div class="setup-hint muted treasury-anomaly-notice" role="status">
+                <strong><?= e(__('treasury.anomaly_aria')) ?></strong>
+                <ul class="treasury-form-anomaly-list">
+                    <?php foreach ($formAnomalyLabels as $formAnomalyLabel): ?>
+                        <li><?= e($formAnomalyLabel) ?></li>
+                    <?php endforeach; ?>
+                </ul>
+            </div>
+        <?php endif; ?>
     <?php endif; ?>
     <?php require __DIR__ . '/_form_fields.php'; ?>
     <?= field('hidden', ['name' => 'ret', 'value' => $returnPath]) ?>

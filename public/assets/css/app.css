@@ -15741,11 +15741,18 @@ select.is-remote-choice {
 }
 .treasury-statement-crop {
   display: block;
-  width: min(100%, 320px);
+  width: min(100%, 640px);
+  margin: 0;
+  padding: 0;
   border: 1px solid var(--line, #d7e3df);
   border-radius: 10px;
   overflow: hidden;
   background: #fff;
+  color: inherit;
+  font: inherit;
+  cursor: zoom-in;
+  text-align: left;
+  appearance: none;
   transition: border-color 0.15s ease, box-shadow 0.15s ease;
 }
 .treasury-statement-crop:hover,
@@ -15757,6 +15764,58 @@ select.is-remote-choice {
   display: block;
   width: 100%;
   height: auto;
+}
+.treasury-crop-dialog {
+  width: min(1100px, 94vw);
+  height: 90vh;
+  padding: 0;
+  border: 1px solid var(--line, #d7e3df);
+  border-radius: 10px;
+  background: #fff;
+  overflow: hidden;
+}
+.treasury-crop-dialog::backdrop {
+  background: rgb(0 0 0 / 0.45);
+}
+.treasury-crop-dialog-head {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.6rem 0.8rem;
+  border-bottom: 1px solid var(--line, #d7e3df);
+}
+.treasury-crop-dialog-tools {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  align-items: center;
+}
+.treasury-crop-dialog-body {
+  height: calc(90vh - 3.5rem);
+  padding: 0.5rem;
+  overflow: auto;
+  background: #fff;
+}
+.treasury-crop-dialog-body img {
+  display: block;
+  width: 100%;
+  max-width: none;
+  height: auto;
+}
+.tmf-field-anomaly {
+  margin-left: 0.3rem;
+  vertical-align: middle;
+}
+.treasury-form-anomaly-list {
+  margin: 0.35rem 0 0;
+  padding-left: 1.1rem;
+}
+.treasury-statement-evidence .tmf-card-title {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
 }
 .treasury-row-statement {
   display: flex;

@@ -191,6 +191,7 @@ document.addEventListener('DOMContentLoaded', () => {
   initTreasuryRecurring();
   initTreasurySimilar();
   initTreasuryPatternHints();
+  initTreasuryStatementCropZoom();
   initTreasuryRuntsWizard();
   initTreasuryAdvancedFilters();
   initBudgetSectionSort();
@@ -2412,6 +2413,63 @@ function initTreasurySimilar() {
     actions.append(apply, dismiss);
     panel.appendChild(actions);
   }
+}
+
+/**
+ * Statement excerpt on the movement edit form: open in a zoomable dialog (same UX as the
+ * bank-statement verify screen). Ctrl/⌘ + wheel also zooms.
+ */
+function initTreasuryStatementCropZoom() {
+  const cropDialog = document.querySelector('[data-treasury-crop-dialog]');
+  if (!(cropDialog instanceof HTMLElement)) return;
+  const cropImage = cropDialog.querySelector('[data-treasury-crop-image]');
+  const cropBody = cropDialog.querySelector('[data-treasury-crop-body]');
+  let cropZoom = 1;
+  const applyCropZoom = (value) => {
+    cropZoom = Math.min(8, Math.max(1, Math.round(value * 10) / 10));
+    if (cropImage instanceof HTMLImageElement) {
+      cropImage.style.width = (cropZoom * 100) + '%';
+    }
+  };
+  const closeCrop = () => {
+    if (cropDialog instanceof HTMLDialogElement && typeof cropDialog.close === 'function') {
+      cropDialog.close();
+    } else {
+      cropDialog.removeAttribute('open');
+    }
+    if (cropImage instanceof HTMLImageElement) cropImage.removeAttribute('src');
+  };
+  document.querySelectorAll('[data-treasury-crop-open]').forEach((button) => {
+    button.addEventListener('click', () => {
+      if (!(cropImage instanceof HTMLImageElement)) return;
+      // Same guard as BSI verify: the empty dialog <img> is hidden by the broken-image helper
+      // until we set src — re-enable it before loading the excerpt.
+      cropImage.hidden = false;
+      cropImage.classList.remove('is-broken');
+      cropImage.src = button.getAttribute('data-src') || '';
+      applyCropZoom(1);
+      if (cropDialog instanceof HTMLDialogElement && typeof cropDialog.showModal === 'function') {
+        cropDialog.showModal();
+      } else {
+        cropDialog.setAttribute('open', 'open');
+      }
+    });
+  });
+  cropDialog.querySelector('[data-treasury-crop-zoom-in]')?.addEventListener('click', () => applyCropZoom(cropZoom + 0.5));
+  cropDialog.querySelector('[data-treasury-crop-zoom-out]')?.addEventListener('click', () => applyCropZoom(cropZoom - 0.5));
+  cropDialog.querySelector('[data-treasury-crop-reset]')?.addEventListener('click', () => applyCropZoom(1));
+  cropDialog.querySelector('[data-treasury-crop-close]')?.addEventListener('click', closeCrop);
+  cropDialog.addEventListener('click', (event) => {
+    if (event.target === cropDialog) closeCrop();
+  });
+  cropDialog.addEventListener('close', () => {
+    if (cropImage instanceof HTMLImageElement) cropImage.removeAttribute('src');
+  });
+  cropBody?.addEventListener('wheel', (event) => {
+    if (!event.ctrlKey && !event.metaKey) return;
+    event.preventDefault();
+    applyCropZoom(cropZoom + (event.deltaY < 0 ? 0.25 : -0.25));
+  }, { passive: false });
 }
 
 /**

@@ -81,6 +81,49 @@ $fileReady = $hasAttachment;
 $patternSlot = static fn (string $field): string => '<span class="tmf-pattern-slot" data-tmf-pattern-field="'
     . e($field) . '"></span>';
 
+// Ledger anomalies (duplicate / future date / missing Model D / missing excerpt…): same triangle
+// mark as the cash-book list, pinned next to the field that needs attention.
+$movementAnomalies = is_array($movement_anomalies ?? null) ? $movement_anomalies : [];
+$anomalyByField = [];
+foreach ($movementAnomalies as $anomalyItem) {
+    if (!is_array($anomalyItem)) {
+        continue;
+    }
+    $code = (string) ($anomalyItem['code'] ?? '');
+    $message = trim((string) ($anomalyItem['message'] ?? ''));
+    if ($message === '') {
+        continue;
+    }
+    $targets = match ($code) {
+        'future_date' => ['movement_date'],
+        'no_runts' => ['runts_line'],
+        'missing_excerpt' => ['statement_evidence'],
+        'duplicate' => ['amount', 'movement_date', 'description', 'beneficiary'],
+        'classification' => [], // already covered by the pattern warning buttons
+        default => [],
+    };
+    foreach ($targets as $targetField) {
+        $anomalyByField[$targetField][] = $message;
+    }
+}
+$anomalyMark = static function (string $field) use ($anomalyByField): string {
+    $messages = $anomalyByField[$field] ?? [];
+    if ($messages === []) {
+        return '';
+    }
+    $text = implode(' · ', array_values(array_unique($messages)));
+
+    return '<span class="member-anomaly-mark is-static tmf-field-anomaly"'
+        . ' tabindex="0" role="img"'
+        . ' aria-label="' . e(__('treasury.anomaly_aria') . ': ' . $text) . '"'
+        . ' title="' . e($text) . '">'
+        . '<svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true" focusable="false">'
+        . '<path fill="currentColor" d="M12 3.2 22 20.5H2L12 3.2zm0 5.3c-.7 0-1.2.5-1.1 1.2l.4 5.1h1.4l.4-5.1c.1-.7-.4-1.2-1.1-1.2zm0 8.3a1.15 1.15 0 1 0 0 2.3 1.15 1.15 0 0 0 0-2.3z"/>'
+        . '</svg>'
+        . '<span class="member-anomaly-tooltip">' . e($text) . '</span>'
+        . '</span>';
+};
+
 $treasuryCategoryGroups = [];
 $treasuryCategoryFlat = [];
 if ($categoryGroups !== []) {
@@ -246,6 +289,7 @@ foreach ($members as $member) {
             <?= field('text', [
                 'name' => 'amount',
                 'label' => (string) __('treasury.amount'),
+                'label_extra' => $anomalyMark('amount'),
                 'value' => $displayAmount,
                 'required' => true,
                 'placeholder' => '0,00',
@@ -255,6 +299,7 @@ foreach ($members as $member) {
         <?= field('date', [
             'name' => 'movement_date',
             'label' => (string) __('treasury.operation_date'),
+            'label_extra' => $anomalyMark('movement_date'),
             'value' => (string) ($values['movement_date'] ?? $today),
             'required' => true,
         ]) ?>
@@ -285,7 +330,7 @@ foreach ($members as $member) {
         <?= field('select', [
             'name' => 'payment_method',
             'label' => (string) __('treasury.payment_method_label'),
-            'label_extra' => $patternSlot('payment_method'),
+            'label_extra' => $patternSlot('payment_method') . $anomalyMark('payment_method'),
             'value' => $selectedMethod,
             'include_empty' => true,
             'empty_label' => (string) __('treasury.method_unspecified'),
@@ -333,6 +378,7 @@ foreach ($members as $member) {
             <?= field('text', [
                 'name' => 'beneficiary',
                 'label' => (string) __('treasury.counterparty'),
+                'label_extra' => $anomalyMark('beneficiary'),
                 'value' => (string) ($values['beneficiary'] ?? ''),
                 'maxlength' => 190,
                 'placeholder' => (string) __('treasury.supplier_placeholder'),
@@ -409,7 +455,7 @@ if (array_key_exists('has_document', $values)) {
         <?= field('select', [
             'name' => 'category',
             'label' => (string) __('treasury.category'),
-            'label_extra' => $patternSlot('category'),
+            'label_extra' => $patternSlot('category') . $anomalyMark('category'),
             'value' => $selectedCategory,
             'include_empty' => false,
             'groups' => $treasuryCategoryGroups !== [] ? $treasuryCategoryGroups : null,
@@ -458,7 +504,7 @@ if (array_key_exists('has_document', $values)) {
         <?= field('select', [
             'name' => 'runts_line',
             'label' => (string) __('runts.line_label'),
-            'label_extra' => $runtsWizardButton . $patternSlot('runts_line'),
+            'label_extra' => $runtsWizardButton . $patternSlot('runts_line') . $anomalyMark('runts_line'),
             'wrapper_class' => 'runts-line-field',
             'value' => (string) ($values['runts_line'] ?? ''),
             'include_empty' => true,
@@ -501,7 +547,7 @@ if (array_key_exists('has_document', $values)) {
                 <?= field('select', [
                     'name' => 'budget_item_id',
                     'label' => (string) __('treasury.budget_item'),
-                    'label_extra' => $patternSlot('budget_item_id'),
+                    'label_extra' => $patternSlot('budget_item_id') . $anomalyMark('budget_item_id'),
                     'value' => (string) ($values['budget_item_id'] ?? ''),
                     'empty_label' => (string) __('treasury.budget_item_none'),
                     'options' => $budgetItemOptions,
@@ -515,6 +561,7 @@ if (array_key_exists('has_document', $values)) {
         <?= field('textarea', [
             'name' => 'description',
             'label' => (string) __('treasury.description'),
+            'label_extra' => $anomalyMark('description'),
             'value' => (string) ($values['description'] ?? ''),
             'maxlength' => 500,
             'rows' => 4,
@@ -672,21 +719,47 @@ if (array_key_exists('has_document', $values)) {
 <?php
 $statementCrops = is_array($statement_crops ?? null) ? $statement_crops : [];
 ?>
-<?php if (!empty($isEdit) && $statementCrops !== []): ?>
+<?php if (!empty($isEdit) && ($statementCrops !== [] || isset($anomalyByField['statement_evidence']))): ?>
 <section class="tmf-card treasury-statement-evidence">
     <header class="tmf-card-head">
-        <h2 class="tmf-card-title"><?= e(__('treasury.statement_evidence_title')) ?></h2>
+        <h2 class="tmf-card-title">
+            <?= e(__('treasury.statement_evidence_title')) ?>
+            <?= $anomalyMark('statement_evidence') ?>
+        </h2>
     </header>
     <p class="section-lede"><?= e(__('treasury.statement_evidence_hint')) ?></p>
+    <?php if ($statementCrops !== []): ?>
     <div class="treasury-statement-crops">
         <?php foreach ($statementCrops as $statementCrop): ?>
             <?php $statementCropId = (int) ($statementCrop['id'] ?? 0); ?>
             <?php if ($statementCropId < 1) { continue; } ?>
-            <a class="treasury-statement-crop" href="<?= e(url('/treasury/excerpt/' . $statementCropId)) ?>" target="_blank" rel="noopener" title="<?= e(__('treasury.statement_evidence_preview')) ?>">
-                <img src="<?= e(url('/treasury/excerpt/' . $statementCropId)) ?>" alt="<?= e(__('treasury.statement_evidence_alt')) ?>" loading="lazy">
-            </a>
+            <?php $cropSrc = url('/treasury/excerpt/' . $statementCropId); ?>
+            <button type="button" class="treasury-statement-crop" data-treasury-crop-open
+                data-src="<?= e($cropSrc) ?>"
+                title="<?= e(__('treasury.statement_evidence_preview')) ?>"
+                aria-label="<?= e(__('treasury.statement_evidence_preview')) ?>">
+                <img src="<?= e($cropSrc) ?>" alt="<?= e(__('treasury.statement_evidence_alt')) ?>" loading="lazy">
+            </button>
         <?php endforeach; ?>
     </div>
+    <dialog class="treasury-crop-dialog" data-treasury-crop-dialog>
+        <header class="treasury-crop-dialog-head">
+            <strong><?= e(__('treasury.statement_evidence_title')) ?></strong>
+            <div class="treasury-crop-dialog-tools">
+                <button type="button" class="btn btn-sm btn-ghost" data-treasury-crop-zoom-out
+                    aria-label="<?= e(__('treasury.statement_crop_zoom_out')) ?>" title="<?= e(__('treasury.statement_crop_zoom_out')) ?>">−</button>
+                <button type="button" class="btn btn-sm btn-ghost" data-treasury-crop-reset
+                    title="<?= e(__('treasury.statement_crop_reset')) ?>">100%</button>
+                <button type="button" class="btn btn-sm btn-ghost" data-treasury-crop-zoom-in
+                    aria-label="<?= e(__('treasury.statement_crop_zoom_in')) ?>" title="<?= e(__('treasury.statement_crop_zoom_in')) ?>">+</button>
+                <button type="button" class="btn btn-sm btn-ghost" data-treasury-crop-close><?= e(__('treasury.statement_crop_close')) ?></button>
+            </div>
+        </header>
+        <div class="treasury-crop-dialog-body" data-treasury-crop-body>
+            <img data-treasury-crop-image alt="<?= e(__('treasury.statement_evidence_alt')) ?>">
+        </div>
+    </dialog>
+    <?php endif; ?>
     <?php if (can('documents.view')): ?>
         <p class="muted">
             <a href="<?= e(url('/documents?section=bank_statement_import')) ?>" target="_blank" rel="noopener"><?= e(__('treasury.statement_evidence_open')) ?></a>
