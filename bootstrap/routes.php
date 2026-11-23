@@ -183,6 +183,7 @@ $router->get('/treasury/supplier-movements', [TreasuryController::class, 'suppli
 $router->get('/treasury/loans', [TreasuryController::class, 'loans'], 'treasury.view', ['mw.locale', 'mw.install', 'mw.auth']);
 $router->get('/treasury/deposits', [TreasuryController::class, 'deposits'], 'treasury.view', ['mw.locale', 'mw.install', 'mw.auth']);
 $router->get('/treasury/accounts/balances', [TreasuryController::class, 'accountBalances'], 'treasury.view', ['mw.locale', 'mw.install', 'mw.auth']);
+$router->get('/treasury/budget-items', [TreasuryController::class, 'budgetItemsForDate'], 'treasury.view', ['mw.locale', 'mw.install', 'mw.auth']);
 // Bank-statement excerpts linked to a movement: readable with treasury.view, whatever the role's
 // access to the document archive.
 $router->get('/treasury/excerpt/{id}', [TreasuryController::class, 'statementExcerpt'], 'treasury.view', ['mw.locale', 'mw.install', 'mw.auth']);

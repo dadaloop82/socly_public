@@ -537,6 +537,7 @@ if (array_key_exists('has_document', $values)) {
                         'data-category' => (string) ($budgetOption['category'] ?? ''),
                         'data-direction' => (string) ($budgetOption['direction'] ?? ''),
                         'data-section' => $budgetSection,
+                        'data-year' => (string) ($budgetOption['year'] ?? ''),
                     ],
                 ];
             }

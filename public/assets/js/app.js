@@ -18456,7 +18456,14 @@ function initTreasuryBudgetImpute(scope = document) {
   form.dataset.budgetImputeBound = '1';
   const select = form.querySelector('[data-treasury-budget-item]');
   const category = form.querySelector('[data-treasury-category]');
+  const dateInput = form.querySelector('[name="movement_date"]');
+  const directionRadios = [...form.querySelectorAll('[data-treasury-direction]')];
   if (!select || !category) return;
+  const emptyLabel = (() => {
+    const first = select.options[0];
+    return first && first.value === '' ? String(first.textContent || '').trim() : '';
+  })();
+  let loadedYear = '';
   // The option label carries “section · line”, which can be wider than the control: keep the full
   // text reachable as a tooltip instead of losing it to the clipping.
   const syncTitle = () => {
@@ -18465,13 +18472,22 @@ function initTreasuryBudgetImpute(scope = document) {
     if (label === '') select.removeAttribute('title');
     else select.setAttribute('title', label);
   };
-  select.addEventListener('change', syncTitle);
-  syncTitle();
-  category.addEventListener('change', () => {
+  const yearOf = (raw) => {
+    const match = String(raw || '').trim().match(/^(\d{4})-/);
+    return match ? match[1] : '';
+  };
+  const currentDirection = () => {
+    const checked = directionRadios.find((radio) => radio instanceof HTMLInputElement && radio.checked);
+    return checked instanceof HTMLInputElement ? checked.value : '';
+  };
+  const proposeFromCategory = () => {
     const current = select.options[select.selectedIndex];
     const currentCat = current ? String(current.dataset.category || '') : '';
     // Keep a manual cost centre only when it already matches this category; otherwise propose again.
-    if (select.value && currentCat && currentCat === category.value) return;
+    if (select.value && currentCat && currentCat === category.value) {
+      syncTitle();
+      return;
+    }
     const matches = Array.from(select.options).filter(
       (option) => option.dataset.category && option.dataset.category === category.value
     );
@@ -18481,6 +18497,62 @@ function initTreasuryBudgetImpute(scope = document) {
       select.value = '';
     }
     syncTitle();
+  };
+  const rebuildOptions = (options, selected) => {
+    const keep = selected || select.value || '';
+    select.innerHTML = '';
+    const blank = document.createElement('option');
+    blank.value = '';
+    blank.textContent = emptyLabel;
+    select.appendChild(blank);
+    (Array.isArray(options) ? options : []).forEach((row) => {
+      const option = document.createElement('option');
+      option.value = String(row.value || '');
+      option.textContent = String(row.label || '');
+      if (row.category) option.dataset.category = String(row.category);
+      if (row.direction) option.dataset.direction = String(row.direction);
+      if (row.year) option.dataset.year = String(row.year);
+      select.appendChild(option);
+    });
+    if (keep && Array.from(select.options).some((option) => option.value === keep)) {
+      select.value = keep;
+    } else {
+      select.value = '';
+      proposeFromCategory();
+      return;
+    }
+    syncTitle();
+  };
+  const refreshForDate = async () => {
+    const endpoint = form.getAttribute('data-budget-items-url') || '';
+    if (endpoint === '' || !(dateInput instanceof HTMLInputElement)) return;
+    const year = yearOf(dateInput.value);
+    if (year === '' || year === loadedYear) return;
+    loadedYear = year;
+    const params = new URLSearchParams({
+      date: dateInput.value,
+      assigned: select.value || '0',
+      category: category.value || '',
+      direction: currentDirection(),
+    });
+    try {
+      const response = await fetch(`${endpoint}?${params.toString()}`, { credentials: 'same-origin' });
+      const data = await response.json();
+      if (!data?.ok || !Array.isArray(data.options)) return;
+      rebuildOptions(data.options, data.selected || '');
+    } catch {
+      // Keep the options already rendered with the page.
+    }
+  };
+  select.addEventListener('change', syncTitle);
+  syncTitle();
+  loadedYear = dateInput instanceof HTMLInputElement ? yearOf(dateInput.value) : '';
+  category.addEventListener('change', proposeFromCategory);
+  dateInput?.addEventListener('change', () => {
+    refreshForDate();
+  });
+  dateInput?.addEventListener('blur', () => {
+    refreshForDate();
   });
 }
 

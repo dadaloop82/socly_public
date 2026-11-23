@@ -198,6 +198,7 @@ if ($probe !== null && $movementId > 0) {
       <?php if (!$isEdit): ?>data-confirm-template="<?= e(__('treasury.confirm_summary')) ?>"<?php endif; ?>
       data-base-currency="<?= e($currency->code()) ?>"
       data-account-balances-url="<?= e(url('/treasury/accounts/balances')) ?>"
+      data-budget-items-url="<?= e(url('/treasury/budget-items')) ?>"
       data-msg-account-option="<?= e(__('treasury.account_option_balance')) ?>"
       data-msg-doc-loaded="<?= e(__('treasury.document_loaded')) ?>"
       data-msg-doc-idle="<?= e(__('documents.upload_idle')) ?>"

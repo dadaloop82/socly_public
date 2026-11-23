@@ -200,6 +200,16 @@ final class TreasuryController extends BaseController
             ? $requestedDirection
             : 'income';
         $prefill = $this->createPrefillFromRequest($request, $defaultCategory, $defaultDirection);
+        $budgetSource = is_array($prefill) ? $prefill : [
+            'movement_date' => date('Y-m-d'),
+            'category' => $defaultCategory,
+            'direction' => $defaultDirection,
+            'budget_item_id' => null,
+        ];
+        $budgetItems = $this->budgetItemsAlignedToMovement($budgetSource);
+        if (is_array($prefill)) {
+            $prefill['budget_item_id'] = $budgetSource['budget_item_id'] ?? ($prefill['budget_item_id'] ?? null);
+        }
         $this->render('treasury/form', [
             'title' => __('treasury.add_movement'),
             'isEdit' => false,
@@ -218,13 +228,58 @@ final class TreasuryController extends BaseController
             'config' => $this->components->config('treasury', ['auto_from_payments' => true]),
             'beneficiaries' => $this->treasury->beneficiaries(),
             'currency' => $this->currency,
-            'budget_items' => $this->budgets->itemOptionsForMovement(
-                (int) substr((string) ($prefill['movement_date'] ?? date('Y-m-d')), 0, 4)
-            ),
+            'budget_items' => $budgetItems,
             'repository_documents' => $this->files->listForPicker('treasury', '', null, 80),
             'embed' => $embed,
             'embed_saved' => $embedSaved,
         ], $embed ? 'layouts/embed' : 'layouts/app');
+    }
+
+    /**
+     * Cost centres for the movement form, keyed to the year of the given date (JSON for live refresh).
+     */
+    public function budgetItemsForDate(Request $request): void
+    {
+        require_component('treasury');
+        $date = $this->isoDate((string) $request->input('date', ''));
+        if ($date === '') {
+            $date = date('Y-m-d');
+        }
+        $year = (int) substr($date, 0, 4);
+        $assigned = max(0, (int) $request->input('assigned', 0));
+        $category = trim((string) $request->input('category', ''));
+        $direction = (string) $request->input('direction', '');
+        if ($assigned > 0) {
+            $assigned = $this->budgets->alignItemToYear($assigned, $year, $category, $direction);
+        }
+        $groups = $this->budgets->itemOptionsForMovement($year, $assigned);
+        $options = [];
+        foreach ($groups as $group) {
+            $section = trim((string) ($group['label'] ?? ''));
+            foreach (($group['options'] ?? []) as $option) {
+                $item = trim((string) ($option['label'] ?? ''));
+                $label = $section !== '' && $item !== ''
+                    ? $section . ' · ' . $item
+                    : ($item !== '' ? $item : $section);
+                if ($label === '') {
+                    continue;
+                }
+                $options[] = [
+                    'value' => (string) ($option['value'] ?? ''),
+                    'label' => $label,
+                    'category' => (string) ($option['category'] ?? ''),
+                    'direction' => (string) ($option['direction'] ?? ''),
+                    'year' => (string) ($option['year'] ?? $year),
+                ];
+            }
+        }
+        header('Content-Type: application/json; charset=utf-8');
+        echo json_encode([
+            'ok' => true,
+            'year' => $year,
+            'selected' => $assigned > 0 ? (string) $assigned : '',
+            'options' => $options,
+        ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
     }
 
     public function edit(Request $request, string $id): void
@@ -306,10 +361,7 @@ final class TreasuryController extends BaseController
             'config' => $this->components->config('treasury', ['auto_from_payments' => true]),
             'beneficiaries' => $this->treasury->beneficiaries(),
             'currency' => $this->currency,
-            'budget_items' => $this->budgets->itemOptionsForMovement(
-                (int) substr((string) ($movement['movement_date'] ?? date('Y-m-d')), 0, 4),
-                (int) ($movement['budget_item_id'] ?? 0)
-            ),
+            'budget_items' => $this->budgetItemsAlignedToMovement($movement),
             'pattern_profile' => $this->treasury->classificationProfile($movement, (int) $movement['id'], 24),
             'embed' => $embed,
             'embed_saved' => $embedSaved,
@@ -374,10 +426,7 @@ final class TreasuryController extends BaseController
             'config' => $this->components->config('treasury', ['auto_from_payments' => true]),
             'beneficiaries' => $this->treasury->beneficiaries(),
             'currency' => $this->currency,
-            'budget_items' => $this->budgets->itemOptionsForMovement(
-                (int) date('Y'),
-                (int) ($movement['budget_item_id'] ?? 0)
-            ),
+            'budget_items' => $this->budgetItemsAlignedToMovement($copy),
         ]);
     }
 
@@ -1636,6 +1685,31 @@ final class TreasuryController extends BaseController
         }
 
         return $path . (str_contains($path, '?') ? '&' : '?') . http_build_query($params);
+    }
+
+    /**
+     * Cost centres for the movement year (preventivo of that year when it exists). Aligns any
+     * already stored line onto that year before the select is rendered.
+     *
+     * @param array<string,mixed> $movement
+     * @return list<array{label:string,options:list<array{value:string,label:string,direction:string,category:string,year?:string}>}>
+     */
+    private function budgetItemsAlignedToMovement(array &$movement): array
+    {
+        $date = (string) ($movement['movement_date'] ?? date('Y-m-d'));
+        $year = (int) substr($date !== '' ? $date : date('Y-m-d'), 0, 4);
+        $assigned = (int) ($movement['budget_item_id'] ?? 0);
+        $aligned = $this->budgets->alignItemToYear(
+            $assigned,
+            $year,
+            (string) ($movement['category'] ?? ''),
+            (string) ($movement['direction'] ?? '')
+        );
+        if ($aligned !== $assigned) {
+            $movement['budget_item_id'] = $aligned > 0 ? $aligned : null;
+        }
+
+        return $this->budgets->itemOptionsForMovement($year, $aligned);
     }
 
     /**

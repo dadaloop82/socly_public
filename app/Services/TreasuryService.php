@@ -1968,6 +1968,75 @@ final class TreasuryService
     }
 
     /**
+     * When the movement year already has a preventivo, never keep a cost centre from another year:
+     * remap by category (unique) or by the same label, otherwise clear.
+     */
+    public function coerceBudgetItemForDate(int $budgetItemId, string $movementDate, string $category, string $direction): int
+    {
+        if (preg_match('/^\d{4}-\d{2}-\d{2}/', $movementDate) !== 1) {
+            return max(0, $budgetItemId);
+        }
+        $year = (int) substr($movementDate, 0, 4);
+        if ($year < 1) {
+            return max(0, $budgetItemId);
+        }
+        $hasYearBudget = $this->db->fetch('SELECT id FROM budgets WHERE fiscal_year = :y', ['y' => $year]) !== null;
+        if (!$hasYearBudget) {
+            return max(0, $budgetItemId);
+        }
+        $owner = null;
+        if ($budgetItemId > 0) {
+            $owner = $this->db->fetch(
+                'SELECT b.fiscal_year, i.label, i.direction
+                 FROM budget_items i
+                 INNER JOIN budgets b ON b.id = i.budget_id
+                 WHERE i.id = :id',
+                ['id' => $budgetItemId]
+            );
+            if ($owner !== null && (int) ($owner['fiscal_year'] ?? 0) === $year) {
+                return $budgetItemId;
+            }
+        }
+        $resolved = $this->resolveBudgetItemId($category, $direction, substr($movementDate, 0, 10));
+        if ($resolved !== null) {
+            return $resolved;
+        }
+        if ($budgetItemId < 1 || $owner === null) {
+            return 0;
+        }
+        $label = trim((string) ($owner['label'] ?? ''));
+        if ($label === '') {
+            return 0;
+        }
+        $params = ['y' => $year, 'label' => $label];
+        $dirSql = '';
+        $sourceDir = (string) ($owner['direction'] ?? '');
+        if (in_array($sourceDir, ['income', 'expense'], true)) {
+            $dirSql = ' AND i.direction = :dir';
+            $params['dir'] = $sourceDir;
+        }
+        try {
+            $matches = $this->db->fetchAll(
+                'SELECT i.id
+                 FROM budget_items i
+                 INNER JOIN budgets b ON b.id = i.budget_id
+                 WHERE b.fiscal_year = :y
+                   AND i.label = :label' . $dirSql . '
+                 ORDER BY i.id ASC
+                 LIMIT 3',
+                $params
+            );
+        } catch (\Throwable) {
+            return 0;
+        }
+        if (count($matches) !== 1) {
+            return 0;
+        }
+
+        return max(0, (int) ($matches[0]['id'] ?? 0));
+    }
+
+    /**
      * Link approved unallocated movements to the unique matching budget line for that year.
      * Called when opening preventivo vs consuntivo so the actuals refresh without a manual re-save.
      */
@@ -3148,7 +3217,13 @@ final class TreasuryService
                 $current = (int) ($row['budget_item_id'] ?? 0);
                 $original = (int) ($originals['budget_item_id'] ?? 0);
                 if ($current === 0 || $current === $original) {
-                    $update['budget_item_id'] = $payload['budget_item_id'];
+                    $nextCategory = trim((string) ($update['category'] ?? ($row['category'] ?? '')));
+                    $update['budget_item_id'] = $this->coerceBudgetItemForDate(
+                        (int) $payload['budget_item_id'],
+                        (string) ($row['movement_date'] ?? ''),
+                        $nextCategory,
+                        (string) ($row['direction'] ?? 'expense')
+                    ) ?: null;
                 }
             }
             // Changing the category (or leaving the cost centre empty) should still feed the
@@ -3163,6 +3238,17 @@ final class TreasuryService
                 );
                 if ($resolved !== null) {
                     $update['budget_item_id'] = $resolved;
+                }
+            } elseif ($nextBudget > 0 && (string) ($row['direction'] ?? '') !== 'transfer') {
+                $nextCategory = trim((string) ($update['category'] ?? ($row['category'] ?? '')));
+                $aligned = $this->coerceBudgetItemForDate(
+                    $nextBudget,
+                    (string) ($row['movement_date'] ?? ''),
+                    $nextCategory,
+                    (string) ($row['direction'] ?? 'expense')
+                );
+                if ($aligned !== $nextBudget) {
+                    $update['budget_item_id'] = $aligned > 0 ? $aligned : null;
                 }
             }
             if ($update !== []) {
@@ -4276,18 +4362,39 @@ final class TreasuryService
                 }
                 $update[$field] = $value;
             }
-            // Category set without a cost centre: link to the unique matching budget line for the year.
-            if (!$isTransfer && !array_key_exists('budget_item_id', $update)) {
-                $nextBudget = (int) ($row['budget_item_id'] ?? 0);
-                if ($nextBudget < 1) {
-                    $nextCategory = trim((string) ($update['category'] ?? ($row['category'] ?? '')));
-                    $resolved = $this->resolveBudgetItemId(
+            // Cost centre must follow the movement year whenever that year has a preventivo.
+            if (!$isTransfer) {
+                $nextCategory = trim((string) ($update['category'] ?? ($row['category'] ?? '')));
+                $movementDate = (string) ($row['movement_date'] ?? '');
+                if (array_key_exists('budget_item_id', $update)) {
+                    $aligned = $this->coerceBudgetItemForDate(
+                        (int) ($update['budget_item_id'] ?? 0),
+                        $movementDate,
                         $nextCategory,
-                        (string) ($row['direction'] ?? 'expense'),
-                        (string) ($row['movement_date'] ?? '')
+                        (string) ($row['direction'] ?? 'expense')
                     );
-                    if ($resolved !== null) {
-                        $update['budget_item_id'] = $resolved;
+                    $update['budget_item_id'] = $aligned > 0 ? $aligned : null;
+                } else {
+                    $nextBudget = (int) ($row['budget_item_id'] ?? 0);
+                    if ($nextBudget < 1) {
+                        $resolved = $this->resolveBudgetItemId(
+                            $nextCategory,
+                            (string) ($row['direction'] ?? 'expense'),
+                            $movementDate
+                        );
+                        if ($resolved !== null) {
+                            $update['budget_item_id'] = $resolved;
+                        }
+                    } else {
+                        $aligned = $this->coerceBudgetItemForDate(
+                            $nextBudget,
+                            $movementDate,
+                            $nextCategory,
+                            (string) ($row['direction'] ?? 'expense')
+                        );
+                        if ($aligned !== $nextBudget) {
+                            $update['budget_item_id'] = $aligned > 0 ? $aligned : null;
+                        }
                     }
                 }
             }
@@ -4602,6 +4709,13 @@ final class TreasuryService
             if ($exists === null) {
                 return ['ok' => false, 'errors' => ['budget_item_id' => __('validation.in')]];
             }
+            // Never keep a preventivo line from another year when this year already has a budget.
+            $budgetItemId = $this->coerceBudgetItemForDate(
+                $budgetItemId,
+                $date,
+                (string) $categoryResult['key'],
+                $direction
+            );
         }
         // Category alone should drive the consuntivo when it uniquely identifies a budget line
         // for that year (the form JS does the same; the server must not rely on it).

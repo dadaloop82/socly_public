@@ -967,6 +967,12 @@ final class BudgetService
         return (int) ($row['fiscal_year'] ?? 0);
     }
 
+    /** True when a preventivo exists for that fiscal year. */
+    public function hasBudgetForYear(int $year): bool
+    {
+        return $year > 0 && $this->db->fetch('SELECT id FROM budgets WHERE fiscal_year = :y', ['y' => $year]) !== null;
+    }
+
     /**
      * Closest budget year to the given one (the later one wins a tie), 0 when no budget exists.
      */
@@ -990,26 +996,116 @@ final class BudgetService
     }
 
     /**
+     * Map a cost centre onto the preventivo of `$year` when that year has a budget.
+     * Same category (unique) wins; otherwise the same label in that year. Returns 0 when the year
+     * has a budget but no counterpart — never keep a 2026 line on a 2025 movement.
+     */
+    public function alignItemToYear(int $itemId, int $year, string $category = '', string $direction = ''): int
+    {
+        if ($year < 1) {
+            return max(0, $itemId);
+        }
+        if (!$this->hasBudgetForYear($year)) {
+            // No preventivo for the movement year: keep the (labelled) fallback choice.
+            return max(0, $itemId);
+        }
+        if ($itemId > 0 && $this->itemYear($itemId) === $year) {
+            return $itemId;
+        }
+        $direction = $direction === 'income' ? 'income' : ($direction === 'expense' ? 'expense' : '');
+        $category = trim($category);
+        if ($category !== '' && $direction !== '') {
+            try {
+                $rows = $this->db->fetchAll(
+                    'SELECT i.id
+                     FROM budget_items i
+                     INNER JOIN budgets b ON b.id = i.budget_id
+                     WHERE b.fiscal_year = :y
+                       AND i.direction = :dir
+                       AND i.category = :cat
+                     ORDER BY i.id ASC
+                     LIMIT 3',
+                    ['y' => $year, 'dir' => $direction, 'cat' => $category]
+                );
+            } catch (\Throwable) {
+                $rows = [];
+            }
+            if (count($rows) === 1) {
+                $id = (int) ($rows[0]['id'] ?? 0);
+                if ($id > 0) {
+                    return $id;
+                }
+            }
+        }
+        if ($itemId < 1) {
+            return 0;
+        }
+        $source = $this->db->fetch(
+            'SELECT i.label, i.direction FROM budget_items i WHERE i.id = :id',
+            ['id' => $itemId]
+        );
+        $label = trim((string) ($source['label'] ?? ''));
+        if ($label === '') {
+            return 0;
+        }
+        $params = ['y' => $year, 'label' => $label];
+        $dirSql = '';
+        $sourceDir = (string) ($source['direction'] ?? '');
+        if (in_array($sourceDir, ['income', 'expense'], true)) {
+            $dirSql = ' AND i.direction = :dir';
+            $params['dir'] = $sourceDir;
+        }
+        try {
+            $matches = $this->db->fetchAll(
+                'SELECT i.id
+                 FROM budget_items i
+                 INNER JOIN budgets b ON b.id = i.budget_id
+                 WHERE b.fiscal_year = :y
+                   AND i.label = :label' . $dirSql . '
+                 ORDER BY i.id ASC
+                 LIMIT 3',
+                $params
+            );
+        } catch (\Throwable) {
+            $matches = [];
+        }
+        if (count($matches) === 1) {
+            $id = (int) ($matches[0]['id'] ?? 0);
+            if ($id > 0) {
+                return $id;
+            }
+        }
+
+        return 0;
+    }
+
+    /**
      * Cost centres offered on a movement of the given year.
      *
-     * The budget of the reference year is used as-is. When that year has no budget the closest one
-     * is offered instead (labelled with its year), because the field must not disappear just because
-     * the association budgeted another year. A cost centre already assigned to the movement is
-     * always kept in the list, even when it belongs to a different budget.
+     * The preventivo of the movement year is used whenever it exists. Only when that year has no
+     * budget the closest one is offered instead (always labelled with its year). A cost centre
+     * already assigned is kept only when it belongs to the listed budget (or the year has none).
      *
-     * @return list<array{label:string,options:list<array{value:string,label:string,direction:string,category:string}>}>
+     * @return list<array{label:string,options:list<array{value:string,label:string,direction:string,category:string,year:string}>}>
      */
     public function itemOptionsForMovement(int $year, int $assignedItemId = 0): array
     {
+        $sourceYear = $year;
         $groups = $this->itemOptions($year);
-        $fallbackYear = 0;
         if ($groups === []) {
             $fallbackYear = $this->nearestBudgetYear($year);
             if ($fallbackYear > 0 && $fallbackYear !== $year) {
+                $sourceYear = $fallbackYear;
                 $groups = $this->itemOptions($fallbackYear);
-                foreach ($groups as $index => $group) {
-                    $groups[$index]['label'] = $fallbackYear . ' · ' . $group['label'];
-                }
+            }
+        }
+        foreach ($groups as $index => $group) {
+            $section = trim((string) ($group['label'] ?? ''));
+            $groups[$index]['label'] = $section !== ''
+                ? $sourceYear . ' · ' . $section
+                : (string) $sourceYear;
+            foreach ($groups[$index]['options'] as $optIndex => $option) {
+                $groups[$index]['options'][$optIndex]['year'] = (string) $sourceYear;
             }
         }
         if ($assignedItemId < 1) {
@@ -1022,7 +1118,11 @@ final class BudgetService
                 }
             }
         }
-        // The movement is imputed to a cost centre outside the listed budget: keep it selectable.
+        // Wrong-year assignment while this year has a preventivo: do not re-offer the foreign line.
+        if ($this->hasBudgetForYear($year) && $this->itemYear($assignedItemId) !== $year) {
+            return $groups;
+        }
+        // No preventivo for the year (fallback list) or the line vanished: keep it selectable.
         $ownerYear = $this->itemYear($assignedItemId);
         if ($ownerYear < 1) {
             return $groups;
@@ -1030,8 +1130,10 @@ final class BudgetService
         foreach ($this->itemOptions($ownerYear) as $group) {
             foreach ($group['options'] as $option) {
                 if ((int) ($option['value'] ?? 0) === $assignedItemId) {
+                    $option['year'] = (string) $ownerYear;
+                    $section = trim((string) ($group['label'] ?? ''));
                     $groups[] = [
-                        'label' => ($ownerYear === $year ? '' : $ownerYear . ' · ') . (string) $group['label'],
+                        'label' => $section !== '' ? $ownerYear . ' · ' . $section : (string) $ownerYear,
                         'options' => [$option],
                     ];
                     return $groups;
