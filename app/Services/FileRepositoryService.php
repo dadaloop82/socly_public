@@ -269,12 +269,52 @@ final class FileRepositoryService
             return null;
         }
 
-        return $this->db->fetch(
+        $existing = $this->db->fetch(
             'SELECT * FROM association_documents
               WHERE content_hash = :hash AND deleted_at IS NULL
               ORDER BY id ASC LIMIT 1',
             ['hash' => $hash]
         );
+        if ($existing !== null) {
+            return $existing;
+        }
+
+        // Legacy rows uploaded before content_hash existed: compute on the fly and keep the oldest.
+        $candidates = $this->db->fetchAll(
+            "SELECT * FROM association_documents
+              WHERE deleted_at IS NULL
+                AND file_path IS NOT NULL AND file_path <> ''
+                AND (content_hash IS NULL OR content_hash = '')
+              ORDER BY id ASC
+              LIMIT 400"
+        );
+        foreach ($candidates as $row) {
+            $absolute = resolve_upload_absolute_path(ltrim((string) ($row['file_path'] ?? ''), '/'));
+            if ($absolute === null) {
+                continue;
+            }
+            $computed = hash_file('sha256', $absolute);
+            if (!is_string($computed) || !hash_equals($hash, $computed)) {
+                continue;
+            }
+            try {
+                $this->db->update(
+                    'association_documents',
+                    [
+                        'content_hash' => $hash,
+                        'file_size' => (int) (@filesize($absolute) ?: 0),
+                    ],
+                    'id = :id',
+                    ['id' => (int) $row['id']]
+                );
+            } catch (\Throwable) {
+            }
+            $row['content_hash'] = $hash;
+
+            return $row;
+        }
+
+        return null;
     }
 
     /** @return array<string,mixed>|null */
@@ -700,23 +740,34 @@ final class FileRepositoryService
                 $updated++;
             }
             if (isset($seen[$hash])) {
-                // Same bytes already archived: keep the metadata row, point it to the canonical file
-                // and drop the duplicate copy so the repository holds one single physical file.
+                // Same bytes already archived: keep the oldest document (original name/title) and
+                // soft-delete the duplicate row so the archive never lists the same file twice.
                 $canonical = $seen[$hash];
+                $this->link((int) $canonical['id'], 'documents', 'duplicate:' . $id, ['section' => 'documents']);
                 if (ltrim((string) $canonical['file_path'], '/') !== ltrim((string) $row['file_path'], '/')) {
+                    @unlink($absolute);
+                }
+                try {
+                    $this->db->update(
+                        'association_documents',
+                        ['deleted_at' => date('Y-m-d H:i:s')],
+                        'id = :id AND deleted_at IS NULL',
+                        ['id' => $id]
+                    );
+                } catch (\Throwable) {
+                    // If soft-delete is unavailable, at least retarget the path to the original file.
                     $this->db->update(
                         'association_documents',
                         [
                             'file_path' => (string) $canonical['file_path'],
                             'file_mime' => $canonical['file_mime'] ?: ($row['file_mime'] ?? null),
+                            'content_hash' => $hash,
                         ],
                         'id = :id',
                         ['id' => $id]
                     );
-                    $this->link((int) $canonical['id'], 'documents', 'duplicate:' . $id, ['section' => 'documents']);
-                    @unlink($absolute);
-                    $merged++;
                 }
+                $merged++;
                 continue;
             }
             $seen[$hash] = [

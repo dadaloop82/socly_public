@@ -8,6 +8,15 @@ every 100 patches bump the series, and each bump is published to this rep come o
 
 ## [Unreleased]
 
+### Fixed
+
+- Bank-statement import: movement years follow the statement period (`DAL`/`AL`). Two-digit or
+  missing years, and OCR slips such as `30.09.2026` on a Sept 2025 statement, are aligned before
+  review and again on confirm so Sept/Oct lines cannot land in the wrong calendar year.
+- Documents: uploading the same file under a different name reuses the original archive row (hash
+  match, including legacy rows without `content_hash`). Reindex soft-deletes duplicate rows instead
+  of listing the same bytes twice.
+
 ### Security
 
 - Install always generates `PLATFORM_MASTER_PASSWORD_HASH`, reloads it into the current request, and
