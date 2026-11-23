@@ -22,6 +22,8 @@ every 100 patches bump the series, and each bump is published to this rep come o
   the operator can reopen those results instead of re-running OCR on every PDF.
 - Bank-statement verify: bulk “fix all dates / amounts” with confirm, count and ETA;
   ledger-only rows without a covering archived statement are listed as ignored (not actionable).
+- Session idle timeout no longer logs anyone out in the middle of a heavy job (statement
+  audit, excerpt repair, in-app update): the holder’s session stays alive until the job ends.
 
 ### Changed
 

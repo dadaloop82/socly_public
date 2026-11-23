@@ -2851,6 +2851,7 @@ function initSessionHeartbeat() {
   let lastActivity = Date.now();
   let lastBump = 0;
   let redirecting = false;
+  let forcedKeepAlive = 0;
 
   const goExpired = () => {
     if (redirecting) return;
@@ -2861,14 +2862,24 @@ function initSessionHeartbeat() {
 
   const idleFor = () => Date.now() - lastActivity;
 
-  const bump = () => {
-    if (document.visibilityState === 'hidden') return;
-    if (idleFor() >= IDLE_MS) {
+  // Long jobs (statement audit, excerpt repair, in-app update, busy overlay) must never
+  // look like “idle”: the operator is waiting on the machine, not abandoning the desk.
+  const isHeavyJob = () => (
+    forcedKeepAlive > 0
+    || document.documentElement.classList.contains('is-busy')
+    || !!document.querySelector('.update-overlay:not([hidden]), [data-bsi-busy]:not([hidden]), [data-bsi-bulk-overlay]:not([hidden])')
+  );
+
+  const bump = (opts = {}) => {
+    const force = !!opts.force || isHeavyJob();
+    if (!force && document.visibilityState === 'hidden') return;
+    if (!force && idleFor() >= IDLE_MS) {
       goExpired();
       return;
     }
     const now = Date.now();
-    if (now - lastBump < BUMP_THROTTLE_MS) return;
+    if (!force && now - lastBump < BUMP_THROTTLE_MS) return;
+    if (force && now - lastBump < Math.min(BUMP_THROTTLE_MS, 10000)) return;
     lastBump = now;
     fetch(pingUrl, {
       method: 'POST',
@@ -2881,32 +2892,58 @@ function initSessionHeartbeat() {
       credentials: 'same-origin',
     })
       .then((res) => {
-        if (res.status === 401) goExpired();
+        // During a heavy job a transient 401 must not yank the operator mid-flight; the
+        // next tick/ping will recover. Idle expiry still applies when not busy.
+        if (res.status === 401 && !isHeavyJob()) goExpired();
       })
       .catch(() => {});
   };
 
   const onActivity = () => {
-    if (document.visibilityState === 'hidden') return;
+    if (document.visibilityState === 'hidden' && !isHeavyJob()) return;
     lastActivity = Date.now();
     bump();
   };
 
-  // Only real user activity renews the session — never a blind interval ping.
+  // Long-running procedures can call hold(true) while work runs and hold(false) when done.
+  window.__soclySessionKeepAlive = {
+    hold(active) {
+      forcedKeepAlive = Math.max(0, forcedKeepAlive + (active ? 1 : -1));
+      if (forcedKeepAlive > 0) {
+        lastActivity = Date.now();
+        bump({ force: true });
+      }
+    },
+    touch() {
+      lastActivity = Date.now();
+      bump({ force: true });
+    },
+  };
+
+  // Only real user activity renews the session — except while a heavy job is running.
   ['pointerdown', 'keydown', 'scroll', 'touchstart', 'click'].forEach((evt) => {
     document.addEventListener(evt, onActivity, { passive: true });
   });
   document.addEventListener('visibilitychange', () => {
-    if (document.visibilityState === 'hidden') return;
-    if (idleFor() >= IDLE_MS) {
+    if (document.visibilityState === 'hidden') {
+      if (isHeavyJob()) bump({ force: true });
+      return;
+    }
+    if (!isHeavyJob() && idleFor() >= IDLE_MS) {
       goExpired();
       return;
     }
     onActivity();
   });
 
-  // Client-side idle watch: redirect even if the user never navigates again.
+  // Client-side idle watch: redirect even if the user never navigates again — but never
+  // while an in-app heavy job is still on screen.
   setInterval(() => {
+    if (isHeavyJob()) {
+      lastActivity = Date.now();
+      bump({ force: true });
+      return;
+    }
     if (idleFor() >= IDLE_MS) goExpired();
   }, 15000);
 }

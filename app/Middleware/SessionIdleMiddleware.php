@@ -27,6 +27,7 @@ namespace Socly\Middleware;
 
 use Socly\Core\Http\Request;
 use Socly\Services\AuthService;
+use Socly\Services\ResourceBusyLock;
 
 /**
  * Enforces idle session timeout and refreshes last_activity.
@@ -55,6 +56,13 @@ final class SessionIdleMiddleware
         }
 
         $now = time();
+        // Heavy jobs (statement audit, excerpt repair, in-app update) hold the resource lock for
+        // longer than the idle window: never log the holder out mid-procedure.
+        if ($this->holdsHeavyJobLock()) {
+            $_SESSION['last_activity'] = $now;
+            return true;
+        }
+
         $last = (int) ($_SESSION['last_activity'] ?? 0);
         if ($last > 0 && ($now - $last) > self::IDLE_SECONDS) {
             $this->auth->logout($request->ip());
@@ -75,5 +83,24 @@ final class SessionIdleMiddleware
 
         $_SESSION['last_activity'] = $now;
         return true;
+    }
+
+    private function holdsHeavyJobLock(): bool
+    {
+        try {
+            /** @var ResourceBusyLock $lock */
+            $lock = app(ResourceBusyLock::class);
+            $status = $lock->status();
+            if ($status === null) {
+                return false;
+            }
+            $user = auth_user();
+            $userId = is_array($user) ? (int) ($user['id'] ?? 0) : 0;
+            $sessionId = session_status() === PHP_SESSION_ACTIVE ? (string) session_id() : '';
+
+            return $lock->isHolder($status, $userId > 0 ? $userId : null, $sessionId);
+        } catch (\Throwable) {
+            return false;
+        }
     }
 }
