@@ -44,8 +44,8 @@ every 100 patches bump the series, and each bump is published to this rep come o
 
 - Bank-statement “check all statements”: percent and ETA cover both PDF compare and ritagli creation,
   so the overlay no longer looks finished after the last statement while excerpts are still running.
-- Bank-statement verify: “Add to cash book” prefills from the statement; if date/amount/counterparty
-  are still unusable (e.g. € 0,00 or empty payee) it opens a completion dialog instead of a dead-end error.
+- Bank-statement verify: “Add to cash book” opens the full Prima cassa movement form (prefilled)
+  in the same zoomable dialog as edit; closing without saving asks for confirmation.
 - Bank-statement “check all statements”: after comparing every PDF, the same job also creates
   missing ritagli for matched cash-book movements, with live feedback
   (“Creo ritaglio dell’estratto conto per il movimento …”).

@@ -180,8 +180,12 @@ final class TreasuryController extends BaseController
             $this->clearOld();
         }
         $returnPath = $this->listReturnPath($request);
+        // Quick create inside an add-on dialog (`embed=1`): bare layout, same as embed edit.
+        $embed = trim((string) $request->input('embed', '')) === '1';
+        $embedSaved = $embed && (string) $request->input('saved', '') === '1';
         // The loan/deposit registers open the form already on their category (and on the right
-        // direction: money received vs money paid back).
+        // direction: money received vs money paid back). Prefill query params (e.g. statement
+        // “add missing”) seed a synthetic movement so the form opens fully filled like a copy.
         $categories = $this->treasury->categoryOptions();
         $requestedCategory = trim((string) $request->input('category', ''));
         $defaultCategory = $this->treasury->defaultCategory();
@@ -195,13 +199,14 @@ final class TreasuryController extends BaseController
         $defaultDirection = in_array($requestedDirection, ['income', 'expense', 'transfer'], true)
             ? $requestedDirection
             : 'income';
+        $prefill = $this->createPrefillFromRequest($request, $defaultCategory, $defaultDirection);
         $this->render('treasury/form', [
             'title' => __('treasury.add_movement'),
             'isEdit' => false,
             'action' => url('/treasury'),
             'return_url' => url($returnPath),
             'return_path' => $returnPath,
-            'movement' => null,
+            'movement' => $prefill,
             'default_category' => $defaultCategory,
             'default_direction' => $defaultDirection,
             'categories' => $categories,
@@ -213,9 +218,13 @@ final class TreasuryController extends BaseController
             'config' => $this->components->config('treasury', ['auto_from_payments' => true]),
             'beneficiaries' => $this->treasury->beneficiaries(),
             'currency' => $this->currency,
-            'budget_items' => $this->budgets->itemOptionsForMovement((int) date('Y')),
+            'budget_items' => $this->budgets->itemOptionsForMovement(
+                (int) substr((string) ($prefill['movement_date'] ?? date('Y-m-d')), 0, 4)
+            ),
             'repository_documents' => $this->files->listForPicker('treasury', '', null, 80),
-        ]);
+            'embed' => $embed,
+            'embed_saved' => $embedSaved,
+        ], $embed ? 'layouts/embed' : 'layouts/app');
     }
 
     public function edit(Request $request, string $id): void
@@ -495,12 +504,14 @@ final class TreasuryController extends BaseController
         require_component('treasury');
         // Ledger state to come back to (filters, sort, page) after the save or a validation error.
         $returnPath = $this->listReturnPath($request);
+        $embed = trim((string) $request->input('embed', '')) === '1';
+        $embedParams = $embed ? ['embed' => '1'] : [];
         if (upload_post_too_large()) {
             $this->flash('errors', [
                 'invoice_pdf' => __('documents.upload_too_large', ['max' => upload_max_mb()]),
             ]);
             $this->rememberOld($request->all());
-            redirect(self::withQuery('/treasury/create', ['retry' => '1', 'ret' => $returnPath]));
+            redirect(self::withQuery('/treasury/create', ['retry' => '1', 'ret' => $returnPath] + $embedParams));
         }
         $result = $this->treasury->create(
             $request->all(),
@@ -511,7 +522,7 @@ final class TreasuryController extends BaseController
         if (empty($result['ok'])) {
             $this->flash('errors', $result['errors'] ?? ['treasury' => __('validation.required')]);
             $this->rememberOld($request->all());
-            redirect(self::withQuery('/treasury/create', ['retry' => '1', 'ret' => $returnPath]));
+            redirect(self::withQuery('/treasury/create', ['retry' => '1', 'ret' => $returnPath] + $embedParams));
         }
         // Recurring operation: the rule starts from the date of the just saved movement.
         if (!empty($request->input('recurring'))) {
@@ -533,6 +544,14 @@ final class TreasuryController extends BaseController
             || trim((string) $request->input('runts_line', '')) !== ''
             || (int) $request->input('budget_item_id', 0) > 0;
         $newId = (int) ($result['id'] ?? 0);
+        if ($embed && $newId > 0) {
+            // Stay in the dialog on the new card and mark `saved=1` so the parent can close/refresh.
+            $this->flash('treasury_saved', (string) $newId);
+            redirect(self::withQuery('/treasury/' . $newId . '/edit', array_merge(
+                ['ret' => $returnPath, 'saved' => '1'],
+                $classified ? ['similar' => (string) $newId] : []
+            )));
+        }
         if ($newId > 0) {
             // Back to the ledger pointing at the new row (copies included): the list scrolls to it
             // and blinks it. The page is dropped so the first batch really contains it.
@@ -1373,12 +1392,63 @@ final class TreasuryController extends BaseController
     }
 
     /**
-     * Ledger state the operator came from ("/treasury?q=…&sort=…&page=2"), so “Back”, a retry after
-     * a validation error and the redirect after a save land on the same filters, sort and page.
+     * Optional GET prefill for `/treasury/create` (statement “add missing”, loan/deposit shortcuts).
+     * Returns a synthetic movement array so the form opens filled like a copy; null when empty.
      *
-     * Only a *relative* `/treasury` path carrying the ledger keys is accepted: an external host,
-     * another screen, a fragment or an unknown parameter are dropped (no open redirect).
+     * @return array<string,mixed>|null
      */
+    private function createPrefillFromRequest(Request $request, string $defaultCategory, string $defaultDirection): ?array
+    {
+        $date = $this->isoDate((string) $request->input('movement_date', $request->input('date', '')));
+        $amountRaw = trim((string) $request->input('amount', ''));
+        $beneficiary = trim((string) $request->input('beneficiary', ''));
+        $description = trim((string) $request->input('description', ''));
+        $notes = trim((string) $request->input('notes', ''));
+        $account = trim((string) $request->input('account', ''));
+        $paymentMethod = trim((string) $request->input('payment_method', ''));
+        $runtsLine = trim((string) $request->input('runts_line', ''));
+        $budgetItemId = (int) $request->input('budget_item_id', 0);
+        $direction = (string) $request->input('direction', $defaultDirection);
+        if (!in_array($direction, ['income', 'expense', 'transfer'], true)) {
+            $direction = $defaultDirection;
+        }
+        $category = trim((string) $request->input('category', $defaultCategory));
+        $hasAny = $date !== '' || $amountRaw !== '' || $beneficiary !== '' || $description !== ''
+            || $notes !== '' || $account !== '' || $paymentMethod !== '' || $runtsLine !== ''
+            || $budgetItemId > 0
+            || ($category !== '' && $category !== $defaultCategory)
+            || ($direction !== '' && $direction !== $defaultDirection);
+        if (!$hasAny) {
+            return null;
+        }
+        $amount = '';
+        if ($amountRaw !== '') {
+            $normalized = str_replace(["\xc2\xa0", ' ', '€'], '', $amountRaw);
+            if (str_contains($normalized, ',') && str_contains($normalized, '.')) {
+                $normalized = str_replace(['.', ','], ['', '.'], $normalized);
+            } elseif (str_contains($normalized, ',')) {
+                $normalized = str_replace(',', '.', $normalized);
+            }
+            if (is_numeric($normalized)) {
+                $amount = number_format((float) $normalized, 2, '.', '');
+            }
+        }
+
+        return [
+            'direction' => $direction,
+            'amount' => $amount,
+            'movement_date' => $date !== '' ? $date : date('Y-m-d'),
+            'category' => $category !== '' ? $category : $defaultCategory,
+            'runts_line' => $runtsLine,
+            'budget_item_id' => $budgetItemId > 0 ? $budgetItemId : '',
+            'payment_method' => $paymentMethod,
+            'account' => $account,
+            'description' => mb_substr($description, 0, 500),
+            'notes' => mb_substr($notes, 0, 2000),
+            'beneficiary' => mb_substr($beneficiary, 0, 190),
+        ];
+    }
+
     /**
      * Ledger state carried by the `ret` parameter, cleaned (only a relative `/treasury` path with the
      * ledger keys survives; no external host, scheme, fragment, backslash or unknown parameter).

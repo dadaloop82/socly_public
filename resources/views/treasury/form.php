@@ -44,7 +44,8 @@ $justSaved = !empty($just_saved ?? false);
 // Embedded quick edit (add-on dialog): bare layout, no page actions and only the save button.
 $embed = !empty($embed ?? false);
 // “Copia movimento”: the form opens pre-filled like an edit page, but saves a new movement.
-$isCopy = !$isEdit && is_array($movement);
+// Statement “add missing” also passes a synthetic movement (no id) — keep the “new” title.
+$isCopy = !$isEdit && is_array($movement) && (int) ($movement['id'] ?? 0) > 0;
 $old = old_input();
 // Only a resubmission of the same form (after an error) can reuse the entered values: a `_old` left over from
 // another screen must not empty the tab being edited.

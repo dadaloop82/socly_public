@@ -14633,8 +14633,17 @@ function initTreasuryEmbedSaved() {
   if (!window.parent || window.parent === window) return;
   window.setTimeout(() => {
     try {
+      // Include the movement id when the embed landed on /treasury/{id}/edit after create/save.
+      let movementId = 0;
+      const match = String(window.location.pathname || '').match(/^\/treasury\/(\d+)\/edit\/?$/);
+      if (match) {
+        movementId = parseInt(match[1], 10) || 0;
+      }
       // The parent validates the message source (its own iframe), so `*` is safe here.
-      window.parent.postMessage({ type: 'socly:treasury-embed-saved' }, '*');
+      window.parent.postMessage({
+        type: 'socly:treasury-embed-saved',
+        movementId,
+      }, '*');
     } catch (error) {
       // Cross-window messaging is best effort: the popup still shows the updated card.
     }
