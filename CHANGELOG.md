@@ -34,6 +34,9 @@ every 100 patches bump the series, and each bump is published to this rep come o
 
 ### Fixed
 
+- Bank-statement “check all statements”: after comparing every PDF, the same job also creates
+  missing ritagli for matched cash-book movements, with live feedback
+  (“Creo ritaglio dell’estratto conto per il movimento …”).
 - Bank-statement verify: “Fix all dates / amounts” now applies every open card on the server
   (instead of posting hundreds of checkboxes that PHP’s `max_input_vars` silently truncated),
   so the count cannot come back unchanged after a confirmed bulk.
