@@ -1443,6 +1443,9 @@ function initPlatformConsents(scope) {
 function initResourceBusyWatch() {
   const root = document.querySelector('[data-presence-root]');
   const statusUrl = root?.getAttribute('data-resource-busy-url') || '';
+  const whoTpl = root?.getAttribute('data-resource-busy-who') || ':name';
+  const messageTpl = root?.getAttribute('data-resource-busy-message') || '';
+  const someone = root?.getAttribute('data-resource-busy-someone') || '';
   let overlay = null;
   let localActive = false;
   let serverActive = false;
@@ -1457,6 +1460,7 @@ function initResourceBusyWatch() {
       '<div class="update-overlay-card" role="status" aria-live="polite">',
       '<div class="update-spinner" aria-hidden="true"></div>',
       '<h2 class="update-overlay-title" data-resource-busy-title></h2>',
+      '<p class="update-overlay-who" data-resource-busy-who-line></p>',
       '<p class="update-overlay-text" data-resource-busy-text></p>',
       '<p class="update-overlay-hint" data-resource-busy-hint></p>',
       '<p><button type="button" class="btn" data-resource-busy-retry></button></p>',
@@ -1476,23 +1480,52 @@ function initResourceBusyWatch() {
         title: 'Operazione impegnativa in corso',
         hint: 'La pagina si aggiorna da sola. Potrai riprendere non appena l’operazione sarà terminata.',
         retry: 'Controlla di nuovo',
+        someone: 'Un collega',
+        operation: 'un’operazione impegnativa',
         fallback: 'Un collega sta eseguendo un’operazione che richiede molte risorse. L’uso dell’app è temporaneamente sospeso.',
       },
       en: {
         title: 'A demanding operation is running',
         hint: 'This page refreshes on its own. You can continue when the operation finishes.',
         retry: 'Check again',
+        someone: 'A colleague',
+        operation: 'a demanding operation',
         fallback: 'A colleague is running a resource-heavy operation. The app is temporarily paused.',
       },
       de: {
         title: 'Anspruchsvoller Vorgang läuft',
         hint: 'Diese Seite aktualisiert sich von selbst. Sie können fortfahren, sobald der Vorgang beendet ist.',
         retry: 'Erneut prüfen',
+        someone: 'Eine Kollegin / ein Kollege',
+        operation: 'einen anspruchsvollen Vorgang',
         fallback: 'Eine Kollegin / ein Kollege führt einen ressourcenintensiven Vorgang aus. Die App ist vorübergehend pausiert.',
       },
     };
     return map[lang] || map.it;
   })();
+
+  const fillTpl = (tpl, vars) => {
+    let out = String(tpl || '');
+    Object.keys(vars).forEach((key) => {
+      out = out.split(`:${key}`).join(String(vars[key] ?? ''));
+    });
+    return out;
+  };
+
+  const paintPayload = (card, data) => {
+    const name = String(data?.user_name || '').trim() || someone || labels.someone;
+    const operation = String(data?.operation_label || data?.label || '').trim() || labels.operation;
+    let message = String(data?.message || '').trim();
+    // Publishers sometimes send only the operation title: rebuild the full sentence with the name.
+    if (!message || (name && !message.includes(name))) {
+      message = messageTpl
+        ? fillTpl(messageTpl, { name, operation })
+        : labels.fallback;
+    }
+    card.dataset.who = String(data?.who || '').trim() || fillTpl(whoTpl, { name });
+    card.dataset.message = message;
+    card.dataset.userName = name;
+  };
 
   const sync = () => {
     const active = localActive || serverActive;
@@ -1505,10 +1538,15 @@ function initResourceBusyWatch() {
       return;
     }
     const titleEl = card.querySelector('[data-resource-busy-title]');
+    const whoEl = card.querySelector('[data-resource-busy-who-line]');
     const textEl = card.querySelector('[data-resource-busy-text]');
     const hintEl = card.querySelector('[data-resource-busy-hint]');
     const retryEl = card.querySelector('[data-resource-busy-retry]');
     if (titleEl) titleEl.textContent = labels.title;
+    if (whoEl) {
+      whoEl.textContent = card.dataset.who || fillTpl(whoTpl, { name: someone || labels.someone });
+      whoEl.hidden = !whoEl.textContent;
+    }
     if (textEl) textEl.textContent = card.dataset.message || labels.fallback;
     if (hintEl) hintEl.textContent = labels.hint;
     if (retryEl) retryEl.textContent = labels.retry;
@@ -1537,7 +1575,7 @@ function initResourceBusyWatch() {
     localActive = !!data;
     const card = ensureOverlay();
     if (data) {
-      card.dataset.message = String(data.message || labels.fallback);
+      paintPayload(card, data);
     }
     sync();
   };
@@ -1561,7 +1599,12 @@ function initResourceBusyWatch() {
       serverActive = busy;
       const card = ensureOverlay();
       if (busy) {
-        card.dataset.message = String(data.message || labels.fallback);
+        paintPayload(card, {
+          user_name: data.user_name,
+          operation: data.operation,
+          operation_label: data.operation_label || data.label || '',
+          message: data.message,
+        });
       }
       sync();
     } catch (error) {

@@ -86,6 +86,8 @@ final class SessionController extends BaseController
                 'holder' => $holder,
                 'user_name' => $name,
                 'operation' => $op,
+                'operation_label' => $opLabel,
+                'who' => __('resource_busy.who', ['name' => $name]),
                 'message' => __('resource_busy.message', [
                     'name' => $name,
                     'operation' => $opLabel,

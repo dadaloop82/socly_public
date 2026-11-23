@@ -13,7 +13,8 @@ every 100 patches bump the series, and each bump is published to this rep come o
 - Resource busy lock: while an operator runs a heavy job (bank-statement anomaly check /
   excerpt repair, or an in-app update), other users and other browser tabs see a pause
   message with that person’s name until the job finishes or the lock expires. Presence
-  dots keep updating during the pause.
+  dots keep updating during the pause. The pause overlay now shows clearly who started
+  the job (not only the operation title).
 
 ### Changed
 

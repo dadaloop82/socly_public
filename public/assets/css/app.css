@@ -2696,6 +2696,20 @@ html.is-busy .update-overlay {
   font-size: 1.15rem;
   letter-spacing: -0.01em;
 }
+.update-overlay-who {
+  margin: 0 0 0.75rem;
+  padding: 0.7rem 0.85rem;
+  border-radius: 12px;
+  font-size: 0.95rem;
+  font-weight: 650;
+  line-height: 1.4;
+  color: var(--ink);
+  background: color-mix(in srgb, var(--brand-primary) 8%, #ffffff);
+  border: 1px solid color-mix(in srgb, var(--brand-primary) 18%, var(--line, #d7e3df));
+}
+.update-overlay-who[hidden] {
+  display: none !important;
+}
 .update-overlay-text {
   margin: 0 0 0.9rem;
   font-size: 0.92rem;
