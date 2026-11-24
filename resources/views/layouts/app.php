@@ -66,6 +66,8 @@ foreach ($pluginMenu as $item) {
     <?= view_partial('partials/confirm_i18n_meta') ?>
     <meta name="session-ping-url" content="<?= e(url('/session/ping')) ?>">
     <meta name="login-url" content="<?= e(url('/login')) ?>">
+    <meta name="busy-wait-title" content="<?= e(__('common.busy_title')) ?>">
+    <meta name="busy-wait-text" content="<?= e(__('common.busy_text')) ?>">
     <title><?= e(($title ?? 'SOCLY') . ' · ' . $assocName) ?></title>
     <link rel="icon" href="<?= e(socly_icon_url()) ?>" type="image/png">
     <link rel="preconnect" href="https://fonts.googleapis.com">

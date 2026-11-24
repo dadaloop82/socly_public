@@ -1110,7 +1110,7 @@ final class TreasuryController extends BaseController
     private function advancedFilterCount(array $filters): int
     {
         $count = 0;
-        foreach (['category', 'runts_line', 'budget_item_id', 'account', 'approval', 'anomaly'] as $key) {
+        foreach (['category', 'runts_line', 'budget_item_id', 'account', 'approval', 'anomaly', 'beneficiary', 'no_counterparty'] as $key) {
             if (trim((string) ($filters[$key] ?? '')) !== '') {
                 $count++;
             }

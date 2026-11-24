@@ -268,9 +268,6 @@ if ($filterYear !== '' && !isset($yearFilterOptions[$filterYear])) {
 }
 ?>
 <form class="panel filter-bar members-filter treasury-filter" method="get" action="<?= e(url('/treasury')) ?>" role="search" data-treasury-filter>
-    <?php if ($filterBeneficiary !== ''): ?>
-        <?= field('hidden', ['name' => 'beneficiary', 'value' => $filterBeneficiary]) ?>
-    <?php endif; ?>
     <div class="members-filter-row treasury-filter-row">
         <div class="members-filter-q">
             <?= field('search', [
@@ -421,6 +418,34 @@ if ($filterYear !== '' && !isset($yearFilterOptions[$filterYear])) {
             'context' => 'filter',
             'empty_label' => (string) __('treasury.filter_all'),
             'options' => $accountFilterOptions,
+        ]) ?>
+        <?= field('text', [
+            'name' => 'beneficiary',
+            'id' => 'treasury-beneficiary-filter',
+            'label' => (string) __('treasury.filter_beneficiary'),
+            'value' => $filterBeneficiary,
+            'context' => 'filter',
+            'placeholder' => (string) __('treasury.filter_beneficiary_placeholder'),
+            'maxlength' => 190,
+            'list' => 'treasury-filter-beneficiaries',
+            'attrs' => [
+                'data-treasury-beneficiary-filter' => true,
+                'autocomplete' => 'off',
+            ],
+        ]) ?>
+        <datalist id="treasury-filter-beneficiaries">
+            <?php foreach ((array) ($beneficiaries ?? []) as $beneficiaryOption): ?>
+                <option value="<?= e((string) $beneficiaryOption) ?>"></option>
+            <?php endforeach; ?>
+        </datalist>
+        <?= field('checkbox', [
+            'name' => 'no_counterparty',
+            'id' => 'treasury-no-counterparty-filter',
+            'label' => (string) __('treasury.filter_no_counterparty'),
+            'value' => $filterNoCounterparty === '1' ? '1' : '',
+            'check_value' => '1',
+            'context' => 'filter',
+            'attrs' => ['data-treasury-no-counterparty-filter' => true],
         ]) ?>
         <?= field('select', [
             'name' => 'sort',

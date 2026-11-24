@@ -48,6 +48,8 @@ $year = date('Y');
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="csrf-token" content="<?= e(csrf_token()) ?>">
+    <meta name="busy-wait-title" content="<?= e(__('common.busy_title')) ?>">
+    <meta name="busy-wait-text" content="<?= e(__('common.busy_text')) ?>">
     <?= view_partial('partials/password_i18n_meta') ?>
     <?= view_partial('partials/confirm_i18n_meta') ?>
     <title><?= e($computedTitle) ?></title>

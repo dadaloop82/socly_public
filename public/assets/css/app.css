@@ -243,6 +243,62 @@ a:hover { text-decoration: underline; color: var(--brand-primary-deep); }
 .topbar-spacer { flex: 1; min-width: 0; pointer-events: none; }
 
 /*
+ * ── Global “please wait” lock (slow saves / opens on large datasets) ───────────
+ */
+.app-busy-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 10060;
+  display: grid;
+  place-items: center;
+  padding: 1.25rem;
+  background: color-mix(in srgb, #0b1f1c 42%, transparent);
+  backdrop-filter: blur(3px);
+}
+.app-busy-overlay[hidden] {
+  display: none !important;
+}
+.app-busy-card {
+  width: min(22rem, 100%);
+  padding: 1.25rem 1.35rem 1.2rem;
+  border-radius: 18px;
+  background: #fff;
+  box-shadow: 0 22px 50px rgba(8, 40, 36, 0.28);
+  text-align: center;
+}
+.app-busy-spinner {
+  width: 2.1rem;
+  height: 2.1rem;
+  margin: 0 auto 0.85rem;
+  border-radius: 50%;
+  border: 3px solid color-mix(in srgb, var(--brand-primary, #0d6e66) 22%, #d7e8e4);
+  border-top-color: var(--brand-primary, #0d6e66);
+  animation: app-busy-spin 0.75s linear infinite;
+}
+.app-busy-title {
+  margin: 0 0 0.35rem;
+  font-size: 1.05rem;
+  font-weight: 800;
+  color: var(--ink, #0b1f1c);
+}
+.app-busy-text {
+  margin: 0;
+  font-size: 0.92rem;
+  line-height: 1.4;
+  color: var(--muted, #5b6b68);
+}
+html.is-app-busy,
+html.is-app-busy body {
+  cursor: wait;
+}
+@keyframes app-busy-spin {
+  to { transform: rotate(360deg); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .app-busy-spinner { animation: none; border-top-color: color-mix(in srgb, var(--brand-primary, #0d6e66) 22%, #d7e8e4); }
+}
+
+/*
  * ── Operator presence: floating dots (viewport-fixed, not in document flow) ───
  * Must stay `fixed`: with `absolute` they scrolled away with the page and looked “gone”.
  */

@@ -61,6 +61,7 @@ function initConfirmLinks(scope = document) {
         link.dataset.confirmed = '0';
         return;
       }
+      if (typeof showAppBusyOverlay === 'function') showAppBusyOverlay();
       window.location.href = link.href;
     });
   });
@@ -185,6 +186,7 @@ document.addEventListener('DOMContentLoaded', () => {
   syncBrandReadableColors();
   initBrokenImageGuards();
   initSessionHeartbeat();
+  initActionBusyGuard();
   initPresence();
   initResourceBusyWatch();
   initFreshnessGuard();
@@ -2925,6 +2927,138 @@ function initTreasuryAdvancedFilters() {
     sync();
   });
   sync();
+
+  const beneficiary = form.querySelector('[data-treasury-beneficiary-filter]');
+  const noCounterparty = form.querySelector('[data-treasury-no-counterparty-filter]');
+  if (beneficiary instanceof HTMLInputElement && noCounterparty instanceof HTMLInputElement) {
+    beneficiary.addEventListener('input', () => {
+      if (beneficiary.value.trim() !== '' && noCounterparty.checked) {
+        noCounterparty.checked = false;
+      }
+    });
+    noCounterparty.addEventListener('change', () => {
+      if (noCounterparty.checked) {
+        beneficiary.value = '';
+      }
+    });
+  }
+}
+
+/**
+ * Full-page “please wait” lock: stops double-clicks on slow operations (large ledgers,
+ * saves, deletes) without requiring every screen to opt in. Opt out with data-no-busy.
+ */
+function showAppBusyOverlay(message) {
+  let root = document.getElementById('app-busy-overlay');
+  const title = document.querySelector('meta[name="busy-wait-title"]')?.content
+    || 'Operazione in corso';
+  const text = message
+    || document.querySelector('meta[name="busy-wait-text"]')?.content
+    || 'Attendere prego…';
+  if (!root) {
+    root = document.createElement('div');
+    root.id = 'app-busy-overlay';
+    root.className = 'app-busy-overlay';
+    root.setAttribute('role', 'alert');
+    root.setAttribute('aria-live', 'assertive');
+    root.innerHTML = '<div class="app-busy-card">'
+      + '<div class="app-busy-spinner" aria-hidden="true"></div>'
+      + '<p class="app-busy-title"></p>'
+      + '<p class="app-busy-text"></p>'
+      + '</div>';
+    document.body.appendChild(root);
+  }
+  const titleEl = root.querySelector('.app-busy-title');
+  const textEl = root.querySelector('.app-busy-text');
+  if (titleEl) titleEl.textContent = title;
+  if (textEl) textEl.textContent = text;
+  root.hidden = false;
+  document.documentElement.classList.add('is-app-busy');
+}
+
+function hideAppBusyOverlay() {
+  const root = document.getElementById('app-busy-overlay');
+  if (root) root.hidden = true;
+  document.documentElement.classList.remove('is-app-busy');
+}
+
+function initActionBusyGuard() {
+  const shouldSkipForm = (form) => {
+    if (!(form instanceof HTMLFormElement)) return true;
+    if (form.dataset.noBusy === '1' || form.hasAttribute('data-no-busy')) return true;
+    if (form.target && form.target !== '_self') return true;
+    // Autocomplete / live search forms that never leave the page.
+    if (form.hasAttribute('data-live-search') || form.hasAttribute('data-no-navigate')) return true;
+    return false;
+  };
+
+  const lockAndShow = (form) => {
+    if (form instanceof HTMLFormElement) {
+      if (form.dataset.busySubmitted === '1') return false;
+      form.dataset.busySubmitted = '1';
+      form.querySelectorAll('button[type="submit"], input[type="submit"]').forEach((btn) => {
+        btn.disabled = true;
+      });
+    }
+    showAppBusyOverlay();
+    return true;
+  };
+
+  document.addEventListener('submit', (event) => {
+    if (event.defaultPrevented) return;
+    const form = event.target;
+    if (shouldSkipForm(form)) return;
+    if (form instanceof HTMLFormElement && form.dataset.busySubmitted === '1') {
+      event.preventDefault();
+      showAppBusyOverlay();
+      return;
+    }
+    lockAndShow(form);
+  }, false);
+
+  // Programmatic submit() after a confirm dialog bypasses the submit event in some browsers.
+  const nativeSubmit = HTMLFormElement.prototype.submit;
+  HTMLFormElement.prototype.submit = function busyAwareSubmit() {
+    if (!shouldSkipForm(this) && this.dataset.busySubmitted !== '1') {
+      lockAndShow(this);
+    }
+    return nativeSubmit.call(this);
+  };
+
+  document.addEventListener('click', (event) => {
+    if (event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) {
+      return;
+    }
+    const el = event.target instanceof Element
+      ? event.target.closest('a.btn[href], a[data-busy], button[data-busy], [data-busy-click]')
+      : null;
+    if (!el) return;
+    if (el.closest('.sidebar, [data-sidebar], nav, .side')) return;
+    if (el.hasAttribute('data-no-busy') || el.dataset.noBusy === '1') return;
+    if (el instanceof HTMLAnchorElement) {
+      if (!el.href || el.getAttribute('href') === '#' || el.hasAttribute('download')) return;
+      if (el.target && el.target !== '_self') return;
+      // Confirm links navigate only after the dialog; show busy once confirmed.
+      if (el.hasAttribute('data-confirm') && el.dataset.confirmed !== '1') return;
+      showAppBusyOverlay();
+      return;
+    }
+    if (el instanceof HTMLButtonElement && el.type === 'submit') return; // form submit handles it
+    if (el.hasAttribute('data-busy') || el.hasAttribute('data-busy-click')) {
+      showAppBusyOverlay();
+    }
+  }, true);
+
+  // Back/forward cache: if the user returns, clear a stuck overlay.
+  window.addEventListener('pageshow', () => {
+    hideAppBusyOverlay();
+    document.querySelectorAll('form[data-busy-submitted="1"]').forEach((form) => {
+      delete form.dataset.busySubmitted;
+      form.querySelectorAll('button[type="submit"], input[type="submit"]').forEach((btn) => {
+        btn.disabled = false;
+      });
+    });
+  });
 }
 
 function initSessionHeartbeat() {
