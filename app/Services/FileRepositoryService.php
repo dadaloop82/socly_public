@@ -595,9 +595,14 @@ final class FileRepositoryService
     public function years(): array
     {
         try {
+            // Include years inferred from document/upload date when reference_year is null,
+            // otherwise older uploads vanish from the year filter and look "missing".
             $rows = $this->db->fetchAll(
-                'SELECT DISTINCT reference_year AS y FROM association_documents
-                  WHERE reference_year IS NOT NULL ORDER BY reference_year DESC'
+                'SELECT DISTINCT COALESCE(reference_year, YEAR(COALESCE(document_date, created_at))) AS y
+                   FROM association_documents
+                  WHERE deleted_at IS NULL
+                    AND COALESCE(reference_year, YEAR(COALESCE(document_date, created_at))) IS NOT NULL
+                  ORDER BY y DESC'
             );
         } catch (\Throwable) {
             return [];
@@ -606,7 +611,7 @@ final class FileRepositoryService
         return array_values(array_filter(array_map(
             static fn (array $row): int => (int) ($row['y'] ?? 0),
             $rows
-        )));
+        ), static fn (int $y): bool => $y >= 1900 && $y <= 2100));
     }
 
     /** @return array{files:int,size:int,linked:int,current_year:int,duplicates:int} */
@@ -616,7 +621,7 @@ final class FileRepositoryService
             $row = $this->db->fetch(
                 'SELECT COUNT(*) AS files,
                         COALESCE(SUM(file_size), 0) AS size,
-                        COALESCE(SUM(CASE WHEN reference_year = :year THEN 1 ELSE 0 END), 0) AS current_year
+                        COALESCE(SUM(CASE WHEN COALESCE(reference_year, YEAR(COALESCE(document_date, created_at))) = :year THEN 1 ELSE 0 END), 0) AS current_year
                    FROM association_documents
                   WHERE deleted_at IS NULL',
                 ['year' => (int) date('Y')]

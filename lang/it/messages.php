@@ -3280,6 +3280,7 @@ return [
         'category_group_custom' => 'Categorie personalizzate',
         'filter_section' => 'Sezione di origine',
         'filter_year' => 'Anno di riferimento',
+        'filter_year_all' => 'Tutti gli anni',
         'filter_uploader' => 'Caricato da',
         'filter_uploader_placeholder' => 'Nome operatore o partecipante',
         'uploaded_by' => 'Caricato da',

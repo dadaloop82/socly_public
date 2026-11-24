@@ -3859,6 +3859,7 @@ return [
         'category_group_custom' => 'Eigene Kategorien',
         'filter_section' => 'Herkunftsbereich',
         'filter_year' => 'Bezugsjahr',
+        'filter_year_all' => 'Alle Jahre',
         'filter_uploader' => 'Hochgeladen von',
         'filter_uploader_placeholder' => 'Name des Bedieners oder Teilnehmers',
         'uploaded_by' => 'Hochgeladen von',

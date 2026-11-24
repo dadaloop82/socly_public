@@ -297,7 +297,7 @@ $repoSizeLabel = $repoSize >= 1048576
             'label' => (string) __('documents.filter_year'),
             'value' => $filterYear > 0 ? (string) $filterYear : '',
             'context' => 'filter',
-            'empty_label' => (string) __('documents.filter_all'),
+            'empty_label' => (string) __('documents.filter_year_all'),
             'options' => $yearOptions,
         ]) ?>
         <?= field('text', [

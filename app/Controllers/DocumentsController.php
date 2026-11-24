@@ -56,7 +56,7 @@ final class DocumentsController extends BaseController
         }
         $this->render('documents/index', [
             'title' => __('documents.title'),
-            'documents' => $this->documents->all(200, $query, $filters),
+            'documents' => $this->documents->all(5000, $query, $filters),
             'counts' => $this->documents->counts(),
             'minutes_overview' => $this->documents->minutesOverview(),
             'filters' => $filters,

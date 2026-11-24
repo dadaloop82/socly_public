@@ -3859,6 +3859,7 @@ return [
         'category_group_custom' => 'Custom categories',
         'filter_section' => 'Source section',
         'filter_year' => 'Reference year',
+        'filter_year_all' => 'All years',
         'filter_uploader' => 'Uploaded by',
         'filter_uploader_placeholder' => 'Operator or participant name',
         'uploaded_by' => 'Uploaded by',

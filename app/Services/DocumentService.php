@@ -99,10 +99,13 @@ final class DocumentService
     /**
      * @param array{status?:string,category?:string,expiring?:bool} $filters
      */
-    public function all(int $limit = 200, string $query = '', array $filters = []): array
+    public function all(int $limit = 5000, string $query = '', array $filters = []): array
     {
         $query = trim($query);
-        $limitSql = ' LIMIT ' . max(1, min(500, $limit));
+        // Archive must surface every year: bank-statement excerpts from the current year
+        // used to fill a tight LIMIT and hide older verbali / statute files.
+        $limitSql = ' LIMIT ' . max(1, min(10000, $limit));
+        $effectiveYear = $this->effectiveYearSql('d');
         $base = 'SELECT d.*, u.name AS author_name
              FROM association_documents d
              LEFT JOIN users u ON u.id = d.created_by
@@ -130,7 +133,7 @@ final class DocumentService
         }
         $year = (int) ($filters['year'] ?? 0);
         if ($year > 0) {
-            $where[] = 'd.reference_year = :filter_year';
+            $where[] = $effectiveYear . ' = :filter_year';
             $params['filter_year'] = $year;
         }
         $uploader = trim((string) ($filters['uploader'] ?? ''));
@@ -147,13 +150,22 @@ final class DocumentService
         if ($where !== []) {
             $sql .= ' AND ' . implode(' AND ', $where);
         }
-        // Prefer the declared reference period (year + month) so bank statements and other
-        // period-bound files list newest first; fall back to document/upload date.
-        $sql .= ' ORDER BY COALESCE(d.reference_year, YEAR(COALESCE(d.document_date, d.created_at))) DESC,
+        // Official books/docs before statement excerpts so older years are never truncated
+        // away by hundreds of current-year bank PDFs; then newest reference period first.
+        $sql .= ' ORDER BY CASE WHEN d.category = \'statement_excerpt\' THEN 1 ELSE 0 END ASC,
+                         ' . $effectiveYear . ' DESC,
                          COALESCE(d.reference_month_to, d.reference_month_from, MONTH(COALESCE(d.document_date, d.created_at)), 0) DESC,
                          COALESCE(d.document_date, d.created_at) DESC,
                          d.id DESC' . $limitSql;
         return $this->db->fetchAll($sql, $params);
+    }
+
+    /** SQL expression: declared reference year, else year of document/upload date. */
+    private function effectiveYearSql(string $alias = 'd'): string
+    {
+        $a = preg_replace('/[^a-z_]/', '', $alias) ?: 'd';
+
+        return 'COALESCE(' . $a . '.reference_year, YEAR(COALESCE(' . $a . '.document_date, ' . $a . '.created_at)))';
     }
 
     /**
@@ -165,14 +177,15 @@ final class DocumentService
     public function minutesOverview(): array
     {
         $year = (int) date('Y');
+        $effectiveYear = $this->effectiveYearSql('d');
         $out = [];
         foreach (self::MINUTES_CATEGORIES as $key) {
             $row = $this->db->fetch(
                 'SELECT COUNT(*) AS total,
-                        SUM(CASE WHEN document_date IS NOT NULL AND YEAR(document_date) = :year THEN 1 ELSE 0 END) AS current_year,
-                        MAX(document_date) AS last_date
-                 FROM association_documents
-                 WHERE category = :category',
+                        SUM(CASE WHEN ' . $effectiveYear . ' = :year THEN 1 ELSE 0 END) AS current_year,
+                        MAX(COALESCE(d.document_date, d.created_at)) AS last_date
+                 FROM association_documents d
+                 WHERE d.deleted_at IS NULL AND d.category = :category',
                 ['year' => $year, 'category' => $key]
             );
             $lastDate = trim((string) ($row['last_date'] ?? ''));
