@@ -168,6 +168,7 @@ if (($groups['balance'] ?? []) !== []) {
                 type="button"
                 class="btn btn-ghost"
                 data-repair-excerpts
+                data-no-busy
                 data-repair-start="<?= e(url('/documents/repair-excerpts')) ?>"
                 data-repair-tick="<?= e(url('/documents/repair-excerpts/tick')) ?>"
                 data-repair-missing="<?= (int) $excerptMissing ?>"

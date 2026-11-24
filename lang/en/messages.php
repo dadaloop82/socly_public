@@ -3365,6 +3365,7 @@ return [
         'filter_beneficiary' => 'Counterparty',
         'filter_beneficiary_placeholder' => 'Counterparty name…',
         'filter_no_counterparty' => 'Without a counterparty only',
+        'filter_no_counterparty_hint' => 'Movements with no beneficiary or counterparty set.',
         'audit_created' => 'Created on :date by :user',
         'audit_updated' => 'Last updated: :date',
         'created' => 'Created',

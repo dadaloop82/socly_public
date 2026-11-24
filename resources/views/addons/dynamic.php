@@ -64,6 +64,7 @@ declare(strict_types=1);
             method="post"
             action="<?= e(url('/settings/addons/check')) ?>"
             data-addons-json
+            data-no-busy
             data-busy="<?= e(__('addons.checking')) ?>"
             data-error="<?= e(__('addons.error_online')) ?>"
         >
@@ -75,6 +76,7 @@ declare(strict_types=1);
                 method="post"
                 action="<?= e(url('/settings/addons/auto-install')) ?>"
                 data-addons-json
+                data-no-busy
                 data-busy="<?= e(__('addons.installing')) ?>"
                 data-error="<?= e(__('addons.error_generic')) ?>"
             >

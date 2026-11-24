@@ -87,6 +87,7 @@ foreach (\Socly\Services\MemberService::memberStatuses() as $status) {
     action="<?= e(url('/members/import/commit')) ?>"
     class="import-references-form"
     data-import-commit
+    data-no-busy
     data-import-confirm="<?= e(__('members.import.confirm_commit')) ?>"
     data-import-total="<?= (int) (($stats['create'] ?? 0) + ($stats['update'] ?? 0)) ?>"
 >

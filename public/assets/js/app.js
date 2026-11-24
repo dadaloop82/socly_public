@@ -61,7 +61,9 @@ function initConfirmLinks(scope = document) {
         link.dataset.confirmed = '0';
         return;
       }
-      if (typeof showAppBusyOverlay === 'function') showAppBusyOverlay();
+      if (typeof showAppBusyOverlay === 'function' && !linkHasOwnProgress(link)) {
+        showAppBusyOverlay();
+      }
       window.location.href = link.href;
     });
   });
@@ -2946,9 +2948,107 @@ function initTreasuryAdvancedFilters() {
 
 /**
  * Full-page “please wait” lock: stops double-clicks on slow operations (large ledgers,
- * saves, deletes) without requiring every screen to opt in. Opt out with data-no-busy.
+ * saves, deletes) without requiring every screen to opt in.
+ *
+ * Never covers screens that already show their own progress UI (imports, ritagli,
+ * in-app updates, bank-statement analysis). Opt out with data-no-busy / data-own-progress.
  */
+const OWN_PROGRESS_SELECTOR = [
+  '.update-overlay:not([hidden])',
+  '[data-import-progress]:not([hidden])',
+  '[data-bsi-busy]:not([hidden])',
+  '[data-bsi-bulk-overlay]:not([hidden])',
+].join(', ');
+
+const OWN_PROGRESS_FORM_SELECTOR = [
+  '[data-no-busy]',
+  '[data-own-progress]',
+  '[data-import-commit]',
+  '[data-update-form]',
+  '[data-bsi-analyze-form]',
+  '[data-addons-json]',
+  '[data-import-file-field]',
+].join(', ');
+
+function pageHasOwnProgress() {
+  return document.documentElement.classList.contains('is-importing')
+    || document.documentElement.classList.contains('is-busy')
+    || !!document.querySelector(OWN_PROGRESS_SELECTOR);
+}
+
+function formHasOwnProgress(form) {
+  if (!(form instanceof HTMLFormElement)) return false;
+  if (form.matches(OWN_PROGRESS_FORM_SELECTOR)) return true;
+  if (form.querySelector('[data-bsi-busy], [data-import-progress], [data-bsi-bulk-overlay], [data-import-status]')) {
+    return true;
+  }
+  return false;
+}
+
+function linkHasOwnProgress(el) {
+  if (!(el instanceof Element)) return false;
+  if (el.hasAttribute('data-no-busy') || el.dataset.noBusy === '1' || el.hasAttribute('data-own-progress')) {
+    return true;
+  }
+  if (el.closest('[data-no-busy], [data-own-progress]')) return true;
+  if (el.hasAttribute('data-repair-excerpts')) return true;
+  const form = el.closest('form');
+  return formHasOwnProgress(form);
+}
+
+/** Same-origin link that leaves the current page (menu, sections, lists, filters). */
+function isAppPageNavigation(anchor) {
+  if (!(anchor instanceof HTMLAnchorElement)) return false;
+  if (linkHasOwnProgress(anchor)) return false;
+  const raw = (anchor.getAttribute('href') || '').trim();
+  if (raw === '' || raw === '#' || raw.startsWith('#')) return false;
+  if (/^(javascript:|mailto:|tel:)/i.test(raw)) return false;
+  if (anchor.hasAttribute('download')) return false;
+  if (anchor.target && anchor.target !== '_self') return false;
+  // Confirm links navigate only after the dialog.
+  if (anchor.hasAttribute('data-confirm') && anchor.dataset.confirmed !== '1') return false;
+
+  let url;
+  try {
+    url = new URL(anchor.href, window.location.href);
+  } catch (err) {
+    return false;
+  }
+  if (url.origin !== window.location.origin) return false;
+
+  const here = window.location;
+  const samePath = url.pathname === here.pathname && url.search === here.search;
+  // In-page hash jump (tabs / anchors): keep the current view, no wait card.
+  if (samePath && url.hash !== '' && url.hash !== here.hash) return false;
+  // Already on this exact URL (active menu item).
+  if (samePath && url.hash === here.hash) return false;
+
+  return true;
+}
+
+/** Safety cap: never leave the generic wait card stuck forever. */
+const APP_BUSY_MAX_MS = 30000;
+let appBusyHideTimer = 0;
+
+function clearAppBusyHideTimer() {
+  if (appBusyHideTimer) {
+    window.clearTimeout(appBusyHideTimer);
+    appBusyHideTimer = 0;
+  }
+}
+
+function unlockBusyForms() {
+  document.querySelectorAll('form[data-busy-submitted="1"]').forEach((form) => {
+    delete form.dataset.busySubmitted;
+    form.querySelectorAll('button[type="submit"], input[type="submit"]').forEach((btn) => {
+      btn.disabled = false;
+    });
+  });
+}
+
 function showAppBusyOverlay(message) {
+  // Prefer dedicated progress UIs over the generic wait card.
+  if (pageHasOwnProgress()) return;
   let root = document.getElementById('app-busy-overlay');
   const title = document.querySelector('meta[name="busy-wait-title"]')?.content
     || 'Operazione in corso';
@@ -2974,9 +3074,16 @@ function showAppBusyOverlay(message) {
   if (textEl) textEl.textContent = text;
   root.hidden = false;
   document.documentElement.classList.add('is-app-busy');
+  clearAppBusyHideTimer();
+  appBusyHideTimer = window.setTimeout(() => {
+    appBusyHideTimer = 0;
+    hideAppBusyOverlay();
+    unlockBusyForms();
+  }, APP_BUSY_MAX_MS);
 }
 
 function hideAppBusyOverlay() {
+  clearAppBusyHideTimer();
   const root = document.getElementById('app-busy-overlay');
   if (root) root.hidden = true;
   document.documentElement.classList.remove('is-app-busy');
@@ -2985,35 +3092,58 @@ function hideAppBusyOverlay() {
 function initActionBusyGuard() {
   const shouldSkipForm = (form) => {
     if (!(form instanceof HTMLFormElement)) return true;
-    if (form.dataset.noBusy === '1' || form.hasAttribute('data-no-busy')) return true;
+    if (formHasOwnProgress(form)) return true;
     if (form.target && form.target !== '_self') return true;
     // Autocomplete / live search forms that never leave the page.
     if (form.hasAttribute('data-live-search') || form.hasAttribute('data-no-navigate')) return true;
     return false;
   };
 
+  const lockButtons = (form) => {
+    form.querySelectorAll('button[type="submit"], input[type="submit"]').forEach((btn) => {
+      btn.disabled = true;
+    });
+  };
+
+  const unlockForm = (form) => {
+    delete form.dataset.busySubmitted;
+    form.querySelectorAll('button[type="submit"], input[type="submit"]').forEach((btn) => {
+      btn.disabled = false;
+    });
+  };
+
   const lockAndShow = (form) => {
     if (form instanceof HTMLFormElement) {
       if (form.dataset.busySubmitted === '1') return false;
       form.dataset.busySubmitted = '1';
-      form.querySelectorAll('button[type="submit"], input[type="submit"]').forEach((btn) => {
-        btn.disabled = true;
-      });
+      lockButtons(form);
     }
-    showAppBusyOverlay();
+    if (!formHasOwnProgress(form) && !pageHasOwnProgress()) {
+      showAppBusyOverlay();
+    }
     return true;
   };
 
   document.addEventListener('submit', (event) => {
-    if (event.defaultPrevented) return;
     const form = event.target;
-    if (shouldSkipForm(form)) return;
-    if (form instanceof HTMLFormElement && form.dataset.busySubmitted === '1') {
+    if (!(form instanceof HTMLFormElement) || shouldSkipForm(form)) return;
+    if (form.dataset.busySubmitted === '1') {
       event.preventDefault();
-      showAppBusyOverlay();
+      if (!pageHasOwnProgress()) showAppBusyOverlay();
       return;
     }
-    lockAndShow(form);
+    // Lock immediately to block double-clicks; defer the overlay so AJAX handlers
+    // (addons, uploads) can preventDefault and keep their own feedback visible.
+    form.dataset.busySubmitted = '1';
+    lockButtons(form);
+    queueMicrotask(() => {
+      if (event.defaultPrevented || formHasOwnProgress(form) || pageHasOwnProgress()) {
+        unlockForm(form);
+        hideAppBusyOverlay();
+        return;
+      }
+      showAppBusyOverlay();
+    });
   }, false);
 
   // Programmatic submit() after a confirm dialog bypasses the submit event in some browsers.
@@ -3021,6 +3151,8 @@ function initActionBusyGuard() {
   HTMLFormElement.prototype.submit = function busyAwareSubmit() {
     if (!shouldSkipForm(this) && this.dataset.busySubmitted !== '1') {
       lockAndShow(this);
+    } else if (formHasOwnProgress(this) || pageHasOwnProgress()) {
+      hideAppBusyOverlay();
     }
     return nativeSubmit.call(this);
   };
@@ -3030,19 +3162,21 @@ function initActionBusyGuard() {
       return;
     }
     const el = event.target instanceof Element
-      ? event.target.closest('a.btn[href], a[data-busy], button[data-busy], [data-busy-click]')
+      ? event.target.closest('a[href], button[data-busy], [data-busy-click]')
       : null;
     if (!el) return;
-    if (el.closest('.sidebar, [data-sidebar], nav, .side')) return;
-    if (el.hasAttribute('data-no-busy') || el.dataset.noBusy === '1') return;
+    // Sidebar close / pure UI controls are buttons, not navigations.
+    if (el.closest('[data-sidebar-close], [data-sidebar-update-dismiss]')) return;
     if (el instanceof HTMLAnchorElement) {
-      if (!el.href || el.getAttribute('href') === '#' || el.hasAttribute('download')) return;
-      if (el.target && el.target !== '_self') return;
-      // Confirm links navigate only after the dialog; show busy once confirmed.
-      if (el.hasAttribute('data-confirm') && el.dataset.confirmed !== '1') return;
-      showAppBusyOverlay();
+      if (!isAppPageNavigation(el)) return;
+      // Defer so client-side handlers can cancel (tabs, wizards) without a stuck overlay.
+      queueMicrotask(() => {
+        if (event.defaultPrevented || pageHasOwnProgress()) return;
+        showAppBusyOverlay();
+      });
       return;
     }
+    if (linkHasOwnProgress(el)) return;
     if (el instanceof HTMLButtonElement && el.type === 'submit') return; // form submit handles it
     if (el.hasAttribute('data-busy') || el.hasAttribute('data-busy-click')) {
       showAppBusyOverlay();
@@ -3052,12 +3186,7 @@ function initActionBusyGuard() {
   // Back/forward cache: if the user returns, clear a stuck overlay.
   window.addEventListener('pageshow', () => {
     hideAppBusyOverlay();
-    document.querySelectorAll('form[data-busy-submitted="1"]').forEach((form) => {
-      delete form.dataset.busySubmitted;
-      form.querySelectorAll('button[type="submit"], input[type="submit"]').forEach((btn) => {
-        btn.disabled = false;
-      });
-    });
+    unlockBusyForms();
   });
 }
 
@@ -3089,7 +3218,9 @@ function initSessionHeartbeat() {
   const isHeavyJob = () => (
     forcedKeepAlive > 0
     || document.documentElement.classList.contains('is-busy')
-    || !!document.querySelector('.update-overlay:not([hidden]), [data-bsi-busy]:not([hidden]), [data-bsi-bulk-overlay]:not([hidden])')
+    || document.documentElement.classList.contains('is-app-busy')
+    || document.documentElement.classList.contains('is-importing')
+    || !!document.querySelector('.update-overlay:not([hidden]), [data-import-progress]:not([hidden]), [data-bsi-busy]:not([hidden]), [data-bsi-bulk-overlay]:not([hidden])')
   );
 
   const bump = (opts = {}) => {
@@ -16982,6 +17113,7 @@ function initRepairExcerpts() {
       return;
     }
     button.disabled = true;
+    if (typeof hideAppBusyOverlay === 'function') hideAppBusyOverlay();
     setText('[data-update-title]', button.getAttribute('data-repair-title') || '');
     setText('[data-update-text]', button.getAttribute('data-repair-starting') || '');
     setText('[data-update-hint]', '');
@@ -17099,7 +17231,9 @@ function initUpdateProgress() {
 
       setText('[data-update-title]', steps.title);
       setText('[data-update-hint]', steps.hint);
+      if (typeof hideAppBusyOverlay === 'function') hideAppBusyOverlay();
       box.hidden = false;
+      document.documentElement.classList.add('is-busy');
 
       const button = form.querySelector('button[type="submit"]');
       if (button) {
@@ -19466,6 +19600,7 @@ function initBudgetGrid(scope = document) {
 
   const startProgress = () => {
     busy = true;
+    if (typeof hideAppBusyOverlay === 'function') hideAppBusyOverlay();
     if (button instanceof HTMLButtonElement) {
       button.disabled = true;
       const running = button.dataset.runningLabel || '';

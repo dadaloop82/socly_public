@@ -3365,6 +3365,7 @@ return [
         'filter_beneficiary' => 'Gegenpartei',
         'filter_beneficiary_placeholder' => 'Name der Gegenpartei…',
         'filter_no_counterparty' => 'Nur ohne Gegenpartei',
+        'filter_no_counterparty_hint' => 'Buchungen ohne Begünstigten oder Gegenpartei.',
         'audit_created' => 'Erstellt am :date von :user',
         'audit_updated' => 'Letzte Änderung: :date',
         'created' => 'Erstellt',

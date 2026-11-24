@@ -349,7 +349,7 @@ if ($filterYear !== '' && !isset($yearFilterOptions[$filterYear])) {
         </div>
     </div>
     <div class="treasury-advanced<?= $advancedCount > 0 ? ' is-open' : '' ?>" id="treasury-advanced-filters" data-treasury-advanced <?= $advancedCount > 0 ? '' : 'hidden' ?>>
-        <div class="treasury-advanced-grid">
+        <div class="treasury-advanced-fields">
         <?php
         $categoryFilterOptions = $categoryFilterOptions ?? [];
         $categoryFilterOptions['__none__'] = (string) __('treasury.filter_none');
@@ -438,15 +438,6 @@ if ($filterYear !== '' && !isset($yearFilterOptions[$filterYear])) {
                 <option value="<?= e((string) $beneficiaryOption) ?>"></option>
             <?php endforeach; ?>
         </datalist>
-        <?= field('checkbox', [
-            'name' => 'no_counterparty',
-            'id' => 'treasury-no-counterparty-filter',
-            'label' => (string) __('treasury.filter_no_counterparty'),
-            'value' => $filterNoCounterparty === '1' ? '1' : '',
-            'check_value' => '1',
-            'context' => 'filter',
-            'attrs' => ['data-treasury-no-counterparty-filter' => true],
-        ]) ?>
         <?= field('select', [
             'name' => 'sort',
             'id' => 'treasury-sort',
@@ -493,6 +484,19 @@ if ($filterYear !== '' && !isset($yearFilterOptions[$filterYear])) {
                 ['value' => 'approved', 'label' => (string) __('treasury.approval_approved')],
             ],
             'context' => 'filter',
+        ]) ?>
+        </div>
+        <div class="treasury-advanced-flags">
+        <?= field('checkbox', [
+            'name' => 'no_counterparty',
+            'id' => 'treasury-no-counterparty-filter',
+            'label' => (string) __('treasury.filter_no_counterparty'),
+            'hint' => (string) __('treasury.filter_no_counterparty_hint'),
+            'value' => $filterNoCounterparty === '1' ? '1' : '',
+            'check_value' => '1',
+            'context' => 'filter',
+            'label_class' => 'checkbox-row-lg',
+            'attrs' => ['data-treasury-no-counterparty-filter' => true],
         ]) ?>
         <?= field('checkbox', [
             'name' => 'anomaly',

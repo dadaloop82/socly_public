@@ -61,7 +61,7 @@ $knowItems = [
             <p class="section-lede"><?= e(__('members.import.upload_lede')) ?></p>
         </div>
     </header>
-    <form method="post" action="<?= e(url('/members/import/upload')) ?>" enctype="multipart/form-data" class="import-upload-form" data-import-file-field>
+    <form method="post" action="<?= e(url('/members/import/upload')) ?>" enctype="multipart/form-data" class="import-upload-form" data-import-file-field data-no-busy>
         <?= csrf_field() ?>
         <span class="field-label sf-field__label"><?= e(__('members.import.file_label')) ?></span>
         <div class="doc-dropzone import-dropzone" data-import-dropzone role="button" tabindex="0">

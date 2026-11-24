@@ -468,6 +468,7 @@ $showVersionFooter = true;
                                     action="<?= e(url('/updates/install')) ?>"
                                     data-confirm="<?= e(__('updates.confirm_update', ['version' => $updateRemote])) ?>"
                                     data-update-form
+                                    data-no-busy
                                     data-update-progress-url="<?= e(url('/api/updates/progress')) ?>"
                                     data-update-steps="<?= e((string) json_encode([
                                         'title' => __('updates.in_progress_title'),

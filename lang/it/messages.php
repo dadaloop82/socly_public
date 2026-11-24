@@ -2797,6 +2797,7 @@ return [
         'filter_beneficiary' => 'Controparte',
         'filter_beneficiary_placeholder' => 'Nome controparte…',
         'filter_no_counterparty' => 'Solo senza controparte',
+        'filter_no_counterparty_hint' => 'Movimenti senza beneficiario o controparte indicata.',
         'audit_created' => 'Creato il :date da :user',
         'audit_updated' => 'Ultima modifica: :date',
         'created' => 'Creazione',
