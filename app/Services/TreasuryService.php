@@ -3775,14 +3775,20 @@ final class TreasuryService
         return is_string($messages) ? $messages : '';
     }
 
-    /** @return list<string> */
+    /**
+     * Free-text counterparties already used in the cash book.
+     * Most-used names come first so datalists and import review suggest the usual ones.
+     *
+     * @return list<string>
+     */
     public function beneficiaries(): array
     {
         $rows = $this->db->fetchAll(
-            "SELECT beneficiary
+            "SELECT TRIM(beneficiary) AS beneficiary, COUNT(*) AS uses
              FROM treasury_movements
-             WHERE beneficiary IS NOT NULL AND beneficiary <> ''
-             ORDER BY beneficiary
+             WHERE beneficiary IS NOT NULL AND TRIM(beneficiary) <> ''
+             GROUP BY TRIM(beneficiary)
+             ORDER BY uses DESC, beneficiary ASC
              LIMIT 400"
         );
         $seen = [];
@@ -3797,7 +3803,7 @@ final class TreasuryService
                 $seen[$key] = $value;
             }
         }
-        ksort($seen, SORT_NATURAL | SORT_FLAG_CASE);
+
         return array_values($seen);
     }
 
