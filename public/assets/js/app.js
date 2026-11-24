@@ -62,7 +62,9 @@ function initConfirmLinks(scope = document) {
         return;
       }
       if (typeof showAppBusyOverlay === 'function' && !linkHasOwnProgress(link)) {
-        showAppBusyOverlay();
+        showAppBusyOverlay(
+          typeof resolveBusyCopy === 'function' ? resolveBusyCopy(link) : undefined
+        );
       }
       window.location.href = link.href;
     });
@@ -529,21 +531,26 @@ function initFreshnessGuard() {
 
 /**
  * The live filter sends the form (GET) at every typing pause: before reloading it remembers which
- * field had the focus and the cursor position, so the search does not "jump" away.
+ * field had the focus, the cursor position and the scroll offset, so the list does not jump to the top.
  */
 const FILTER_FOCUS_KEY = 'socly.filter.focus';
 
 function rememberFilterFocus(form) {
+  const payload = {
+    path: window.location.pathname,
+    scrollY: window.scrollY || window.pageYOffset || 0,
+    name: '',
+    pos: null,
+  };
   const el = document.activeElement;
-  if (!(el instanceof HTMLElement) || !form.contains(el)) return;
-  const name = el.getAttribute('name') || '';
-  if (name === '') return;
-  let pos = null;
-  if (typeof el.selectionStart === 'number') pos = el.selectionStart;
+  if (el instanceof HTMLElement && (!(form instanceof HTMLElement) || form.contains(el))) {
+    payload.name = el.getAttribute('name') || '';
+    if (typeof el.selectionStart === 'number') payload.pos = el.selectionStart;
+  }
   try {
-    sessionStorage.setItem(FILTER_FOCUS_KEY, JSON.stringify({ name, pos }));
+    sessionStorage.setItem(FILTER_FOCUS_KEY, JSON.stringify(payload));
   } catch (err) {
-    // storage not available: you just lose focus
+    // storage not available: you just lose focus/scroll
   }
 }
 
@@ -555,8 +562,25 @@ function restoreFilterFocus() {
   } catch (err) {
     return;
   }
-  if (!saved || !saved.name) return;
-  const form = document.querySelector('[data-members-filter], [data-treasury-filter], [data-live-filter]');
+  if (!saved || typeof saved !== 'object') return;
+  if (saved.path && saved.path !== window.location.pathname) return;
+
+  // Avoid fighting the browser's own scroll restoration on filter reloads.
+  if ('scrollRestoration' in window.history) {
+    try { window.history.scrollRestoration = 'manual'; } catch (err) { /* ignore */ }
+  }
+
+  const scrollY = Number(saved.scrollY);
+  if (Number.isFinite(scrollY) && scrollY > 0 && !new URLSearchParams(window.location.search).get('highlight')) {
+    const applyScroll = () => window.scrollTo(0, scrollY);
+    applyScroll();
+    window.requestAnimationFrame(applyScroll);
+    window.setTimeout(applyScroll, 50);
+    window.setTimeout(applyScroll, 200);
+  }
+
+  if (!saved.name) return;
+  const form = document.querySelector('[data-members-filter], [data-treasury-filter], [data-live-filter], [data-documents-filter]');
   const el = form ? form.querySelector(`[name="${saved.name}"]`) : null;
   if (!(el instanceof HTMLElement)) return;
   el.focus({ preventScroll: true });
@@ -3046,15 +3070,122 @@ function unlockBusyForms() {
   });
 }
 
-function showAppBusyOverlay(message) {
+function busyMessageCatalog() {
+  if (busyMessageCatalog._cache) return busyMessageCatalog._cache;
+  try {
+    busyMessageCatalog._cache = JSON.parse(
+      document.querySelector('meta[name="busy-messages"]')?.content || '{}'
+    ) || {};
+  } catch (err) {
+    busyMessageCatalog._cache = {};
+  }
+  return busyMessageCatalog._cache;
+}
+
+function resolveBusyCopy(source) {
+  const msgs = busyMessageCatalog();
+  const fallback = {
+    title: msgs.default_title
+      || document.querySelector('meta[name="busy-wait-title"]')?.content
+      || 'Operazione in corso',
+    text: msgs.default_text
+      || document.querySelector('meta[name="busy-wait-text"]')?.content
+      || 'Attendere prego…',
+  };
+
+  if (source instanceof Element) {
+    const titled = source.closest('[data-busy-title]');
+    const texted = source.closest('[data-busy-text]');
+    const customTitle = source.getAttribute('data-busy-title') || titled?.getAttribute('data-busy-title');
+    const customText = source.getAttribute('data-busy-text') || texted?.getAttribute('data-busy-text');
+    if (customTitle || customText) {
+      return {
+        title: customTitle || fallback.title,
+        text: customText || fallback.text,
+      };
+    }
+  }
+
+  if (source instanceof HTMLFormElement) {
+    if (source.matches('[data-treasury-filter], [data-members-filter], [data-live-filter], [data-documents-filter], .filter-bar')) {
+      return {
+        title: msgs.filter_title || fallback.title,
+        text: msgs.filter_text || fallback.text,
+      };
+    }
+    const action = `${source.getAttribute('action') || ''} ${source.className || ''}`.toLowerCase();
+    const method = String(source.method || 'get').toLowerCase();
+    if (
+      action.includes('delete')
+      || source.hasAttribute('data-confirm-danger')
+      || !!source.querySelector('input[name="_method"][value="DELETE"], input[name="_method"][value="delete"]')
+    ) {
+      return {
+        title: msgs.delete_title || fallback.title,
+        text: msgs.delete_text || fallback.text,
+      };
+    }
+    if (action.includes('export')) {
+      return {
+        title: msgs.export_title || fallback.title,
+        text: msgs.export_text || fallback.text,
+      };
+    }
+    if (method === 'post') {
+      return {
+        title: msgs.save_title || fallback.title,
+        text: msgs.save_text || fallback.text,
+      };
+    }
+    if (method === 'get') {
+      return {
+        title: msgs.search_title || msgs.filter_title || fallback.title,
+        text: msgs.search_text || msgs.filter_text || fallback.text,
+      };
+    }
+  }
+
+  if (source instanceof HTMLAnchorElement) {
+    const href = `${source.getAttribute('href') || ''} ${source.className || ''}`.toLowerCase();
+    if (href.includes('export')) {
+      return {
+        title: msgs.export_title || fallback.title,
+        text: msgs.export_text || fallback.text,
+      };
+    }
+    const label = String(
+      source.getAttribute('aria-label')
+      || source.getAttribute('title')
+      || source.textContent
+      || ''
+    ).replace(/\s+/g, ' ').trim();
+    if (label !== '' && msgs.open_text) {
+      const short = label.length > 42 ? `${label.slice(0, 39)}…` : label;
+      return {
+        title: msgs.open_title || fallback.title,
+        text: String(msgs.open_text).replace(':name', short),
+      };
+    }
+  }
+
+  return fallback;
+}
+
+function showAppBusyOverlay(messageOrOpts) {
   // Prefer dedicated progress UIs over the generic wait card.
   if (pageHasOwnProgress()) return;
   let root = document.getElementById('app-busy-overlay');
-  const title = document.querySelector('meta[name="busy-wait-title"]')?.content
-    || 'Operazione in corso';
-  const text = message
-    || document.querySelector('meta[name="busy-wait-text"]')?.content
-    || 'Attendere prego…';
+  let title = '';
+  let text = '';
+  if (messageOrOpts && typeof messageOrOpts === 'object') {
+    title = String(messageOrOpts.title || '');
+    text = String(messageOrOpts.text || messageOrOpts.message || '');
+  } else if (typeof messageOrOpts === 'string' && messageOrOpts !== '') {
+    text = messageOrOpts;
+  }
+  const fallback = resolveBusyCopy(null);
+  title = title || fallback.title;
+  text = text || fallback.text;
   if (!root) {
     root = document.createElement('div');
     root.id = 'app-busy-overlay';
@@ -3112,14 +3243,19 @@ function initActionBusyGuard() {
     });
   };
 
+  const isFilterForm = (form) => form instanceof HTMLFormElement && form.matches(
+    '[data-treasury-filter], [data-members-filter], [data-live-filter], [data-documents-filter], .filter-bar'
+  );
+
   const lockAndShow = (form) => {
     if (form instanceof HTMLFormElement) {
       if (form.dataset.busySubmitted === '1') return false;
       form.dataset.busySubmitted = '1';
       lockButtons(form);
+      if (isFilterForm(form)) rememberFilterFocus(form);
     }
     if (!formHasOwnProgress(form) && !pageHasOwnProgress()) {
-      showAppBusyOverlay();
+      showAppBusyOverlay(resolveBusyCopy(form));
     }
     return true;
   };
@@ -3127,9 +3263,10 @@ function initActionBusyGuard() {
   document.addEventListener('submit', (event) => {
     const form = event.target;
     if (!(form instanceof HTMLFormElement) || shouldSkipForm(form)) return;
+    if (isFilterForm(form)) rememberFilterFocus(form);
     if (form.dataset.busySubmitted === '1') {
       event.preventDefault();
-      if (!pageHasOwnProgress()) showAppBusyOverlay();
+      if (!pageHasOwnProgress()) showAppBusyOverlay(resolveBusyCopy(form));
       return;
     }
     // Lock immediately to block double-clicks; defer the overlay so AJAX handlers
@@ -3142,7 +3279,7 @@ function initActionBusyGuard() {
         hideAppBusyOverlay();
         return;
       }
-      showAppBusyOverlay();
+      showAppBusyOverlay(resolveBusyCopy(form));
     });
   }, false);
 
@@ -3172,14 +3309,14 @@ function initActionBusyGuard() {
       // Defer so client-side handlers can cancel (tabs, wizards) without a stuck overlay.
       queueMicrotask(() => {
         if (event.defaultPrevented || pageHasOwnProgress()) return;
-        showAppBusyOverlay();
+        showAppBusyOverlay(resolveBusyCopy(el));
       });
       return;
     }
     if (linkHasOwnProgress(el)) return;
     if (el instanceof HTMLButtonElement && el.type === 'submit') return; // form submit handles it
     if (el.hasAttribute('data-busy') || el.hasAttribute('data-busy-click')) {
-      showAppBusyOverlay();
+      showAppBusyOverlay(resolveBusyCopy(el));
     }
   }, true);
 

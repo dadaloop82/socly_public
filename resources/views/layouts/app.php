@@ -68,6 +68,22 @@ foreach ($pluginMenu as $item) {
     <meta name="login-url" content="<?= e(url('/login')) ?>">
     <meta name="busy-wait-title" content="<?= e(__('common.busy_title')) ?>">
     <meta name="busy-wait-text" content="<?= e(__('common.busy_text')) ?>">
+    <meta name="busy-messages" content="<?= e((string) json_encode([
+        'default_title' => (string) __('common.busy_title'),
+        'default_text' => (string) __('common.busy_text'),
+        'filter_title' => (string) __('common.busy_filter_title'),
+        'filter_text' => (string) __('common.busy_filter_text'),
+        'open_title' => (string) __('common.busy_open_title'),
+        'open_text' => (string) __('common.busy_open_text'),
+        'save_title' => (string) __('common.busy_save_title'),
+        'save_text' => (string) __('common.busy_save_text'),
+        'delete_title' => (string) __('common.busy_delete_title'),
+        'delete_text' => (string) __('common.busy_delete_text'),
+        'export_title' => (string) __('common.busy_export_title'),
+        'export_text' => (string) __('common.busy_export_text'),
+        'search_title' => (string) __('common.busy_search_title'),
+        'search_text' => (string) __('common.busy_search_text'),
+    ], JSON_UNESCAPED_UNICODE)) ?>">
     <title><?= e(($title ?? 'SOCLY') . ' · ' . $assocName) ?></title>
     <link rel="icon" href="<?= e(socly_icon_url()) ?>" type="image/png">
     <link rel="preconnect" href="https://fonts.googleapis.com">
