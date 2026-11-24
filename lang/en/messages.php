@@ -2617,6 +2617,8 @@ return [
         'busy_open_text' => 'Opening “:name”…',
         'busy_save_title' => 'Saving',
         'busy_save_text' => 'Saving your changes…',
+        'busy_login_title' => 'Signing in',
+        'busy_login_text' => 'Signing you in…',
         'busy_delete_title' => 'Deleting',
         'busy_delete_text' => 'Deleting…',
         'busy_export_title' => 'Export',

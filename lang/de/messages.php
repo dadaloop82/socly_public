@@ -2617,6 +2617,8 @@ return [
         'busy_open_text' => 'Öffne „:name“…',
         'busy_save_title' => 'Speichern',
         'busy_save_text' => 'Änderungen werden gespeichert…',
+        'busy_login_title' => 'Anmeldung',
+        'busy_login_text' => 'Anmeldung läuft…',
         'busy_delete_title' => 'Löschen',
         'busy_delete_text' => 'Wird gelöscht…',
         'busy_export_title' => 'Export',

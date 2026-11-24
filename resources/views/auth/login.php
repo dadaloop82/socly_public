@@ -85,7 +85,9 @@ if ($setupUrl === '') {
     <h1 class="h1" data-i18n="auth.welcome_title"><?= e(__('auth.welcome_title')) ?></h1>
     <p class="lede" data-i18n="auth.welcome_text"><?= e(__('auth.welcome_text')) ?></p>
 
-    <form method="post" action="<?= e(url('/login')) ?>">
+    <form method="post" action="<?= e(url('/login')) ?>"
+          data-busy-title="<?= e(__('common.busy_login_title')) ?>"
+          data-busy-text="<?= e(__('common.busy_login_text')) ?>">
         <?= csrf_field() ?>
         <?= field('hidden', [
             'name' => 'lang',

@@ -77,6 +77,8 @@ foreach ($pluginMenu as $item) {
         'open_text' => (string) __('common.busy_open_text'),
         'save_title' => (string) __('common.busy_save_title'),
         'save_text' => (string) __('common.busy_save_text'),
+        'login_title' => (string) __('common.busy_login_title'),
+        'login_text' => (string) __('common.busy_login_text'),
         'delete_title' => (string) __('common.busy_delete_title'),
         'delete_text' => (string) __('common.busy_delete_text'),
         'export_title' => (string) __('common.busy_export_title'),

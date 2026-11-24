@@ -3771,6 +3771,8 @@ return [
         'busy_open_text' => 'Sto aprendo «:name»…',
         'busy_save_title' => 'Salvataggio',
         'busy_save_text' => 'Sto salvando…',
+        'busy_login_title' => 'Accesso',
+        'busy_login_text' => 'Sto entrando…',
         'busy_delete_title' => 'Eliminazione',
         'busy_delete_text' => 'Sto eliminando…',
         'busy_export_title' => 'Esportazione',

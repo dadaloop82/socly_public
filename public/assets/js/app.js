@@ -3139,6 +3139,18 @@ function resolveBusyCopy(source) {
         text: msgs.export_text || fallback.text,
       };
     }
+    // Login / password forms are POST but must never say “Sto salvando…”.
+    if (
+      action.includes('/login')
+      || action.includes('/password')
+      || action.includes('/auth/')
+      || /\blogin\b/.test(action)
+    ) {
+      return {
+        title: msgs.login_title || msgs.default_title || fallback.title,
+        text: msgs.login_text || msgs.default_text || fallback.text,
+      };
+    }
     if (method === 'post') {
       return {
         title: msgs.save_title || fallback.title,
