@@ -42,6 +42,10 @@ final class PresenceController extends BaseController
 
     public function state(Request $request): void
     {
+        // Never dump the poll payload into a browser tab (address bar / bookmark / history).
+        if ($this->rejectBrowserNavigationForJson($request)) {
+            return;
+        }
         $entity = (string) $request->input('editing', '');
         $parts = $entity !== '' ? explode(':', $entity, 2) : [];
         $editingEntity = (string) ($parts[0] ?? '');

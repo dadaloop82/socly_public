@@ -1643,9 +1643,11 @@ function initResourceBusyWatch() {
       const response = await fetch(statusUrl, {
         credentials: 'same-origin',
         headers: { Accept: 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+        cache: 'no-store',
       });
       if (!response.ok) return;
       const data = await response.json();
+      // Holder session must keep working (own progress UI). Other sessions pause.
       const busy = !!(data && data.busy && !data.holder);
       serverActive = busy;
       const card = ensureOverlay();
@@ -1659,8 +1661,9 @@ function initResourceBusyWatch() {
           started_by: data.started_by,
           message: data.message,
         });
-      } else if (localActive) {
-        // Server lock gone (finished or hard-expired): drop the soft tab signal too.
+      } else if (data && data.busy === false && localActive) {
+        // Drop the soft tab signal only when the SERVER lock is gone — never when
+        // this session is the holder (other tabs of the same login still need it).
         try { window.localStorage.removeItem('socly_resource_busy'); } catch (error) { /* ignore */ }
         localActive = false;
       }
@@ -1670,7 +1673,9 @@ function initResourceBusyWatch() {
     }
   };
   void poll();
-  window.setInterval(() => { void poll(); }, 8000);
+  window.setInterval(() => { void poll(); }, 4000);
+  // Back/forward or manual refresh restore: re-check the shared lock immediately.
+  window.addEventListener('pageshow', () => { void poll(); });
 }
 
 /**
@@ -2033,7 +2038,10 @@ function initPresence() {
         lastSentValue = currentValue;
       }
       const res = await fetch(target.toString(), {
-        headers: { Accept: 'application/json' },
+        headers: {
+          Accept: 'application/json',
+          'X-Requested-With': 'XMLHttpRequest',
+        },
         credentials: 'same-origin',
         cache: 'no-store',
       });

@@ -39,6 +39,9 @@ final class SessionController extends BaseController
 
     public function ping(Request $request): void
     {
+        if ($this->rejectBrowserNavigationForJson($request)) {
+            return;
+        }
         $_SESSION['last_activity'] = time();
         try {
             app(\Socly\Services\PresenceService::class)->touch();
@@ -59,6 +62,9 @@ final class SessionController extends BaseController
      */
     public function resourceBusyStatus(Request $request): void
     {
+        if ($this->rejectBrowserNavigationForJson($request)) {
+            return;
+        }
         header('Content-Type: application/json; charset=utf-8');
         header('Cache-Control: no-store');
         try {

@@ -25,6 +25,7 @@ declare(strict_types=1);
 
 namespace Socly\Controllers;
 
+use Socly\Core\Http\Request;
 use Socly\Core\View;
 
 abstract class BaseController
@@ -51,6 +52,37 @@ abstract class BaseController
     protected function clearOld(): void
     {
         unset($_SESSION['_old']);
+    }
+
+    /**
+     * True when the browser opened this URL as a normal page (address bar, bookmark, link),
+     * not as an XHR/fetch that expects JSON.
+     */
+    protected function isBrowserDocumentRequest(Request $request): bool
+    {
+        $dest = strtolower(trim((string) $request->header('Sec-Fetch-Dest', '')));
+        if ($dest === 'document') {
+            return true;
+        }
+        $xhr = strtolower(trim((string) $request->header('X-Requested-With', ''))) === 'xmlhttprequest';
+        $accept = strtolower((string) $request->header('Accept', ''));
+        if ($xhr || str_contains($accept, 'application/json')) {
+            return false;
+        }
+
+        return str_contains($accept, 'text/html');
+    }
+
+    /**
+     * JSON-only endpoints must never dump a payload into a browser tab.
+     * Returns true when the request was redirected away (caller should stop).
+     */
+    protected function rejectBrowserNavigationForJson(Request $request, string $fallback = '/dashboard'): bool
+    {
+        if (!$this->isBrowserDocumentRequest($request)) {
+            return false;
+        }
+        redirect($fallback);
     }
 
     /**

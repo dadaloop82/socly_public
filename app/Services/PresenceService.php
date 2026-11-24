@@ -117,6 +117,18 @@ final class PresenceService
         if ($pathname === '' || strlen($pathname) > 200) {
             return '';
         }
+        // Internal JSON/poll endpoints must never become a badge jump target.
+        foreach ([
+            '/presence/',
+            '/freshness',
+            '/session/',
+            '/resource-busy/',
+            '/api/',
+        ] as $blocked) {
+            if ($pathname === rtrim($blocked, '/') || str_starts_with($pathname, $blocked)) {
+                return '';
+            }
+        }
         $hash = (string) preg_replace('/[^A-Za-z0-9_\-.]/', '', (string) ($parts[1] ?? ''));
 
         return $hash !== '' ? $pathname . '#' . mb_substr($hash, 0, 40) : $pathname;

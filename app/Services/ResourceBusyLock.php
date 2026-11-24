@@ -30,8 +30,13 @@ namespace Socly\Services;
  */
 final class ResourceBusyLock
 {
-    /** Seconds without heartbeat before the lock is treated as abandoned. */
-    public const TTL_SECONDS = 180;
+    /**
+     * Seconds without heartbeat before the lock is treated as abandoned.
+     * Must exceed the longest single audit/repair tick (OCR of a heavy PDF can
+     * run several minutes); otherwise another user's refresh clears the lock
+     * mid-job and the shared busy page disappears while work continues.
+     */
+    public const TTL_SECONDS = 600;
 
     /** Hard ceiling: no busy lock may block the instance longer than this. */
     public const MAX_HOLD_SECONDS = 1800; // 30 minutes
@@ -58,7 +63,12 @@ final class ResourceBusyLock
             return null;
         }
         if ($this->isExpired($data)) {
-            $this->clearFile();
+            // Soft TTL expiry: do not unlink — a long OCR tick may still reclaim
+            // via heartbeat. Only purge past the hard ceiling (abandoned crash).
+            $started = strtotime((string) ($data['started_at'] ?? ''));
+            if ($started !== false && (time() - $started) >= self::MAX_HOLD_SECONDS) {
+                $this->clearFile();
+            }
 
             return null;
         }
@@ -111,7 +121,11 @@ final class ResourceBusyLock
         if ($operation === '' || strlen($job) < 8) {
             return ['ok' => false, 'error' => 'invalid'];
         }
-        $existing = $this->status();
+        $existing = $this->read();
+        if ($existing !== null && $this->isExpired($existing)) {
+            $this->clearFile();
+            $existing = null;
+        }
         if ($existing !== null && !$this->isHolder($existing, $userId, $sessionId)) {
             return ['ok' => false, 'error' => 'busy', 'status' => $existing];
         }

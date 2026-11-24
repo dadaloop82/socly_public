@@ -42,6 +42,9 @@ final class FreshnessController extends BaseController
 
     public function state(Request $request): void
     {
+        if ($this->rejectBrowserNavigationForJson($request)) {
+            return;
+        }
         $entity = (string) $request->input('entity', '');
         $id = (int) $request->input('id', 0);
         $expected = (int) $request->input('version', 0);
