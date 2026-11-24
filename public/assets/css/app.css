@@ -243,13 +243,14 @@ a:hover { text-decoration: underline; color: var(--brand-primary-deep); }
 .topbar-spacer { flex: 1; min-width: 0; pointer-events: none; }
 
 /*
- * ── Operator presence: floating dots (they do not take up space in the flow) ───
+ * ── Operator presence: floating dots (viewport-fixed, not in document flow) ───
+ * Must stay `fixed`: with `absolute` they scrolled away with the page and looked “gone”.
  */
 .presence {
-  position: absolute;
-  top: 0.45rem;
+  position: fixed;
+  top: calc(0.45rem + var(--safe-top, 0px));
   right: clamp(0.7rem, 2.5vw, 1.6rem);
-  z-index: 30;
+  z-index: 60;
   display: none;
   align-items: flex-end;
   pointer-events: none;
@@ -7250,11 +7251,11 @@ html.enter-anim .will-enter.is-entered {
     border-bottom: 1px solid color-mix(in srgb, var(--brand-primary) 14%, var(--line));
     box-shadow: 0 6px 18px color-mix(in srgb, var(--brand-primary-deep) 8%, transparent);
   }
-  /* Floating presence badges sit inside the sticky bar, not under it. */
+  /* Keep presence above the sticky mobile topbar. */
   .presence {
-    top: 0.5rem;
+    top: calc(0.5rem + var(--safe-top, 0px));
     right: 0.75rem;
-    z-index: 45;
+    z-index: 70;
   }
   .topbar-menu {
     display: inline-flex;
