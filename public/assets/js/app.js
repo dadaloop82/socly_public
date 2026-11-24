@@ -1956,8 +1956,9 @@ function initPresence() {
       dot.classList.add('is-leaving');
       window.setTimeout(() => dot.remove(), 420);
     });
-    // The group only appears when there is more than one person connected.
-    root.classList.toggle('is-visible', users.length > 1);
+    // Show when at least one other operator is online (not only "users.length > 1":
+    // Platform master is filtered out server-side, so alone+Platform looked empty).
+    root.classList.toggle('is-visible', users.some((u) => !u.self));
   };
 
   // Clicking the badge of another operator opens exactly the record they are working in, or the
