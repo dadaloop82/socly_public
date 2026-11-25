@@ -6450,7 +6450,10 @@ function initLeaveGuards(scope = document) {
     };
     state.submitAndLeave = submitAndLeave;
 
-    form.addEventListener('submit', () => {
+    form.addEventListener('submit', (event) => {
+      // confirm_summary / other handlers may preventDefault and await a dialog: do not disarm the
+      // guard on that cancelled submit, or a later navigation can prompt a second “conferma”.
+      if (event.defaultPrevented) return;
       state.allowLeave = true;
       state.dirty = false;
     });

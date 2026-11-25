@@ -137,7 +137,9 @@ function appConfirm(message, options = {}) {
       cancelBtn?.removeEventListener('click', onCancel);
       dialog.removeEventListener('cancel', onCancelEvent);
       dialog.close();
-      resolve(result);
+      // Defer resolve so the click that closed the modal cannot hit Salva/submit underneath and
+      // open a second confirm (classic showModal click-through, common in the embed iframe).
+      window.setTimeout(() => resolve(result), 0);
     };
     const onOk = () => {
       if (snoozeEnabled && snoozeInput instanceof HTMLInputElement && snoozeInput.checked) {

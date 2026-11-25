@@ -195,7 +195,7 @@ if ($probe !== null && $movementId > 0) {
 <form id="treasury-form" class="panel treasury-movement-form" method="post" action="<?= e($action) ?>" enctype="multipart/form-data"
       <?php if (!empty($isEdit)): ?><?= version_attrs('treasury', ['id' => (int) ($movement['id'] ?? 0), 'row_version' => (int) ($movement_version ?? ($movement['row_version'] ?? 0))]) ?><?php endif; ?>
       data-treasury-form data-leave-guard
-      <?php if (!$isEdit): ?>data-confirm-template="<?= e(__('treasury.confirm_summary')) ?>"<?php endif; ?>
+      <?php if (!$isEdit && !$embed): ?>data-confirm-template="<?= e(__('treasury.confirm_summary')) ?>"<?php endif; ?>
       data-base-currency="<?= e($currency->code()) ?>"
       data-account-balances-url="<?= e(url('/treasury/accounts/balances')) ?>"
       data-budget-items-url="<?= e(url('/treasury/budget-items')) ?>"
