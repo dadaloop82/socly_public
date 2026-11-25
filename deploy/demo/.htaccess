@@ -5,9 +5,7 @@ RewriteCond %{REQUEST_FILENAME} !-f
 RewriteCond %{DOCUMENT_ROOT}/$1/public/index.php !-f
 RewriteRule ^([a-f0-9]{10})(?:/.*)?$ /demo/expired.php?code=$1 [L,QSA]
 
-# /demo/{10-hex}/assets/... → solo asset core (public/assets).
-# NON mappare generici *.css|*.js: gli add-on servono CSS/JS via PHP
-# (/agenzia-entrate/assets/..., /board-voting/assets/..., …).
+# /demo/{10-hex}/assets/... → instance assets
 RewriteCond %{DOCUMENT_ROOT}/$1/public/assets/$2 -f
 RewriteRule ^([a-f0-9]{10})/assets/(.*)$ $1/public/assets/$2 [L]
 
