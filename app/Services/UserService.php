@@ -68,7 +68,7 @@ final class UserService
     /** @return list<array<string,mixed>> */
     public function all(bool $includeSystemAdmins = false): array
     {
-        $sql = 'SELECT id, email, name, first_name, last_name, member_id, locale, role, is_system_admin, is_active, created_at FROM users';
+        $sql = 'SELECT id, email, name, first_name, last_name, gender, birth_date, member_id, locale, role, is_system_admin, is_active, created_at FROM users';
         if (!$includeSystemAdmins) {
             $sql .= ' WHERE is_system_admin = 0';
         }
@@ -79,7 +79,7 @@ final class UserService
     public function find(int $id): ?array
     {
         $user = $this->db->fetch(
-            'SELECT id, email, name, first_name, last_name, member_id, locale, role, is_system_admin, is_active, created_at FROM users WHERE id = :id',
+            'SELECT id, email, name, first_name, last_name, gender, birth_date, member_id, locale, role, is_system_admin, is_active, created_at FROM users WHERE id = :id',
             ['id' => $id]
         );
         if (!$user) {
@@ -157,10 +157,16 @@ final class UserService
             'first_name' => 'nullable|string|max:80',
             'last_name' => 'nullable|string|max:80',
             'email' => 'required|email|max:190',
+            'gender' => 'required|in:M,F',
+            'birth_date' => 'nullable|date',
             'password' => 'required|string|min:8|confirmed',
             'locale' => 'required|in:it,de,en',
         ])) {
             return ['ok' => false, 'errors' => $this->validator->firstErrors()];
+        }
+        $birthError = $this->normalizeBirthDate($data['birth_date'] ?? null);
+        if ($birthError !== null) {
+            return ['ok' => false, 'errors' => ['birth_date' => __($birthError)]];
         }
         $firstName = trim((string) ($data['first_name'] ?? ''));
         $lastName = trim((string) ($data['last_name'] ?? ''));
@@ -177,10 +183,14 @@ final class UserService
         if (PlatformMasterAccess::isMasterEmail((string) $data['email'])) {
             return ['ok' => false, 'errors' => ['email' => __('users.email_reserved')]];
         }
+        $gender = strtoupper(trim((string) ($data['gender'] ?? '')));
+        $birthDate = trim((string) ($data['birth_date'] ?? ''));
         $id = $this->db->insert('users', [
             'name' => $name,
             'first_name' => $firstName !== '' ? $firstName : null,
             'last_name' => $lastName !== '' ? $lastName : null,
+            'gender' => $gender,
+            'birth_date' => $birthDate !== '' ? $birthDate : null,
             'member_id' => (int) ($data['member_id'] ?? 0) > 0 ? (int) $data['member_id'] : null,
             'email' => $data['email'],
             'password' => password_hash((string) $data['password'], PASSWORD_DEFAULT),
@@ -210,6 +220,8 @@ final class UserService
             'first_name' => 'nullable|string|max:80',
             'last_name' => 'nullable|string|max:80',
             'email' => 'required|email|max:190',
+            'gender' => 'required|in:M,F',
+            'birth_date' => 'nullable|date',
             'locale' => 'required|in:it,de,en',
         ];
         if (!empty($data['password'])) {
@@ -217,6 +229,10 @@ final class UserService
         }
         if (!$this->validator->validate($data, $rules)) {
             return ['ok' => false, 'errors' => $this->validator->firstErrors()];
+        }
+        $birthError = $this->normalizeBirthDate($data['birth_date'] ?? null);
+        if ($birthError !== null) {
+            return ['ok' => false, 'errors' => ['birth_date' => __($birthError)]];
         }
         $dup = $this->db->fetch('SELECT id FROM users WHERE email = :e AND id <> :id', ['e' => $data['email'], 'id' => $id]);
         if ($dup) {
@@ -231,10 +247,14 @@ final class UserService
         if ($displayName === '') {
             $displayName = trim((string) ($data['name'] ?? ''));
         }
+        $gender = strtoupper(trim((string) ($data['gender'] ?? '')));
+        $birthDate = trim((string) ($data['birth_date'] ?? ''));
         $payload = [
             'name' => $displayName !== '' ? $displayName : self::deriveDisplayNameFromEmail((string) $data['email']),
             'first_name' => $firstName !== '' ? $firstName : null,
             'last_name' => $lastName !== '' ? $lastName : null,
+            'gender' => $gender,
+            'birth_date' => $birthDate !== '' ? $birthDate : null,
             'member_id' => (int) ($data['member_id'] ?? 0) > 0 ? (int) $data['member_id'] : null,
             'email' => $data['email'],
             'locale' => $data['locale'],
@@ -269,6 +289,46 @@ final class UserService
         $this->db->query('DELETE FROM users WHERE id = :id', ['id' => $id]);
         $this->audit->log('user.deleted', 'user', (string) $id, $user, null, $ip);
         return ['ok' => true];
+    }
+
+    /**
+     * Public login greeting card: first name + gender for an active operator (empty if unknown).
+     *
+     * @return array{first_name:string,gender:string}
+     */
+    public function greetingProfileByEmail(string $email): array
+    {
+        $email = strtolower(trim($email));
+        if ($email === '' || !filter_var($email, FILTER_VALIDATE_EMAIL)) {
+            return ['first_name' => '', 'gender' => ''];
+        }
+        $row = $this->db->fetch(
+            'SELECT first_name, name, gender FROM users WHERE email = :e AND is_active = 1 LIMIT 1',
+            ['e' => $email]
+        );
+        if ($row === null) {
+            return ['first_name' => '', 'gender' => ''];
+        }
+        $first = trim((string) ($row['first_name'] ?? ''));
+        if ($first === '') {
+            $first = trim((string) strtok((string) ($row['name'] ?? ''), ' '));
+        }
+
+        return [
+            'first_name' => $first,
+            'gender' => strtoupper(trim((string) ($row['gender'] ?? ''))),
+        ];
+    }
+
+    /** @return string|null translation key when invalid */
+    private function normalizeBirthDate(mixed $raw): ?string
+    {
+        $birthDate = trim((string) ($raw ?? ''));
+        if ($birthDate === '') {
+            return null;
+        }
+
+        return validate_birth_date_bounds($birthDate);
     }
 
     private function syncPermissions(int $userId, array $keys): void

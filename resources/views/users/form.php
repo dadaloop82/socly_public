@@ -73,6 +73,29 @@
         'autocomplete' => 'off',
         'context' => 'setup',
     ]) ?>
+    <div class="setup-equal-row">
+        <?= field('select', [
+            'name' => 'gender',
+            'label' => (string) __('users.gender'),
+            'value' => (string) old('gender', $user['gender'] ?? ''),
+            'required' => true,
+            'include_empty' => true,
+            'empty_label' => (string) __('common.select'),
+            'options' => [
+                ['value' => 'M', 'label' => (string) __('members.gender_m')],
+                ['value' => 'F', 'label' => (string) __('members.gender_f')],
+            ],
+            'context' => 'setup',
+        ]) ?>
+        <?= field('date', [
+            'name' => 'birth_date',
+            'label' => (string) __('users.birth_date'),
+            'hint' => (string) __('users.birth_date_hint'),
+            'value' => (string) old('birth_date', $user['birth_date'] ?? ''),
+            'required' => false,
+            'context' => 'setup',
+        ]) ?>
+    </div>
     <?php if (!$isEdit): ?>
         <div class="setup-equal-row">
             <?= field('password', [

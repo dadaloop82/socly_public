@@ -580,6 +580,8 @@ final class SetupService
                 'last_name' => '',
                 'name' => '',
                 'email' => (string) $this->readValue('association.email', 'ASSOCIATION_EMAIL', ''),
+                'gender' => '',
+                'birth_date' => '',
                 'locale' => (string) $this->readValue('app.locale', 'APP_LOCALE', 'it'),
             ];
         }
@@ -3498,6 +3500,8 @@ final class SetupService
             'first_name' => $firstName,
             'last_name' => $lastName,
             'email' => $email,
+            'gender' => strtoupper(trim((string) ($input['gender'] ?? ''))),
+            'birth_date' => trim((string) ($input['birth_date'] ?? '')),
             'password' => (string) ($input['password'] ?? ''),
             'password_confirmation' => (string) ($input['password_confirmation'] ?? ''),
             'locale' => (string) ($input['locale'] ?? $this->readValue('app.locale', 'APP_LOCALE', 'it')),

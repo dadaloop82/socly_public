@@ -30,8 +30,10 @@ use Socly\Core\Validator;
 use Socly\Core\View;
 use Socly\Services\AuthService;
 use Socly\Services\MailService;
+use Socly\Services\RateLimiter;
 use Socly\Services\SettingsService;
 use Socly\Services\SetupService;
+use Socly\Services\UserService;
 
 final class AuthController extends BaseController
 {
@@ -98,6 +100,42 @@ final class AuthController extends BaseController
             // (and show the “contact your admin” note) until SMTP is verified.
             'mailReady' => $this->isMailReady(),
         ], 'layouts/guest');
+    }
+
+    /**
+     * Soft profile for the login busy card (greeting + Bentornato/a). Empty fields when unknown.
+     */
+    public function loginGreeting(Request $request): void
+    {
+        header('Content-Type: application/json; charset=utf-8');
+        header('Cache-Control: no-store');
+        if ($this->databaseUnreachable()) {
+            echo json_encode(['ok' => true, 'first_name' => '', 'gender' => ''], JSON_UNESCAPED_UNICODE);
+            return;
+        }
+        // Public endpoint: throttle per IP so it cannot be used to harvest operator emails.
+        $ipKey = 'login.greeting:ip:' . $request->ip();
+        try {
+            $limiter = app(RateLimiter::class);
+            if ($limiter->tooManyAttempts($ipKey, 30, 60)) {
+                echo json_encode(['ok' => true, 'first_name' => '', 'gender' => ''], JSON_UNESCAPED_UNICODE);
+                return;
+            }
+            $limiter->hit($ipKey, 60);
+        } catch (\Throwable) {
+            // A broken cache must never block the login page.
+        }
+        $email = trim((string) $request->input('email', ''));
+        try {
+            $profile = app(UserService::class)->greetingProfileByEmail($email);
+        } catch (\Throwable) {
+            $profile = ['first_name' => '', 'gender' => ''];
+        }
+        echo json_encode([
+            'ok' => true,
+            'first_name' => (string) ($profile['first_name'] ?? ''),
+            'gender' => (string) ($profile['gender'] ?? ''),
+        ], JSON_UNESCAPED_UNICODE);
     }
 
     /** SMTP configured and last test succeeded; never fails the login page. */

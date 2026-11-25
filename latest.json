@@ -1,6 +1,6 @@
 {
-    "version": "1.13.48",
-    "released_at": "2026-11-25T13:42:22+00:00",
+    "version": "1.13.52",
+    "released_at": "2026-11-25T15:48:07+00:00",
     "repository_url": "https://github.com/dadaloop82/socly_public",
     "notes_url": "https://github.com/dadaloop82/socly_public/blob/main/CHANGELOG.md",
     "download_url": "https://github.com/dadaloop82/socly_public/archive/refs/heads/main.zip",
@@ -8,6 +8,8 @@
     "changelog": [
         "Bank-statement import: Intesa Sanpaolo “Operazioni di conto” / Lista movimenti model (signed single IMPORTO column; separate from the Conto Business Insieme estratto). Large Lista movimenti PDFs no longer re-OCR every…",
         "Resource busy lock: while an operator runs a heavy job (bank-statement anomaly check / excerpt repair, or an in-app update), other users and other browser tabs see a pause message with that person’s name until the job…",
+        "Login greeting: the sign-in card now reads “Buongiorno / Buon pomeriggio / Buonasera <nome>” with “Bentornato/a” under it (from the operator profile) instead of the generic “Accesso / Sto entrando…” copy.",
+        "Operator accounts now collect gender (required, used for the welcome greeting) and an optional birth date, in the admin user editor, the inline Settings form and the setup wizard.",
         "Bank-statement “check all statements”: if a full audit finished less than an hour ago, the operator can reopen those results instead of re-running OCR on every PDF.",
         "Bank-statement verify: bulk “fix all dates / amounts” with confirm, count and ETA; ledger-only rows without a covering archived statement are listed as ignored (not actionable).",
         "Session idle timeout no longer logs anyone out in the middle of a heavy job (statement audit, excerpt repair, in-app update): the holder’s session stays alive until the job ends.",
@@ -15,8 +17,6 @@
         "Documents: Estratti Conto list newest reference period first (year, then month).",
         "Document repository: `annotate()` can update `original_name` so downloads match the archive title.",
         "Treasury movement edit: statement excerpt opens in a zoomable popup (same UX as statement verify) and the on-form preview is twice as large; open ledger anomalies show the triangle mark next to the relevant fields wit…",
-        "Bank-statement ritagli: storing an excerpt is idempotent — at most one live crop per cash-book movement (same image is reused; a different cut replaces the previous one).",
-        "Gestione Controparti: list ordered by number of movements; similar spellings are suggested for aggregation into one canonical name.",
-        "Gestione Controparti: merge button reads “Aggrega tutti con …” using the spelling that already has the most movements (the canonical target)."
+        "Bank-statement ritagli: storing an excerpt is idempotent — at most one live crop per cash-book movement (same image is reused; a different cut replaces the previous one)."
     ]
 }

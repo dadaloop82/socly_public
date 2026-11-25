@@ -86,9 +86,17 @@ if ($setupUrl === '') {
     <p class="lede" data-i18n="auth.welcome_text"><?= e(__('auth.welcome_text')) ?></p>
 
     <form method="post" action="<?= e(url('/login')) ?>"
-          data-busy-title="<?= e(__('common.busy_login_title')) ?>"
-          data-busy-text="<?= e(__('common.busy_login_text')) ?>">
+          data-login-busy="1"
+          data-login-greeting-url="<?= e(url('/login/greeting')) ?>">
         <?= csrf_field() ?>
+        <div hidden data-login-greeting-labels>
+            <span data-login-greeting="morning" data-i18n="auth.login_greeting_morning"><?= e(__('auth.login_greeting_morning')) ?></span>
+            <span data-login-greeting="afternoon" data-i18n="auth.login_greeting_afternoon"><?= e(__('auth.login_greeting_afternoon')) ?></span>
+            <span data-login-greeting="evening" data-i18n="auth.login_greeting_evening"><?= e(__('auth.login_greeting_evening')) ?></span>
+            <span data-login-welcome="M" data-i18n="auth.login_welcome_back_m"><?= e(__('auth.login_welcome_back_m')) ?></span>
+            <span data-login-welcome="F" data-i18n="auth.login_welcome_back_f"><?= e(__('auth.login_welcome_back_f')) ?></span>
+            <span data-login-welcome="" data-i18n="auth.login_welcome_back_neutral"><?= e(__('auth.login_welcome_back_neutral')) ?></span>
+        </div>
         <?= field('hidden', [
             'name' => 'lang',
             'value' => $currentLocale,

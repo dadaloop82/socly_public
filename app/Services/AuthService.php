@@ -415,7 +415,10 @@ final class AuthService
         if (!$user) {
             return;
         }
-        $fresh = $this->db->fetch('SELECT id, email, name, locale, is_system_admin, is_active FROM users WHERE id = :id', ['id' => $user['id']]);
+        $fresh = $this->db->fetch(
+            'SELECT id, email, name, first_name, last_name, gender, birth_date, locale, is_system_admin, is_active FROM users WHERE id = :id',
+            ['id' => $user['id']]
+        );
         if (!$fresh || !(int) $fresh['is_active']) {
             $_SESSION = [];
             return;

@@ -71,9 +71,28 @@ final class Migrator
         $parts = array_filter(array_map('trim', explode(';', $sql)));
         foreach ($parts as $statement) {
             if ($statement !== '') {
-                $this->db->pdo()->exec($statement);
+                $this->execStatement($statement);
             }
         }
+    }
+
+    /**
+     * Run one schema statement. A guarded migration ends with SELECT 1 (or EXECUTE of a
+     * SELECT) when there is nothing to do: PDO::exec() leaves an active cursor there and
+     * the next statement crashes with HY000/2014, so result-producing statements are
+     * executed and fully fetched instead.
+     */
+    private function execStatement(string $statement): void
+    {
+        if (preg_match('/^(SELECT|SHOW|DESCRIBE|DESC|EXPLAIN|WITH|EXECUTE)\b/i', $statement) === 1) {
+            $query = $this->db->pdo()->query($statement);
+            if ($query instanceof \PDOStatement) {
+                $query->closeCursor();
+            }
+
+            return;
+        }
+        $this->db->pdo()->exec($statement);
     }
 
     public function runPluginSql(string $pluginId, array $migrations): void

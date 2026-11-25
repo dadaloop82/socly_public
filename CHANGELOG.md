@@ -20,6 +20,12 @@ every 100 patches bump the series, and each bump is published to this rep come o
   message with that person’s name until the job finishes or the lock expires. Presence
   dots keep updating during the pause. The pause overlay now shows clearly who started
   the job (not only the operation title).
+- Login greeting: the sign-in card now reads “Buongiorno / Buon pomeriggio / Buonasera
+  <nome>” with “Bentornato/a” under it (from the operator profile) instead of the generic
+  “Accesso / Sto entrando…” copy.
+- Operator accounts now collect gender (required, used for the welcome greeting) and an
+  optional birth date, in the admin user editor, the inline Settings form and the setup
+  wizard.
 
 ### Changed
 
@@ -55,6 +61,9 @@ every 100 patches bump the series, and each bump is published to this rep come o
 
 ### Fixed
 
+- Schema upgrades: guarded migrations that end with `SELECT 1` no longer leave an open
+  cursor (HY000/2014), which could stop the migration queue on databases that already had
+  the guarded columns.
 - Treasury cost centre: every select shows only the preventivo of the movement year (no other
   years, no nearest-year fallback). Bulk edit filters to that year (or disables the field when
   years are mixed); options refresh when the date year changes; save remaps foreign lines.

@@ -87,6 +87,7 @@ $router->post('/install', [InstallController::class, 'save'], null, ['mw.locale'
 
 $router->get('/login', [AuthController::class, 'showLogin'], null, ['mw.locale', 'mw.install', 'mw.guest']);
 $router->post('/login', [AuthController::class, 'login'], null, ['mw.locale', 'mw.install', 'mw.guest', 'mw.csrf']);
+$router->post('/login/greeting', [AuthController::class, 'loginGreeting'], null, ['mw.locale', 'mw.install', 'mw.guest', 'mw.csrf']);
 $privateRoutes = code_path('bootstrap/routes_private.php');
 if (is_file($privateRoutes)) {
     require $privateRoutes;

@@ -191,6 +191,7 @@ document.addEventListener('DOMContentLoaded', () => {
   initBrokenImageGuards();
   initSessionHeartbeat();
   initActionBusyGuard();
+  initLoginBusyGreeting();
   initPresence();
   initResourceBusyWatch();
   initFreshnessGuard();
@@ -3238,6 +3239,117 @@ function hideAppBusyOverlay() {
   const root = document.getElementById('app-busy-overlay');
   if (root) root.hidden = true;
   document.documentElement.classList.remove('is-app-busy');
+}
+
+/**
+ * Login POST: replace the generic “Accesso / Sto entrando…” card with a proper
+ * “Buongiorno Mario” + “Bentornato/a”, using the operator profile for the typed
+ * email. The greeting strings are hidden [data-i18n] nodes in the login view, so
+ * the language switch keeps translating them. Never blocks the login: if the
+ * profile lookup fails or is slow, the form is submitted anyway.
+ */
+function initLoginBusyGreeting() {
+  const form = document.querySelector('form[data-login-busy]');
+  if (!form) return;
+  const endpoint = String(form.dataset.loginGreetingUrl || '');
+  const labels = form.querySelector('[data-login-greeting-labels]');
+  const emailInput = form.querySelector('input[name="email"]');
+  const csrf = document.querySelector('meta[name="csrf-token"]')?.content || '';
+  if (!labels || !emailInput || endpoint === '' || csrf === '') return;
+
+  const labelText = (selector) => {
+    const el = labels.querySelector(selector);
+    return el ? String(el.textContent || '').trim() : '';
+  };
+
+  const greetingLabel = () => {
+    const hour = new Date().getHours();
+    const slot = hour >= 5 && hour < 13 ? 'morning' : (hour >= 13 && hour < 18 ? 'afternoon' : 'evening');
+    return labelText(`[data-login-greeting="${slot}"]`) || labelText('[data-login-greeting]');
+  };
+
+  const welcomeLabel = (gender) => {
+    const code = String(gender || '').toUpperCase();
+    const specific = code === 'M' || code === 'F' ? labelText(`[data-login-welcome="${code}"]`) : '';
+    return specific || labelText('[data-login-welcome=""]') || labelText('[data-login-welcome]');
+  };
+
+  const copyFor = (profile) => ({
+    title: [greetingLabel(), String(profile?.first_name || '').trim()].filter(Boolean).join(' '),
+    text: welcomeLabel(profile?.gender),
+  });
+
+  const showGreeting = (profile) => {
+    const copy = copyFor(profile);
+    showAppBusyOverlay({ title: copy.title || undefined, text: copy.text || undefined });
+  };
+
+  const normalizeEmail = (value) => String(value || '').trim().toLowerCase();
+  let cachedEmail = '';
+  let cachedProfile = null;
+  let pending = null;
+
+  const loadProfile = (email) => {
+    const normalized = normalizeEmail(email);
+    if (normalized === '' || !normalized.includes('@')) return Promise.resolve(null);
+    if (normalized === cachedEmail) return Promise.resolve(cachedProfile);
+    if (pending && pending.email === normalized) return pending.promise;
+    const request = fetch(endpoint, {
+      method: 'POST',
+      credentials: 'same-origin',
+      headers: {
+        Accept: 'application/json',
+        'Content-Type': 'application/x-www-form-urlencoded',
+        'X-CSRF-TOKEN': csrf,
+      },
+      body: new URLSearchParams({ email: normalized }).toString(),
+    })
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => (data && data.ok
+        ? { first_name: String(data.first_name || ''), gender: String(data.gender || '') }
+        : null))
+      .catch(() => null);
+    pending = { email: normalized, promise: request };
+    request.then((profile) => {
+      cachedEmail = normalized;
+      cachedProfile = profile;
+      if (pending && pending.promise === request) pending = null;
+    });
+    return request;
+  };
+
+  // Warm the profile while the operator moves from email to password.
+  const prefetch = () => {
+    const email = normalizeEmail(emailInput.value);
+    if (email !== '' && email !== cachedEmail) loadProfile(email);
+  };
+  emailInput.addEventListener('blur', prefetch);
+  emailInput.addEventListener('change', prefetch);
+
+  document.addEventListener('submit', (event) => {
+    if (event.target !== form || event.defaultPrevented) return;
+    event.preventDefault();
+    event.stopPropagation();
+    if (form.dataset.busySubmitted === '1') {
+      showGreeting(cachedProfile);
+      return;
+    }
+    form.dataset.busySubmitted = '1';
+    form.querySelectorAll('button[type="submit"], input[type="submit"]').forEach((btn) => {
+      btn.disabled = true;
+    });
+    showGreeting(null);
+    const timeout = new Promise((resolve) => window.setTimeout(() => resolve(null), 900));
+    Promise.race([loadProfile(emailInput.value), timeout]).then((profile) => {
+      showGreeting(profile);
+      // Let the browser paint the personalised card, then submit for real.
+      window.requestAnimationFrame(() => {
+        HTMLFormElement.prototype.submit.call(form);
+      });
+    }).catch(() => {
+      HTMLFormElement.prototype.submit.call(form);
+    });
+  }, true);
 }
 
 function initActionBusyGuard() {
