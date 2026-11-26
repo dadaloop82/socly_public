@@ -16349,21 +16349,64 @@ select.is-remote-choice {
 }
 
 /* —— Minutes wizard (“Crea nuovo verbale”) —— */
+/* Center the wizard card and use the full panel width: the empty “spacer” side column made the
+   content look stuck on the left with a large dead area on the right. */
+.minutes-wizard {
+  width: min(100%, 66rem);
+  margin-inline: auto;
+}
+.minutes-wizard .wizard-panel-body {
+  grid-template-columns: minmax(0, 1fr);
+}
+.minutes-wizard .wizard-panel-side--spacer {
+  display: none;
+}
 .minutes-wizard .minutes-agenda-tools {
   display: flex;
   flex-wrap: wrap;
   gap: 0.5rem;
   margin-bottom: 0.85rem;
 }
-/* “Tipo di verbale”: four long descriptions. Two columns avoid the lone fourth card and the
-   text spilling outside the rounded border (the centred auto-sized children used to overflow). */
+/* “Tipo di verbale”: five cards with icons, centered as a group. Flex keeps the last row
+   centered (no lone card glued to the left) while long descriptions stay inside the border. */
 .minutes-type-cards {
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 0.75rem;
+  max-width: 64rem;
+  margin-inline: auto;
 }
 .minutes-type-cards .tessera-choice-card {
+  flex: 1 1 17.5rem;
+  max-width: 24rem;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  grid-template-rows: auto 1fr;
+  align-items: start;
+  column-gap: 0.7rem;
+  row-gap: 0.2rem;
   justify-items: stretch;
   min-width: 0;
+  padding: 0.9rem 1rem;
   text-align: left;
+}
+.minutes-type-cards .tessera-choice-card-icon {
+  grid-column: 1;
+  grid-row: 1 / span 2;
+  width: 2.5rem;
+  height: 2.5rem;
+  border-radius: 12px;
+}
+.minutes-type-cards .tessera-choice-card-title {
+  grid-column: 2;
+  font-size: 1.02rem;
+  line-height: 1.2;
+}
+.minutes-type-cards .tessera-choice-card-desc {
+  grid-column: 2;
+  font-size: 0.88rem;
+  line-height: 1.35;
 }
 .minutes-type-cards .tessera-choice-card-title,
 .minutes-type-cards .tessera-choice-card-desc {
@@ -16372,7 +16415,11 @@ select.is-remote-choice {
 }
 @media (max-width: 640px) {
   .minutes-type-cards {
+    display: grid;
     grid-template-columns: 1fr;
+  }
+  .minutes-type-cards .tessera-choice-card {
+    max-width: none;
   }
 }
 .minutes-agenda-list { display: grid; gap: 0.85rem; }

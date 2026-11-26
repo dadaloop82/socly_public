@@ -49,6 +49,13 @@ $agendaYes = $oldArray('agenda_yes');
 $agendaNo = $oldArray('agenda_no');
 $agendaAbstain = $oldArray('agenda_abstain');
 $defaultType = (string) old('minutes_type', (string) ($templates[0]['key'] ?? 'board'));
+$typeIcons = [
+    'board' => '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M3 21h18"/><path d="M5 21V10M9 21V10M15 21V10M19 21V10"/><path d="m12 3 8 5H4l8-5Z"/></svg>',
+    'assembly_ordinary' => '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>',
+    'assembly_extraordinary' => '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M13 2 4 14h7l-1 8 9-12h-7l1-8Z"/></svg>',
+    'free' => '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8Z"/><path d="M14 3v5h5"/><path d="M8 13h8M8 17h5"/></svg>',
+    'convocation' => '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M16 3v4M8 3v4M3 10h18"/><path d="M8 14h.01M12 14h.01M16 14h.01M8 18h.01M12 18h.01"/></svg>',
+];
 $templateModes = [];
 $templateDefaults = [];
 foreach ($templates as $template) {
@@ -138,6 +145,7 @@ $memberDelegates = is_array($memberDelegates) ? $memberDelegates : [];
                         'value' => (string) $template['key'],
                         'label' => (string) $template['label'],
                         'description' => (string) $template['description'],
+                        'icon' => $typeIcons[(string) $template['key']] ?? '',
                     ], $templates),
                 ]) ?>
             </div>
