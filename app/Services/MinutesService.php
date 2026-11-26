@@ -51,7 +51,7 @@ final class MinutesService
     ];
 
     /** Meeting platforms accepted by the video-conference block (free link stays mandatory). */
-    private const VIDEO_PLATFORMS = ['teams', 'google_meet', 'zoom', 'whatsapp', 'jitsi', 'other'];
+    private const VIDEO_PLATFORMS = ['socly', 'teams', 'google_meet', 'zoom', 'whatsapp', 'jitsi', 'other'];
 
     /** Attendance values accepted for board members. */
     private const BOARD_ATTENDANCE = ['present', 'absent_justified', 'absent'];
@@ -678,6 +678,7 @@ final class MinutesService
     private function videoPlatformLabel(string $key): string
     {
         return match ($key) {
+            'socly' => 'Socly',
             'teams' => 'Microsoft Teams',
             'google_meet' => 'Google Meet',
             'zoom' => 'Zoom',

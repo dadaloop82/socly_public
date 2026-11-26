@@ -57,6 +57,7 @@ $typeIcons = [
     'convocation' => '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M16 3v4M8 3v4M3 10h18"/><path d="M8 14h.01M12 14h.01M16 14h.01M8 18h.01M12 18h.01"/></svg>',
 ];
 $platformIcons = [
+    'socly' => '<img src="' . e(socly_icon_url()) . '" alt="" width="24" height="24" decoding="async">',
     'teams' => '<svg viewBox="0 0 24 24" width="24" height="24" aria-hidden="true" focusable="false"><rect x="2" y="2" width="20" height="20" rx="5" fill="#5059C9"/><path d="M7 8h10M12 8v9" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round"/></svg>',
     'google_meet' => '<svg viewBox="0 0 24 24" width="24" height="24" aria-hidden="true" focusable="false"><path d="M3 7a2 2 0 0 1 2-2h9v14H5a2 2 0 0 1-2-2z" fill="#00832d"/><path d="M14 10l6-3v10l-6-3z" fill="#0066da"/><path d="M3 17h11" stroke="#ffba00" stroke-width="2"/><path d="M3 7h11" stroke="#e94235" stroke-width="2"/></svg>',
     'zoom' => '<svg viewBox="0 0 24 24" width="24" height="24" aria-hidden="true" focusable="false"><rect x="2" y="4" width="20" height="16" rx="5" fill="#2D8CFF"/><rect x="7" y="8" width="8" height="8" rx="2" fill="#fff"/><path d="M15 11l3-2v6l-3-2z" fill="#fff"/></svg>',
@@ -231,6 +232,7 @@ $memberDelegates = is_array($memberDelegates) ? $memberDelegates : [];
                         'required' => false,
                         'cards_class' => 'minutes-platform-cards',
                         'options' => [
+                            ['value' => 'socly', 'label' => 'Socly', 'icon' => $platformIcons['socly']],
                             ['value' => 'teams', 'label' => 'Microsoft Teams', 'icon' => $platformIcons['teams']],
                             ['value' => 'google_meet', 'label' => 'Google Meet', 'icon' => $platformIcons['google_meet']],
                             ['value' => 'zoom', 'label' => 'Zoom', 'icon' => $platformIcons['zoom']],

@@ -20577,6 +20577,7 @@ function initMinutesWizard(root = document) {
     // Meeting platform: the link placeholder follows the chosen provider (no URL is invented).
     const videoLinkInput = form.querySelector('[name="minutes_video_link"]');
     const platformPlaceholders = {
+      socly: 'https://socly.it/…',
       teams: 'https://teams.microsoft.com/l/meetup-join/…',
       google_meet: 'https://meet.google.com/…',
       zoom: 'https://zoom.us/j/…',
