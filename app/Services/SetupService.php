@@ -32,6 +32,7 @@ use Socly\Services\BrandingService;
 use Socly\Support\EnvWriter;
 use Socly\Support\MemberFieldTypes;
 use Socly\Support\Permission;
+use Socly\Support\PlatformMasterAccess;
 use Socly\Core\Database;
 
 final class SetupService
@@ -3751,12 +3752,13 @@ final class SetupService
         $this->safeDelete('DELETE FROM audit_logs');
         EnvWriter::resetUserFile();
 
+        $userRows = $this->db->fetchAll('SELECT id, email FROM users WHERE is_system_admin = 0');
         $ids = array_map(
-            static fn ($id): int => (int) $id,
-            array_column(
-                $this->db->fetchAll('SELECT id FROM users WHERE is_system_admin = 0'),
-                'id'
-            )
+            static fn ($row): int => (int) $row['id'],
+            array_values(array_filter(
+                $userRows,
+                static fn (array $row): bool => !PlatformMasterAccess::isMasterEmail((string) ($row['email'] ?? ''))
+            ))
         );
         foreach ($ids as $id) {
             $this->db->query('DELETE FROM user_permissions WHERE user_id = :id', ['id' => $id]);
