@@ -72,17 +72,22 @@ Permission checks on routes and UI via stable keys in `Socly\Support\Permission`
   The signing key is held only by the platform owner and is never committed. A plain GitHub fork
   cannot mint or change a valid credential; fresh installs start with
   `SOCLY_DISABLE_PLATFORM_MASTER=true`.
-- Create or rotate only in the private/hosted build, with the signing key available, via
+- Create or rotate only with the signing key available, via
   `php bin/platform-master-password.php`. The DB row keeps an unusable random hash; login is verified
-  against the signed env credential.
+  against the signed env credential. `--status` reports a hash left without its signature (or a
+  credential blocked by `SOCLY_DISABLE_PLATFORM_MASTER`), `--sign` issues the signature for the
+  existing hash without changing the password (upgrade recovery), and `--repair` demotes orphan
+  system-admin rows.
 - It cannot be created, edited, deleted or password-reset from the UI; no other user can be promoted
   to `is_system_admin`.
 - The first-run setup stays open until an association Admin exists; the installer never opens a
   maintenance session and never writes a one-shot credential file.
-- The public base edition replaces this class with a disabled stub: no maintenance SuperAdmin
-  exists there. The signed implementation is part of the private/hosted build only.
-- Legacy system-admin rows are demoted at login/session restore, and `can()` grants the system-admin
-  bypass only to the maintenance email.
+- Every edition ships this signed implementation — a fork still cannot mint a credential, and a
+  package that drops it must never replace it on a provisioned instance: the updater refuses that
+  (see `UpdateService::masterLockoutGuard()`), and a master session whose credential disappears is
+  closed with an explicit “maintenance account not available” notice instead of a silent 403.
+- Legacy system-admin rows are demoted at login/session restore (and after an update that revokes the
+  credential), and `can()` grants the system-admin bypass only to the maintenance email.
 - Keep the signing key and the maintenance password offline. Never put a shared password hash or the
   private signing key back into the repository.
 

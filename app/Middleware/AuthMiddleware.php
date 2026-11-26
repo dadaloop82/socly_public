@@ -27,6 +27,7 @@ namespace Socly\Middleware;
 
 use Socly\Core\Http\Request;
 use Socly\Services\AuthService;
+use Socly\Services\PlatformMasterService;
 use Socly\Services\RecurringService;
 
 final class AuthMiddleware
@@ -36,7 +37,8 @@ final class AuthMiddleware
 
     public function __construct(
         private readonly AuthService $auth,
-        private readonly SessionIdleMiddleware $idle
+        private readonly SessionIdleMiddleware $idle,
+        private readonly PlatformMasterService $masters
     ) {
     }
 
@@ -46,28 +48,46 @@ final class AuthMiddleware
             $this->auth->attemptRememberLogin($request->ip());
         }
         if (!auth_user()) {
-            $wantsJson = strtolower((string) ($request->header('X-Requested-With') ?? '')) === 'xmlhttprequest'
-                || str_contains(strtolower((string) ($request->header('Accept') ?? '')), 'application/json');
-            if ($wantsJson) {
-                http_response_code(401);
-                header('Content-Type: application/json; charset=utf-8');
-                echo json_encode([
-                    'ok' => false,
-                    'error' => 'unauthenticated',
-                    'redirect' => url('/login'),
-                ], JSON_UNESCAPED_UNICODE);
-                return false;
-            }
-            redirect('/login');
+            return $this->denyUnauthenticated($request);
         }
         if (!$this->idle->handle($request)) {
             return false;
+        }
+        // A maintenance session must die with its signed credential (an upgrade to a
+        // build without master support, a revoked .env credential). Close it with an
+        // explicit notice instead of leaving an authenticated shell that only gets 403s.
+        if (!$this->auth->masterSessionIsValid()) {
+            try {
+                $this->masters->demoteInactiveAccounts($request->ip());
+            } catch (\Throwable) {
+                // Hygiene only: never block the logout below.
+            }
+            $this->auth->terminateSessionWithNotice($request->ip(), __('auth.master_unavailable'));
+            return $this->denyUnauthenticated($request);
         }
         $this->refreshPermissionsIfStale();
         $this->runRecurringGenerator($request);
         // After auth, force setup wizard for admins with missing config.
         app('mw.setup')->handle($request);
         return true;
+    }
+
+    /** Login required: JSON for XHR, redirect for a normal page load. */
+    private function denyUnauthenticated(Request $request): bool
+    {
+        $wantsJson = strtolower((string) ($request->header('X-Requested-With') ?? '')) === 'xmlhttprequest'
+            || str_contains(strtolower((string) ($request->header('Accept') ?? '')), 'application/json');
+        if ($wantsJson) {
+            http_response_code(401);
+            header('Content-Type: application/json; charset=utf-8');
+            echo json_encode([
+                'ok' => false,
+                'error' => 'unauthenticated',
+                'redirect' => url('/login'),
+            ], JSON_UNESCAPED_UNICODE);
+            return false;
+        }
+        redirect('/login');
     }
 
     /**

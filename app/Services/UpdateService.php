@@ -27,6 +27,7 @@ namespace Socly\Services;
 
 use Socly\Core\Database;
 use Socly\Core\Migrator;
+use Socly\Support\PlatformMasterAccess;
 
 final class UpdateService
 {
@@ -49,7 +50,8 @@ final class UpdateService
     public function __construct(
         private readonly Migrator $migrator,
         private readonly AuditService $audit,
-        private readonly Database $db
+        private readonly Database $db,
+        private readonly PlatformMasterService $masters
     ) {
     }
 
@@ -338,6 +340,15 @@ final class UpdateService
             $result['error'] = $this->describeUpdateError($manifestError);
         }
 
+        // Surface the self-lockout risk before the operator clicks “Update”: the
+        // target build must be able to verify this instance's signed credential.
+        if ($this->installEnabled() && $this->instanceHasMasterAccess()
+            && $this->targetBuildSupportsMaster() === false
+        ) {
+            $result['master_lockout_blocked'] = true;
+            $result['master_lockout_message'] = __('updates.master_lockout_blocked');
+        }
+
         return $this->writeCache($cacheFile, $this->finalizeResult($result));
     }
 
@@ -357,6 +368,17 @@ final class UpdateService
         }
         if (!$this->installEnabled()) {
             return ['ok' => false, 'message' => __('updates.disabled')];
+        }
+
+        // Never install a build that revokes the maintenance credential of this
+        // instance from the maintenance session itself (public base-edition stub).
+        $masterLockout = $this->masterLockoutGuard();
+        if ($masterLockout !== null) {
+            $this->audit->log('update.blocked_master_lockout', 'system', null, null, [
+                'current' => $this->currentVersion(),
+                'reason' => 'target_without_master_credential',
+            ], $ip);
+            return ['ok' => false, 'message' => $masterLockout, 'blocked' => 'master_lockout'];
         }
 
         $lock = storage_path('maintenance.lock');
@@ -462,6 +484,13 @@ final class UpdateService
                 app(InstallerService::class)->seedFields(InstallerService::defaultFields());
             } catch (\Throwable) {
                 // seed best-effort
+            }
+            // The new build may have revoked the maintenance credential: never leave an
+            // orphan system-admin row behind (it is invisible in the users UI).
+            try {
+                $this->masters->demoteInactiveAccounts($ip);
+            } catch (\Throwable) {
+                // Hygiene step: never fail a completed update.
             }
             $this->progress('done');
             $this->audit->log('update.applied', 'system', null, ['version' => $before], [
@@ -812,6 +841,80 @@ final class UpdateService
             return __('updates.git_check_failed', ['error' => $e->getMessage()]);
         }
         return null;
+    }
+
+    /**
+     * Guard run by apply(): refuse a release package that would silently revoke the
+     * maintenance (SuperAdmin) access of this instance.
+     *
+     * A package whose PlatformMasterAccess implementation does not verify signed
+     * credentials cannot keep an existing master session alive. Updating from that
+     * session would lock the platform owner out with no local recovery (the signing
+     * key never ships with the instance). Release 1.13.67 shipped exactly that stub
+     * to instances tracking the public repository.
+     *
+     * Escape hatch for a deliberate edition switch:
+     * SOCLY_ALLOW_MASTER_LOCKOUT_UPDATE=true.
+     */
+    private function masterLockoutGuard(): ?string
+    {
+        if (filter_var($_ENV['SOCLY_ALLOW_MASTER_LOCKOUT_UPDATE'] ?? 'false', FILTER_VALIDATE_BOOL)) {
+            return null;
+        }
+        if (!$this->instanceHasMasterAccess()) {
+            return null;
+        }
+        try {
+            $this->git(['fetch', 'origin']);
+        } catch (\Throwable) {
+            // Offline: inspect the last known ref, the merge below reports its own error.
+        }
+        if ($this->targetBuildSupportsMaster() !== false) {
+            return null;
+        }
+        return __('updates.master_lockout_blocked');
+    }
+
+    /** True while this installation still relies on a maintenance/SuperAdmin account. */
+    private function instanceHasMasterAccess(): bool
+    {
+        if (PlatformMasterAccess::isConfigured()) {
+            return true;
+        }
+        try {
+            return $this->masters->hasMasterAccount();
+        } catch (\Throwable) {
+            return false;
+        }
+    }
+
+    /**
+     * Does the package at origin/<channel> keep verifying signed master credentials?
+     *
+     * @return bool|null null when the target file cannot be inspected
+     */
+    private function targetBuildSupportsMaster(): ?bool
+    {
+        try {
+            $source = $this->git(['show', 'origin/' . $this->channel() . ':app/Support/PlatformMasterAccess.php']);
+        } catch (\Throwable) {
+            return null;
+        }
+        if (trim($source) === '') {
+            return null;
+        }
+        return $this->sourceSupportsMasterCredential($source);
+    }
+
+    /** True when a PlatformMasterAccess source verifies signed credentials. */
+    private function sourceSupportsMasterCredential(string $source): bool
+    {
+        // A disabled base-edition stub has neither the env credential nor the
+        // Ed25519 verification; a real implementation always has both.
+        return str_contains($source, 'PLATFORM_MASTER_PASSWORD_HASH')
+            && str_contains($source, 'isSignatureValid')
+            && (str_contains($source, "const EDITION = 'full'")
+                || str_contains($source, 'sodium_crypto_sign_verify_detached'));
     }
 
     /** @return array<string, mixed> */

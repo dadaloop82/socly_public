@@ -169,6 +169,17 @@ creates the association **Admin** account and guides the configuration (associat
 website lookup, logo and colours, statute and privacy notice, treasury and deadlines). Once the
 Admin exists, sign in with that account.
 
+If a maintenance credential was already provisioned on this server, verify it after an update (and
+after any `.env` change) with:
+
+```bash
+php bin/platform-master-password.php --status
+```
+
+`signature=valid` and `login_possible=yes` mean the master login works. A hash without a signature
+(`warning=hash_without_signature`) is recovered with `--sign`, which re-issues the signature for the
+existing password using the platform owner's signing key (the password itself does not change).
+
 ## 6. Verify
 
 - `https://socly.example.org/login` responds and login works.

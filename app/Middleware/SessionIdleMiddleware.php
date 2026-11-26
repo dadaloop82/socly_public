@@ -65,11 +65,9 @@ final class SessionIdleMiddleware
 
         $last = (int) ($_SESSION['last_activity'] ?? 0);
         if ($last > 0 && ($now - $last) > self::IDLE_SECONDS) {
-            $this->auth->logout($request->ip());
-            if (session_status() === PHP_SESSION_NONE) {
-                session_start();
-            }
-            $_SESSION['_flash']['errors'] = ['session' => __('auth.session_expired')];
+            // Close the session and hand the login page a notice stored in a session
+            // the browser actually owns (fresh id + fresh cookie).
+            $this->auth->terminateSessionWithNotice($request->ip(), __('auth.session_expired'));
             $accept = (string) ($_SERVER['HTTP_ACCEPT'] ?? '');
             $wantsJson = str_contains($accept, 'application/json') || str_starts_with($path, '/session/');
             if ($wantsJson) {

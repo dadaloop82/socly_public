@@ -107,6 +107,7 @@ use Socly\Services\MemberService;
 use Socly\Services\SmtpDiscoveryService;
 use Socly\Services\PaymentService;
 use Socly\Services\PlatformService;
+use Socly\Services\PlatformMasterService;
 use Socly\Services\PresenceService;
 use Socly\Services\RecurringService;
 use Socly\Services\VersionService;
@@ -262,6 +263,10 @@ $app->bind(InstallerService::class, fn (App $a) => new InstallerService(
     $a->get(SettingsService::class),
     $a->get(AuditService::class)
 ));
+$app->bind(PlatformMasterService::class, fn (App $a) => new PlatformMasterService(
+    $a->get(Database::class),
+    $a->get(AuditService::class)
+));
 $app->bind(PluginManager::class, fn (App $a) => new PluginManager($a, $codePath . '/plugins', $a->get(HookBus::class)));
 $app->bind('plugins', fn (App $a) => $a->get(PluginManager::class));
 $app->bind(MemberService::class, fn (App $a) => new MemberService(
@@ -307,7 +312,8 @@ $app->bind(InstallGate::class, fn (App $a) => new InstallGate($a));
 $app->bind(SessionIdleMiddleware::class, fn (App $a) => new SessionIdleMiddleware($a->get(AuthService::class)));
 $app->bind(AuthMiddleware::class, fn (App $a) => new AuthMiddleware(
     $a->get(AuthService::class),
-    $a->get(SessionIdleMiddleware::class)
+    $a->get(SessionIdleMiddleware::class),
+    $a->get(PlatformMasterService::class)
 ));
 $app->bind(GuestMiddleware::class, fn (App $a) => new GuestMiddleware($a->get(AuthService::class)));
 $app->bind(CsrfMiddleware::class, fn (App $a) => new CsrfMiddleware(
@@ -452,7 +458,8 @@ $app->bind(MinutesService::class, fn (App $a) => new MinutesService(
 $app->bind(UpdateService::class, fn (App $a) => new UpdateService(
     $a->get(Migrator::class),
     $a->get(AuditService::class),
-    $a->get(Database::class)
+    $a->get(Database::class),
+    $a->get(PlatformMasterService::class)
 ));
 
 $app->bind(BrandingService::class, fn (App $a) => new BrandingService($a->get(SettingsService::class)));

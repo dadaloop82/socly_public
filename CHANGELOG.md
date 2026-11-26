@@ -61,6 +61,17 @@ every 100 patches bump the series, and each bump is published to this rep come o
 
 ### Fixed
 
+- Maintenance SuperAdmin (self-lockout on upgrade): the signed credential implementation now ships in
+  every edition. Releases 1.13.67–1.13.69 replaced it with a disabled stub in the public tree, so an
+  instance upgrading from ≤1.13.65 lost `admin@socly.it` (reported as “invalid credentials”, with an
+  already-open session stuck on `403 dashboard.view`). Now the updater refuses a package that cannot
+  verify the signed credential while the instance still has a maintenance account, a revoked
+  maintenance session is closed with an explicit notice, the orphan `is_system_admin` row is demoted,
+  and `bin/platform-master-password.php` (`--status`, `--sign`, `--repair`) ships publicly for
+  diagnosis and recovery.
+- Login: a successful sign-in clears stale notices, so “Sessione scaduta” can no longer appear right
+  after logging in; an expired session is closed with a brand-new session id, so its notice always
+  reaches the browser that shows the login page.
 - Schema upgrades: guarded migrations that end with `SELECT 1` no longer leave an open
   cursor (HY000/2014), which could stop the migration queue on databases that already had
   the guarded columns.

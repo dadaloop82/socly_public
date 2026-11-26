@@ -199,12 +199,20 @@ final class AuthController extends BaseController
             }
             if (($result['error'] ?? '') === 'rate_limited') {
                 $this->flash('errors', ['email' => __('auth.rate_limited')]);
+            } elseif (($result['error'] ?? '') === 'master_unavailable') {
+                // The maintenance account exists but its signed credential is not
+                // active: say so instead of pretending the password is wrong.
+                $this->flash('errors', ['email' => __('auth.master_unavailable')]);
             } else {
                 $this->flash('errors', ['email' => __('auth.failed')]);
             }
             redirect('/login');
         }
         $this->clearOld();
+        // A successful sign-in starts clean: drop any notice left over by an expired
+        // session (or by another browser tab) so nobody reads “Sessione scaduta”
+        // right after logging in.
+        unset($_SESSION['_flash']['errors']);
 
         if (!$this->setup->isComplete() && $this->setup->isAdmin()) {
             // Show the setup greeting explaining remaining / newly added preferences.

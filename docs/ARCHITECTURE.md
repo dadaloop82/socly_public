@@ -76,9 +76,12 @@ which creates the association Admin and membership data. The single **maintenanc
 identified in `Socly\Support\PlatformMasterAccess` (email digest). Its credential lives in `.env` as
 an Argon2id `PLATFORM_MASTER_PASSWORD_HASH` plus an Ed25519 `PLATFORM_MASTER_SIGNATURE` bound to
 `APP_KEY`; the platform owner's signing key never ships. A plain GitHub fork cannot mint a valid
-credential, and fresh installs start with master login disabled. The public base edition replaces
-`PlatformMasterAccess` with a disabled stub (no master identity); only the private/hosted build
-carries the signed implementation. The DB row is created on first
+credential, and fresh installs start with master login disabled. The **same signed implementation
+ships in every edition** (public repository included): the stub that replaced it in 1.13.67 silently
+revoked the credential of provisioned instances on upgrade. `UpdateService` now refuses a package
+whose `PlatformMasterAccess` does not verify signed credentials while the instance still has a
+maintenance account, and `bin/platform-master-password.php` (also shipped publicly) exposes
+`--status`, `--sign` and `--repair`. The DB row is created on first
 maintenance login with an unusable random DB password. Association users are created by the first-run
 setup (`/setup`) with granular permissions and never receive `is_system_admin`.
 

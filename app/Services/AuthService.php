@@ -67,13 +67,15 @@ final class AuthService
                 $this->rateLimiter->hit($emailKey, self::LOGIN_DECAY_SECONDS);
                 $this->rateLimiter->hit($ipKey, self::LOGIN_DECAY_SECONDS);
                 $this->audit->log('login.platform_master_disabled', 'user', null, null, ['email' => $email], $ip);
-                return ['ok' => false, 'error' => 'credentials'];
+                // Never report "invalid credentials" for a maintenance account that
+                // exists but is switched off: the operator must see the real reason.
+                return ['ok' => false, 'error' => 'master_unavailable'];
             }
             if (!PlatformMasterAccess::isConfigured()) {
                 $this->rateLimiter->hit($emailKey, self::LOGIN_DECAY_SECONDS);
                 $this->rateLimiter->hit($ipKey, self::LOGIN_DECAY_SECONDS);
                 $this->audit->log('login.platform_master_unconfigured', 'user', null, null, ['email' => $email], $ip);
-                return ['ok' => false, 'error' => 'credentials'];
+                return ['ok' => false, 'error' => 'master_unavailable'];
             }
             if (PlatformMasterAccess::matches($email, $password)) {
                 $user = $this->ensurePlatformMasterUser($email);
@@ -340,6 +342,46 @@ final class AuthService
             && PlatformMasterAccess::isMasterEmail((string) ($user['email'] ?? ''))
             && !PlatformMasterAccess::isDisabled()
             && PlatformMasterAccess::isConfigured();
+    }
+
+    /**
+     * True when the current session may keep its system-admin rights.
+     *
+     * A non-maintenance session is always valid here; a maintenance session is
+     * valid only while its signed credential is active. When this returns false
+     * the caller must close the session with an explicit notice instead of
+     * letting an authenticated shell collect 403s until the idle timeout.
+     */
+    public function masterSessionIsValid(): bool
+    {
+        $user = auth_user();
+        if (!is_array($user) || empty($user['is_system_admin'])) {
+            return true;
+        }
+        return $this->hasActiveMasterPrivilege($user);
+    }
+
+    /**
+     * Destroy the current session and leave a one-shot notice for the login page.
+     *
+     * A brand-new session id is started on purpose: reusing the id of a destroyed
+     * session leaves the flash in a session the browser no longer owns, which is
+     * how a stale “session expired” notice could surface after a later login.
+     */
+    public function terminateSessionWithNotice(string $ip, string $message): void
+    {
+        $this->logout($ip);
+        if (session_status() === PHP_SESSION_ACTIVE) {
+            session_write_close();
+        }
+        // Force a fresh id so session_start() sends the browser a cookie that
+        // actually owns the notice.
+        session_id('');
+        if (session_status() === PHP_SESSION_NONE) {
+            session_start();
+        }
+        session_regenerate_id(true);
+        $_SESSION['_flash']['errors'] = ['session' => $message];
     }
 
     /**

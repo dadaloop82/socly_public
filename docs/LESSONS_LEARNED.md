@@ -15,6 +15,8 @@ This document captures mistakes and costly fixes from the previous membership co
 | Login rate limit stored in session (clear cookie = reset) | Server-side rate limit by IP + email in `storage/` |
 | Session cookie without `Secure` on HTTPS | `httponly`, `SameSite=Lax`, `secure` when request is HTTPS |
 | Logging full `$_POST` / `$_SESSION` (PII) | Structured logs with IDs; never dump passwords, CF, full payloads |
+| “Fixing” a security concern by shipping a disabled stub of a credential-verifying class | Keep one signed implementation in every edition and protect the upgrade path: an instance updating itself must never install a build that revokes its own SuperAdmin (`UpdateService::masterLockoutGuard()`), and a revoked session is closed with an explicit notice |
+| Destroying a session and reusing the id for the flash notice | Destroy + `session_id('')` + `session_start()` + `session_regenerate_id(true)`: the notice must live in the session the browser actually owns, and a successful login clears stale notices |
 
 ## Data integrity
 

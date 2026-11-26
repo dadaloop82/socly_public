@@ -33,6 +33,9 @@ declare(strict_types=1);
  *   php bin/update.php --apply --force-check
  *   php bin/update.php --apply --force   # apply even if the check reports "nothing to do"
  *                                        # (recovery when a stale/blocked check says up to date)
+ *   php bin/update.php --apply --allow-master-lockout
+ *                                        # apply even if the target build no longer verifies the
+ *                                        # signed maintenance credential (closes the master session)
  *
  * Cron (automatic nightly updates):
  *   15 4 * * * php /path/to/socly/bin/update.php --apply >> /path/to/socly/storage/logs/update.log 2>&1
@@ -56,6 +59,13 @@ $args = array_slice($argv ?? [], 1);
 $apply = in_array('--apply', $args, true);
 $force = in_array('--force-check', $args, true);
 $forceApply = in_array('--force', $args, true);
+if (in_array('--allow-master-lockout', $args, true)) {
+    // Explicit, auditable override of UpdateService::masterLockoutGuard(): the
+    // update will install a build that cannot verify the signed master credential.
+    $_ENV['SOCLY_ALLOW_MASTER_LOCKOUT_UPDATE'] = 'true';
+    fwrite(STDERR, "WARNING: --allow-master-lockout bypasses the maintenance-credential guard.\n"
+        . "         The maintenance SuperAdmin session will be closed after this update.\n");
+}
 
 @set_time_limit(0);
 

@@ -56,10 +56,12 @@ powershell -ExecutionPolicy Bypass -File bin\install\windows.ps1   # Windows
 ```
 
 During the wizard you configure the database, association branding, membership period and finally the
-association **Admin** account. The public base edition does not expose a maintenance SuperAdmin at
-all: fresh installations start with master login disabled. Only the private/hosted build, holding the
-platform owner's Ed25519 signing key, can add a signed master credential. The first-run setup stays
-open until the association Admin exists.
+association **Admin** account. Fresh installations start with the maintenance master login disabled.
+A maintenance SuperAdmin credential is accepted only when `.env` carries the Argon2id hash **and** an
+Ed25519 signature bound to this installation's `APP_KEY`, issued with the platform owner's signing key
+(never shipped): a plain GitHub fork cannot mint one. `php bin/platform-master-password.php --status`
+reports whether a credential on this server is usable. The first-run setup stays open until the
+association Admin exists.
 
 ## Documentation
 
