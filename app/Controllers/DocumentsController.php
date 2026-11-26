@@ -87,7 +87,39 @@ final class DocumentsController extends BaseController
     /** “Crea nuovo verbale”: template wizard with data already stored in SOCLY. */
     public function minutesCreate(Request $request): void
     {
+        $this->renderMinutesWizard();
+    }
+
+    /** Saves the wizard as an archived document with its generated PDF. */
+    public function minutesStore(Request $request): void
+    {
         require_component('documents');
+        $input = $request->all();
+        $result = $this->minutes->save($input, $request->ip(), (int) (auth_user()['id'] ?? 0));
+        if (empty($result['ok'])) {
+            // Back to the wizard with the input preserved: a dedicated flash (not `errors`) so the
+            // reasons are shown inside the wizard instead of a generic banner above it.
+            $this->flash('minutes_errors', is_array($result['errors'] ?? null) ? $result['errors'] : []);
+            $this->rememberOld($input);
+            redirect('/documents/minutes/create');
+        }
+        $this->clearOld();
+        $this->flash('success', __('documents.minutes_created'));
+        redirect('/documents/' . (int) ($result['id'] ?? 0));
+    }
+
+    /**
+     * Data every render of the “new minute” wizard needs (GET and a failed POST share it).
+     *
+     * @param array<string,string>|null $errors Null = read the one-shot flash of a rejected save.
+     */
+    private function renderMinutesWizard(?array $errors = null): void
+    {
+        require_component('documents');
+        if ($errors === null) {
+            $flashed = flash('minutes_errors');
+            $errors = is_array($flashed) ? $flashed : [];
+        }
         $templates = $this->minutes->templates();
         $year = (int) date('Y');
         $numbers = [];
@@ -123,23 +155,10 @@ final class DocumentsController extends BaseController
             'default_place' => $this->minutes->defaultPlace(),
             'pending_text' => $pendingText,
             'budget_text' => $budgetText,
+            'budget_voices' => $this->minutes->budgetVoices((int) date('Y')),
+            'convocation_notice_days' => $this->minutes->convocationNoticeDays(),
+            'errors' => $errors,
         ]);
-    }
-
-    /** Saves the wizard as an archived document with its generated PDF. */
-    public function minutesStore(Request $request): void
-    {
-        require_component('documents');
-        $input = $request->all();
-        $result = $this->minutes->save($input, $request->ip(), (int) (auth_user()['id'] ?? 0));
-        if (empty($result['ok'])) {
-            $this->flash('errors', is_array($result['errors'] ?? null) ? $result['errors'] : []);
-            $this->rememberOld($input);
-            redirect('/documents/minutes/create');
-        }
-        $this->clearOld();
-        $this->flash('success', __('documents.minutes_created'));
-        redirect('/documents/' . (int) ($result['id'] ?? 0));
     }
 
     public function create(Request $request): void
@@ -231,14 +250,39 @@ final class DocumentsController extends BaseController
         }
         $repoId = (int) ($doc['id'] ?? 0);
         $signed = $this->files->signedUrl($repoId, 900);
+        // “Referenze da altre sezioni”: readable labels instead of the raw section/ref codes.
+        $repositoryLinks = [];
+        foreach ($this->files->linksFor($repoId) as $link) {
+            $section = (string) ($link['section'] ?? '');
+            $ref = trim((string) ($link['context_ref'] ?? ''));
+            $repositoryLinks[] = [
+                'section' => $section,
+                'section_label' => $this->files->sectionLabel($section),
+                'context_label' => $this->contextRefLabel($section, $ref),
+                'created_at' => (string) ($link['created_at'] ?? ''),
+            ];
+        }
         $this->render('documents/show', [
             'title' => (string) ($doc['title'] ?? __('documents.title')),
             'document' => $doc,
+            'minutes' => $this->documents->minutesMeta($doc),
             'category_label' => $this->documents->categoryLabel((string) ($doc['category'] ?? 'other')),
             'section_label' => $this->files->sectionLabel((string) ($doc['source_section'] ?? 'documents')),
-            'repository_links' => $this->files->linksFor($repoId),
+            'repository_links' => $repositoryLinks,
             'signed_url' => $signed,
         ]);
+    }
+
+    /** Human label of a repository context (“minutes” → “Verbale”, “treasury_bank” → “Banca”). */
+    private function contextRefLabel(string $section, string $ref): string
+    {
+        if ($ref === '') {
+            return '';
+        }
+        $key = 'documents.source_' . preg_replace('/[^a-z0-9_]/', '_', strtolower($ref));
+        $label = (string) __($key);
+
+        return $label !== $key ? $label : ucfirst(str_replace('_', ' ', $ref));
     }
 
     public function update(Request $request, string $id): void

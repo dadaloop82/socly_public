@@ -1,11 +1,13 @@
 {
-    "version": "1.14.49",
-    "released_at": "2026-11-26T21:29:14+00:00",
+    "version": "1.14.52",
+    "released_at": "2026-11-26T23:56:42+00:00",
     "repository_url": "https://github.com/dadaloop82/socly_public",
     "notes_url": "https://github.com/dadaloop82/socly_public/blob/main/CHANGELOG.md",
     "download_url": "https://github.com/dadaloop82/socly_public/archive/refs/heads/main.zip",
     "install_guide_url": "https://github.com/dadaloop82/socly_public/blob/main/README.md#updates",
     "changelog": [
+        "Bank-statement import: an unreadable amount now has **Riprova a leggere la cifra** on the review card, with six alternate crops/OCR modes on the same line. If the number still cannot be read the card offers **Copia lo…",
+        "Board voting: **Esporta PDF** replaces “Stampa / PDF”. The results report (summary, outcomes, participation register and, for open polls, the individual ballots) opens inline in the browser with the association brandi…",
         "Documents: a document in **Draft** status can now be deleted from its detail or edit page with a double confirmation. Approved, signed and archived documents remain immutable; the deletion is recorded in the activity …",
         "Org chart: the vice-president office is no longer monocratic, so an association can record two (or more) vice presidents. The chart shows every assignee plus the “Add” node, and a migration clears a legacy `is_unique`…",
         "Session expiry warning: 30 seconds before the idle timeout a card with a countdown ring and a soft chime says the session is about to end, with a “Stay signed in” button that renews it in one click. The idle timeout i…",
@@ -15,8 +17,6 @@
         "Login greeting: the sign-in card now reads “Buongiorno / Buon pomeriggio / Buonasera <nome>” with “Bentornato/a” under it (from the operator profile) instead of the generic “Accesso / Sto entrando…” copy.",
         "Operator accounts now collect gender (required, used for the welcome greeting) and an optional birth date, in the admin user editor, the inline Settings form and the setup wizard.",
         "Documents: bank-statement crops (“Ritagli dell’estratto conto”) are no longer counted as documents and stay out of the default archive, so the KPI cards show how many real documents exist. They remain reachable by sel…",
-        "Bank-statement “check all statements”: if a full audit finished less than an hour ago, the operator can reopen those results instead of re-running OCR on every PDF.",
-        "Bank-statement verify: bulk “fix all dates / amounts” with confirm, count and ETA; ledger-only rows without a covering archived statement are listed as ignored (not actionable).",
-        "Session idle timeout no longer logs anyone out in the middle of a heavy job (statement audit, excerpt repair, in-app update): the holder’s session stays alive until the job ends."
+        "Bank-statement “check all statements”: if a full audit finished less than an hour ago, the operator can reopen those results instead of re-running OCR on every PDF."
     ]
 }

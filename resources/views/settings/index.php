@@ -760,9 +760,25 @@
                 'last_test_ok' => false, 'last_test_at' => '',
             ];
             $mailReady = !empty($mailReady);
-            $showManual = !empty($mailCfg['host']) || !empty(flash('smtp_needs_manual'));
+            $mailDiscovery = is_array($mailDiscovery ?? null)
+                ? $mailDiscovery
+                : ['active' => false, 'until' => 0, 'remaining' => 0];
+            $mailSuggestion = is_array($mailSuggestion ?? null)
+                ? $mailSuggestion
+                : ['host' => '', 'port' => 0, 'encryption' => '', 'username' => ''];
+            $mailCooldownIso = !empty($mailDiscovery['active']) ? date('c', (int) ($mailDiscovery['until'] ?? 0)) : '';
+            $showManual = !empty($mailCfg['host'])
+                || !empty(flash('smtp_needs_manual'))
+                || $mailCooldownIso !== ''
+                || (string) ($mailSuggestion['host'] ?? '') !== '';
             $mailSkipped = !empty($mailCfg['outbound_disabled']);
             $mailEnc = (string) ($mailCfg['encryption'] ?? 'tls');
+            if ($mailEnc === '' && (string) ($mailSuggestion['encryption'] ?? '') !== '') {
+                $mailEnc = (string) $mailSuggestion['encryption'];
+            }
+            $mailHostValue = (string) ($mailCfg['host'] !== '' ? $mailCfg['host'] : ($mailSuggestion['host'] ?? ''));
+            $mailPortValue = (string) ((int) ($mailCfg['port'] ?? 0) > 0 ? (int) $mailCfg['port'] : ((int) ($mailSuggestion['port'] ?? 0) > 0 ? (int) $mailSuggestion['port'] : 587));
+            $mailUserValue = (string) ($mailCfg['username'] !== '' ? $mailCfg['username'] : ($mailSuggestion['username'] ?? ''));
             $assocEmail = (string) ($mailCfg['from_address'] ?: '');
         ?>
         <form
@@ -772,6 +788,8 @@
             class="setup-smtp"
             data-setup-smtp
             data-smtp-initial-manual="<?= $showManual ? '1' : '0' ?>"
+            data-discovery-cooldown-until="<?= e($mailCooldownIso) ?>"
+            data-msg-discovery-cooldown="<?= e((string) __('mail.discovery_cooldown')) ?>"
             data-discover-url="<?= e(url('/setup/mail/discover')) ?>"
             data-test-url="<?= e(url('/setup/mail/test')) ?>"
             data-discover-ok="<?= e(__('setup.mail_discover_ok')) ?>"
@@ -845,7 +863,7 @@
                         <?= field('text', [
                             'name' => 'host',
                             'label' => (string) __('mail.host'),
-                            'value' => (string) $mailCfg['host'],
+                            'value' => $mailHostValue,
                             'required' => true,
                             'context' => 'setup',
                             'placeholder' => 'smtp.example.com',
@@ -855,7 +873,7 @@
                         <?= field('number', [
                             'name' => 'port',
                             'label' => (string) __('mail.port'),
-                            'value' => (string) ($mailCfg['port'] ?: 587),
+                            'value' => $mailPortValue,
                             'required' => true,
                             'context' => 'setup',
                             'min' => 1,
@@ -880,7 +898,7 @@
                     <?= field('text', [
                         'name' => 'username',
                         'label' => (string) __('mail.username'),
-                        'value' => (string) $mailCfg['username'],
+                        'value' => $mailUserValue,
                         'required' => true,
                         'context' => 'setup',
                         'autocomplete' => 'off',
@@ -1104,6 +1122,15 @@
                 'label_class' => 'checkbox-row',
             ]) ?>
             <p class="muted"><?= e(__('org.control_body_hint')) ?></p>
+            <?= field('number', [
+                'name' => 'convocation_notice_days',
+                'label' => (string) __('settings.org_convocation_notice_label'),
+                'hint' => (string) __('settings.org_convocation_notice_hint'),
+                'value' => (string) ($orgConvocationNoticeDays ?? 5),
+                'min' => 0,
+                'max' => 90,
+                'context' => 'setup',
+            ]) ?>
             <p class="settings-autosave-status muted" data-settings-autosave-status aria-live="polite"></p>
             <div class="config-accordion-actions">
                 <a class="btn btn-ghost btn-sm" href="<?= e(url('/org')) ?>"><?= e(__('settings.open_org')) ?></a>

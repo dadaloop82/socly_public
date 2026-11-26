@@ -52,6 +52,7 @@ final class SessionIdleMiddleware
         // Open setup wizard keeps its own session keeper; do not idle-kick mid-config.
         if (str_starts_with($path, '/setup')) {
             $_SESSION['last_activity'] = time();
+            $this->refreshCookie();
             return true;
         }
 
@@ -60,6 +61,7 @@ final class SessionIdleMiddleware
         // longer than the idle window: never log the holder out mid-procedure.
         if ($this->holdsHeavyJobLock()) {
             $_SESSION['last_activity'] = $now;
+            $this->refreshCookie();
             return true;
         }
 
@@ -81,7 +83,48 @@ final class SessionIdleMiddleware
         }
 
         $_SESSION['last_activity'] = $now;
+        $this->refreshCookie();
         return true;
+    }
+
+    /**
+     * Sliding session cookie.
+     *
+     * PHP sends the session cookie only when it creates (or regenerates) the id: with
+     * SESSION_LIFETIME minutes the browser dropped a perfectly active login at that fixed
+     * deadline, however much the operator kept working. Re-sending the same id with a fresh
+     * expiry makes the cookie slide, so the only reasons to be signed out are the idle window
+     * (SESSION_IDLE_MINUTES), a heavy job ending or an explicit logout.
+     */
+    private function refreshCookie(): void
+    {
+        if (session_status() !== PHP_SESSION_ACTIVE || headers_sent()) {
+            return;
+        }
+        $name = (string) session_name();
+        $id = (string) session_id();
+        if ($name === '' || $id === '' || (string) ($_COOKIE[$name] ?? '') !== $id) {
+            // Brand-new or just-regenerated id: PHP is already sending its own cookie.
+            return;
+        }
+        $params = session_get_cookie_params();
+        $lifetime = (int) ($params['lifetime'] ?? 0);
+        if ($lifetime <= 0) {
+            // Browser-session cookie: nothing to renew.
+            return;
+        }
+        $options = [
+            'expires' => time() + $lifetime,
+            'path' => (string) ($params['path'] ?? '/'),
+            'secure' => !empty($params['secure']),
+            'httponly' => !empty($params['httponly']),
+            'samesite' => (string) ($params['samesite'] ?? 'Lax'),
+        ];
+        $domain = trim((string) ($params['domain'] ?? ''));
+        if ($domain !== '') {
+            $options['domain'] = $domain;
+        }
+        setcookie($name, $id, $options);
     }
 
     private function holdsHeavyJobLock(): bool

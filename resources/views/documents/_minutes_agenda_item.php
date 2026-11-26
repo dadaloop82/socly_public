@@ -65,6 +65,7 @@ $required = !empty($required);
         <?= field('select', [
             'name' => 'agenda_outcome[]',
             'label' => (string) __('documents.minutes_agenda_outcome'),
+            'hint' => (string) __('documents.minutes_agenda_outcome_hint'),
             'value' => $outcome,
             'include_empty' => false,
             'options' => [
@@ -73,12 +74,36 @@ $required = !empty($required);
                 ['value' => 'rejected', 'label' => (string) __('documents.minutes_outcome_rejected')],
                 ['value' => 'not_voted', 'label' => (string) __('documents.minutes_outcome_not_voted')],
             ],
+            'attrs' => ['data-minutes-agenda-outcome' => true],
             'context' => 'member',
         ]) ?>
         <div class="minutes-vote-row">
-            <?= field('number', ['name' => 'agenda_yes[]', 'label' => (string) __('documents.minutes_vote_yes'), 'value' => (string) $yes, 'min' => 0, 'context' => 'member']) ?>
-            <?= field('number', ['name' => 'agenda_no[]', 'label' => (string) __('documents.minutes_vote_no'), 'value' => (string) $no, 'min' => 0, 'context' => 'member']) ?>
-            <?= field('number', ['name' => 'agenda_abstain[]', 'label' => (string) __('documents.minutes_vote_abstain'), 'value' => (string) $abstain, 'min' => 0, 'context' => 'member']) ?>
+            <?= field('number', [
+                'name' => 'agenda_yes[]',
+                'label' => (string) __('documents.minutes_vote_yes'),
+                'value' => (string) $yes,
+                'min' => 0,
+                'attrs' => ['data-minutes-agenda-vote' => 'yes'],
+                'context' => 'member',
+            ]) ?>
+            <?= field('number', [
+                'name' => 'agenda_no[]',
+                'label' => (string) __('documents.minutes_vote_no'),
+                'value' => (string) $no,
+                'min' => 0,
+                'attrs' => ['data-minutes-agenda-vote' => 'no'],
+                'context' => 'member',
+            ]) ?>
+            <?= field('number', [
+                'name' => 'agenda_abstain[]',
+                'label' => (string) __('documents.minutes_vote_abstain'),
+                'value' => (string) $abstain,
+                'min' => 0,
+                'readonly' => true,
+                'attrs' => ['data-minutes-agenda-vote' => 'abstain'],
+                'context' => 'member',
+            ]) ?>
         </div>
     </div>
+    <p class="setup-hint muted minutes-vote-cap" data-minutes-agenda-cap hidden></p>
 </article>

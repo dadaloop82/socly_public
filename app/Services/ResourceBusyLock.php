@@ -41,6 +41,18 @@ final class ResourceBusyLock
     /** Hard ceiling: no busy lock may block the instance longer than this. */
     public const MAX_HOLD_SECONDS = 1800; // 30 minutes
 
+    /**
+     * Rough duration (seconds) per operation, used when the starter does not provide a real ETA:
+     * the busy page promises “about” this much, never a precision it cannot keep.
+     *
+     * @var array<string,int>
+     */
+    private const DEFAULT_ETA_SECONDS = [
+        self::OP_BANK_STATEMENT_AUDIT => 240,
+        self::OP_BANK_STATEMENT_REPAIR => 300,
+        self::OP_SYSTEM_UPDATE => 180,
+    ];
+
     public const OP_BANK_STATEMENT_AUDIT = 'bank_statement_audit';
     public const OP_BANK_STATEMENT_REPAIR = 'bank_statement_repair';
     public const OP_SYSTEM_UPDATE = 'system_update';
@@ -114,7 +126,8 @@ final class ResourceBusyLock
         string $userName,
         string $sessionId,
         ?string $label = null,
-        ?int $ttlSeconds = null
+        ?int $ttlSeconds = null,
+        ?int $etaSeconds = null
     ): array {
         $operation = preg_replace('/[^a-z0-9_]/', '', strtolower($operation)) ?? '';
         $job = preg_replace('/[^a-f0-9]/', '', strtolower($job)) ?? '';
@@ -145,6 +158,11 @@ final class ResourceBusyLock
                 ? mb_substr(trim($label), 0, 190)
                 : $this->operationLabel($operation),
         ];
+        if ($etaSeconds !== null && $etaSeconds > 0) {
+            $eta = max(30, min(self::MAX_HOLD_SECONDS, $etaSeconds));
+            $payload['eta_seconds'] = $eta;
+            $payload['eta_at'] = date('c', min($now + $eta, $hardCap));
+        }
         if (!$this->write($payload)) {
             return ['ok' => false, 'error' => 'write_failed'];
         }
@@ -220,6 +238,61 @@ final class ResourceBusyLock
     }
 
     /**
+     * Expected end of the heavy job, in seconds from now. Uses the estimate provided when the
+     * lock was taken, otherwise a rough per-operation default; null when nothing is known.
+     *
+     * @param array<string,mixed> $status
+     * @return array{remaining:int,total:int,at:int,overrun:bool}|null
+     */
+    public function eta(array $status): ?array
+    {
+        $started = strtotime((string) ($status['started_at'] ?? '')) ?: 0;
+        $etaAt = strtotime((string) ($status['eta_at'] ?? '')) ?: 0;
+        $total = max(0, (int) ($status['eta_seconds'] ?? 0));
+        if ($etaAt < 1) {
+            $total = $total > 0
+                ? $total
+                : (self::DEFAULT_ETA_SECONDS[(string) ($status['operation'] ?? '')] ?? 0);
+            if ($started > 0 && $total > 0) {
+                $etaAt = $started + $total;
+            }
+        }
+        if ($etaAt < 1) {
+            return null;
+        }
+
+        return [
+            'remaining' => max(0, $etaAt - time()),
+            'total' => $total > 0 ? $total : max(0, $etaAt - $started),
+            'at' => $etaAt,
+            'overrun' => $etaAt <= time(),
+        ];
+    }
+
+    /**
+     * One sentence for the pause page and the JSON probe: “Fine stimata: 22:41 (tra circa 12
+     * minuti)”, “Sta richiedendo più del previsto…”, or “Durata non stimabile…”.
+     *
+     * @param array<string,mixed> $status
+     */
+    public function etaLabel(array $status): string
+    {
+        $eta = $this->eta($status);
+        if ($eta === null) {
+            return (string) __('resource_busy.eta_unknown');
+        }
+        if ($eta['overrun']) {
+            return (string) __('resource_busy.eta_overrun');
+        }
+        $minutes = max(1, (int) ceil($eta['remaining'] / 60));
+
+        return (string) __('resource_busy.eta', [
+            'time' => date('H:i', (int) $eta['at']),
+            'minutes' => (string) $minutes,
+        ]);
+    }
+
+    /**
      * @return array{
      *   operation:string,job:string,user_id:int,user_name:string,session_id:string,
      *   started_at:string,expires_at:string,label?:string
@@ -254,6 +327,8 @@ final class ResourceBusyLock
             'started_at' => (string) ($data['started_at'] ?? ''),
             'expires_at' => (string) ($data['expires_at'] ?? ''),
             'label' => mb_substr(trim((string) ($data['label'] ?? '')), 0, 190),
+            'eta_seconds' => max(0, (int) ($data['eta_seconds'] ?? 0)),
+            'eta_at' => (string) ($data['eta_at'] ?? ''),
         ];
     }
 

@@ -30,6 +30,13 @@ namespace Socly\Services;
  */
 final class MailService
 {
+    /**
+     * After an automatic search (success or failure) the discovery rests this long: the probe
+     * hammers the provider and holds the session for up to two minutes, so the operator works
+     * with the pre-filled/manual configuration instead.
+     */
+    public const DISCOVERY_COOLDOWN_SECONDS = 21600; // 6 hours
+
     public function __construct(
         private readonly SettingsService $settings
     ) {
@@ -74,6 +81,26 @@ final class MailService
      */
     public function discover(array $input): array
     {
+        // Automatic search rested after the previous attempt: the operator verifies the pre-filled
+        // (or manual) configuration instead of re-running a slow probe.
+        $autoSearch = trim((string) ($input['host'] ?? '')) === '';
+        if ($autoSearch) {
+            $cooldown = $this->discoveryCooldown();
+            if ($cooldown['active']) {
+                return [
+                    'ok' => false,
+                    'cooldown' => true,
+                    'cooldown_until' => date('c', $cooldown['until']),
+                    'cooldown_remaining' => $cooldown['remaining'],
+                    'needs_manual' => true,
+                    'error' => __('mail.discovery_cooldown', [
+                        'time' => date('H:i', $cooldown['until']),
+                        'minutes' => (string) max(1, (int) ceil($cooldown['remaining'] / 60)),
+                    ]),
+                ];
+            }
+        }
+
         $fromAddress = trim((string) ($input['from_address'] ?? ''));
         $passwordIn = (string) ($input['password'] ?? '');
         $existingPassword = (string) $this->settings->get('mail.password', '');
@@ -122,15 +149,19 @@ final class MailService
             }
 
             $probeError = (string) ($probe['error'] ?? '');
+            $probeRaw = trim((string) ($probe['raw_error'] ?? ''));
             $looksTimeout = stripos($probeError, 'timed out') !== false
                 || stripos($probeError, 'timeout') !== false
                 || stripos($probeError, 'Connection refused') !== false;
 
+            $probeMessage = $looksTimeout
+                ? __('mail.discovery_unreachable', ['host' => $host, 'tried' => '1'])
+                : ($probeError !== '' ? $probeError : __('mail.discovery_failed', ['tried' => '1']));
+            $this->logDiscoveryFailure(1, $looksTimeout, $host, $probeRaw !== '' ? $probeRaw : $probeError);
+
             return [
                 'ok' => false,
-                'error' => $looksTimeout
-                    ? __('mail.discovery_unreachable', ['host' => $host, 'tried' => '1'])
-                    : ($probeError !== '' ? $probeError : __('mail.discovery_failed', ['tried' => '1'])),
+                'error' => $this->withDiscoveryDetail($probeMessage, $probeRaw),
                 'needs_manual' => true,
                 'host' => $host,
                 'port' => $port,
@@ -139,13 +170,17 @@ final class MailService
                 'from_address' => $fromAddress,
                 'tried' => 1,
                 'unreachable' => $looksTimeout,
+                'last_error' => $probeRaw !== '' ? $probeRaw : $probeError,
             ];
         }
 
         @set_time_limit(130);
+        // An attempt is an attempt, even if it times out: the cooldown starts before the probe.
+        $this->settings->set('mail.discovery_last_attempt', (string) time());
         $found = app(SmtpDiscoveryService::class)->discover($fromAddress, $password, $username);
         if (empty($found['ok']) || empty($found['config'])) {
             $suggestion = is_array($found['suggestion'] ?? null) ? $found['suggestion'] : null;
+            $this->storeDiscoverySuggestion($suggestion);
             $hostHint = (string) ($suggestion['host'] ?? 'smtp');
             $error = !empty($found['unreachable'])
                 ? __('mail.discovery_unreachable', [
@@ -153,10 +188,17 @@ final class MailService
                     'tried' => (string) ((int) ($found['tried'] ?? 0)),
                 ])
                 : __('mail.discovery_failed', ['tried' => (string) ((int) ($found['tried'] ?? 0))]);
+            $detail = trim((string) ($found['last_error'] ?? ''));
+            $this->logDiscoveryFailure(
+                (int) ($found['tried'] ?? 0),
+                !empty($found['unreachable']),
+                $hostHint,
+                $detail
+            );
 
             return [
                 'ok' => false,
-                'error' => $error,
+                'error' => $this->withDiscoveryDetail($error, $detail),
                 'needs_manual' => true,
                 'tried' => (int) ($found['tried'] ?? 0),
                 'unreachable' => !empty($found['unreachable']),
@@ -171,6 +213,7 @@ final class MailService
         }
 
         $cfg = $found['config'];
+        $this->clearDiscoverySuggestion();
         return [
             'ok' => true,
             'host' => $cfg['host'],
@@ -181,6 +224,95 @@ final class MailService
             'connection_ok' => true,
             'tried' => (int) ($found['tried'] ?? 0),
         ];
+    }
+
+    /**
+     * Append the technical SMTP reason so the operator (and support) know *why* the automatic
+     * search failed instead of only “we could not connect”. Never carries credentials: the
+     * string comes from the socket handshake (e.g. “535 5.7.8 Username and Password not accepted”).
+     */
+    private function withDiscoveryDetail(string $message, string $detail): string
+    {
+        $detail = trim((string) (preg_replace('/\s+/', ' ', $detail) ?? ''));
+        if ($detail === '' || str_contains($message, $detail)) {
+            return $message;
+        }
+        if (mb_strlen($detail, 'UTF-8') > 200) {
+            $detail = mb_substr($detail, 0, 200, 'UTF-8') . '…';
+        }
+
+        return $message . ' ' . __('mail.discovery_detail', ['error' => $detail]);
+    }
+
+    /** Support trail for a failed discovery: host/port + SMTP answer only, never the mailbox. */
+    private function logDiscoveryFailure(int $tried, bool $unreachable, string $host, string $detail): void
+    {
+        if ($detail === '') {
+            return;
+        }
+        try {
+            app('logger')->warning('mail.discovery_failed', [
+                'tried' => $tried,
+                'unreachable' => $unreachable,
+                'host' => $host,
+                'detail' => mb_substr($detail, 0, 300, 'UTF-8'),
+            ]);
+        } catch (\Throwable) {
+            // Logging must never break the mail step of the wizard.
+        }
+    }
+
+    /**
+     * Remaining rest of the automatic discovery (per instance).
+     *
+     * @return array{active:bool,until:int,remaining:int}
+     */
+    public function discoveryCooldown(): array
+    {
+        $last = (int) $this->settings->get('mail.discovery_last_attempt', '0');
+        $until = $last > 0 ? $last + self::DISCOVERY_COOLDOWN_SECONDS : 0;
+        $remaining = max(0, $until - time());
+
+        return ['active' => $remaining > 0, 'until' => $until, 'remaining' => $remaining];
+    }
+
+    /**
+     * Host/port/encryption/username suggested by the last failed search: the manual form starts
+     * from these values instead of an empty box.
+     *
+     * @return array{host:string,port:int,encryption:string,username:string}
+     */
+    public function discoveryPrefill(): array
+    {
+        return [
+            'host' => trim((string) $this->settings->get('mail.suggestion_host', '')),
+            'port' => (int) ($this->settings->get('mail.suggestion_port', '0') ?: 0),
+            'encryption' => trim((string) $this->settings->get('mail.suggestion_encryption', '')),
+            'username' => trim((string) $this->settings->get('mail.suggestion_username', '')),
+        ];
+    }
+
+    /** @param array<string,mixed>|null $suggestion */
+    private function storeDiscoverySuggestion(?array $suggestion): void
+    {
+        if ($suggestion === null) {
+            return;
+        }
+        $host = trim((string) ($suggestion['host'] ?? ''));
+        if ($host === '') {
+            return;
+        }
+        $this->settings->set('mail.suggestion_host', $host);
+        $this->settings->set('mail.suggestion_port', (string) max(1, (int) ($suggestion['port'] ?? 587)));
+        $this->settings->set('mail.suggestion_encryption', (string) ($suggestion['encryption'] ?? 'tls'));
+        $this->settings->set('mail.suggestion_username', trim((string) ($suggestion['username'] ?? '')));
+    }
+
+    private function clearDiscoverySuggestion(): void
+    {
+        foreach (['mail.suggestion_host', 'mail.suggestion_port', 'mail.suggestion_encryption', 'mail.suggestion_username'] as $key) {
+            $this->settings->set($key, '');
+        }
     }
 
     /** @return array{host:string,port:int,encryption:string,username:string,password:string,from_address:string,from_name:string,has_password:bool,last_test_ok:bool,last_test_at:string} */
@@ -232,6 +364,25 @@ final class MailService
 
         $discovery = app(SmtpDiscoveryService::class);
         $found = $discovery->discover($fromAddress, $password, $username);
+        if (!empty($found['cooldown'])) {
+            // The automatic search is resting: continue with the saved suggestion when there is
+            // one, otherwise ask for the manual data instead of failing for hours.
+            $prefill = $this->discoveryPrefill();
+            if ($prefill['host'] !== '') {
+                return $this->save(array_merge($input, [
+                    'host' => $prefill['host'],
+                    'port' => $prefill['port'] > 0 ? $prefill['port'] : 587,
+                    'encryption' => $prefill['encryption'] !== '' ? $prefill['encryption'] : 'tls',
+                    'username' => $prefill['username'] !== '' ? $prefill['username'] : $username,
+                ]), $requireTestPass);
+            }
+
+            return [
+                'ok' => false,
+                'errors' => ['from_address' => (string) ($found['error'] ?? '')],
+                'needs_manual' => true,
+            ];
+        }
         if (empty($found['ok']) || empty($found['config'])) {
             $msg = !empty($found['unreachable'])
                 ? __('mail.discovery_unreachable', [
@@ -239,6 +390,7 @@ final class MailService
                     'tried' => (string) ((int) ($found['tried'] ?? 0)),
                 ])
                 : __('mail.discovery_failed', ['tried' => (string) ((int) ($found['tried'] ?? 0))]);
+            $msg = $this->withDiscoveryDetail($msg, (string) ($found['last_error'] ?? ''));
 
             return [
                 'ok' => false,

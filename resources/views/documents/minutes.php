@@ -34,7 +34,50 @@
  * @var string $default_place
  * @var string $pending_text
  * @var string $budget_text
+ * @var array{years:list<int>,default_year:int,budgets:list<array<string,mixed>>} $budget_voices
+ * @var array<string,string> $errors
  */
+$minutesErrors = [];
+$minutesErrorStep = 1;
+if (isset($errors) && is_array($errors)) {
+    // Field => wizard step, so a server-side rejection reopens the point that needs attention.
+    $minutesErrorSteps = [
+        'minutes_type' => 1,
+        'minutes_number' => 2,
+        'minutes_date' => 2,
+        'minutes_time_open' => 2,
+        'minutes_time_close' => 5,
+        'minutes_convocation_date' => 2,
+        'minutes_place_mode' => 2,
+        'minutes_place' => 2,
+        'minutes_video_platform' => 2,
+        'minutes_video_link' => 2,
+        'president_id' => 3,
+        'president_substitute' => 3,
+        'secretary_id' => 3,
+        'secretary_substitute' => 3,
+        'attendance' => 3,
+        'member_presence' => 3,
+        'member_delegate_to' => 3,
+        'delegation_limit' => 3,
+        'agenda_title' => 4,
+        'agenda_yes' => 4,
+        'agenda_no' => 4,
+        'agenda_abstain' => 4,
+        'minutes_status' => 5,
+        'minutes_notes' => 5,
+    ];
+    foreach ($errors as $field => $message) {
+        $text = is_array($message) ? implode(', ', $message) : (string) $message;
+        if (trim($text) === '') {
+            continue;
+        }
+        $minutesErrors[] = $text;
+        if ($minutesErrorStep === 1 && isset($minutesErrorSteps[(string) $field])) {
+            $minutesErrorStep = (int) $minutesErrorSteps[(string) $field];
+        }
+    }
+}
 $oldArray = static function (string $name): array {
     $value = old($name, []);
     return is_array($value) ? array_values($value) : [];
@@ -115,10 +158,21 @@ $memberDelegates = is_array($memberDelegates) ? $memberDelegates : [];
     action="<?= e(url('/documents/minutes')) ?>"
     data-minutes-wizard
     data-total-steps="5"
+    data-msg-vote-cap="<?= e((string) __('documents.minutes_vote_cap')) ?>"
+    data-convocation-notice-days="<?= (int) ($convocation_notice_days ?? 0) ?>"
+    <?php if ($minutesErrors !== []): ?>data-minutes-error-step="<?= (int) $minutesErrorStep ?>"<?php endif; ?>
     autocomplete="off"
 >
     <?= csrf_field() ?>
+    <?php if ($minutesErrors !== []): ?>
+        <div class="alert alert-error" role="alert">
+            <?php foreach ($minutesErrors as $minutesError): ?>
+                <div><?= e($minutesError) ?></div>
+            <?php endforeach; ?>
+        </div>
+    <?php endif; ?>
     <script type="application/json" data-minutes-numbers><?= json_encode($numbers, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?></script>
+    <script type="application/json" data-minutes-budget-data><?= json_encode($budget_voices ?? [], JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?></script>
     <script type="application/json" data-minutes-template-modes><?= json_encode($templateModes, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?></script>
     <script type="application/json" data-minutes-template-defaults><?= json_encode($templateDefaults, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?></script>
 
@@ -185,6 +239,7 @@ $memberDelegates = is_array($memberDelegates) ? $memberDelegates : [];
                         'label' => (string) __('documents.minutes_field_date'),
                         'value' => (string) ($default_date ?? date('Y-m-d')),
                         'required' => true,
+                        'min' => date('Y-m-d'),
                         'context' => 'member',
                     ]) ?>
                 </div>
@@ -194,6 +249,7 @@ $memberDelegates = is_array($memberDelegates) ? $memberDelegates : [];
                         'label' => (string) __('documents.minutes_field_time_open'),
                         'value' => (string) old('minutes_time_open', ''),
                         'input_type' => 'time',
+                        'required' => true,
                         'context' => 'member',
                     ]) ?>
                     <?= field('date', [
@@ -244,6 +300,7 @@ $memberDelegates = is_array($memberDelegates) ? $memberDelegates : [];
                     <?= field('text', [
                         'name' => 'minutes_video_link',
                         'label' => (string) __('documents.minutes_field_video'),
+                        'hint' => (string) __('documents.minutes_field_video_hint'),
                         'value' => (string) old('minutes_video_link', ''),
                         'input_type' => 'url',
                         'maxlength' => 255,
@@ -255,6 +312,7 @@ $memberDelegates = is_array($memberDelegates) ? $memberDelegates : [];
                     <?= field('checkbox', [
                         'name' => 'minutes_convoked',
                         'label' => (string) __('documents.minutes_field_convoked'),
+                        'hint' => (string) __('documents.minutes_field_convoked_hint'),
                         'value' => '1',
                         'checked' => (bool) old('minutes_convoked', 0),
                         'context' => 'member',
@@ -330,8 +388,27 @@ $memberDelegates = is_array($memberDelegates) ? $memberDelegates : [];
                                     <?php $personId = (int) $person['id']; ?>
                                     <tr data-minutes-attendee>
                                         <td>
-                                            <strong><?= e((string) $person['name']) ?></strong>
-                                            <span class="muted"><?= e((string) $person['role']) ?></span>
+                                            <strong class="minutes-attendee-name"><?= e((string) $person['name']) ?></strong>
+                                            <?php if ((string) $person['role'] !== ''): ?>
+                                                <span class="muted minutes-attendee-role"><?= e((string) $person['role']) ?></span>
+                                            <?php endif; ?>
+                                            <?php
+                                            $boardMeta = [];
+                                            if ((string) ($person['mandate'] ?? '') !== '') {
+                                                $boardMeta[] = (string) __('documents.minutes_mandate_left', [
+                                                    'value' => (string) $person['mandate'],
+                                                ]);
+                                            }
+                                            if ((string) ($person['gender'] ?? '') !== '') {
+                                                $boardMeta[] = (string) $person['gender'];
+                                            }
+                                            if ((string) ($person['email'] ?? '') !== '') {
+                                                $boardMeta[] = (string) $person['email'];
+                                            }
+                                            ?>
+                                            <?php if ($boardMeta !== []): ?>
+                                                <span class="muted minutes-attendee-meta"><?= e(implode(' · ', $boardMeta)) ?></span>
+                                            <?php endif; ?>
                                         </td>
                                         <td>
                                             <select class="sf-field__control" name="attendance[<?= $personId ?>]" aria-label="<?= e((string) $person['name']) ?>">
@@ -392,12 +469,15 @@ $memberDelegates = is_array($memberDelegates) ? $memberDelegates : [];
                                 <?php foreach ($members_list as $member): ?>
                                     <?php
                                     $memberId = (int) $member['id'];
+                                    $memberNumber = trim((string) ($member['number'] ?? ''));
                                     $presence = (string) ($memberPresence[$memberId] ?? 'absent');
                                     ?>
-                                    <tr data-minutes-attendee data-minutes-member-row data-search="<?= e(mb_strtolower((string) $member['label'])) ?>">
+                                    <tr data-minutes-attendee data-minutes-member-row data-search="<?= e(trim(mb_strtolower((string) $member['label']) . ' ' . $memberNumber)) ?>">
                                         <td>
                                             <strong><?= e((string) $member['label']) ?></strong>
-                                            <span class="muted"><?= e((string) $member['number']) ?></span>
+                                            <?php if ($memberNumber !== ''): ?>
+                                                <span class="muted"><?= e(__('documents.minutes_member_number', ['number' => $memberNumber])) ?></span>
+                                            <?php endif; ?>
                                         </td>
                                         <td>
                                             <select class="sf-field__control" name="member_presence[<?= $memberId ?>]" aria-label="<?= e((string) $member['label']) ?>">
@@ -443,8 +523,8 @@ $memberDelegates = is_array($memberDelegates) ? $memberDelegates : [];
                     <?php if (($pending_text ?? '') !== ''): ?>
                         <button type="button" class="btn btn-ghost btn-sm" data-minutes-insert="pending" data-minutes-pending-text="<?= e((string) $pending_text) ?>"><?= e(__('documents.minutes_insert_pending')) ?></button>
                     <?php endif; ?>
-                    <?php if (($budget_text ?? '') !== ''): ?>
-                        <button type="button" class="btn btn-ghost btn-sm" data-minutes-insert="budget" data-minutes-budget-text="<?= e((string) $budget_text) ?>"><?= e(__('documents.minutes_insert_budget')) ?></button>
+                    <?php if (($budget_text ?? '') !== '' || ($budget_voices['years'] ?? []) !== []): ?>
+                        <button type="button" class="btn btn-ghost btn-sm" data-minutes-insert="budget" data-minutes-budget-text="<?= e((string) ($budget_text ?? '')) ?>"><?= e(__('documents.minutes_insert_budget')) ?></button>
                     <?php endif; ?>
                 </div>
                 <div class="minutes-agenda-list" data-minutes-agenda-list>
@@ -488,8 +568,10 @@ $memberDelegates = is_array($memberDelegates) ? $memberDelegates : [];
                 <?= field('text', [
                     'name' => 'minutes_time_close',
                     'label' => (string) __('documents.minutes_field_time_close'),
-                    'value' => (string) old('minutes_time_close', ''),
+                    'value' => (string) old('minutes_time_close', date('H:i')),
                     'input_type' => 'time',
+                    'required' => true,
+                    'attrs' => ['data-minutes-time-default' => date('H:i')],
                     'context' => 'member',
                 ]) ?>
                 <?= field('textarea', [
@@ -532,3 +614,60 @@ $memberDelegates = is_array($memberDelegates) ? $memberDelegates : [];
     </div>
     <p class="wizard-error muted" data-minutes-error hidden><?= e(__('documents.minutes_wizard_incomplete')) ?></p>
 </form>
+
+<dialog
+        class="setup-exit-dialog"
+        data-minutes-budget-dialog
+        data-tpl-planned="<?= e((string) __('documents.minutes_budget_line_planned')) ?>"
+        data-tpl-actual="<?= e((string) __('documents.minutes_budget_line_actual')) ?>"
+        data-tpl-delta="<?= e((string) __('documents.minutes_budget_line_delta')) ?>"
+        data-label-totals="<?= e((string) __('documents.minutes_budget_totals')) ?>"
+        data-label-total-income="<?= e((string) __('documents.minutes_budget_total_income')) ?>"
+        data-label-total-expense="<?= e((string) __('documents.minutes_budget_total_expense')) ?>"
+        data-msg-nothing="<?= e((string) __('documents.minutes_budget_nothing')) ?>"
+    >
+        <div class="setup-exit-shell">
+            <p class="setup-exit-text"><?= e(__('documents.minutes_budget_dialog_title')) ?></p>
+            <div class="setup-equal-row">
+                <?= field('select', [
+                    'name' => '',
+                    'id' => 'minutes-budget-year',
+                    'label' => (string) __('documents.minutes_budget_year'),
+                    'value' => '',
+                    'include_empty' => false,
+                    'options' => [],
+                    'attrs' => ['data-minutes-budget-year' => true],
+                    'context' => 'member',
+                ]) ?>
+                <?= field('select', [
+                    'name' => '',
+                    'id' => 'minutes-budget-datum',
+                    'label' => (string) __('documents.minutes_budget_datum'),
+                    'value' => 'planned',
+                    'include_empty' => false,
+                    'options' => [
+                        ['value' => 'planned', 'label' => (string) __('documents.minutes_budget_datum_planned')],
+                        ['value' => 'actual', 'label' => (string) __('documents.minutes_budget_datum_actual')],
+                        ['value' => 'delta', 'label' => (string) __('documents.minutes_budget_datum_delta')],
+                    ],
+                    'attrs' => ['data-minutes-budget-datum' => true],
+                    'context' => 'member',
+                ]) ?>
+            </div>
+            <?= field('select', [
+                'name' => '',
+                'id' => 'minutes-budget-voice',
+                'label' => (string) __('documents.minutes_budget_voice'),
+                'value' => '',
+                'include_empty' => false,
+                'options' => [],
+                'attrs' => ['data-minutes-budget-voice' => true],
+                'context' => 'member',
+            ]) ?>
+            <p class="setup-hint muted" data-minutes-budget-preview></p>
+            <div class="setup-exit-actions">
+                <button type="button" class="btn btn-ghost" data-minutes-budget-cancel><?= e(__('documents.minutes_budget_cancel')) ?></button>
+                <button type="button" class="btn" data-minutes-budget-insert><?= e(__('documents.minutes_budget_confirm')) ?></button>
+            </div>
+        </div>
+    </dialog>

@@ -133,6 +133,8 @@ final class SettingsController extends BaseController
             'formSteps' => $this->members->formSteps(),
             'defaultFields' => InstallerService::defaultFields(),
             'mailConfig' => $this->mail->config(),
+            'mailDiscovery' => $this->mail->discoveryCooldown(),
+            'mailSuggestion' => $this->mail->discoveryPrefill(),
             'mailReady' => $this->mail->isReady(),
             'presidentFirstPlaceholder' => trim((string) (($this->people->getPresident() ?? [])['first_name'] ?? '')),
             'presidentLastPlaceholder' => trim((string) (($this->people->getPresident() ?? [])['last_name'] ?? '')),
@@ -142,6 +144,7 @@ final class SettingsController extends BaseController
             // Organigramma: whether the association has a control body (auditors/sindaci).
             // The setting lives only in Settings → Organigramma, not on the org chart page.
             'orgHasControlBody' => (string) $this->settings->get('org.has_control_body', '1') !== '0',
+            'orgConvocationNoticeDays' => (int) $this->settings->get('org.convocation_notice_days', '5'),
             'componentConfigs' => [
                 'treasury' => $this->components->config('treasury', ['auto_from_payments' => true]),
                 'org_roles' => $this->components->config('org_roles', []),
@@ -614,15 +617,19 @@ final class SettingsController extends BaseController
         $hasControlBody = (string) $request->input('has_control_body', '0') === '1';
         $before = (string) $this->settings->get('org.has_control_body', '1');
         $this->settings->set('org.has_control_body', $hasControlBody ? '1' : '0');
+        // Statutory notice: minimum days between the convocation and the sitting (0 = no check).
+        $noticeDays = max(0, min(90, (int) $request->input('convocation_notice_days', 5)));
+        $beforeNotice = (string) $this->settings->get('org.convocation_notice_days', '5');
+        $this->settings->set('org.convocation_notice_days', (string) $noticeDays);
         $this->audit->log(
             'org.control_body_updated',
             'settings',
             'org.has_control_body',
-            ['has_control_body' => $before],
-            ['has_control_body' => $hasControlBody ? '1' : '0'],
+            ['has_control_body' => $before, 'convocation_notice_days' => $beforeNotice],
+            ['has_control_body' => $hasControlBody ? '1' : '0', 'convocation_notice_days' => (string) $noticeDays],
             $request->ip()
         );
-        $this->plugins->fire('settings.saved', ['org.has_control_body']);
+        $this->plugins->fire('settings.saved', ['org.has_control_body', 'org.convocation_notice_days']);
         $this->settingsFinish($request, 'org');
     }
 

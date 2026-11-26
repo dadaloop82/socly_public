@@ -60,7 +60,10 @@ $events = $workflowEvents;
         foreach ($eventGroups as $groupKey => $groupEvents) {
             $opts = [];
             foreach ($groupEvents as $k => $labelKey) {
-                $opts[] = ['value' => (string) $k, 'label' => (string) __($labelKey)];
+                $opts[] = [
+                    'value' => (string) $k,
+                    'label' => (string) \Socly\Services\WorkflowService::labelFor((string) $k, (string) $labelKey),
+                ];
             }
             $eventOptionGroups[] = ['label' => (string) __($groupKey), 'options' => $opts];
         }
@@ -140,7 +143,15 @@ $events = $workflowEvents;
                     <?php foreach ($workflowRules as $r): ?>
                         <tr>
                             <td><strong><?= e((string) ($r['name'] ?? '')) ?></strong></td>
-                            <td><?= e(__($events[(string) ($r['event_key'] ?? '')] ?? (string) ($r['event_key'] ?? ''))) ?></td>
+                            <td>
+                                <?php $ruleEventKey = (string) ($r['event_key'] ?? ''); ?>
+                                <?php if (isset($events[$ruleEventKey])): ?>
+                                    <?= e(\Socly\Services\WorkflowService::labelFor($ruleEventKey, (string) $events[$ruleEventKey])) ?>
+                                <?php else: ?>
+                                    <code><?= e($ruleEventKey) ?></code>
+                                    <span class="badge badge-muted"><?= e(__('workflow.event_unavailable')) ?></span>
+                                <?php endif; ?>
+                            </td>
                             <td><code><?= e((string) ($r['template_slug'] ?? '')) ?></code></td>
                             <td>
                                 <?php if (!empty($r['enabled'])): ?>

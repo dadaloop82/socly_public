@@ -16253,6 +16253,175 @@ select.is-remote-choice {
   word-break: break-all;
 }
 
+/* ---------------------------------------------------------------------------
+   Document detail: structured minute (who, who was there, what was decided)
+   --------------------------------------------------------------------------- */
+.doc-file-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.25rem 1.5rem;
+  margin-top: 1rem;
+  font-size: 0.9rem;
+}
+/* Textual file actions (open · download · shareable link): no pills, just links with a glyph. */
+.doc-file-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.15rem 0;
+  color: var(--brand-primary);
+  font-weight: 600;
+  text-decoration: none;
+}
+.doc-file-link:hover,
+.doc-file-link:focus-visible { text-decoration: underline; }
+.doc-file-link .row-action-icon { width: 1rem; height: 1rem; }
+.doc-minutes { margin-top: 1rem; }
+.doc-minutes-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+.doc-minutes-kicker {
+  margin: 0 0 0.2rem;
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--brand-primary);
+}
+.doc-minutes-number {
+  padding: 0.3rem 0.7rem;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--brand-primary) 10%, #fff);
+  border: 1px solid color-mix(in srgb, var(--brand-primary) 22%, #fff);
+  font-weight: 700;
+  font-size: 0.85rem;
+  white-space: nowrap;
+}
+.doc-minutes-officers {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(12rem, 1fr));
+  gap: 0.75rem 1.25rem;
+  margin: 0.9rem 0 0;
+  padding: 0.85rem 1rem;
+  border-radius: 14px;
+  background: color-mix(in srgb, var(--line) 14%, #fff);
+}
+.doc-minutes-officers > div { display: flex; flex-direction: column; gap: 0.15rem; }
+.doc-minutes-officers .muted { font-size: 0.76rem; }
+.doc-minutes-quorum {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.4rem 0.6rem;
+  margin: 0.9rem 0 0;
+}
+.doc-minutes-chip {
+  padding: 0.2rem 0.6rem;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--line) 22%, #fff);
+  font-size: 0.84rem;
+}
+.doc-minutes-quorum-badge {
+  padding: 0.2rem 0.7rem;
+  border-radius: 999px;
+  font-size: 0.8rem;
+  font-weight: 700;
+}
+.doc-minutes-quorum-badge.is-ok { color: #0a5a4a; background: color-mix(in srgb, #2f9e8f 14%, #fff); }
+.doc-minutes-quorum-badge.is-missing { color: #7a2f12; background: color-mix(in srgb, #e7c46a 26%, #fff); }
+.doc-minutes-subtitle { margin: 1.25rem 0 0.5rem; font-size: 0.95rem; }
+.doc-minutes-people {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 0.35rem;
+}
+.doc-minutes-people li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.45rem 0.7rem;
+  border-radius: 10px;
+  background: #fff;
+  border: 1px solid var(--line);
+}
+.doc-minutes-person { display: flex; flex-direction: column; gap: 0.1rem; }
+.doc-minutes-person .muted { font-size: 0.78rem; }
+.doc-minutes-attendance {
+  font-size: 0.78rem;
+  font-weight: 700;
+  padding: 0.15rem 0.55rem;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--line) 25%, #fff);
+  white-space: nowrap;
+}
+.doc-minutes-attendance.is-present { color: #0a5a4a; background: color-mix(in srgb, #2f9e8f 16%, #fff); }
+.doc-minutes-attendance.is-delegate { color: #38498a; background: color-mix(in srgb, #3f5bd6 14%, #fff); }
+.doc-minutes-attendance.is-absent,
+.doc-minutes-attendance.is-absent_justified { color: #6b4a12; background: color-mix(in srgb, #e7c46a 22%, #fff); }
+.doc-minutes-agenda { list-style: none; margin: 0; padding: 0; display: grid; gap: 0.6rem; }
+.doc-minutes-agenda-item {
+  padding: 0.75rem 0.85rem;
+  border-radius: 12px;
+  border: 1px solid var(--line);
+  background: #fff;
+}
+.doc-minutes-agenda-head { display: flex; align-items: baseline; gap: 0.55rem; }
+.doc-minutes-agenda-index {
+  flex: 0 0 auto;
+  width: 1.6rem;
+  height: 1.6rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--brand-primary) 12%, #fff);
+  color: var(--brand-primary);
+  font-weight: 800;
+  font-size: 0.8rem;
+}
+.doc-minutes-agenda-title { font-size: 1rem; }
+.doc-minutes-agenda-text { margin: 0.45rem 0 0; font-size: 0.9rem; line-height: 1.5; color: #33413f; }
+.doc-minutes-agenda-foot { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem 1rem; margin-top: 0.55rem; }
+.doc-minutes-outcome { padding: 0.3rem 0.85rem; border-radius: 999px; font-weight: 800; font-size: 0.92rem; }
+.doc-minutes-outcome.is-unanimous { color: #0a5a4a; background: color-mix(in srgb, #2f9e8f 20%, #fff); }
+.doc-minutes-outcome.is-majority { color: #0a4f6a; background: color-mix(in srgb, #2f8f9e 18%, #fff); }
+.doc-minutes-outcome.is-rejected { color: #8a1f1f; background: color-mix(in srgb, #d63f3f 14%, #fff); }
+.doc-minutes-outcome.is-not_voted { color: #5c5200; background: color-mix(in srgb, #e7c46a 26%, #fff); }
+.doc-minutes-votes { display: inline-flex; gap: 0.9rem; font-size: 0.82rem; color: #5d6f6c; }
+.doc-minutes-votes strong { color: #142a28; }
+
+/* File integrity + repository links + summary */
+.doc-integrity { margin-top: 1rem; }
+.doc-hash {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem 1.25rem;
+  align-items: flex-start;
+  justify-content: space-between;
+}
+.doc-hash-label { display: block; font-size: 0.8rem; font-weight: 700; color: #5d6f6c; }
+.doc-hash-hint { margin: 0.2rem 0 0; max-width: 46rem; font-size: 0.8rem; color: #7b8b88; }
+.doc-hash-value { display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; }
+.doc-hash-value code {
+  padding: 0.35rem 0.55rem;
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--line) 18%, #fff);
+  font-size: 0.78rem;
+  word-break: break-all;
+}
+.doc-links { margin-top: 1rem; }
+.doc-links .documents-repository-links { font-size: 0.88rem; }
+.doc-summary { margin-top: 1rem; }
+.doc-summary p { margin: 0.3rem 0 0; font-size: 0.92rem; line-height: 1.55; }
+
 /* Bank statement excerpts shown inside the cash-book movement card/list */
 .treasury-statement-crops {
   display: flex;
@@ -16494,6 +16663,10 @@ select.is-remote-choice {
 .minutes-attendance-table td select,
 .minutes-attendance-table td input { min-width: 9rem; }
 .minutes-attendance-table tr[hidden] { display: none !important; }
+/* Board attendance: name, role and the small meta line (mandate left · gender · email). */
+.minutes-attendee-name { display: block; }
+.minutes-attendee-role { display: block; font-size: 0.92em; }
+.minutes-attendee-meta { display: block; font-size: 0.82em; line-height: 1.35; }
 .minutes-attendance-scroll { max-height: 26rem; overflow-y: auto; }
 .minutes-quorum-line {
   display: flex;

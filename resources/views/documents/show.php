@@ -22,6 +22,8 @@
 
 /** @var array<string,mixed> $document */
 /** @var string $category_label */
+/** @var array<string,mixed>|null $minutes */
+/** @var list<array<string,mixed>> $repository_links */
 $docId = (int) ($document['id'] ?? 0);
 $docTitle = (string) ($document['title'] ?? '');
 $language = trim((string) ($document['language'] ?? ''));
@@ -63,47 +65,219 @@ $languageLabel = $language !== '' ? __('documents.language_' . $language) : '—
         <div><span class="muted"><?= e(__('documents.file_size')) ?></span><br><strong><?= (int) ($document['file_size'] ?? 0) > 0 ? e(number_format((int) $document['file_size'] / 1024, 0, ',', '.') . ' KB') : '—' ?></strong></div>
         <div><span class="muted"><?= e(__('documents.downloads')) ?></span><br><strong><?= (int) ($document['download_count'] ?? 0) ?></strong></div>
     </div>
-    <?php if (trim((string) ($document['content_hash'] ?? '')) !== ''): ?>
-        <p class="muted documents-hash"><?= e(__('documents.content_hash')) ?>: <code><?= e(substr((string) $document['content_hash'], 0, 16)) ?>…</code></p>
-    <?php endif; ?>
-    <?php if (!empty($repository_links)): ?>
-        <div style="margin-top:1rem">
-            <span class="muted"><?= e(__('documents.repository_links_title')) ?></span>
-            <ul class="documents-repository-links">
-                <?php foreach ($repository_links as $repoLink): ?>
-                    <li>
-                        <span class="documents-section-badge"><?= e((string) ($repoLink['section'] ?? '')) ?></span>
-                        <?php if (trim((string) ($repoLink['context_ref'] ?? '')) !== ''): ?>
-                            <code><?= e((string) $repoLink['context_ref']) ?></code>
-                        <?php endif; ?>
-                        <span class="muted"><?= e(format_datetime($repoLink['created_at'] ?? null) ?: '') ?></span>
-                    </li>
-                <?php endforeach; ?>
-            </ul>
-        </div>
-    <?php endif; ?>
-    <?php if (trim((string) ($document['summary'] ?? '')) !== ''): ?>
-        <div style="margin-top:1rem">
-            <span class="muted"><?= e(__('documents.summary')) ?></span>
-            <p><?= nl2br(e(document_summary_display((string) $document['summary']))) ?></p>
-        </div>
-    <?php endif; ?>
     <?php if (!empty($document['file_path'])): ?>
-        <div class="actions" style="margin-top:1rem">
-            <a class="btn" href="<?= e(url('/documents/' . $docId . '/file')) ?>" target="_blank" rel="noopener"><?= e(__('documents.open_file')) ?></a>
-            <?= page_action_icon([
-                'icon' => 'download',
-                'label' => (string) __('documents.download_file'),
-                'href' => url('/documents/' . $docId . '/download'),
-            ]) ?>
+        <div class="doc-file-actions">
+            <a class="doc-file-link" href="<?= e(url('/documents/' . $docId . '/file')) ?>" target="_blank" rel="noopener">
+                <?= row_action_icon_svg('view') ?><span><?= e(__('documents.open_file')) ?></span>
+            </a>
+            <a class="doc-file-link" href="<?= e(url('/documents/' . $docId . '/download')) ?>">
+                <?= row_action_icon_svg('download') ?><span><?= e(__('documents.download_file')) ?></span>
+            </a>
             <?php if (trim((string) ($signed_url ?? '')) !== ''): ?>
-                <a class="btn btn-ghost" href="<?= e((string) $signed_url) ?>" target="_blank" rel="noopener"><?= e(__('documents.signed_link')) ?></a>
+                <a class="doc-file-link" href="<?= e((string) $signed_url) ?>" target="_blank" rel="noopener">
+                    <?= row_action_icon_svg('external') ?><span><?= e(__('documents.signed_link')) ?></span>
+                </a>
             <?php endif; ?>
         </div>
     <?php else: ?>
-        <p class="muted" style="margin-top:1rem"><?= e(__('documents.no_file')) ?></p>
+        <p class="muted doc-file-actions"><?= e(__('documents.no_file')) ?></p>
     <?php endif; ?>
 </div>
+
+<?php if (is_array($minutes ?? null) && $minutes !== []): ?>
+    <?php
+    $mType = (string) ($minutes['type_label'] ?? '');
+    $mDate = (string) ($minutes['date'] ?? '');
+    $mOpen = (string) ($minutes['time_open'] ?? '');
+    $mClose = (string) ($minutes['time_close'] ?? '');
+    $mMode = (string) ($minutes['mode'] ?? 'free');
+    $mPresident = (string) ($minutes['president'] ?? '');
+    $mSecretary = (string) ($minutes['secretary'] ?? '');
+    $mPlaceMode = (string) ($minutes['place_mode'] ?? 'in_person');
+    $mPlace = (string) ($minutes['place'] ?? '');
+    $mPlatform = (string) ($minutes['platform'] ?? '');
+    $mVideoLink = (string) ($minutes['video_link'] ?? '');
+    $mConvoked = !empty($minutes['convoked']);
+    $mConvDate = (string) ($minutes['convocation_date'] ?? '');
+    $mBoard = is_array($minutes['board'] ?? null) ? $minutes['board'] : [];
+    $mAssembly = is_array($minutes['assembly'] ?? null) ? $minutes['assembly'] : [];
+    $mAgenda = is_array($minutes['agenda'] ?? null) ? $minutes['agenda'] : [];
+    $mQuorum = is_array($minutes['quorum'] ?? null) ? $minutes['quorum'] : [];
+    $mTime = trim($mOpen . '–' . $mClose, '–');
+    $mVenue = $mPlaceMode === 'video'
+        ? trim(($mPlatform !== '' ? $mPlatform : '') . ($mVideoLink !== '' ? ' — ' . $mVideoLink : ''), ' —')
+        : $mPlace;
+    ?>
+    <section class="panel doc-minutes">
+        <div class="doc-minutes-head">
+            <div>
+                <p class="doc-minutes-kicker"><?= e(__('documents.minutes_panel_kicker')) ?></p>
+                <h2 class="section-title"><?= e($mType !== '' ? $mType : (string) __('documents.minutes_panel_title')) ?></h2>
+                <p class="muted">
+                    <?php if ($mDate !== ''): ?><?= e(format_date($mDate) ?: $mDate) ?><?php endif; ?>
+                    <?php if ($mTime !== ''): ?> · <?= e($mTime) ?><?php endif; ?>
+                </p>
+            </div>
+            <?php if (trim((string) ($document['document_number'] ?? '')) !== ''): ?>
+                <span class="doc-minutes-number"><?= e(__('documents.minutes_number_badge', ['number' => (string) $document['document_number']])) ?></span>
+            <?php endif; ?>
+        </div>
+
+        <div class="doc-minutes-officers">
+            <div>
+                <span class="muted"><?= e(__('documents.minutes_field_president')) ?></span>
+                <strong><?= e($mPresident !== '' ? $mPresident : '—') ?></strong>
+            </div>
+            <div>
+                <span class="muted"><?= e(__('documents.minutes_field_secretary')) ?></span>
+                <strong><?= e($mSecretary !== '' ? $mSecretary : '—') ?></strong>
+            </div>
+            <div>
+                <span class="muted"><?= e(__('documents.minutes_field_convocation')) ?></span>
+                <strong>
+                    <?php if ($mConvoked): ?>
+                        <?= e($mConvDate !== '' ? __('documents.minutes_convoked_on', ['date' => format_date($mConvDate) ?: $mConvDate]) : __('documents.minutes_convoked_regularly')) ?>
+                    <?php else: ?>
+                        <?= e(__('documents.minutes_convoked_no')) ?>
+                    <?php endif; ?>
+                </strong>
+            </div>
+            <div>
+                <span class="muted"><?= e($mPlaceMode === 'video' ? __('documents.minutes_place_video') : __('documents.minutes_field_place')) ?></span>
+                <strong><?= e($mVenue !== '' ? $mVenue : '—') ?></strong>
+            </div>
+        </div>
+
+        <?php if (in_array($mMode, ['board', 'assembly'], true) && $mQuorum !== []): ?>
+            <p class="doc-minutes-quorum">
+                <span class="doc-minutes-chip"><strong><?= (int) ($mQuorum['present'] ?? 0) ?></strong> <?= e(__('documents.minutes_quorum_present_chip')) ?></span>
+                <?php if ((int) ($mQuorum['delegations'] ?? 0) > 0): ?>
+                    <span class="doc-minutes-chip"><strong><?= (int) $mQuorum['delegations'] ?></strong> <?= e(__('documents.minutes_quorum_delegations_chip')) ?></span>
+                <?php endif; ?>
+                <span class="doc-minutes-chip"><strong><?= (int) ($mQuorum['total'] ?? 0) ?></strong> <?= e(__('documents.minutes_quorum_total_chip')) ?></span>
+                <span class="doc-minutes-quorum-badge <?= !empty($mQuorum['reached']) ? 'is-ok' : 'is-missing' ?>">
+                    <?= e(!empty($mQuorum['reached']) ? __('documents.minutes_quorum_reached') : __('documents.minutes_quorum_missing')) ?>
+                    · <?= e(__('documents.minutes_quorum_required', ['count' => (string) (int) ($mQuorum['required'] ?? 0)])) ?>
+                </span>
+            </p>
+        <?php endif; ?>
+
+        <?php if ($mBoard !== []): ?>
+            <h3 class="doc-minutes-subtitle"><?= e(__('documents.minutes_board_attendance')) ?></h3>
+            <ul class="doc-minutes-people">
+                <?php foreach ($mBoard as $row): ?>
+                    <?php $state = (string) ($row['attendance'] ?? 'absent'); ?>
+                    <li>
+                        <span class="doc-minutes-person">
+                            <strong><?= e((string) ($row['name'] ?? '')) ?></strong>
+                            <?php if ((string) ($row['role'] ?? '') !== ''): ?><span class="muted"><?= e((string) $row['role']) ?></span><?php endif; ?>
+                        </span>
+                        <span class="doc-minutes-attendance is-<?= e($state) ?>"><?= e(__('documents.minutes_attendance_' . $state)) ?></span>
+                    </li>
+                <?php endforeach; ?>
+            </ul>
+        <?php endif; ?>
+
+        <?php if ($mAssembly !== []): ?>
+            <h3 class="doc-minutes-subtitle"><?= e(__('documents.minutes_assembly_attendance')) ?></h3>
+            <ul class="doc-minutes-people">
+                <?php foreach ($mAssembly as $row): ?>
+                    <?php
+                    $state = (string) ($row['presence'] ?? 'absent');
+                    $delegate = trim((string) ($row['delegate'] ?? ''));
+                    $stateLabel = $state === 'delegate'
+                        ? ($delegate !== ''
+                            ? (string) __('documents.minutes_presence_delegate', ['name' => $delegate])
+                            : (string) __('documents.minutes_presence_delegate_generic'))
+                        : (string) __('documents.minutes_presence_' . $state);
+                    ?>
+                    <li>
+                        <span class="doc-minutes-person"><strong><?= e((string) ($row['name'] ?? '')) ?></strong></span>
+                        <span class="doc-minutes-attendance is-<?= e($state) ?>"><?= e($stateLabel) ?></span>
+                    </li>
+                <?php endforeach; ?>
+            </ul>
+        <?php endif; ?>
+
+        <?php if ($mAgenda !== []): ?>
+            <h3 class="doc-minutes-subtitle"><?= e(__('documents.minutes_agenda_outcomes_title')) ?></h3>
+            <ol class="doc-minutes-agenda">
+                <?php foreach ($mAgenda as $index => $item): ?>
+                    <?php $outcome = (string) ($item['outcome'] ?? 'majority'); ?>
+                    <li class="doc-minutes-agenda-item">
+                        <div class="doc-minutes-agenda-head">
+                            <span class="doc-minutes-agenda-index"><?= (int) $index + 1 ?></span>
+                            <strong class="doc-minutes-agenda-title"><?= e((string) ($item['title'] ?? '')) ?></strong>
+                        </div>
+                        <?php if ((string) ($item['text'] ?? '') !== ''): ?>
+                            <p class="doc-minutes-agenda-text"><?= nl2br(e((string) $item['text'])) ?></p>
+                        <?php endif; ?>
+                        <div class="doc-minutes-agenda-foot">
+                            <span class="doc-minutes-outcome is-<?= e($outcome) ?>"><?= e(__('documents.minutes_outcome_' . $outcome)) ?></span>
+                            <?php if ($mMode !== 'free'): ?>
+                                <span class="doc-minutes-votes">
+                                    <span><strong><?= (int) ($item['yes'] ?? 0) ?></strong> <?= e(__('documents.minutes_vote_yes')) ?></span>
+                                    <span><strong><?= (int) ($item['no'] ?? 0) ?></strong> <?= e(__('documents.minutes_vote_no')) ?></span>
+                                    <span><strong><?= (int) ($item['abstain'] ?? 0) ?></strong> <?= e(__('documents.minutes_vote_abstain')) ?></span>
+                                </span>
+                            <?php endif; ?>
+                        </div>
+                    </li>
+                <?php endforeach; ?>
+            </ol>
+        <?php endif; ?>
+    </section>
+<?php endif; ?>
+
+<?php
+$hashValue = trim((string) ($document['content_hash'] ?? ''));
+$showSummary = !is_array($minutes ?? null) && trim((string) ($document['summary'] ?? '')) !== '';
+?>
+<?php if ($hashValue !== '' || !empty($repository_links) || $showSummary): ?>
+    <section class="panel doc-integrity">
+        <?php if ($hashValue !== ''): ?>
+            <div class="doc-hash">
+                <div class="doc-hash-copy">
+                    <span class="doc-hash-label"><?= e(__('documents.content_hash')) ?></span>
+                    <p class="doc-hash-hint"><?= e(__('documents.content_hash_hint')) ?></p>
+                </div>
+                <div class="doc-hash-value">
+                    <code><?= e($hashValue) ?></code>
+                    <button
+                        type="button"
+                        class="btn btn-sm btn-ghost"
+                        data-copy-text="<?= e($hashValue) ?>"
+                        data-copied="<?= e(__('documents.hash_copied')) ?>"
+                    ><?= e(__('documents.hash_copy')) ?></button>
+                </div>
+            </div>
+        <?php endif; ?>
+
+        <?php if (!empty($repository_links)): ?>
+            <div class="doc-links">
+                <span class="doc-hash-label"><?= e(__('documents.repository_links_title')) ?></span>
+                <ul class="documents-repository-links">
+                    <?php foreach ($repository_links as $repoLink): ?>
+                        <li>
+                            <span class="documents-section-badge"><?= e((string) ($repoLink['section_label'] ?? $repoLink['section'] ?? '')) ?></span>
+                            <?php if (trim((string) ($repoLink['context_label'] ?? '')) !== ''): ?>
+                                <span><?= e((string) $repoLink['context_label']) ?></span>
+                            <?php endif; ?>
+                            <span class="muted"><?= e(format_datetime($repoLink['created_at'] ?? null) ?: '') ?></span>
+                        </li>
+                    <?php endforeach; ?>
+                </ul>
+            </div>
+        <?php endif; ?>
+
+        <?php if ($showSummary): ?>
+            <div class="doc-summary">
+                <span class="doc-hash-label"><?= e(__('documents.summary')) ?></span>
+                <p><?= nl2br(e(document_summary_display((string) $document['summary']))) ?></p>
+            </div>
+        <?php endif; ?>
+    </section>
+<?php endif; ?>
 
 <?php if (can('documents.manage') && (string) ($document['status'] ?? '') === 'draft'): ?>
     <section class="panel treasury-danger-zone documents-danger-zone">

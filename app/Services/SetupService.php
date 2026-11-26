@@ -627,12 +627,18 @@ final class SetupService
             }
 
             $neverConfigured = $this->rawStored('mail.configured', '') === null;
+            $discovery = $this->mail->discoveryCooldown();
+            $suggestion = $this->mail->discoveryPrefill();
+            $showManual = $cfg['host'] !== ''
+                || !empty($_SESSION['_flash']['smtp_needs_manual'])
+                || !empty($discovery['active'])
+                || $suggestion['host'] !== '';
 
             return [
-                'host' => $cfg['host'],
-                'port' => $cfg['port'] > 0 ? (string) $cfg['port'] : '587',
-                'encryption' => $cfg['encryption'] ?: 'tls',
-                'username' => $cfg['username'],
+                'host' => $cfg['host'] !== '' ? $cfg['host'] : $suggestion['host'],
+                'port' => $cfg['port'] > 0 ? (string) $cfg['port'] : (string) ($suggestion['port'] > 0 ? $suggestion['port'] : '587'),
+                'encryption' => $cfg['encryption'] !== '' ? $cfg['encryption'] : ($suggestion['encryption'] !== '' ? $suggestion['encryption'] : 'tls'),
+                'username' => $cfg['username'] !== '' ? $cfg['username'] : $suggestion['username'],
                 'password' => '',
                 'from_address' => $defaultFrom,
                 'from_name' => $cfg['from_name'] !== '' ? $cfg['from_name'] : (string) $this->readValue('association.name', 'ASSOCIATION_NAME', 'SOCLY'),
@@ -640,7 +646,8 @@ final class SetupService
                 'has_password' => $cfg['has_password'],
                 'last_test_ok' => $cfg['last_test_ok'],
                 'last_test_at' => $cfg['last_test_at'],
-                'show_manual' => $cfg['host'] !== '' || !empty($_SESSION['_flash']['smtp_needs_manual']),
+                'show_manual' => $showManual,
+                'discovery' => $discovery,
                 'outbound_disabled' => $neverConfigured ? true : $this->mail->isOutboundDisabled(),
             ];
         }

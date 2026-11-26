@@ -35,7 +35,7 @@ final class WorkflowService
     private static bool $dispatching = false;
 
     /** Bump when add-on discovery logic changes, so the persistent cache is rebuilt. */
-    private const ADDON_EVENTS_CACHE_VERSION = 4;
+    private const ADDON_EVENTS_CACHE_VERSION = 5;
 
     /** @var array<string, WorkflowEventProviderInterface>|null */
     private ?array $pluginProviders = null;
@@ -77,6 +77,7 @@ final class WorkflowService
                 'member.updated' => 'workflow.event_member_updated',
                 'member.deleted' => 'workflow.event_member_deleted',
                 'member.imported' => 'workflow.event_member_imported',
+                'member.mass_renewed' => 'workflow.event_member_mass_renewed',
             ],
             'workflow.group_enrollment' => [
                 'member.enrollment_otp' => 'workflow.event_enrollment_otp',
@@ -86,11 +87,16 @@ final class WorkflowService
                 'member.payment_reminder' => 'workflow.event_payment_reminder',
                 'member.payment_received' => 'workflow.event_payment_received',
                 'payment.treasury_registered' => 'workflow.event_payment_treasury_registered',
+                'payment.treasury_deleted' => 'workflow.event_payment_treasury_deleted',
                 'payment.cashbook_acknowledged' => 'workflow.event_payment_cashbook_acknowledged',
             ],
             'workflow.group_documents' => [
                 'document.created' => 'workflow.event_document_created',
                 'document.updated' => 'workflow.event_document_updated',
+                'document.deleted' => 'workflow.event_document_deleted',
+            ],
+            'workflow.group_minutes' => [
+                'minutes.created' => 'workflow.event_minutes_created',
             ],
             'workflow.group_deadlines' => [
                 'deadline.created' => 'workflow.event_deadline_created',
@@ -104,6 +110,8 @@ final class WorkflowService
                 'treasury.deleted' => 'workflow.event_treasury_deleted',
                 'treasury.approved' => 'workflow.event_treasury_approved',
                 'treasury.recurring_generated' => 'workflow.event_treasury_recurring_generated',
+                'treasury.recurring_created' => 'workflow.event_treasury_recurring_created',
+                'treasury.recurring_deleted' => 'workflow.event_treasury_recurring_deleted',
             ],
             'workflow.group_budgets' => [
                 'budget.created' => 'workflow.event_budget_created',
@@ -189,6 +197,30 @@ final class WorkflowService
         return $this->eventGroupsCache = $groups;
     }
 
+    /**
+     * Display label for a workflow event. Core events store a lang key; add-on events store a
+     * humanised key discovered from the add-on source ("Topic created"), so they are translated
+     * here at render time (workflow.addon_events.<prefix>.<action>) and never in the cache.
+     */
+    public static function labelFor(string $eventKey, string $stored = ''): string
+    {
+        $stored = $stored !== '' ? $stored : $eventKey;
+        try {
+            if (str_starts_with($stored, 'workflow.')) {
+                return (string) __($stored);
+            }
+            $langKey = 'workflow.addon_events.' . $eventKey;
+            $translated = (string) __($langKey);
+            if ($translated !== '' && $translated !== $langKey) {
+                return $translated;
+            }
+        } catch (\Throwable) {
+            // No translator available (CLI scripts): fall back to the stored label.
+        }
+
+        return $stored;
+    }
+
     /** @return array<string, string> */
     public function events(): array
     {
@@ -216,12 +248,16 @@ final class WorkflowService
             'member.updated' => 'member.updated',
             'member.deleted' => 'member.deleted',
             'members.imported' => 'member.imported',
+            'member.mass_renewed' => 'member.mass_renewed',
             'member.enrollment_attested' => 'member.enrollment_attested',
             'payment.recorded' => 'member.payment_received',
             'payment.treasury_registered' => 'payment.treasury_registered',
+            'payment.treasury_deleted' => 'payment.treasury_deleted',
             'payment.cashbook_acknowledged' => 'payment.cashbook_acknowledged',
             'document.created' => 'document.created',
             'document.updated' => 'document.updated',
+            'document.deleted' => 'document.deleted',
+            'minutes.created' => 'minutes.created',
             'deadline.created' => 'deadline.created',
             'deadline.updated' => 'deadline.updated',
             'deadline.done' => 'deadline.done',
@@ -231,6 +267,8 @@ final class WorkflowService
             'treasury.deleted' => 'treasury.deleted',
             'treasury.approved' => 'treasury.approved',
             'treasury.recurring_generated' => 'treasury.recurring_generated',
+            'treasury.recurring_created' => 'treasury.recurring_created',
+            'treasury.recurring_deleted' => 'treasury.recurring_deleted',
             'budget.created' => 'budget.created',
             'budget.updated' => 'budget.updated',
             'budget.approved' => 'budget.approved',
@@ -329,8 +367,9 @@ final class WorkflowService
     }
 
     /**
-     * Events discovered from all available add-ons: packages in storage/addons (installed or just
-     * copied), the addons/ drop-in and the addons-src/ sources. Older packages do not implement
+     * Events discovered from the add-ons that are installed and enabled in this instance
+     * (packages in storage/addons, the addons/ drop-in, the addons-src/ sources): a package that
+     * is only present on disk must not offer events. Older packages do not implement
      * WorkflowEventProviderInterface, so their audit actions and explicit workflow dispatches are
      * read from the PHP source and cached in storage/cache/workflow_addons.json.
      *
@@ -508,7 +547,29 @@ final class WorkflowService
             }
         }
 
-        return array_values($found);
+        $active = [];
+        foreach ($found as $id => $candidate) {
+            // Only add-ons that are actually installed and enabled can fire an event: a package
+            // sitting in the folder (or a source tree) must never appear in Workflow.
+            if ($this->addonIsActive((string) $id)) {
+                $active[$id] = $candidate;
+            }
+        }
+
+        return array_values($active);
+    }
+
+    /** True when the add-on is installed and enabled in this instance. */
+    private function addonIsActive(string $id): bool
+    {
+        if (!function_exists('addon_active')) {
+            return true; // helper unavailable (bare scripts): keep the old behaviour.
+        }
+        try {
+            return addon_active($id);
+        } catch (\Throwable) {
+            return false;
+        }
     }
 
     /**
@@ -580,53 +641,30 @@ final class WorkflowService
     {
         $audit = [];
         $dispatch = [];
-        $literals = [];
         $auditPattern = '/->audit\s*->\s*log\s*\(\s*[\'"]([A-Za-z0-9_.-]{3,80})[\'"]/';
+        // Audit helpers (e.g. $this->store->audit('ade.invoice_matched', …)) carry real actions
+        // as their first literal argument. Only calls named audit/log()/fire() are trusted:
+        // scanning every literal would also pick up UI translation keys (treasury.manage, …).
+        $auditArgPattern = '/(?:->|\b)(?:audit|log)\s*\(\s*[\'"]([A-Za-z0-9_.-]{3,80})[\'"]\s*[,)]/';
         $dispatchPattern = '/->workflow\s*->\s*dispatch\s*\(\s*[\'"]([A-Za-z0-9_.-]{3,80})[\'"]/';
         $servicePattern = '/WorkflowService::class\s*\)\s*->\s*dispatch\s*\(\s*[\'"]([A-Za-z0-9_.-]{3,80})[\'"]/';
-        $literalPattern = '/[\'"]([a-z0-9][a-z0-9_.-]{2,79})[\'"]/';
         foreach ($this->addonPhpFiles($dir) as $file) {
             $source = @file_get_contents($file, false, null, 0, 2_000_000);
             if (!is_string($source) || $source === '') {
                 continue;
             }
-            if (preg_match_all($auditPattern, $source, $matches) > 0) {
-                foreach ($matches[1] as $action) {
-                    $audit[(string) $action] = true;
-                }
-            }
-            if (preg_match_all($dispatchPattern, $source, $matches) > 0) {
-                foreach ($matches[1] as $eventKey) {
-                    $dispatch[(string) $eventKey] = true;
-                }
-            }
-            if (preg_match_all($servicePattern, $source, $matches) > 0) {
-                foreach ($matches[1] as $eventKey) {
-                    $dispatch[(string) $eventKey] = true;
-                }
-            }
-            if (preg_match_all($literalPattern, $source, $matches) > 0) {
-                foreach ($matches[1] as $literal) {
-                    $literal = (string) $literal;
-                    if (str_contains($literal, '.')) {
-                        $literals[$literal] = true;
+            foreach ([$auditPattern, $auditArgPattern] as $pattern) {
+                if (preg_match_all($pattern, $source, $matches) > 0) {
+                    foreach ($matches[1] as $action) {
+                        $audit[(string) $action] = true;
                     }
                 }
             }
-        }
-
-        $prefixes = [];
-        foreach (array_keys($audit) as $action) {
-            $dot = strpos($action, '.');
-            if ($dot !== false && $dot > 0) {
-                $prefixes[substr($action, 0, $dot + 1)] = true;
-            }
-        }
-        foreach (array_keys($literals) as $literal) {
-            foreach (array_keys($prefixes) as $prefix) {
-                if ($literal !== $prefix && str_starts_with($literal, $prefix)) {
-                    $audit[$literal] = true;
-                    break;
+            foreach ([$dispatchPattern, $servicePattern] as $pattern) {
+                if (preg_match_all($pattern, $source, $matches) > 0) {
+                    foreach ($matches[1] as $eventKey) {
+                        $dispatch[(string) $eventKey] = true;
+                    }
                 }
             }
         }
@@ -783,7 +821,14 @@ final class WorkflowService
         $id = (int) ($data['id'] ?? 0);
         $eventKey = (string) ($data['event_key'] ?? '');
         $templateSlug = trim((string) ($data['template_slug'] ?? ''));
-        if (!isset($this->events()[$eventKey])) {
+        $knownEvent = isset($this->events()[$eventKey]);
+        if (!$knownEvent && $id > 0) {
+            // A rule created for an add-on that is now disabled must stay editable: the event key
+            // is kept as-is and the rule simply stays dormant until the add-on is active again.
+            $existing = $this->find($id);
+            $knownEvent = is_array($existing) && (string) ($existing['event_key'] ?? '') === $eventKey;
+        }
+        if (!$knownEvent) {
             return ['ok' => false, 'errors' => ['event_key' => __('validation.required')]];
         }
         if (!$this->validator->validate($data, [

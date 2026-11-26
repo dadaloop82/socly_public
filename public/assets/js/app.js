@@ -8401,6 +8401,11 @@ function initSetupSmtp(root) {
   let smtpPipelineBusy = false;
   const wizardRoot = root.matches?.('[data-setup-wizard]') ? root : root.querySelector?.('[data-setup-wizard]');
   const ctaBtn = form?.querySelector('button.setup-cta[type="submit"]');
+  // Automatic search rested after the previous attempt (6 hours): the operator works with the
+  // pre-filled/manual configuration and the provider is not hammered again.
+  let cooldownUntil = Date.parse(box.dataset.discoveryCooldownUntil || '') || 0;
+  const cooldownMsg = box.dataset.msgDiscoveryCooldown || '';
+  const cooldownLeft = () => Math.max(0, cooldownUntil - Date.now());
 
   const scrollSmtpReveal = (el) => {
     if (!(el instanceof HTMLElement) || el.hidden) return;
@@ -8427,7 +8432,7 @@ function initSetupSmtp(root) {
       }
     });
     if (!busy && discoverBtn) {
-      discoverBtn.disabled = !!skip?.checked || !manual?.hidden;
+      discoverBtn.disabled = !!skip?.checked || !manual?.hidden || cooldownLeft() > 0;
     }
     if (!busy && verifyBtn && !skip?.checked) {
       verifyBtn.disabled = false;
@@ -8477,6 +8482,34 @@ function initSetupSmtp(root) {
       smtpLive.hidden = !text && !box.classList.contains('is-smtp-busy');
     }
   };
+
+  const paintCooldown = () => {
+    const left = cooldownLeft();
+    if (left <= 0) return false;
+    if (cooldownMsg !== '') {
+      const minutes = Math.max(1, Math.ceil(left / 60000));
+      const at = new Date(cooldownUntil);
+      const time = `${String(at.getHours()).padStart(2, '0')}:${String(at.getMinutes()).padStart(2, '0')}`;
+      showStatus(discoverStatus, cooldownMsg.replace(':minutes', String(minutes)).replace(':time', time), true);
+    }
+    if (discoverBtn) {
+      discoverBtn.disabled = true;
+      discoverBtn.setAttribute('aria-disabled', 'true');
+    }
+    return true;
+  };
+  if (cooldownLeft() > 0) {
+    // Start on the manual/pre-filled block and hand the search button back when the rest ends.
+    setManualMode(true, { scroll: false });
+    paintCooldown();
+    window.setTimeout(() => {
+      if (discoverBtn) {
+        discoverBtn.disabled = !!skip?.checked || !manual?.hidden;
+        discoverBtn.removeAttribute('aria-disabled');
+      }
+      showStatus(discoverStatus, '', false);
+    }, cooldownLeft() + 1000);
+  }
 
   const testSuccessMessage = (email) => {
     const addr = (email || testToInput?.value || fromInput?.value || '').trim();
@@ -8541,16 +8574,8 @@ function initSetupSmtp(root) {
     savedConnectionOk = false;
     setConnectionOk(false);
     showStatus(discoverStatus, '', false);
-  };
-
-  const resetToAutoMode = () => {
-    if (initialManual || connectionOk) return;
-    if (!manualRevealedByFailure) return;
-    manualRevealedByFailure = false;
-    setManualMode(false);
-    showStatus(verifyStatus, '', false);
-    showStatus(discoverStatus, '', false);
-    clearFieldHints();
+    // A resting automatic search keeps its message even after editing the credentials.
+    paintCooldown();
   };
 
   const setSkipped = (skipped) => {
@@ -8571,7 +8596,7 @@ function initSetupSmtp(root) {
           input.disabled = false;
         }
       });
-      if (discoverBtn) discoverBtn.disabled = skipped;
+      if (discoverBtn) discoverBtn.disabled = skipped || cooldownLeft() > 0;
       if (verifyBtn) verifyBtn.disabled = skipped;
       if (skipped) {
         savedConnectionOk = connectionOk;
@@ -8591,7 +8616,8 @@ function initSetupSmtp(root) {
 
   fromInput?.addEventListener('input', () => {
     showFieldHint(fromHint, '');
-    resetToAutoMode();
+    // Editing the sender or the password must never throw the operator back to the automatic
+    // search: they are working in the manual/pre-filled block.
     invalidateConnection();
     if (testToInput && !testToInput.dataset.touched) {
       testToInput.value = fromInput.value;
@@ -8599,7 +8625,6 @@ function initSetupSmtp(root) {
   });
   passwordInput?.addEventListener('input', () => {
     showFieldHint(passwordHint, '');
-    resetToAutoMode();
     invalidateConnection();
   });
   const syncEncryptionWithPort = () => {
@@ -8676,6 +8701,9 @@ function initSetupSmtp(root) {
 
   const handleDiscoverResult = (data, statusEl, { revealManualOnFail = true } = {}) => {
     if (!data.ok) {
+      if (data.cooldown && typeof data.cooldown_until === 'string' && data.cooldown_until !== '') {
+        cooldownUntil = Date.parse(data.cooldown_until) || cooldownUntil;
+      }
       setConnectionOk(false);
       savedConnectionOk = false;
       const fieldError = applyFieldErrors(data);
@@ -8775,6 +8803,11 @@ function initSetupSmtp(root) {
     event.preventDefault();
     event.stopPropagation();
     if (discovering || smtpPipelineBusy || !discoverUrl || !fromInput || !passwordInput) return;
+    if (cooldownLeft() > 0) {
+      paintCooldown();
+      setManualMode(true);
+      return;
+    }
     if (!validateSimpleFields()) return;
 
     discovering = true;
@@ -8800,7 +8833,7 @@ function initSetupSmtp(root) {
       setSkipped(!!skip?.checked);
       discoverBtn.removeAttribute('aria-busy');
       discoverBtn.removeAttribute('aria-disabled');
-      if (!manual?.hidden || !!skip?.checked) {
+      if (!manual?.hidden || !!skip?.checked || cooldownLeft() > 0) {
         discoverBtn.disabled = true;
       } else {
         discoverBtn.disabled = false;
@@ -12864,6 +12897,12 @@ async function handleGeoResolveResult(data, input, applyItem, confirmTemplate, o
     return true;
   }
   if (data.action === 'not_found') {
+    // The blur resolve of the same field may have picked a valid value while this request was
+    // still in flight: asking again (and clearing the input on “No”) is what made the first
+    // Save click look ignored.
+    if (input.dataset.geoPicked === '1') {
+      return true;
+    }
     if (isAddress) {
       showGeoAddressForcePanel(input, {
         message: document.body?.dataset?.msgGeoAddressNotFoundHint
@@ -12889,6 +12928,8 @@ async function handleGeoResolveResult(data, input, applyItem, confirmTemplate, o
     return true;
   }
   if (data.action !== 'confirm' || !data.item) return false;
+  // Already resolved by the blur handler while this request was running: keep that value.
+  if (input.dataset.geoPicked === '1') return true;
   // Address: never block with a modal — offer suggestion + force inline.
   if (isAddress) {
     const suggestion = data.label || data.item.label || data.item.address || data.item.name || '';
@@ -15223,8 +15264,15 @@ function initGeoSubmitValidation(root = document) {
           return;
         }
         form.dataset.geoResolved = '1';
+        // Re-submit with the button that was actually pressed: forms with more than one submit
+        // action (Settings/mail “Save” vs “Send test”) must keep its name/value.
+        const submitter = event.submitter instanceof HTMLButtonElement
+          && event.submitter.type === 'submit'
+          && !event.submitter.disabled
+          ? event.submitter
+          : undefined;
         if (typeof form.requestSubmit === 'function') {
-          form.requestSubmit();
+          form.requestSubmit(submitter);
         } else {
           HTMLFormElement.prototype.submit.call(form);
         }
@@ -20368,8 +20416,31 @@ function initMinutesWizard(root = document) {
     const submitBtn = form.querySelector('[data-minutes-submit]');
     const progress = form.querySelector('[data-minutes-progress]');
     const errorBox = form.querySelector('[data-minutes-error]');
+    // A failed server-side save reopens the step that holds the failing field and keeps the
+    // reasons visible until the operator acts on them.
+    const serverErrorStep = Number(form.dataset.minutesErrorStep || 0);
     const total = panels.length;
     let step = 1;
+
+    // Closing time: the step proposes “now” (the minute is being closed as we write it) until
+    // the operator types a time of their own or a submitted value comes back from the server.
+    const closeTimeInput = form.querySelector('[name="minutes_time_close"]');
+    const refreshCloseTime = () => {
+      if (!(closeTimeInput instanceof HTMLInputElement) || closeTimeInput.dataset.touched === '1') return;
+      const initial = String(closeTimeInput.dataset.minutesTimeDefault || '');
+      const current = closeTimeInput.value.trim();
+      if (current !== '' && current !== initial) return; // the operator chose this time
+      const now = new Date();
+      const time = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+      if (closeTimeInput.value !== time) closeTimeInput.value = time;
+    };
+    if (closeTimeInput instanceof HTMLInputElement) {
+      const markTouched = () => {
+        closeTimeInput.dataset.touched = '1';
+      };
+      closeTimeInput.addEventListener('input', markTouched);
+      closeTimeInput.addEventListener('change', markTouched);
+    }
 
     const panelFor = (num) => panels.find((p) => Number(p.dataset.minutesPanel || 0) === num);
 
@@ -20394,6 +20465,7 @@ function initMinutesWizard(root = document) {
         submitBtn.disabled = step !== total;
       }
       if (errorBox instanceof HTMLElement) errorBox.hidden = true;
+      if (step === total) refreshCloseTime();
       const head = panelFor(step)?.querySelector('h2, h3');
       if (head instanceof HTMLElement) head.focus({ preventScroll: true });
     };
@@ -20464,6 +20536,7 @@ function initMinutesWizard(root = document) {
         if (!(node instanceof HTMLElement)) return;
         agendaList.appendChild(node);
         renumber();
+        syncAgendaVotes();
         node.querySelector('input, textarea')?.focus?.();
       });
     });
@@ -20498,18 +20571,266 @@ function initMinutesWizard(root = document) {
       const cards = [...agendaList.querySelectorAll('[data-minutes-agenda-item]')];
       const target = cards[cards.length - 1]?.querySelector('textarea[name="agenda_text[]"]') || null;
       if (!(target instanceof HTMLTextAreaElement)) return;
-      target.value = target.value.trim() === '' ? clean : `${target.value.trim()}\n${clean}`;
+      const existing = target.value.trim();
+      // Never paste the same line twice: a duplicated paragraph is what makes a minute unreadable.
+      if (existing.split('\n').some((line) => line.trim() === clean)) {
+        target.focus();
+        return;
+      }
+      target.value = existing === '' ? clean : `${existing}\n${clean}`;
       target.focus();
       target.dispatchEvent(new Event('input', { bubbles: true }));
     };
+    // ── “Inserisci dati Bilancio / Modello D” ─────────────────────────────────────────────
+    // The operator picks the budget line (voice) and which figure goes into the minute:
+    // planned (forecast), accounted (actual) or the variance. Nothing is inserted blindly.
+    const budgetDialog = document.querySelector('[data-minutes-budget-dialog]');
+    const budgetSource = form.querySelector('[data-minutes-budget-data]');
+    const budgetData = (() => {
+      if (!(budgetSource instanceof HTMLScriptElement)) return { years: [], budgets: [] };
+      try {
+        return JSON.parse(budgetSource.textContent || '{}') || { years: [], budgets: [] };
+      } catch (err) {
+        return { years: [], budgets: [] };
+      }
+    })();
+    const budgetYear = budgetDialog?.querySelector('[data-minutes-budget-year]');
+    const budgetVoice = budgetDialog?.querySelector('[data-minutes-budget-voice]');
+    const budgetDatum = budgetDialog?.querySelector('[data-minutes-budget-datum]');
+    const budgetPreview = budgetDialog?.querySelector('[data-minutes-budget-preview]');
+    const budgetInsertBtn = budgetDialog?.querySelector('[data-minutes-budget-insert]');
+    const budgetMoney = (value) => {
+      const amount = Number(value) || 0;
+      try {
+        return new Intl.NumberFormat(document.documentElement.lang || 'it', {
+          style: 'currency',
+          currency: 'EUR',
+        }).format(amount);
+      } catch (err) {
+        return amount.toFixed(2) + ' €';
+      }
+    };
+    const budgetSelected = (select) => (select instanceof HTMLSelectElement && select.selectedOptions.length > 0
+      ? select.selectedOptions[0]
+      : null);
+    const budgetFillYears = () => {
+      if (!(budgetYear instanceof HTMLSelectElement)) return;
+      const years = Array.isArray(budgetData.years) ? budgetData.years : [];
+      const dateInput = form.querySelector('[name="minutes_date"]');
+      const meetingYear = Number(String(dateInput?.value || '').slice(0, 4));
+      budgetYear.innerHTML = '';
+      years.forEach((year) => {
+        const option = document.createElement('option');
+        option.value = String(year);
+        option.textContent = String(year);
+        budgetYear.add(option);
+      });
+      const wanted = years.includes(meetingYear) ? meetingYear : Number(years[0] || 0);
+      if (wanted > 0) budgetYear.value = String(wanted);
+    };
+    const budgetFillVoices = () => {
+      if (!(budgetVoice instanceof HTMLSelectElement) || !(budgetYear instanceof HTMLSelectElement)) return;
+      const year = Number(budgetYear.value || 0);
+      const budget = (Array.isArray(budgetData.budgets) ? budgetData.budgets : [])
+        .find((entry) => Number(entry?.year || 0) === year);
+      budgetVoice.innerHTML = '';
+      if (!budget) return;
+      const addGroup = (label, items) => {
+        if (!Array.isArray(items) || items.length === 0) return;
+        const group = document.createElement('optgroup');
+        group.label = label;
+        items.forEach((item) => {
+          const option = document.createElement('option');
+          option.value = String(item.value);
+          option.textContent = String(item.label);
+          option.dataset.planned = String(item.planned ?? 0);
+          option.dataset.actual = String(item.actual ?? 0);
+          group.appendChild(option);
+        });
+        budgetVoice.appendChild(group);
+      };
+      const totals = budget.totals || {};
+      addGroup(budgetDialog?.dataset.labelTotals || '', [
+        {
+          value: 'total:income',
+          label: budgetDialog?.dataset.labelTotalIncome || '',
+          planned: totals.planned_income ?? 0,
+          actual: totals.actual_income ?? 0,
+        },
+        {
+          value: 'total:expense',
+          label: budgetDialog?.dataset.labelTotalExpense || '',
+          planned: totals.planned_expense ?? 0,
+          actual: totals.actual_expense ?? 0,
+        },
+      ]);
+      (Array.isArray(budget.sections) ? budget.sections : []).forEach((section) => {
+        addGroup(String(section?.title || ''), (Array.isArray(section?.items) ? section.items : []).map((item) => ({
+          value: 'item:' + String(item.id),
+          label: String(item.label || ''),
+          planned: item.planned ?? 0,
+          actual: item.actual ?? 0,
+        })));
+      });
+    };
+    const budgetCompose = () => {
+      const option = budgetSelected(budgetVoice);
+      if (!option || !(budgetYear instanceof HTMLSelectElement) || !(budgetDatum instanceof HTMLSelectElement)) {
+        return '';
+      }
+      const datum = budgetDatum.value;
+      const template = datum === 'actual'
+        ? (budgetDialog?.dataset.tplActual || '')
+        : (datum === 'delta' ? (budgetDialog?.dataset.tplDelta || '') : (budgetDialog?.dataset.tplPlanned || ''));
+      if (template === '') return '';
+      const planned = Number(option.dataset.planned || 0);
+      const actual = Number(option.dataset.actual || 0);
+      const value = datum === 'actual' ? actual : (datum === 'delta' ? actual - planned : planned);
+
+      return template
+        .replace(':voice', String(option.textContent || '').trim())
+        .replace(':year', budgetYear.value)
+        .replace(':amount', budgetMoney(value));
+    };
+    const budgetRefresh = () => {
+      if (!(budgetPreview instanceof HTMLElement)) return;
+      const text = budgetCompose();
+      budgetPreview.textContent = text !== '' ? text : String(budgetDialog?.dataset.msgNothing || '');
+    };
+    const budgetOpen = () => {
+      if (!(budgetDialog instanceof HTMLDialogElement)) return false;
+      budgetFillYears();
+      budgetFillVoices();
+      budgetRefresh();
+      if (typeof budgetDialog.showModal === 'function') budgetDialog.showModal();
+      return true;
+    };
+    budgetYear?.addEventListener('change', () => {
+      budgetFillVoices();
+      budgetRefresh();
+    });
+    budgetVoice?.addEventListener('change', budgetRefresh);
+    budgetDatum?.addEventListener('change', budgetRefresh);
+    budgetDialog?.querySelector('[data-minutes-budget-cancel]')?.addEventListener('click', () => {
+      budgetDialog.close();
+    });
+    budgetDialog?.addEventListener('cancel', (event) => {
+      event.preventDefault();
+      budgetDialog.close();
+    });
+    budgetInsertBtn?.addEventListener('click', () => {
+      const text = budgetCompose();
+      if (text === '' || !(budgetDialog instanceof HTMLDialogElement)) return;
+      insertText(text);
+      budgetDialog.close();
+    });
+
     form.querySelectorAll('[data-minutes-insert]').forEach((btn) => {
       btn.addEventListener('click', () => {
         const pending = btn.getAttribute('data-minutes-pending-text') || '';
-        const budget = btn.getAttribute('data-minutes-budget-text') || '';
-        insertText(btn.getAttribute('data-minutes-insert') === 'budget' ? budget : pending);
+        if (btn.getAttribute('data-minutes-insert') !== 'budget') {
+          insertText(pending);
+          return;
+        }
+        if (budgetData.years?.length > 0 && budgetOpen()) return;
+        // No budget data on this instance: keep the previous behaviour (pre-computed summary).
+        insertText(btn.getAttribute('data-minutes-budget-text') || '');
       });
     });
 
+
+    // ── Votes are bound to the people entitled to vote ────────────────────────────────────
+    // Present directors (board) or members present + proxies (assembly) are the maximum number
+    // of votes per agenda point. The abstentions are the remainder and the outcome is derived
+    // from the numbers; “Rejected” and “Not voted” stay a manual override.
+    const votingParticipants = () => {
+      const scope = [...form.querySelectorAll('[data-minutes-attendance-scope]')]
+        .find((el) => el instanceof HTMLElement && !el.hidden);
+      if (!(scope instanceof HTMLElement)) return 0;
+      const mode = scope.getAttribute('data-minutes-attendance-scope') || '';
+      const root = scope.querySelector('[data-minutes-attendance]');
+      if (!(root instanceof HTMLElement)) return 0;
+      let count = 0;
+      root.querySelectorAll('[data-minutes-attendee]').forEach((row) => {
+        const control = row.querySelector('select');
+        if (!(control instanceof HTMLSelectElement)) return;
+        const value = control.value;
+        if (value === 'present') {
+          count += 1;
+        } else if (mode === 'assembly' && value === 'delegate') {
+          // A proxy carries the vote of the member who delegated it.
+          count += 1;
+        }
+      });
+      return count;
+    };
+    const agendaVoteValue = (input) => {
+      const value = Number(input instanceof HTMLInputElement ? input.value : 0);
+      return Number.isFinite(value) && value > 0 ? Math.floor(value) : 0;
+    };
+    const syncAgendaItem = (item) => {
+      const total = votingParticipants();
+      const cap = item.querySelector('[data-minutes-agenda-cap]');
+      if (cap instanceof HTMLElement) {
+        const template = form.dataset.msgVoteCap || '';
+        cap.textContent = total > 0 && template !== '' ? template.replace(':count', String(total)) : '';
+        cap.hidden = cap.textContent === '';
+      }
+      const yesInput = item.querySelector('[data-minutes-agenda-vote="yes"]');
+      const noInput = item.querySelector('[data-minutes-agenda-vote="no"]');
+      const abstainInput = item.querySelector('[data-minutes-agenda-vote="abstain"]');
+      const outcomeSelect = item.querySelector('[data-minutes-agenda-outcome]');
+      if (!(yesInput instanceof HTMLInputElement) || !(noInput instanceof HTMLInputElement)) return;
+      if (total <= 0) return; // free document: nothing to bind the votes to
+      yesInput.max = String(total);
+      noInput.max = String(total);
+      const yes = Math.min(agendaVoteValue(yesInput), total);
+      const no = Math.min(agendaVoteValue(noInput), total - yes);
+      if (yesInput.value !== '' && String(yes) !== yesInput.value) yesInput.value = String(yes);
+      if (noInput.value !== '' && String(no) !== noInput.value) noInput.value = String(no);
+      const abstain = total - yes - no;
+      if (abstainInput instanceof HTMLInputElement) abstainInput.value = String(abstain);
+      // A manual “Rejected” / “Not voted” is remembered on the card: any other outcome is derived.
+      if (outcomeSelect instanceof HTMLSelectElement && item.dataset.outcomeLocked !== '1') {
+        let auto = 'not_voted';
+        if (yes > 0 || no > 0) {
+          auto = (no === 0 && abstain === 0 && yes === total)
+            ? 'unanimous'
+            : (yes > no ? 'majority' : 'rejected');
+        }
+        if (auto !== outcomeSelect.value) outcomeSelect.value = auto;
+      }
+    };
+    const syncAgendaVotes = () => {
+      if (!(agendaList instanceof HTMLElement)) return;
+      agendaList.querySelectorAll('[data-minutes-agenda-item]').forEach((item) => {
+        if (item instanceof HTMLElement) syncAgendaItem(item);
+      });
+    };
+    if (agendaList instanceof HTMLElement) {
+      const agendaItemOf = (target) => (target instanceof Element
+        ? target.closest('[data-minutes-agenda-item]')
+        : null);
+      agendaList.addEventListener('input', (event) => {
+        const item = agendaItemOf(event.target);
+        if (item instanceof HTMLElement) syncAgendaItem(item);
+      });
+      agendaList.addEventListener('change', (event) => {
+        const item = agendaItemOf(event.target);
+        if (!(item instanceof HTMLElement)) return;
+        // Picking “Rejected” or “Not voted” by hand freezes the outcome for this agenda point;
+        // going back to a computed outcome releases the lock.
+        const target = event.target;
+        if (target instanceof HTMLSelectElement && target.hasAttribute('data-minutes-agenda-outcome')) {
+          if (target.value === 'rejected' || target.value === 'not_voted') {
+            item.dataset.outcomeLocked = '1';
+          } else {
+            delete item.dataset.outcomeLocked;
+          }
+        }
+        syncAgendaItem(item);
+      });
+    }
 
     // Quorum / attendance counters (board and assembly both update live).
     const attendanceRoots = [...form.querySelectorAll('[data-minutes-attendance]')];
@@ -20558,6 +20879,8 @@ function initMinutesWizard(root = document) {
           if (warn instanceof HTMLElement) warn.hidden = !over;
         }
       });
+      // Attendance changed: the votes available per agenda point change with it.
+      syncAgendaVotes();
     };
     attendanceRoots.forEach((rootEl) => rootEl.addEventListener('change', updateQuorum));
     form.querySelectorAll('[name^="member_delegate_to"]').forEach((input) => {
@@ -20569,16 +20892,55 @@ function initMinutesWizard(root = document) {
     // Presence mode: in-person place vs video-conference link.
     const syncPlace = () => {
       const value = form.querySelector('input[name="minutes_place_mode"]:checked')?.value || 'in_person';
+      const video = value === 'video';
       form.querySelectorAll('[data-minutes-place-block]').forEach((block) => {
         if (!(block instanceof HTMLElement)) return;
         const wanted = block.getAttribute('data-minutes-place-block');
         block.hidden = wanted === 'video' ? value !== 'video' : value !== 'in_person';
+      });
+      // The platform belongs to the minute: mandatory only while the video block is in use
+      // (a hidden required field would block the save with an error nobody can see).
+      form.querySelectorAll('input[name="minutes_video_platform"]').forEach((input) => {
+        if (input instanceof HTMLInputElement) input.required = video;
       });
     };
     form.querySelectorAll('input[name="minutes_place_mode"]').forEach((input) => {
       input.addEventListener('change', syncPlace);
     });
     syncPlace();
+
+    // Formal data: a convocation cannot be dated after the meeting, and its date becomes
+    // mandatory as soon as the operator declares the meeting duly convened.
+    const minutesDateInput = form.querySelector('[name="minutes_date"]');
+    const convocationInput = form.querySelector('[name="minutes_convocation_date"]');
+    const convokedInput = form.querySelector('[name="minutes_convoked"]');
+    const syncConvocation = () => {
+      if (!(convocationInput instanceof HTMLInputElement)) return;
+      const meetingDate = minutesDateInput instanceof HTMLInputElement ? minutesDateInput.value : '';
+      if (meetingDate !== '') {
+        convocationInput.max = meetingDate;
+        // Statutory notice: at least N days before the sitting (Settings → Organizzazione).
+        const noticeDays = Number(form.dataset.convocationNoticeDays || 0);
+        if (noticeDays > 0) {
+          const earliest = new Date(`${meetingDate}T00:00:00`);
+          earliest.setDate(earliest.getDate() - noticeDays);
+          const pad = (value) => String(value).padStart(2, '0');
+          convocationInput.min = `${earliest.getFullYear()}-${pad(earliest.getMonth() + 1)}-${pad(earliest.getDate())}`;
+        } else {
+          convocationInput.removeAttribute('min');
+        }
+      } else {
+        convocationInput.removeAttribute('max');
+        convocationInput.removeAttribute('min');
+      }
+      if (convokedInput instanceof HTMLInputElement) {
+        convocationInput.required = convokedInput.checked;
+      }
+    };
+    minutesDateInput?.addEventListener('change', syncConvocation);
+    minutesDateInput?.addEventListener('input', syncConvocation);
+    convokedInput?.addEventListener('change', syncConvocation);
+    syncConvocation();
 
     // Meeting platform: the link placeholder follows the chosen provider (no URL is invented).
     const videoLinkInput = form.querySelector('[name="minutes_video_link"]');
@@ -20591,13 +20953,38 @@ function initMinutesWizard(root = document) {
       jitsi: 'https://meet.jit.si/…',
       other: 'https://…',
     };
+    // “Socly” is this very installation: the link is the current origin (scheme + host, no
+    // path or query) and the field is locked — nothing is invented and nothing can be mistyped.
+    const soclyOrigin = window.location.origin
+      || `${window.location.protocol}//${window.location.host}`;
+    let soclyAutoValue = '';
     const syncVideoPlatform = () => {
       const platform = form.querySelector('input[name="minutes_video_platform"]:checked')?.value || '';
-      if (videoLinkInput instanceof HTMLInputElement) {
-        videoLinkInput.placeholder = platformPlaceholders[platform] || 'https://…';
+      const mode = form.querySelector('input[name="minutes_place_mode"]:checked')?.value || 'in_person';
+      if (!(videoLinkInput instanceof HTMLInputElement)) return;
+      videoLinkInput.placeholder = platformPlaceholders[platform] || 'https://…';
+      if (platform === 'socly') {
+        videoLinkInput.value = soclyOrigin;
+        soclyAutoValue = soclyOrigin;
+      } else if (soclyAutoValue !== '' && videoLinkInput.value === soclyAutoValue) {
+        // Leaving Socly: drop the auto-filled domain instead of sending it as a Teams/Zoom link.
+        videoLinkInput.value = '';
+        soclyAutoValue = '';
       }
+      const locked = platform === 'socly';
+      videoLinkInput.readOnly = locked;
+      if (locked) {
+        videoLinkInput.setAttribute('aria-disabled', 'true');
+      } else {
+        videoLinkInput.removeAttribute('aria-disabled');
+      }
+      // “Other / link” only exists to carry a URL: without it the record is incomplete.
+      videoLinkInput.required = mode === 'video' && platform === 'other';
     };
     form.querySelectorAll('input[name="minutes_video_platform"]').forEach((input) => {
+      input.addEventListener('change', syncVideoPlatform);
+    });
+    form.querySelectorAll('input[name="minutes_place_mode"]').forEach((input) => {
       input.addEventListener('change', syncVideoPlatform);
     });
     syncVideoPlatform();
@@ -20703,6 +21090,6 @@ function initMinutesWizard(root = document) {
       });
     }
 
-    showStep(1);
+    showStep(serverErrorStep > 0 ? serverErrorStep : 1);
   });
 }

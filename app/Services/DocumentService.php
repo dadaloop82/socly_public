@@ -618,6 +618,41 @@ final class DocumentService
         );
     }
 
+    /**
+     * Structured snapshot of an archived minute (president, secretary, attendance, agenda and
+     * outcomes). Null for an ordinary document or for minutes archived before the snapshot.
+     *
+     * @param array<string,mixed> $document
+     * @return array<string,mixed>|null
+     */
+    public function minutesMeta(array $document): ?array
+    {
+        $raw = trim((string) ($document['minutes_meta'] ?? ''));
+        if ($raw === '') {
+            return null;
+        }
+        $decoded = json_decode($raw, true);
+
+        return is_array($decoded) ? $decoded : null;
+    }
+
+    /**
+     * Structured minutes arrive as a JSON string (or array) from the wizard: keep it only when it
+     * decodes, never let the column receive garbage.
+     */
+    private function normalizeMinutesMeta(mixed $raw): ?string
+    {
+        if (is_array($raw)) {
+            $raw = json_encode($raw, JSON_UNESCAPED_UNICODE);
+        }
+        $json = trim((string) $raw);
+        if ($json === '' || strlen($json) > 60000) {
+            return null;
+        }
+
+        return is_array(json_decode($json, true)) ? $json : null;
+    }
+
     /** @param array<string,mixed> $input */
     public function update(int $id, array $input, ?array $file, string $ip): array
     {
@@ -631,6 +666,10 @@ final class DocumentService
         }
         /** @var array<string,mixed> $data */
         $data = $parsed['data'];
+        // Editing the document metadata must never erase the structured minute snapshot.
+        if (!array_key_exists('minutes_meta', $input)) {
+            unset($data['minutes_meta']);
+        }
         $this->db->update('association_documents', $data, 'id = :id', ['id' => $id]);
         $this->syncExpiryDeadline($id, $data, $ip);
         $oldPath = trim((string) ($existing['file_path'] ?? ''));
@@ -817,6 +856,7 @@ final class DocumentService
                 'original_name' => $originalName !== '' ? mb_substr($originalName, 0, 255) : null,
                 'source_section' => $sourceSection,
                 'source_ref' => $sourceRef !== '' ? $sourceRef : null,
+                'minutes_meta' => $this->normalizeMinutesMeta($input['minutes_meta'] ?? null),
                 'reference_year' => max(1900, min(2100, $referenceYear)),
             ],
         ];

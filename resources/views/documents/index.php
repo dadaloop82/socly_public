@@ -541,6 +541,20 @@ $repoSizeLabel = $repoSize >= 1048576
                                                 'show' => $canManage && !$docLockedMinutes,
                                                 'href' => url('/documents/' . $docId . '/edit'),
                                             ],
+                                            [
+                                                // Drafts can be removed from the archive (double confirmation).
+                                                'icon' => 'delete',
+                                                'label' => __('documents.delete_draft_button'),
+                                                'show' => $canManage && $docStatus === 'draft',
+                                                'danger' => true,
+                                                'form_action' => url('/documents/' . $docId . '/delete'),
+                                                'form_method' => 'post',
+                                                'form_attrs' => [
+                                                    'data-confirm' => (string) __('documents.delete_draft_confirm', ['title' => (string) ($doc['title'] ?? '')]),
+                                                    'data-confirm-second' => (string) __('documents.delete_draft_confirm_again', ['title' => (string) ($doc['title'] ?? '')]),
+                                                    'data-confirm-danger' => '1',
+                                                ],
+                                            ],
                                         ]) ?>
                                     </td>
                                 </tr>

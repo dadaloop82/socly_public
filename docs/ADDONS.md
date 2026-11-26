@@ -195,8 +195,9 @@ code or request code), then install from the drop folder or from the licence cat
 Official polls of the board (consiglio direttivo), published as a drop-in add-on: a five-step
 wizard (title/period, participants, topics, preview, share link), participants identified by first
 name + last name + fiscal code, one ballot per person written inside a transaction, live results
-with charts, participation log, CSV export and a branded public page carrying the “part of the
-Socly package” line. Questions are numeric, single/multiple choice or predetermined text: voters
+with charts, participation log, CSV export, a PDF report (opened inline in the browser, ready to
+print) and a branded public page carrying the “part of the Socly package” line. Questions are
+numeric, single/multiple choice or predetermined text: voters
 can never type free text. Polls can be open or secret (aggregate only). The “Argomenti” step also
 collects the reference material of the poll: PDF/JPG/PNG files uploaded to `storage/uploads` and
 external http(s) links; the public ballot page opens the documents inline (same-origin PDF iframe,
@@ -204,13 +205,14 @@ image preview) or downloads them with the original name. A poll can also be link
 topic of the Internal forum (step “Info”): the public page shows the discussion link and the local
 identity is shared, so a participant identified on the ballot page enters the forum without a second
 login (same fiscal code, same browser). Every operator with `documents.manage` can open the live
-results and the CSV export of a published poll; editing, closing and deleting stay limited to the
-poll creator (or a settings administrator). The add-on also publishes the Workflow events
+results, the CSV export and the PDF report of a published poll; editing, closing and deleting stay
+limited to the poll creator (or a settings administrator). The add-on also publishes the Workflow
+events
 `board_voting.published`, `board_voting.closed` and `board_voting.vote_cast`. Source:
 `addons-src/board_voting/` (private repo; `addons-src/` is not part of the public export).
 
 ```bash
-php tools/addons/addon-tool.php build addons-src/board_voting dist/board_voting-1.2.4.soclyaddon --incoming
+php tools/addons/addon-tool.php build addons-src/board_voting dist/board_voting-1.2.5.soclyaddon --incoming
 ```
 
 ## Internal forum add-on (`internal_forum`)
@@ -313,7 +315,12 @@ until a valid PDF is selected and the reading-engine line is only shown when som
 Amounts get a second chance: a word sitting right on the column boundary is still accepted, and every
 row whose amount is still missing is re-read with a focused OCR pass on its own line (enlarged single
 line). A number that cannot be read stays at 0, disables the row and is reported as unreadable — a
-0,00 movement is never imported silently. In the check-only screen the suggested fields keep the
+0,00 movement is never imported silently. Since v1.4.80 that card also offers **Riprova a leggere la
+cifra**: the retry re-crops the same line with six alternate geometries (taller band, wider column,
+PSM 6/11, threshold) and keeps the first readable value, updating the row in place. If the number
+really cannot be read the card offers **Copia log completo** / **Scarica log completo**: every
+attempt (crop box, OCR words, result) is appended to the same diagnostic log, so the operator can
+send it over instead of retyping the value. In the check-only screen the suggested fields keep the
 *inferred* badge, and a row missing from the cash book can be added straight away with **Aggiungi a
 Prima cassa** (bank account, confirmation, audit log).
 
@@ -357,8 +364,9 @@ audit report and each “Movimento letto dall’estratto conto” card, so a scr
 whether the installed package is the fixed one. Step 2
 shows a live progress overlay (elapsed time and steps), marks every 0,00 row in red until a valid
 amount is typed, pulses the unreadable-amount alert and offers **Mostra log OCR**
-(`/treasury/bank-statements/ocr-log`, also downloadable) with the native text, the words found in the
-amount area, the OCR lines and the parsed movements.
+(`/treasury/bank-statements/ocr-log`, also copyable and downloadable) with the native text, the words
+found in the amount area, the OCR lines and the parsed movements. The same log is linked from the
+review toolbar, so it is reachable even before a retry.
 
 Since v1.3.7 the review explains the excluded rows (already in the cash book / amount not read / other
 reasons) instead of a bare count, the save button says “Continua al prossimo step” and cannot post twice,
@@ -426,7 +434,7 @@ model is a new JSON file in `templates/`; it never changes the PHP code. Source:
 `addons-src/bank_statement_import/` (private repo; `addons-src/` is not part of the public export).
 
 ```bash
-php tools/addons/addon-tool.php build addons-src/bank_statement_import dist/bank_statement_import-1.4.20.soclyaddon --incoming
+php tools/addons/addon-tool.php build addons-src/bank_statement_import dist/bank_statement_import-1.4.80.soclyaddon --incoming
 ```
 
 ## Revenue Agency invoices (`agenzia_entrate_invoices`)

@@ -183,6 +183,7 @@ final class ResourceBusyMiddleware
         $operation = $esc($this->operationLabel($status));
         $startedBy = $esc($this->startedByLine($status));
         $body = $esc(__('resource_busy.message'));
+        $eta = $esc($this->lock->etaLabel($status));
         $pauseText = $esc(__('resource_busy.pause_text'));
         $hint = $esc(__('resource_busy.hint'));
         $reassure = $esc(__('resource_busy.pause_reassure'));
@@ -218,6 +219,7 @@ final class ResourceBusyMiddleware
         echo '<p class="pause-operation">' . $operation . '</p>';
         echo '<p class="pause-started">' . $startedBy . '</p>';
         echo '<p class="pause-message">' . $body . '</p>';
+        echo '<p class="pause-eta" data-busy-eta>' . $eta . '</p>';
         echo '<p class="pause-wait">' . $pauseText . '</p>';
         echo '<p class="pause-hint">' . $hint . '</p>';
         echo '<p class="pause-reassure">' . $reassure . '</p>';
@@ -285,6 +287,8 @@ final class ResourceBusyMiddleware
             . 'color:var(--ink);background:color-mix(in srgb,var(--brand) 7%,#fff);border:1px solid color-mix(in srgb,var(--brand) 18%,var(--line))}'
             . '.pause-started{margin:0 0 .7rem;font-size:.85rem;font-weight:600;color:#4c5f5c}'
             . '.pause-message{margin:0 0 .5rem;font-size:.95rem;line-height:1.5;color:var(--ink)}'
+            . '.pause-eta{margin:0 0 .55rem;padding:.5rem .75rem;border-radius:12px;font-size:.92rem;font-weight:700;'
+            . 'color:#0a4f6a;background:color-mix(in srgb,var(--brand) 8%,#fff);border:1px solid color-mix(in srgb,var(--brand) 20%,#fff)}'
             . '.pause-wait{margin:0 0 .55rem;font-size:.95rem;line-height:1.45;color:var(--ink)}'
             . '.pause-hint{margin:0 0 .85rem;font-size:.82rem;line-height:1.45;color:#5d6f6c}'
             . '.pause-reassure{margin:0 0 1rem;padding:.55rem .75rem;border-radius:12px;font-size:.82rem;line-height:1.4;'
@@ -335,9 +339,10 @@ final class ResourceBusyMiddleware
             . 'var retry=document.querySelector("[data-busy-retry]");'
             . 'if(retry){retry.addEventListener("click",function(){location.reload();});}'
             . 'if(window.SoclyPauseGame){window.SoclyPauseGame.init(document);}'
+            . 'var eta=document.querySelector("[data-busy-eta]");'
             . 'function check(){fetch(url,{credentials:"same-origin",headers:{Accept:"application/json","X-Requested-With":"XMLHttpRequest"},cache:"no-store"})'
             . '.then(function(r){return r.ok?r.json():null;})'
-            . '.then(function(d){if(d&&d.busy===false){location.reload();}})'
+            . '.then(function(d){if(d&&typeof d.eta_label==="string"&&d.eta_label!==""){document.querySelectorAll("[data-busy-eta]").forEach(function(el){el.textContent=d.eta_label;});}if(d&&d.busy===false){location.reload();}})'
             . '.catch(function(){});}'
             . 'window.setTimeout(check,1500);window.setInterval(check,5000);'
             . '})();';

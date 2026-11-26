@@ -46,6 +46,7 @@ final class MinutesPdfService
     private int $pageCount = 0;
     private string $documentTitle = '';
     private string $association = '';
+    private string $associationMeta = '';
     private string $statusLabel = '';
     private string $watermarkLabel = '';
 
@@ -72,6 +73,7 @@ final class MinutesPdfService
         $this->pageCount = 0;
         $this->documentTitle = (string) ($doc['title'] ?? '');
         $this->association = (string) ($doc['association'] ?? '');
+        $this->associationMeta = (string) ($doc['association_meta'] ?? '');
         $this->statusLabel = (string) ($doc['status_label'] ?? '');
         $this->watermarkLabel = (string) ($doc['watermark'] ?? '');
         $this->logo = $this->prepareLogo(isset($doc['logo_path']) ? (string) $doc['logo_path'] : '');
@@ -172,10 +174,18 @@ final class MinutesPdfService
             self::HEADER_H
         );
         if ($this->association !== '') {
-            $this->textAt(self::MARGIN, self::PAGE_H - 46, $this->association, 15, true, [1, 1, 1]);
+            $nameWidth = $this->logo !== [] ? self::PAGE_W - (self::MARGIN * 2) - 160 : self::PAGE_W - (self::MARGIN * 2);
+            $this->textAt(self::MARGIN, self::PAGE_H - 46, $this->fit($this->association, 15, $nameWidth), 15, true, [1, 1, 1]);
+        }
+        $titleY = self::PAGE_H - 68;
+        if ($this->associationMeta !== '') {
+            $metaWidth = $this->logo !== [] ? self::PAGE_W - (self::MARGIN * 2) - 160 : self::PAGE_W - (self::MARGIN * 2);
+            $this->textAt(self::MARGIN, self::PAGE_H - 60, $this->fit($this->associationMeta, 8, $metaWidth), 8, false, [1, 1, 1]);
+            $titleY = self::PAGE_H - 80;
         }
         $subtitle = $this->documentTitle !== '' ? $this->documentTitle : 'SOCLY';
-        $this->textAt(self::MARGIN, self::PAGE_H - 68, $subtitle, 10, false, [1, 1, 1]);
+        // The status label sits on the right: never let the title run under it.
+        $this->textAt(self::MARGIN, $titleY, $this->fit($subtitle, 10, self::PAGE_W - (self::MARGIN * 2) - 120), 10, false, [1, 1, 1]);
         if ($this->logo !== []) {
             $maxW = 150.0;
             $maxH = 42.0;
@@ -227,7 +237,7 @@ final class MinutesPdfService
             $x = $left + $index * ($width + $gap);
             $role = trim((string) ($signature['role'] ?? ''));
             $name = trim((string) ($signature['name'] ?? ''));
-            $this->textAt($x, $y + 22, $role, 9, false, [0.35, 0.40, 0.39]);
+            $this->textAt($x, $y + 22, $this->fit($role, 9, $width), 9, false, [0.35, 0.40, 0.39]);
             $this->content .= sprintf(
                 "0.45 0.48 0.47 RG 0.8 w %.2F %.2F m %.2F %.2F l S\n",
                 $x,
@@ -236,7 +246,7 @@ final class MinutesPdfService
                 $y
             );
             if ($name !== '') {
-                $this->textAt($x, $y - 16, $name, 10, true, [0.10, 0.17, 0.16]);
+                $this->textAt($x, $y - 16, $this->fit($name, 10, $width), 10, true, [0.10, 0.17, 0.16]);
             }
         }
         $this->y = $y - 30;
@@ -325,6 +335,25 @@ final class MinutesPdfService
         $narrow = preg_match_all('/[il.,;:\'!|]/u', $text) ?: 0;
 
         return max(0.0, ($chars * 0.53 - $narrow * 0.13) * $size);
+    }
+
+    /**
+     * Cut a single-line text to the available width. Two signature columns sit side by side: an
+     * overlong name (“Mario Rossi — Presidente (legale rappresentante)”) used to run into the
+     * next column and print on top of it.
+     */
+    private function fit(string $text, float $size, float $width): string
+    {
+        $text = trim(preg_replace('/\s+/u', ' ', $text) ?? $text);
+        if ($text === '' || $width <= 0 || $this->textWidth($text, $size) <= $width) {
+            return $text;
+        }
+        $cut = $text;
+        while ($cut !== '' && $this->textWidth($cut . '...', $size) > $width) {
+            $cut = mb_substr($cut, 0, max(0, mb_strlen($cut) - 1));
+        }
+
+        return $cut === '' ? '' : rtrim($cut) . '...';
     }
 
     /**

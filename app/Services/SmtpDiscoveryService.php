@@ -32,7 +32,8 @@ namespace Socly\Services;
  *  1. Mozilla/Thunderbird autoconfig XML
  *  2. DNS SRV (_submission._tcp, _smtps._tcp, _smtp._tcp)
  *  3. MX records and hosts derived from MX / provider domain
- *  4. Common hostname patterns on the email domain (smtp., mail., …)
+ *  4. Hosted families recognised from the MX (Google Workspace, Microsoft 365)
+ *  5. Common hostname patterns on the email domain (smtp., mail., …)
  *
  * Each host is TCP-probed on standard submission ports before attempting AUTH.
  */
@@ -336,6 +337,17 @@ final class SmtpDiscoveryService
         if (str_contains($blob, 'register.it') || str_contains($blob, 'securemail') || str_contains($blob, 'webnode')) {
             $candidates[] = 'authsmtp.securemail.pro';
             $candidates[] = 'smtp.securemail.pro';
+        }
+
+        // Hosted mailboxes: the MX is a generic inbound protection host, so neither
+        // “smtp.<domain>” nor the MX siblings accept AUTH. These families are recognised by
+        // the MX itself, not by the sender domain.
+        if (str_contains($blob, 'google')) {
+            $candidates[] = 'smtp.gmail.com';
+        }
+        if (str_contains($blob, 'outlook') || str_contains($blob, 'office365')) {
+            $candidates[] = 'smtp-mail.outlook.com';
+            $candidates[] = 'smtp.office365.com';
         }
 
         // When MX lives on the same domain as the mailbox, also try local patterns.

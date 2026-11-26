@@ -10,6 +10,13 @@ every 100 patches bump the series, and each bump is published to this rep come o
 
 ### Added
 
+- Bank-statement import: an unreadable amount now has **Riprova a leggere la cifra** on the review
+  card, with six alternate crops/OCR modes on the same line. If the number still cannot be read the
+  card offers **Copia log completo** / **Scarica log completo** (attempts, OCR words and crop boxes
+  appended to the same diagnostic log), so the value can be analysed instead of retyped.
+- Board voting: **Esporta PDF** replaces “Stampa / PDF”. The results report (summary, outcomes,
+  participation register and, for open polls, the individual ballots) opens inline in the browser
+  with the association branding, ready to print from the PDF.
 - Documents: a document in **Draft** status can now be deleted from its detail or edit page with a
   double confirmation. Approved, signed and archived documents remain immutable; the deletion is
   recorded in the activity log.

@@ -1717,6 +1717,8 @@ $showNameDe = !empty($showNameDe);
                         data-setup-smtp
                         data-setup-line
                         data-smtp-initial-manual="<?= $showManual ? '1' : '0' ?>"
+                        data-discovery-cooldown-until="<?= !empty($value['discovery']['active']) ? e(date('c', (int) ($value['discovery']['until'] ?? 0))) : '' ?>"
+                        data-msg-discovery-cooldown="<?= e((string) __('mail.discovery_cooldown')) ?>"
                         data-discover-url="<?= e(url('/setup/mail/discover')) ?>"
                         data-test-url="<?= e(url('/setup/mail/test')) ?>"
                         data-discover-ok="<?= e(__('setup.mail_discover_ok')) ?>"

@@ -95,6 +95,7 @@ final class SessionController extends BaseController
                     $startedTime = '';
                 }
             }
+            $eta = $lock->eta($status);
             echo json_encode([
                 'ok' => true,
                 'busy' => true,
@@ -108,6 +109,9 @@ final class SessionController extends BaseController
                     'name' => $name,
                     'time' => $startedTime !== '' ? $startedTime : '—',
                 ]),
+                'eta_label' => $lock->etaLabel($status),
+                'eta_remaining_seconds' => (int) ($eta['remaining'] ?? 0),
+                'eta_at' => (string) ($eta['at'] ?? ''),
                 'message' => __('resource_busy.message'),
             ], JSON_UNESCAPED_UNICODE);
         } catch (\Throwable) {
