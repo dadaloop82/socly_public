@@ -321,9 +321,21 @@ explicit confirmation; a declared total that was not detected is reported as a p
 reconciliation. The sum always includes every detected row, also the duplicates excluded from the
 import, so an already imported statement still reconciles.
 
+Dates follow one rule for every model: the imported movement is dated with the **value date**
+(data valuta), the day the bank actually credits or debits the account — the date a cash-basis
+association report needs and the one normally used for POS/SEPA rows in Prima cassa. The operation
+(booking/contabile) date is only the fallback when the statement prints no value date. Both dates stay
+on the row: the review labels the field “Data movimento (valuta)” and shows the bank booking date
+underneath, so a date difference in the check screen is explained instead of the rule changing from one
+import to the next. A model whose value-date band is too narrow still gets the second date printed on
+the row.
+
 The parser joins amount fragments the text layer prints separately (`"108,"` + `"42"`) and reads the
 declared totals from the `Totale/Totali` line. Thousands are handled too: Intesa hides the separator
-in a control character (`6<0x19>957,06`), which is normalised before the fragments are joined. When the
+in a control character (`6<0x19>957,06`), which is normalised before the fragments are joined. The
+**leading group** is put back as well: Intesa prints `"5."` and `"933,38"` (or `"2<0x19>"` and
+`"171,90"`) as two runs, which used to become 933,38 while a 5.000,00 repayment turned into 0,00; a
+dangling thousands group is now closed by the following run before the amount is accepted. When the
 text layer already carries readable amounts the OCR pass is skipped (much faster analysis); the focused
 per-row OCR remains the fallback. Step 2
 shows a live progress overlay (elapsed time and steps), marks every 0,00 row in red until a valid

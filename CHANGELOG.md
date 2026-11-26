@@ -79,6 +79,14 @@ every 100 patches bump the series, and each bump is published to this rep come o
 
 ### Fixed
 
+- Bank statement import: amounts printed in separate text runs no longer lose their thousands
+  (`5.933,38` was read as 933,38 and a 5.000,00 repayment as € 0,00): the leading group (`5.`,
+  `2<0x19>`) is closed by the following run before the amount is accepted.
+- Bank statement import: one date rule for every model — the cash-book movement is dated with the
+  **value date** (data valuta), the day the money really moves on the account, and only falls back to
+  the operation/booking date when the statement prints none. Both dates stay on the row and the
+  review shows the bank booking date under “Data movimento (valuta)”. A statement row whose amount
+  cannot be read no longer marks the recorded movement as wrong: the amount shows “—” with a note.
 - Bank statement import (Intesa Sanpaolo): POS rows whose amount is split into two text runs (“14,” and
   “95” with a wide tab gap or a slightly lower baseline) are joined again, so they no longer land at
   € 0,00 and no longer produce a bogus “Mancante in Prima cassa” in the audit. The statement period
