@@ -85,7 +85,8 @@ every 100 patches bump the series, and each bump is published to this rep come o
   “Solo il creatore può aprire i risultati”.
 - Minutes wizard: the “Tipo di verbale” cards use two columns and long descriptions wrap inside the
   card, so the text no longer spills outside the rounded border and the fourth template is no longer
-  alone on its own row.
+  alone on its own row. Choosing another template, venue or status now clears the previous
+  highlight: the server-side `is-selected` class is repainted from the checked radio.
 - Bank statement import: amounts printed in separate text runs no longer lose their thousands
   (`5.933,38` was read as 933,38 and a 5.000,00 repayment as € 0,00): the leading group (`5.`,
   `2<0x19>`) is closed by the following run before the amount is accepted.

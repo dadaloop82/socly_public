@@ -20649,6 +20649,20 @@ function initMinutesWizard(root = document) {
     });
     syncTemplate(false);
 
+    // The cards are painted server-side with `is-selected` on the initial value. A radio change
+    // must repaint the whole group, otherwise the first card keeps its highlighted border and two
+    // options look selected at the same time (tipo di verbale, sede, stato del verbale).
+    const paintMinutesChoiceCards = () => {
+      form.querySelectorAll('.tessera-choice-card > input[type="radio"]').forEach((input) => {
+        const card = input.closest('.tessera-choice-card');
+        if (card) card.classList.toggle('is-selected', !!input.checked);
+      });
+    };
+    form.querySelectorAll('.tessera-choice-card > input[type="radio"]').forEach((input) => {
+      input.addEventListener('change', paintMinutesChoiceCards);
+    });
+    paintMinutesChoiceCards();
+
     // Quick search inside the assembly attendance list.
     const memberSearch = form.querySelector('[data-minutes-member-search]');
     if (memberSearch instanceof HTMLInputElement) {
