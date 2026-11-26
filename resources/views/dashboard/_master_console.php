@@ -45,11 +45,11 @@ $levelClass = static fn (string $level): string => match (strtoupper($level)) {
     default => 'master-console-log-level--anomaly',
 };
 ?>
-<section class="panel master-console" aria-labelledby="master-console-title">
-    <div class="master-console-head">
+<details class="panel master-console" aria-labelledby="master-console-title" open>
+    <summary class="master-console-head" title="<?= e(__('master_console.toggle_hint')) ?>">
         <h2 class="master-console-title" id="master-console-title"><?= e(__('master_console.title')) ?></h2>
-        <p class="master-console-subtitle"><?= e(__('master_console.subtitle')) ?></p>
-    </div>
+        <span class="master-console-subtitle"><?= e(__('master_console.subtitle')) ?></span>
+    </summary>
 
     <dl class="master-console-meta">
         <dt><?= e(__('master_console.connected_label')) ?></dt>
@@ -110,4 +110,4 @@ $levelClass = static fn (string $level): string => match (strtoupper($level)) {
             <?php endforeach; ?>
         </ul>
     <?php endif; ?>
-</section>
+</details>

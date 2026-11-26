@@ -16421,11 +16421,37 @@ select.is-remote-choice {
   border-left: 4px solid var(--danger, #A61B1B);
 }
 .master-console-head {
+  position: relative;
   display: flex;
   flex-wrap: wrap;
   align-items: baseline;
   gap: .2rem .9rem;
-  margin-bottom: .9rem;
+  padding-right: 1.9rem;
+  list-style: none;
+  cursor: pointer;
+}
+/* Native <details>: no default triangle, a chevron on the right instead. */
+.master-console-head::-webkit-details-marker { display: none; }
+.master-console-head:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--danger, #A61B1B) 35%, transparent);
+  outline-offset: .35rem;
+  border-radius: .4rem;
+}
+.master-console-head::after {
+  content: "";
+  position: absolute;
+  right: .55rem;
+  top: 50%;
+  width: .5rem;
+  height: .5rem;
+  border-right: 2px solid var(--danger, #A61B1B);
+  border-bottom: 2px solid var(--danger, #A61B1B);
+  opacity: .6;
+  transform: translateY(-50%) rotate(45deg);
+  transition: transform .18s ease;
+}
+.master-console[open] > .master-console-head::after {
+  transform: translateY(-50%) rotate(-135deg);
 }
 .master-console-title {
   margin: 0;
@@ -16441,7 +16467,7 @@ select.is-remote-choice {
   display: grid;
   grid-template-columns: max-content minmax(0, 1fr);
   gap: .3rem .9rem;
-  margin: 0 0 1rem;
+  margin: .9rem 0 1rem;
   font-size: .9rem;
 }
 .master-console-meta dt {

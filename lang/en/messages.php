@@ -2165,6 +2165,7 @@ return [
         'login_text' => 'Maintenance account — reserved to the platform owner.',
         'title' => 'Welcome Socly SuperAdmin',
         'subtitle' => 'Platform maintenance console',
+        'toggle_hint' => 'Collapse or expand the maintenance console',
         'connected_label' => 'Connected',
         'connected_value' => ':name (:email)',
         'session_label' => 'Session started',

@@ -2165,6 +2165,7 @@ return [
         'login_text' => 'Wartungskonto — nur für den Plattform-Eigentümer.',
         'title' => 'Willkommen Socly SuperAdmin',
         'subtitle' => 'Wartungskonsole der Plattform',
+        'toggle_hint' => 'Wartungskonsole ein- oder ausklappen',
         'connected_label' => 'Verbunden',
         'connected_value' => ':name (:email)',
         'session_label' => 'Sitzung gestartet',

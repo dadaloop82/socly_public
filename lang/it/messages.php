@@ -2169,6 +2169,7 @@ return [
         'login_text' => 'Account di manutenzione — accesso riservato al platform owner.',
         'title' => 'Benvenuto Socly SuperAdmin',
         'subtitle' => 'Console di manutenzione della piattaforma',
+        'toggle_hint' => 'Comprimi o espandi la console di manutenzione',
         'connected_label' => 'Collegato',
         'connected_value' => ':name (:email)',
         'session_label' => 'Sessione avviata',
