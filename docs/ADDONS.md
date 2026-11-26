@@ -350,7 +350,9 @@ row cannot be turned into “Income”. The full “check all statements” run 
 diagnostic log (report and verify screens) with the add-on and parser-cache versions, each document
 result and every parsed row, marking `importo NON LETTO` when the amount was not read. An audit
 verify session created by an older parser version is not shown: the operator is sent back to the
-audit and must run it again. Step 2
+audit and must run it again. The audit job also stores the parser-cache version at start: a job
+started before an update is closed as stale, so old value dates / zero amounts cannot be mixed with
+new rows. Step 2
 shows a live progress overlay (elapsed time and steps), marks every 0,00 row in red until a valid
 amount is typed, pulses the unreadable-amount alert and offers **Mostra log OCR**
 (`/treasury/bank-statements/ocr-log`, also downloadable) with the native text, the words found in the

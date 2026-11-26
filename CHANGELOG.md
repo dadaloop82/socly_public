@@ -110,7 +110,9 @@ every 100 patches bump the series, and each bump is published to this rep come o
   diagnostic log (report and verify screens): add-on version, parser cache version, each document
   result and every parsed row with `importo NON LETTO` when the amount could not be read. An audit
   verify session created by an older parser version is no longer shown: the operator is sent back
-  to the audit to run it again.
+  to the audit to run it again. The audit job itself now carries the parser-cache version: a job
+  started before the update is closed as stale instead of mixing old rows (value dates, zero
+  amounts) with the new parser.
 - Bank statement import (Intesa Sanpaolo): POS rows whose amount is split into two text runs (“14,” and
   “95” with a wide tab gap or a slightly lower baseline) are joined again, so they no longer land at
   € 0,00 and no longer produce a bogus “Mancante in Prima cassa” in the audit. The statement period
