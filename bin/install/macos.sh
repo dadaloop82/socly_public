@@ -572,12 +572,12 @@ cat <<TXT
 
 ✔ Socly è installato e il server locale è attivo.
   Wizard:   ${LOCAL_URL}
-  Login:    http://${CONNECT_HOST}:${LOCAL_PORT}/login (account di manutenzione: admin@socly.it)
+  Login:    http://${CONNECT_HOST}:${LOCAL_PORT}/login (account di manutenzione: vedi docs/INSTALLATION.md)
   Setup:    http://${CONNECT_HOST}:${LOCAL_PORT}/setup (dopo il wizard e il login)
   Log:      ${ROOT}/storage/logs/install-server.log
   Stop:     Ctrl+C
 
-Completa il wizard (associazione, periodo, quote, campi); poi accedi con admin@socly.it e completa /setup.
+Completa il wizard (associazione, periodo, quote, campi); poi accedi con l’account di manutenzione e completa /setup.
 La password di manutenzione non viene stampata né salvata dallo script.
 Per la produzione (Apache/Nginx, HTTPS) vedi docs/INSTALLATION.md.
 TXT

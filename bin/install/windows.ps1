@@ -1238,13 +1238,13 @@ try {
     Write-Host ''
     Write-Ok 'Socly e installato e il server locale e attivo.'
     Write-Host "  Wizard:   $localUrl"
-    Write-Host "  Login:    http://$($localUrl.Split('/install')[0])/login (account di manutenzione: admin@socly.it)"
+    Write-Host "  Login:    http://$($localUrl.Split('/install')[0])/login (account di manutenzione: vedi docs/INSTALLATION.md)"
     Write-Host "  Setup:    http://$($localUrl.Split('/install')[0])/setup (dopo il wizard e il login)"
     Write-Host "  Log:      $ServerLog"
     Write-Host "  Install:  $InstallerLog"
     Write-Host "  Stop:     Stop-Process -Id (Get-Content '$ServerPidFile')"
     Write-Host ''
-    Write-Host 'Completa il wizard (associazione, periodo, quote, campi); poi accedi con admin@socly.it e completa /setup.'
+    Write-Host 'Completa il wizard (associazione, periodo, quote, campi); poi accedi con l’account di manutenzione e completa /setup.'
     Write-Host 'La password di manutenzione non viene stampata ne salvata dallo script.'
     Write-Host 'Per la produzione (IIS/Apache/Nginx, HTTPS) vedi docs\INSTALLATION.md.'
     if ($WaitOnExit) { Read-Host 'Premi Invio per chiudere' | Out-Null }
