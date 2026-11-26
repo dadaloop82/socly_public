@@ -10,6 +10,9 @@ every 100 patches bump the series, and each bump is published to this rep come o
 
 ### Added
 
+- Org chart: the vice-president office is no longer monocratic, so an association can record two
+  (or more) vice presidents. The chart shows every assignee plus the “Add” node, and a migration
+  clears a legacy `is_unique` flag on the role.
 - Session expiry warning: 30 seconds before the idle timeout a card with a countdown ring and a soft
   chime says the session is about to end, with a “Stay signed in” button that renews it in one click.
   The idle timeout is configurable with `SESSION_IDLE_MINUTES` (never below 15 minutes) and long jobs

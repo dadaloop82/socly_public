@@ -156,7 +156,7 @@ $renderAddNode = static function (string $roleLabelText, string $roleKey, string
     </a>
     <?php
 };
-$monocraticRoleKeys = ['president', 'vice_president', 'secretary', 'treasurer'];
+$monocraticRoleKeys = ['president', 'secretary', 'treasurer'];
 $roleAllowsMultiple = static function (string $roleKey) use ($monocraticRoleKeys): bool {
     return !in_array($roleKey, $monocraticRoleKeys, true);
 };
@@ -216,7 +216,7 @@ $renderRoleSlot = static function (
     string $roleKey,
     string $variant,
     bool $editable
-) use ($byRole, $roleLabel, $renderPersonCard, $renderVacant, $roleAllowsMultiple): void {
+) use ($byRole, $roleLabel, $renderPersonCard, $renderVacant, $roleAllowsMultiple, $renderAddNode): void {
     if (!isset($byRole[$roleKey])) {
         return;
     }
@@ -229,10 +229,14 @@ $renderRoleSlot = static function (
         $renderVacant($label, $roleKey, $variant, $editable);
         return;
     }
-    // Monocratic: show the first assignee only (edit/replace via the card).
+    // Monocratic: show the first assignee only (edit/replace via the card). Multiple offices
+    // (e.g. two vice presidents): every card plus the “+ Add” node.
     $list = $allowMultiple ? $people : array_slice($people, 0, 1);
     foreach ($list as $person) {
         $renderPersonCard($person, $label, $variant, $editable, $monocratic);
+    }
+    if ($editable && $allowMultiple) {
+        $renderAddNode($label, $roleKey);
     }
 };
 
