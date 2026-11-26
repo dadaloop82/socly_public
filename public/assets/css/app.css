@@ -6884,6 +6884,14 @@ input.is-geo-forced,
   to { opacity: 1; transform: translateY(0); }
 }
 .wizard-panel-head { margin-bottom: 1rem; }
+/* The step title is focused programmatically (tabindex="-1") so screen readers announce the new
+   step. It is not an interactive control: the UA focus ring on it looks like a stray black border. */
+.wizard-panel-head .section-title:focus,
+.wizard-panel-head .section-title:focus-visible,
+.wizard-panel-head h2[tabindex="-1"]:focus,
+.wizard-panel-head h2[tabindex="-1"]:focus-visible {
+  outline: none;
+}
 .wizard-panel-body {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(15.5rem, 17.5rem);
