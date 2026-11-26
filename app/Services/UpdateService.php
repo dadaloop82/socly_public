@@ -61,6 +61,12 @@ final class UpdateService
     /** When the running update started (seconds), used by the progress snapshot. */
     private ?int $progressStartedAt = null;
 
+    /** `origin/<channel>:app/Support/PlatformMasterAccess.php` (null = unreadable). */
+    private ?string $targetMasterSource = null;
+
+    /** The target master source is read once per request (preview + apply share it). */
+    private bool $targetMasterSourceLoaded = false;
+
     /** Git-based one-click install (the checkout's `origin` remote must be readable). */
     public function installEnabled(): bool
     {
@@ -372,7 +378,7 @@ final class UpdateService
 
         // Never install a build that revokes the maintenance credential of this
         // instance from the maintenance session itself (public base-edition stub).
-        $masterLockout = $this->masterLockoutGuard();
+        $masterLockout = $this->masterLockoutGuard($ip);
         if ($masterLockout !== null) {
             $this->audit->log('update.blocked_master_lockout', 'system', null, null, [
                 'current' => $this->currentVersion(),
@@ -855,8 +861,17 @@ final class UpdateService
      *
      * Escape hatch for a deliberate edition switch:
      * SOCLY_ALLOW_MASTER_LOCKOUT_UPDATE=true.
+     *
+     * The built-in credential is the one exception to “target without the file =
+     * lockout”: the public export deliberately drops app/Support/PlatformMasterBuiltin.php
+     * while its PlatformMasterAccess still verifies the credential when the file is
+     * present. A hosted instance keeps that file as an untracked artefact (listed in
+     * .git/info/exclude), and `git merge --ff-only` never deletes untracked files, so
+     * the maintenance login survives the update. Until 1.13.99 this combination was
+     * refused and every hosted instance tracking the public repository stayed stuck on
+     * its installed version.
      */
-    private function masterLockoutGuard(): ?string
+    private function masterLockoutGuard(string $ip): ?string
     {
         if (filter_var($_ENV['SOCLY_ALLOW_MASTER_LOCKOUT_UPDATE'] ?? 'false', FILTER_VALIDATE_BOOL)) {
             return null;
@@ -873,9 +888,17 @@ final class UpdateService
             return __('updates.master_lockout_blocked');
         }
         // An instance that logs in only through the hosted build's fixed credential
-        // must not move to a package that does not ship that file.
+        // must not move to a package that stops reading that file or tracks it.
         if ($this->instanceReliesOnBuiltin() && $this->targetBuildShipsBuiltin() === false) {
-            return __('updates.master_lockout_blocked');
+            if (!$this->targetBuildUsesBuiltin() || $this->localBuiltinTracked()) {
+                return __('updates.master_lockout_blocked');
+            }
+            // Allowed: the package still verifies the built-in credential and the local
+            // copy is untracked, so the fast-forward keeps it on disk.
+            $this->audit->log('update.allowed_untracked_builtin', 'system', null, null, [
+                'current' => $this->currentVersion(),
+                'reason' => 'untracked_builtin_survives_merge',
+            ], $ip);
         }
         return null;
     }
@@ -910,15 +933,60 @@ final class UpdateService
      */
     private function targetBuildSupportsMaster(): ?bool
     {
+        $source = $this->targetMasterSource();
+        return $source === null ? null : $this->sourceSupportsMasterCredential($source);
+    }
+
+    /**
+     * Does the package at origin/<channel> still read the built-in credential file?
+     *
+     * The public export ships the PlatformMasterAccess implementation without
+     * app/Support/PlatformMasterBuiltin.php; the class is loaded only `if
+     * (class_exists(...))`, so an untracked local copy keeps working.
+     */
+    private function targetBuildUsesBuiltin(): bool
+    {
+        $source = $this->targetMasterSource();
+        return $source !== null && self::sourceUsesBuiltin($source);
+    }
+
+    /** Does a PlatformMasterAccess source still verify the built-in fixed credential? */
+    private static function sourceUsesBuiltin(string $source): bool
+    {
+        return str_contains($source, 'PlatformMasterBuiltin')
+            && str_contains($source, 'matchesBuiltin');
+    }
+
+    /**
+     * Is app/Support/PlatformMasterBuiltin.php tracked by this repository?
+     *
+     * Untracked copies are local artefacts of the hosted build (kept out with
+     * .git/info/exclude): `git merge --ff-only` leaves them on disk, so the
+     * maintenance login survives the update.
+     */
+    private function localBuiltinTracked(): bool
+    {
+        try {
+            $this->git(['ls-files', '--error-unmatch', 'app/Support/PlatformMasterBuiltin.php']);
+            return true;
+        } catch (\Throwable) {
+            return false;
+        }
+    }
+
+    /** The target PlatformMasterAccess source, read once per request. */
+    private function targetMasterSource(): ?string
+    {
+        if ($this->targetMasterSourceLoaded) {
+            return $this->targetMasterSource;
+        }
+        $this->targetMasterSourceLoaded = true;
         try {
             $source = $this->git(['show', 'origin/' . $this->channel() . ':app/Support/PlatformMasterAccess.php']);
         } catch (\Throwable) {
-            return null;
+            return $this->targetMasterSource = null;
         }
-        if (trim($source) === '') {
-            return null;
-        }
-        return $this->sourceSupportsMasterCredential($source);
+        return $this->targetMasterSource = trim($source) === '' ? null : $source;
     }
 
     /**
