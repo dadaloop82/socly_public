@@ -2167,6 +2167,8 @@ return [
         'last_label' => 'Vorheriger Zugriff',
         'last_value' => ':at von :ip',
         'last_never' => 'kein vorheriger Zugriff',
+        'recent_users_title' => 'Letzte 3 angemeldete Benutzer',
+        'recent_users_empty' => 'Keine weiteren Anmeldungen protokolliert.',
         'logs_title' => 'Letzte 5 Fehler / Warnungen',
         'logs_empty' => 'Keine Fehler oder Warnungen im Anwendungsprotokoll.',
     ],

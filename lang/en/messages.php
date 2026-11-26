@@ -2167,6 +2167,8 @@ return [
         'last_label' => 'Previous sign-in',
         'last_value' => ':at from :ip',
         'last_never' => 'no previous sign-in',
+        'recent_users_title' => 'Last 3 users who signed in',
+        'recent_users_empty' => 'No other sign-in recorded.',
         'logs_title' => 'Last 5 errors / warnings',
         'logs_empty' => 'No errors or warnings in the application log.',
     ],

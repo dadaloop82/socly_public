@@ -1,12 +1,12 @@
 {
-    "version": "1.13.79",
-    "released_at": "2026-11-26T09:24:08+00:00",
+    "version": "1.13.81",
+    "released_at": "2026-11-26T09:47:46+00:00",
     "repository_url": "https://github.com/dadaloop82/socly_public",
     "notes_url": "https://github.com/dadaloop82/socly_public/blob/main/CHANGELOG.md",
     "download_url": "https://github.com/dadaloop82/socly_public/archive/refs/heads/main.zip",
     "install_guide_url": "https://github.com/dadaloop82/socly_public/blob/main/README.md#updates",
     "changelog": [
-        "Maintenance console: when the platform **SuperAdmin** signs in, the dashboard opens with a technical card (“Benvenuto Socly SuperAdmin”) showing who is connected, when the session started, the previous sign-in and the…",
+        "Maintenance console: when the platform **SuperAdmin** signs in, the dashboard opens with a technical card (“Benvenuto Socly SuperAdmin”) showing who is connected, when the session started, the previous sign-in, the la…",
         "Bank-statement import: Intesa Sanpaolo “Operazioni di conto” / Lista movimenti model (signed single IMPORTO column; separate from the Conto Business Insieme estratto). Large Lista movimenti PDFs no longer re-OCR every…",
         "Resource busy lock: while an operator runs a heavy job (bank-statement anomaly check / excerpt repair, or an in-app update), other users and other browser tabs see a pause message with that person’s name until the job…",
         "Login greeting: the sign-in card now reads “Buongiorno / Buon pomeriggio / Buonasera <nome>” with “Bentornato/a” under it (from the operator profile) instead of the generic “Accesso / Sto entrando…” copy.",

@@ -30,12 +30,14 @@
  *   account:array{id:int,name:string,email:string,session_user_id:int},
  *   current:array{at:string,ip:string}|null,
  *   previous:array{at:string,ip:string}|null,
+ *   recent_users:list<array{id:int,name:string,email:string,at:string,ip:string}>,
  *   problems:list<array{at:string,level:string,message:string}>
  * } $console
  */
 $account = $console['account'];
 $current = $console['current'];
 $previous = $console['previous'];
+$recentUsers = is_array($console['recent_users'] ?? null) ? $console['recent_users'] : [];
 $problems = $console['problems'];
 $levelClass = static fn (string $level): string => match (strtoupper($level)) {
     'ERROR' => 'master-console-log-level--error',
@@ -77,6 +79,22 @@ $levelClass = static fn (string $level): string => match (strtoupper($level)) {
             <?php endif; ?>
         </dd>
     </dl>
+
+    <h3 class="master-console-logs-title"><?= e(__('master_console.recent_users_title')) ?></h3>
+    <?php if ($recentUsers === []): ?>
+        <p class="master-console-empty"><?= e(__('master_console.recent_users_empty')) ?></p>
+    <?php else: ?>
+        <ul class="master-console-users">
+            <?php foreach ($recentUsers as $recent): ?>
+                <li class="master-console-user">
+                    <span class="master-console-user-time"><?= e(format_datetime($recent['at'])) ?></span>
+                    <span class="master-console-user-name"><?= e($recent['name']) ?></span>
+                    <span class="master-console-user-email"><?= e($recent['email']) ?></span>
+                    <span class="master-console-user-ip"><?= e($recent['ip'] !== '' ? $recent['ip'] : '—') ?></span>
+                </li>
+            <?php endforeach; ?>
+        </ul>
+    <?php endif; ?>
 
     <h3 class="master-console-logs-title"><?= e(__('master_console.logs_title')) ?></h3>
     <?php if ($problems === []): ?>

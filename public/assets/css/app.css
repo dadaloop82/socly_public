@@ -16464,6 +16464,25 @@ select.is-remote-choice {
   display: grid;
   gap: .35rem;
 }
+.master-console-users {
+  list-style: none;
+  margin: 0 0 1rem;
+  padding: 0;
+  display: grid;
+  gap: .3rem;
+}
+.master-console-user {
+  display: grid;
+  grid-template-columns: 8.75rem minmax(0, 1.1fr) minmax(0, 1.4fr) 8.5rem;
+  gap: .5rem;
+  font-size: .82rem;
+  line-height: 1.45;
+}
+.master-console-user-name,
+.master-console-user-email,
+.master-console-user-ip { word-break: break-word; }
+.master-console-user-email,
+.master-console-user-ip { color: var(--muted); }
 .master-console-log {
   display: grid;
   grid-template-columns: 8.75rem 5.5rem minmax(0, 1fr);
@@ -16488,4 +16507,5 @@ select.is-remote-choice {
 @media (max-width: 640px) {
   .master-console-meta { grid-template-columns: 1fr; gap: .1rem; }
   .master-console-log { grid-template-columns: 1fr; gap: .05rem; }
+  .master-console-user { grid-template-columns: 1fr; gap: .05rem; }
 }

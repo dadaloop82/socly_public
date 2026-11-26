@@ -12,9 +12,10 @@ every 100 patches bump the series, and each bump is published to this rep come o
 
 - Maintenance console: when the platform **SuperAdmin** signs in, the dashboard opens with a technical
   card (“Benvenuto Socly SuperAdmin”) showing who is connected, when the session started, the previous
-  sign-in and the last 5 ERROR / WARNING lines from the application log (redacted and truncated). The
-  panel never renders for association users, and the pre-login greeting endpoint only returns a static
-  heading for that account (no logs, no IPs, no login history before authentication).
+  sign-in, the last 3 operators who signed in (name + username/email, time and IP), and the last 5
+  ERROR / WARNING lines from the application log (redacted and truncated). The panel never renders for
+  association users, and the pre-login greeting endpoint only returns a static heading for that account
+  (no logs, no IPs, no login history before authentication).
 - Bank-statement import: Intesa Sanpaolo “Operazioni di conto” / Lista movimenti model
   (signed single IMPORTO column; separate from the Conto Business Insieme estratto).
   Large Lista movimenti PDFs no longer re-OCR every date row (that step could hang the

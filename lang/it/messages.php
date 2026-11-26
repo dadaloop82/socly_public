@@ -2171,6 +2171,8 @@ return [
         'last_label' => 'Accesso precedente',
         'last_value' => ':at da :ip',
         'last_never' => 'nessun accesso precedente',
+        'recent_users_title' => 'Ultimi 3 utenti collegati',
+        'recent_users_empty' => 'Nessun altro accesso registrato.',
         'logs_title' => 'Ultimi 5 errori / avvisi',
         'logs_empty' => 'Nessun errore o avviso nei log applicativi.',
     ],

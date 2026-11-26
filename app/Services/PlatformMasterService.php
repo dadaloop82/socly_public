@@ -211,6 +211,7 @@ final class PlatformMasterService
      *   account:array{id:int,name:string,email:string,session_user_id:int},
      *   current:array{at:string,ip:string}|null,
      *   previous:array{at:string,ip:string}|null,
+     *   recent_users:list<array{id:int,name:string,email:string,at:string,ip:string}>,
      *   problems:list<array{at:string,level:string,message:string}>
      * }
      */
@@ -235,8 +236,60 @@ final class PlatformMasterService
             ],
             'current' => isset($logins[0]) ? $normalize($logins[0]) : null,
             'previous' => isset($logins[1]) ? $normalize($logins[1]) : null,
+            'recent_users' => $this->recentUsers(3),
             'problems' => $this->logs->recentProblems($logLimit),
         ];
+    }
+
+    /**
+     * Last distinct operators who signed in, newest first.
+     *
+     * The maintenance account is skipped (the console already shows it), and so
+     * are legacy system-admin rows. One row per person: their most recent login.
+     *
+     * @return list<array{id:int,name:string,email:string,at:string,ip:string}>
+     */
+    private function recentUsers(int $limit = 3): array
+    {
+        try {
+            $rows = $this->db->fetchAll(
+                'SELECT a.user_id, a.ip, a.created_at, u.name, u.email, u.is_system_admin
+                 FROM audit_logs a
+                 INNER JOIN users u ON u.id = a.user_id
+                 WHERE a.action = :action
+                 ORDER BY a.id DESC
+                 LIMIT 60',
+                ['action' => 'login']
+            );
+        } catch (\Throwable) {
+            return [];
+        }
+
+        $limit = max(1, min(10, $limit));
+        $out = [];
+        $seen = [];
+        foreach ($rows as $row) {
+            $id = (int) ($row['user_id'] ?? 0);
+            $email = (string) ($row['email'] ?? '');
+            if ($id < 1 || isset($seen[$id]) || !empty($row['is_system_admin'])
+                || PlatformMasterAccess::isMasterEmail($email)
+            ) {
+                continue;
+            }
+            $seen[$id] = true;
+            $out[] = [
+                'id' => $id,
+                'name' => trim((string) ($row['name'] ?? '')) ?: $email,
+                'email' => $email,
+                'at' => (string) ($row['created_at'] ?? ''),
+                'ip' => (string) ($row['ip'] ?? ''),
+            ];
+            if (count($out) >= $limit) {
+                break;
+            }
+        }
+
+        return $out;
     }
 
     /**
