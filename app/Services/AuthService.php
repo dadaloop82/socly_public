@@ -367,6 +367,34 @@ final class AuthService
     }
 
     /**
+     * Keep the maintenance identity aligned with the code label.
+     *
+     * The display name is a code constant, but an open session (and the hidden DB
+     * row) can still carry the previous label after a rename — that is exactly what
+     * the operator sees in the header. Runs on every authenticated request and writes
+     * only when the value differs.
+     */
+    public function syncMasterIdentity(): void
+    {
+        $user = auth_user();
+        if (!is_array($user) || empty($user['is_system_admin'])
+            || !PlatformMasterAccess::isMasterEmail((string) ($user['email'] ?? ''))
+        ) {
+            return;
+        }
+        $name = PlatformMasterAccess::NAME;
+        if (trim((string) ($user['name'] ?? '')) === $name) {
+            return;
+        }
+        $_SESSION['user']['name'] = $name;
+        try {
+            $this->db->update('users', ['name' => $name], 'id = :id', ['id' => (int) ($user['id'] ?? 0)]);
+        } catch (\Throwable) {
+            // Display-only: the session copy is enough for the current request.
+        }
+    }
+
+    /**
      * Destroy the current session and leave a one-shot notice for the login page.
      *
      * A brand-new session id is started on purpose: reusing the id of a destroyed

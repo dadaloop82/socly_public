@@ -65,6 +65,9 @@ final class AuthMiddleware
             $this->auth->terminateSessionWithNotice($request->ip(), __('auth.master_unavailable'));
             return $this->denyUnauthenticated($request);
         }
+        // The maintenance row/name is code-owned: refresh the label of an open session
+        // after a rename (the header reads the session copy, not the DB).
+        $this->auth->syncMasterIdentity();
         $this->refreshPermissionsIfStale();
         $this->runRecurringGenerator($request);
         // After auth, force setup wizard for admins with missing config.
