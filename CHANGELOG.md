@@ -79,6 +79,11 @@ every 100 patches bump the series, and each bump is published to this rep come o
 
 ### Fixed
 
+- Bank statement import (Intesa Sanpaolo): POS rows whose amount is split into two text runs (“14,” and
+  “95” with a wide tab gap or a slightly lower baseline) are joined again, so they no longer land at
+  € 0,00 and no longer produce a bogus “Mancante in Prima cassa” in the audit. The statement period
+  “DAL … AL …” no longer matches the “AL” inside “DAL” (which had turned the period end into the
+  start date).
 - Maintenance SuperAdmin (self-lockout on upgrade): the signed credential implementation now ships in
   every edition. Releases 1.13.67–1.13.69 replaced it with a disabled stub in the public tree, so an
   instance upgrading from ≤1.13.65 lost `admin@socly.it` (reported as “invalid credentials”, with an
