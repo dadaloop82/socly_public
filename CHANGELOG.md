@@ -106,6 +106,11 @@ every 100 patches bump the series, and each bump is published to this rep come o
   cannot be read keeps showing “—” with a note and never marks the recorded movement as wrong.
   Audits cached before this version are not reopened (the date/amount rule changed), so the anomaly
   report is rebuilt from the PDFs.
+- Bank statement import: the full “Controlla tutti gli estratti conto” now offers a downloadable
+  diagnostic log (report and verify screens): add-on version, parser cache version, each document
+  result and every parsed row with `importo NON LETTO` when the amount could not be read. An audit
+  verify session created by an older parser version is no longer shown: the operator is sent back
+  to the audit to run it again.
 - Bank statement import (Intesa Sanpaolo): POS rows whose amount is split into two text runs (“14,” and
   “95” with a wide tab gap or a slightly lower baseline) are joined again, so they no longer land at
   € 0,00 and no longer produce a bogus “Mancante in Prima cassa” in the audit. The statement period

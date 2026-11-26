@@ -346,7 +346,11 @@ rows are still without an amount after the first parse, the amount strip is OCR-
 result is kept only when it reads more amounts without losing movements; the focused per-row OCR
 remains the last fallback. A 0,00 printed in the unused amount column is a placeholder, never the
 movement: zero-valued candidates are skipped so the real debit/credit amount still wins and a POS
-row cannot be turned into “Income”. Step 2
+row cannot be turned into “Income”. The full “check all statements” run exposes a downloadable
+diagnostic log (report and verify screens) with the add-on and parser-cache versions, each document
+result and every parsed row, marking `importo NON LETTO` when the amount was not read. An audit
+verify session created by an older parser version is not shown: the operator is sent back to the
+audit and must run it again. Step 2
 shows a live progress overlay (elapsed time and steps), marks every 0,00 row in red until a valid
 amount is typed, pulses the unreadable-amount alert and offers **Mostra log OCR**
 (`/treasury/bank-statements/ocr-log`, also downloadable) with the native text, the words found in the
