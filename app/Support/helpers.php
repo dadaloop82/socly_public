@@ -1926,4 +1926,80 @@ if (!function_exists('ledger_url')) {
     }
 }
 
+if (!function_exists('compose_legal_address')) {
+    /**
+     * Legal-seat line: “Via Roma 12, 39100 Bolzano”.
+     *
+     * The province is appended only when it adds information: in a province capital the province
+     * name equals the city (Bolzano/Bolzano, Trento/Trento, Roma/Roma), and printing it twice made
+     * the prefilled minutes place read “39100 Bolzano Bolzano”.
+     */
+    function compose_legal_address(
+        string $address,
+        string $houseNumber,
+        string $postalCode,
+        string $city,
+        string $province
+    ): string {
+        $clean = static fn (string $value): string => trim((string) preg_replace('/\s+/u', ' ', $value));
+        $street = $clean($address . ' ' . $houseNumber);
+        $locality = $clean($postalCode . ' ' . $city);
+        $parts = array_values(array_filter(
+            [$street, $locality],
+            static fn (string $part): bool => $part !== ''
+        ));
+        $out = implode(', ', $parts);
+        $province = $clean($province);
+        $normalize = static fn (string $value): string => mb_strtolower($clean($value));
+        $cityKey = $normalize($city);
+        $provinceKey = $normalize($province);
+        $provinceAddsInfo = $provinceKey !== ''
+            && $provinceKey !== $cityKey
+            && ($cityKey === '' || !str_contains($cityKey, $provinceKey));
+        if ($provinceAddsInfo) {
+            $out = $out !== '' ? $out . ' ' . $province : $province;
+        }
+
+        return $out;
+    }
+}
+
+if (!function_exists('association_address_full')) {
+    /**
+     * Canonical legal-seat line from the individual settings, with a fallback to the legacy
+     * `association.address_full` value. Reading through this helper also heals addresses stored by
+     * older versions as “39100 Bolzano Bolzano” without rewriting the settings row.
+     */
+    function association_address_full(): string
+    {
+        try {
+            /** @var \Socly\Services\SettingsService $settings */
+            $settings = app(\Socly\Services\SettingsService::class);
+            $address = trim((string) $settings->get('association.address', ''));
+            $city = trim((string) $settings->get('association.city', ''));
+            if ($address !== '' && $city !== '') {
+                return compose_legal_address(
+                    $address,
+                    (string) $settings->get('association.house_number', ''),
+                    (string) $settings->get('association.postal_code', ''),
+                    $city,
+                    (string) $settings->get('association.province', '')
+                );
+            }
+            $full = trim((string) $settings->get('association.address_full', ''));
+            if ($full !== '' && $city !== '') {
+                $full = (string) preg_replace(
+                    '/\b' . preg_quote($city, '/') . '\s+' . preg_quote($city, '/') . '\b/iu',
+                    $city,
+                    $full
+                );
+            }
+
+            return $full;
+        } catch (\Throwable) {
+            return '';
+        }
+    }
+}
+
 

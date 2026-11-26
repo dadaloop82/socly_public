@@ -438,18 +438,7 @@ final class MinutesService
     /** Legal seat, pre-filled when the meeting is held in person. */
     public function defaultPlace(): string
     {
-        $address = trim((string) $this->settings->get('association.address_full', ''));
-        if ($address === '') {
-            $parts = array_filter([
-                trim((string) $this->settings->get('association.address', '')),
-                trim((string) $this->settings->get('association.postal_code', '')),
-                trim((string) $this->settings->get('association.city', '')),
-                trim((string) $this->settings->get('association.province', '')),
-            ], static fn (string $part): bool => $part !== '');
-            $address = implode(' · ', $parts);
-        }
-
-        return mb_substr($address, 0, 190);
+        return mb_substr(association_address_full(), 0, 190);
     }
 
     /**

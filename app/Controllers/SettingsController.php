@@ -355,14 +355,13 @@ final class SettingsController extends BaseController
         $this->settings->set('association.address', $data['association_address']);
         $this->settings->set('association.house_number', $data['association_house_number']);
         if ($seatComplete) {
-            $this->settings->set('association.address_full', trim(sprintf(
-                '%s %s, %s %s %s',
-                $data['association_address'],
-                $data['association_house_number'],
-                $data['association_postal_code'],
-                $data['association_city'],
+            $this->settings->set('association.address_full', compose_legal_address(
+                (string) $data['association_address'],
+                (string) $data['association_house_number'],
+                (string) $data['association_postal_code'],
+                (string) $data['association_city'],
                 $province
-            )));
+            ));
         }
         $this->settings->set('association.pec', $data['association_pec']);
         $this->settings->set('association.email', $data['association_email']);

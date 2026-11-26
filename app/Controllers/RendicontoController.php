@@ -112,8 +112,7 @@ final class RendicontoController extends BaseController
             'assocLegalCode' => $legalCode,
             'assocLegalLabel' => $legalLabel,
             'assocFiscalCode' => trim((string) $this->settings->get('association.fiscal_code', '')),
-            'assocAddress' => trim((string) ($this->settings->get('association.address_full', '')
-                ?: $this->settings->get('association.address', ''))),
+            'assocAddress' => association_address_full(),
             'assocCity' => trim((string) $this->settings->get('association.city', '')),
             'brandPrimary' => (string) ($branding['primary'] ?? ''),
             'brandAccent' => (string) ($branding['accent'] ?? ''),

@@ -185,8 +185,7 @@ final class MemberRegistryService
             'association' => [
                 'name' => (string) $this->settings->get('association.name', ''),
                 'fiscal_code' => (string) $this->settings->get('association.fiscal_code', ''),
-                'address' => (string) ($this->settings->get('association.address_full', '')
-                    ?: $this->settings->get('association.address', '')),
+                'address' => association_address_full(),
                 'legal_code' => $legalCode,
                 'legal_label' => $legalLabel,
             ],

@@ -49,8 +49,7 @@ if (!function_exists('privacy_sample_draft')) {
             $house = trim((string) $settings->get('association.house_number', ''));
             $cap = trim((string) $settings->get('association.postal_code', ''));
             $province = trim((string) $settings->get('association.province', ''));
-            $parts = array_filter([$street . ($house !== '' ? ' ' . $house : ''), trim($cap . ' ' . $city), $province]);
-            $address = trim(implode(', ', $parts));
+            $address = compose_legal_address($street, $house, $cap, $city, $province);
             $email = trim((string) $settings->get('association.email', ''));
             $pec = trim((string) $settings->get('association.pec', ''));
         } catch (Throwable) {

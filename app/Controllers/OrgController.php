@@ -255,8 +255,7 @@ final class OrgController extends BaseController
             'assocLegalCode' => $legal['code'],
             'assocLegalLabel' => $legal['label'],
             'assocFiscalCode' => trim((string) $this->settings->get('association.fiscal_code', '')),
-            'assocAddress' => trim((string) ($this->settings->get('association.address_full', '')
-                ?: $this->settings->get('association.address', ''))),
+            'assocAddress' => association_address_full(),
             'brandPrimary' => (string) ($branding['primary'] ?? ''),
             'brandAccent' => (string) ($branding['accent'] ?? ''),
             'generatedAt' => date('d/m/Y H:i'),
@@ -293,8 +292,7 @@ final class OrgController extends BaseController
             'assocLegalCode' => $legal['code'],
             'assocLegalLabel' => $legal['label'],
             'assocFiscalCode' => trim((string) $this->settings->get('association.fiscal_code', '')),
-            'assocAddress' => trim((string) ($this->settings->get('association.address_full', '')
-                ?: $this->settings->get('association.address', ''))),
+            'assocAddress' => association_address_full(),
             'brandPrimary' => (string) ($branding['primary'] ?? ''),
             'brandAccent' => (string) ($branding['accent'] ?? ''),
             'generatedAt' => date('d/m/Y H:i'),

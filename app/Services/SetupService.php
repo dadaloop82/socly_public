@@ -1100,13 +1100,13 @@ final class SetupService
             && isset($found['address'], $found['house_number'], $found['postal_code'], $found['city'])
             && trim((string) $this->settings->get('association.address_full', '')) === ''
         ) {
-            $this->settings->set('association.address_full', trim(sprintf(
-                '%s %s, %s %s',
-                $found['address'],
-                $found['house_number'],
-                $found['postal_code'],
-                $found['city']
-            )));
+            $this->settings->set('association.address_full', compose_legal_address(
+                (string) $found['address'],
+                (string) $found['house_number'],
+                (string) $found['postal_code'],
+                (string) $found['city'],
+                ''
+            ));
         }
 
         $logoUrl = trim((string) ($found['logo_url'] ?? ''));
@@ -1387,13 +1387,13 @@ final class SetupService
             isset($fields['address'], $fields['house_number'], $fields['postal_code'], $fields['city'])
             && trim((string) ($fields['address'] ?? '')) !== ''
         ) {
-            $this->settings->set('association.address_full', trim(sprintf(
-                '%s %s, %s %s',
-                $fields['address'],
-                $fields['house_number'],
-                $fields['postal_code'],
-                $fields['city']
-            )));
+            $this->settings->set('association.address_full', compose_legal_address(
+                (string) ($fields['address'] ?? ''),
+                (string) ($fields['house_number'] ?? ''),
+                (string) ($fields['postal_code'] ?? ''),
+                (string) ($fields['city'] ?? ''),
+                ''
+            ));
         }
 
         $peopleApplied = $this->applyRuntsPeopleFromDetail(
@@ -2688,14 +2688,13 @@ final class SetupService
             }
         }
         // Composite line for legacy consumers of association.address display
-        $composite = trim(sprintf(
-            '%s %s, %s %s %s',
-            $parts['address'] ?? '',
-            $parts['house_number'] ?? '',
-            $parts['postal_code'] ?? '',
-            $parts['city'] ?? '',
-            $parts['province'] ?? ''
-        ));
+        $composite = compose_legal_address(
+            (string) ($parts['address'] ?? ''),
+            (string) ($parts['house_number'] ?? ''),
+            (string) ($parts['postal_code'] ?? ''),
+            (string) ($parts['city'] ?? ''),
+            (string) ($parts['province'] ?? '')
+        );
         $this->settings->set('association.address_full', $composite);
         if ($env !== []) {
             EnvWriter::setUserValues($env);

@@ -79,6 +79,10 @@ every 100 patches bump the series, and each bump is published to this rep come o
 
 ### Fixed
 
+- Minutes wizard: the legal seat prefilled in “Luogo” no longer repeats the province capital
+  (“39100 Bolzano Bolzano” → “39100 Bolzano”). The same canonical helper is used when Settings and
+  the setup wizard save the address, and when minutes, reports, org charts, enrolment forms and the
+  member register read it, so existing rows are healed too.
 - Minutes wizard: “Ora di apertura” now uses the standard SOCLY field chrome. The base input rule
   styled text/date/number but not `time`, so the browser rendered its native control with a
   different border, height and padding.

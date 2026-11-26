@@ -79,8 +79,7 @@ final class EnrollmentFormService
                 'name' => (string) $this->settings->get('association.name', ''),
                 'fiscal_code' => (string) $this->settings->get('association.fiscal_code', ''),
                 'vat_number' => (string) $this->settings->get('association.vat_number', ''),
-                'address' => (string) ($this->settings->get('association.address_full', '')
-                    ?: $this->settings->get('association.address', '')),
+                'address' => association_address_full(),
                 'email' => (string) $this->settings->get('association.email', ''),
                 'phone' => (string) $this->settings->get('association.phone', ''),
                 'website' => (string) $this->settings->get('association.website', ''),
