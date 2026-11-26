@@ -2274,7 +2274,7 @@ return [
         'pause_text' => 'Nel frattempo ti avviseremo appena la procedura sarà terminata.',
         'pause_reassure' => 'Nessun dato è a rischio: stiamo solo dando priorità al lavoro pesante.',
         'game_title' => 'Scoppia le bolle',
-        'game_hint' => 'Un passatempo leggero mentre aspetti.',
+        'game_hint' => 'Scoppia le bolle: più ne scoppi, più diventano veloci.',
         'game_score' => ':count bolle scoppiate',
         'game_win' => 'Pausa completata: la scrivania è più leggera!',
         'game_reset' => 'Ricomincia',

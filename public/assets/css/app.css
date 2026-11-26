@@ -3040,6 +3040,8 @@ html.is-busy .update-overlay {
 }
 .pause-bubble {
   position: absolute;
+  left: 0;
+  top: 0;
   width: var(--bubble-size, 1rem);
   height: var(--bubble-size, 1rem);
   padding: 0;
@@ -3049,23 +3051,21 @@ html.is-busy .update-overlay {
     radial-gradient(circle at 32% 28%, #ffffff 0 18%, color-mix(in srgb, var(--brand-primary) 22%, #ffffff) 55%, color-mix(in srgb, var(--brand-primary) 38%, #ffffff) 100%);
   box-shadow: 0 4px 12px color-mix(in srgb, var(--brand-primary) 20%, transparent), inset 0 -3px 6px color-mix(in srgb, #ffffff 55%, transparent);
   cursor: pointer;
-  animation: pause-float 4s ease-in-out infinite alternate;
-  transition: transform 0.16s ease, opacity 0.16s ease;
+  /* Position comes from the game loop (--bx/--by, px); scale stays composable. */
+  transform: translate3d(var(--bx, 0px), var(--by, 0px), 0);
+  will-change: transform;
+  transition: opacity 0.16s ease;
 }
 .pause-bubble:hover,
 .pause-bubble:focus-visible {
-  transform: scale(1.12);
+  transform: translate3d(var(--bx, 0px), var(--by, 0px), 0) scale(1.12);
   outline: 2px solid color-mix(in srgb, var(--brand-primary) 55%, #ffffff);
   outline-offset: 2px;
 }
 .pause-bubble.is-popped {
-  transform: scale(0.25);
+  transform: translate3d(var(--bx, 0px), var(--by, 0px), 0) scale(0.25);
   opacity: 0;
   pointer-events: none;
-}
-@keyframes pause-float {
-  from { transform: translate3d(0, 0, 0); }
-  to { transform: translate3d(0, -7px, 0); }
 }
 .pause-win {
   margin: 0.65rem 0 0;
@@ -3099,7 +3099,6 @@ html.is-busy .update-overlay {
 }
 @media (prefers-reduced-motion: reduce) {
   .pause-orb,
-  .pause-bubble,
   .pause-pulse span,
   .resource-busy-overlay .pause-card {
     animation: none !important;

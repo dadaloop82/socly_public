@@ -2270,7 +2270,7 @@ return [
         'pause_text' => 'We will let you know as soon as the procedure is finished.',
         'pause_reassure' => 'No data is at risk: we are simply giving priority to the heavy work.',
         'game_title' => 'Pop the bubbles',
-        'game_hint' => 'A light pastime while you wait.',
+        'game_hint' => 'Pop the bubbles: the more you pop, the faster they get.',
         'game_score' => ':count bubbles popped',
         'game_win' => 'Break complete: the desk feels lighter!',
         'game_reset' => 'Play again',

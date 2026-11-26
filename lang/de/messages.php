@@ -2270,7 +2270,7 @@ return [
         'pause_text' => 'Wir melden uns, sobald der Vorgang abgeschlossen ist.',
         'pause_reassure' => 'Keine Daten sind gefährdet: wir geben nur der schweren Arbeit Vorrang.',
         'game_title' => 'Blasen platzen lassen',
-        'game_hint' => 'Eine kleine Abwechslung für zwischendurch.',
+        'game_hint' => 'Lass die Blasen platzen: je mehr du platzen lässt, desto schneller werden sie.',
         'game_score' => ':count Blasen geplatzt',
         'game_win' => 'Pause geschafft: der Schreibtisch ist leichter!',
         'game_reset' => 'Neu starten',
