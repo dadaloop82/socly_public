@@ -2290,6 +2290,7 @@ return [
         'operation_bank_statement_repair' => 'Reparatur der Kontoauszugs-Ausschnitte',
         'operation_system_update' => 'Systemaktualisierung',
         'blocked_start' => 'Sie können das jetzt nicht starten: :name führt bereits „:operation“ aus.',
+        'api_message' => ':name führt „:operation“ aus: die App ist vorübergehend pausiert.',
     ],
     'errors' => [
         '403' => 'Zugriff verweigert',

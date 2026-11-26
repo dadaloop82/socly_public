@@ -2290,6 +2290,7 @@ return [
         'operation_bank_statement_repair' => 'Bank-statement excerpt repair',
         'operation_system_update' => 'System update',
         'blocked_start' => 'You cannot start this now: :name is already running “:operation”.',
+        'api_message' => ':name is running “:operation”: the app is paused for a moment.',
     ],
     'errors' => [
         '403' => 'Access denied',

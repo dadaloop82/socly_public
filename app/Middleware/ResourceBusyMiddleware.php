@@ -122,6 +122,20 @@ final class ResourceBusyMiddleware
     }
 
     /** @param array<string,mixed> $status */
+    private function message(array $status): string
+    {
+        $name = trim((string) ($status['user_name'] ?? ''));
+        if ($name === '') {
+            $name = __('resource_busy.someone');
+        }
+
+        return __('resource_busy.api_message', [
+            'name' => $name,
+            'operation' => $this->operationLabel($status),
+        ]);
+    }
+
+    /** @param array<string,mixed> $status */
     private function startedByLine(array $status): string
     {
         $rawName = trim((string) ($status['user_name'] ?? ''));

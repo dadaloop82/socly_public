@@ -2294,6 +2294,7 @@ return [
         'operation_bank_statement_repair' => 'Riparazione ritagli degli estratti conto',
         'operation_system_update' => 'Aggiornamento del sistema',
         'blocked_start' => 'Non puoi avviare questa operazione ora: :name sta già eseguendo «:operation».',
+        'api_message' => ':name sta eseguendo «:operation»: l’app è momentaneamente in pausa.',
     ],
     'errors' => [
         '403' => 'Accesso negato',

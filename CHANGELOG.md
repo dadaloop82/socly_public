@@ -79,6 +79,10 @@ every 100 patches bump the series, and each bump is published to this rep come o
 
 ### Fixed
 
+- Resource-busy middleware: the JSON 503 response called a `message()` method that the refactor
+  removed, so every API request (for example `/api/updates/check`) crashed with “Call to undefined
+  method” while another operator was running a heavy job. The localized pause message is restored
+  and covered by a regression check.
 - Board voting: every operator with access to “Verbali e documenti” can open the live results and
   the CSV export of a published poll; editing, closing and deleting stay limited to the poll creator
   (or a settings administrator). The list now shows the “Risultati” button for all of them instead of
