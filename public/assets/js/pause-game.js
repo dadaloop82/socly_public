@@ -22,7 +22,8 @@
 /*
  * “Goditi una pausa”: the small bubble-popping game shown while a heavy SOCLY
  * operation keeps the instance paused. Vanilla JS, no dependencies, keyboard
- * accessible (every bubble is a real button) and quiet under prefers-reduced-motion.
+ * accessible (every bubble is a real button). Bubbles travel and bounce inside
+ * the playfield; under prefers-reduced-motion they only drift slowly.
  *
  * Usage:
  *   SoclyPauseGame.init(document);            // scans [data-pause-game]
@@ -123,12 +124,16 @@
       }
     }
 
-    // Reduced motion: the bubbles stay still (no rAF loop at all).
+    // Reduced motion: the bubbles still drift, just much more slowly (the motion is
+    // the game, so it is not removed entirely), and the decorative CSS animations
+    // stay off.
     var reducedMotion = !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+    var motionScale = reducedMotion ? 0.35 : 1;
     // Live bubbles with their position/velocity in pixels.
     var bubbles = [];
     var rafId = 0;
     var lastTs = 0;
+    var everConnected = false;
 
     function remPx() {
       var value = parseFloat(window.getComputedStyle(document.documentElement).fontSize);
@@ -201,14 +206,21 @@
 
     function step(ts) {
       rafId = 0;
-      if (!box.isConnected || finished) return;
+      if (finished) return;
+      if (box.isConnected) {
+        everConnected = true;
+      } else if (everConnected) {
+        // The overlay was closed: stop for good.
+        return;
+      }
+      // Not in the document yet: keep polling, the game starts as soon as it is.
       var width = field.clientWidth;
       var height = field.clientHeight;
       var dt = lastTs === 0 ? 0 : Math.min(MAX_FRAME_MS, Math.max(0, ts - lastTs)) / 1000;
       lastTs = ts;
 
       if (width >= 24 && height >= 24) {
-        var factor = speedFactor();
+        var factor = speedFactor() * motionScale;
         for (var i = 0; i < bubbles.length; i += 1) {
           var entry = bubbles[i];
           if (!entry.placed) {
@@ -232,7 +244,7 @@
     }
 
     function startLoop() {
-      if (reducedMotion || rafId || finished) return;
+      if (rafId || finished) return;
       lastTs = 0;
       rafId = window.requestAnimationFrame(step);
     }

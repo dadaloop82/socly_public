@@ -48,7 +48,8 @@ every 100 patches bump the series, and each bump is published to this rep come o
 
 - Pause game (“Scoppia le bolle”): bubbles now travel across the playfield and bounce off the walls
   and off each other; every popped bubble speeds the whole field up (+15% each, capped at 2.5×) and
-  the hint says it. Still keyboard accessible, and still frozen under `prefers-reduced-motion`.
+  the hint says it. Still keyboard accessible; with `prefers-reduced-motion` they only drift slowly,
+  and the game loop no longer stops when the overlay is attached after start-up.
 - Documents: Estratti Conto list newest reference period first (year, then month).
 - Document repository: `annotate()` can update `original_name` so downloads match the archive title.
 
