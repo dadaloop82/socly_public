@@ -79,6 +79,9 @@ every 100 patches bump the series, and each bump is published to this rep come o
 
 ### Fixed
 
+- Minutes wizard: “Ora di apertura” now uses the standard SOCLY field chrome. The base input rule
+  styled text/date/number but not `time`, so the browser rendered its native control with a
+  different border, height and padding.
 - Resource-busy middleware: the JSON 503 response called a `message()` method that the refactor
   removed, so every API request (for example `/api/updates/check`) crashed with “Call to undefined
   method” while another operator was running a heavy job. The localized pause message is restored
