@@ -42,6 +42,9 @@ every 100 patches bump the series, and each bump is published to this rep come o
 
 ### Changed
 
+- Documents: bank-statement crops (“Ritagli dell’estratto conto”) are no longer counted as
+  documents and stay out of the default archive, so the KPI cards show how many real documents
+  exist. They remain reachable by selecting their category or from the treasury movement.
 - Bank-statement “check all statements”: if a full audit finished less than an hour ago,
   the operator can reopen those results instead of re-running OCR on every PDF.
 - Bank-statement verify: bulk “fix all dates / amounts” with confirm, count and ETA;

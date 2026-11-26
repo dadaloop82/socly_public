@@ -125,6 +125,11 @@ final class DocumentService
         if ($category !== '') {
             $where[] = 'd.category = :filter_category';
             $params['filter_category'] = $category;
+        } else {
+            // Bank-statement crops are evidence attached to a movement, not archive documents:
+            // keep them out of the default list so hundreds of crops never hide verbali,
+            // statuto and the other real documents. Pick the category explicitly to browse them.
+            $where[] = "d.category <> 'statement_excerpt'";
         }
         $section = trim((string) ($filters['section'] ?? ''));
         if ($section !== '') {
@@ -229,7 +234,8 @@ final class DocumentService
                     SUM(CASE WHEN status IN (\'approved\', \'signed\') THEN 1 ELSE 0 END) AS approved,
                     SUM(CASE WHEN expires_at IS NOT NULL AND expires_at >= :expires_from AND expires_at <= :expires_to THEN 1 ELSE 0 END) AS expiring
              FROM association_documents
-             WHERE deleted_at IS NULL',
+             WHERE deleted_at IS NULL
+               AND category <> \'statement_excerpt\'',
             [
                 'expires_from' => date('Y-m-d'),
                 'expires_to' => date('Y-m-d', strtotime('+30 days')),
@@ -245,7 +251,12 @@ final class DocumentService
 
     public function countAll(): int
     {
-        $row = $this->db->fetch('SELECT COUNT(*) AS c FROM association_documents');
+        $row = $this->db->fetch(
+            'SELECT COUNT(*) AS c
+               FROM association_documents
+              WHERE deleted_at IS NULL
+                AND category <> \'statement_excerpt\''
+        );
         return (int) ($row['c'] ?? 0);
     }
 
