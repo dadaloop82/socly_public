@@ -664,6 +664,48 @@ final class DocumentService
     }
 
     /**
+     * Soft-delete a draft document. Approved/signed/archived documents are historical records and
+     * must never be removed here.
+     *
+     * @return array{ok:bool,errors?:array<string,string>}
+     */
+    public function deleteDraft(int $id, string $ip = ''): array
+    {
+        $existing = $this->find($id);
+        if ($existing === null) {
+            return ['ok' => false, 'errors' => ['document' => __('errors.404')]];
+        }
+        if ((string) ($existing['status'] ?? '') !== 'draft') {
+            return ['ok' => false, 'errors' => ['document' => __('documents.delete_only_draft')]];
+        }
+
+        $deleted = $this->db->query(
+            'UPDATE association_documents
+                SET deleted_at = :deleted_at
+              WHERE id = :id AND status = \'draft\' AND deleted_at IS NULL',
+            ['deleted_at' => date('Y-m-d H:i:s'), 'id' => $id]
+        )->rowCount();
+        if ($deleted < 1) {
+            return ['ok' => false, 'errors' => ['document' => __('documents.delete_only_draft')]];
+        }
+
+        // The document's expiry reminder must not survive the document itself.
+        $this->db->query(
+            'DELETE FROM deadline_items WHERE source = :source',
+            ['source' => 'system:document:' . $id]
+        );
+        $this->audit->log('document.deleted', 'document', (string) $id, [
+            'title' => $existing['title'] ?? null,
+            'document_number' => $existing['document_number'] ?? null,
+            'category' => $existing['category'] ?? null,
+            'status' => $existing['status'] ?? null,
+            'source_section' => $existing['source_section'] ?? null,
+        ], ['deleted' => true], $ip);
+
+        return ['ok' => true];
+    }
+
+    /**
      * @param array<string,mixed> $input
      * @param array<string,mixed>|null $existing
      * @return array{ok:bool,errors?:array<string,string>,data?:array<string,mixed>}

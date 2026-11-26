@@ -23,6 +23,7 @@
 /** @var array<string,mixed> $document */
 /** @var string $category_label */
 $docId = (int) ($document['id'] ?? 0);
+$docTitle = (string) ($document['title'] ?? '');
 $language = trim((string) ($document['language'] ?? ''));
 $languageLabel = $language !== '' ? __('documents.language_' . $language) : '—';
 ?>
@@ -103,3 +104,19 @@ $languageLabel = $language !== '' ? __('documents.language_' . $language) : '—
         <p class="muted" style="margin-top:1rem"><?= e(__('documents.no_file')) ?></p>
     <?php endif; ?>
 </div>
+
+<?php if (can('documents.manage') && (string) ($document['status'] ?? '') === 'draft'): ?>
+    <section class="panel treasury-danger-zone documents-danger-zone">
+        <div>
+            <h2 class="section-title"><?= e(__('documents.delete_draft_title')) ?></h2>
+            <p class="muted"><?= e(__('documents.delete_draft_hint')) ?></p>
+        </div>
+        <form method="post" action="<?= e(url('/documents/' . $docId . '/delete')) ?>"
+              data-confirm="<?= e(__('documents.delete_draft_confirm', ['title' => $docTitle])) ?>"
+              data-confirm-second="<?= e(__('documents.delete_draft_confirm_again', ['title' => $docTitle])) ?>"
+              data-confirm-danger="1">
+            <?= csrf_field() ?>
+            <button class="btn btn-danger" type="submit"><?= e(__('documents.delete_draft_button')) ?></button>
+        </form>
+    </section>
+<?php endif; ?>

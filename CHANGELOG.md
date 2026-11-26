@@ -10,6 +10,9 @@ every 100 patches bump the series, and each bump is published to this rep come o
 
 ### Added
 
+- Documents: a document in **Draft** status can now be deleted from its detail or edit page with a
+  double confirmation. Approved, signed and archived documents remain immutable; the deletion is
+  recorded in the activity log.
 - Org chart: the vice-president office is no longer monocratic, so an association can record two
   (or more) vice presidents. The chart shows every assignee plus the “Add” node, and a migration
   clears a legacy `is_unique` flag on the role.

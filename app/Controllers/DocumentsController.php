@@ -265,6 +265,21 @@ final class DocumentsController extends BaseController
         redirect('/documents');
     }
 
+    public function destroy(Request $request, string $id): void
+    {
+        require_component('documents');
+        $docId = (int) $id;
+        $result = $this->documents->deleteDraft($docId, $request->ip());
+        if (empty($result['ok'])) {
+            $this->flash('errors', is_array($result['errors'] ?? null) ? $result['errors'] : []);
+            redirect($this->documents->find($docId) !== null && $docId > 0
+                ? '/documents/' . $docId
+                : '/documents');
+        }
+        $this->flash('success', __('documents.deleted'));
+        redirect('/documents');
+    }
+
     public function upload(Request $request): void
     {
         require_component('documents');

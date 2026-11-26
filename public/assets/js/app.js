@@ -35,6 +35,9 @@ function initConfirmForms(scope = document) {
       // Destructive confirmations are never snoozed: a 30-minute bypass could delete data silently.
       const ok = await appConfirm(form.dataset.confirm || '', { danger, snooze: !danger });
       if (!ok) return;
+      // Optional second confirmation for irreversible actions (`data-confirm-second`).
+      const second = (form.dataset.confirmSecond || '').trim();
+      if (second !== '' && !(await appConfirm(second, { danger, snooze: false }))) return;
       form.dataset.confirmed = '1';
       HTMLFormElement.prototype.submit.call(form);
     });
@@ -55,6 +58,9 @@ function initConfirmLinks(scope = document) {
       // Destructive confirmations are never snoozed: a 30-minute bypass could delete data silently.
       const ok = await appConfirm(link.dataset.confirm || '', { danger, snooze: !danger });
       if (!ok) return;
+      // Optional second confirmation for irreversible actions (`data-confirm-second`).
+      const second = (link.dataset.confirmSecond || '').trim();
+      if (second !== '' && !(await appConfirm(second, { danger, snooze: false }))) return;
       link.dataset.confirmed = '1';
       if (link.target && link.target !== '_self') {
         window.open(link.href, link.target, 'noopener');

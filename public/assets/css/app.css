@@ -13982,7 +13982,8 @@ tr.doc-row-editable:focus-visible {
 }
 .treasury-row-classification-label { color: var(--muted); }
 /* Single-movement delete: a clearly separated danger panel on the movement card. */
-.treasury-danger-zone {
+.treasury-danger-zone,
+.documents-danger-zone {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
@@ -13991,9 +13992,12 @@ tr.doc-row-editable:focus-visible {
   margin-top: 1rem;
   border-color: color-mix(in srgb, #b42318 30%, var(--line));
 }
-.treasury-danger-zone .section-title { margin: 0 0 0.25rem; font-size: 1rem; }
-.treasury-danger-zone p { margin: 0; max-width: 62ch; font-size: 0.88rem; }
-.treasury-danger-zone form { margin: 0; }
+.treasury-danger-zone .section-title,
+.documents-danger-zone .section-title { margin: 0 0 0.25rem; font-size: 1rem; }
+.treasury-danger-zone p,
+.documents-danger-zone p { margin: 0; max-width: 62ch; font-size: 0.88rem; }
+.treasury-danger-zone form,
+.documents-danger-zone form { margin: 0; }
 /*
  * The whole “Dettagli” cell shares the same small, fixed text size: classification, counterparty,
  * document data and attachment links must not jump between 12px and the larger cell size.

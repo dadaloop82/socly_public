@@ -263,6 +263,7 @@ $router->post('/documents/upload', [DocumentsController::class, 'upload'], 'docu
 $router->get('/documents/{id}', [DocumentsController::class, 'show'], 'documents.view', ['mw.locale', 'mw.install', 'mw.auth']);
 $router->get('/documents/{id}/edit', [DocumentsController::class, 'edit'], 'documents.manage', ['mw.locale', 'mw.install', 'mw.auth']);
 $router->post('/documents/{id}', [DocumentsController::class, 'update'], 'documents.manage', ['mw.locale', 'mw.install', 'mw.auth', 'mw.csrf']);
+$router->post('/documents/{id}/delete', [DocumentsController::class, 'destroy'], 'documents.manage', ['mw.locale', 'mw.install', 'mw.auth', 'mw.csrf']);
 $router->get('/documents/{id}/file', [DocumentsController::class, 'download'], 'documents.view', ['mw.locale', 'mw.install', 'mw.auth']);
 $router->get('/documents/{id}/download', [DocumentsController::class, 'forceDownload'], 'documents.view', ['mw.locale', 'mw.install', 'mw.auth']);
 

@@ -132,3 +132,19 @@ $submitLabel = $isEdit ? __('documents.update') : __('documents.submit');
         <button class="btn" type="submit"><?= e($submitLabel) ?></button>
     </div>
 </form>
+
+<?php if ($isEdit && $docId > 0 && is_array($document) && (string) ($document['status'] ?? '') === 'draft' && can('documents.manage')): ?>
+    <section class="panel treasury-danger-zone documents-danger-zone">
+        <div>
+            <h2 class="section-title"><?= e(__('documents.delete_draft_title')) ?></h2>
+            <p class="muted"><?= e(__('documents.delete_draft_hint')) ?></p>
+        </div>
+        <form method="post" action="<?= e(url('/documents/' . $docId . '/delete')) ?>"
+              data-confirm="<?= e(__('documents.delete_draft_confirm', ['title' => (string) ($document['title'] ?? '')])) ?>"
+              data-confirm-second="<?= e(__('documents.delete_draft_confirm_again', ['title' => (string) ($document['title'] ?? '')])) ?>"
+              data-confirm-danger="1">
+            <?= csrf_field() ?>
+            <button class="btn btn-danger" type="submit"><?= e(__('documents.delete_draft_button')) ?></button>
+        </form>
+    </section>
+<?php endif; ?>

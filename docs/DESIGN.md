@@ -134,3 +134,5 @@ shared “do not ask again” option.
   destructive confirmation would act without asking again.
 - `form[data-confirm]` / `a[data-confirm]` are wired by `initConfirmForms()` / `initConfirmLinks()`
   in `app.js`; add-ons must use `appConfirm()` for buttons they handle in their own JS.
+- Add `data-confirm-second` to a form/link when an action needs a second explicit confirmation
+  after the first (used for draft-document deletion). The second dialog is never snoozed.

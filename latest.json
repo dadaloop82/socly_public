@@ -1,11 +1,12 @@
 {
-    "version": "1.14.47",
-    "released_at": "2026-11-26T21:18:22+00:00",
+    "version": "1.14.49",
+    "released_at": "2026-11-26T21:29:14+00:00",
     "repository_url": "https://github.com/dadaloop82/socly_public",
     "notes_url": "https://github.com/dadaloop82/socly_public/blob/main/CHANGELOG.md",
     "download_url": "https://github.com/dadaloop82/socly_public/archive/refs/heads/main.zip",
     "install_guide_url": "https://github.com/dadaloop82/socly_public/blob/main/README.md#updates",
     "changelog": [
+        "Documents: a document in **Draft** status can now be deleted from its detail or edit page with a double confirmation. Approved, signed and archived documents remain immutable; the deletion is recorded in the activity …",
         "Org chart: the vice-president office is no longer monocratic, so an association can record two (or more) vice presidents. The chart shows every assignee plus the “Add” node, and a migration clears a legacy `is_unique`…",
         "Session expiry warning: 30 seconds before the idle timeout a card with a countdown ring and a soft chime says the session is about to end, with a “Stay signed in” button that renews it in one click. The idle timeout i…",
         "Maintenance console: when the platform **SuperAdmin** signs in, the dashboard opens with a technical card (“Benvenuto Socly SuperAdmin”) showing who is connected, when the session started, the previous sign-in, the la…",
@@ -16,7 +17,6 @@
         "Documents: bank-statement crops (“Ritagli dell’estratto conto”) are no longer counted as documents and stay out of the default archive, so the KPI cards show how many real documents exist. They remain reachable by sel…",
         "Bank-statement “check all statements”: if a full audit finished less than an hour ago, the operator can reopen those results instead of re-running OCR on every PDF.",
         "Bank-statement verify: bulk “fix all dates / amounts” with confirm, count and ETA; ledger-only rows without a covering archived statement are listed as ignored (not actionable).",
-        "Session idle timeout no longer logs anyone out in the middle of a heavy job (statement audit, excerpt repair, in-app update): the holder’s session stays alive until the job ends.",
-        "Resource-busy pause shows the operation name first and “Started by … at …”, and hard-unlocks the instance after at most 30 minutes."
+        "Session idle timeout no longer logs anyone out in the middle of a heavy job (statement audit, excerpt repair, in-app update): the holder’s session stays alive until the job ends."
     ]
 }
