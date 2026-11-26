@@ -16414,3 +16414,79 @@ select.is-remote-choice {
   .minutes-attendance-table td select,
   .minutes-attendance-table td input { min-width: 0; width: 100%; }
 }
+
+/* ---------------------------------------------------------------------------
+   Maintenance console (platform SuperAdmin, dashboard only)
+   --------------------------------------------------------------------------- */
+.master-console {
+  border-left: 4px solid var(--danger, #A61B1B);
+}
+.master-console-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: .2rem .9rem;
+  margin-bottom: .9rem;
+}
+.master-console-title {
+  margin: 0;
+  font-size: 1.1rem;
+  line-height: 1.25;
+}
+.master-console-subtitle {
+  margin: 0;
+  font-size: .85rem;
+  color: var(--muted);
+}
+.master-console-meta {
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr);
+  gap: .3rem .9rem;
+  margin: 0 0 1rem;
+  font-size: .9rem;
+}
+.master-console-meta dt {
+  font-weight: 600;
+  color: var(--muted);
+}
+.master-console-meta dd {
+  margin: 0;
+  word-break: break-word;
+}
+.master-console-logs-title {
+  margin: 0 0 .45rem;
+  font-size: .9rem;
+  font-weight: 600;
+}
+.master-console-logs {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: .35rem;
+}
+.master-console-log {
+  display: grid;
+  grid-template-columns: 8.75rem 5.5rem minmax(0, 1fr);
+  gap: .5rem;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: .78rem;
+  line-height: 1.45;
+}
+.master-console-log-level {
+  font-weight: 700;
+  text-transform: uppercase;
+}
+.master-console-log-level--error { color: var(--danger, #A61B1B); }
+.master-console-log-level--warning { color: #B54708; }
+.master-console-log-level--anomaly { color: #7A2E0E; }
+.master-console-log-text { word-break: break-word; }
+.master-console-empty {
+  margin: 0;
+  font-size: .85rem;
+  color: var(--muted);
+}
+@media (max-width: 640px) {
+  .master-console-meta { grid-template-columns: 1fr; gap: .1rem; }
+  .master-console-log { grid-template-columns: 1fr; gap: .05rem; }
+}

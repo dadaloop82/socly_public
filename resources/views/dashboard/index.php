@@ -112,6 +112,10 @@ $defaultTab = $tabs[0]['id'] ?? '';
     </div>
 </div>
 
+<?php if (is_array($masterConsole ?? null)): ?>
+    <?= view_partial('dashboard/_master_console', ['console' => $masterConsole]) ?>
+<?php endif; ?>
+
 <?php if ($tabs === []): ?>
     <div class="panel">
         <div class="empty-state">

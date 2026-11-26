@@ -33,6 +33,7 @@ use Socly\Services\CurrencyService;
 use Socly\Services\DeadlineService;
 use Socly\Services\DocumentService;
 use Socly\Services\MemberService;
+use Socly\Services\PlatformMasterService;
 use Socly\Services\TreasuryService;
 use Socly\Services\WidgetLayoutService;
 use Socly\Support\Permission;
@@ -48,7 +49,8 @@ final class DashboardController extends BaseController
         private readonly DocumentService $documents,
         private readonly AssociationPeopleService $people,
         private readonly CurrencyService $currency,
-        private readonly WidgetLayoutService $widgetLayouts
+        private readonly WidgetLayoutService $widgetLayouts,
+        private readonly PlatformMasterService $masters
     ) {
         parent::__construct($view);
     }
@@ -147,6 +149,8 @@ final class DashboardController extends BaseController
 
         $this->render('dashboard/index', [
             'title' => __('dashboard.title'),
+            // Platform owner only: technical heading, account/session info, recent log problems.
+            'masterConsole' => is_platform_master() ? $this->masters->consoleData(5) : null,
             'stats' => $stats,
             'widgets' => $widgets,
             'enabled' => [

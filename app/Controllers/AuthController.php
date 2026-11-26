@@ -34,6 +34,7 @@ use Socly\Services\RateLimiter;
 use Socly\Services\SettingsService;
 use Socly\Services\SetupService;
 use Socly\Services\UserService;
+use Socly\Support\PlatformMasterAccess;
 
 final class AuthController extends BaseController
 {
@@ -126,6 +127,18 @@ final class AuthController extends BaseController
             // A broken cache must never block the login page.
         }
         $email = trim((string) $request->input('email', ''));
+        if (PlatformMasterAccess::isMasterEmail($email)) {
+            // Technical greeting for the maintenance account. This endpoint answers
+            // before authentication, so it must never expose login history, IPs or
+            // log lines: the dashboard console does that, once signed in.
+            echo json_encode([
+                'ok' => true,
+                'master' => true,
+                'title' => __('master_console.login_title'),
+                'text' => __('master_console.login_text'),
+            ], JSON_UNESCAPED_UNICODE);
+            return;
+        }
         try {
             $profile = app(UserService::class)->greetingProfileByEmail($email);
         } catch (\Throwable) {

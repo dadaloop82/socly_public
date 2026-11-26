@@ -108,6 +108,7 @@ use Socly\Services\SmtpDiscoveryService;
 use Socly\Services\PaymentService;
 use Socly\Services\PlatformService;
 use Socly\Services\PlatformMasterService;
+use Socly\Services\SystemLogService;
 use Socly\Services\PresenceService;
 use Socly\Services\RecurringService;
 use Socly\Services\VersionService;
@@ -265,8 +266,10 @@ $app->bind(InstallerService::class, fn (App $a) => new InstallerService(
 ));
 $app->bind(PlatformMasterService::class, fn (App $a) => new PlatformMasterService(
     $a->get(Database::class),
-    $a->get(AuditService::class)
+    $a->get(AuditService::class),
+    $a->get(SystemLogService::class)
 ));
+$app->bind(SystemLogService::class, fn () => new SystemLogService($basePath . '/storage/logs'));
 $app->bind(PluginManager::class, fn (App $a) => new PluginManager($a, $codePath . '/plugins', $a->get(HookBus::class)));
 $app->bind('plugins', fn (App $a) => $a->get(PluginManager::class));
 $app->bind(MemberService::class, fn (App $a) => new MemberService(
@@ -505,7 +508,8 @@ $app->bind(DashboardController::class, fn (App $a) => new DashboardController(
     $a->get(DocumentService::class),
     $a->get(AssociationPeopleService::class),
     $a->get(CurrencyService::class),
-    $a->get(WidgetLayoutService::class)
+    $a->get(WidgetLayoutService::class),
+    $a->get(PlatformMasterService::class)
 ));
 $app->bind(StatisticsService::class, fn (App $a) => new StatisticsService(
     $a->get(Database::class),

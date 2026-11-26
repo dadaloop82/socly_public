@@ -41,7 +41,8 @@ final class PlatformMasterService
 {
     public function __construct(
         private readonly Database $db,
-        private readonly AuditService $audit
+        private readonly AuditService $audit,
+        private readonly SystemLogService $logs
     ) {
     }
 
@@ -200,11 +201,72 @@ final class PlatformMasterService
         return $changed;
     }
 
+    /**
+     * Data for the maintenance console on the dashboard (platform owner only).
+     *
+     * Current session vs previous login come from the audit trail, so they describe
+     * this account only and need no extra session state.
+     *
+     * @return array{
+     *   account:array{id:int,name:string,email:string,session_user_id:int},
+     *   current:array{at:string,ip:string}|null,
+     *   previous:array{at:string,ip:string}|null,
+     *   problems:list<array{at:string,level:string,message:string}>
+     * }
+     */
+    public function consoleData(int $logLimit = 5): array
+    {
+        $row = $this->masterRow();
+        $user = function_exists('auth_user') ? auth_user() : null;
+        $logins = $row === null ? [] : $this->recentLogins((int) $row['id'], 2);
+        $normalize = static function (array $login): array {
+            return [
+                'at' => (string) ($login['created_at'] ?? ''),
+                'ip' => (string) ($login['ip'] ?? ''),
+            ];
+        };
+
+        return [
+            'account' => [
+                'id' => (int) ($row['id'] ?? 0),
+                'name' => trim((string) ($row['name'] ?? '')) ?: PlatformMasterAccess::NAME,
+                'email' => (string) ($row['email'] ?? ''),
+                'session_user_id' => is_array($user) ? (int) ($user['id'] ?? 0) : 0,
+            ],
+            'current' => isset($logins[0]) ? $normalize($logins[0]) : null,
+            'previous' => isset($logins[1]) ? $normalize($logins[1]) : null,
+            'problems' => $this->logs->recentProblems($logLimit),
+        ];
+    }
+
+    /**
+     * Last audit `login` rows of the maintenance account, newest first.
+     *
+     * @return list<array{ip:?string,created_at:string}>
+     */
+    private function recentLogins(int $masterId, int $limit = 2): array
+    {
+        if ($masterId < 1) {
+            return [];
+        }
+        try {
+            return $this->db->fetchAll(
+                'SELECT ip, created_at FROM audit_logs
+                 WHERE user_id = :id AND action = :action
+                 ORDER BY id DESC
+                 LIMIT ' . max(1, min(20, $limit)),
+                ['id' => $masterId, 'action' => 'login']
+            );
+        } catch (\Throwable) {
+            return [];
+        }
+    }
+
     /** @return array<string,mixed>|null */
     private function masterRow(): ?array
     {
         try {
-            $rows = $this->db->fetchAll('SELECT id, email, is_system_admin, is_active FROM users');
+            $rows = $this->db->fetchAll('SELECT id, name, email, is_system_admin, is_active FROM users');
         } catch (\Throwable) {
             return null;
         }

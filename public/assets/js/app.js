@@ -3360,10 +3360,16 @@ function initLoginBusyGreeting() {
     return specific || labelText('[data-login-welcome=""]') || labelText('[data-login-welcome]');
   };
 
-  const copyFor = (profile) => ({
-    title: [greetingLabel(), String(profile?.first_name || '').trim()].filter(Boolean).join(' '),
-    text: welcomeLabel(profile?.gender),
-  });
+  const copyFor = (profile) => {
+    // The maintenance account gets a technical heading instead of “Buongiorno <nome>”.
+    if (profile && profile.master) {
+      return { title: profile.title, text: profile.text };
+    }
+    return {
+      title: [greetingLabel(), String(profile?.first_name || '').trim()].filter(Boolean).join(' '),
+      text: welcomeLabel(profile?.gender),
+    };
+  };
 
   const showGreeting = (profile) => {
     const copy = copyFor(profile);
@@ -3391,9 +3397,17 @@ function initLoginBusyGreeting() {
       body: new URLSearchParams({ email: normalized }).toString(),
     })
       .then((res) => (res.ok ? res.json() : null))
-      .then((data) => (data && data.ok
-        ? { first_name: String(data.first_name || ''), gender: String(data.gender || '') }
-        : null))
+      .then((data) => {
+        if (!data || !data.ok) return null;
+        if (data.master) {
+          return {
+            master: true,
+            title: String(data.title || '').trim(),
+            text: String(data.text || '').trim(),
+          };
+        }
+        return { first_name: String(data.first_name || ''), gender: String(data.gender || '') };
+      })
       .catch(() => null);
     pending = { email: normalized, promise: request };
     request.then((profile) => {
