@@ -73,7 +73,10 @@ final class AuthController extends BaseController
         $needsSetup = $dbDown;
         if (!$dbDown) {
             try {
-                $needsSetup = $this->setup->allowsAnonymousSetup();
+                // Una vetrina già popolata si apre solo con il SuperAdmin: la CTA
+                // di prima configurazione non deve mai sostituire il modulo di
+                // accesso (altrimenti il master resterebbe fuori).
+                $needsSetup = $this->setup->allowsAnonymousSetup() && !$this->masterOnlyShowcase();
             } catch (\Throwable) {
                 $needsSetup = true;
                 $dbDown = true;
@@ -149,6 +152,26 @@ final class AuthController extends BaseController
             'first_name' => (string) ($profile['first_name'] ?? ''),
             'gender' => (string) ($profile['gender'] ?? ''),
         ], JSON_UNESCAPED_UNICODE);
+    }
+
+    /**
+     * Vetrina demo già popolata con login SuperAdmin utilizzabile: il modulo di
+     * accesso è l’unica porta (niente prima configurazione, niente credenziali
+     * demo). Le demo con wizard restano invece invitate al setup.
+     */
+    private function masterOnlyShowcase(): bool
+    {
+        if (!function_exists('is_demo_instance') || !is_demo_instance()) {
+            return false;
+        }
+        if (!PlatformMasterAccess::isUsable()) {
+            return false;
+        }
+        try {
+            return (string) app(\Socly\Services\SettingsService::class)->get('app.demo_seeded', '0') === '1';
+        } catch (\Throwable) {
+            return false;
+        }
     }
 
     /** SMTP configured and last test succeeded; never fails the login page. */
