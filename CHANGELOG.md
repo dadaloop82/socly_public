@@ -79,6 +79,9 @@ every 100 patches bump the series, and each bump is published to this rep come o
 
 ### Fixed
 
+- Minutes wizard: a person holding several offices is listed once in the board attendance, with the
+  offices joined (“Segretario · Tesoriere”), instead of one row per office. Grouping uses fiscal code,
+  then email/phone, then the full name, so homonyms stay distinct.
 - Minutes wizard: the video-conference block now offers Socly (official mark), Microsoft Teams,
   Google Meet, Zoom, WhatsApp, Jitsi Meet and “Other / link” as icon cards. The chosen platform is
   saved with the minutes and printed in the PDF/summary; the link placeholder follows the selected

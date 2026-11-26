@@ -116,33 +116,48 @@ final class MinutesService
     public function peopleOptions(): array
     {
         $out = [];
-        foreach ($this->people->all() as $person) {
-            $name = trim((string) ($person['first_name'] ?? '') . ' ' . (string) ($person['last_name'] ?? ''));
-            if ($name === '') {
-                continue;
-            }
-            $roleKey = (string) ($person['role_key'] ?? '');
-            $role = $this->people->roleLabel([
-                'key' => $roleKey,
-                'label_key' => (string) ($person['role_label_key'] ?? ('association.role_' . $roleKey)),
-            ]);
-            $out[(int) ($person['id'] ?? 0)] = $role !== '' ? $name . ' — ' . $role : $name;
+        foreach ($this->groupedPeople($this->people->all()) as $person) {
+            $out[(int) $person['id']] = $person['role'] !== ''
+                ? $person['name'] . ' — ' . $person['role']
+                : $person['name'];
         }
 
         return $out;
     }
 
     /**
-     * Board of directors in office, ordered by hierarchy.
+     * Board of directors in office, ordered by hierarchy. A person holding several offices is one
+     * row with the roles joined (“Segretario · Tesoriere”), never two attendance rows.
      *
      * @return list<array{id:int,name:string,role:string}>
      */
     public function boardMembers(): array
     {
+        return array_map(
+            static fn (array $person): array => [
+                'id' => (int) $person['id'],
+                'name' => (string) $person['name'],
+                'role' => (string) $person['role'],
+            ],
+            $this->groupedPeople($this->people->all(), AssociationPeopleService::DIRECTOR_ROLE_KEYS)
+        );
+    }
+
+    /**
+     * The DB stores one row per office (a person with two offices has two rows). Group them by the
+     * strongest identity available and merge the role labels, preserving the hierarchy order.
+     *
+     * @param list<array<string,mixed>> $rows
+     * @param list<string>|null $allowedRoles null = every role
+     * @return list<array{id:int,name:string,role:string,roles:list<string>}>
+     */
+    private function groupedPeople(array $rows, ?array $allowedRoles = null): array
+    {
         $out = [];
-        foreach ($this->people->all() as $person) {
+        $index = [];
+        foreach ($rows as $person) {
             $roleKey = (string) ($person['role_key'] ?? '');
-            if (!in_array($roleKey, AssociationPeopleService::DIRECTOR_ROLE_KEYS, true)) {
+            if ($allowedRoles !== null && !in_array($roleKey, $allowedRoles, true)) {
                 continue;
             }
             $name = trim((string) ($person['first_name'] ?? '') . ' ' . (string) ($person['last_name'] ?? ''));
@@ -153,10 +168,48 @@ final class MinutesService
                 'key' => $roleKey,
                 'label_key' => (string) ($person['role_label_key'] ?? ('association.role_' . $roleKey)),
             ]);
-            $out[] = ['id' => (int) ($person['id'] ?? 0), 'name' => $name, 'role' => $role];
+            $key = $this->personIdentityKey($person, $name);
+            if (!isset($index[$key])) {
+                $index[$key] = count($out);
+                $out[] = [
+                    'id' => (int) ($person['id'] ?? 0),
+                    'name' => $name,
+                    'role' => $role,
+                    'roles' => $role !== '' ? [$role] : [],
+                ];
+                continue;
+            }
+            if ($role !== '' && !in_array($role, $out[$index[$key]]['roles'], true)) {
+                $out[$index[$key]]['roles'][] = $role;
+            }
         }
+        foreach ($out as &$person) {
+            $person['role'] = implode(' · ', $person['roles']);
+        }
+        unset($person);
 
         return $out;
+    }
+
+    /**
+     * Same person across office rows: fiscal code is authoritative, then email/phone, then name.
+     * Homonyms without a shared identifier stay distinct.
+     *
+     * @param array<string,mixed> $person
+     */
+    private function personIdentityKey(array $person, string $name): string
+    {
+        $normalize = static fn (string $value): string => mb_strtolower(
+            trim((string) preg_replace('/\s+/u', ' ', $value))
+        );
+        foreach (['fiscal_code', 'email', 'phone'] as $field) {
+            $identity = $normalize((string) ($person[$field] ?? ''));
+            if ($identity !== '') {
+                return 'id:' . $identity;
+            }
+        }
+
+        return 'name:' . $normalize($name);
     }
 
     /**
