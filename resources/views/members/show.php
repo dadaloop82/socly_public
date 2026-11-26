@@ -276,7 +276,7 @@ $paymentIssues = array_values(array_filter(
 ));
 ?>
 
-<?php if ($dataIssues !== []): ?>
+<?php if ($dataIssues !== [] && !(function_exists('is_demo_instance') && is_demo_instance())): ?>
 <div class="alert alert-warn member-anomaly-banner" role="status">
     <div class="member-anomaly-banner-head">
         <span class="member-anomaly-mark is-static" aria-hidden="true">

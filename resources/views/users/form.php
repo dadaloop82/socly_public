@@ -19,7 +19,15 @@
  *   This header is part of the project identity. Keep it in derived files.
  *
  */
- $isEdit = $user !== null; $selected = $user['permission_keys'] ?? []; $returnTo = (string) ($returnTo ?? ''); ?>
+ $isEdit = $user !== null; $selected = $user['permission_keys'] ?? []; $returnTo = (string) ($returnTo ?? '');
+$memberProfile = is_array($memberProfile ?? null) ? $memberProfile : null;
+$memberLinked = $memberProfile !== null && (int) ($memberProfile['id'] ?? 0) > 0;
+$firstNameValue = $memberLinked ? ($memberProfile['first_name'] ?? '') : old('first_name', $user['first_name'] ?? '');
+$lastNameValue = $memberLinked ? ($memberProfile['last_name'] ?? '') : old('last_name', $user['last_name'] ?? '');
+$genderValue = $memberLinked ? ($memberProfile['gender'] ?? '') : old('gender', $user['gender'] ?? '');
+$birthValue = $memberLinked ? ($memberProfile['birth_date'] ?? '') : old('birth_date', $user['birth_date'] ?? '');
+$memberProfileUrl = (string) ($memberProfileUrl ?? url('/users/member-profile'));
+?>
 <div class="page-header">
     <div class="titles">
         <h1 class="page-title"><?= e($title) ?></h1>
@@ -32,8 +40,13 @@
         <a class="btn btn-ghost" href="<?= e($returnTo === 'settings' ? url('/settings#users') : url('/users')) ?>"><?= e(__('common.back')) ?></a>
     </div>
 </div>
-<form class="form-card setup-admin-account" method="post" action="<?= e($isEdit ? url('/users/'.$user['id']) : url('/users')) ?>" data-leave-guard data-user-create-form>
+<form class="form-card setup-admin-account" method="post" action="<?= e($isEdit ? url('/users/'.$user['id']) : url('/users')) ?>" data-leave-guard data-user-create-form data-user-form data-member-profile-url="<?= e($memberProfileUrl) ?>">
     <?= csrf_field() ?>
+    <?php if ($memberLinked): ?>
+        <script type="application/json" data-member-profiles><?= json_encode([
+            (string) (int) $memberProfile['id'] => $memberProfile,
+        ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?></script>
+    <?php endif; ?>
     <?php if ($returnTo !== ''): ?>
         <?= field('hidden', ['name' => 'return', 'value' => $returnTo]) ?>
     <?php endif; ?>
@@ -41,18 +54,22 @@
         <?= field('text', [
             'name' => 'first_name',
             'label' => (string) __('users.first_name'),
-            'value' => (string) old('first_name', $user['first_name'] ?? ''),
+            'value' => (string) $firstNameValue,
             'maxlength' => 80,
             'autocomplete' => 'given-name',
+            'readonly' => $memberLinked,
             'context' => 'setup',
+            'attrs' => ['data-user-field' => 'first_name'],
         ]) ?>
         <?= field('text', [
             'name' => 'last_name',
             'label' => (string) __('users.last_name'),
-            'value' => (string) old('last_name', $user['last_name'] ?? ''),
+            'value' => (string) $lastNameValue,
             'maxlength' => 80,
             'autocomplete' => 'family-name',
+            'readonly' => $memberLinked,
             'context' => 'setup',
+            'attrs' => ['data-user-field' => 'last_name'],
         ]) ?>
     </div>
     <?= field('select', [
@@ -64,7 +81,31 @@
         'empty_label' => (string) __('users.member_link_none'),
         'options' => $memberOptions ?? [],
         'context' => 'setup',
+        'attrs' => ['data-member-link' => true],
     ]) ?>
+    <div class="setup-membership-card user-member-profile" data-member-profile<?= $memberLinked ? '' : ' hidden' ?>>
+        <p class="setup-field-label"><?= e(__('users.member_profile_title')) ?></p>
+        <dl class="user-member-profile-grid">
+            <div>
+                <dt><?= e(__('users.name_column')) ?></dt>
+                <dd data-member-profile-name><?= e((string) ($memberProfile['last_name'] ?? '') . ' ' . (string) ($memberProfile['first_name'] ?? '')) ?></dd>
+            </div>
+            <div>
+                <dt><?= e(__('users.member_number')) ?></dt>
+                <dd data-member-profile-number><?= e((string) ($memberProfile['member_number'] ?? '')) ?></dd>
+            </div>
+            <div>
+                <dt><?= e(__('users.birth_date')) ?></dt>
+                <dd data-member-profile-birth><?= e((string) ($memberProfile['birth_date_display'] ?? $memberProfile['birth_date'] ?? '')) ?></dd>
+            </div>
+            <div>
+                <dt><?= e(__('users.fiscal_code')) ?></dt>
+                <dd data-member-profile-cf><?= e((string) ($memberProfile['fiscal_code'] ?? '')) ?></dd>
+            </div>
+        </dl>
+        <a class="btn btn-ghost btn-sm" data-member-profile-link href="<?= e((string) ($memberProfile['url'] ?? url('/members'))) ?>"<?= $memberLinked ? '' : ' hidden' ?>><?= e(__('users.open_member')) ?></a>
+    </div>
+    <p class="setup-hint muted" data-member-lock-note<?= $memberLinked ? '' : ' hidden' ?>><?= e(__('users.member_lock_hint')) ?></p>
     <?= field('email', [
         'name' => 'email',
         'label' => (string) __('users.email'),
@@ -77,8 +118,9 @@
         <?= field('select', [
             'name' => 'gender',
             'label' => (string) __('users.gender'),
-            'value' => (string) old('gender', $user['gender'] ?? ''),
+            'value' => (string) $genderValue,
             'required' => true,
+            'disabled' => $memberLinked,
             'include_empty' => true,
             'empty_label' => (string) __('common.select'),
             'options' => [
@@ -86,14 +128,17 @@
                 ['value' => 'F', 'label' => (string) __('members.gender_f')],
             ],
             'context' => 'setup',
+            'attrs' => ['data-user-field' => 'gender'],
         ]) ?>
         <?= field('date', [
             'name' => 'birth_date',
             'label' => (string) __('users.birth_date'),
             'hint' => (string) __('users.birth_date_hint'),
-            'value' => (string) old('birth_date', $user['birth_date'] ?? ''),
+            'value' => (string) $birthValue,
             'required' => false,
+            'readonly' => $memberLinked,
             'context' => 'setup',
+            'attrs' => ['data-user-field' => 'birth_date'],
         ]) ?>
     </div>
     <?php if (!$isEdit): ?>

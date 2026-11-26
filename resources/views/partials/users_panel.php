@@ -78,7 +78,7 @@ $panelUsers = is_array($panelUsers ?? null) ? $panelUsers : [];
 <div class="setup-membership-card setup-membership-card-new settings-user-create">
     <h3 class="setup-subhead"><?= e(__('users.create')) ?></h3>
     <p class="setup-hint muted"><?= e(__('users.create_hint')) ?></p>
-    <form method="post" action="<?= e(url('/users')) ?>" data-leave-guard data-user-create-form>
+    <form method="post" action="<?= e(url('/users')) ?>" data-leave-guard data-user-create-form data-user-form data-member-profile-url="<?= e((string) ($memberProfileUrl ?? url('/users/member-profile'))) ?>">
         <?= csrf_field() ?>
         <?= field('hidden', ['name' => 'return', 'value' => 'settings']) ?>
         <div class="setup-equal-row">
@@ -89,6 +89,7 @@ $panelUsers = is_array($panelUsers ?? null) ? $panelUsers : [];
                 'maxlength' => 80,
                 'autocomplete' => 'given-name',
                 'context' => 'setup',
+                'attrs' => ['data-user-field' => 'first_name'],
             ]) ?>
             <?= field('text', [
                 'name' => 'last_name',
@@ -97,6 +98,7 @@ $panelUsers = is_array($panelUsers ?? null) ? $panelUsers : [];
                 'maxlength' => 80,
                 'autocomplete' => 'family-name',
                 'context' => 'setup',
+                'attrs' => ['data-user-field' => 'last_name'],
             ]) ?>
         </div>
         <?= field('select', [
@@ -108,7 +110,9 @@ $panelUsers = is_array($panelUsers ?? null) ? $panelUsers : [];
             'empty_label' => (string) __('users.member_link_none'),
             'options' => $memberOptions ?? [],
             'context' => 'setup',
+            'attrs' => ['data-member-link' => true],
         ]) ?>
+        <p class="setup-hint muted" data-member-lock-note hidden><?= e(__('users.member_lock_hint')) ?></p>
         <?= field('email', [
             'name' => 'email',
             'label' => (string) __('users.email'),
@@ -130,6 +134,7 @@ $panelUsers = is_array($panelUsers ?? null) ? $panelUsers : [];
                     ['value' => 'F', 'label' => (string) __('members.gender_f')],
                 ],
                 'context' => 'setup',
+                'attrs' => ['data-user-field' => 'gender'],
             ]) ?>
             <?= field('date', [
                 'name' => 'birth_date',
@@ -138,6 +143,7 @@ $panelUsers = is_array($panelUsers ?? null) ? $panelUsers : [];
                 'value' => (string) old('birth_date'),
                 'required' => false,
                 'context' => 'setup',
+                'attrs' => ['data-user-field' => 'birth_date'],
             ]) ?>
         </div>
         <div class="setup-equal-row">

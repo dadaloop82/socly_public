@@ -36,7 +36,11 @@ $languageLabel = $language !== '' ? __('documents.language_' . $language) : '—
     </div>
     <div class="actions">
         <a class="btn btn-ghost" href="<?= e(url('/documents')) ?>"><?= e(__('common.back')) ?></a>
-        <?php if (can('documents.manage')): ?>
+        <?php
+        $lockedMinutes = (string) ($document['source_ref'] ?? '') === 'minutes'
+            && in_array((string) ($document['status'] ?? ''), ['approved', 'signed', 'archived'], true);
+        ?>
+        <?php if (can('documents.manage') && !$lockedMinutes): ?>
             <a class="btn" href="<?= e(url('/documents/' . $docId . '/edit')) ?>"><?= e(__('documents.edit')) ?></a>
         <?php endif; ?>
     </div>

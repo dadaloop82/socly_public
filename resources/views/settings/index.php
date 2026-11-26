@@ -1078,6 +1078,7 @@
             'panelUsers' => $panelUsers ?? [],
             'mailReady' => !empty($mailReady),
             'memberOptions' => $memberOptions ?? [],
+            'memberProfileUrl' => url('/users/member-profile'),
         ]) ?>
     </div>
 </details>

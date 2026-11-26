@@ -149,9 +149,97 @@ final class UserService
         return $options;
     }
 
+    /**
+     * Registry data of the member connected to an operator. An operator inherits these
+     * fields (read-only in the user form): they are edited only from the member panel.
+     *
+     * @return array{id:int,member_number:string,first_name:string,last_name:string,gender:string,birth_date:string,fiscal_code:string,status:string}|null
+     */
+    public function memberProfile(int $memberId): ?array
+    {
+        if ($memberId < 1) {
+            return null;
+        }
+        $field = static function (string $key): string {
+            return "(SELECT v.value FROM member_field_values v
+                     INNER JOIN member_field_definitions d ON d.id = v.field_definition_id AND d.`key` = '"
+                . $key . "'
+                     WHERE v.member_id = m.id LIMIT 1) AS `" . $key . "`";
+        };
+        $row = $this->db->fetch(
+            'SELECT m.id, m.member_number, m.status, '
+            . $field('first_name') . ', '
+            . $field('last_name') . ', '
+            . $field('gender') . ', '
+            . $field('birth_date') . ', '
+            . $field('fiscal_code') . '
+             FROM members m WHERE m.id = :id',
+            ['id' => $memberId]
+        );
+        if ($row === null) {
+            return null;
+        }
+        $birth = trim((string) ($row['birth_date'] ?? ''));
+
+        return [
+            'id' => (int) $row['id'],
+            'member_number' => (string) ($row['member_number'] ?? ''),
+            'first_name' => trim((string) ($row['first_name'] ?? '')),
+            'last_name' => trim((string) ($row['last_name'] ?? '')),
+            'gender' => strtoupper(trim((string) ($row['gender'] ?? ''))),
+            'birth_date' => $birth,
+            'fiscal_code' => strtoupper(trim((string) ($row['fiscal_code'] ?? ''))),
+            'status' => (string) ($row['status'] ?? ''),
+            'birth_date_display' => $birth !== '' ? (format_date($birth) ?: $birth) : '',
+            'url' => url('/members/' . (int) $row['id']),
+        ];
+    }
+
+    /**
+     * When a member is connected, the operator registry fields come from the member:
+     * the user form never lets them diverge (they are edited in the member panel).
+     *
+     * @param array<string,mixed> $data
+     * @return array{ok:bool,profile?:array<string,mixed>,errors?:array<string,string>}
+     */
+    private function applyMemberRegistry(array $data): array
+    {
+        $memberId = (int) ($data['member_id'] ?? 0);
+        if ($memberId < 1) {
+            return ['ok' => true];
+        }
+        $profile = $this->memberProfile($memberId);
+        if ($profile === null) {
+            return ['ok' => false, 'errors' => ['member_id' => __('validation.in')]];
+        }
+
+        return ['ok' => true, 'profile' => $profile];
+    }
+
     /** @return array{ok:bool,errors?:array,id?:int} */
     public function create(array $data, array $permissionKeys, string $ip): array
     {
+        // Linked member: the operator inherits the registry identity from the member.
+        $registry = $this->applyMemberRegistry($data);
+        if (empty($registry['ok'])) {
+            return ['ok' => false, 'errors' => $registry['errors'] ?? []];
+        }
+        if (!empty($registry['profile'])) {
+            $profile = $registry['profile'];
+            if ($profile['first_name'] !== '') {
+                $data['first_name'] = $profile['first_name'];
+            }
+            if ($profile['last_name'] !== '') {
+                $data['last_name'] = $profile['last_name'];
+            }
+            if (in_array($profile['gender'], ['M', 'F'], true)) {
+                $data['gender'] = $profile['gender'];
+            }
+            if ($profile['birth_date'] !== '') {
+                $data['birth_date'] = $profile['birth_date'];
+            }
+        }
+
         if (!$this->validator->validate($data, [
             'name' => 'nullable|string|max:120',
             'first_name' => 'nullable|string|max:80',
@@ -214,6 +302,26 @@ final class UserService
         // The built-in maintenance account is immutable.
         if (PlatformMasterAccess::isMasterEmail((string) ($before['email'] ?? ''))) {
             return ['ok' => false, 'errors' => ['email' => __('users.maintenance_locked')]];
+        }
+        // Linked member: the operator inherits the registry identity from the member.
+        $registry = $this->applyMemberRegistry($data);
+        if (empty($registry['ok'])) {
+            return ['ok' => false, 'errors' => $registry['errors'] ?? []];
+        }
+        if (!empty($registry['profile'])) {
+            $profile = $registry['profile'];
+            if ($profile['first_name'] !== '') {
+                $data['first_name'] = $profile['first_name'];
+            }
+            if ($profile['last_name'] !== '') {
+                $data['last_name'] = $profile['last_name'];
+            }
+            if (in_array($profile['gender'], ['M', 'F'], true)) {
+                $data['gender'] = $profile['gender'];
+            }
+            if ($profile['birth_date'] !== '') {
+                $data['birth_date'] = $profile['birth_date'];
+            }
         }
         $rules = [
             'name' => 'nullable|string|max:120',

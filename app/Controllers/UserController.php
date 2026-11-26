@@ -101,9 +101,27 @@ final class UserController extends BaseController
             'title' => __('users.edit'),
             'user' => $user,
             'memberOptions' => $this->users->memberOptions(),
+            'memberProfile' => (int) ($user['member_id'] ?? 0) > 0
+                ? $this->users->memberProfile((int) $user['member_id'])
+                : null,
+            'memberProfileUrl' => url('/users/member-profile'),
             'returnTo' => (string) $request->input('return', ''),
             'mailReady' => $this->mail->isReady(),
         ]);
+    }
+
+    /** Registry data of a member, used when an operator is linked to the member archive. */
+    public function memberProfile(Request $request): void
+    {
+        header('Content-Type: application/json; charset=utf-8');
+        $id = (int) ($request->input('id', 0));
+        $profile = $id > 0 ? $this->users->memberProfile($id) : null;
+        if ($profile === null) {
+            http_response_code(404);
+            echo json_encode(['ok' => false], JSON_UNESCAPED_UNICODE);
+            return;
+        }
+        echo json_encode(['ok' => true, 'profile' => $profile], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
     }
 
     public function update(Request $request, string $id): void

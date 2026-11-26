@@ -92,6 +92,8 @@ use Socly\Services\CurrencyService;
 use Socly\Services\DeadlineService;
 use Socly\Services\DocumentService;
 use Socly\Services\FileRepositoryService;
+use Socly\Services\MinutesPdfService;
+use Socly\Services\MinutesService;
 use Socly\Services\EmailTemplateService;
 use Socly\Services\MemberRegistryService;
 use Socly\Services\EnrollmentFormService;
@@ -437,6 +439,16 @@ $app->bind(DocumentService::class, fn (App $a) => new DocumentService(
     $a->get(ComponentService::class),
     $a->get(FileRepositoryService::class)
 ));
+$app->bind(MinutesPdfService::class, fn (App $a) => new MinutesPdfService());
+$app->bind(MinutesService::class, fn (App $a) => new MinutesService(
+    $a->get(Database::class),
+    $a->get(DocumentService::class),
+    $a->get(AssociationPeopleService::class),
+    $a->get(BudgetService::class),
+    $a->get(SettingsService::class),
+    $a->get(MinutesPdfService::class),
+    $a->get(Validator::class)
+));
 $app->bind(UpdateService::class, fn (App $a) => new UpdateService(
     $a->get(Migrator::class),
     $a->get(AuditService::class),
@@ -609,7 +621,8 @@ $app->bind(DocumentsController::class, fn (App $a) => new DocumentsController(
     $a->get(View::class),
     $a->get(DocumentService::class),
     $a->get(MemberService::class),
-    $a->get(FileRepositoryService::class)
+    $a->get(FileRepositoryService::class),
+    $a->get(MinutesService::class)
 ));
 $app->bind(FilesController::class, fn (App $a) => new FilesController(
     $a->get(View::class),

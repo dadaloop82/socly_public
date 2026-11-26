@@ -228,6 +228,9 @@ document.addEventListener('DOMContentLoaded', () => {
   initDocumentUpload(document);
   initDocumentFilters(document);
   initDocumentRowLinks(document);
+  initDocumentsArchiveMore(document);
+  initMinutesWizard(document);
+  initUserMemberLink(document);
   document.querySelectorAll('[data-org-person-form]').forEach((form) => {
     initPlaceSuggest(form);
     initFiscalCodeAuto(form);
@@ -1483,18 +1486,29 @@ function initResourceBusyWatch() {
   const ensureOverlay = () => {
     if (overlay) return overlay;
     overlay = document.createElement('div');
-    overlay.className = 'update-overlay';
+    overlay.className = 'update-overlay resource-busy-overlay';
     overlay.hidden = true;
     overlay.dataset.resourceBusyOverlay = '1';
     overlay.innerHTML = [
-      '<div class="update-overlay-card" role="status" aria-live="polite">',
-      '<div class="update-spinner" aria-hidden="true"></div>',
+      '<div class="pause-scene" aria-hidden="true">',
+      '<span class="pause-grid"></span>',
+      '<span class="pause-orb pause-orb--1"></span>',
+      '<span class="pause-orb pause-orb--2"></span>',
+      '<span class="pause-orb pause-orb--3"></span>',
+      '<span class="pause-orb pause-orb--4"></span>',
+      '</div>',
+      '<div class="update-overlay-card pause-card" role="status" aria-live="polite">',
+      '<p class="pause-kicker" data-resource-busy-kicker></p>',
+      '<div class="pause-pulse" aria-hidden="true"><span></span><span></span><span></span></div>',
       '<h2 class="update-overlay-title" data-resource-busy-title></h2>',
       '<p class="update-overlay-who" data-resource-busy-operation></p>',
       '<p class="update-overlay-started" data-resource-busy-started></p>',
       '<p class="update-overlay-text" data-resource-busy-text></p>',
+      '<p class="pause-text" data-resource-busy-pause-text></p>',
       '<p class="update-overlay-hint" data-resource-busy-hint></p>',
-      '<p><button type="button" class="btn" data-resource-busy-retry></button></p>',
+      '<p class="pause-reassure" data-resource-busy-reassure></p>',
+      '<div class="pause-game" data-pause-game></div>',
+      '<p class="pause-actions"><button type="button" class="btn" data-resource-busy-retry></button></p>',
       '</div>',
     ].join('');
     document.body.appendChild(overlay);
@@ -1504,38 +1518,91 @@ function initResourceBusyWatch() {
     return overlay;
   };
 
+  const attr = (name, fallback = '') => String(root?.getAttribute(name) || fallback);
+
   const labels = (() => {
     const lang = (document.documentElement.lang || 'it').slice(0, 2);
     const map = {
       it: {
-        title: 'Operazione impegnativa in corso',
-        hint: 'La pagina si aggiorna da sola. Potrai riprendere non appena l’operazione sarà terminata (al massimo 30 minuti).',
-        retry: 'Controlla di nuovo',
+        title: 'Stiamo lavorando per te',
+        hint: 'Puoi lasciare questa schermata aperta: si sbloccherà da sola al termine (entro 30 minuti).',
+        retry: 'Aggiorna ora',
         someone: 'Un collega',
         operation: 'Operazione impegnativa',
-        fallback: 'Per non rallentare o interrompere il lavoro, l’uso dell’app è temporaneamente sospeso per gli altri.',
+        fallback: 'Questa operazione richiede tutta la potenza del sistema: per non interferire con l’analisi dei dati, l’app è momentaneamente in pausa.',
         startedBy: 'Avviata da :name alle :time',
+        kicker: 'Goditi una pausa',
+        pauseText: 'Nel frattempo ti avviseremo appena la procedura sarà terminata.',
+        reassure: 'Nessun dato è a rischio: stiamo solo dando priorità al lavoro pesante.',
+        gameTitle: 'Scoppia le bolle',
+        gameHint: 'Un passatempo leggero mentre aspetti.',
+        gameScore: ':count bolle scoppiate',
+        gameWin: 'Pausa completata: la scrivania è più leggera!',
+        gameReset: 'Ricomincia',
+        gameAria: 'Minigioco: scoppia le bolle',
+        gameBubble: 'Scoppia la bolla',
       },
       en: {
-        title: 'A demanding operation is running',
-        hint: 'This page refreshes on its own. You can continue as soon as the operation finishes (30 minutes maximum).',
-        retry: 'Check again',
+        title: 'We are working for you',
+        hint: 'You can leave this screen open: it will unlock by itself when the work is done (within 30 minutes).',
+        retry: 'Refresh now',
         someone: 'A colleague',
         operation: 'Demanding operation',
-        fallback: 'To avoid slowing or interrupting that work, the app is temporarily paused for everyone else.',
+        fallback: 'This operation needs the full power of the system: so the data analysis is not disturbed, the app is paused for a moment.',
         startedBy: 'Started by :name at :time',
+        kicker: 'Enjoy a break',
+        pauseText: 'We will let you know as soon as the procedure is finished.',
+        reassure: 'No data is at risk: we are simply giving priority to the heavy work.',
+        gameTitle: 'Pop the bubbles',
+        gameHint: 'A light pastime while you wait.',
+        gameScore: ':count bubbles popped',
+        gameWin: 'Break complete: the desk feels lighter!',
+        gameReset: 'Play again',
+        gameAria: 'Mini-game: pop the bubbles',
+        gameBubble: 'Pop the bubble',
       },
       de: {
-        title: 'Anspruchsvoller Vorgang läuft',
-        hint: 'Diese Seite aktualisiert sich von selbst. Sie können fortfahren, sobald der Vorgang beendet ist (höchstens 30 Minuten).',
-        retry: 'Erneut prüfen',
+        title: 'Wir arbeiten für dich',
+        hint: 'Du kannst diese Seite geöffnet lassen: sie entsperrt sich am Ende von selbst (innerhalb von 30 Minuten).',
+        retry: 'Jetzt aktualisieren',
         someone: 'Eine Kollegin / ein Kollege',
         operation: 'Anspruchsvoller Vorgang',
-        fallback: 'Damit die Arbeit nicht ausgebremst oder unterbrochen wird, ist die App für alle anderen vorübergehend pausiert.',
+        fallback: 'Dieser Vorgang braucht die volle Rechenleistung: damit die Datenanalyse nicht gestört wird, ist die App vorübergehend pausiert.',
         startedBy: 'Gestartet von :name um :time',
+        kicker: 'Gönn dir eine Pause',
+        pauseText: 'Wir melden uns, sobald der Vorgang abgeschlossen ist.',
+        reassure: 'Keine Daten sind gefährdet: wir geben nur der schweren Arbeit Vorrang.',
+        gameTitle: 'Blasen platzen lassen',
+        gameHint: 'Eine kleine Abwechslung für zwischendurch.',
+        gameScore: ':count Blasen geplatzt',
+        gameWin: 'Pause geschafft: der Schreibtisch ist leichter!',
+        gameReset: 'Neu starten',
+        gameAria: 'Minispiel: Blasen platzen lassen',
+        gameBubble: 'Blase platzen lassen',
       },
     };
-    return map[lang] || map.it;
+    const base = map[lang] || map.it;
+    return {
+      title: attr('data-resource-busy-heading', base.title),
+      hint: attr('data-resource-busy-hint', base.hint),
+      retry: attr('data-resource-busy-retry', base.retry),
+      someone: attr('data-resource-busy-someone', base.someone),
+      operation: base.operation,
+      fallback: attr('data-resource-busy-message', base.fallback),
+      startedBy: attr('data-resource-busy-started-by', base.startedBy),
+      kicker: attr('data-resource-busy-kicker', base.kicker),
+      pauseText: attr('data-resource-busy-pause-text', base.pauseText),
+      reassure: attr('data-resource-busy-reassure', base.reassure),
+      game: {
+        title: attr('data-resource-busy-game-title', base.gameTitle),
+        hint: attr('data-resource-busy-game-hint', base.gameHint),
+        score: attr('data-resource-busy-game-score', base.gameScore),
+        win: attr('data-resource-busy-game-win', base.gameWin),
+        reset: attr('data-resource-busy-game-reset', base.gameReset),
+        aria: attr('data-resource-busy-game-aria', base.gameAria),
+        bubble: attr('data-resource-busy-game-bubble', base.gameBubble),
+      },
+    };
   })();
 
   const fillTpl = (tpl, vars) => {
@@ -1589,6 +1656,11 @@ function initResourceBusyWatch() {
     const textEl = card.querySelector('[data-resource-busy-text]');
     const hintEl = card.querySelector('[data-resource-busy-hint]');
     const retryEl = card.querySelector('[data-resource-busy-retry]');
+    const kickerEl = card.querySelector('[data-resource-busy-kicker]');
+    const pauseTextEl = card.querySelector('[data-resource-busy-pause-text]');
+    const reassureEl = card.querySelector('[data-resource-busy-reassure]');
+    const gameEl = card.querySelector('[data-pause-game]');
+    if (kickerEl) kickerEl.textContent = labels.kicker;
     if (titleEl) titleEl.textContent = labels.title;
     if (opEl) {
       opEl.textContent = card.dataset.operation || labels.operation;
@@ -1599,8 +1671,22 @@ function initResourceBusyWatch() {
       startedEl.hidden = !startedEl.textContent;
     }
     if (textEl) textEl.textContent = card.dataset.message || labels.fallback;
+    if (pauseTextEl) pauseTextEl.textContent = labels.pauseText;
     if (hintEl) hintEl.textContent = labels.hint;
+    if (reassureEl) reassureEl.textContent = labels.reassure;
     if (retryEl) retryEl.textContent = labels.retry;
+    if (gameEl instanceof HTMLElement && gameEl.dataset.pauseGameBound !== '1') {
+      gameEl.dataset.gameTitle = labels.game.title;
+      gameEl.dataset.gameHint = labels.game.hint;
+      gameEl.dataset.gameScore = labels.game.score;
+      gameEl.dataset.gameWin = labels.game.win;
+      gameEl.dataset.gameReset = labels.game.reset;
+      gameEl.dataset.gameAria = labels.game.aria;
+      gameEl.dataset.gameBubble = labels.game.bubble;
+      if (window.SoclyPauseGame && typeof window.SoclyPauseGame.init === 'function') {
+        window.SoclyPauseGame.init(card);
+      }
+    }
     card.hidden = false;
     document.documentElement.classList.add('is-busy');
   };
@@ -3328,6 +3414,14 @@ function initLoginBusyGreeting() {
 
   document.addEventListener('submit', (event) => {
     if (event.target !== form || event.defaultPrevented) return;
+    // Never replace the login card before the browser accepts the form: an invalid
+    // email/password must show its own field message without any wait card.
+    if (typeof form.checkValidity === 'function' && !form.checkValidity()) {
+      hideAppBusyOverlay();
+      unlockBusyForms();
+      form.reportValidity();
+      return;
+    }
     event.preventDefault();
     event.stopPropagation();
     if (form.dataset.busySubmitted === '1') {
@@ -3395,6 +3489,15 @@ function initActionBusyGuard() {
   document.addEventListener('submit', (event) => {
     const form = event.target;
     if (!(form instanceof HTMLFormElement) || shouldSkipForm(form)) return;
+    if (event.defaultPrevented) return;
+    // A form the browser refuses to submit must never get a wait card: the card
+    // would hide the field-level validation message and leave the page locked.
+    if (typeof form.checkValidity === 'function' && !form.checkValidity()) {
+      hideAppBusyOverlay();
+      unlockBusyForms();
+      form.reportValidity();
+      return;
+    }
     if (isFilterForm(form)) rememberFilterFocus(form);
     if (form.dataset.busySubmitted === '1') {
       event.preventDefault();
@@ -3418,6 +3521,14 @@ function initActionBusyGuard() {
   // Programmatic submit() after a confirm dialog bypasses the submit event in some browsers.
   const nativeSubmit = HTMLFormElement.prototype.submit;
   HTMLFormElement.prototype.submit = function busyAwareSubmit() {
+    // Novalidate forms opt out of native validation on purpose; everyone else must
+    // pass it before a wait card is painted (see the submit listener above).
+    if (!this.noValidate && typeof this.checkValidity === 'function' && !this.checkValidity()) {
+      hideAppBusyOverlay();
+      unlockBusyForms();
+      this.reportValidity();
+      return undefined;
+    }
     if (!shouldSkipForm(this) && this.dataset.busySubmitted !== '1') {
       lockAndShow(this);
     } else if (formHasOwnProgress(this) || pageHasOwnProgress()) {
@@ -3425,6 +3536,13 @@ function initActionBusyGuard() {
     }
     return nativeSubmit.call(this);
   };
+
+  // Safety net: any native validation failure (even one triggered after a link
+  // click or a leave-guard dialog) clears the wait card immediately.
+  document.addEventListener('invalid', () => {
+    hideAppBusyOverlay();
+    unlockBusyForms();
+  }, true);
 
   document.addEventListener('click', (event) => {
     if (event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) {
@@ -19937,3 +20055,454 @@ function initBudgetGrid(scope = document) {
     });
   });
 })();
+
+/**
+ * Archive groups: show the newest 5 rows, then a “e altri X” toggle that reveals
+ * the rest of the section without leaving the page.
+ */
+function initDocumentsArchiveMore(root = document) {
+  root.querySelectorAll('[data-documents-more]').forEach((btn) => {
+    if (!(btn instanceof HTMLElement) || btn.dataset.moreBound === '1') return;
+    btn.dataset.moreBound = '1';
+    btn.addEventListener('click', () => {
+      const group = btn.closest('.doc-archive-group');
+      if (!group) return;
+      const extraRows = [...group.querySelectorAll('[data-documents-extra]')];
+      const expanded = btn.getAttribute('aria-expanded') === 'true';
+      extraRows.forEach((row) => {
+        if (row instanceof HTMLElement) row.hidden = expanded;
+      });
+      btn.setAttribute('aria-expanded', expanded ? 'false' : 'true');
+      const moreLabel = btn.dataset.labelMore || '';
+      const lessLabel = btn.dataset.labelLess || '';
+      if (!expanded) {
+        if (lessLabel !== '') btn.textContent = lessLabel;
+      } else if (moreLabel !== '') {
+        btn.textContent = moreLabel;
+      }
+    });
+  });
+}
+
+/**
+ * Operator ↔ member link: an operator connected to a member inherits the member's
+ * registry data (name, gender, birth date). Those fields become read-only here and
+ * are edited only from the member panel.
+ */
+function initUserMemberLink(root = document) {
+  root.querySelectorAll('form[data-user-form]').forEach((form) => {
+    const select = form.querySelector('[data-member-link]');
+    if (!(select instanceof HTMLSelectElement) || select.dataset.memberLinkBound === '1') return;
+    select.dataset.memberLinkBound = '1';
+
+    let profiles = {};
+    const dataEl = form.querySelector('[data-member-profiles]') || document.querySelector('[data-member-profiles]');
+    if (dataEl instanceof HTMLScriptElement) {
+      try {
+        profiles = JSON.parse(dataEl.textContent || '{}') || {};
+      } catch (err) {
+        profiles = {};
+      }
+    }
+
+    const field = (name) => form.querySelector(`[data-user-field="${name}"]`);
+    const first = field('first_name');
+    const last = field('last_name');
+    const gender = field('gender');
+    const birth = field('birth_date');
+    const summary = form.querySelector('[data-member-profile]');
+    const summaryLink = form.querySelector('[data-member-profile-link]');
+    const note = form.querySelector('[data-member-lock-note]');
+    const endpoint = String(form.getAttribute('data-member-profile-url') || '');
+    const cache = { ...profiles };
+
+    const applyProfile = (profile) => {
+      if (!profile) return;
+      const id = String(select.value || '');
+      if (id !== '') cache[id] = profile;
+
+      if (first instanceof HTMLInputElement) first.value = profile.first_name || '';
+      if (last instanceof HTMLInputElement) last.value = profile.last_name || '';
+      if (birth instanceof HTMLInputElement) birth.value = profile.birth_date || '';
+      if (gender instanceof HTMLSelectElement) {
+        if (profile.gender === 'M' || profile.gender === 'F') gender.value = profile.gender;
+        gender.disabled = true;
+      }
+      if (summary instanceof HTMLElement) {
+        const set = (sel, value) => {
+          const el = summary.querySelector(sel);
+          if (el instanceof HTMLElement) el.textContent = value || '—';
+        };
+        set('[data-member-profile-name]', [profile.last_name, profile.first_name].filter(Boolean).join(' '));
+        set('[data-member-profile-birth]', profile.birth_date_display || profile.birth_date || '');
+        set('[data-member-profile-cf]', profile.fiscal_code || '');
+        set('[data-member-profile-number]', profile.member_number || '');
+        if (summaryLink instanceof HTMLAnchorElement) {
+          summaryLink.hidden = !profile.url;
+          if (profile.url) summaryLink.href = profile.url;
+        }
+      }
+    };
+
+    const apply = () => {
+      const key = String(select.value || '');
+      const profile = cache[key] || null;
+      const linked = key !== '' && profile !== null;
+      form.classList.toggle('is-member-linked', linked);
+      if (note instanceof HTMLElement) note.hidden = !linked;
+      if (summary instanceof HTMLElement) summary.hidden = !linked;
+      if (first instanceof HTMLInputElement) first.readOnly = linked;
+      if (last instanceof HTMLInputElement) last.readOnly = linked;
+      if (birth instanceof HTMLInputElement) birth.readOnly = linked;
+      if (gender instanceof HTMLSelectElement) gender.disabled = linked;
+      if (profile !== null) {
+        applyProfile(profile);
+        return;
+      }
+      // The create form lists every member: fetch the registry data on demand.
+      if (key !== '' && endpoint !== '' && !form.dataset.memberProfilePending) {
+        form.dataset.memberProfilePending = '1';
+        fetch(`${endpoint}${endpoint.includes('?') ? '&' : '?'}id=${encodeURIComponent(key)}`, {
+          credentials: 'same-origin',
+          headers: { 'Accept': 'application/json' },
+        })
+          .then((response) => (response.ok ? response.json() : null))
+          .then((payload) => {
+            if (payload && payload.ok && payload.profile) {
+              applyProfile(payload.profile);
+              apply();
+            }
+          })
+          .catch(() => null)
+          .finally(() => {
+            delete form.dataset.memberProfilePending;
+          });
+      }
+    };
+
+    select.addEventListener('change', apply);
+    apply();
+  });
+}
+
+
+/**
+ * “Crea nuovo verbale” wizard: template → formal data → people/quorum → agenda →
+ * closure. Progressive enhancement only: without JS every panel is visible and the
+ * server validates the whole form.
+ */
+function initMinutesWizard(root = document) {
+  root.querySelectorAll('[data-minutes-wizard]').forEach((form) => {
+    if (!(form instanceof HTMLFormElement) || form.dataset.minutesWizardBound === '1') return;
+    form.dataset.minutesWizardBound = '1';
+
+    const panels = [...form.querySelectorAll('[data-minutes-panel]')];
+    if (panels.length === 0) return;
+    const stepButtons = [...form.querySelectorAll('[data-minutes-step]')];
+    const prevBtn = form.querySelector('[data-minutes-prev]');
+    const nextBtn = form.querySelector('[data-minutes-next]');
+    const submitBtn = form.querySelector('[data-minutes-submit]');
+    const progress = form.querySelector('[data-minutes-progress]');
+    const errorBox = form.querySelector('[data-minutes-error]');
+    const total = panels.length;
+    let step = 1;
+
+    const panelFor = (num) => panels.find((p) => Number(p.dataset.minutesPanel || 0) === num);
+
+    const showStep = (num) => {
+      step = Math.max(1, Math.min(total, num));
+      panels.forEach((panel) => {
+        const active = Number(panel.dataset.minutesPanel || 0) === step;
+        panel.hidden = !active;
+        panel.classList.toggle('is-active', active);
+      });
+      stepButtons.forEach((btn) => {
+        const n = Number(btn.dataset.minutesStep || 0);
+        btn.classList.toggle('is-active', n === step);
+        btn.classList.toggle('is-done', n < step);
+        btn.setAttribute('aria-current', n === step ? 'step' : 'false');
+      });
+      if (progress) progress.style.width = `${Math.round((step / total) * 100)}%`;
+      if (prevBtn instanceof HTMLElement) prevBtn.hidden = step === 1;
+      if (nextBtn instanceof HTMLElement) nextBtn.hidden = step === total;
+      if (submitBtn instanceof HTMLElement) {
+        submitBtn.hidden = step !== total;
+        submitBtn.disabled = step !== total;
+      }
+      if (errorBox instanceof HTMLElement) errorBox.hidden = true;
+      const head = panelFor(step)?.querySelector('h2, h3');
+      if (head instanceof HTMLElement) head.focus({ preventScroll: true });
+    };
+
+    const validateStep = () => {
+      const panel = panelFor(step);
+      if (!panel) return true;
+      let ok = true;
+      let firstInvalid = null;
+      panel.querySelectorAll('input, select, textarea').forEach((el) => {
+        if (!(el instanceof HTMLInputElement || el instanceof HTMLSelectElement || el instanceof HTMLTextAreaElement)) return;
+        if (el.disabled || el.hidden || el.type === 'hidden' || el.type === 'submit' || el.type === 'button') return;
+        if (el.closest('[hidden]')) return;
+        if (el.type === 'radio') {
+          const group = panel.querySelectorAll(`input[type="radio"][name="${el.name}"]`);
+          const checked = [...group].some((r) => r.checked);
+          if (el.required && !checked) {
+            ok = false;
+            firstInvalid ||= el;
+          }
+          return;
+        }
+        if (el.offsetParent === null) return;
+        if (!el.checkValidity() || (el.required && typeof el.value === 'string' && el.value.trim() === '')) {
+          ok = false;
+          firstInvalid ||= el;
+        }
+      });
+      if (!ok) {
+        if (errorBox instanceof HTMLElement) errorBox.hidden = false;
+        if (firstInvalid instanceof HTMLElement) {
+          firstInvalid.reportValidity?.();
+          firstInvalid.focus?.({ preventScroll: false });
+        }
+      } else if (errorBox instanceof HTMLElement) {
+        errorBox.hidden = true;
+      }
+      return ok;
+    };
+
+    nextBtn?.addEventListener('click', () => {
+      if (!validateStep()) return;
+      showStep(step + 1);
+    });
+    prevBtn?.addEventListener('click', () => showStep(step - 1));
+    stepButtons.forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const target = Number(btn.dataset.minutesStep || 0);
+        if (target <= step) showStep(target);
+      });
+    });
+
+
+    // Agenda: repeatable cards cloned from a <template>.
+    const agendaList = form.querySelector('[data-minutes-agenda-list]');
+    const agendaTemplate = form.querySelector('template[data-minutes-agenda-template]');
+    const renumber = () => {
+      if (!(agendaList instanceof HTMLElement)) return;
+      [...agendaList.querySelectorAll('[data-minutes-agenda-item]')].forEach((item, index) => {
+        const badge = item.querySelector('[data-minutes-agenda-index]');
+        if (badge instanceof HTMLElement) badge.textContent = String(index + 1);
+      });
+    };
+    form.querySelectorAll('[data-minutes-agenda-add]').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        if (!(agendaList instanceof HTMLElement) || !(agendaTemplate instanceof HTMLTemplateElement)) return;
+        const node = agendaTemplate.content.firstElementChild?.cloneNode(true);
+        if (!(node instanceof HTMLElement)) return;
+        agendaList.appendChild(node);
+        renumber();
+        node.querySelector('input, textarea')?.focus?.();
+      });
+    });
+    agendaList?.addEventListener('click', (event) => {
+      const btn = event.target instanceof Element ? event.target.closest('[data-minutes-agenda-remove]') : null;
+      if (!(btn instanceof HTMLElement) || !(agendaList instanceof HTMLElement)) return;
+      const item = btn.closest('[data-minutes-agenda-item]');
+      if (!item) return;
+      if (agendaList.querySelectorAll('[data-minutes-agenda-item]').length <= 1) {
+        item.querySelectorAll('input, textarea').forEach((el) => {
+          if (el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement) el.value = '';
+        });
+        item.querySelectorAll('select').forEach((el) => {
+          if (el instanceof HTMLSelectElement) el.selectedIndex = 0;
+        });
+        renumber();
+        return;
+      }
+      item.remove();
+      renumber();
+    });
+    renumber();
+
+    // “Inserisci da SOCLY”: quick data imports into the last agenda point.
+    const insertText = (text) => {
+      const clean = String(text || '').trim();
+      if (clean === '' || !(agendaList instanceof HTMLElement)) return;
+      if (agendaList.querySelectorAll('[data-minutes-agenda-item]').length === 0) {
+        const addBtn = form.querySelector('[data-minutes-agenda-add]');
+        if (addBtn instanceof HTMLElement) addBtn.click();
+      }
+      const cards = [...agendaList.querySelectorAll('[data-minutes-agenda-item]')];
+      const target = cards[cards.length - 1]?.querySelector('textarea[name="agenda_text[]"]') || null;
+      if (!(target instanceof HTMLTextAreaElement)) return;
+      target.value = target.value.trim() === '' ? clean : `${target.value.trim()}\n${clean}`;
+      target.focus();
+      target.dispatchEvent(new Event('input', { bubbles: true }));
+    };
+    form.querySelectorAll('[data-minutes-insert]').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const pending = btn.getAttribute('data-minutes-pending-text') || '';
+        const budget = btn.getAttribute('data-minutes-budget-text') || '';
+        insertText(btn.getAttribute('data-minutes-insert') === 'budget' ? budget : pending);
+      });
+    });
+
+
+    // Quorum / attendance counters (board and assembly both update live).
+    const attendanceRoots = [...form.querySelectorAll('[data-minutes-attendance]')];
+    const updateQuorum = () => {
+      attendanceRoots.forEach((attendanceRoot) => {
+        const mode = attendanceRoot.getAttribute('data-minutes-attendance') || 'board';
+        const rows = [...attendanceRoot.querySelectorAll('[data-minutes-attendee]')];
+        let present = 0;
+        let delegations = 0;
+        rows.forEach((row) => {
+          const control = row.querySelector('select, input[type="radio"]:checked');
+          const value = control instanceof HTMLSelectElement
+            ? control.value
+            : (control instanceof HTMLInputElement ? control.value : '');
+          if (value === 'present') present += 1;
+          if (value === 'delegate') delegations += 1;
+        });
+        const total = rows.length;
+        const set = (sel, value) => {
+          const el = attendanceRoot.querySelector(sel);
+          if (el instanceof HTMLElement) el.textContent = String(value);
+        };
+        set('[data-minutes-present-count]', present);
+        set('[data-minutes-total-count]', total);
+        set('[data-minutes-delegation-count]', delegations);
+        const valid = total > 0 && present + delegations >= Math.floor(total / 2) + 1;
+        const badge = attendanceRoot.querySelector('[data-minutes-quorum-state]');
+        if (badge instanceof HTMLElement) {
+          badge.textContent = valid ? (badge.dataset.labelOk || '') : (badge.dataset.labelMissing || '');
+          badge.classList.toggle('is-ok', valid);
+          badge.classList.toggle('is-missing', !valid);
+        }
+        if (mode === 'assembly') {
+          // Statutory delegation cap: warn when one delegate holds more proxies than allowed.
+          const limitInput = form.querySelector('[name="delegation_limit"]');
+          const limit = limitInput instanceof HTMLInputElement ? Math.max(0, Number(limitInput.value || 0)) : 0;
+          const counts = {};
+          attendanceRoot.querySelectorAll('[name^="member_delegate_to"]').forEach((input) => {
+            if (!(input instanceof HTMLInputElement)) return;
+            const name = String(input.value || '').trim().toLowerCase();
+            if (name === '') return;
+            counts[name] = (counts[name] || 0) + 1;
+          });
+          const over = limit > 0 && Object.values(counts).some((c) => c > limit);
+          const warn = attendanceRoot.querySelector('[data-minutes-delegation-warning]');
+          if (warn instanceof HTMLElement) warn.hidden = !over;
+        }
+      });
+    };
+    attendanceRoots.forEach((rootEl) => rootEl.addEventListener('change', updateQuorum));
+    form.querySelectorAll('[name^="member_delegate_to"]').forEach((input) => {
+      input.addEventListener('input', updateQuorum);
+    });
+    form.querySelector('[name="delegation_limit"]')?.addEventListener('input', updateQuorum);
+    updateQuorum();
+
+    // Presence mode: in-person place vs video-conference link.
+    const syncPlace = () => {
+      const value = form.querySelector('input[name="minutes_place_mode"]:checked')?.value || 'in_person';
+      form.querySelectorAll('[data-minutes-place-block]').forEach((block) => {
+        if (!(block instanceof HTMLElement)) return;
+        const wanted = block.getAttribute('data-minutes-place-block');
+        block.hidden = wanted === 'video' ? value !== 'video' : value !== 'in_person';
+      });
+    };
+    form.querySelectorAll('input[name="minutes_place_mode"]').forEach((input) => {
+      input.addEventListener('change', syncPlace);
+    });
+    syncPlace();
+
+    form.addEventListener('submit', (event) => {
+      if (event.defaultPrevented) return;
+      const current = step;
+      for (let s = 1; s <= total; s += 1) {
+        step = s;
+        if (!validateStep()) {
+          event.preventDefault();
+          showStep(s);
+          return;
+        }
+      }
+      step = current;
+    });
+
+    // Template switch: archive category/number, attendance scope and agenda defaults.
+    const readJson = (selector) => {
+      const el = form.querySelector(selector);
+      if (!(el instanceof HTMLScriptElement)) return {};
+      try {
+        return JSON.parse(el.textContent || '{}') || {};
+      } catch (err) {
+        return {};
+      }
+    };
+    const numbersMap = readJson('[data-minutes-numbers]');
+    const modesMap = readJson('[data-minutes-template-modes]');
+    const defaultsMap = readJson('[data-minutes-template-defaults]');
+    const numberInput = form.querySelector('[data-minutes-number]');
+    let numberTouched = false;
+    numberInput?.addEventListener('input', () => {
+      numberTouched = true;
+    });
+    let templateReady = false;
+
+    const fillDefaultAgenda = (items) => {
+      if (!(agendaList instanceof HTMLElement) || !(agendaTemplate instanceof HTMLTemplateElement) || !Array.isArray(items)) return;
+      if (items.length === 0) return;
+      agendaList.innerHTML = '';
+      items.forEach((title) => {
+        const node = agendaTemplate.content.firstElementChild?.cloneNode(true);
+        if (!(node instanceof HTMLElement)) return;
+        const input = node.querySelector('input[name="agenda_title[]"]');
+        if (input instanceof HTMLInputElement) input.value = String(title || '');
+        agendaList.appendChild(node);
+      });
+      renumber();
+    };
+
+    const syncTemplate = (prefill = false) => {
+      const type = form.querySelector('input[name="minutes_type"]:checked')?.value || '';
+      const mode = String(modesMap[type] || 'free');
+      form.querySelectorAll('[data-minutes-attendance-scope]').forEach((scope) => {
+        if (!(scope instanceof HTMLElement)) return;
+        scope.hidden = scope.getAttribute('data-minutes-attendance-scope') !== mode;
+      });
+      const category = mode === 'board' ? 'board_minutes' : 'minutes';
+      if (numberInput instanceof HTMLInputElement && !numberTouched && numbersMap[category]) {
+        numberInput.value = String(numbersMap[category]);
+      }
+      if (prefill && agendaList instanceof HTMLElement && agendaTemplate instanceof HTMLTemplateElement) {
+        const titles = [...agendaList.querySelectorAll('input[name="agenda_title[]"]')];
+        if (titles.every((el) => el instanceof HTMLInputElement && el.value.trim() === '')) {
+          fillDefaultAgenda(defaultsMap[type] || []);
+        }
+      }
+    };
+    form.querySelectorAll('input[name="minutes_type"]').forEach((input) => {
+      input.addEventListener('change', () => {
+        syncTemplate(templateReady);
+        templateReady = true;
+        updateQuorum();
+      });
+    });
+    syncTemplate(false);
+
+    // Quick search inside the assembly attendance list.
+    const memberSearch = form.querySelector('[data-minutes-member-search]');
+    if (memberSearch instanceof HTMLInputElement) {
+      memberSearch.addEventListener('input', () => {
+        const term = memberSearch.value.trim().toLowerCase();
+        form.querySelectorAll('[data-minutes-member-row]').forEach((row) => {
+          if (!(row instanceof HTMLElement)) return;
+          row.hidden = term !== '' && !String(row.dataset.search || '').includes(term);
+        });
+      });
+    }
+
+    showStep(1);
+  });
+}

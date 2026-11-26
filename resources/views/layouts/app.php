@@ -564,6 +564,19 @@ $showVersionFooter = true;
             data-resource-busy-someone="<?= e(__('resource_busy.someone')) ?>"
             data-resource-busy-started-by="<?= e(__('resource_busy.started_by', ['name' => ':name', 'time' => ':time'])) ?>"
             data-resource-busy-message="<?= e(__('resource_busy.message')) ?>"
+            data-resource-busy-heading="<?= e(__('resource_busy.heading')) ?>"
+            data-resource-busy-hint="<?= e(__('resource_busy.hint')) ?>"
+            data-resource-busy-retry="<?= e(__('resource_busy.retry')) ?>"
+            data-resource-busy-kicker="<?= e(__('resource_busy.pause_kicker')) ?>"
+            data-resource-busy-pause-text="<?= e(__('resource_busy.pause_text')) ?>"
+            data-resource-busy-reassure="<?= e(__('resource_busy.pause_reassure')) ?>"
+            data-resource-busy-game-title="<?= e(__('resource_busy.game_title')) ?>"
+            data-resource-busy-game-hint="<?= e(__('resource_busy.game_hint')) ?>"
+            data-resource-busy-game-score="<?= e(__('resource_busy.game_score', ['count' => ':count'])) ?>"
+            data-resource-busy-game-win="<?= e(__('resource_busy.game_win')) ?>"
+            data-resource-busy-game-reset="<?= e(__('resource_busy.game_reset')) ?>"
+            data-resource-busy-game-aria="<?= e(__('resource_busy.game_aria')) ?>"
+            data-resource-busy-game-bubble="<?= e(__('resource_busy.game_bubble')) ?>"
             aria-live="polite">
             <span class="visually-hidden"><?= e(__('presence.online_label')) ?></span>
             <div class="presence-avatars" data-presence-avatars></div>
@@ -659,6 +672,7 @@ $showVersionFooter = true;
 <main class="main"><?= $content ?></main>
 <?php endif; ?>
 <script src="<?= e(asset('js/confirm.js')) ?>?v=<?= e((string) (@filemtime(base_path('public/assets/js/confirm.js')) ?: time())) ?>"></script>
+<script src="<?= e(asset('js/pause-game.js')) ?>?v=<?= e((string) (@filemtime(base_path('public/assets/js/pause-game.js')) ?: time())) ?>"></script>
 <script src="<?= e(asset('js/app.js')) ?>?v=<?= e((string) (@filemtime(base_path('public/assets/js/app.js')) ?: time())) ?>"></script>
 </body>
 </html>

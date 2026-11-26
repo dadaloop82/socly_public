@@ -30,6 +30,7 @@ use Socly\Core\View;
 use Socly\Services\DocumentService;
 use Socly\Services\FileRepositoryService;
 use Socly\Services\MemberService;
+use Socly\Services\MinutesService;
 
 final class DocumentsController extends BaseController
 {
@@ -37,7 +38,8 @@ final class DocumentsController extends BaseController
         View $view,
         private readonly DocumentService $documents,
         private readonly MemberService $members,
-        private readonly FileRepositoryService $files
+        private readonly FileRepositoryService $files,
+        private readonly MinutesService $minutes
     ) {
         parent::__construct($view);
     }
@@ -75,10 +77,74 @@ final class DocumentsController extends BaseController
         ]);
     }
 
+    /** Final minutes are immutable: corrections require a new minute. */
+    private function minutesDocumentLocked(array $doc): bool
+    {
+        return (string) ($doc['source_ref'] ?? '') === 'minutes'
+            && in_array((string) ($doc['status'] ?? ''), ['approved', 'signed', 'archived'], true);
+    }
+
+    /** “Crea nuovo verbale”: template wizard with data already stored in SOCLY. */
+    public function minutesCreate(Request $request): void
+    {
+        require_component('documents');
+        $templates = $this->minutes->templates();
+        $year = (int) date('Y');
+        $numbers = [];
+        foreach (MinutesService::TEMPLATES as $config) {
+            $category = (string) $config['category'];
+            if (!isset($numbers[$category])) {
+                $numbers[$category] = $this->minutes->nextNumber($category, date('Y-m-d'));
+            }
+        }
+        $pending = $this->minutes->pendingMemberLabels();
+        $budget = $this->minutes->budgetSummary($year);
+        $pendingText = $pending !== []
+            ? (string) __('documents.minutes_pending_prefix') . ' ' . implode(', ', $pending) . '.'
+            : '';
+        $budgetText = $budget !== null
+            ? (string) __('documents.minutes_budget_text', [
+                'year' => (string) $budget['year'],
+                'income' => number_format($budget['income'], 2, ',', '.'),
+                'expense' => number_format($budget['expense'], 2, ',', '.'),
+                'need' => number_format($budget['need'], 2, ',', '.'),
+            ])
+            : '';
+
+        $this->render('documents/minutes', [
+            'title' => __('documents.minutes_wizard_title'),
+            'templates' => $templates,
+            'people' => $this->minutes->peopleOptions(),
+            'board_members' => $this->minutes->boardMembers(),
+            'members_list' => $this->minutes->activeMembers(),
+            'numbers' => $numbers,
+            'default_date' => old('minutes_date', date('Y-m-d')),
+            'default_number' => old('minutes_number', (string) ($numbers['board_minutes'] ?? sprintf('01/%s', date('Y')))),
+            'default_place' => $this->minutes->defaultPlace(),
+            'pending_text' => $pendingText,
+            'budget_text' => $budgetText,
+        ]);
+    }
+
+    /** Saves the wizard as an archived document with its generated PDF. */
+    public function minutesStore(Request $request): void
+    {
+        require_component('documents');
+        $input = $request->all();
+        $result = $this->minutes->save($input, $request->ip(), (int) (auth_user()['id'] ?? 0));
+        if (empty($result['ok'])) {
+            $this->flash('errors', is_array($result['errors'] ?? null) ? $result['errors'] : []);
+            $this->rememberOld($input);
+            redirect('/documents/minutes/create');
+        }
+        $this->clearOld();
+        $this->flash('success', __('documents.minutes_created'));
+        redirect('/documents/' . (int) ($result['id'] ?? 0));
+    }
+
     public function create(Request $request): void
     {
         require_component('documents');
-        // The category can come from the "Upload minutes" link in the Social Books block.
         $categories = $this->documents->categoryOptions();
         $category = trim((string) $request->input('category', ''));
         if ($category !== '' && !in_array($category, array_column($categories, 'key'), true)) {
@@ -112,6 +178,10 @@ final class DocumentsController extends BaseController
             http_response_code(404);
             $this->flash('errors', ['document' => __('errors.404')]);
             redirect('/documents');
+        }
+        if ($this->minutesDocumentLocked($doc)) {
+            $this->flash('errors', ['document' => __('documents.minutes_locked')]);
+            redirect('/documents/' . (int) $id);
         }
         $categories = $this->documents->categoryOptions();
         $catKey = trim((string) ($doc['category'] ?? ''));
@@ -174,6 +244,11 @@ final class DocumentsController extends BaseController
     public function update(Request $request, string $id): void
     {
         require_component('documents');
+        $existing = $this->documents->find((int) $id);
+        if ($existing !== null && $this->minutesDocumentLocked($existing)) {
+            $this->flash('errors', ['document' => __('documents.minutes_locked')]);
+            redirect('/documents/' . (int) $id);
+        }
         $file = $_FILES['document_file'] ?? null;
         $result = $this->documents->update(
             (int) $id,

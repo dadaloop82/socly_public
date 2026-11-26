@@ -249,6 +249,8 @@ $router->post('/deadlines/{id}/done', [DeadlinesController::class, 'done'], 'dea
 $router->post('/deadlines/{id}/renew', [DeadlinesController::class, 'renew'], 'deadlines.manage', ['mw.locale', 'mw.install', 'mw.auth', 'mw.csrf']);
 
 $router->get('/documents', [DocumentsController::class, 'index'], 'documents.view', ['mw.locale', 'mw.install', 'mw.auth']);
+$router->get('/documents/minutes/create', [DocumentsController::class, 'minutesCreate'], 'documents.manage', ['mw.locale', 'mw.install', 'mw.auth']);
+$router->post('/documents/minutes', [DocumentsController::class, 'minutesStore'], 'documents.manage', ['mw.locale', 'mw.install', 'mw.auth', 'mw.csrf']);
 $router->get('/documents/create', [DocumentsController::class, 'create'], 'documents.manage', ['mw.locale', 'mw.install', 'mw.auth']);
 // Repository picker: JSON list of the files already uploaded in a section (declared before {id}).
 $router->get('/documents/picker', [DocumentsController::class, 'picker'], 'documents.view', ['mw.locale', 'mw.install', 'mw.auth']);
@@ -322,6 +324,7 @@ $router->post('/settings/reset-user-data', [SettingsController::class, 'resetUse
 
 $router->get('/users', [UserController::class, 'index'], 'users.manage', ['mw.locale', 'mw.install', 'mw.auth']);
 $router->get('/users/create', [UserController::class, 'create'], 'users.manage', ['mw.locale', 'mw.install', 'mw.auth']);
+$router->get('/users/member-profile', [UserController::class, 'memberProfile'], 'users.manage', ['mw.locale', 'mw.install', 'mw.auth']);
 $router->post('/users', [UserController::class, 'store'], 'users.manage', ['mw.locale', 'mw.install', 'mw.auth', 'mw.csrf']);
 $router->get('/users/{id}/edit', [UserController::class, 'edit'], 'users.manage', ['mw.locale', 'mw.install', 'mw.auth']);
 $router->post('/users/{id}', [UserController::class, 'update'], 'users.manage', ['mw.locale', 'mw.install', 'mw.auth', 'mw.csrf']);

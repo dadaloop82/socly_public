@@ -113,40 +113,49 @@ foreach ($documents as $doc) {
     }
     $groups[$key][] = $doc;
 }
-// Estratti conto: always newest period (year/month) first, regardless of upload order.
-if (($groups['balance'] ?? []) !== []) {
-    usort($groups['balance'], static function (array $a, array $b): int {
-        $yearA = (int) ($a['reference_year'] ?? 0);
-        $yearB = (int) ($b['reference_year'] ?? 0);
-        if ($yearA < 1900) {
-            $yearA = (int) substr((string) ($a['document_date'] ?? $a['created_at'] ?? ''), 0, 4);
-        }
-        if ($yearB < 1900) {
-            $yearB = (int) substr((string) ($b['document_date'] ?? $b['created_at'] ?? ''), 0, 4);
-        }
-        if ($yearA !== $yearB) {
-            return $yearB <=> $yearA;
-        }
-        $monthA = (int) ($a['reference_month_to'] ?? 0);
-        if ($monthA < 1 || $monthA > 12) {
-            $monthA = (int) ($a['reference_month_from'] ?? 0);
-        }
-        if ($monthA < 1 || $monthA > 12) {
-            $monthA = (int) substr((string) ($a['document_date'] ?? $a['created_at'] ?? ''), 5, 2);
-        }
-        $monthB = (int) ($b['reference_month_to'] ?? 0);
-        if ($monthB < 1 || $monthB > 12) {
-            $monthB = (int) ($b['reference_month_from'] ?? 0);
-        }
-        if ($monthB < 1 || $monthB > 12) {
-            $monthB = (int) substr((string) ($b['document_date'] ?? $b['created_at'] ?? ''), 5, 2);
-        }
-        if ($monthA !== $monthB) {
-            return $monthB <=> $monthA;
-        }
+// Every archive section is newest-first: reference period (bank excerpts), then
+// document date, then upload. Within the same day the last inserted wins.
+$newestFirst = static function (array $a, array $b): int {
+    $yearA = (int) ($a['reference_year'] ?? 0);
+    $yearB = (int) ($b['reference_year'] ?? 0);
+    if ($yearA < 1900) {
+        $yearA = (int) substr((string) ($a['document_date'] ?? $a['created_at'] ?? ''), 0, 4);
+    }
+    if ($yearB < 1900) {
+        $yearB = (int) substr((string) ($b['document_date'] ?? $b['created_at'] ?? ''), 0, 4);
+    }
+    if ($yearA !== $yearB) {
+        return $yearB <=> $yearA;
+    }
+    $monthA = (int) ($a['reference_month_to'] ?? 0);
+    if ($monthA < 1 || $monthA > 12) {
+        $monthA = (int) ($a['reference_month_from'] ?? 0);
+    }
+    if ($monthA < 1 || $monthA > 12) {
+        $monthA = (int) substr((string) ($a['document_date'] ?? $a['created_at'] ?? ''), 5, 2);
+    }
+    $monthB = (int) ($b['reference_month_to'] ?? 0);
+    if ($monthB < 1 || $monthB > 12) {
+        $monthB = (int) ($b['reference_month_from'] ?? 0);
+    }
+    if ($monthB < 1 || $monthB > 12) {
+        $monthB = (int) substr((string) ($b['document_date'] ?? $b['created_at'] ?? ''), 5, 2);
+    }
+    if ($monthA !== $monthB) {
+        return $monthB <=> $monthA;
+    }
+    $dateA = (string) ($a['document_date'] ?? $a['created_at'] ?? '');
+    $dateB = (string) ($b['document_date'] ?? $b['created_at'] ?? '');
+    if ($dateA !== $dateB) {
+        return strcmp($dateB, $dateA);
+    }
 
-        return ((int) ($b['id'] ?? 0)) <=> ((int) ($a['id'] ?? 0));
-    });
+    return ((int) ($b['id'] ?? 0)) <=> ((int) ($a['id'] ?? 0));
+};
+foreach ($groups as $groupKey => $groupRows) {
+    if ($groupRows !== []) {
+        usort($groups[$groupKey], $newestFirst);
+    }
 }
 ?>
 <div class="page-header">
@@ -188,7 +197,10 @@ if (($groups['balance'] ?? []) !== []) {
             ><?= e(__('documents.repair_excerpts')) ?></button>
         <?php endif; ?>
         <?php if ($canManage): ?>
-            <a class="btn<?= ($documents === [] && !$hasActiveFilters) ? ' is-first-cta' : '' ?>" href="<?= e(url('/documents/create')) ?>"><?= e(__('documents.add')) ?></a>
+            <a class="btn<?= ($documents === [] && !$hasActiveFilters) ? ' is-first-cta' : '' ?>" href="<?= e(url('/documents/minutes/create')) ?>"><?= e(__('documents.minutes_create')) ?></a>
+        <?php endif; ?>
+        <?php if ($canManage): ?>
+            <a class="btn btn-ghost" href="<?= e(url('/documents/create')) ?>"><?= e(__('documents.add')) ?></a>
         <?php endif; ?>
     </div>
 </div>
@@ -406,7 +418,28 @@ $repoSizeLabel = $repoSize >= 1048576
                             </thead>
                             <tbody>
 
-                            <?php foreach ($groupItems as $doc): ?>
+                            <?php
+                            // Dense sections stay readable: newest 5 first, the rest behind “e altri X”.
+                            $visibleLimit = 5;
+                            $hiddenCount = max(0, count($groupItems) - $visibleLimit);
+                            ?>
+                            <?php foreach ($groupItems as $docIndex => $doc): ?>
+                                <?php $isExtra = $docIndex >= $visibleLimit; ?>
+                                <?php if ($docIndex === $visibleLimit && $hiddenCount > 0): ?>
+                                    <?php $moreLabel = (string) __('documents.more_items', ['count' => (string) $hiddenCount]); ?>
+                                    <tr class="documents-more-row">
+                                        <td colspan="7">
+                                            <button
+                                                type="button"
+                                                class="btn btn-ghost btn-sm documents-more-toggle"
+                                                data-documents-more
+                                                aria-expanded="false"
+                                                data-label-more="<?= e($moreLabel) ?>"
+                                                data-label-less="<?= e(__('documents.show_less')) ?>"
+                                            ><?= e($moreLabel) ?></button>
+                                        </td>
+                                    </tr>
+                                <?php endif; ?>
                                 <?php
                                 $docId = (int) ($doc['id'] ?? 0);
                                 $detailUrl = url('/documents/' . $docId);
@@ -426,10 +459,13 @@ $repoSizeLabel = $repoSize >= 1048576
                                 $expires = trim((string) ($doc['expires_at'] ?? ''));
                                 $expiresPast = $expires !== '' && $expires < $today;
                                 $expiresSoon = $expires !== '' && !$expiresPast && $expires <= $soon;
+                                $docLockedMinutes = (string) ($doc['source_ref'] ?? '') === 'minutes'
+                                    && in_array($docStatus, ['approved', 'signed', 'archived'], true);
                                 ?>
                                 <tr
                                     class="documents-row doc-row-editable"
                                     data-href="<?= e($detailUrl) ?>"
+                                    <?= $isExtra ? 'data-documents-extra hidden' : '' ?>
                                     tabindex="0"
                                     role="link"
                                     aria-label="<?= e(__('documents.view') . ': ' . (string) ($doc['title'] ?? '')) ?>"
@@ -502,7 +538,7 @@ $repoSizeLabel = $repoSize >= 1048576
                                             [
                                                 'icon' => 'edit',
                                                 'label' => __('documents.edit'),
-                                                'show' => $canManage,
+                                                'show' => $canManage && !$docLockedMinutes,
                                                 'href' => url('/documents/' . $docId . '/edit'),
                                             ],
                                         ]) ?>
