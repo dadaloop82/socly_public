@@ -16509,3 +16509,82 @@ select.is-remote-choice {
   .master-console-log { grid-template-columns: 1fr; gap: .05rem; }
   .master-console-user { grid-template-columns: 1fr; gap: .05rem; }
 }
+
+/* ---------------------------------------------------------------------------
+   Session expiry warning (last 30 seconds: ring + countdown + optional chime)
+   --------------------------------------------------------------------------- */
+.session-warning {
+  position: fixed;
+  right: 1rem;
+  bottom: 1rem;
+  z-index: 95;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: .8rem;
+  max-width: 27rem;
+  padding: .8rem .95rem;
+  border-radius: 16px;
+  border: 1px solid color-mix(in srgb, var(--danger, #A61B1B) 28%, #ffffff);
+  background: #ffffff;
+  box-shadow: 0 18px 40px rgba(20, 42, 40, .18), 0 2px 6px rgba(20, 42, 40, .08);
+}
+.session-warning[hidden] { display: none !important; }
+.session-warning-ring {
+  position: relative;
+  width: 2.9rem;
+  height: 2.9rem;
+  flex: 0 0 auto;
+}
+.session-warning-ring svg {
+  width: 100%;
+  height: 100%;
+  transform: rotate(-90deg);
+}
+.session-warning-track {
+  fill: none;
+  stroke: color-mix(in srgb, var(--danger, #A61B1B) 16%, #ffffff);
+  stroke-width: 4;
+}
+.session-warning-progress {
+  fill: none;
+  stroke: var(--danger, #A61B1B);
+  stroke-width: 4;
+  stroke-linecap: round;
+  transition: stroke-dashoffset .35s linear;
+}
+.session-warning-count {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  font-weight: 800;
+  font-size: .92rem;
+  font-variant-numeric: tabular-nums;
+  color: var(--danger, #A61B1B);
+}
+.session-warning-copy strong {
+  display: block;
+  font-size: .9rem;
+  line-height: 1.25;
+}
+.session-warning-copy p {
+  margin: .15rem 0 0;
+  font-size: .78rem;
+  line-height: 1.35;
+  color: var(--muted);
+}
+.session-warning-stay { white-space: nowrap; }
+@media (max-width: 640px) {
+  .session-warning {
+    left: .75rem;
+    right: .75rem;
+    bottom: .75rem;
+    max-width: none;
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+  .session-warning .session-warning-stay { grid-column: 1 / -1; justify-self: stretch; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .session-warning-progress { transition: none; }
+}

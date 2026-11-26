@@ -10,6 +10,10 @@ every 100 patches bump the series, and each bump is published to this rep come o
 
 ### Added
 
+- Session expiry warning: 30 seconds before the idle timeout a card with a countdown ring and a soft
+  chime says the session is about to end, with a “Stay signed in” button that renews it in one click.
+  The idle timeout is configurable with `SESSION_IDLE_MINUTES` (never below 15 minutes) and long jobs
+  (statement audit, imports, in-app update) keep the session alive without ever triggering it.
 - Maintenance console: when the platform **SuperAdmin** signs in, the dashboard opens with a technical
   card (“Benvenuto Socly SuperAdmin”) showing who is connected, when the session started, the previous
   sign-in, the last 3 operators who signed in (name + username/email, time and IP), and the last 5

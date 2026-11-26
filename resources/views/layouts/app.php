@@ -66,6 +66,12 @@ foreach ($pluginMenu as $item) {
     <?= view_partial('partials/confirm_i18n_meta') ?>
     <meta name="session-ping-url" content="<?= e(url('/session/ping')) ?>">
     <meta name="login-url" content="<?= e(url('/login')) ?>">
+    <meta name="session-idle-seconds" content="<?= (int) session_idle_seconds() ?>">
+    <meta name="session-warning-i18n" content="<?= e((string) json_encode([
+        'title' => (string) __('session_warning.title'),
+        'text' => (string) __('session_warning.text'),
+        'stay' => (string) __('session_warning.stay'),
+    ], JSON_UNESCAPED_UNICODE)) ?>">
     <meta name="busy-wait-title" content="<?= e(__('common.busy_title')) ?>">
     <meta name="busy-wait-text" content="<?= e(__('common.busy_text')) ?>">
     <meta name="busy-messages" content="<?= e((string) json_encode([

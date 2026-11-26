@@ -2154,6 +2154,11 @@ return [
         'required_for_otp' => 'E-Mail-OTP erfordert konfiguriertes und geprüftes SMTP.',
         'required_short' => 'braucht SMTP',
     ],
+    'session_warning' => [
+        'title' => 'Deine Sitzung läuft bald ab',
+        'text' => 'Du wirst in :seconds Sekunden wegen Inaktivität abgemeldet.',
+        'stay' => 'Angemeldet bleiben',
+    ],
     'master_console' => [
         'login_title' => 'Willkommen Socly SuperAdmin',
         'login_text' => 'Wartungskonto — nur für den Plattform-Eigentümer.',

@@ -34,7 +34,7 @@ use Socly\Services\ResourceBusyLock;
  */
 final class SessionIdleMiddleware
 {
-    /** Idle timeout: no authenticated request / activity for this long → login. */
+    /** Default idle timeout (15 minutes); runtime value comes from session_idle_seconds(). */
     public const IDLE_SECONDS = 900; // 15 minutes
 
     public function __construct(
@@ -64,7 +64,8 @@ final class SessionIdleMiddleware
         }
 
         $last = (int) ($_SESSION['last_activity'] ?? 0);
-        if ($last > 0 && ($now - $last) > self::IDLE_SECONDS) {
+        $idleSeconds = function_exists('session_idle_seconds') ? session_idle_seconds() : self::IDLE_SECONDS;
+        if ($last > 0 && ($now - $last) > $idleSeconds) {
             // Close the session and hand the login page a notice stored in a session
             // the browser actually owns (fresh id + fresh cookie).
             $this->auth->terminateSessionWithNotice($request->ip(), __('auth.session_expired'));

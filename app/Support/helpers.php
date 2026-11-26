@@ -237,6 +237,29 @@ if (!function_exists('redirect')) {
     }
 }
 
+if (!function_exists('session_idle_seconds')) {
+    /**
+     * Idle timeout of an authenticated session, in seconds.
+     *
+     * Configurable with SESSION_IDLE_MINUTES, but never below 15 minutes and never
+     * absurdly long: the operator needs time to read a page or answer the phone
+     * without being thrown back to the login screen. Heavy jobs are exempt (see
+     * SessionIdleMiddleware::holdsHeavyJobLock() and the JS keep-alive).
+     */
+    function session_idle_seconds(): int
+    {
+        $minutes = (int) ($_ENV['SESSION_IDLE_MINUTES'] ?? 0);
+        if ($minutes < 15) {
+            $minutes = 15;
+        }
+        if ($minutes > 720) {
+            $minutes = 720;
+        }
+
+        return $minutes * 60;
+    }
+}
+
 if (!function_exists('setup_eta_reassure_line')) {
     /** Setup ETA reassurance (~15s/step). With $html, duration is highlighted (escaped). */
     function setup_eta_reassure_line(int $steps, bool $html = false): string

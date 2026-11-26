@@ -2154,6 +2154,11 @@ return [
         'required_for_otp' => 'Email OTP requires configured and verified SMTP.',
         'required_short' => 'needs SMTP',
     ],
+    'session_warning' => [
+        'title' => 'Your session is about to expire',
+        'text' => 'You will be signed out in :seconds seconds due to inactivity.',
+        'stay' => 'Stay signed in',
+    ],
     'master_console' => [
         'login_title' => 'Welcome Socly SuperAdmin',
         'login_text' => 'Maintenance account — reserved to the platform owner.',

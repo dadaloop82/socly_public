@@ -3595,15 +3595,30 @@ function initSessionHeartbeat() {
   const pingUrl = document.querySelector('meta[name="session-ping-url"]')?.content;
   const csrf = document.querySelector('meta[name="csrf-token"]')?.content;
   const loginUrl = document.querySelector('meta[name="login-url"]')?.content || '/login';
-  // Must match SessionIdleMiddleware::IDLE_SECONDS (15 minutes).
-  const IDLE_MS = 15 * 60 * 1000;
+  // Server-side idle window (SESSION_IDLE_MINUTES, never below 15 minutes).
+  const idleMeta = Number(document.querySelector('meta[name="session-idle-seconds"]')?.content || 0);
+  const IDLE_MS = Math.max(15 * 60 * 1000, (idleMeta > 0 ? idleMeta : 900) * 1000);
+  // Warn (card + chime + countdown) this long before the session dies.
+  const WARN_MS = 30 * 1000;
   const BUMP_THROTTLE_MS = 20000;
   if (!pingUrl || !csrf) return;
+
+  const warningLabels = (() => {
+    try {
+      const raw = document.querySelector('meta[name="session-warning-i18n"]')?.content || '';
+      return JSON.parse(raw) || {};
+    } catch {
+      return {};
+    }
+  })();
 
   let lastActivity = Date.now();
   let lastBump = 0;
   let redirecting = false;
   let forcedKeepAlive = 0;
+  let warning = null;
+  let warningSeconds = 0;
+  let audio = null;
 
   const goExpired = () => {
     if (redirecting) return;
@@ -3623,6 +3638,121 @@ function initSessionHeartbeat() {
     || document.documentElement.classList.contains('is-importing')
     || !!document.querySelector('.update-overlay:not([hidden]), [data-import-progress]:not([hidden]), [data-bsi-busy]:not([hidden]), [data-bsi-bulk-overlay]:not([hidden])')
   );
+
+  // --- “Your session is about to expire”: card + countdown ring + soft chime -----
+  // Web Audio (no asset, no dependency). The context is created/resumed on the
+  // first user gesture, which is how the operator got here in the first place.
+  const ensureAudio = () => {
+    if (audio !== null) return audio;
+    const Ctx = window.AudioContext || window.webkitAudioContext;
+    if (!Ctx) {
+      audio = false;
+      return false;
+    }
+    try {
+      audio = new Ctx();
+    } catch {
+      audio = false;
+    }
+    return audio;
+  };
+
+  const tone = (ctx, freq, start, duration, volume) => {
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.type = 'sine';
+    osc.frequency.value = freq;
+    gain.gain.setValueAtTime(0.0001, start);
+    gain.gain.linearRampToValueAtTime(volume, start + 0.02);
+    gain.gain.exponentialRampToValueAtTime(0.0001, start + duration);
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.start(start);
+    osc.stop(start + duration + 0.03);
+  };
+
+  const chime = (urgent) => {
+    const ctx = ensureAudio();
+    if (!ctx || !ctx.createOscillator) return;
+    if (ctx.state === 'suspended') ctx.resume().catch(() => {});
+    try {
+      const at = ctx.currentTime + 0.01;
+      if (urgent) {
+        // Two descending notes: unmistakable, not harsh.
+        tone(ctx, 880, at, 0.22, 0.05);
+        tone(ctx, 660, at + 0.24, 0.34, 0.045);
+      } else {
+        tone(ctx, 1040, at, 0.09, 0.03);
+      }
+    } catch {
+      // Audio is a nicety: never break the countdown.
+    }
+  };
+
+  const staySignedIn = () => {
+    lastActivity = Date.now();
+    hideWarning();
+    bump({ force: true });
+  };
+
+  const buildWarning = () => {
+    if (warning) return warning;
+    warning = document.createElement('div');
+    warning.className = 'session-warning';
+    warning.hidden = true;
+    warning.setAttribute('role', 'alertdialog');
+    warning.setAttribute('aria-labelledby', 'session-warning-title');
+    warning.innerHTML = [
+      '<div class="session-warning-ring" aria-hidden="true">',
+      '<svg viewBox="0 0 44 44" focusable="false">',
+      '<circle class="session-warning-track" cx="22" cy="22" r="18"></circle>',
+      '<circle class="session-warning-progress" cx="22" cy="22" r="18"></circle>',
+      '</svg>',
+      '<span class="session-warning-count">30</span>',
+      '</div>',
+      '<div class="session-warning-copy">',
+      '<strong id="session-warning-title"></strong>',
+      '<p class="session-warning-text"></p>',
+      '</div>',
+      '<button type="button" class="btn btn-sm session-warning-stay"></button>',
+    ].join('');
+    warning.querySelector('.session-warning-copy strong').textContent = String(warningLabels.title || '');
+    warning.querySelector('.session-warning-text').textContent = String(warningLabels.text || '');
+    warning.querySelector('.session-warning-stay').textContent = String(warningLabels.stay || '');
+    const progress = warning.querySelector('.session-warning-progress');
+    progress.style.strokeDasharray = String(2 * Math.PI * 18);
+    progress.style.strokeDashoffset = '0';
+    warning.querySelector('.session-warning-stay').addEventListener('click', staySignedIn);
+    document.body.appendChild(warning);
+    return warning;
+  };
+
+  const hideWarning = () => {
+    if (!warning || warning.hidden) return;
+    warning.hidden = true;
+    warningSeconds = 0;
+    document.documentElement.classList.remove('is-session-warning');
+  };
+
+  const showWarning = (seconds) => {
+    const card = buildWarning();
+    if (card.hidden) {
+      card.hidden = false;
+      document.documentElement.classList.add('is-session-warning');
+      chime(true);
+    }
+    if (seconds === warningSeconds) return;
+    warningSeconds = seconds;
+    const total = Math.max(1, Math.round(WARN_MS / 1000));
+    const clamped = Math.max(0, Math.min(total, seconds));
+    card.querySelector('.session-warning-count').textContent = String(clamped);
+    card.querySelector('.session-warning-text').textContent = String(warningLabels.text || '')
+      .replace(':seconds', String(clamped));
+    const progress = card.querySelector('.session-warning-progress');
+    progress.style.strokeDashoffset = String((2 * Math.PI * 18) * (1 - clamped / total));
+    // Soft tick in the last seconds, once per second.
+    if (clamped <= 5 && clamped > 0) chime(false);
+  };
 
   const bump = (opts = {}) => {
     const force = !!opts.force || isHeavyJob();
@@ -3655,7 +3785,9 @@ function initSessionHeartbeat() {
 
   const onActivity = () => {
     if (document.visibilityState === 'hidden' && !isHeavyJob()) return;
+    ensureAudio(); // unlock Web Audio on the first real gesture
     lastActivity = Date.now();
+    hideWarning();
     bump();
   };
 
@@ -3690,16 +3822,28 @@ function initSessionHeartbeat() {
     onActivity();
   });
 
-  // Client-side idle watch: redirect even if the user never navigates again — but never
-  // while an in-app heavy job is still on screen.
+  // Client-side idle watch, 1 s tick so the countdown is smooth: in the last
+  // 30 seconds show the card + chime, then redirect. Heavy jobs never expire.
   setInterval(() => {
+    if (redirecting) return;
     if (isHeavyJob()) {
       lastActivity = Date.now();
+      hideWarning();
       bump({ force: true });
       return;
     }
-    if (idleFor() >= IDLE_MS) goExpired();
-  }, 15000);
+    const remaining = IDLE_MS - idleFor();
+    if (remaining <= 0) {
+      hideWarning();
+      goExpired();
+      return;
+    }
+    if (remaining <= WARN_MS && document.visibilityState !== 'hidden') {
+      showWarning(Math.ceil(remaining / 1000));
+    } else {
+      hideWarning();
+    }
+  }, 1000);
 }
 
 function brandNormalizeHex(value, fallback = '') {

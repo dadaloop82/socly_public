@@ -198,6 +198,12 @@ if ($isIsolatedInstance) {
 }
 session_save_path($sessionPath);
 session_name($sessionCookieName);
+// PHP drops the session file after gc_maxlifetime: keep it above the idle window
+// (plus a margin) so raising SESSION_IDLE_MINUTES cannot log people out early.
+$idleWindow = function_exists('session_idle_seconds') ? session_idle_seconds() : 900;
+if ((int) ini_get('session.gc_maxlifetime') < $idleWindow + 3600) {
+    ini_set('session.gc_maxlifetime', (string) ($idleWindow + 3600));
+}
 session_set_cookie_params([
     'lifetime' => ((int) ($_ENV['SESSION_LIFETIME'] ?? 120)) * 60,
     'path' => $sessionCookiePath,

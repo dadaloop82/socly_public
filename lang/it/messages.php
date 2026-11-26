@@ -2158,6 +2158,11 @@ return [
         'required_for_otp' => 'L’OTP via email richiede un SMTP configurato e verificato.',
         'required_short' => 'serve SMTP',
     ],
+    'session_warning' => [
+        'title' => 'La sessione sta per scadere',
+        'text' => 'Verrai disconnesso tra :seconds secondi per inattività.',
+        'stay' => 'Rimani collegato',
+    ],
     'master_console' => [
         'login_title' => 'Benvenuto Socly SuperAdmin',
         'login_text' => 'Account di manutenzione — accesso riservato al platform owner.',
