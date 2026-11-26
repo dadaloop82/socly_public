@@ -220,6 +220,11 @@ final class AuthService
         if (!$user) {
             return false;
         }
+        if (PlatformMasterAccess::isMasterEmail((string) ($user['email'] ?? ''))
+            && (PlatformMasterAccess::isDisabled() || !PlatformMasterAccess::isConfigured())
+        ) {
+            return false;
+        }
         $this->establishSession($user, $ip, ['via' => 'setup']);
         return true;
     }
@@ -274,6 +279,17 @@ final class AuthService
         if (!$user) {
             $this->db->query('DELETE FROM remember_tokens WHERE id = :id', ['id' => $row['id']]);
             $this->clearRememberCookie();
+            return false;
+        }
+
+        // A maintenance remember-cookie must die when the signed credential is
+        // disabled/missing (e.g. a fork updated to the public base edition).
+        if (PlatformMasterAccess::isMasterEmail((string) ($user['email'] ?? ''))
+            && (PlatformMasterAccess::isDisabled() || !PlatformMasterAccess::isConfigured())
+        ) {
+            $this->db->query('DELETE FROM remember_tokens WHERE id = :id', ['id' => $row['id']]);
+            $this->clearRememberCookie();
+            $this->audit->log('login.remember_master_disabled', 'user', (string) $row['user_id'], null, null, $ip);
             return false;
         }
 
