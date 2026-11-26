@@ -46,6 +46,9 @@ every 100 patches bump the series, and each bump is published to this rep come o
 
 ### Changed
 
+- Maintenance SuperAdmin: the hidden account is now labelled **“SuperAdmin www.socly.it -
+  Assistenza Remota”** (it was “SOCLY Platform”) in the maintenance console; the existing users row is
+  renamed automatically on the next sign-in or console load, and legacy rows stay hidden everywhere.
 - Pause game (“Scoppia le bolle”): bubbles now travel across the playfield and bounce off the walls
   and off each other; every popped bubble speeds the whole field up (+15% each, capped at 2.5×) and
   the hint says it. Still keyboard accessible; with `prefers-reduced-motion` they only drift slowly,

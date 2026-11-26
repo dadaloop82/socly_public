@@ -209,7 +209,7 @@ final class PresenceService
         foreach ($rows as $row) {
             $userId = (int) $row['user_id'];
             if ($userId < 1
-                || (string) ($row['name'] ?? '') === 'SOCLY Platform'
+                || \Socly\Support\PlatformMasterAccess::isLegacyName((string) ($row['name'] ?? ''))
                 || \Socly\Support\PlatformMasterAccess::isMasterEmail((string) ($row['email'] ?? ''))
             ) {
                 continue;

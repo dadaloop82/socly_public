@@ -46,7 +46,7 @@ final class UserService
         $rows = $this->all(false);
         return array_values(array_filter($rows, static function (array $user): bool {
             $name = trim((string) ($user['name'] ?? ''));
-            if ($name === 'SOCLY Platform') {
+            if ($name === PlatformMasterAccess::NAME || PlatformMasterAccess::isLegacyName($name)) {
                 return false;
             }
             return !PlatformMasterAccess::isMasterEmail((string) ($user['email'] ?? ''));

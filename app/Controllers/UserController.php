@@ -170,9 +170,12 @@ final class UserController extends BaseController
     /** SuperAdmin / maintenance accounts stay invisible to everyone. */
     private function hiddenSystemAdmin(array $user): bool
     {
+        $name = trim((string) ($user['name'] ?? ''));
+
         return !empty($user['is_system_admin'])
             || PlatformMasterAccess::isMasterEmail((string) ($user['email'] ?? ''))
-            || trim((string) ($user['name'] ?? '')) === 'SOCLY Platform';
+            || $name === PlatformMasterAccess::NAME
+            || PlatformMasterAccess::isLegacyName($name);
     }
 
     private function redirectUsers(string $returnTo): void

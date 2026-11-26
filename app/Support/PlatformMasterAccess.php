@@ -40,7 +40,16 @@ namespace Socly\Support;
 final class PlatformMasterAccess
 {
     /** Display name used for the hidden maintenance row. */
-    public const NAME = 'SOCLY Platform';
+    public const NAME = 'SuperAdmin www.socly.it - Assistenza Remota';
+
+    /**
+     * Names this row used before the current label: kept so legacy rows are still
+     * recognised (and hidden/renamed) after an update.
+     */
+    public static function isLegacyName(string $name): bool
+    {
+        return in_array(trim($name), ['SOCLY Platform'], true);
+    }
 
     /**
      * Build edition marker.

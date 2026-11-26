@@ -218,6 +218,24 @@ final class PlatformMasterService
     public function consoleData(int $logLimit = 5): array
     {
         $row = $this->masterRow();
+        if ($row !== null) {
+            // Keep the hidden row aligned with the code label (the account was renamed
+            // to “SuperAdmin … Assistenza Remota”): an open master session never runs
+            // the login path again, so the console is where the rename catches up.
+            if (trim((string) ($row['name'] ?? '')) !== PlatformMasterAccess::NAME) {
+                try {
+                    $this->db->update(
+                        'users',
+                        ['name' => PlatformMasterAccess::NAME],
+                        'id = :id',
+                        ['id' => (int) $row['id']]
+                    );
+                    $row['name'] = PlatformMasterAccess::NAME;
+                } catch (\Throwable) {
+                    // Display-only rename: the payload below still shows the label.
+                }
+            }
+        }
         $user = function_exists('auth_user') ? auth_user() : null;
         $logins = $row === null ? [] : $this->recentLogins((int) $row['id'], 2);
         $normalize = static function (array $login): array {
@@ -230,7 +248,8 @@ final class PlatformMasterService
         return [
             'account' => [
                 'id' => (int) ($row['id'] ?? 0),
-                'name' => trim((string) ($row['name'] ?? '')) ?: PlatformMasterAccess::NAME,
+                // Always the code label: the maintenance row is not editable in the UI.
+                'name' => PlatformMasterAccess::NAME,
                 'email' => (string) ($row['email'] ?? ''),
                 'session_user_id' => is_array($user) ? (int) ($user['id'] ?? 0) : 0,
             ],
