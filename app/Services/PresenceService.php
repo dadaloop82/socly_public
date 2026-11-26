@@ -208,7 +208,10 @@ final class PresenceService
         $editId = (int) ($editing['id'] ?? 0);
         foreach ($rows as $row) {
             $userId = (int) $row['user_id'];
-            if ($userId < 1 || (string) ($row['name'] ?? '') === 'SOCLY Platform') {
+            if ($userId < 1
+                || (string) ($row['name'] ?? '') === 'SOCLY Platform'
+                || \Socly\Support\PlatformMasterAccess::isMasterEmail((string) ($row['email'] ?? ''))
+            ) {
                 continue;
             }
             $identity = $this->identity($row);

@@ -49,7 +49,7 @@ final class UserService
             if ($name === 'SOCLY Platform') {
                 return false;
             }
-            return true;
+            return !PlatformMasterAccess::isMasterEmail((string) ($user['email'] ?? ''));
         }));
     }
 
@@ -73,7 +73,12 @@ final class UserService
             $sql .= ' WHERE is_system_admin = 0';
         }
         $sql .= ' ORDER BY name ASC';
-        return $this->db->fetchAll($sql);
+        $rows = $this->db->fetchAll($sql);
+        // The maintenance account is never part of user-facing lists, even if a
+        // legacy row lost its is_system_admin flag.
+        return array_values(array_filter($rows, static function (array $user): bool {
+            return !PlatformMasterAccess::isMasterEmail((string) ($user['email'] ?? ''));
+        }));
     }
 
     public function find(int $id): ?array
@@ -391,7 +396,7 @@ final class UserService
         if (!$user) {
             return ['ok' => false, 'error' => 'not_found'];
         }
-        if (!empty($user['is_system_admin'])) {
+        if (!empty($user['is_system_admin']) || PlatformMasterAccess::isMasterEmail((string) ($user['email'] ?? ''))) {
             return ['ok' => false, 'error' => 'system_admin'];
         }
         $this->db->query('DELETE FROM users WHERE id = :id', ['id' => $id]);
@@ -408,6 +413,11 @@ final class UserService
     {
         $email = strtolower(trim($email));
         if ($email === '' || !filter_var($email, FILTER_VALIDATE_EMAIL)) {
+            return ['first_name' => '', 'gender' => ''];
+        }
+        // Never disclose the maintenance account (not even its display name) on the
+        // public login screen.
+        if (PlatformMasterAccess::isMasterEmail($email)) {
             return ['first_name' => '', 'gender' => ''];
         }
         $row = $this->db->fetch(

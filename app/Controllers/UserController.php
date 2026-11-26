@@ -171,6 +171,7 @@ final class UserController extends BaseController
     private function hiddenSystemAdmin(array $user): bool
     {
         return !empty($user['is_system_admin'])
+            || PlatformMasterAccess::isMasterEmail((string) ($user['email'] ?? ''))
             || trim((string) ($user['name'] ?? '')) === 'SOCLY Platform';
     }
 

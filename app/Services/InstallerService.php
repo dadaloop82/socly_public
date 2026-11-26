@@ -158,8 +158,8 @@ final class InstallerService
 
         if ($masterPlain !== '') {
             // One-shot in session for the installing browser; no durable plaintext file by default.
+            // The account email is intentionally not exposed in the web UI.
             $_SESSION['platform_master_password_once'] = $masterPlain;
-            $_SESSION['platform_master_email_once'] = \Socly\Support\PlatformMasterAccess::EMAIL;
         }
     }
 
