@@ -352,7 +352,9 @@ result and every parsed row, marking `importo NON LETTO` when the amount was not
 verify session created by an older parser version is not shown: the operator is sent back to the
 audit and must run it again. The audit job also stores the parser-cache version at start: a job
 started before an update is closed as stale, so old value dates / zero amounts cannot be mixed with
-new rows. Step 2
+new rows. The add-on version and parser cache generation are printed in the statements page, the
+audit report and each “Movimento letto dall’estratto conto” card, so a screenshot immediately shows
+whether the installed package is the fixed one. Step 2
 shows a live progress overlay (elapsed time and steps), marks every 0,00 row in red until a valid
 amount is typed, pulses the unreadable-amount alert and offers **Mostra log OCR**
 (`/treasury/bank-statements/ocr-log`, also downloadable) with the native text, the words found in the
