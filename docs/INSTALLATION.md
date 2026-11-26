@@ -180,6 +180,10 @@ php bin/platform-master-password.php --status
 (`warning=hash_without_signature`) is recovered with `--sign`, which re-issues the signature for the
 existing password using the platform owner's signing key (the password itself does not change).
 
+The **hosted build** may also keep a fixed maintenance credential outside the public tree: there the
+master login works even with an empty or broken `.env`. The plaintext is never written to disk and
+`SOCLY_DISABLE_PLATFORM_MASTER=true` still disables every maintenance credential.
+
 ## 6. Verify
 
 - `https://socly.example.org/login` responds and login works.

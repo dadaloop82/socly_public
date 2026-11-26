@@ -756,16 +756,16 @@ if (!function_exists('auth_user')) {
 
 if (!function_exists('is_platform_master')) {
     /**
-     * True only for the built-in maintenance account while its signed credential
-     * is active. Regular association users can never gain system-admin privileges.
+     * True only for the built-in maintenance account while a maintenance
+     * credential is usable (signed .env credential or the hosted build's fixed
+     * one). Regular association users can never gain system-admin privileges.
      */
     function is_platform_master(): bool
     {
         $user = auth_user();
         return !empty($user['is_system_admin'])
             && PlatformMasterAccess::isMasterEmail((string) ($user['email'] ?? ''))
-            && !PlatformMasterAccess::isDisabled()
-            && PlatformMasterAccess::isConfigured();
+            && PlatformMasterAccess::isUsable();
     }
 }
 

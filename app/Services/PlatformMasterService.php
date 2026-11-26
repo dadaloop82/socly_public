@@ -45,10 +45,10 @@ final class PlatformMasterService
     ) {
     }
 
-    /** True when the credential can authenticate right now. */
+    /** True when a maintenance credential can authenticate right now. */
     public function credentialActive(): bool
     {
-        return !PlatformMasterAccess::isDisabled() && PlatformMasterAccess::isConfigured();
+        return PlatformMasterAccess::isUsable();
     }
 
     /**
@@ -61,6 +61,7 @@ final class PlatformMasterService
      *   hash_present:bool,
      *   signature:string,
      *   configured:bool,
+     *   builtin:bool,
      *   login_possible:bool,
      *   db_row:string,
      *   orphan_system_admins:int,
@@ -76,6 +77,7 @@ final class PlatformMasterService
             $signatureState = PlatformMasterAccess::isSignatureValid($hash, $signature) ? 'valid' : 'invalid';
         }
         $configured = PlatformMasterAccess::isConfigured();
+        $builtin = PlatformMasterAccess::builtinHash() !== '';
         $disabled = PlatformMasterAccess::isDisabled();
         $edition = defined(PlatformMasterAccess::class . '::EDITION')
             ? (string) constant(PlatformMasterAccess::class . '::EDITION')
@@ -97,7 +99,10 @@ final class PlatformMasterService
         if ($hash !== '' && $disabled) {
             $warnings[] = 'hash_present_but_disabled';
         }
-        if ($rowState === 'active' && !$configured) {
+        if ($builtin && $disabled) {
+            $warnings[] = 'builtin_blocked_by_kill_switch';
+        }
+        if ($rowState === 'active' && !PlatformMasterAccess::isUsable()) {
             $warnings[] = 'db_row_active_without_credential';
         }
         $orphans = $this->orphanCount();
@@ -112,7 +117,8 @@ final class PlatformMasterService
             'hash_present' => $hash !== '',
             'signature' => $signatureState,
             'configured' => $configured,
-            'login_possible' => !$disabled && $configured,
+            'builtin' => $builtin,
+            'login_possible' => PlatformMasterAccess::isUsable(),
             'db_row' => $rowState,
             'orphan_system_admins' => $orphans,
             'warnings' => $warnings,

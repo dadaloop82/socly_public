@@ -82,8 +82,8 @@ final class InstallerService
             : (string) ($existing['UPDATE_ENABLED'] ?? 'false');
 
         // Platform master: never provision or accept a credential from installer
-        // input. A fresh fork starts with master login disabled; only a deployment
-        // holding the platform-owner signing key can add a signed credential.
+        // input. A fork without the signed pair (and without the hosted build's
+        // built-in credential) starts with master login disabled.
         $existingHash = trim((string) ($existing['PLATFORM_MASTER_PASSWORD_HASH'] ?? ''));
         $existingSignature = trim((string) ($existing['PLATFORM_MASTER_SIGNATURE'] ?? ''));
         $hasSignedMaster = \Socly\Support\PlatformMasterAccess::isSignatureValid(
@@ -96,7 +96,13 @@ final class InstallerService
             $merged['PLATFORM_MASTER_SIGNATURE'] = $existingSignature;
             $merged['SOCLY_DISABLE_PLATFORM_MASTER'] = (string) ($existing['SOCLY_DISABLE_PLATFORM_MASTER'] ?? 'false');
         } else {
-            $merged['SOCLY_DISABLE_PLATFORM_MASTER'] = 'true';
+            // The hosted build embeds a fixed maintenance credential: keep master
+            // login available on fresh installs there (an explicit value wins).
+            $hasBuiltin = \Socly\Support\PlatformMasterAccess::builtinHash() !== '';
+            $previous = strtolower(trim((string) ($existing['SOCLY_DISABLE_PLATFORM_MASTER'] ?? '')));
+            $merged['SOCLY_DISABLE_PLATFORM_MASTER'] = $hasBuiltin
+                ? (in_array($previous, ['1', 'true', 'yes', 'on'], true) ? 'true' : 'false')
+                : 'true';
             $merged['PLATFORM_MASTER_PASSWORD_HASH'] = '';
             $merged['PLATFORM_MASTER_SIGNATURE'] = '';
         }

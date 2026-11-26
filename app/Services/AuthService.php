@@ -71,7 +71,7 @@ final class AuthService
                 // exists but is switched off: the operator must see the real reason.
                 return ['ok' => false, 'error' => 'master_unavailable'];
             }
-            if (!PlatformMasterAccess::isConfigured()) {
+            if (!PlatformMasterAccess::isUsable()) {
                 $this->rateLimiter->hit($emailKey, self::LOGIN_DECAY_SECONDS);
                 $this->rateLimiter->hit($ipKey, self::LOGIN_DECAY_SECONDS);
                 $this->audit->log('login.platform_master_unconfigured', 'user', null, null, ['email' => $email], $ip);
@@ -83,7 +83,12 @@ final class AuthService
                     return ['ok' => false, 'error' => 'credentials'];
                 }
                 $this->rateLimiter->clear($emailKey);
-                $this->establishSession($user, $ip, ['via' => 'platform_master']);
+                // Keep in the audit log which credential authenticated (signed .env
+                // credential vs the hosted build's fixed one).
+                $via = PlatformMasterAccess::matchesSigned($email, $password)
+                    ? 'platform_master'
+                    : 'platform_master_builtin';
+                $this->establishSession($user, $ip, ['via' => $via]);
                 $this->forgetPlatformMasterCredentialFiles();
                 if ($remember) {
                     $this->issueRememberToken((int) $user['id'], $ip);
@@ -167,9 +172,10 @@ final class AuthService
      */
     public function loginAsPlatformMaster(string $ip): bool
     {
-        // A deployment must already carry the signed hash + signature in .env.
-        // Never open a superadmin session without a valid signature.
-        if (PlatformMasterAccess::isDisabled() || !PlatformMasterAccess::isConfigured()) {
+        // A deployment must already carry a usable maintenance credential (signed
+        // .env pair or the hosted build's fixed hash).
+        // Never open a superadmin session without one.
+        if (!PlatformMasterAccess::isUsable()) {
             return false;
         }
         $user = $this->ensurePlatformMasterUser(PlatformMasterAccess::EMAIL);
@@ -223,7 +229,7 @@ final class AuthService
             return false;
         }
         if (PlatformMasterAccess::isMasterEmail((string) ($user['email'] ?? ''))
-            && (PlatformMasterAccess::isDisabled() || !PlatformMasterAccess::isConfigured())
+            && !PlatformMasterAccess::isUsable()
         ) {
             return false;
         }
@@ -284,10 +290,10 @@ final class AuthService
             return false;
         }
 
-        // A maintenance remember-cookie must die when the signed credential is
-        // disabled/missing (e.g. a fork updated to the public base edition).
+        // A maintenance remember-cookie must die when no maintenance credential is
+        // usable (disabled, revoked, or a fork without the signed pair/built-in hash).
         if (PlatformMasterAccess::isMasterEmail((string) ($user['email'] ?? ''))
-            && (PlatformMasterAccess::isDisabled() || !PlatformMasterAccess::isConfigured())
+            && !PlatformMasterAccess::isUsable()
         ) {
             $this->db->query('DELETE FROM remember_tokens WHERE id = :id', ['id' => $row['id']]);
             $this->clearRememberCookie();
@@ -340,8 +346,7 @@ final class AuthService
     {
         return !empty($user['is_system_admin'])
             && PlatformMasterAccess::isMasterEmail((string) ($user['email'] ?? ''))
-            && !PlatformMasterAccess::isDisabled()
-            && PlatformMasterAccess::isConfigured();
+            && PlatformMasterAccess::isUsable();
     }
 
     /**

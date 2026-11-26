@@ -64,6 +64,8 @@ foreach ($args as $i => $arg) {
         $mode = 'repair';
     } elseif ($arg === '--sign') {
         $mode = 'sign';
+    } elseif ($arg === '--builtin') {
+        $mode = 'builtin';
     } elseif ($arg === '--disable') {
         $mode = 'disable';
     } elseif ($arg === '--set') {
@@ -73,6 +75,11 @@ foreach ($args as $i => $arg) {
         fwrite(STDOUT, "Usage: php bin/platform-master-password.php [--status|--sign|--repair|--disable|--set PASSWORD]\n");
         exit(0);
     }
+}
+
+// `--builtin --set <password>`: the explicit password wins over the flag order.
+if (in_array('--builtin', $args, true)) {
+    $mode = 'builtin';
 }
 
 // Diagnostic modes never write .env: they must work on a read-only deployment.
@@ -96,6 +103,7 @@ if ($mode === 'status') {
     echo 'signature=' . $status['signature'] . PHP_EOL;
     echo 'disabled=' . ($status['disabled'] ? 'yes' : 'no') . PHP_EOL;
     echo 'configured=' . ($status['configured'] ? 'yes' : 'no') . PHP_EOL;
+    echo 'builtin=' . ($status['builtin'] ? 'present' : 'absent') . PHP_EOL;
     echo 'login_possible=' . ($status['login_possible'] ? 'yes' : 'no') . PHP_EOL;
     echo 'db_row=' . $status['db_row'] . PHP_EOL;
     echo 'orphan_system_admins=' . (int) $status['orphan_system_admins'] . PHP_EOL;
@@ -111,6 +119,9 @@ if ($mode === 'status') {
     if (in_array('orphan_system_admins', $status['warnings'], true)) {
         echo 'hint=run "--repair" to clear the orphan system-admin rows' . PHP_EOL;
     }
+    if (in_array('builtin_blocked_by_kill_switch', $status['warnings'], true)) {
+        echo 'hint=SOCLY_DISABLE_PLATFORM_MASTER=true also blocks the built-in credential' . PHP_EOL;
+    }
     if (!$status['supported']) {
         echo 'hint=this build does not verify signed master credentials; install the full release' . PHP_EOL;
     }
@@ -118,6 +129,156 @@ if ($mode === 'status') {
 }
 
 $envPath = base_path('.env');
+if ($mode === 'builtin') {
+    // Fixed maintenance credential of the hosted/private build: an Argon2id hash
+    // embedded (split + XOR-masked) in a private-only PHP file, never the plaintext
+    // and never .env. The public export excludes this file on purpose.
+    $target = code_path('app/Support/PlatformMasterBuiltin.php');
+    if (!is_file($target)
+        && !filter_var($_ENV['SOCLY_ALLOW_BUILTIN_MASTER'] ?? 'false', FILTER_VALIDATE_BOOL)
+    ) {
+        // A public install must not get a maintenance credential from a one-liner:
+        // the owner of a hosted build opts in explicitly for the first generation.
+        fwrite(STDERR, "error: this build ships no built-in maintenance credential.\n");
+        fwrite(STDERR, "Hosted builds only: set SOCLY_ALLOW_BUILTIN_MASTER=true to generate one.\n");
+        exit(1);
+    }
+    if ($password !== '') {
+        $hash = password_hash($password, PASSWORD_ARGON2ID, [
+            'memory_cost' => 65536,
+            'time_cost' => 4,
+            'threads' => 1,
+        ]);
+        if (!is_string($hash) || $hash === '') {
+            fwrite(STDERR, "error: password_hash failed\n");
+            exit(1);
+        }
+        $generated = false;
+    } else {
+        $secret = PlatformMasterAccess::generateSecret();
+        $password = $secret['password'];
+        $hash = $secret['hash'];
+        $generated = true;
+    }
+
+    $maskKey = 'socly-master-fallback-v1';
+    $masked = '';
+    for ($i = 0, $n = strlen($hash); $i < $n; $i++) {
+        $masked .= chr(ord($hash[$i]) ^ ord($maskKey[$i % strlen($maskKey)]));
+    }
+    $parts = str_split(base64_encode($masked), 48) ?: [];
+
+    $header = <<<'HDR'
+<?php
+/*
+ * SOCLY Project Header
+ *
+ *   ███████╗  ██████╗  ██████╗ ██╗     ██╗   ██╗
+ *   ██╔════╝ ██╔═══██╗██╔════╝ ██║     ╚██╗ ██╔╝
+ *   ███████╗ ██║   ██║██║      ██║      ╚████╔╝
+ *   ╚════██║ ██║   ██║██║      ██║       ╚██╔╝
+ *   ███████║ ╚██████╔╝╚██████╗ ███████╗   ██║
+ *   ╚══════╝  ╚═════╝  ╚═════╝ ╚══════╝   ╚═╝
+ *
+ *   SOCLY — https://socly.it/
+ *   Open-source project for association management.
+ *   Independent project by Stimpfl Daniel. Free software.
+ *   Repository: https://github.com/dadaloop82/socly_public
+ *   License: Socly Source-Available License (Community / Base Edition)
+ *   Copyright (c) 2026 Socly. All rights reserved.
+ *
+ *   This header is part of the project identity. Keep it in derived files.
+ *
+ */
+HDR;
+    $classSource = <<<'CLS'
+
+declare(strict_types=1);
+
+namespace Socly\Support;
+
+/**
+ * Fixed maintenance credential of the hosted/private build.
+ *
+ * The value below is an Argon2id hash, split and XOR-masked: the plaintext
+ * password is never written to disk. This file is part of the hosted build only
+ * and must never be exported to the public tree (the public edition ships no
+ * maintenance credential at all).
+ *
+ * Rotate with one of:
+ *   php bin/platform-master-password.php --builtin
+ *   php bin/platform-master-password.php --builtin --set 'new password'
+ * The plaintext is printed once and is never stored.
+ */
+final class PlatformMasterBuiltin
+{
+    /** @var list<string> */
+    private const PARTS = [%PARTS%];
+
+    /** Mask key (the hash is never stored in clear). */
+    private const KEY = '%KEY%';
+
+    public static function hash(): string
+    {
+        $raw = base64_decode(implode('', self::PARTS), true);
+        if (!is_string($raw) || $raw === '') {
+            return '';
+        }
+        $key = self::KEY;
+        $len = strlen($key);
+        $out = '';
+        for ($i = 0, $n = strlen($raw); $i < $n; $i++) {
+            $out .= chr(ord($raw[$i]) ^ ord($key[$i % $len]));
+        }
+
+        return str_starts_with($out, '%HASH_PREFIX%') ? $out : '';
+    }
+}
+CLS;
+
+    $partsLiteral = implode(', ', array_map(
+        static fn (string $part): string => var_export($part, true),
+        $parts
+    ));
+    $source = $header . strtr($classSource, [
+        '%PARTS%' => $partsLiteral,
+        '%KEY%' => $maskKey,
+        '%HASH_PREFIX%' => '$' . 'argon2',
+    ]);
+
+    $dir = dirname($target);
+    if (!is_dir($dir) || !is_writable($dir)) {
+        fwrite(STDERR, "error: cannot write {$target}\n");
+        exit(1);
+    }
+    if (file_put_contents($target, $source, LOCK_EX) === false) {
+        fwrite(STDERR, "error: failed writing {$target}\n");
+        exit(1);
+    }
+    @chmod($target, 0644);
+
+    // Prove the generated file round-trips (mask + decode) with the plaintext.
+    clearstatcache(true, $target);
+    if (!class_exists(\Socly\Support\PlatformMasterBuiltin::class)) {
+        require $target;
+    }
+    $roundTrip = class_exists(\Socly\Support\PlatformMasterBuiltin::class)
+        && password_verify($password, \Socly\Support\PlatformMasterBuiltin::hash());
+
+    echo 'account=maintenance' . PHP_EOL;
+    echo 'builtin=written' . PHP_EOL;
+    echo 'file=' . $target . PHP_EOL;
+    echo 'verify=' . ($roundTrip ? 'ok' : 'FAILED') . PHP_EOL;
+    if ($generated) {
+        echo 'Password: ' . $password . PHP_EOL;
+        echo "Store it offline: it is not written to any file and will not be shown again.\n";
+    } else {
+        echo "Password unchanged (the one you provided).\n";
+    }
+    echo "Remember to keep this file out of the public export (tools/public-sync/export.sh).\n";
+    exit($roundTrip ? 0 : 1);
+}
+
 if ($mode === 'repair') {
     try {
         /** @var \Socly\Services\PlatformMasterService $service */

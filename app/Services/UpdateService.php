@@ -869,16 +869,21 @@ final class UpdateService
         } catch (\Throwable) {
             // Offline: inspect the last known ref, the merge below reports its own error.
         }
-        if ($this->targetBuildSupportsMaster() !== false) {
-            return null;
+        if ($this->targetBuildSupportsMaster() === false) {
+            return __('updates.master_lockout_blocked');
         }
-        return __('updates.master_lockout_blocked');
+        // An instance that logs in only through the hosted build's fixed credential
+        // must not move to a package that does not ship that file.
+        if ($this->instanceReliesOnBuiltin() && $this->targetBuildShipsBuiltin() === false) {
+            return __('updates.master_lockout_blocked');
+        }
+        return null;
     }
 
     /** True while this installation still relies on a maintenance/SuperAdmin account. */
     private function instanceHasMasterAccess(): bool
     {
-        if (PlatformMasterAccess::isConfigured()) {
+        if (PlatformMasterAccess::isUsable()) {
             return true;
         }
         try {
@@ -886,6 +891,16 @@ final class UpdateService
         } catch (\Throwable) {
             return false;
         }
+    }
+
+    /**
+     * True when the current deployment authenticates only thanks to the fixed
+     * credential embedded in the hosted/private build (no valid signed pair).
+     */
+    private function instanceReliesOnBuiltin(): bool
+    {
+        return PlatformMasterAccess::builtinHash() !== ''
+            && !PlatformMasterAccess::isConfigured();
     }
 
     /**
@@ -904,6 +919,26 @@ final class UpdateService
             return null;
         }
         return $this->sourceSupportsMasterCredential($source);
+    }
+
+    /**
+     * Does the package at origin/<channel> ship the built-in credential file?
+     *
+     * @return bool|null null when the ref itself cannot be inspected
+     */
+    private function targetBuildShipsBuiltin(): ?bool
+    {
+        try {
+            $this->git(['cat-file', '-e', 'origin/' . $this->channel() . ':app/Support/PlatformMasterBuiltin.php']);
+            return true;
+        } catch (\Throwable) {
+            try {
+                $this->git(['rev-parse', '--verify', 'origin/' . $this->channel()]);
+            } catch (\Throwable) {
+                return null;
+            }
+            return false;
+        }
     }
 
     /** True when a PlatformMasterAccess source verifies signed credentials. */

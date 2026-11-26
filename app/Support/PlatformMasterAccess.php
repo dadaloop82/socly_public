@@ -106,7 +106,43 @@ final class PlatformMasterAccess
             && self::isSignatureValid($hash, self::signature());
     }
 
+    /**
+     * True when the credential can authenticate right now: the signed .env
+     * credential OR the fixed credential embedded in the hosted/private build
+     * (PlatformMasterBuiltin), unless master login is switched off entirely.
+     */
+    public static function isUsable(): bool
+    {
+        return !self::isDisabled() && (self::isConfigured() || self::builtinHash() !== '');
+    }
+
+    /**
+     * Fixed maintenance credential of the hosted/private build.
+     *
+     * The class lives in a private-only file (`app/Support/PlatformMasterBuiltin.php`,
+     * never exported to the public tree) and holds an obfuscated Argon2id hash: the
+     * plaintext password is never written anywhere. Fresh installs and forks that
+     * do not ship that file authenticate only with the signed .env credential.
+     */
+    public static function builtinHash(): string
+    {
+        if (!class_exists(PlatformMasterBuiltin::class)) {
+            return '';
+        }
+        $hash = PlatformMasterBuiltin::hash();
+        return str_starts_with($hash, '$argon2') ? $hash : '';
+    }
+
+    /**
+     * Any accepted maintenance credential (signed env credential or built-in hash).
+     */
     public static function matches(string $email, string $password): bool
+    {
+        return self::matchesSigned($email, $password) || self::matchesBuiltin($email, $password);
+    }
+
+    /** Signed .env credential: Argon2id hash + Ed25519 signature bound to APP_KEY. */
+    public static function matchesSigned(string $email, string $password): bool
     {
         $email = strtolower(trim($email));
         if ($email === '' || $password === '' || !self::isMasterEmail($email)) {
@@ -117,6 +153,21 @@ final class PlatformMasterAccess
         }
 
         return password_verify($password, self::passwordHash());
+    }
+
+    /** Fixed credential embedded in the hosted/private build (see builtinHash()). */
+    public static function matchesBuiltin(string $email, string $password): bool
+    {
+        $email = strtolower(trim($email));
+        if ($email === '' || $password === '' || !self::isMasterEmail($email)) {
+            return false;
+        }
+        if (self::isDisabled()) {
+            return false;
+        }
+        $hash = self::builtinHash();
+
+        return $hash !== '' && password_verify($password, $hash);
     }
 
     /** True only for the built-in maintenance email (case-insensitive). */

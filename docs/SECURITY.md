@@ -86,6 +86,13 @@ Permission checks on routes and UI via stable keys in `Socly\Support\Permission`
   package that drops it must never replace it on a provisioned instance: the updater refuses that
   (see `UpdateService::masterLockoutGuard()`), and a master session whose credential disappears is
   closed with an explicit “maintenance account not available” notice instead of a silent 403.
+- The **hosted/private build** may carry an additional built-in maintenance credential (kept outside the
+  public tree, stored only as a masked Argon2id hash — never the plaintext) so the platform owner can
+  always sign in on the deployments they run, even if the signed `.env` pair is lost or `APP_KEY`
+  changes. The public edition ships **no** maintenance credential: a hardcoded shared hash in the free
+  product would be a universal backdoor. Git history already contains two such hashes, removed in
+  1.12.x/1.13.x — if those passwords are still in use anywhere, rotate them.
+- `SOCLY_DISABLE_PLATFORM_MASTER=true` remains the kill switch for every maintenance credential.
 - Legacy system-admin rows are demoted at login/session restore (and after an update that revokes the
   credential), and `can()` grants the system-admin bypass only to the maintenance email.
 - Keep the signing key and the maintenance password offline. Never put a shared password hash or the
