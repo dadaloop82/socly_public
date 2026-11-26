@@ -162,7 +162,10 @@ Contexts in use: `dashboard.members`, `statistics.finance` and `dashboard.treasu
 `platform.usage_stats_opt_in`, `platform.contacts_opt_in`, `platform.consents_configured/confirmed_at/name`,
 `platform.telemetry_last_at`, `platform.installation_last_at`, `platform.installation_version`,
 `platform.installation_sent`, `platform.installation_last_try`, `platform.installation_needs_sync`.
-Demos set `app.temporary_instance = 1` and never send platform data.
+Demos set `app.temporary_instance = 1` and never send platform data. Temporary demos also store
+`app.instance_expires_at`; permanent instances (the private presentation) have **no** such setting
+at all — the login notice, the in-app banner and `InstanceExpiredMiddleware` treat a missing expiry
+as “never expires”.
 
 ## Economic status (derived)
 

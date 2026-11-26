@@ -237,6 +237,7 @@ return [
         'reset_invalid' => 'Ungültiger Wiederherstellungslink.',
         'reset_expired' => 'Link abgelaufen. Bitte erneut anfordern.',
         'demo_login_notice' => "Demo-Umgebung\n\nDiese Testinstanz läuft am :expires ab.\n\nKeine echten personenbezogenen Daten eingeben — nur fiktive Angaben verwenden.",
+        'demo_login_notice_permanent' => "Demo-Umgebung\n\nDiese Testinstanz läuft nicht ab.\n\nKeine echten personenbezogenen Daten eingeben — nur fiktive Angaben verwenden.",
         'demo_login_notice_ok' => 'Verstanden',
         'footer_tagline' => 'Mit :heart gemacht von Stimpfl Daniel',
     ],

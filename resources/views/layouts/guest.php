@@ -85,7 +85,7 @@ $year = date('Y');
     <?php if (!empty($demoLoginNotice)): ?>
     data-demo-login-notice="1"
     data-demo-expires="<?= e((string) ($demoLoginNotice['expires_label'] ?? '')) ?>"
-    data-demo-login-notice-text="<?= e(__('auth.demo_login_notice')) ?>"
+    data-demo-login-notice-text="<?= e(__(!empty($demoLoginNotice['permanent']) ? 'auth.demo_login_notice_permanent' : 'auth.demo_login_notice')) ?>"
     data-demo-login-notice-ok="<?= e(__('auth.demo_login_notice_ok')) ?>"
     <?php endif; ?>
     data-max-upload-bytes="<?= (int) upload_limit_bytes() ?>"

@@ -319,7 +319,15 @@ final class AuthController extends BaseController
         redirect('/login');
     }
 
-    /** @return array{expires_label:string}|null */
+    /**
+     * Login notice for temporary evaluation instances.
+     *
+     * Permanent instances (the private presentation) carry no `app.instance_expires_at`:
+     * they never expire, so the notice must not claim a date — and must not render an
+     * empty “scade il .” clause.
+     *
+     * @return array{expires_label:string,permanent:bool}|null
+     */
     private function demoLoginNotice(): ?array
     {
         try {
@@ -327,14 +335,15 @@ final class AuthController extends BaseController
                 return null;
             }
             $exp = trim((string) app(SettingsService::class)->get('app.instance_expires_at', ''));
-            $label = '';
-            if ($exp !== '') {
-                $ts = strtotime($exp);
-                if ($ts !== false) {
-                    $label = date('d/m/Y H:i', $ts);
-                }
+            if ($exp === '') {
+                return ['expires_label' => '', 'permanent' => true];
             }
-            return ['expires_label' => $label];
+            $label = '';
+            $ts = strtotime($exp);
+            if ($ts !== false) {
+                $label = date('d/m/Y H:i', $ts);
+            }
+            return ['expires_label' => $label, 'permanent' => false];
         } catch (\Throwable) {
             return null;
         }
