@@ -79,14 +79,32 @@ every 100 patches bump the series, and each bump is published to this rep come o
 
 ### Fixed
 
+- Board voting: every operator with access to “Verbali e documenti” can open the live results and
+  the CSV export of a published poll; editing, closing and deleting stay limited to the poll creator
+  (or a settings administrator). The list now shows the “Risultati” button for all of them instead of
+  “Solo il creatore può aprire i risultati”.
+- Minutes wizard: the “Tipo di verbale” cards use two columns and long descriptions wrap inside the
+  card, so the text no longer spills outside the rounded border and the fourth template is no longer
+  alone on its own row.
 - Bank statement import: amounts printed in separate text runs no longer lose their thousands
   (`5.933,38` was read as 933,38 and a 5.000,00 repayment as € 0,00): the leading group (`5.`,
   `2<0x19>`) is closed by the following run before the amount is accepted.
 - Bank statement import: one date rule for every model — the cash-book movement is dated with the
-  **value date** (data valuta), the day the money really moves on the account, and only falls back to
-  the operation/booking date when the statement prints none. Both dates stay on the row and the
-  review shows the bank booking date under “Data movimento (valuta)”. A statement row whose amount
-  cannot be read no longer marks the recorded movement as wrong: the amount shows “—” with a note.
+  **operation/booking date** (data operazione / contabile), the day the bank books the movement and
+  the balance actually changes; the value date (data valuta) stays on the row as information and is
+  only the fallback when the statement prints no operation date. This removes the wave of false date
+  anomalies caused by POS rows whose value date precedes booking. The review labels the field “Data
+  movimento” and shows the bank value date underneath.
+- Bank statement import: when most rows still have no amount after the first parse (a few complete
+  native amounts such as balance/total lines used to skip the strip OCR), the amount column is
+  OCR-read again and the result is adopted only if it reads more amounts without losing movements.
+  Only complete amounts count as “native amounts”, so split runs like `18,` no longer hide the
+  missing cents; the per-row OCR cap rises to 120 rows. A 0,00 placeholder printed in the unused
+  amount column no longer becomes the movement (it used to show Type “Income” with amount “—” when
+  the real debit amount sat just outside the template band). A statement row whose amount still
+  cannot be read keeps showing “—” with a note and never marks the recorded movement as wrong.
+  Audits cached before this version are not reopened (the date/amount rule changed), so the anomaly
+  report is rebuilt from the PDFs.
 - Bank statement import (Intesa Sanpaolo): POS rows whose amount is split into two text runs (“14,” and
   “95” with a wide tab gap or a slightly lower baseline) are joined again, so they no longer land at
   € 0,00 and no longer produce a bogus “Mancante in Prima cassa” in the audit. The statement period

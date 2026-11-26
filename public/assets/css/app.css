@@ -16347,6 +16347,26 @@ select.is-remote-choice {
   gap: 0.5rem;
   margin-bottom: 0.85rem;
 }
+/* “Tipo di verbale”: four long descriptions. Two columns avoid the lone fourth card and the
+   text spilling outside the rounded border (the centred auto-sized children used to overflow). */
+.minutes-type-cards {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+.minutes-type-cards .tessera-choice-card {
+  justify-items: stretch;
+  min-width: 0;
+  text-align: left;
+}
+.minutes-type-cards .tessera-choice-card-title,
+.minutes-type-cards .tessera-choice-card-desc {
+  max-width: 100%;
+  overflow-wrap: anywhere;
+}
+@media (max-width: 640px) {
+  .minutes-type-cards {
+    grid-template-columns: 1fr;
+  }
+}
 .minutes-agenda-list { display: grid; gap: 0.85rem; }
 .minutes-agenda-card {
   border: 1px solid var(--line);

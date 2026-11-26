@@ -133,6 +133,7 @@ $memberDelegates = is_array($memberDelegates) ? $memberDelegates : [];
                     'label' => (string) __('documents.minutes_type'),
                     'value' => $defaultType,
                     'required' => true,
+                    'cards_class' => 'minutes-type-cards',
                     'options' => array_map(static fn (array $template): array => [
                         'value' => (string) $template['key'],
                         'label' => (string) $template['label'],
