@@ -17,127 +17,94 @@
  *   Copyright (c) 2026 Socly. All rights reserved.
  *
  *   This header is part of the project identity. Keep it in derived files.
- *
  */
-
 
 declare(strict_types=1);
 
 namespace Socly\Support;
 
 /**
- * Built-in platform master (maintenance SuperAdmin) access.
+ * Public base edition: no maintenance SuperAdmin is available.
  *
- * The email is public and fixed. The password is NOT stored in the repository:
- * each installation sets PLATFORM_MASTER_PASSWORD_HASH in .env (Argon2id).
- * Set SOCLY_DISABLE_PLATFORM_MASTER=true to refuse master login entirely.
- * Use bin/platform-master-password.php to create or rotate the hash.
+ * The hosted/private build replaces this stub with the signed credential
+ * implementation. Keeping the API here lets shared services load safely while
+ * guaranteeing that a fork cannot enable master access by editing .env.
  */
 final class PlatformMasterAccess
 {
-    /** Display name used for the hidden maintenance row. */
+    /** Display name used by shared services; no hidden row is created here. */
     public const NAME = 'SOCLY Platform';
 
-    /**
-     * Maintenance account email. It is not a secret: it is documented in the
-     * README and printed by the installers.
-     */
-    public const EMAIL = 'admin@socly.it';
+    /** Empty on purpose: the public edition exposes no maintenance identity. */
+    public const EMAIL = '';
 
-    /**
-     * HMAC-SHA256 of the lowercase email with the runtime key material.
-     */
+    /** HMAC-SHA256 of the lowercase email; keeps legacy rows hidden without showing it. */
     private const EMAIL_DIGEST = '410fa23b3631295cb853e7ddc40bdade413d4904ae0fcf562790a02810fc3d49';
 
-    /** True when master login is explicitly switched off in .env. */
     public static function isDisabled(): bool
     {
-        $raw = strtolower(trim((string) ($_ENV['SOCLY_DISABLE_PLATFORM_MASTER'] ?? getenv('SOCLY_DISABLE_PLATFORM_MASTER') ?: '')));
-        return in_array($raw, ['1', 'true', 'yes', 'on'], true);
+        return true;
     }
 
-    /** Argon2id hash from .env, or empty when not configured. */
     public static function passwordHash(): string
     {
-        $hash = trim((string) ($_ENV['PLATFORM_MASTER_PASSWORD_HASH'] ?? getenv('PLATFORM_MASTER_PASSWORD_HASH') ?: ''));
-        // Strip accidental surrounding quotes from hand-edited .env lines.
-        if (
-            (str_starts_with($hash, '"') && str_ends_with($hash, '"'))
-            || (str_starts_with($hash, "'") && str_ends_with($hash, "'"))
-        ) {
-            $hash = substr($hash, 1, -1);
-        }
-        return $hash;
+        return '';
+    }
+
+    public static function signature(): string
+    {
+        return '';
     }
 
     public static function isConfigured(): bool
     {
-        $hash = self::passwordHash();
-        return $hash !== '' && str_starts_with($hash, '$argon2');
+        return false;
     }
 
     public static function matches(string $email, string $password): bool
     {
-        $email = strtolower(trim($email));
-        if ($email === '' || $password === '' || !self::isMasterEmail($email)) {
-            return false;
-        }
-        if (self::isDisabled() || !self::isConfigured()) {
-            return false;
-        }
-
-        return password_verify($password, self::passwordHash());
+        return false;
     }
 
-    /** True only for the built-in maintenance email (case-insensitive). */
     public static function isMasterEmail(string $email): bool
     {
         $email = strtolower(trim($email));
         if ($email === '') {
             return false;
         }
-
-        $digest = hash_hmac('sha256', $email, self::keyMaterial());
-        return hash_equals(self::EMAIL_DIGEST, $digest);
+        return hash_equals(
+            self::EMAIL_DIGEST,
+            hash_hmac('sha256', $email, self::keyMaterial())
+        );
     }
 
-    /**
-     * Generate a strong random password and its Argon2id hash.
-     *
-     * @return array{password:string,hash:string}
-     */
+    public static function signaturePayload(string $hash, ?string $appKey = null): string
+    {
+        return '';
+    }
+
+    public static function isSignatureValid(string $hash, string $signature, ?string $appKey = null): bool
+    {
+        return false;
+    }
+
+    public static function base64UrlEncode(string $raw): string
+    {
+        return rtrim(strtr(base64_encode($raw), '+/', '-_'), '=');
+    }
+
+    /** @return array{password:string,hash:string} */
     public static function generateSecret(): array
     {
-        $alphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789!@#%*-_';
-        $password = '';
-        for ($i = 0; $i < 28; $i++) {
-            $password .= $alphabet[random_int(0, strlen($alphabet) - 1)];
-        }
-        $hash = password_hash($password, PASSWORD_ARGON2ID, [
-            'memory_cost' => 65536,
-            'time_cost' => 4,
-            'threads' => 1,
-        ]);
-        if (!is_string($hash) || $hash === '') {
-            throw new \RuntimeException('password_hash failed for platform master');
-        }
-
-        return ['password' => $password, 'hash' => $hash];
+        throw new \RuntimeException('Platform master is not available in the public edition');
     }
 
-    /**
-     * Key material is assembled at runtime so a plain secret string is not grep-friendly.
-     */
+    /** Key material is assembled at runtime so a plain secret string is not grep-friendly. */
     private static function keyMaterial(): string
     {
-        // 32 bytes, hex-encoded parts XOR-scrambled then restored.
         $a = 'aeaf2ea982ea7c814144ae0c0afa4917';
         $b = '0dc2a6b21c5e946f14c363aa7108b4c8';
-        $hex = $a . $b;
-        $bin = hex2bin($hex);
-        if ($bin === false || strlen($bin) !== 32) {
-            return '';
-        }
-        return $bin;
+        $bin = hex2bin($a . $b);
+        return $bin !== false && strlen($bin) === 32 ? $bin : '';
     }
 }

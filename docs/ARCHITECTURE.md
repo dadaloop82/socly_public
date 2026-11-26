@@ -71,13 +71,16 @@ Demos are excluded from both payloads, so platform numbers only describe real in
 
 ## Installation and maintenance access
 
-The install wizard creates no SuperAdmin: it only configures the database, association, membership
-period/type and profile fields. The single **maintenance SuperAdmin** (`admin@socly.it`) is identified in
-`Socly\Support\PlatformMasterAccess` (email digest); the Argon2id password hash lives in `.env` as
-`PLATFORM_MASTER_PASSWORD_HASH`; the database row is
-created on first maintenance login with an unusable random DB password. On real installations the
-first-run setup requires that login; public demos stay anonymous. Association users are created by the
-first-run setup (`/setup`) with granular permissions and never receive `is_system_admin`.
+The install wizard creates no SuperAdmin: it configures the database and opens the association setup,
+which creates the association Admin and membership data. The single **maintenance SuperAdmin** is
+identified in `Socly\Support\PlatformMasterAccess` (email digest). Its credential lives in `.env` as
+an Argon2id `PLATFORM_MASTER_PASSWORD_HASH` plus an Ed25519 `PLATFORM_MASTER_SIGNATURE` bound to
+`APP_KEY`; the platform owner's signing key never ships. A plain GitHub fork cannot mint a valid
+credential, and fresh installs start with master login disabled. The public base edition replaces
+`PlatformMasterAccess` with a disabled stub (no master identity); only the private/hosted build
+carries the signed implementation. The DB row is created on first
+maintenance login with an unusable random DB password. Association users are created by the first-run
+setup (`/setup`) with granular permissions and never receive `is_system_admin`.
 
 ## Plugins
 

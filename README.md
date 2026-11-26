@@ -55,10 +55,11 @@ bash bin/install/macos.sh        # macOS
 powershell -ExecutionPolicy Bypass -File bin\install\windows.ps1   # Windows
 ```
 
-During the wizard you configure the database, association branding, and membership period. The
-**maintenance SuperAdmin** account is hardcoded in the application and is not created by the wizard.
-After install, sign in with the maintenance account and complete the first-run setup, which creates
-the association **Admin** account used day to day. Setup is not anonymous.
+During the wizard you configure the database, association branding, membership period and finally the
+association **Admin** account. The public base edition does not expose a maintenance SuperAdmin at
+all: fresh installations start with master login disabled. Only the private/hosted build, holding the
+platform owner's Ed25519 signing key, can add a signed master credential. The first-run setup stays
+open until the association Admin exists.
 
 ## Documentation
 

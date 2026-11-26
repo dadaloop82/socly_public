@@ -17,20 +17,20 @@ Scripts that turn a fresh machine into a working Socly instance:
 
 Then open **http://127.0.0.1:8080/install**: the installers already created the database and wrote
 `.env`, so this page only confirms the connection (nothing to type) and drops you **straight into the
-guided setup** with the maintenance session already active — no login form. The 22 steps cover
+guided setup** directly — no login form and no maintenance session. The 22 steps cover
 language, association and seat, logo/colors, officers, statute/privacy, member types and periods,
 profile fields, treasury accounts, mail, enrollment, components, Admin account and consents; the last
 one creates the association **Admin**. Until that Admin exists `/setup` is the only way in: `/login`
 shows no credential form, just the button that reopens the configuration (“Resume setup” once some
 steps are saved). “Exit and continue later” keeps the progress and resumes at the first pending step;
-“Discard everything” restarts from step 1. Afterwards sign in with the maintenance account
-(`admin@socly.it`; password hash in `.env`, see `php bin/platform-master-password.php`).
+“Discard everything” restarts from step 1. Afterwards sign in with the association Admin account.
 `/install` is only needed again to restore the database credentials when the instance cannot connect.
 Without the one-click script the same page asks for the database credentials, creates the database
 and runs the migrations.
-The single **maintenance SuperAdmin** email is fixed in the application: it is never created by the
-wizard and cannot be changed from the UI. Setup is not anonymous. The scripts do not accept the
-Terms of Service for you.
+The **maintenance SuperAdmin** is not created or shown by the installer; fresh installs start with
+master login disabled. A signed master credential requires the platform owner's Ed25519 key and is
+bound to this installation's `APP_KEY`, so a plain GitHub fork cannot mint or change it. The scripts
+do not accept the Terms of Service for you.
 
 ## Common options
 
@@ -83,9 +83,10 @@ PHP/Composer/MariaDB, project files, firewall/Defender). `-Plan` only prints the
 
 - The local server uses PHP's built-in web server: it is meant for installation and evaluation.
   For production use Apache/Nginx + HTTPS, see [`docs/INSTALLATION.md`](../../docs/INSTALLATION.md).
-- The maintenance SuperAdmin email is `admin@socly.it`; its Argon2id password hash lives in `.env`
-  (`PLATFORM_MASTER_PASSWORD_HASH`). Fresh installs also write a one-shot file under
-  `storage/PLATFORM_MASTER_CREDENTIALS.txt` — rotate with `php bin/platform-master-password.php`.
+- The maintenance SuperAdmin is not provisioned by a fresh install (master login stays disabled).
+  Authorized deployments only can add a signed credential: Argon2id hash + Ed25519 signature in
+  `.env`, bound to `APP_KEY`, via `php bin/platform-master-password.php` in the private/hosted build
+  with the platform signing key outside the repository. A plain GitHub fork cannot mint or change it.
 - On Windows the script auto-elevates through UAC, writes a transcript to `storage/logs/install-*.log`
   and keeps the elevated window/log available on failure. MariaDB is installed with
   `winget`/Chocolatey when available; otherwise install MariaDB Server manually and re-run.

@@ -92,10 +92,12 @@ every 100 patches bump the series, and each bump is published to this rep come o
 
 ### Security
 
-- Install always generates `PLATFORM_MASTER_PASSWORD_HASH`, reloads it into the current request, and
-  refuses `loginAsPlatformMaster()` when the hash is missing. The one-shot password is shown once in
-  the setup UI (no durable plaintext file by default). CLI rotator prints to stdout; `--write-file`
-  is opt-in and the file is deleted on successful master login.
+- Maintenance SuperAdmin is now a signed, per-deployment credential: Argon2id hash + Ed25519
+  `PLATFORM_MASTER_SIGNATURE` bound to `APP_KEY`. The signing key never ships, installers never
+  provision or expose the account, and fresh GitHub forks start with master login disabled.
+- Older installs generated `PLATFORM_MASTER_PASSWORD_HASH` and showed a one-shot setup password. Current
+  installs do not provision a master credential at all: they require a signed hash + signature from the
+  platform owner and leave master login disabled otherwise.
 - `.env` quoting for Argon2 hashes uses single quotes (escaping `$` as `\$` broke Dotenv). `chmod 0600`
   is applied after every `writeEnv`.
 - Password-reset tokens are no longer written in cleartext to `app.log` when SMTP is missing.
@@ -103,7 +105,7 @@ every 100 patches bump the series, and each bump is published to this rep come o
   credentials), `.env` mode `0600`, optional `DEMO_ALLOWED_IPS` for setup-wizard demos
   (`demo.setup_wizard_allowed_ips`). Marketing admin supports `admin.allowed_ips` /
   `SOCLY_ADMIN_ALLOWED_IPS` (covers demos wizard and all admin pages including login).
-- Platform master (`admin@socly.it`): the shared Argon2id password hash was removed from the
+- Platform maintenance account: the shared Argon2id password hash was removed from the
   repository. Each install now stores `PLATFORM_MASTER_PASSWORD_HASH` in `.env` only. Generate or
   rotate with `php bin/platform-master-password.php`. Set `SOCLY_DISABLE_PLATFORM_MASTER=true` to
   refuse master login entirely.

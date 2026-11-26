@@ -81,19 +81,24 @@ final class InstallerService
             ? (!empty($data['update_enabled']) ? 'true' : 'false')
             : (string) ($existing['UPDATE_ENABLED'] ?? 'false');
 
-        // Platform master password: never ship a shared hash in the repository.
-        $masterPlain = '';
-        if (!empty($data['platform_master_password_hash'])) {
-            $merged['PLATFORM_MASTER_PASSWORD_HASH'] = (string) $data['platform_master_password_hash'];
-            $merged['SOCLY_DISABLE_PLATFORM_MASTER'] = (string) ($data['socly_disable_platform_master'] ?? 'false');
-        } elseif (empty($existing['PLATFORM_MASTER_PASSWORD_HASH'])) {
-            $secret = \Socly\Support\PlatformMasterAccess::generateSecret();
-            $merged['PLATFORM_MASTER_PASSWORD_HASH'] = $secret['hash'];
-            $merged['SOCLY_DISABLE_PLATFORM_MASTER'] = 'false';
-            $masterPlain = $secret['password'];
-        } else {
-            $merged['PLATFORM_MASTER_PASSWORD_HASH'] = (string) $existing['PLATFORM_MASTER_PASSWORD_HASH'];
+        // Platform master: never provision or accept a credential from installer
+        // input. A fresh fork starts with master login disabled; only a deployment
+        // holding the platform-owner signing key can add a signed credential.
+        $existingHash = trim((string) ($existing['PLATFORM_MASTER_PASSWORD_HASH'] ?? ''));
+        $existingSignature = trim((string) ($existing['PLATFORM_MASTER_SIGNATURE'] ?? ''));
+        $hasSignedMaster = \Socly\Support\PlatformMasterAccess::isSignatureValid(
+            $existingHash,
+            $existingSignature,
+            $merged['APP_KEY']
+        );
+        if ($hasSignedMaster) {
+            $merged['PLATFORM_MASTER_PASSWORD_HASH'] = $existingHash;
+            $merged['PLATFORM_MASTER_SIGNATURE'] = $existingSignature;
             $merged['SOCLY_DISABLE_PLATFORM_MASTER'] = (string) ($existing['SOCLY_DISABLE_PLATFORM_MASTER'] ?? 'false');
+        } else {
+            $merged['SOCLY_DISABLE_PLATFORM_MASTER'] = 'true';
+            $merged['PLATFORM_MASTER_PASSWORD_HASH'] = '';
+            $merged['PLATFORM_MASTER_SIGNATURE'] = '';
         }
 
         // Preferred key order for readability; leftover keys (e.g. SOCLY_SITE_URL) kept after.
@@ -102,7 +107,7 @@ final class InstallerService
             'DB_HOST', 'DB_PORT', 'DB_DATABASE', 'DB_USERNAME', 'DB_PASSWORD',
             'APP_LOCALE', 'SESSION_LIFETIME',
             'SOCLY_SITE_URL', 'SOCLY_PLATFORM_API_URL', 'SOCLY_REPORT_PROBLEMS',
-            'SOCLY_DISABLE_PLATFORM_MASTER', 'PLATFORM_MASTER_PASSWORD_HASH',
+            'SOCLY_DISABLE_PLATFORM_MASTER', 'PLATFORM_MASTER_PASSWORD_HASH', 'PLATFORM_MASTER_SIGNATURE',
             'UPDATE_NOTIFY', 'UPDATE_MANIFEST_URL', 'UPDATE_REPO', 'UPDATE_CHANNEL', 'UPDATE_ENABLED',
         ];
         $lines = [
@@ -116,7 +121,7 @@ final class InstallerService
             }
             $lines[] = $key . '=' . self::envEscape((string) $merged[$key]);
             $written[$key] = true;
-            if (in_array($key, ['APP_KEY', 'DB_PASSWORD', 'SESSION_LIFETIME', 'PLATFORM_MASTER_PASSWORD_HASH', 'UPDATE_ENABLED'], true)) {
+            if (in_array($key, ['APP_KEY', 'DB_PASSWORD', 'SESSION_LIFETIME', 'PLATFORM_MASTER_PASSWORD_HASH', 'PLATFORM_MASTER_SIGNATURE', 'UPDATE_ENABLED'], true)) {
                 $lines[] = '';
             }
         }
@@ -137,6 +142,7 @@ final class InstallerService
         // Same request must see the new master hash (Dotenv already ran at boot).
         foreach ([
             'PLATFORM_MASTER_PASSWORD_HASH',
+            'PLATFORM_MASTER_SIGNATURE',
             'SOCLY_DISABLE_PLATFORM_MASTER',
             'APP_KEY',
             'DB_HOST',
@@ -155,12 +161,6 @@ final class InstallerService
         }
 
         Database::clearReachableCache();
-
-        if ($masterPlain !== '') {
-            // One-shot in session for the installing browser; no durable plaintext file by default.
-            // The account email is intentionally not exposed in the web UI.
-            $_SESSION['platform_master_password_once'] = $masterPlain;
-        }
     }
 
     /**

@@ -947,14 +947,14 @@ cat <<TXT
 
 ✔ Socly è installato e il server locale è attivo.
   Wizard:   ${LOCAL_URL}
-  Login:    http://${CONNECT_HOST}:${LOCAL_PORT}/login (account di manutenzione: vedi docs/INSTALLATION.md)
-  Setup:    http://${CONNECT_HOST}:${LOCAL_PORT}/setup (dopo il wizard e il login)
+  Setup:    http://${CONNECT_HOST}:${LOCAL_PORT}/setup (configurazione guidata, si apre dopo l’installazione)
+  Login:    http://${CONNECT_HOST}:${LOCAL_PORT}/login (account amministratore creato nel wizard)
   Log:      ${ROOT}/storage/logs/install-server.log
   Stop:     Ctrl+C
 ${TUNNEL_HINT}
 
-Completa il wizard (associazione, periodo, quote, campi); poi accedi con l’account di manutenzione e completa /setup.
-La password di manutenzione non viene stampata né salvata dallo script.
+Completa il wizard (associazione, periodo, quote, campi, account amministratore).
+L’account SuperAdmin di manutenzione non viene creato dall’installer né mostrato qui.
 Il server locale vive in questa sessione: se chiudi SSH si ferma (--no-serve per un vhost).
 Per la produzione (Apache/Nginx, HTTPS) vedi docs/INSTALLATION.md.
 TXT

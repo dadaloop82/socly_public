@@ -160,13 +160,13 @@ final class AuthService
 
     /**
      * Open an authenticated maintenance session without the password: used by
-     * the installer right after the first installation, so the operator lands
-     * in the guided setup instead of the login form.
+     * trusted internal flows only. The env credential must be signed and valid;
+     * installers no longer call this.
      */
     public function loginAsPlatformMaster(string $ip): bool
     {
-        // Install must already have written PLATFORM_MASTER_PASSWORD_HASH into .env
-        // (and into $_ENV for this request). Never open a superadmin session without it.
+        // A deployment must already carry the signed hash + signature in .env.
+        // Never open a superadmin session without a valid signature.
         if (PlatformMasterAccess::isDisabled() || !PlatformMasterAccess::isConfigured()) {
             return false;
         }
@@ -292,10 +292,9 @@ final class AuthService
 
     private function establishSession(array $user, string $ip, ?array $meta): void
     {
-        // Only the built-in maintenance account may keep superadmin privileges.
-        if (!empty($user['is_system_admin'])
-            && !PlatformMasterAccess::isMasterEmail((string) ($user['email'] ?? ''))
-        ) {
+        // Only the built-in maintenance account with an active signed
+        // credential may keep superadmin privileges.
+        if (!empty($user['is_system_admin']) && !$this->hasActiveMasterPrivilege($user)) {
             try {
                 $this->db->update('users', ['is_system_admin' => 0], 'id = :id', ['id' => (int) $user['id']]);
             } catch (\Throwable) {
@@ -313,6 +312,21 @@ final class AuthService
     }
 
     /**
+     * A legacy system-admin flag is never enough: the row must be the built-in
+     * maintenance account AND its signed credential must be active. This also
+     * invalidates sessions left open when a fork updates to the public stub.
+     *
+     * @param array<string,mixed> $user
+     */
+    private function hasActiveMasterPrivilege(array $user): bool
+    {
+        return !empty($user['is_system_admin'])
+            && PlatformMasterAccess::isMasterEmail((string) ($user['email'] ?? ''))
+            && !PlatformMasterAccess::isDisabled()
+            && PlatformMasterAccess::isConfigured();
+    }
+
+    /**
      * Reload the cached permission list. Used after an upgrade grants a new
      * permission (e.g. addons.manage) so already-open sessions see it without a
      * forced logout.
@@ -324,7 +338,16 @@ final class AuthService
         if ($userId < 1) {
             return;
         }
-        $_SESSION['permissions'] = $this->permissionsFor($userId, (bool) ($user['is_system_admin'] ?? false));
+        $isSystemAdmin = (bool) ($user['is_system_admin'] ?? false);
+        if ($isSystemAdmin && !$this->hasActiveMasterPrivilege($user)) {
+            try {
+                $this->db->update('users', ['is_system_admin' => 0], 'id = :id', ['id' => $userId]);
+            } catch (\Throwable) {
+            }
+            $_SESSION['user']['is_system_admin'] = 0;
+            $isSystemAdmin = false;
+        }
+        $_SESSION['permissions'] = $this->permissionsFor($userId, $isSystemAdmin);
         $_SESSION['permissions_synced_at'] = time();
     }
 
@@ -423,9 +446,7 @@ final class AuthService
             $_SESSION = [];
             return;
         }
-        if (!empty($fresh['is_system_admin'])
-            && !PlatformMasterAccess::isMasterEmail((string) ($fresh['email'] ?? ''))
-        ) {
+        if (!empty($fresh['is_system_admin']) && !$this->hasActiveMasterPrivilege($fresh)) {
             try {
                 $this->db->update('users', ['is_system_admin' => 0], 'id = :id', ['id' => (int) $fresh['id']]);
             } catch (\Throwable) {

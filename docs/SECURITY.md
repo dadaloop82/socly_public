@@ -65,20 +65,26 @@ Permission checks on routes and UI via stable keys in `Socly\Support\Permission`
 
 ## Maintenance SuperAdmin
 
-- Exactly one system administrator exists: the built-in **maintenance account** (`admin@socly.it`).
-- The email is public and fixed in code (HMAC digest). The **password is per-install**: Argon2id hash
-  in `.env` as `PLATFORM_MASTER_PASSWORD_HASH` (never committed). The DB row keeps an unusable random
-  hash. Create or rotate with `php bin/platform-master-password.php`.
-- Set `SOCLY_DISABLE_PLATFORM_MASTER=true` to refuse master login entirely (recommended when only a
-  local association admin is used).
+- Exactly one system administrator exists: the built-in **maintenance account**. The email is a fixed
+  technical identifier (HMAC digest); the app never displays it in lists, setup or installers.
+- The credential is **per-deployment and signed**: Argon2id hash in `.env` as
+  `PLATFORM_MASTER_PASSWORD_HASH` plus an Ed25519 `PLATFORM_MASTER_SIGNATURE` bound to `APP_KEY`.
+  The signing key is held only by the platform owner and is never committed. A plain GitHub fork
+  cannot mint or change a valid credential; fresh installs start with
+  `SOCLY_DISABLE_PLATFORM_MASTER=true`.
+- Create or rotate only in the private/hosted build, with the signing key available, via
+  `php bin/platform-master-password.php`. The DB row keeps an unusable random hash; login is verified
+  against the signed env credential.
 - It cannot be created, edited, deleted or password-reset from the UI; no other user can be promoted
   to `is_system_admin`.
-- On real installations the first-run setup requires the maintenance login; public demo instances
-  keep anonymous setup. Fresh installs write a one-shot credential file under
-  `storage/PLATFORM_MASTER_CREDENTIALS.txt` (mode 0600) — delete after first use.
+- The first-run setup stays open until an association Admin exists; the installer never opens a
+  maintenance session and never writes a one-shot credential file.
+- The public base edition replaces this class with a disabled stub: no maintenance SuperAdmin
+  exists there. The signed implementation is part of the private/hosted build only.
 - Legacy system-admin rows are demoted at login/session restore, and `can()` grants the system-admin
   bypass only to the maintenance email.
-- Keep the maintenance credentials offline. Never put a shared password hash back into the repository.
+- Keep the signing key and the maintenance password offline. Never put a shared password hash or the
+  private signing key back into the repository.
 
 ## Public endpoints
 

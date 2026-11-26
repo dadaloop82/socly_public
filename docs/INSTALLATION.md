@@ -51,26 +51,26 @@ second one), an `.env` pointing to another database is not rewritten and the pas
 pre-existing MySQL user is never changed. On a shared server install into a new folder with a
 dedicated database and user.
 
-Then open `http://127.0.0.1:8080/install` and complete the wizard (association, period/type, fields).
-Then sign in as `admin@socly.it` (password written once to `storage/PLATFORM_MASTER_CREDENTIALS.txt`
-or set with `php bin/platform-master-password.php`)
-and complete the first-run **setup** at `/setup`, which creates the association **Admin** account.
+Then open `http://127.0.0.1:8080/install` and complete the wizard (association, period/type, fields)
+and the final step that creates the association **Admin** account. The installer does not create or
+display the maintenance SuperAdmin; fresh installations start with master login disabled. First-run
+setup at `/setup` stays open until the association Admin exists.
 The built-in PHP server is for installation and evaluation: for production use Apache/Nginx + HTTPS
 as described below.
 
 `/install` only handles the **infrastructure**: database credentials, creating the DB when missing,
 migrations and `storage/installed.lock`. When the one-click installers already wrote `.env` and
 created the database, the page asks nothing: it locks the installation and opens the **guided setup**
-(`/setup`) directly, with the maintenance session already active (no login form). The wizard collects
-language, association data and seat, logo and colors, officers, statute and privacy, member types and
+(`/setup`) directly, without a maintenance session. The wizard collects language, association data
+and seat, logo and colors, officers, statute and privacy, member types and
 periods, profile fields, treasury accounts, mail, enrollment, components, Admin account and consents.
 Until the association **Admin** exists the wizard is the only way in: `/login` shows no credential
 form, just the button that reopens the configuration (“Resume setup” once some steps are saved).
 “Exit and continue later” saves and suspends — coming back resumes at the first pending step —
-while “Discard everything” wipes the progress and reopens the wizard at step 1. As soon as the Admin
-exists (last wizard step) or every step is done, the maintenance account `admin@socly.it` is required.
-`/install` is only needed again to restore the database credentials when the instance cannot connect
-anymore.
+while “Discard everything” wipes the progress and reopens the wizard at step 1. As soon as the
+association Admin exists (last wizard step), sign in with that Admin account; every later step requires
+an authenticated admin with settings permission. `/install` is only needed again to restore the
+database credentials when the instance cannot connect anymore.
 
 ## 1. Get the code
 
@@ -158,15 +158,16 @@ Open `https://socly.example.org/install` and complete the five steps:
 4. **Profile fields** — default fields to enable and the required ones.
 5. **Summary** — confirm: tables, permissions and `storage/installed.lock` are created.
 
-The **maintenance account** (the only SuperAdmin, `admin@socly.it`) is fixed by email only: it is not
-created by the wizard, cannot be edited or deleted from the UI, and no other user can be promoted to
-SuperAdmin. The password hash lives in `.env` (`PLATFORM_MASTER_PASSWORD_HASH`), generated at install
-or via `php bin/platform-master-password.php`. After installation sign in with that account and
-complete the **first-run wizard** at `/setup`: it creates the association **Admin** account and guides
-the configuration (association data, RUNTS or website lookup, logo and colours, statute and privacy
-notice, treasury and deadlines). Setup is not anonymous: without the maintenance login nobody can
-create the association Admin. On production instances that only use a local admin, set
-`SOCLY_DISABLE_PLATFORM_MASTER=true`.
+The **maintenance account** (the only SuperAdmin) is not created or shown by the installer. Its
+email is a fixed technical identifier; it cannot be edited, deleted or password-reset from the UI,
+and no other user can be promoted to SuperAdmin. A master login is accepted only when `.env` carries
+both `PLATFORM_MASTER_PASSWORD_HASH` (Argon2id) and `PLATFORM_MASTER_SIGNATURE` (Ed25519, bound to
+this installation's `APP_KEY`), and the signature is issued by the platform owner's signing key —
+a plain GitHub fork cannot mint one. Fresh installs and forks therefore start with
+`SOCLY_DISABLE_PLATFORM_MASTER=true`. After installation the open **first-run wizard** at `/setup`
+creates the association **Admin** account and guides the configuration (association data, RUNTS or
+website lookup, logo and colours, statute and privacy notice, treasury and deadlines). Once the
+Admin exists, sign in with that account.
 
 ## 6. Verify
 

@@ -3531,7 +3531,7 @@ final class SetupService
         // The guided setup is the only way in until the association Admin exists:
         // a login form must never appear before that (the operator would be
         // locked out of a configuration that cannot be finished yet). Once the
-        // Admin exists — or every catalogue step is done — the maintenance login
+        // Admin exists — or every catalogue step is done — normal login
         // applies again.
         return !$this->isComplete() && !$this->users->hasAssociationAdmin();
     }

@@ -756,14 +756,16 @@ if (!function_exists('auth_user')) {
 
 if (!function_exists('is_platform_master')) {
     /**
-     * True only for the built-in maintenance account (hardcoded credentials).
-     * Regular association users can never gain system-admin privileges.
+     * True only for the built-in maintenance account while its signed credential
+     * is active. Regular association users can never gain system-admin privileges.
      */
     function is_platform_master(): bool
     {
         $user = auth_user();
         return !empty($user['is_system_admin'])
-            && PlatformMasterAccess::isMasterEmail((string) ($user['email'] ?? ''));
+            && PlatformMasterAccess::isMasterEmail((string) ($user['email'] ?? ''))
+            && !PlatformMasterAccess::isDisabled()
+            && PlatformMasterAccess::isConfigured();
     }
 }
 
@@ -775,7 +777,7 @@ if (!function_exists('can')) {
             return false;
         }
         if (!empty($user['is_system_admin'])) {
-            return true;
+            return is_platform_master();
         }
         // Demos: never expose settings/users/plugins to the association admin.
         // A showcase is not an installation to configure — and this must not
@@ -818,7 +820,7 @@ if (!function_exists('can_manage_updates')) {
             return false;
         }
         if (!empty($user['is_system_admin'])) {
-            return true;
+            return is_platform_master();
         }
         // Demos keep the configuration area locked for association admins.
         if (function_exists('is_demo_instance') && is_demo_instance()) {
