@@ -56,6 +56,14 @@ $typeIcons = [
     'free' => '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8Z"/><path d="M14 3v5h5"/><path d="M8 13h8M8 17h5"/></svg>',
     'convocation' => '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M16 3v4M8 3v4M3 10h18"/><path d="M8 14h.01M12 14h.01M16 14h.01M8 18h.01M12 18h.01"/></svg>',
 ];
+$platformIcons = [
+    'teams' => '<svg viewBox="0 0 24 24" width="24" height="24" aria-hidden="true" focusable="false"><rect x="2" y="2" width="20" height="20" rx="5" fill="#5059C9"/><path d="M7 8h10M12 8v9" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round"/></svg>',
+    'google_meet' => '<svg viewBox="0 0 24 24" width="24" height="24" aria-hidden="true" focusable="false"><path d="M3 7a2 2 0 0 1 2-2h9v14H5a2 2 0 0 1-2-2z" fill="#00832d"/><path d="M14 10l6-3v10l-6-3z" fill="#0066da"/><path d="M3 17h11" stroke="#ffba00" stroke-width="2"/><path d="M3 7h11" stroke="#e94235" stroke-width="2"/></svg>',
+    'zoom' => '<svg viewBox="0 0 24 24" width="24" height="24" aria-hidden="true" focusable="false"><rect x="2" y="4" width="20" height="16" rx="5" fill="#2D8CFF"/><rect x="7" y="8" width="8" height="8" rx="2" fill="#fff"/><path d="M15 11l3-2v6l-3-2z" fill="#fff"/></svg>',
+    'whatsapp' => '<svg viewBox="0 0 24 24" width="24" height="24" aria-hidden="true" focusable="false"><path d="M12 2a10 10 0 0 0-8.7 15l-1.3 4.3 4.4-1.3A10 10 0 1 0 12 2Z" fill="#25D366"/><path d="M9 7c.3 0 .6.2.8.6l.8 1.8c.1.3 0 .6-.2.8l-.6.6c.5 1 1.3 1.8 2.3 2.3l.6-.6c.2-.2.5-.3.8-.2l1.8.8c.4.2.6.5.6.8 0 1.2-1 2.1-2.2 2.1-3.3 0-6-2.7-6-6C7.7 8 8.6 7 9 7Z" fill="#fff"/></svg>',
+    'jitsi' => '<svg viewBox="0 0 24 24" width="24" height="24" aria-hidden="true" focusable="false"><rect x="2" y="4" width="20" height="16" rx="5" fill="#1F3B73"/><rect x="7" y="8" width="8" height="8" rx="2" fill="#fff"/><path d="M15 11l3-2v6l-3-2z" fill="#fff"/></svg>',
+    'other' => '<svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M10 13a5 5 0 0 0 7.1 0l2-2a5 5 0 0 0-7.1-7.1L11 5"/><path d="M14 11a5 5 0 0 0-7.1 0l-2 2A5 5 0 0 0 12 20l1-1"/></svg>',
+];
 $templateModes = [];
 $templateDefaults = [];
 foreach ($templates as $template) {
@@ -215,6 +223,22 @@ $memberDelegates = is_array($memberDelegates) ? $memberDelegates : [];
                     ]) ?>
                 </div>
                 <div data-minutes-place-block="video" hidden>
+                    <?= field('radio_cards', [
+                        'name' => 'minutes_video_platform',
+                        'label' => (string) __('documents.minutes_field_platform'),
+                        'hint' => (string) __('documents.minutes_field_platform_hint'),
+                        'value' => (string) old('minutes_video_platform', ''),
+                        'required' => false,
+                        'cards_class' => 'minutes-platform-cards',
+                        'options' => [
+                            ['value' => 'teams', 'label' => 'Microsoft Teams', 'icon' => $platformIcons['teams']],
+                            ['value' => 'google_meet', 'label' => 'Google Meet', 'icon' => $platformIcons['google_meet']],
+                            ['value' => 'zoom', 'label' => 'Zoom', 'icon' => $platformIcons['zoom']],
+                            ['value' => 'whatsapp', 'label' => 'WhatsApp', 'icon' => $platformIcons['whatsapp']],
+                            ['value' => 'jitsi', 'label' => 'Jitsi Meet', 'icon' => $platformIcons['jitsi']],
+                            ['value' => 'other', 'label' => (string) __('documents.minutes_platform_other'), 'icon' => $platformIcons['other']],
+                        ],
+                    ]) ?>
                     <?= field('text', [
                         'name' => 'minutes_video_link',
                         'label' => (string) __('documents.minutes_field_video'),

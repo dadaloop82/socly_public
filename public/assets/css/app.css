@@ -16423,6 +16423,38 @@ select.is-remote-choice {
     max-width: none;
   }
 }
+/* Meeting platforms: compact icon cards that wrap two per row on small screens. */
+.minutes-platform-cards {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.55rem;
+  margin-bottom: 0.75rem;
+}
+.minutes-platform-cards .tessera-choice-card {
+  flex: 1 1 8.5rem;
+  max-width: 11.5rem;
+  min-width: 0;
+  padding: 0.7rem 0.5rem;
+  display: grid;
+  justify-items: center;
+  gap: 0.35rem;
+  text-align: center;
+}
+.minutes-platform-cards .tessera-choice-card-icon {
+  width: 2.4rem;
+  height: 2.4rem;
+  border-radius: 12px;
+  background: #fff;
+  border: 1px solid color-mix(in srgb, var(--ink) 10%, transparent);
+}
+.minutes-platform-cards .tessera-choice-card-title {
+  font-size: 0.86rem;
+}
+@media (max-width: 560px) {
+  .minutes-platform-cards .tessera-choice-card {
+    flex-basis: calc(50% - 0.55rem);
+  }
+}
 .minutes-agenda-list { display: grid; gap: 0.85rem; }
 .minutes-agenda-card {
   border: 1px solid var(--line);

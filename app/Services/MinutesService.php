@@ -50,6 +50,9 @@ final class MinutesService
         'convocation' => ['category' => 'minutes', 'mode' => 'assembly'],
     ];
 
+    /** Meeting platforms accepted by the video-conference block (free link stays mandatory). */
+    private const VIDEO_PLATFORMS = ['teams', 'google_meet', 'zoom', 'whatsapp', 'jitsi', 'other'];
+
     /** Attendance values accepted for board members. */
     private const BOARD_ATTENDANCE = ['present', 'absent_justified', 'absent'];
 
@@ -342,6 +345,10 @@ final class MinutesService
 
         $place = mb_substr(trim((string) ($input['minutes_place'] ?? '')), 0, 190);
         $videoLink = mb_substr(trim((string) ($input['minutes_video_link'] ?? '')), 0, 255);
+        $videoPlatform = strtolower(trim((string) ($input['minutes_video_platform'] ?? '')));
+        if (!in_array($videoPlatform, self::VIDEO_PLATFORMS, true)) {
+            $videoPlatform = '';
+        }
         if ($place === '' && $placeMode === 'in_person') {
             $place = $this->defaultPlace();
         }
@@ -360,6 +367,7 @@ final class MinutesService
             'place_mode' => $placeMode,
             'place' => $place,
             'video_link' => $videoLink,
+            'video_platform' => $videoPlatform,
             'convoked' => $convoked,
             'convocation_date' => $convocationDate,
             'president' => $presidentName,
@@ -613,6 +621,12 @@ final class MinutesService
         $lines[] = (string) __('documents.minutes_summary_date', [
             'date' => format_date((string) ($minutes['date'] ?? '')) ?: (string) ($minutes['date'] ?? ''),
         ]);
+        if (($minutes['place_mode'] ?? '') === 'video') {
+            $video = $this->videoValue($minutes);
+            if ($video !== '') {
+                $lines[] = (string) __('documents.minutes_summary_video', ['value' => $video]);
+            }
+        }
         $mode = (string) ($minutes['mode'] ?? 'free');
         if (in_array($mode, ['board', 'assembly'], true)) {
             $quorum = $this->quorum($minutes);
@@ -646,6 +660,35 @@ final class MinutesService
 
 
     /**
+     * “Microsoft Teams — https://…” for the PDF and the archive summary. An unknown/empty
+     * platform simply leaves the pasted link, so the field never invents a URL.
+     *
+     * @param array<string,mixed> $minutes
+     */
+    private function videoValue(array $minutes): string
+    {
+        $parts = array_values(array_filter([
+            $this->videoPlatformLabel((string) ($minutes['video_platform'] ?? '')),
+            trim((string) ($minutes['video_link'] ?? '')),
+        ], static fn (string $part): bool => $part !== ''));
+
+        return implode(' — ', $parts);
+    }
+
+    private function videoPlatformLabel(string $key): string
+    {
+        return match ($key) {
+            'teams' => 'Microsoft Teams',
+            'google_meet' => 'Google Meet',
+            'zoom' => 'Zoom',
+            'whatsapp' => 'WhatsApp',
+            'jitsi' => 'Jitsi Meet',
+            'other' => (string) __('documents.minutes_platform_other'),
+            default => '',
+        };
+    }
+
+    /**
      * Structured content handed to the PDF writer.
      *
      * @param array<string,mixed> $minutes
@@ -664,7 +707,7 @@ final class MinutesService
             ['label' => (string) __('documents.minutes_field_time_open'), 'value' => (string) ($minutes['time_open'] ?? '')],
         ];
         if (($minutes['place_mode'] ?? 'in_person') === 'video') {
-            $meta[] = ['label' => (string) __('documents.minutes_field_video'), 'value' => (string) ($minutes['video_link'] ?? '')];
+            $meta[] = ['label' => (string) __('documents.minutes_field_video'), 'value' => $this->videoValue($minutes)];
         } else {
             $meta[] = ['label' => (string) __('documents.minutes_field_place'), 'value' => (string) ($minutes['place'] ?? '')];
         }

@@ -20574,6 +20574,27 @@ function initMinutesWizard(root = document) {
     });
     syncPlace();
 
+    // Meeting platform: the link placeholder follows the chosen provider (no URL is invented).
+    const videoLinkInput = form.querySelector('[name="minutes_video_link"]');
+    const platformPlaceholders = {
+      teams: 'https://teams.microsoft.com/l/meetup-join/…',
+      google_meet: 'https://meet.google.com/…',
+      zoom: 'https://zoom.us/j/…',
+      whatsapp: 'https://call.whatsapp.com/video/…',
+      jitsi: 'https://meet.jit.si/…',
+      other: 'https://…',
+    };
+    const syncVideoPlatform = () => {
+      const platform = form.querySelector('input[name="minutes_video_platform"]:checked')?.value || '';
+      if (videoLinkInput instanceof HTMLInputElement) {
+        videoLinkInput.placeholder = platformPlaceholders[platform] || 'https://…';
+      }
+    };
+    form.querySelectorAll('input[name="minutes_video_platform"]').forEach((input) => {
+      input.addEventListener('change', syncVideoPlatform);
+    });
+    syncVideoPlatform();
+
     form.addEventListener('submit', (event) => {
       if (event.defaultPrevented) return;
       const current = step;
