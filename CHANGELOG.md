@@ -114,6 +114,37 @@ every 100 patches bump the series, and each bump is published to this rep come o
 
 ### Fixed
 
+- Bank-statement audit: the **“Movimenti a libro non presenti in estratto”** list is rebuilt from the
+  stored statement pairings (`matched_id` per parsed row) instead of the bare `used_existing` id set.
+  Movements whose pairing was never stored (matched rows are dropped from `verify_movements`) are
+  listed again instead of being invisible; a ledger row is justified also by the **same transaction
+  code** on any date. The list appears in the report page too and has **multiple selection** with
+  **Elimina selezionati** / **Ignora definitivamente** (new `addon_bank_statement_ignored` table: the
+  movement stays in the cash book and is never flagged again — e.g. the opening balance #1097).
+- Bank-statement audit: **one statement row ↔ one movement globally**. A movement already paired by a
+  monthly statement is not paired again by the annual one, and a statement row whose transaction code
+  was already read in another PDF is reported as a notice, never as “missing” (annual 2026 vs monthly
+  files: Wix 14,95 was assigned to #2068 and #903).
+- Bank-statement OCR: completeness is checked **page by page** (a page read with 0 rows is a notice,
+  never “ok”) and every row now always gets a **crop** (row geometry, date strip, or whole page).
+  “Anomalie sugli estratti conto” and similar documents are excluded from the audit.
+- Bank-statement “verifica”: server-side duplicate guard (same date/amount/sign/transaction code →
+  links the existing movement instead of creating a copy), idempotency token on the submit, one
+  movement can be linked to one row only, and every value read from the statement (counterparty,
+  description, transaction code, notes) is saved on the movement.
+- Bank-statement parser: a transaction-code line printed **above** the next dated row now belongs to
+  that row, not to the previous one (the 19/12/2025 fees carried the code of the next fee: 1.085
+  “diff” on 1.377 rows).
+- Bank-statement audit files: retention keeps the newest 5 runs, so `audit-*.json` no longer grows by
+  3+ MB per run (add-on 1.4.90).
+- Bank-statement audit: duplicates are also found by **transaction code** (SEPA/disposition number,
+  POS date+time+merchant, mandate) across **all dates**, and the statement pairing uses the same key:
+  a copy re-entered with another date (same SEPA code) is paired/detected instead of being offered as
+  a new movement.
+- Bank-statement audit: the period declared by the statement now decides the year of every row. Rows
+  whose year does not fit are corrected from the declared period when the month/day fit it; rows that
+  remain outside the period are reported as a notice in the report and are **not** offered as missing
+  (a wrong year no longer creates a movement that does not exist) (add-on 1.4.89).
 - Bank-statement audit / verify: a row that already exists in the ledger is no longer offered as
   “add to the cash book” without a warning. Each missing row now lists the **similar movements
   already recorded** (same direction and amount within ten days), with **“Collega il movimento #N”**
