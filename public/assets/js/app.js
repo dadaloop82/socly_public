@@ -20466,6 +20466,13 @@ function initMinutesWizard(root = document) {
       }
       if (errorBox instanceof HTMLElement) errorBox.hidden = true;
       if (step === total) refreshCloseTime();
+      // Values already present (including corrections returned by the server) are checked as soon
+      // as the step opens: the constraint must be visible before the operator presses “Next”.
+      panelFor(step)?.querySelectorAll('input, select, textarea').forEach((el) => {
+        if (!(el instanceof HTMLInputElement || el instanceof HTMLSelectElement || el instanceof HTMLTextAreaElement)) return;
+        if (el.type === 'radio' || el.type === 'checkbox' || el.type === 'hidden') return;
+        if (typeof el.value === 'string' && el.value !== '') liveValidate(el);
+      });
       const head = panelFor(step)?.querySelector('h2, h3');
       if (head instanceof HTMLElement) head.focus({ preventScroll: true });
     };
@@ -20489,6 +20496,10 @@ function initMinutesWizard(root = document) {
         node.classList.remove('is-invalid');
         node.removeAttribute('aria-invalid');
       });
+      panel.querySelectorAll('[data-minutes-field-error]').forEach((node) => {
+        node.hidden = true;
+        node.textContent = '';
+      });
     };
     const markInvalid = (el) => {
       if (el.type === 'radio') {
@@ -20499,6 +20510,73 @@ function initMinutesWizard(root = document) {
       }
       el.classList.add('is-invalid');
       el.setAttribute('aria-invalid', 'true');
+    };
+    // Inline message under the field: the operator must see the constraint while filling the step,
+    // not only after pressing “Next” (the statutory convocation notice is the classic surprise).
+    const fieldErrorBox = (el) => {
+      const field = el.closest('[data-sf-field]');
+      if (!(field instanceof HTMLElement)) return null;
+      let box = field.querySelector('[data-minutes-field-error]');
+      if (!(box instanceof HTMLElement)) {
+        box = document.createElement('p');
+        box.className = 'sf-field__error';
+        box.setAttribute('data-minutes-field-error', '');
+        box.setAttribute('role', 'alert');
+        const anchor = el.type === 'radio'
+          ? (field.querySelector('[role="radiogroup"]') || el)
+          : el;
+        anchor.insertAdjacentElement('afterend', box);
+      }
+      return box;
+    };
+    const setFieldError = (el, message) => {
+      if (message === '') {
+        const field = el.closest('[data-sf-field]');
+        const existing = field ? field.querySelector('[data-minutes-field-error]') : null;
+        if (existing instanceof HTMLElement) {
+          existing.hidden = true;
+          existing.textContent = '';
+        }
+        return;
+      }
+      const box = fieldErrorBox(el);
+      if (!(box instanceof HTMLElement)) return;
+      box.textContent = message;
+      box.hidden = false;
+    };
+    const controlMessage = (el) => {
+      if (el.disabled || el.hidden || el.type === 'hidden' || el.type === 'submit' || el.type === 'button') return '';
+      if (el.closest('[hidden]')) return '';
+      if (el.type === 'radio') {
+        if (!el.required) return '';
+        const group = el.form ? el.form.querySelectorAll(`input[type="radio"][name="${el.name}"]`) : [];
+        return [...group].some((radio) => radio.checked) ? '' : (el.validationMessage || '');
+      }
+      if (el.offsetParent === null) return '';
+      if (el.checkValidity() && !(el.required && typeof el.value === 'string' && el.value.trim() === '')) return '';
+      return el.validationMessage || '';
+    };
+    const liveValidate = (el) => {
+      if (!(el instanceof HTMLElement)) return;
+      const message = controlMessage(el);
+      if (message === '') {
+        setFieldError(el, '');
+        if (el.type === 'radio') {
+          const group = el.form ? el.form.querySelectorAll(`input[type="radio"][name="${el.name}"]`) : [];
+          group.forEach((radio) => {
+            radio.classList.remove('is-invalid');
+            radio.removeAttribute('aria-invalid');
+          });
+          const box = el.closest('[role="radiogroup"]');
+          if (box instanceof HTMLElement) box.classList.remove('is-invalid');
+        } else {
+          el.classList.remove('is-invalid');
+          el.removeAttribute('aria-invalid');
+        }
+        return;
+      }
+      markInvalid(el);
+      setFieldError(el, `${fieldLabel(el)}: ${message}`.trim());
     };
 
     const validateStep = () => {
@@ -20520,7 +20598,7 @@ function initMinutesWizard(root = document) {
           const checked = [...group].some((r) => r.checked);
           if (el.required && !checked) {
             ok = false;
-            problems.push({ label: fieldLabel(el), message: el.validationMessage || '' });
+            problems.push({ el, label: fieldLabel(el), message: el.validationMessage || '' });
             group.forEach((radio) => markInvalid(radio));
             firstInvalid ||= el;
           }
@@ -20529,12 +20607,15 @@ function initMinutesWizard(root = document) {
         if (el.offsetParent === null) return;
         if (!el.checkValidity() || (el.required && typeof el.value === 'string' && el.value.trim() === '')) {
           ok = false;
-          problems.push({ label: fieldLabel(el), message: el.validationMessage || '' });
+          problems.push({ el, label: fieldLabel(el), message: el.validationMessage || '' });
           markInvalid(el);
           firstInvalid ||= el;
         }
       });
       if (!ok) {
+        problems.forEach((problem) => {
+          setFieldError(problem.el, `${problem.label}: ${problem.message}`.trim());
+        });
         if (errorBox instanceof HTMLElement) {
           const details = problems
             .map((problem) => (problem.message !== '' ? `${problem.label}: ${problem.message}` : problem.label))
@@ -20555,9 +20636,42 @@ function initMinutesWizard(root = document) {
       return ok;
     };
 
+    // Validate while typing: an impossible date or a wrong time range must say so immediately,
+    // before the operator tries to move to the next step.
+    form.querySelectorAll('input, select, textarea').forEach((el) => {
+      if (!(el instanceof HTMLInputElement || el instanceof HTMLSelectElement || el instanceof HTMLTextAreaElement)) return;
+      el.addEventListener('change', () => liveValidate(el));
+      el.addEventListener('blur', () => liveValidate(el));
+      if (el.type === 'date' || el.type === 'time') {
+        el.addEventListener('input', () => {
+          if (el.value !== '') liveValidate(el);
+        });
+      }
+    });
+
+    // Closing time after opening time: the server refuses the couple, so show it at once.
+    const openTimeInput = form.querySelector('[name="minutes_time_open"]');
+    const closeTimeField = form.querySelector('[name="minutes_time_close"]');
+    const syncTimeOrder = () => {
+      if (!(openTimeInput instanceof HTMLInputElement) || !(closeTimeField instanceof HTMLInputElement)) return;
+      const invalid = openTimeInput.value !== ''
+        && closeTimeField.value !== ''
+        && closeTimeField.value < openTimeInput.value;
+      closeTimeField.setCustomValidity(invalid ? (form.dataset.msgTimeOrder || '') : '');
+      if (openTimeInput.value !== '' || closeTimeField.value !== '') {
+        liveValidate(closeTimeField);
+        liveValidate(openTimeInput);
+      }
+    };
+    [openTimeInput, closeTimeField].forEach((input) => {
+      input?.addEventListener('change', syncTimeOrder);
+      input?.addEventListener('blur', syncTimeOrder);
+    });
+
     nextBtn?.addEventListener('click', () => {
       if (!validateStep()) return;
       showStep(step + 1);
+      if (step === total) syncTimeOrder();
     });
     prevBtn?.addEventListener('click', () => showStep(step - 1));
     stepButtons.forEach((btn) => {
@@ -20966,9 +21080,10 @@ function initMinutesWizard(root = document) {
     const syncConvocation = () => {
       if (!(convocationInput instanceof HTMLInputElement)) return;
       const meetingDate = minutesDateInput instanceof HTMLInputElement ? minutesDateInput.value : '';
+      const noticeDays = Number(form.dataset.convocationNoticeDays || 0);
+      const convoked = convokedInput instanceof HTMLInputElement && convokedInput.checked;
+      let message = '';
       if (meetingDate !== '') {
-        const noticeDays = Number(form.dataset.convocationNoticeDays || 0);
-        const convoked = convokedInput instanceof HTMLInputElement && convokedInput.checked;
         const shifted = (days) => {
           const date = new Date(`${meetingDate}T00:00:00`);
           date.setDate(date.getDate() + days);
@@ -20976,21 +21091,41 @@ function initMinutesWizard(root = document) {
           return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
         };
         // Same window as the server (MinutesService::save): on or before the sitting, at least the
-        // statutory notice before it, never more than a year older. The previous code set
-        // min = meeting − notice, which allowed exactly the dates the server then rejected.
-        convocationInput.min = shifted(-365);
-        convocationInput.max = convoked && noticeDays > 0 ? shifted(-noticeDays) : meetingDate;
+        // statutory notice before it when the convocation is declared regular, never more than a
+        // year older. The previous code set min = meeting − notice, which allowed exactly the dates
+        // the server then rejected.
+        const oldest = shifted(-365);
+        const latest = convoked && noticeDays > 0 ? shifted(-noticeDays) : meetingDate;
+        convocationInput.min = oldest;
+        convocationInput.max = latest;
+        const value = convocationInput.value;
+        if (value !== '') {
+          if (value > meetingDate) {
+            message = form.dataset.msgConvocationAfter || '';
+          } else if (convoked && noticeDays > 0 && value > latest) {
+            message = (form.dataset.msgConvocationNotice || '').replace(':days', String(noticeDays));
+          } else if (value < oldest) {
+            message = form.dataset.msgConvocationTooOld || '';
+          }
+        }
       } else {
         convocationInput.removeAttribute('max');
         convocationInput.removeAttribute('min');
       }
+      // The message under the field replaces the browser's bare “value must be … or earlier” with
+      // the actual rule (statutory notice), and it is refreshed as soon as the meeting date or the
+      // “duly convened” box changes.
+      convocationInput.setCustomValidity(message);
       if (convokedInput instanceof HTMLInputElement) {
         convocationInput.required = convokedInput.checked;
       }
+      liveValidate(convocationInput);
     };
     minutesDateInput?.addEventListener('change', syncConvocation);
     minutesDateInput?.addEventListener('input', syncConvocation);
     convokedInput?.addEventListener('change', syncConvocation);
+    convocationInput?.addEventListener('change', syncConvocation);
+    convocationInput?.addEventListener('blur', syncConvocation);
     syncConvocation();
 
     // Meeting platform: the link placeholder follows the chosen provider (no URL is invented).

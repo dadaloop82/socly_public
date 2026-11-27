@@ -16548,6 +16548,16 @@ select.is-remote-choice {
   outline: 2px solid var(--danger);
   outline-offset: 3px;
 }
+/* Inline constraint shown while the operator fills the step (no “Next” needed to discover it). */
+.minutes-wizard .sf-field__error {
+  margin: 0.3rem 0 0;
+  color: var(--danger);
+  font-size: 0.82rem;
+  font-weight: 500;
+}
+.minutes-wizard .sf-field__error[hidden] {
+  display: none;
+}
 .minutes-wizard .minutes-agenda-tools {
   display: flex;
   flex-wrap: wrap;

@@ -165,6 +165,10 @@ $convocationHint = $convocationNoticeDays > 0
     data-minutes-wizard
     data-total-steps="5"
     data-msg-vote-cap="<?= e((string) __('documents.minutes_vote_cap')) ?>"
+    data-msg-convocation-after="<?= e((string) __('validation.convocation_after_meeting')) ?>"
+    data-msg-convocation-notice="<?= e((string) __('documents.minutes_error_convocation_notice', ['days' => ':days'])) ?>"
+    data-msg-convocation-too-old="<?= e((string) __('documents.minutes_error_convocation_too_old')) ?>"
+    data-msg-time-order="<?= e((string) __('validation.time_end_before_start')) ?>"
     data-convocation-notice-days="<?= (int) ($convocation_notice_days ?? 0) ?>"
     <?php if ($minutesErrors !== []): ?>data-minutes-error-step="<?= (int) $minutesErrorStep ?>"<?php endif; ?>
     autocomplete="off"
