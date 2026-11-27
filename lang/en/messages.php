@@ -4039,6 +4039,8 @@ return [
         'minutes_agenda_outcomes_title' => 'Agenda and outcomes',
         'minutes_field_convocation' => 'Convocation',
         'minutes_field_convocation_date' => 'Convocation date',
+        'minutes_field_convocation_hint' => 'For a duly convened meeting, at least :days days before the sitting (notice period set by the articles).',
+        'minutes_field_convocation_hint_no_notice' => 'For a duly convened meeting, on or before the meeting date.',
         'minutes_field_president' => 'Chair',
         'minutes_field_president_substitute' => 'Chair substitute',
         'minutes_field_secretary' => 'Minutes secretary',

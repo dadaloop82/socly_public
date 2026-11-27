@@ -141,6 +141,12 @@ $memberDelegates = old('member_delegate_to', []);
 $attendance = is_array($attendance) ? $attendance : [];
 $memberPresence = is_array($memberPresence) ? $memberPresence : [];
 $memberDelegates = is_array($memberDelegates) ? $memberDelegates : [];
+$convocationNoticeDays = (int) ($convocation_notice_days ?? 0);
+// The convocation date is not just “a date”: the statute fixes how many days before the sitting
+// it must be, so the field explains the rule instead of failing later with a generic message.
+$convocationHint = $convocationNoticeDays > 0
+    ? (string) __('documents.minutes_field_convocation_hint', ['days' => (string) $convocationNoticeDays])
+    : (string) __('documents.minutes_field_convocation_hint_no_notice');
 ?>
 <div class="page-header">
     <div class="titles">
@@ -255,6 +261,7 @@ $memberDelegates = is_array($memberDelegates) ? $memberDelegates : [];
                     <?= field('date', [
                         'name' => 'minutes_convocation_date',
                         'label' => (string) __('documents.minutes_field_convocation_date'),
+                        'hint' => $convocationHint,
                         'value' => (string) old('minutes_convocation_date', ''),
                         'context' => 'member',
                     ]) ?>

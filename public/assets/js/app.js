@@ -20470,20 +20470,58 @@ function initMinutesWizard(root = document) {
       if (head instanceof HTMLElement) head.focus({ preventScroll: true });
     };
 
+    // The generic “complete the required fields” line left the operator hunting through a long step
+    // for an invisible constraint (a date range, a duplicate number, the statute notice). Keep the
+    // sentence but append the field that blocks the step and the browser's own reason.
+    const errorDefault = errorBox instanceof HTMLElement ? (errorBox.textContent || '').trim() : '';
+    const fieldLabel = (el) => {
+      const field = el.closest('[data-sf-field]');
+      const label = field ? field.querySelector('.sf-field__label') : null;
+      const text = String(label?.textContent || '')
+        .replace(/\s+/g, ' ')
+        .trim()
+        .replace(/\s*\*$/, '')
+        .trim();
+      return text !== '' ? text : (el.getAttribute('aria-label') || el.name || '');
+    };
+    const clearInvalidMarks = (panel) => {
+      panel.querySelectorAll('.is-invalid, [aria-invalid="true"]').forEach((node) => {
+        node.classList.remove('is-invalid');
+        node.removeAttribute('aria-invalid');
+      });
+    };
+    const markInvalid = (el) => {
+      if (el.type === 'radio') {
+        const group = el.closest('[role="radiogroup"]');
+        (group instanceof HTMLElement ? group : el).classList.add('is-invalid');
+        el.setAttribute('aria-invalid', 'true');
+        return;
+      }
+      el.classList.add('is-invalid');
+      el.setAttribute('aria-invalid', 'true');
+    };
+
     const validateStep = () => {
       const panel = panelFor(step);
       if (!panel) return true;
+      clearInvalidMarks(panel);
       let ok = true;
       let firstInvalid = null;
+      const problems = [];
+      const seenRadios = new Set();
       panel.querySelectorAll('input, select, textarea').forEach((el) => {
         if (!(el instanceof HTMLInputElement || el instanceof HTMLSelectElement || el instanceof HTMLTextAreaElement)) return;
         if (el.disabled || el.hidden || el.type === 'hidden' || el.type === 'submit' || el.type === 'button') return;
         if (el.closest('[hidden]')) return;
         if (el.type === 'radio') {
+          if (seenRadios.has(el.name)) return;
+          seenRadios.add(el.name);
           const group = panel.querySelectorAll(`input[type="radio"][name="${el.name}"]`);
           const checked = [...group].some((r) => r.checked);
           if (el.required && !checked) {
             ok = false;
+            problems.push({ label: fieldLabel(el), message: el.validationMessage || '' });
+            group.forEach((radio) => markInvalid(radio));
             firstInvalid ||= el;
           }
           return;
@@ -20491,16 +20529,27 @@ function initMinutesWizard(root = document) {
         if (el.offsetParent === null) return;
         if (!el.checkValidity() || (el.required && typeof el.value === 'string' && el.value.trim() === '')) {
           ok = false;
+          problems.push({ label: fieldLabel(el), message: el.validationMessage || '' });
+          markInvalid(el);
           firstInvalid ||= el;
         }
       });
       if (!ok) {
-        if (errorBox instanceof HTMLElement) errorBox.hidden = false;
+        if (errorBox instanceof HTMLElement) {
+          const details = problems
+            .map((problem) => (problem.message !== '' ? `${problem.label}: ${problem.message}` : problem.label))
+            .filter((line) => line !== '');
+          errorBox.textContent = details.length > 0
+            ? `${errorDefault} ${details.join(' · ')}`.trim()
+            : errorDefault;
+          errorBox.hidden = false;
+        }
         if (firstInvalid instanceof HTMLElement) {
           firstInvalid.reportValidity?.();
           firstInvalid.focus?.({ preventScroll: false });
         }
       } else if (errorBox instanceof HTMLElement) {
+        errorBox.textContent = errorDefault;
         errorBox.hidden = true;
       }
       return ok;
@@ -20918,17 +20967,19 @@ function initMinutesWizard(root = document) {
       if (!(convocationInput instanceof HTMLInputElement)) return;
       const meetingDate = minutesDateInput instanceof HTMLInputElement ? minutesDateInput.value : '';
       if (meetingDate !== '') {
-        convocationInput.max = meetingDate;
-        // Statutory notice: at least N days before the sitting (Settings → Organizzazione).
         const noticeDays = Number(form.dataset.convocationNoticeDays || 0);
-        if (noticeDays > 0) {
-          const earliest = new Date(`${meetingDate}T00:00:00`);
-          earliest.setDate(earliest.getDate() - noticeDays);
+        const convoked = convokedInput instanceof HTMLInputElement && convokedInput.checked;
+        const shifted = (days) => {
+          const date = new Date(`${meetingDate}T00:00:00`);
+          date.setDate(date.getDate() + days);
           const pad = (value) => String(value).padStart(2, '0');
-          convocationInput.min = `${earliest.getFullYear()}-${pad(earliest.getMonth() + 1)}-${pad(earliest.getDate())}`;
-        } else {
-          convocationInput.removeAttribute('min');
-        }
+          return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
+        };
+        // Same window as the server (MinutesService::save): on or before the sitting, at least the
+        // statutory notice before it, never more than a year older. The previous code set
+        // min = meeting − notice, which allowed exactly the dates the server then rejected.
+        convocationInput.min = shifted(-365);
+        convocationInput.max = convoked && noticeDays > 0 ? shifted(-noticeDays) : meetingDate;
       } else {
         convocationInput.removeAttribute('max');
         convocationInput.removeAttribute('min');

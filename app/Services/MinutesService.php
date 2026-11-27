@@ -539,9 +539,11 @@ final class MinutesService
         }
         if ($convocationDate !== '') {
             // The statute fixes the notice: the convocation must be at least N days before the
-            // sitting (and not absurdly older than it, which is the classic typing slip).
+            // sitting (and not absurdly older than it, which is the classic typing slip). The
+            // notice only applies to a convocation declared regular; an irregular one is recorded
+            // with its real date and the defect is described in the minutes.
             $noticeDays = $this->convocationNoticeDays();
-            if ($noticeDays > 0) {
+            if ($convoked && $noticeDays > 0) {
                 $earliest = (new \DateTimeImmutable($date))
                     ->sub(new \DateInterval('P' . $noticeDays . 'D'))
                     ->format('Y-m-d');

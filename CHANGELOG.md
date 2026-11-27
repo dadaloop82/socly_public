@@ -95,6 +95,12 @@ every 100 patches bump the series, and each bump is published to this rep come o
 
 ### Fixed
 
+- Minutes wizard: the step error now names the field that blocks the step (and the browser reason)
+  instead of a bare “complete the required fields”, and the control is highlighted. The convocation
+  date follows the statutory notice both in the field hint and in the client validation window
+  (at least N days before the meeting, only while “Convocazione regolare” is checked): the previous
+  `min`/`max` pair allowed exactly the dates the server then rejected, and an irregular convocation
+  is now recorded with its real date instead of failing the notice check.
 - Minutes wizard: a person holding several offices is listed once in the board attendance, with the
   offices joined (“Segretario · Tesoriere”), instead of one row per office. Grouping uses fiscal code,
   then email/phone, then the full name, so homonyms stay distinct.

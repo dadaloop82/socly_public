@@ -4039,6 +4039,8 @@ return [
         'minutes_agenda_outcomes_title' => 'Tagesordnung und Ergebnisse',
         'minutes_field_convocation' => 'Einberufung',
         'minutes_field_convocation_date' => 'Datum der Einberufung',
+        'minutes_field_convocation_hint' => 'Bei einer regulären Einberufung mindestens :days Tage vor der Sitzung (im Statut vorgesehene Frist).',
+        'minutes_field_convocation_hint_no_notice' => 'Bei einer regulären Einberufung gleich wie oder vor dem Sitzungsdatum.',
         'minutes_field_president' => 'Vorsitz',
         'minutes_field_president_substitute' => 'Stellvertretung des Präsidenten',
         'minutes_field_secretary' => 'Protokollführung',

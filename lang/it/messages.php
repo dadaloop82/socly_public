@@ -3457,6 +3457,8 @@ return [
         'minutes_agenda_outcomes_title' => 'Ordine del giorno ed esiti',
         'minutes_field_convocation' => 'Convocazione',
         'minutes_field_convocation_date' => 'Data di convocazione',
+        'minutes_field_convocation_hint' => 'Se la convocazione è regolare deve precedere la seduta di almeno :days giorni (preavviso previsto dallo statuto).',
+        'minutes_field_convocation_hint_no_notice' => 'Se la convocazione è regolare deve essere uguale o precedente alla data della seduta.',
         'minutes_field_president' => 'Presiede',
         'minutes_field_president_substitute' => 'Sostituto del presidente',
         'minutes_field_secretary' => 'Verbalizza',

@@ -16535,6 +16535,19 @@ select.is-remote-choice {
 .minutes-wizard .wizard-panel-side--spacer {
   display: none;
 }
+/* The wizard error line now names the field that blocks the step: the control itself shows where
+   to look (date ranges, a missing value, a radio group left unchecked). */
+.minutes-wizard .sf-field__control.is-invalid,
+.minutes-wizard .sf-field__control[aria-invalid="true"] {
+  border-color: var(--danger);
+  background: color-mix(in srgb, var(--danger) 6%, #fff);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--danger) 14%, transparent);
+}
+.minutes-wizard .tessera-choice-cards.is-invalid {
+  border-radius: 12px;
+  outline: 2px solid var(--danger);
+  outline-offset: 3px;
+}
 .minutes-wizard .minutes-agenda-tools {
   display: flex;
   flex-wrap: wrap;
