@@ -91,6 +91,7 @@ final class ResourceBusyMiddleware
             '/reset-password',
             '/branding/logo',
             '/branding/favicon',
+            '/favicon.ico',
             // Keep presence dots and idle heartbeat alive for everyone during a heavy job.
             '/presence/state',
             '/session/ping',

@@ -127,6 +127,9 @@ final class GitHubIssueService
                             'reason' => 'external_script',
                             'script' => (string) ($_SERVER['SCRIPT_FILENAME'] ?? ''),
                             'error' => $e->getMessage(),
+                            // The message alone does not say which ad-hoc script threw: without the
+                            // first frames an external cron crash cannot be located at all.
+                            'trace' => $this->shortTrace($e),
                         ]);
                     }
                 } catch (\Throwable) {
@@ -277,6 +280,29 @@ final class GitHubIssueService
         }
 
         return $roots === [];
+    }
+
+    /**
+     * First “file:line” frames of a throwable, without arguments (they may carry personal data).
+     *
+     * @return list<string>
+     */
+    private function shortTrace(\Throwable $e, int $limit = 6): array
+    {
+        $out = [];
+        foreach ($e->getTrace() as $frame) {
+            $file = (string) ($frame['file'] ?? '');
+            if ($file === '') {
+                continue;
+            }
+            $out[] = $file . ':' . (string) ($frame['line'] ?? 0);
+            if (count($out) >= $limit) {
+                break;
+            }
+        }
+        $out[] = $e->getFile() . ':' . $e->getLine();
+
+        return $out;
     }
 
     /**

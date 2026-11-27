@@ -90,6 +90,31 @@ final class BrandingController extends BaseController
     }
 
     /**
+     * `/favicon.ico` and the legacy `/branding/favicon` alias.
+     *
+     * Browsers ask for `/favicon.ico` even when the layout already declares `<link rel="icon">`
+     * (crawlers, PDF viewers, older clients): serving it keeps the request out of the 404 anomaly
+     * log and needs no database, so it also works before the app is installed.
+     */
+    public function favicon(Request $request): void
+    {
+        $path = base_path('public/assets/img/socly-icon.png');
+        if (!is_file($path) || !is_readable($path)) {
+            http_response_code(404);
+            header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
+            return;
+        }
+        $size = @filesize($path);
+        header('Content-Type: image/png');
+        if (is_int($size)) {
+            header('Content-Length: ' . (string) $size);
+        }
+        // The icon changes only with a release: let the browser keep it for a day.
+        header('Cache-Control: public, max-age=86400');
+        readfile($path);
+    }
+
+    /**
      * Upload/remove logo from settings: JSON response consumed by `initLogoFilePickers()` (preview
      * + inline state, without reloading).
      */

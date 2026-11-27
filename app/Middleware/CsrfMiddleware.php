@@ -61,15 +61,30 @@ final class CsrfMiddleware
             } catch (\Throwable) {
             }
 
+            $path = $request->path();
+            $hasToken = is_string($token) && $token !== '';
+            $hasSessionToken = !empty($_SESSION['_csrf']);
+            // A guest page with no session token at all is an expired cookie (or cookies blocked),
+            // not a forged form: the visitor only has to reload. Keeping it out of the anomaly list
+            // avoids a 419 storm every time somebody leaves the login tab open for hours.
+            $guestPath = in_array($path, ['/login', '/login/greeting', '/forgot-password', '/reset-password'], true)
+                || str_starts_with($path, '/password/');
+            $context = [
+                'path' => $path,
+                'method' => $request->method(),
+                'has_token' => $hasToken,
+                'has_session_csrf' => $hasSessionToken,
+                'setup_open' => $setupOpen,
+                'ip' => $request->ip(),
+            ];
+
             try {
-                app('logger')->anomaly('csrf.failed', [
-                    'path' => $request->path(),
-                    'method' => $request->method(),
-                    'has_token' => is_string($token) && $token !== '',
-                    'has_session_csrf' => !empty($_SESSION['_csrf']),
-                    'setup_open' => $setupOpen,
-                    'ip' => $request->ip(),
-                ]);
+                if (!$hasSessionToken && $guestPath) {
+                    $context['reason'] = 'no_session';
+                    app('logger')->warning('csrf.failed', $context);
+                } else {
+                    app('logger')->anomaly('csrf.failed', $context);
+                }
             } catch (\Throwable) {
             }
 

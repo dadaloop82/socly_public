@@ -139,6 +139,9 @@ $router->post('/api/translate', [ApiController::class, 'translate'], null, ['mw.
 $router->post('/api/report-problem', [ApiController::class, 'reportProblem'], null, ['mw.locale', 'mw.install', 'mw.csrf']);
 $router->get('/i18n/messages', [I18nController::class, 'messages'], null, ['mw.locale', 'mw.install']);
 $router->get('/branding/logo', [BrandingController::class, 'logo'], null, ['mw.locale', 'mw.install']);
+$router->get('/branding/favicon', [BrandingController::class, 'favicon'], null, ['mw.locale', 'mw.install']);
+// The conventional icon path, requested by crawlers and old clients even with <link rel="icon">.
+$router->get('/favicon.ico', [BrandingController::class, 'favicon'], null, []);
 $router->post('/settings/logo', [BrandingController::class, 'upload'], 'settings.manage', ['mw.locale', 'mw.install', 'mw.auth', 'mw.csrf']);
 
 $router->get('/members', [MemberController::class, 'index'], 'members.view', ['mw.locale', 'mw.install', 'mw.auth']);

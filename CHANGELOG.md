@@ -114,6 +114,13 @@ every 100 patches bump the series, and each bump is published to this rep come o
 
 ### Fixed
 
+- Login page: a POST without any session cookie (login tab left open for hours, cookies blocked) is
+  logged as a warning with `reason=no_session` instead of an anomaly; the 419 page is unchanged and
+  the visitor only reloads. A token that does not match an existing session keeps the anomaly entry.
+- Logs: `/favicon.ico` (and the legacy `/branding/favicon`) is now served by the app, so crawlers and
+  old clients no longer leave a 404 anomaly on every visit; a crash raised by an external script
+  (ad-hoc cron, `php -r`) now logs its first stack frames, because the message alone did not say
+  which script threw.
 - Bank-statement audit: the full check no longer aborts on a statement that the **wrong bank model**
   “read” as rows without amounts (the diagnostic log said “5 importi leggibili su 47 righe” on an
   Intesa statement). The model that actually reads the amounts now wins over the one with more rows,
