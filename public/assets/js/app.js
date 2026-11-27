@@ -1512,7 +1512,6 @@ function initResourceBusyWatch() {
       '<p class="update-overlay-text" data-resource-busy-text></p>',
       '<p class="pause-text" data-resource-busy-pause-text></p>',
       '<p class="update-overlay-hint" data-resource-busy-hint></p>',
-      '<p class="pause-reassure" data-resource-busy-reassure></p>',
       '<div class="pause-game" data-pause-game></div>',
       '<p class="pause-actions"><button type="button" class="btn" data-resource-busy-retry></button></p>',
       '</div>',
@@ -1539,12 +1538,15 @@ function initResourceBusyWatch() {
         startedBy: 'Avviata da :name alle :time',
         kicker: 'Goditi una pausa',
         pauseText: 'Nel frattempo ti avviseremo appena la procedura sarà terminata.',
-        reassure: 'Nessun dato è a rischio: stiamo solo dando priorità al lavoro pesante.',
         gameTitle: 'Scoppia le bolle',
         gameHint: 'Scoppia le bolle: più ne scoppi, più diventano veloci.',
-        gameScore: ':count bolle scoppiate',
-        gameWin: 'Pausa completata: la scrivania è più leggera!',
-        gameReset: 'Ricomincia',
+        gameScoreLabel: 'Punteggio',
+        gameRecordLabel: 'Record',
+        gameRecordNone: 'Nessun record',
+        gameRecordYou: 'Tu',
+        gamePersonalLabel: 'Il tuo record',
+        gameRecordNew: 'Nuovo record!',
+        gamePlayers: ':count giocatori',
         gameAria: 'Minigioco: scoppia le bolle',
         gameBubble: 'Scoppia la bolla',
       },
@@ -1558,12 +1560,15 @@ function initResourceBusyWatch() {
         startedBy: 'Started by :name at :time',
         kicker: 'Enjoy a break',
         pauseText: 'We will let you know as soon as the procedure is finished.',
-        reassure: 'No data is at risk: we are simply giving priority to the heavy work.',
         gameTitle: 'Pop the bubbles',
         gameHint: 'Pop the bubbles: the more you pop, the faster they get.',
-        gameScore: ':count bubbles popped',
-        gameWin: 'Break complete: the desk feels lighter!',
-        gameReset: 'Play again',
+        gameScoreLabel: 'Score',
+        gameRecordLabel: 'Record',
+        gameRecordNone: 'No record yet',
+        gameRecordYou: 'You',
+        gamePersonalLabel: 'Your best',
+        gameRecordNew: 'New record!',
+        gamePlayers: ':count players',
         gameAria: 'Mini-game: pop the bubbles',
         gameBubble: 'Pop the bubble',
       },
@@ -1577,12 +1582,15 @@ function initResourceBusyWatch() {
         startedBy: 'Gestartet von :name um :time',
         kicker: 'Gönn dir eine Pause',
         pauseText: 'Wir melden uns, sobald der Vorgang abgeschlossen ist.',
-        reassure: 'Keine Daten sind gefährdet: wir geben nur der schweren Arbeit Vorrang.',
         gameTitle: 'Blasen platzen lassen',
         gameHint: 'Lass die Blasen platzen: je mehr du platzen lässt, desto schneller werden sie.',
-        gameScore: ':count Blasen geplatzt',
-        gameWin: 'Pause geschafft: der Schreibtisch ist leichter!',
-        gameReset: 'Neu starten',
+        gameScoreLabel: 'Punkte',
+        gameRecordLabel: 'Rekord',
+        gameRecordNone: 'Noch kein Rekord',
+        gameRecordYou: 'Du',
+        gamePersonalLabel: 'Dein Rekord',
+        gameRecordNew: 'Neuer Rekord!',
+        gamePlayers: ':count Spieler',
         gameAria: 'Minispiel: Blasen platzen lassen',
         gameBubble: 'Blase platzen lassen',
       },
@@ -1598,13 +1606,17 @@ function initResourceBusyWatch() {
       startedBy: attr('data-resource-busy-started-by', base.startedBy),
       kicker: attr('data-resource-busy-kicker', base.kicker),
       pauseText: attr('data-resource-busy-pause-text', base.pauseText),
-      reassure: attr('data-resource-busy-reassure', base.reassure),
       game: {
+        url: attr('data-resource-busy-game-url', ''),
         title: attr('data-resource-busy-game-title', base.gameTitle),
         hint: attr('data-resource-busy-game-hint', base.gameHint),
-        score: attr('data-resource-busy-game-score', base.gameScore),
-        win: attr('data-resource-busy-game-win', base.gameWin),
-        reset: attr('data-resource-busy-game-reset', base.gameReset),
+        scoreLabel: attr('data-resource-busy-game-score-label', base.gameScoreLabel),
+        recordLabel: attr('data-resource-busy-game-record-label', base.gameRecordLabel),
+        recordNone: attr('data-resource-busy-game-record-none', base.gameRecordNone),
+        recordYou: attr('data-resource-busy-game-record-you', base.gameRecordYou),
+        personalLabel: attr('data-resource-busy-game-personal-label', base.gamePersonalLabel),
+        recordNew: attr('data-resource-busy-game-record-new', base.gameRecordNew),
+        players: attr('data-resource-busy-game-players', base.gamePlayers),
         aria: attr('data-resource-busy-game-aria', base.gameAria),
         bubble: attr('data-resource-busy-game-bubble', base.gameBubble),
       },
@@ -1664,7 +1676,6 @@ function initResourceBusyWatch() {
     const retryEl = card.querySelector('[data-resource-busy-retry]');
     const kickerEl = card.querySelector('[data-resource-busy-kicker]');
     const pauseTextEl = card.querySelector('[data-resource-busy-pause-text]');
-    const reassureEl = card.querySelector('[data-resource-busy-reassure]');
     const gameEl = card.querySelector('[data-pause-game]');
     if (kickerEl) kickerEl.textContent = labels.kicker;
     if (titleEl) titleEl.textContent = labels.title;
@@ -1679,14 +1690,18 @@ function initResourceBusyWatch() {
     if (textEl) textEl.textContent = card.dataset.message || labels.fallback;
     if (pauseTextEl) pauseTextEl.textContent = labels.pauseText;
     if (hintEl) hintEl.textContent = labels.hint;
-    if (reassureEl) reassureEl.textContent = labels.reassure;
     if (retryEl) retryEl.textContent = labels.retry;
     if (gameEl instanceof HTMLElement && gameEl.dataset.pauseGameBound !== '1') {
+      gameEl.dataset.gameUrl = labels.game.url;
       gameEl.dataset.gameTitle = labels.game.title;
       gameEl.dataset.gameHint = labels.game.hint;
-      gameEl.dataset.gameScore = labels.game.score;
-      gameEl.dataset.gameWin = labels.game.win;
-      gameEl.dataset.gameReset = labels.game.reset;
+      gameEl.dataset.gameScoreLabel = labels.game.scoreLabel;
+      gameEl.dataset.gameRecordLabel = labels.game.recordLabel;
+      gameEl.dataset.gameRecordNone = labels.game.recordNone;
+      gameEl.dataset.gameRecordYou = labels.game.recordYou;
+      gameEl.dataset.gamePersonalLabel = labels.game.personalLabel;
+      gameEl.dataset.gameRecordNew = labels.game.recordNew;
+      gameEl.dataset.gamePlayers = labels.game.players;
       gameEl.dataset.gameAria = labels.game.aria;
       gameEl.dataset.gameBubble = labels.game.bubble;
       if (window.SoclyPauseGame && typeof window.SoclyPauseGame.init === 'function') {

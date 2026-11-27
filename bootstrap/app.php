@@ -80,6 +80,7 @@ use Socly\Services\ResourceBusyLock;
 use Socly\Middleware\SecurityHeadersMiddleware;
 use Socly\Controllers\SessionController;
 use Socly\Controllers\PresenceController;
+use Socly\Controllers\PauseGameController;
 use Socly\Controllers\FreshnessController;
 use Socly\Services\AssociationPeopleService;
 use Socly\Services\AssociationWebsiteScrapeService;
@@ -110,6 +111,7 @@ use Socly\Services\PlatformService;
 use Socly\Services\PlatformMasterService;
 use Socly\Services\SystemLogService;
 use Socly\Services\PresenceService;
+use Socly\Services\PauseGameService;
 use Socly\Services\RecurringService;
 use Socly\Services\VersionService;
 use Socly\Services\PluginAdminService;
@@ -351,6 +353,8 @@ $app->bind('mw.resource_busy', fn (App $a) => $a->get(ResourceBusyMiddleware::cl
 $app->bind(SessionController::class, fn (App $a) => new SessionController($a->get(View::class), $a->get(PlatformService::class)));
 $app->bind(PresenceController::class, fn (App $a) => new PresenceController($a->get(View::class), $a->get(PresenceService::class)));
 $app->bind(PresenceService::class, fn (App $a) => new PresenceService($a->get(Database::class)));
+$app->bind(PauseGameController::class, fn (App $a) => new PauseGameController($a->get(View::class), $a->get(PauseGameService::class)));
+$app->bind(PauseGameService::class, fn (App $a) => new PauseGameService($a->get(Database::class)));
 $app->bind(FreshnessController::class, fn (App $a) => new FreshnessController($a->get(View::class), $a->get(VersionService::class)));
 $app->bind(VersionService::class, fn (App $a) => new VersionService($a->get(Database::class)));
 $app->bind(RecurringService::class, fn (App $a) => new RecurringService(

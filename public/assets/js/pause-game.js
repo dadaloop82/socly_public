@@ -22,8 +22,12 @@
 /*
  * “Goditi una pausa”: the small bubble-popping game shown while a heavy SOCLY
  * operation keeps the instance paused. Vanilla JS, no dependencies, keyboard
- * accessible (every bubble is a real button). Bubbles travel and bounce inside
- * the playfield; under prefers-reduced-motion they only drift slowly.
+ * accessible (every bubble is a real button).
+ *
+ * The game is endless: a popped bubble is replaced immediately and every pop
+ * speeds the whole field up. A small scoreboard shows the current score, the
+ * operator's best and the shared all-time record with its holder (the score is
+ * saved to /pause-game/score while the overlay is open).
  *
  * Usage:
  *   SoclyPauseGame.init(document);            // scans [data-pause-game]
@@ -35,24 +39,29 @@
 (function () {
   'use strict';
 
-  var MAX_SCORE = 10;
-  var BUBBLES = 7;
-  var RESPAWN_MS = 320;
+  var BUBBLES = 8;
+  var RESPAWN_MS = 260;
   /** Base speed (px per second) before the first pop. */
-  var BASE_SPEED = 26;
-  /** Every popped bubble adds this fraction to the speed (0.15 = +15%). */
-  var SPEED_STEP = 0.15;
+  var BASE_SPEED = 42;
+  /** Every popped bubble adds this fraction to the speed (0.22 = +22%). */
+  var SPEED_STEP = 0.22;
   /** Never faster than this multiple of the base speed. */
-  var MAX_SPEED_FACTOR = 2.5;
+  var MAX_SPEED_FACTOR = 6;
   /** Longest frame we integrate, so a background tab does not teleport bubbles. */
   var MAX_FRAME_MS = 50;
+  /** Score POSTs are coalesced: a quick burst of pops sends one update. */
+  var SAVE_DEBOUNCE_MS = 900;
 
   var DEFAULTS = {
     title: 'Pop the bubbles',
-    hint: 'A light pastime while you wait.',
-    score: ':count bubbles popped',
-    win: 'Break complete: the desk feels lighter!',
-    reset: 'Play again',
+    hint: 'The more you pop, the faster they get.',
+    scoreLabel: 'Score',
+    recordLabel: 'Record',
+    recordNone: 'No record yet',
+    recordYou: 'You',
+    personalLabel: 'Your best',
+    recordNew: 'New record!',
+    players: ':count players',
     aria: 'Mini-game: pop the bubbles',
     bubble: 'Pop the bubble',
   };
@@ -62,20 +71,35 @@
     return {
       title: dataset.gameTitle || DEFAULTS.title,
       hint: dataset.gameHint || DEFAULTS.hint,
-      score: dataset.gameScore || DEFAULTS.score,
-      win: dataset.gameWin || DEFAULTS.win,
-      reset: dataset.gameReset || DEFAULTS.reset,
+      scoreLabel: dataset.gameScoreLabel || DEFAULTS.scoreLabel,
+      recordLabel: dataset.gameRecordLabel || DEFAULTS.recordLabel,
+      recordNone: dataset.gameRecordNone || DEFAULTS.recordNone,
+      recordYou: dataset.gameRecordYou || DEFAULTS.recordYou,
+      personalLabel: dataset.gamePersonalLabel || DEFAULTS.personalLabel,
+      recordNew: dataset.gameRecordNew || DEFAULTS.recordNew,
+      players: dataset.gamePlayers || DEFAULTS.players,
       aria: dataset.gameAria || DEFAULTS.aria,
       bubble: dataset.gameBubble || DEFAULTS.bubble,
     };
   }
 
-  function formatScore(template, score) {
-    return String(template || '').replace(':count', String(score));
+  function fillTemplate(template, values) {
+    var out = String(template || '');
+    Object.keys(values || {}).forEach(function (key) {
+      out = out.split(':' + key).join(String(values[key] == null ? '' : values[key]));
+    });
+    return out;
+  }
+
+  function csrfToken() {
+    var meta = document.querySelector('meta[name="csrf-token"]');
+    return meta ? String(meta.getAttribute('content') || '') : '';
   }
 
   function setup(box) {
     var labels = labelsFor(box);
+    var apiUrl = String(box.dataset.gameUrl || '');
+    var token = csrfToken();
     box.innerHTML = '';
     box.setAttribute('role', 'group');
     box.setAttribute('aria-label', labels.aria);
@@ -84,38 +108,64 @@
     head.className = 'pause-game-head';
     var headTitle = document.createElement('strong');
     headTitle.textContent = labels.title;
-    var scoreEl = document.createElement('span');
-    scoreEl.className = 'pause-score';
-    scoreEl.setAttribute('aria-live', 'polite');
     head.appendChild(headTitle);
-    head.appendChild(scoreEl);
 
     var hint = document.createElement('p');
     hint.className = 'pause-game-hint';
     hint.textContent = labels.hint;
 
+    var hud = document.createElement('div');
+    hud.className = 'pause-hud';
+    hud.setAttribute('role', 'status');
+
+    function stat(text, modifier) {
+      var el = document.createElement('div');
+      el.className = 'pause-stat ' + modifier;
+      var label = document.createElement('span');
+      label.className = 'pause-stat-label';
+      label.textContent = text;
+      var value = document.createElement('strong');
+      value.className = 'pause-stat-value';
+      value.textContent = '0';
+      el.appendChild(label);
+      el.appendChild(value);
+      return { el: el, value: value };
+    }
+
+    var scoreStat = stat(labels.scoreLabel, 'pause-stat--score');
+    scoreStat.value.setAttribute('aria-live', 'polite');
+    var recordStat = stat(labels.recordLabel, 'pause-stat--record');
+    var recordMeta = document.createElement('span');
+    recordMeta.className = 'pause-stat-meta';
+    recordMeta.textContent = labels.recordNone;
+    recordStat.el.appendChild(recordMeta);
+    var personalStat = stat(labels.personalLabel, 'pause-stat--personal');
+    hud.appendChild(scoreStat.el);
+    hud.appendChild(recordStat.el);
+    hud.appendChild(personalStat.el);
+
+    var recordFlash = document.createElement('p');
+    recordFlash.className = 'pause-record-flash';
+    recordFlash.textContent = labels.recordNew;
+    recordFlash.hidden = true;
+
     var field = document.createElement('div');
     field.className = 'pause-playfield';
 
-    var win = document.createElement('p');
-    win.className = 'pause-win';
-    win.hidden = true;
-    win.textContent = labels.win;
-
-    var reset = document.createElement('button');
-    reset.type = 'button';
-    reset.className = 'btn btn-ghost btn-sm pause-reset';
-    reset.textContent = labels.reset;
-    reset.hidden = true;
-
     box.appendChild(head);
     box.appendChild(hint);
+    box.appendChild(hud);
+    box.appendChild(recordFlash);
     box.appendChild(field);
-    box.appendChild(win);
-    box.appendChild(reset);
+
 
     var score = 0;
-    var finished = false;
+    var personalBest = 0;
+    var record = null;
+    var players = 0;
+    var savedScore = 0;
+    var saveTimer = 0;
+    var saving = false;
     var slots = [];
     var used = [];
     for (var row = 0; row < 4; row += 1) {
@@ -129,7 +179,6 @@
     // stay off.
     var reducedMotion = !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
     var motionScale = reducedMotion ? 0.35 : 1;
-    // Live bubbles with their position/velocity in pixels.
     var bubbles = [];
     var rafId = 0;
     var lastTs = 0;
@@ -141,14 +190,136 @@
     }
 
     function speedFactor() {
-      // Each pop speeds the whole field up, up to a cap so it stays playable.
+      // Every pop makes the whole field faster; the cap only keeps the game playable.
       return Math.min(MAX_SPEED_FACTOR, 1 + score * SPEED_STEP);
+    }
+
+    function renderHud() {
+      var personal = Math.max(personalBest, score);
+      scoreStat.value.textContent = String(score);
+      personalStat.value.textContent = String(personal);
+
+      var bestScore = record && typeof record.score === 'number' ? record.score : 0;
+      var holder = record ? String(record.name || '') : '';
+      if (score > bestScore) {
+        bestScore = score;
+        holder = labels.recordYou;
+      }
+      if (bestScore <= 0) {
+        recordStat.value.textContent = '—';
+        recordMeta.textContent = labels.recordNone;
+        return;
+      }
+      recordStat.value.textContent = String(bestScore);
+      var meta = [];
+      if (holder !== '') meta.push(holder);
+      if (players > 0) meta.push(fillTemplate(labels.players, { count: players }));
+      recordMeta.textContent = meta.join(' · ');
+    }
+
+    function applyState(data) {
+      if (!data || data.ok !== true) return;
+      if (typeof data.personal === 'number') {
+        personalBest = Math.max(personalBest, data.personal);
+      }
+      if (data.record && typeof data.record.score === 'number') {
+        record = { score: data.record.score, name: String(data.record.name || '') };
+      }
+      if (typeof data.players === 'number') {
+        players = data.players;
+      }
+      renderHud();
+    }
+
+    function flashRecord() {
+      hud.classList.add('is-record');
+      recordFlash.hidden = false;
+      window.setTimeout(function () {
+        hud.classList.remove('is-record');
+        recordFlash.hidden = true;
+      }, 2600);
+    }
+
+    function loadState() {
+      if (apiUrl === '') return;
+      fetch(apiUrl, {
+        credentials: 'same-origin',
+        cache: 'no-store',
+        headers: { Accept: 'application/json' },
+      })
+        .then(function (response) {
+          return response.ok ? response.json() : null;
+        })
+        .then(applyState)
+        .catch(function () {});
+    }
+
+    function needsSave() {
+      // Only a score above both the last saved value and the stored personal best is worth a POST.
+      return apiUrl !== '' && token !== '' && score > Math.max(savedScore, personalBest);
+    }
+
+    function saveScore() {
+      if (saving || !needsSave()) return;
+      var value = score;
+      saving = true;
+      var body = new URLSearchParams();
+      body.set('_token', token);
+      body.set('score', String(value));
+      fetch(apiUrl, {
+        method: 'POST',
+        credentials: 'same-origin',
+        cache: 'no-store',
+        headers: {
+          Accept: 'application/json',
+          'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
+          'X-Requested-With': 'XMLHttpRequest',
+        },
+        body: body.toString(),
+      })
+        .then(function (response) {
+          return response.ok ? response.json() : null;
+        })
+        .then(function (data) {
+          saving = false;
+          if (!data || data.ok !== true) return;
+          savedScore = Math.max(savedScore, value);
+          var previousBest = record ? record.score : 0;
+          applyState(data);
+          if (data.is_record === true && value > previousBest) flashRecord();
+        })
+        .catch(function () {
+          saving = false;
+        });
+    }
+
+    function scheduleSave() {
+      if (!needsSave()) return;
+      window.clearTimeout(saveTimer);
+      saveTimer = window.setTimeout(saveScore, SAVE_DEBOUNCE_MS);
+    }
+
+    function flushScore() {
+      if (!needsSave()) return;
+      try {
+        var body = new URLSearchParams();
+        body.set('_token', token);
+        body.set('score', String(score));
+        if (navigator.sendBeacon && navigator.sendBeacon(apiUrl, body)) {
+          savedScore = score;
+          return;
+        }
+      } catch (error) {
+        // The debounced POST remains the fallback.
+      }
+      saveScore();
     }
 
     function paint(entry) {
       entry.el.style.setProperty('--bx', entry.x.toFixed(1) + 'px');
       entry.el.style.setProperty('--by', entry.y.toFixed(1) + 'px');
     }
+
 
     /** Keep the bubble inside the field, reversing the velocity on the hit wall. */
     function clampToField(entry, width, height) {
@@ -206,7 +377,6 @@
 
     function step(ts) {
       rafId = 0;
-      if (finished) return;
       if (box.isConnected) {
         everConnected = true;
       } else if (everConnected) {
@@ -220,6 +390,8 @@
       lastTs = ts;
 
       if (width >= 24 && height >= 24) {
+        // The speed factor is applied every frame, so a pop accelerates every bubble already on
+        // the field, not only the next ones.
         var factor = speedFactor() * motionScale;
         for (var i = 0; i < bubbles.length; i += 1) {
           var entry = bubbles[i];
@@ -244,7 +416,7 @@
     }
 
     function startLoop() {
-      if (rafId || finished) return;
+      if (rafId) return;
       lastTs = 0;
       rafId = window.requestAnimationFrame(step);
     }
@@ -271,16 +443,6 @@
       if (typeof index === 'number') used[index] = false;
     }
 
-    function updateScore() {
-      scoreEl.textContent = formatScore(labels.score, score);
-      if (score >= MAX_SCORE && !finished) {
-        finished = true;
-        stopLoop();
-        field.classList.add('is-won');
-        win.hidden = false;
-        reset.hidden = false;
-      }
-    }
 
     function pop(entry, slotIndex) {
       if (entry.el.classList.contains('is-popped')) return;
@@ -289,16 +451,17 @@
       var index = bubbles.indexOf(entry);
       if (index !== -1) bubbles.splice(index, 1);
       score += 1;
-      updateScore();
+      renderHud();
+      scheduleSave();
+      // Endless game: the popped bubble is always replaced, so the field never empties.
       window.setTimeout(function () {
         if (entry.el.parentNode) entry.el.parentNode.removeChild(entry.el);
         releaseSlot(slotIndex);
-        if (!finished) spawn();
+        spawn();
       }, RESPAWN_MS);
     }
 
     function spawn() {
-      if (finished) return;
       if (bubbles.length >= BUBBLES) return;
       var slot = takeSlot();
       if (!slot) return;
@@ -340,20 +503,18 @@
       for (var i = 0; i < BUBBLES; i += 1) spawn();
     }
 
-    reset.addEventListener('click', function () {
-      score = 0;
-      finished = false;
-      used = [];
-      bubbles = [];
-      field.classList.remove('is-won');
-      field.innerHTML = '';
-      win.hidden = true;
-      reset.hidden = true;
-      updateScore();
-      fill();
+    document.addEventListener('visibilitychange', function () {
+      if (document.hidden) {
+        stopLoop();
+        flushScore();
+      } else {
+        startLoop();
+      }
     });
+    window.addEventListener('pagehide', flushScore);
 
-    updateScore();
+    loadState();
+    renderHud();
     fill();
   }
 
@@ -379,3 +540,4 @@
     init(document);
   }
 })();
+

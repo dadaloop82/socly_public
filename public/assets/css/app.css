@@ -2977,21 +2977,6 @@ html.is-busy .update-overlay {
   margin: 0 0 0.85rem;
   font-size: 0.82rem;
 }
-.pause-reassure {
-  margin: 0 0 1rem;
-  padding: 0.55rem 0.75rem;
-  border-radius: 12px;
-  font-size: 0.82rem;
-  line-height: 1.4;
-  color: #0a5a4a;
-  background: color-mix(in srgb, #2f9e8f 12%, #ffffff);
-  border: 1px solid color-mix(in srgb, #2f9e8f 26%, #ffffff);
-}
-.pause-reassure::before {
-  content: "✓";
-  font-weight: 800;
-  margin-right: 0.4rem;
-}
 .pause-game {
   margin: 0 0 1rem;
   padding: 0.75rem 0.8rem 0.85rem;
@@ -3011,11 +2996,57 @@ html.is-busy .update-overlay {
   font-size: 1rem;
   letter-spacing: -0.01em;
 }
-.pause-score {
-  font-size: 0.78rem;
+.pause-hud {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.45rem;
+  margin: 0 0 0.55rem;
+}
+.pause-stat {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+  padding: 0.45rem 0.55rem;
+  border-radius: 12px;
+  border: 1px solid color-mix(in srgb, var(--brand-primary) 14%, #ffffff);
+  background: #ffffff;
+}
+.pause-stat-label {
+  font-size: 0.66rem;
   font-weight: 700;
-  color: var(--brand-primary-ink, var(--brand-primary));
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: color-mix(in srgb, var(--ink) 60%, transparent);
+}
+.pause-stat-value {
+  font-family: var(--font-display);
+  font-size: 1.15rem;
+  line-height: 1.1;
+  color: var(--ink);
   font-variant-numeric: tabular-nums;
+}
+.pause-stat-meta {
+  font-size: 0.68rem;
+  line-height: 1.25;
+  color: color-mix(in srgb, var(--ink) 55%, transparent);
+}
+.pause-stat--record .pause-stat-value {
+  color: var(--brand-primary-ink, var(--brand-primary));
+}
+.pause-hud.is-record {
+  animation: pause-record 1.2s ease-in-out 2;
+}
+@keyframes pause-record {
+  0%, 100% { filter: none; }
+  50% { filter: drop-shadow(0 0 10px color-mix(in srgb, #e7c46a 70%, transparent)); }
+}
+@media (max-width: 520px) {
+  .pause-hud {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .pause-stat--personal {
+    grid-column: span 2;
+  }
 }
 .pause-game-hint {
   margin: 0 0 0.55rem;
@@ -3032,11 +3063,6 @@ html.is-busy .update-overlay {
     radial-gradient(140px 90px at 82% 78%, color-mix(in srgb, var(--brand-accent) 12%, transparent), transparent 72%),
     linear-gradient(180deg, #f8fcfb 0%, #eef6f4 100%);
   border: 1px solid color-mix(in srgb, var(--brand-primary) 10%, #ffffff);
-}
-.pause-playfield.is-won {
-  background:
-    radial-gradient(180px 120px at 50% 50%, color-mix(in srgb, #e7c46a 24%, transparent), transparent 70%),
-    linear-gradient(180deg, #fbfffd 0%, #eef8f3 100%);
 }
 .pause-bubble {
   position: absolute;
@@ -3067,19 +3093,17 @@ html.is-busy .update-overlay {
   opacity: 0;
   pointer-events: none;
 }
-.pause-win {
-  margin: 0.65rem 0 0;
-  padding: 0.55rem 0.7rem;
+.pause-record-flash {
+  margin: 0.4rem 0 0;
+  padding: 0.45rem 0.6rem;
   border-radius: 10px;
-  font-size: 0.85rem;
+  font-size: 0.82rem;
   font-weight: 700;
   color: #0a5a4a;
   background: color-mix(in srgb, #2f9e8f 14%, #ffffff);
   border: 1px solid color-mix(in srgb, #2f9e8f 30%, #ffffff);
 }
-.pause-win[hidden],
-.pause-reset[hidden] { display: none !important; }
-.pause-reset { margin-top: 0.55rem; }
+.pause-record-flash[hidden] { display: none !important; }
 .pause-actions {
   margin: 0;
   display: flex;

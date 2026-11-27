@@ -35,6 +35,33 @@ One row per open session, refreshed by the presence polling.
 | editing_value | draft being typed (max 300 chars, control characters stripped). Field and value are ignored once `last_seen` is older than 45 s (`PresenceService::FIELD_TTL_SECONDS`) |
 | page_path | screen the session is on: local path + optional fragment (`/budgets#bil-consuntivo`), query string always stripped, max 255 chars. Used by the colleague's badge when no versioned record is open |
 
+### pause_game_scores
+Best score of each operator in the pause mini-game (“Stiamo lavorando per te”). One row per user:
+the table never grows with played rounds and the all-time record is a single indexed query.
+
+| Column | Notes |
+|--------|-------|
+| user_id | PK — FK `users.id` ON DELETE CASCADE |
+| display_name | name shown as record holder (snapshot, max 190 chars) |
+| best_score | highest score ever saved; `INSERT … ON DUPLICATE KEY UPDATE GREATEST(...)` |
+| updated_at | last improvement |
+
+The record is shared by every operator (`/pause-game/score` is exempt from the resource-busy block):
+the overlay reads it when it opens and saves the operator's best after a short debounce, plus a
+`sendBeacon` flush when the tab is hidden.
+
+### pause_game_scores
+Best score per operator of the pause mini-game (“Stiamo lavorando per te”). One row per user (the
+best score is never lowered), written by `POST /pause-game/score` while the game is played; the
+all-time record and its holder are the top row by `best_score`.
+
+| Column | Notes |
+|--------|-------|
+| user_id | PK — `users.id`, no FK so the fun table never blocks user cleanup |
+| display_name | operator name snapshot shown next to the record (max 190 chars) |
+| best_score | highest score reached by that operator (`GREATEST` on upsert) |
+| updated_at | last improvement; used as tie-breaker (the earlier holder keeps the record) |
+
 ### row_version (members, treasury_movements, budgets, budget_items, association_documents, deadline_items, association_people)
 `INT UNSIGNED NOT NULL DEFAULT 1`, incremented by `Database::updateVersioned()`. A save posted with a
 stale version is refused (HTTP 409 on JSON endpoints) and the form is reopened with the conflict

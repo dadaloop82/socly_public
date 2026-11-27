@@ -95,6 +95,9 @@ final class ResourceBusyMiddleware
             '/presence/state',
             '/session/ping',
             '/resource-busy/status',
+            // The pause mini-game must be able to read and save its scoreboard while the
+            // instance is busy (the request is tiny and never touches association data).
+            '/pause-game/score',
         ];
         if (in_array($path, $exact, true)) {
             return true;
@@ -177,6 +180,12 @@ final class ResourceBusyMiddleware
         }
 
         $esc = static fn (string $v): string => htmlspecialchars($v, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
+        $csrf = '';
+        try {
+            $csrf = function_exists('csrf_token') ? (string) csrf_token() : '';
+        } catch (\Throwable) {
+            // The busy page must render even when the session is not available.
+        }
         $title = $esc(__('resource_busy.title'));
         $kicker = $esc(__('resource_busy.pause_kicker'));
         $heading = $esc(__('resource_busy.heading'));
@@ -186,14 +195,18 @@ final class ResourceBusyMiddleware
         $eta = $esc($this->lock->etaLabel($status));
         $pauseText = $esc(__('resource_busy.pause_text'));
         $hint = $esc(__('resource_busy.hint'));
-        $reassure = $esc(__('resource_busy.pause_reassure'));
         $retry = $esc(__('resource_busy.retry'));
         $gameLabels = [
+            'data-game-url' => $esc(url('/pause-game/score')),
             'data-game-title' => $esc(__('resource_busy.game_title')),
             'data-game-hint' => $esc(__('resource_busy.game_hint')),
-            'data-game-score' => $esc(__('resource_busy.game_score', ['count' => ':count'])),
-            'data-game-win' => $esc(__('resource_busy.game_win')),
-            'data-game-reset' => $esc(__('resource_busy.game_reset')),
+            'data-game-score-label' => $esc(__('resource_busy.game_score_label')),
+            'data-game-record-label' => $esc(__('resource_busy.game_record_label')),
+            'data-game-record-none' => $esc(__('resource_busy.game_record_none')),
+            'data-game-record-you' => $esc(__('resource_busy.game_record_you')),
+            'data-game-personal-label' => $esc(__('resource_busy.game_personal_label')),
+            'data-game-record-new' => $esc(__('resource_busy.game_record_new')),
+            'data-game-players' => $esc(__('resource_busy.game_players', ['count' => ':count'])),
             'data-game-aria' => $esc(__('resource_busy.game_aria')),
             'data-game-bubble' => $esc(__('resource_busy.game_bubble')),
         ];
@@ -204,6 +217,7 @@ final class ResourceBusyMiddleware
 
         echo '<!DOCTYPE html><html lang="' . $esc($locale) . '"><head><meta charset="utf-8">';
         echo '<meta name="viewport" content="width=device-width, initial-scale=1">';
+        echo '<meta name="csrf-token" content="' . $esc($csrf) . '">';
         echo '<link rel="preconnect" href="https://fonts.googleapis.com">';
         echo '<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>';
         echo '<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,560;9..144,700&family=Manrope:wght@400;600;700;800&display=swap">';
@@ -222,7 +236,6 @@ final class ResourceBusyMiddleware
         echo '<p class="pause-eta" data-busy-eta>' . $eta . '</p>';
         echo '<p class="pause-wait">' . $pauseText . '</p>';
         echo '<p class="pause-hint">' . $hint . '</p>';
-        echo '<p class="pause-reassure">' . $reassure . '</p>';
         echo '<div class="pause-game" data-pause-game' . $gameAttrs . '></div>';
         echo '<div class="pause-actions"><button type="button" class="btn" data-busy-retry>' . $retry . '</button></div>';
         echo '</main>';
@@ -291,9 +304,6 @@ final class ResourceBusyMiddleware
             . 'color:#0a4f6a;background:color-mix(in srgb,var(--brand) 8%,#fff);border:1px solid color-mix(in srgb,var(--brand) 20%,#fff)}'
             . '.pause-wait{margin:0 0 .55rem;font-size:.95rem;line-height:1.45;color:var(--ink)}'
             . '.pause-hint{margin:0 0 .85rem;font-size:.82rem;line-height:1.45;color:#5d6f6c}'
-            . '.pause-reassure{margin:0 0 1rem;padding:.55rem .75rem;border-radius:12px;font-size:.82rem;line-height:1.4;'
-            . 'color:#0a5a4a;background:color-mix(in srgb,#2f9e8f 12%,#fff);border:1px solid color-mix(in srgb,#2f9e8f 26%,#fff)}'
-            . '.pause-reassure::before{content:"\\2713";font-weight:800;margin-right:.4rem}'
             . '.pause-actions{display:flex;justify-content:flex-end}'
             . '.btn{appearance:none;border:0;border-radius:999px;padding:.72rem 1.15rem;font:inherit;font-weight:700;cursor:pointer;'
             . 'background:var(--brand);color:#fff;text-decoration:none;display:inline-flex}'
@@ -307,13 +317,21 @@ final class ResourceBusyMiddleware
             . 'border:1px solid color-mix(in srgb,var(--brand) 16%,var(--line));background:color-mix(in srgb,var(--brand) 4%,#fff)}'
             . '.pause-game-head{display:flex;align-items:baseline;justify-content:space-between;gap:.75rem;margin-bottom:.2rem}'
             . '.pause-game-head strong{font-family:"Fraunces",Georgia,serif;font-size:1rem}'
-            . '.pause-score{font-size:.78rem;font-weight:700;color:var(--brand)}'
+            . '.pause-hud{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:.45rem;margin:0 0 .55rem}'
+            . '.pause-stat{display:flex;flex-direction:column;gap:.1rem;padding:.45rem .55rem;border-radius:12px;'
+            . 'border:1px solid color-mix(in srgb,var(--brand) 14%,#fff);background:#fff}'
+            . '.pause-stat-label{font-size:.68rem;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:#6b7c79}'
+            . '.pause-stat-value{font-family:"Fraunces",Georgia,serif;font-size:1.15rem;line-height:1.1;color:var(--ink);'
+            . 'font-variant-numeric:tabular-nums}'
+            . '.pause-stat-meta{font-size:.68rem;color:#6b7c79;line-height:1.25}'
+            . '.pause-stat--record .pause-stat-value{color:var(--brand)}'
+            . '.pause-hud.is-record{animation:pulseRecord 1.2s ease-in-out 2}'
+            . '@keyframes pulseRecord{0%,100%{filter:none}50%{filter:drop-shadow(0 0 10px color-mix(in srgb,#e7c46a 70%,transparent))}}'
             . '.pause-game-hint{margin:0 0 .55rem;font-size:.76rem;color:#6b7c79}'
             . '.pause-playfield{position:relative;height:9.5rem;overflow:hidden;border-radius:12px;'
             . 'background:radial-gradient(120px 80px at 18% 22%,color-mix(in srgb,var(--brand) 12%,transparent),transparent 70%),'
             . 'radial-gradient(140px 90px at 82% 78%,color-mix(in srgb,#e7c46a 16%,transparent),transparent 72%),linear-gradient(180deg,#f8fcfb,#eef6f4);'
             . 'border:1px solid color-mix(in srgb,var(--brand) 10%,#fff)}'
-            . '.pause-playfield.is-won{background:radial-gradient(180px 120px at 50% 50%,color-mix(in srgb,#e7c46a 26%,transparent),transparent 70%),linear-gradient(180deg,#fbfffd,#eef8f3)}'
             . '.pause-bubble{position:absolute;width:var(--bubble-size,1rem);height:var(--bubble-size,1rem);padding:0;border-radius:50%;cursor:pointer;'
             . 'border:1px solid color-mix(in srgb,var(--brand) 30%,#fff);'
             . 'background:radial-gradient(circle at 32% 28%,#fff 0 18%,color-mix(in srgb,var(--brand) 22%,#fff) 55%,color-mix(in srgb,var(--brand) 38%,#fff) 100%);'
@@ -322,12 +340,10 @@ final class ResourceBusyMiddleware
             . '.pause-bubble:hover,.pause-bubble:focus-visible{transform:scale(1.12);outline:2px solid color-mix(in srgb,var(--brand) 55%,#fff);outline-offset:2px}'
             . '.pause-bubble.is-popped{transform:scale(.25);opacity:0;pointer-events:none}'
             . '@keyframes float{from{transform:translate3d(0,0,0)}to{transform:translate3d(0,-7px,0)}}'
-            . '.pause-win{margin:.65rem 0 0;padding:.55rem .7rem;border-radius:10px;font-size:.85rem;font-weight:700;'
+            . '.pause-record-flash{margin:.4rem 0 0;padding:.45rem .6rem;border-radius:10px;font-size:.82rem;font-weight:700;'
             . 'color:#0a5a4a;background:color-mix(in srgb,#2f9e8f 14%,#fff);border:1px solid color-mix(in srgb,#2f9e8f 30%,#fff)}'
-            . '.pause-win[hidden],.pause-reset[hidden]{display:none!important}'
-            . '.pause-reset{margin-top:.55rem;appearance:none;border:1px solid var(--line);border-radius:999px;padding:.45rem .85rem;'
-            . 'font:inherit;font-size:.82rem;font-weight:700;cursor:pointer;background:#fff;color:var(--ink)}'
-            . '@media(max-width:520px){.pause-playfield{height:8rem}}'
+            . '.pause-record-flash[hidden]{display:none!important}'
+            . '@media(max-width:520px){.pause-playfield{height:8rem}.pause-hud{grid-template-columns:repeat(2,minmax(0,1fr))}.pause-stat--personal{grid-column:span 2}}'
             . '@media(prefers-reduced-motion:reduce){.pause-orb,.pause-bubble,.pause-pulse span,.pause-card{animation:none!important}.pause-bubble{transition:none}}';
     }
 

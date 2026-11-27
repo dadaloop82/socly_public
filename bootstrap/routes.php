@@ -40,6 +40,7 @@ use Socly\Controllers\OrgController;
 use Socly\Controllers\ApiController;
 use Socly\Controllers\PluginController;
 use Socly\Controllers\PresenceController;
+use Socly\Controllers\PauseGameController;
 use Socly\Controllers\FreshnessController;
 use Socly\Controllers\SessionController;
 use Socly\Controllers\SettingsController;
@@ -96,6 +97,8 @@ $router->post('/logout', [AuthController::class, 'logout'], null, ['mw.locale', 
 $router->post('/session/ping', [SessionController::class, 'ping'], null, ['mw.locale', 'mw.install', 'mw.auth', 'mw.csrf']);
 $router->get('/resource-busy/status', [SessionController::class, 'resourceBusyStatus'], null, ['mw.locale', 'mw.install', 'mw.auth']);
 $router->get('/presence/state', [PresenceController::class, 'state'], null, ['mw.locale', 'mw.install', 'mw.auth']);
+$router->get('/pause-game/score', [PauseGameController::class, 'state'], null, ['mw.locale', 'mw.install', 'mw.auth']);
+$router->post('/pause-game/score', [PauseGameController::class, 'save'], null, ['mw.locale', 'mw.install', 'mw.auth', 'mw.csrf']);
 $router->get('/freshness', [FreshnessController::class, 'state'], null, ['mw.locale', 'mw.install', 'mw.auth']);
 $router->get('/password/forgot', [AuthController::class, 'showForgot'], null, ['mw.locale', 'mw.install', 'mw.guest']);
 $router->post('/password/forgot', [AuthController::class, 'sendForgot'], null, ['mw.locale', 'mw.install', 'mw.guest', 'mw.csrf']);

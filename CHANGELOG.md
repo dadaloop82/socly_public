@@ -10,6 +10,11 @@ every 100 patches bump the series, and each bump is published to this rep come o
 
 ### Added
 
+- Pause mini-game (“Stiamo lavorando per te”): the bubbles no longer end after ten pops — the field
+  is endless and every pop makes the bubbles faster. A proper scoreboard shows the current score,
+  the operator's best and the **all-time record with the name of the holder**; the record is stored
+  server-side (`pause_game_scores`, `/pause-game/score`) and shared by every user. The
+  “Nessun dato è a rischio…” line and the “N bolle scoppiate” counter are gone.
 - Bank-statement import: an unreadable amount now has **Riprova a leggere la cifra** on the review
   card, with six alternate crops/OCR modes on the same line. If the number still cannot be read the
   card offers **Copia log completo** / **Scarica log completo** (attempts, OCR words and crop boxes

@@ -1,11 +1,12 @@
 {
-    "version": "1.14.60",
-    "released_at": "2026-11-27T08:11:42+00:00",
+    "version": "1.14.62",
+    "released_at": "2026-11-27T08:32:05+00:00",
     "repository_url": "https://github.com/dadaloop82/socly_public",
     "notes_url": "https://github.com/dadaloop82/socly_public/blob/main/CHANGELOG.md",
     "download_url": "https://github.com/dadaloop82/socly_public/archive/refs/heads/main.zip",
     "install_guide_url": "https://github.com/dadaloop82/socly_public/blob/main/README.md#updates",
     "changelog": [
+        "Pause mini-game (“Stiamo lavorando per te”): the bubbles no longer end after ten pops — the field is endless and every pop makes the bubbles faster. A proper scoreboard shows the current score, the operator's best and…",
         "Bank-statement import: an unreadable amount now has **Riprova a leggere la cifra** on the review card, with six alternate crops/OCR modes on the same line. If the number still cannot be read the card offers **Copia lo…",
         "Board voting: **Esporta PDF** replaces “Stampa / PDF”. The results report (summary, outcomes, participation register and, for open polls, the individual ballots) opens inline in the browser with the association brandi…",
         "Documents: a document in **Draft** status can now be deleted from its detail or edit page with a double confirmation. Approved, signed and archived documents remain immutable; the deletion is recorded in the activity …",
@@ -16,7 +17,6 @@
         "Resource busy lock: while an operator runs a heavy job (bank-statement anomaly check / excerpt repair, or an in-app update), other users and other browser tabs see a pause message with that person’s name until the job…",
         "Login greeting: the sign-in card now reads “Buongiorno / Buon pomeriggio / Buonasera <nome>” with “Bentornato/a” under it (from the operator profile) instead of the generic “Accesso / Sto entrando…” copy.",
         "Operator accounts now collect gender (required, used for the welcome greeting) and an optional birth date, in the admin user editor, the inline Settings form and the setup wizard.",
-        "Gender labels: the Italian UI now reads **“Uomo” / “Donna”** (previously “Maschio” / “Femmina”) in the member and operator forms, minute attendance, statistics, PDFs and the tablet enrolment kiosk. The CSV import keep…",
-        "Documents: bank-statement crops (“Ritagli dell’estratto conto”) are no longer counted as documents and stay out of the default archive, so the KPI cards show how many real documents exist. They remain reachable by sel…"
+        "Gender labels: the Italian UI now reads **“Uomo” / “Donna”** (previously “Maschio” / “Femmina”) in the member and operator forms, minute attendance, statistics, PDFs and the tablet enrolment kiosk. The CSV import keep…"
     ]
 }
