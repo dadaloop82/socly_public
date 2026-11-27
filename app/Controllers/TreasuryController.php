@@ -451,6 +451,10 @@ final class TreasuryController extends BaseController
     public function update(Request $request, string $id): void
     {
         require_component('treasury');
+        // Errors of a previous attempt belong to the page that opened this form: they describe the
+        // old submission and must not be printed next to this request's outcome (the embedded dialog
+        // renders both in the same page, so red + green together read as a failure).
+        unset($_SESSION['_flash']['errors']);
         // Ledger state to come back to (filters, sort, page) after the save or a validation error.
         $returnPath = $this->listReturnPath($request);
         $editPath = '/treasury/' . (int) $id . '/edit';
@@ -551,6 +555,8 @@ final class TreasuryController extends BaseController
     public function store(Request $request): void
     {
         require_component('treasury');
+        // Same as update(): a stale error flash from the previous attempt is not about this save.
+        unset($_SESSION['_flash']['errors']);
         // Ledger state to come back to (filters, sort, page) after the save or a validation error.
         $returnPath = $this->listReturnPath($request);
         $embed = trim((string) $request->input('embed', '')) === '1';

@@ -119,7 +119,10 @@ every 100 patches bump the series, and each bump is published to this rep come o
   on the parent page; the dialog closes only when the movement is really saved **and** linked to the
   statement row. A create rejected by validation no longer matches the old `saved=1` substring check,
   and a movement saved but not linked keeps the card open with the reason and “Riprova il
-  collegamento” (add-on 1.4.85).
+  collegamento”. The validation errors of a rejected save are mirrored above the form and never close
+  the dialog; a successful link leaves a green confirmation on the page behind (“Movimento #N
+  collegato alla riga…”), and stale errors from a previous attempt are cleared on success (add-on
+  1.4.86).
 - Login page: a POST without any session cookie (login tab left open for hours, cookies blocked) is
   logged as a warning with `reason=no_session` instead of an anomaly; the 419 page is unchanged and
   the visitor only reloads. A token that does not match an existing session keeps the anomaly entry.
