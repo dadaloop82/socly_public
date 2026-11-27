@@ -175,7 +175,7 @@ $convocationHint = $convocationNoticeDays > 0
 >
     <?= csrf_field() ?>
     <?php if ($minutesErrors !== []): ?>
-        <div class="alert alert-error" role="alert">
+        <div class="alert alert-error" role="alert" data-minutes-server-errors>
             <?php foreach ($minutesErrors as $minutesError): ?>
                 <div><?= e($minutesError) ?></div>
             <?php endforeach; ?>

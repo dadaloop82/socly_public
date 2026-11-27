@@ -20419,6 +20419,17 @@ function initMinutesWizard(root = document) {
     // A failed server-side save reopens the step that holds the failing field and keeps the
     // reasons visible until the operator acts on them.
     const serverErrorStep = Number(form.dataset.minutesErrorStep || 0);
+    // A server rejection describes the previous submission. Once the operator edits a field the
+    // banner is stale — a corrected date kept showing the old notice error — while the inline
+    // messages already describe the current values, so the banner goes away at the first edit.
+    const serverErrors = form.querySelector('[data-minutes-server-errors]');
+    const dismissServerErrors = () => {
+      if (serverErrors instanceof HTMLElement) serverErrors.hidden = true;
+    };
+    if (serverErrors instanceof HTMLElement) {
+      form.addEventListener('input', dismissServerErrors);
+      form.addEventListener('change', dismissServerErrors);
+    }
     const total = panels.length;
     let step = 1;
 

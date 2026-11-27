@@ -103,7 +103,9 @@ every 100 patches bump the series, and each bump is published to this rep come o
   window (at least N days before the meeting, only while “Convocazione regolare” is checked): the
   previous `min`/`max` pair allowed exactly the dates the server then rejected, and an irregular
   convocation is now recorded with its real date instead of failing the notice check. Closing time
-  before opening time and the mandatory agenda point are reported the same way.
+  before opening time and the mandatory agenda point are reported the same way. A server-rejection
+  banner is cleared at the first edit: it described the previous submission, so a corrected
+  convocation date kept showing the old notice error.
 - Minutes wizard: a person holding several offices is listed once in the board attendance, with the
   offices joined (“Segretario · Tesoriere”), instead of one row per office. Grouping uses fiscal code,
   then email/phone, then the full name, so homonyms stay distinct.
