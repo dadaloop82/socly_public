@@ -127,7 +127,13 @@ every 100 patches bump the series, and each bump is published to this rep come o
 - Bank-statement audit: “Movimenti solo in Prima cassa” is now **one-to-one**. Two identical ledger
   movements (same direction and amount) can no longer both count as present in the statement, so the
   duplicated one is finally listed and can be deleted from the verify page. Cached audits are
-  invalidated (parser cache 5) so the report is rebuilt with the correct list (add-on 1.4.87).
+  invalidated (parser cache 5) so the report is rebuilt with the correct list.
+- Bank-statement audit: a new **“Possibili doppi in Prima cassa”** section lists ledger movements with
+  the same amount and the **same description on different dates within ten days** — a duplicate
+  re-entered with the wrong date is not in the statement either, so the PDF comparison could never see
+  it. This scan looks inside the ledger, in the audit report and in the verify page, with a link to
+  open each copy and decide which one stays. Same-day identical movements (e.g. ten membership fees)
+  and monthly recurring ones are not flagged (add-on 1.4.88).
 - Treasury popup (“Aggiungi a prima cassa” from the add-on): the bare dialog layout now renders the
   flash messages, so a rejected save shows its errors **inside** the popup instead of surfacing later
   on the parent page; the dialog closes only when the movement is really saved **and** linked to the
