@@ -47,7 +47,33 @@ $assocName = (string) ($branding['name'] ?? 'SOCLY');
     }</style>
 </head>
 <body class="app-embed"<?= !empty($embed_saved) ? ' data-embed-saved="1"' : '' ?>>
-<main class="main app-embed-main"><?= $content ?></main>
+<main class="main app-embed-main">
+    <?php // Validation errors and confirmations must be readable inside the dialog: the app layout
+          // shows them, the bare layout used by add-on popups used to swallow them, so a rejected
+          // save looked like a form that simply reloaded (and the error flash surfaced later on the
+          // parent page, already gone). ?>
+    <?php if ($msg = flash('success')): ?>
+        <div
+            class="alert alert-success alert-dismissible"
+            data-flash-success
+            data-auto-dismiss-ms="6000"
+            role="status"
+        >
+            <span class="alert-body"><?= e(is_string($msg) ? $msg : '') ?></span>
+            <button type="button" class="alert-dismiss" aria-label="<?= e(__('common.close')) ?>">×</button>
+        </div>
+    <?php endif; ?>
+    <?php if ($errors = flash('errors')): ?>
+        <div class="alert alert-error" data-flash-error role="alert">
+            <?php if (is_array($errors)): foreach ($errors as $err): ?>
+                <div><?= e(is_array($err) ? implode(', ', $err) : (string) $err) ?></div>
+            <?php endforeach; else: ?>
+                <div><?= e((string) $errors) ?></div>
+            <?php endif; ?>
+        </div>
+    <?php endif; ?>
+    <?= $content ?>
+</main>
 <script src="<?= e(asset('js/confirm.js')) ?>?v=<?= e((string) (@filemtime(base_path('public/assets/js/confirm.js')) ?: time())) ?>"></script>
 <script src="<?= e(asset('js/app.js')) ?>?v=<?= e((string) (@filemtime(base_path('public/assets/js/app.js')) ?: time())) ?>"></script>
 </body>

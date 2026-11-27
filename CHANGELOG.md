@@ -114,6 +114,12 @@ every 100 patches bump the series, and each bump is published to this rep come o
 
 ### Fixed
 
+- Treasury popup (“Aggiungi a prima cassa” from the add-on): the bare dialog layout now renders the
+  flash messages, so a rejected save shows its errors **inside** the popup instead of surfacing later
+  on the parent page; the dialog closes only when the movement is really saved **and** linked to the
+  statement row. A create rejected by validation no longer matches the old `saved=1` substring check,
+  and a movement saved but not linked keeps the card open with the reason and “Riprova il
+  collegamento” (add-on 1.4.85).
 - Login page: a POST without any session cookie (login tab left open for hours, cookies blocked) is
   logged as a warning with `reason=no_session` instead of an anomaly; the 419 page is unchanged and
   the visitor only reloads. A token that does not match an existing session keeps the anomaly entry.
