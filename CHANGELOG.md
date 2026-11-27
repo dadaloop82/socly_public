@@ -114,6 +114,20 @@ every 100 patches bump the series, and each bump is published to this rep come o
 
 ### Fixed
 
+- Bank-statement audit / verify: a row that already exists in the ledger is no longer offered as
+  “add to the cash book” without a warning. Each missing row now lists the **similar movements
+  already recorded** (same direction and amount within ten days), with **“Collega il movimento #N”**
+  and an explicit question before creating a new one — this is the duplicate the operator could
+  create by linking the row twice. The counterparty of a row added from a full audit is prefilled
+  with its bank instead of staying empty (the audit verify session now keeps the statement’s bank).
+- Bank-statement audit cache: linking a row (or deleting a ledger-only movement) now updates the
+  durable audit snapshot too, so reopening the cached audit no longer shows the row as missing again
+  (that is how the same movement was added twice); the “Movimenti solo in Prima cassa” list and the
+  anomaly counters follow the change.
+- Bank-statement audit: “Movimenti solo in Prima cassa” is now **one-to-one**. Two identical ledger
+  movements (same direction and amount) can no longer both count as present in the statement, so the
+  duplicated one is finally listed and can be deleted from the verify page. Cached audits are
+  invalidated (parser cache 5) so the report is rebuilt with the correct list (add-on 1.4.87).
 - Treasury popup (“Aggiungi a prima cassa” from the add-on): the bare dialog layout now renders the
   flash messages, so a rejected save shows its errors **inside** the popup instead of surfacing later
   on the parent page; the dialog closes only when the movement is really saved **and** linked to the
