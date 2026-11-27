@@ -2402,8 +2402,8 @@ return [
         'file' => 'Ungültige Datei oder Upload fehlgeschlagen.',
     ],
     'resource_busy' => [
-        'title' => 'SOCLY · Wir arbeiten für dich',
-        'heading' => 'Wir arbeiten für dich',
+        'title' => 'SOCLY · Längere Prozedur läuft',
+        'heading' => 'Längere Prozedur läuft',
         'who' => ':name beansprucht gerade erhöhte Ressourcen auf dieser Instanz.',
         'started_by' => 'Gestartet von :name um :time',
         'message' => 'Dieser Vorgang braucht die volle Rechenleistung: damit die Datenanalyse nicht gestört wird, ist die App vorübergehend pausiert.',

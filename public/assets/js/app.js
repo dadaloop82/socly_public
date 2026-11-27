@@ -1506,12 +1506,14 @@ function initResourceBusyWatch() {
       '<span class="pause-orb pause-orb--4"></span>',
       '</div>',
       '<div class="update-overlay-card pause-card" role="status" aria-live="polite">',
+      '<img class="pause-logo" data-resource-busy-logo alt="Socly" hidden>',
       '<p class="pause-kicker" data-resource-busy-kicker></p>',
       '<div class="pause-pulse" aria-hidden="true"><span></span><span></span><span></span></div>',
       '<h2 class="update-overlay-title" data-resource-busy-title></h2>',
       '<p class="update-overlay-who" data-resource-busy-operation></p>',
       '<p class="update-overlay-started" data-resource-busy-started></p>',
       '<p class="update-overlay-text" data-resource-busy-text></p>',
+      '<p class="pause-eta" data-resource-busy-eta hidden></p>',
       '<p class="pause-text" data-resource-busy-pause-text></p>',
       '<p class="update-overlay-hint" data-resource-busy-hint></p>',
       '<div class="pause-game" data-pause-game></div>',
@@ -1519,6 +1521,13 @@ function initResourceBusyWatch() {
       '</div>',
     ].join('');
     document.body.appendChild(overlay);
+    // The Socly mark is served by the layout: the overlay never invents an asset path.
+    const logoUrl = String(root?.getAttribute('data-resource-busy-logo') || '');
+    const logo = overlay.querySelector('[data-resource-busy-logo]');
+    if (logo instanceof HTMLImageElement && logoUrl !== '') {
+      logo.src = logoUrl;
+      logo.hidden = false;
+    }
     overlay.querySelector('[data-resource-busy-retry]')?.addEventListener('click', () => {
       window.location.reload();
     });
@@ -1531,7 +1540,7 @@ function initResourceBusyWatch() {
     const lang = (document.documentElement.lang || 'it').slice(0, 2);
     const map = {
       it: {
-        title: 'Stiamo lavorando per te',
+        title: 'Procedura lunga in corso',
         hint: 'Puoi lasciare questa schermata aperta: si sbloccherà da sola al termine (entro 30 minuti).',
         retry: 'Aggiorna ora',
         someone: 'Un collega',
@@ -1553,7 +1562,7 @@ function initResourceBusyWatch() {
         gameBubble: 'Scoppia la bolla',
       },
       en: {
-        title: 'We are working for you',
+        title: 'Long procedure in progress',
         hint: 'You can leave this screen open: it will unlock by itself when the work is done (within 30 minutes).',
         retry: 'Refresh now',
         someone: 'A colleague',
@@ -1575,7 +1584,7 @@ function initResourceBusyWatch() {
         gameBubble: 'Pop the bubble',
       },
       de: {
-        title: 'Wir arbeiten für dich',
+        title: 'Längere Prozedur läuft',
         hint: 'Du kannst diese Seite geöffnet lassen: sie entsperrt sich am Ende von selbst (innerhalb von 30 Minuten).',
         retry: 'Jetzt aktualisieren',
         someone: 'Eine Kollegin / ein Kollege',
@@ -1654,10 +1663,12 @@ function initResourceBusyWatch() {
     const startedBy = String(data?.started_by || '').trim()
       || fillTpl(startedByTpl || labels.startedBy, { name, time: startedTime });
     const message = String(data?.message || '').trim() || messageTpl || labels.fallback;
+    const etaLabel = String(data?.eta_label || '').trim();
     card.dataset.operation = operation;
     card.dataset.startedBy = startedBy;
     card.dataset.message = message;
     card.dataset.userName = name;
+    card.dataset.eta = etaLabel;
   };
 
   const sync = () => {
@@ -1678,6 +1689,7 @@ function initResourceBusyWatch() {
     const retryEl = card.querySelector('[data-resource-busy-retry]');
     const kickerEl = card.querySelector('[data-resource-busy-kicker]');
     const pauseTextEl = card.querySelector('[data-resource-busy-pause-text]');
+    const etaEl = card.querySelector('[data-resource-busy-eta]');
     const gameEl = card.querySelector('[data-pause-game]');
     if (kickerEl) kickerEl.textContent = labels.kicker;
     if (titleEl) titleEl.textContent = labels.title;
@@ -1690,6 +1702,10 @@ function initResourceBusyWatch() {
       startedEl.hidden = !startedEl.textContent;
     }
     if (textEl) textEl.textContent = card.dataset.message || labels.fallback;
+    if (etaEl) {
+      etaEl.textContent = card.dataset.eta || '';
+      etaEl.hidden = !etaEl.textContent;
+    }
     if (pauseTextEl) pauseTextEl.textContent = labels.pauseText;
     if (hintEl) hintEl.textContent = labels.hint;
     if (retryEl) retryEl.textContent = labels.retry;
@@ -1770,6 +1786,7 @@ function initResourceBusyWatch() {
           started_time: data.started_time,
           started_by: data.started_by,
           message: data.message,
+          eta_label: data.eta_label,
         });
       } else if (data && data.busy === false && localActive) {
         // Drop the soft tab signal only when the SERVER lock is gone — never when

@@ -2402,8 +2402,8 @@ return [
         'file' => 'Invalid file or upload failed.',
     ],
     'resource_busy' => [
-        'title' => 'SOCLY · We are working for you',
-        'heading' => 'We are working for you',
+        'title' => 'SOCLY · Long procedure in progress',
+        'heading' => 'Long procedure in progress',
         'who' => ':name is using elevated resources on this instance.',
         'started_by' => 'Started by :name at :time',
         'message' => 'This operation needs the full power of the system: so the data analysis is not disturbed, the app is paused for a moment.',

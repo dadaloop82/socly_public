@@ -170,8 +170,12 @@ final class ResourceBusyLock
         return ['ok' => true, 'status' => $payload];
     }
 
-    /** Extend TTL while the heavy job keeps ticking (never past the 30-minute hard cap). */
-    public function heartbeat(string $job, ?int $userId = null, string $sessionId = ''): bool
+    /**
+     * Extend TTL while the heavy job keeps ticking (never past the 30-minute hard cap). A job that
+     * knows its progress can also refresh the expected end, so the pause page counts down a real
+     * estimate instead of the per-operation default.
+     */
+    public function heartbeat(string $job, ?int $userId = null, string $sessionId = '', ?int $etaSeconds = null): bool
     {
         $lock = $this->read();
         if ($lock === null) {
@@ -200,6 +204,11 @@ final class ResourceBusyLock
             return false;
         }
         $lock['expires_at'] = date('c', $next);
+        if ($etaSeconds !== null && $etaSeconds > 0) {
+            $eta = max(30, min(self::MAX_HOLD_SECONDS, $etaSeconds));
+            $lock['eta_seconds'] = $eta;
+            $lock['eta_at'] = date('c', min(time() + $eta, $hardCap));
+        }
 
         return $this->write($lock);
     }

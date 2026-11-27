@@ -57,6 +57,12 @@ every 100 patches bump the series, and each bump is published to this rep come o
 
 ### Changed
 
+- Pause page (heavy job running): the heading now reads **“Procedura lunga in corso”** instead of
+  “Stiamo lavorando per te”, the Socly mark is shown, and the overlay other sessions see carries the
+  **estimated end** as well. The bank-statement audit refreshes that estimate at every heartbeat with
+  its own pace, so the countdown follows the real work instead of a flat per-operation default.
+- Bank-statement page: the “Add-on x · parser y” line under the title is gone; the versions stay in
+  the diagnostic log and in the verify badge (add-on 1.4.84).
 - Settings: the configuration index folds to an **icon rail** on desktop (toggle on the index, the
   preference is remembered, labels stay in the DOM for screen readers) and each macro-area opens its
   sections in a flyout while the rail is active — the same pattern as the sidebar.

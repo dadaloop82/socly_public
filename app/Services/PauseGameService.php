@@ -27,7 +27,7 @@ namespace Socly\Services;
 use Socly\Core\Database;
 
 /**
- * Shared scoreboard of the pause mini-game (“Stiamo lavorando per te”).
+ * Shared scoreboard of the pause mini-game (“Procedura lunga in corso”).
  *
  * The game runs while a heavy job keeps the instance paused, so the score is written in small,
  * throttled POSTs. One row per operator stores the best score: the all-time record and its holder

@@ -2406,8 +2406,8 @@ return [
         'file' => 'File non valido o caricamento non riuscito.',
     ],
     'resource_busy' => [
-        'title' => 'SOCLY · Stiamo lavorando per te',
-        'heading' => 'Stiamo lavorando per te',
+        'title' => 'SOCLY · Procedura lunga in corso',
+        'heading' => 'Procedura lunga in corso',
         'who' => ':name sta usando risorse elevate sull’istanza.',
         'started_by' => 'Avviata da :name alle :time',
         'message' => 'Questa operazione richiede tutta la potenza del sistema: per non interferire con l’analisi dei dati, l’app è momentaneamente in pausa.',

@@ -1,6 +1,6 @@
 {
-    "version": "1.14.70",
-    "released_at": "2026-11-27T11:46:11+00:00",
+    "version": "1.14.72",
+    "released_at": "2026-11-27T12:05:13+00:00",
     "repository_url": "https://github.com/dadaloop82/socly_public",
     "notes_url": "https://github.com/dadaloop82/socly_public/blob/main/CHANGELOG.md",
     "download_url": "https://github.com/dadaloop82/socly_public/archive/refs/heads/main.zip",
@@ -17,6 +17,6 @@
         "Resource busy lock: while an operator runs a heavy job (bank-statement anomaly check / excerpt repair, or an in-app update), other users and other browser tabs see a pause message with that person’s name until the job…",
         "Login greeting: the sign-in card now reads “Buongiorno / Buon pomeriggio / Buonasera <nome>” with “Bentornato/a” under it (from the operator profile) instead of the generic “Accesso / Sto entrando…” copy.",
         "Operator accounts now collect gender (required, used for the welcome greeting) and an optional birth date, in the admin user editor, the inline Settings form and the setup wizard.",
-        "Settings: the configuration index folds to an **icon rail** on desktop (toggle on the index, the preference is remembered, labels stay in the DOM for screen readers) and each macro-area opens its sections in a flyout …"
+        "Pause page (heavy job running): the heading now reads **“Procedura lunga in corso”** instead of “Stiamo lavorando per te”, the Socly mark is shown, and the overlay other sessions see carries the **estimated end** as w…"
     ]
 }

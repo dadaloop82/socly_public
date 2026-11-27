@@ -196,6 +196,7 @@ final class ResourceBusyMiddleware
         $pauseText = $esc(__('resource_busy.pause_text'));
         $hint = $esc(__('resource_busy.hint'));
         $retry = $esc(__('resource_busy.retry'));
+        $logoUrl = function_exists('socly_mark_url') ? socly_mark_url() : '';
         $gameLabels = [
             'data-game-url' => $esc(url('/pause-game/score')),
             'data-game-title' => $esc(__('resource_busy.game_title')),
@@ -227,6 +228,9 @@ final class ResourceBusyMiddleware
         echo '<span class="pause-orb pause-orb--1"></span><span class="pause-orb pause-orb--2"></span>';
         echo '<span class="pause-orb pause-orb--3"></span><span class="pause-orb pause-orb--4"></span></div>';
         echo '<main class="pause-card" role="status" aria-live="polite">';
+        if ($logoUrl !== '') {
+            echo '<img class="pause-logo" src="' . $esc($logoUrl) . '" alt="Socly">';
+        }
         echo '<p class="pause-kicker">' . $kicker . '</p>';
         echo '<div class="pause-pulse" aria-hidden="true"><span></span><span></span><span></span></div>';
         echo '<h1 class="pause-title">' . $heading . '</h1>';
@@ -290,6 +294,7 @@ final class ResourceBusyMiddleware
             . 'border:1px solid color-mix(in srgb,var(--brand) 14%,#fff);box-shadow:0 30px 80px rgba(4,18,15,.55),inset 0 2px 0 #fff;'
             . 'animation:card-in .35s ease}'
             . '@keyframes card-in{from{opacity:0;transform:translateY(12px) scale(.985)}to{opacity:1;transform:none}}'
+            . '.pause-logo{display:block;width:auto;height:1.9rem;margin:0 0 .7rem}'
             . '.pause-kicker{margin:0 0 .55rem;font-size:.72rem;font-weight:800;letter-spacing:.14em;text-transform:uppercase;color:var(--brand)}'
             . '.pause-pulse{display:inline-flex;gap:.32rem;margin:0 0 .65rem}'
             . '.pause-pulse span{width:.5rem;height:.5rem;border-radius:50%;background:var(--brand);animation:bounce 1.15s ease-in-out infinite}'

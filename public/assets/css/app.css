@@ -3151,6 +3151,23 @@ html.is-busy .update-overlay {
   from { opacity: 0; transform: translateY(12px) scale(0.985); }
   to { opacity: 1; transform: translateY(0) scale(1); }
 }
+.pause-logo {
+  display: block;
+  width: auto;
+  height: 1.9rem;
+  margin: 0 0 0.7rem;
+}
+.pause-eta {
+  margin: 0 0 0.55rem;
+  padding: 0.5rem 0.75rem;
+  border-radius: 12px;
+  font-size: 0.92rem;
+  font-weight: 700;
+  color: var(--brand-primary-ink, #0a4f6a);
+  background: color-mix(in srgb, var(--brand-primary) 8%, #ffffff);
+  border: 1px solid color-mix(in srgb, var(--brand-primary) 20%, #ffffff);
+}
+.pause-eta[hidden] { display: none !important; }
 .pause-kicker {
   margin: 0 0 0.55rem;
   font-size: 0.72rem;

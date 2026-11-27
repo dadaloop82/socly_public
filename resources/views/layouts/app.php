@@ -606,6 +606,7 @@ $showVersionFooter = true;
             data-resource-busy-kicker="<?= e(__('resource_busy.pause_kicker')) ?>"
             data-resource-busy-pause-text="<?= e(__('resource_busy.pause_text')) ?>"
             data-resource-busy-game-url="<?= e(url('/pause-game/score')) ?>"
+            data-resource-busy-logo="<?= e(socly_mark_url()) ?>"
             data-resource-busy-game-title="<?= e(__('resource_busy.game_title')) ?>"
             data-resource-busy-game-hint="<?= e(__('resource_busy.game_hint')) ?>"
             data-resource-busy-game-score-label="<?= e(__('resource_busy.game_score_label')) ?>"
