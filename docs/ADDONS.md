@@ -361,7 +361,15 @@ audit and must run it again. The audit job also stores the parser-cache version 
 started before an update is closed as stale, so old value dates / zero amounts cannot be mixed with
 new rows. The add-on version and parser cache generation are printed in the statements page, the
 audit report and each “Movimento letto dall’estratto conto” card, so a screenshot immediately shows
-whether the installed package is the fixed one. Step 2
+whether the installed package is the fixed one. The run stops by itself as soon as the first anomaly
+appears (difference, missing row, cash-book-only movement, reading warning or a PDF that cannot be
+re-read) or when a statement yields at most five readable amounts while some rows stay unread:
+continuing would only repeat the same unusable result for the remaining PDFs. The progress overlay
+offers **Interrompi** while the run is active and, after a stop, shows the statement and the anomaly
+with **Copia log**, **Scarica log .txt** and **Apri report**. The audit report keeps the same banner
+(so the reason and the partial results survive a reload) and links the verify cards; a stopped audit
+is never offered as “reuse recent results”. A per-job tick lock prevents a second tab from advancing
+the same job twice. Step 2
 shows a live progress overlay (elapsed time and steps), marks every 0,00 row in red until a valid
 amount is typed, pulses the unreadable-amount alert and offers **Mostra log OCR**
 (`/treasury/bank-statements/ocr-log`, also copyable and downloadable) with the native text, the words
