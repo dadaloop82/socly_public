@@ -108,6 +108,11 @@ every 100 patches bump the series, and each bump is published to this rep come o
 
 ### Fixed
 
+- Bank-statement audit: the full check no longer aborts on a statement that the **wrong bank model**
+  “read” as rows without amounts (the diagnostic log said “5 importi leggibili su 47 righe” on an
+  Intesa statement). The model that actually reads the amounts now wins over the one with more rows,
+  a cached audit produced by the previous logic is discarded, and the diagnostic log prints the
+  installed add-on version instead of “sconosciuto” (add-on 1.4.83).
 - Minutes wizard: the **Data di convocazione** field no longer erases the digits while they are being
   typed (it used to rewrite its own `min`/`max` on every change and the browser emptied the control);
   the statutory notice is still enforced, and explained inline under the field.
