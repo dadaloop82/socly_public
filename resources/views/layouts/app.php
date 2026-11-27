@@ -227,6 +227,17 @@ $showVersionFooter = true;
     <aside class="sidebar" id="app-sidebar" data-sidebar aria-label="<?= e(__('nav.menu')) ?>">
         <div class="sidebar-brand<?= assoc_logo_url() ? ' has-assoc-logo' : '' ?>">
             <button type="button" class="sidebar-close" data-sidebar-close aria-label="<?= e(__('nav.close_menu')) ?>">×</button>
+            <button
+                type="button"
+                class="sidebar-rail-toggle"
+                data-sidebar-rail-toggle
+                aria-controls="app-sidebar"
+                aria-expanded="true"
+                aria-label="<?= e(__('nav.collapse_menu')) ?>"
+                title="<?= e(__('nav.collapse_menu')) ?>"
+                data-label-collapse="<?= e(__('nav.collapse_menu')) ?>"
+                data-label-expand="<?= e(__('nav.expand_menu')) ?>"
+            ><?= nav_icon_svg('chevron-left', 'sidebar-rail-icon') ?></button>
             <?php if (can('dashboard.view')): ?>
                 <a class="sidebar-brand-stack sidebar-brand-home" href="<?= e(url('/dashboard')) ?>" title="<?= e(__('nav.dashboard')) ?>">
                     <?= socly_mark_img('sidebar-mark', 'SOCLY', 'light') ?>
@@ -255,17 +266,25 @@ $showVersionFooter = true;
         <nav class="nav">
             <span class="nav-label"><?= e(__('nav.menu')) ?></span>
             <?php if (can('dashboard.view')): ?>
-                <a href="<?= e(url('/dashboard')) ?>" class="<?= e($navActive('/dashboard')) ?>"><?= e(__('nav.dashboard')) ?></a>
+                <a href="<?= e(url('/dashboard')) ?>" class="<?= e($navActive('/dashboard')) ?>" title="<?= e(__('nav.dashboard')) ?>">
+                    <?= nav_icon_svg('home') ?>
+                    <span class="nav-text"><?= e(__('nav.dashboard')) ?></span>
+                </a>
             <?php endif; ?>
             <?php foreach ($componentMenu as $item): ?>
                 <?php if (!empty($item['permission']) && !can($item['permission'])) continue; ?>
-                <a href="<?= e(url($item['path'])) ?>" class="<?= e($navActive($item['path'])) ?>"><?= e(__($item['label'])) ?></a>
+                <?php $navLabel = (string) __($item['label']); ?>
+                <a href="<?= e(url($item['path'])) ?>" class="<?= e($navActive($item['path'])) ?>" title="<?= e($navLabel) ?>">
+                    <?= nav_icon_svg((string) ($item['icon'] ?? '')) ?>
+                    <span class="nav-text"><?= e($navLabel) ?></span>
+                </a>
                 <?php foreach ($pluginSubItems[(string) ($item['key'] ?? '')] ?? [] as $sub): ?>
-                    <a class="nav-sub nav-addon <?= e($navActive($sub['path'])) ?>" href="<?= e(url($sub['path'])) ?>">
+                    <?php $subLabel = (string) __($sub['label']); ?>
+                    <a class="nav-sub nav-addon <?= e($navActive($sub['path'])) ?>" href="<?= e(url($sub['path'])) ?>" title="<?= e($subLabel) ?>">
                         <svg class="nav-addon-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
                             <path d="m7.5 4.27 9 5.15"/><path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"/><path d="m3.3 7 8.7 5 8.7-5"/><path d="M12 22V12"/>
                         </svg>
-                        <span><?= e(__($sub['label'])) ?></span>
+                        <span class="nav-text"><?= e($subLabel) ?></span>
                         <?php if (trim((string) ($sub['version'] ?? '')) !== ''): ?>
                             <span class="nav-addon-version">(<?= e((string) $sub['version']) ?>)</span>
                         <?php endif; ?>
@@ -273,22 +292,29 @@ $showVersionFooter = true;
                 <?php endforeach; ?>
                 <?php if (($item['key'] ?? '') === 'treasury' && can('treasury.view')): ?>
                     <?php $budgetNavClass = trim($navActive('/budgets') . ' ' . $navActive('/rendiconto')); ?>
-                    <a href="<?= e(url('/budgets')) ?>" class="<?= e($budgetNavClass) ?>"><?= e(__('nav.bilanci')) ?></a>
+                    <a href="<?= e(url('/budgets')) ?>" class="<?= e($budgetNavClass) ?>" title="<?= e(__('nav.bilanci')) ?>">
+                        <?= nav_icon_svg('chart') ?>
+                        <span class="nav-text"><?= e(__('nav.bilanci')) ?></span>
+                    </a>
                 <?php endif; ?>
             <?php endforeach; ?>
             <?php foreach ($pluginStandalone as $item): ?>
-                <a class="nav-addon <?= e($navActive($item['path'])) ?>" href="<?= e(url($item['path'])) ?>">
+                <?php $standaloneLabel = (string) __($item['label']); ?>
+                <a class="nav-addon <?= e($navActive($item['path'])) ?>" href="<?= e(url($item['path'])) ?>" title="<?= e($standaloneLabel) ?>">
                     <svg class="nav-addon-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
                         <path d="m7.5 4.27 9 5.15"/><path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"/><path d="m3.3 7 8.7 5 8.7-5"/><path d="M12 22V12"/>
                     </svg>
-                    <span><?= e(__($item['label'])) ?></span>
+                    <span class="nav-text"><?= e($standaloneLabel) ?></span>
                     <?php if (trim((string) ($item['version'] ?? '')) !== ''): ?>
                         <span class="nav-addon-version">(<?= e((string) $item['version']) ?>)</span>
                     <?php endif; ?>
                 </a>
             <?php endforeach; ?>
             <?php if (can('members.view')): ?>
-                <a href="<?= e(url('/statistics')) ?>" class="<?= e($navActive('/statistics')) ?>"><?= e(__('nav.statistics')) ?></a>
+                <a href="<?= e(url('/statistics')) ?>" class="<?= e($navActive('/statistics')) ?>" title="<?= e(__('nav.statistics')) ?>">
+                    <?= nav_icon_svg('stats') ?>
+                    <span class="nav-text"><?= e(__('nav.statistics')) ?></span>
+                </a>
             <?php endif; ?>
         </nav>
 
@@ -374,7 +400,7 @@ $showVersionFooter = true;
         <?php endif; ?>
 
         <?php if (can('audit.view')): ?>
-            <a class="nav-history<?= $navActive('/audit') ? ' active' : '' ?>" href="<?= e(url('/audit')) ?>" title="<?= e(__('audit.nav_hint')) ?>">
+            <a class="nav-history<?= $navActive('/audit') ? ' active' : '' ?>" href="<?= e(url('/audit')) ?>" title="<?= e(__('nav.audit')) ?>">
                 <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path fill="currentColor" d="M13 3a9 9 0 0 0-9 9H1l3.96 3.96L9 12H6a7 7 0 1 1 7 7 6.98 6.98 0 0 1-4.9-2.03l-1.42 1.42A8.98 8.98 0 0 0 13 21a9 9 0 0 0 0-18Zm-1 5v5l4.28 2.54.72-1.21-3.5-2.08V8H12Z"/></svg>
                 <span><?= e(__('audit.nav')) ?></span>
             </a>
@@ -547,7 +573,11 @@ $showVersionFooter = true;
                 <?php endif; ?>
                 <form method="post" action="<?= e(url('/logout')) ?>" class="sidebar-logout-form">
                     <?= csrf_field() ?>
-                    <button class="btn btn-ghost btn-sm btn-logout" type="submit"><?= e(!empty($demoPreview) ? __('auth.demo_exit') : __('nav.logout')) ?></button>
+                    <?php $logoutLabel = (string) (!empty($demoPreview) ? __('auth.demo_exit') : __('nav.logout')); ?>
+                    <button class="btn btn-ghost btn-sm btn-logout" type="submit" title="<?= e($logoutLabel) ?>">
+                        <?= nav_icon_svg('logout', 'btn-logout-icon') ?>
+                        <span class="nav-text"><?= e($logoutLabel) ?></span>
+                    </button>
                 </form>
             </div>
         </div>

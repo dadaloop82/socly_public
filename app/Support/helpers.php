@@ -1564,6 +1564,8 @@ if (!function_exists('row_action_icon_svg')) {
             'user' => '<circle cx="12" cy="8" r="3.5"/><path d="M5 19c1.8-3.2 4-4.5 7-4.5s5.2 1.3 7 4.5"/>',
             'delete' => '<path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M10 11v6M14 11v6"/>',
             'toggle' => '<rect x="1" y="5" width="22" height="14" rx="7"/><circle cx="16" cy="12" r="3"/>',
+            // Same switch with the knob on the left: an inactive/paused row must look switched off.
+            'toggle_off' => '<rect x="1" y="5" width="22" height="14" rx="7"/><circle cx="8" cy="12" r="3"/>',
             'download' => '<path d="M12 3v12"/><path d="m7 10 5 5 5-5"/><path d="M4 19h16"/>',
             'sheet' => '<rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 9h18"/><path d="M3 14h18"/><path d="M9 9v11"/>',
             'image' => '<rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="9" cy="10" r="1.6"/><path d="m5 18 5-5 3 3 2-2 4 4"/>',
@@ -2002,4 +2004,71 @@ if (!function_exists('association_address_full')) {
     }
 }
 
+
+if (!function_exists('statement_excerpt_gap')) {
+    /**
+     * Movements that have an archived bank statement but no “ritaglio”, used by the
+     * “Genera ritagli mancanti” action in Configuration → Financial accounts.
+     *
+     * The bank-statement add-on is optional (the public tree does not ship it), hence the
+     * `available` flag: without it the action must not be offered at all.
+     *
+     * @return array{available:bool,missing:int,statements:int}
+     */
+    function statement_excerpt_gap(): array
+    {
+        $empty = ['available' => false, 'missing' => 0, 'statements' => 0];
+        if (!class_exists(\Socly\Addons\BankStatementImport\StatementImportService::class)) {
+            return $empty;
+        }
+        try {
+            $service = app(\Socly\Addons\BankStatementImport\StatementImportService::class);
+            $summary = $service->missingExcerptsSummary();
+        } catch (\Throwable) {
+            return $empty;
+        }
+        if (!is_array($summary)) {
+            return $empty;
+        }
+
+        return [
+            'available' => !empty($summary['available']),
+            'missing' => (int) ($summary['missing'] ?? 0),
+            'statements' => (int) ($summary['statements'] ?? 0),
+        ];
+    }
+}
+
+if (!function_exists('nav_icon_svg')) {
+    /**
+     * Inline stroke icon for the sidebar navigation (24×24, currentColor).
+     *
+     * Used by the collapsible rail: when the menu is reduced to icons the label is only
+     * visually hidden, so `title` on the link and the text node keep the accessible name.
+     *
+     * @param string $key component icon (`users`, `org`, `wallet`, `calendar`, `file`), or a
+     *                    navigation key (`home`, `chart`, `stats`, `logout`, `chevron-left`, …)
+     */
+    function nav_icon_svg(string $key, string $class = 'nav-icon'): string
+    {
+        static $paths = [
+            'home' => '<path d="M3 10.75 12 3l9 7.75"/><path d="M5.75 9.5V20a1 1 0 0 0 1 1h10.5a1 1 0 0 0 1-1V9.5"/><path d="M10 21v-6h4v6"/>',
+            'users' => '<path d="M16 20v-1.5a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4V20"/><circle cx="9" cy="7" r="3.2"/><path d="M17 4.2a3.2 3.2 0 0 1 0 6.2"/><path d="M22 20v-1.5a4 4 0 0 0-3-3.87"/>',
+            'org' => '<rect x="9" y="3" width="6" height="4.5" rx="1"/><rect x="3" y="16.5" width="6" height="4.5" rx="1"/><rect x="15" y="16.5" width="6" height="4.5" rx="1"/><path d="M12 7.5V12"/><path d="M6 16.5V14a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v2.5"/>',
+            'wallet' => '<rect x="3" y="6" width="18" height="13" rx="2"/><path d="M3 10h18"/><path d="M16 14.5h2"/>',
+            'calendar' => '<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M8 3v4"/><path d="M16 3v4"/><path d="M3 10h18"/>',
+            'file' => '<path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/>',
+            'chart' => '<path d="M4 20V10"/><path d="M10 20V4"/><path d="M16 20v-7"/><path d="M22 20H2"/>',
+            'stats' => '<path d="M3 3v18h18"/><path d="m7 15 4-5 3 3 4-6"/>',
+            'logout' => '<path d="M15 4h3a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-3"/><path d="m10 17 5-5-5-5"/><path d="M15 12H3"/>',
+            'chevron-left' => '<path d="m14 6-6 6 6 6"/>',
+            'chevron-right' => '<path d="m10 6 6 6-6 6"/>',
+        ];
+        $body = $paths[$key] ?? '<circle cx="12" cy="12" r="3"/>';
+
+        return '<svg class="' . e($class) . '" viewBox="0 0 24 24" fill="none" stroke="currentColor"'
+            . ' stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"'
+            . ' aria-hidden="true" focusable="false">' . $body . '</svg>';
+    }
+}
 

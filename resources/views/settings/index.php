@@ -1435,6 +1435,40 @@
                 </div>
                 <button class="btn" type="submit"><?= e(__('settings.treasury_account_add')) ?></button>
             </form>
+
+            <?php
+            // Missing statement “ritagli” belong with the financial accounts: same archive, same
+            // treasurer. The bank-statement add-on is optional, so the action only appears when it
+            // is installed; with nothing missing the button simply reports that everything is in place.
+            $excerptRepair = is_array($excerpt_repair ?? null) ? $excerpt_repair : [];
+            $excerptMissing = (int) ($excerptRepair['missing'] ?? 0);
+            ?>
+            <?php if (!empty($excerptRepair['available']) && can('documents.manage')): ?>
+                <div class="config-excerpt-repair">
+                    <p class="muted"><?= e($excerptMissing > 0
+                        ? __('documents.repair_excerpts_hint', ['count' => (string) $excerptMissing])
+                        : __('documents.repair_excerpts_synced')) ?></p>
+                    <button
+                        type="button"
+                        class="btn btn-ghost"
+                        data-repair-excerpts
+                        data-no-busy
+                        data-repair-start="<?= e(url('/documents/repair-excerpts')) ?>"
+                        data-repair-tick="<?= e(url('/documents/repair-excerpts/tick')) ?>"
+                        data-repair-missing="<?= (int) $excerptMissing ?>"
+                        data-repair-addon="1"
+                        data-repair-title="<?= e(__('documents.repair_excerpts_title')) ?>"
+                        data-repair-starting="<?= e(__('documents.repair_excerpts_starting')) ?>"
+                        data-repair-working="<?= e(__('documents.repair_excerpts_working')) ?>"
+                        data-repair-eta="<?= e(__('documents.repair_excerpts_eta')) ?>"
+                        data-repair-done="<?= e(__('documents.repair_excerpts_done')) ?>"
+                        data-repair-failed="<?= e(__('documents.repair_excerpts_failed')) ?>"
+                        data-repair-synced="<?= e(__('documents.repair_excerpts_synced')) ?>"
+                        data-repair-unavailable="<?= e(__('documents.repair_excerpts_unavailable')) ?>"
+                        data-repair-retry="<?= e(__('documents.repair_excerpts_retry')) ?>"
+                    ><?= e(__('documents.repair_excerpts')) ?></button>
+                </div>
+            <?php endif; ?>
         <?php endif; ?>
     </div>
 </details>

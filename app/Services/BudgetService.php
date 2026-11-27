@@ -1630,6 +1630,14 @@ final class BudgetService
              WHERE approved_at IS NOT NULL AND superseded_at IS NULL AND movement_date < :from",
             ['from' => sprintf('%04d-01-01', $year)]
         )['net'] ?? 0);
+        // The wallets' opening balances are money already in hand before any movement: they belong
+        // to the opening cash position of the report (they are not a movement, so they are not in
+        // the query above).
+        try {
+            $opening += array_sum($this->treasury->openingBalances());
+        } catch (\Throwable) {
+            // Keep the ledger-only opening: the report must still render.
+        }
         $closing = round($opening + $actual['income'] - $actual['expense'], 2);
 
         $accounts = $this->treasury->accountBalances([

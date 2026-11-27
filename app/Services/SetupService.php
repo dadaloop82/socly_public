@@ -3333,7 +3333,7 @@ final class SetupService
         $ip = (string) ($_SERVER['REMOTE_ADDR'] ?? '0.0.0.0');
         $errors = [];
         $activeCount = 0;
-        $createdMovementIds = [];
+        $createdOpeningSlugs = [];
         $createdAccountIds = [];
 
         try {
@@ -3367,22 +3367,13 @@ final class SetupService
                 if (!$firstRun || $opening <= 0.0 || !$active) {
                     continue;
                 }
-                $result = $treasury->create([
-                    'direction' => 'income',
-                    'amount' => $opening,
-                    'movement_date' => date('Y-m-d'),
-                    'account' => $slug,
-                    'payment_method' => $slug === 'cash' ? 'cash' : 'bank_transfer',
-                    'category' => 'other',
-                    'description' => __('setup.accounts_opening_movement', ['account' => $label]),
-                    'member_involved' => 0,
-                ], null, $ip, null);
-                if (empty($result['ok'])) {
+                // The opening balance is a property of the wallet: no cash-book movement is written.
+                $openingResult = $treasury->setAccountOpeningBalance($slug, $opening, $ip, null);
+                if (empty($openingResult['ok'])) {
                     $errors['accounts'] = __('setup.accounts_opening_failed', ['account' => $label]);
                     break;
                 }
-                $treasury->markOpeningBalance((int) ($result['id'] ?? 0));
-                $createdMovementIds[] = (int) ($result['id'] ?? 0);
+                $createdOpeningSlugs[] = $slug;
             }
 
             // New wallets typed in the wizard ("Other accounts"): created on the fly, with their opening
@@ -3422,22 +3413,12 @@ final class SetupService
                 if (!$firstRun || $opening <= 0.0 || $newSlug === '') {
                     continue;
                 }
-                $result = $treasury->create([
-                    'direction' => 'income',
-                    'amount' => $opening,
-                    'movement_date' => date('Y-m-d'),
-                    'account' => $newSlug,
-                    'payment_method' => 'other',
-                    'category' => 'other',
-                    'description' => __('setup.accounts_opening_movement', ['account' => $label]),
-                    'member_involved' => 0,
-                ], null, $ip, null);
-                if (empty($result['ok'])) {
+                $openingResult = $treasury->setAccountOpeningBalance($newSlug, $opening, $ip, null);
+                if (empty($openingResult['ok'])) {
                     $errors['accounts'] = __('setup.accounts_opening_failed', ['account' => $label]);
                     break;
                 }
-                $treasury->markOpeningBalance((int) ($result['id'] ?? 0));
-                $createdMovementIds[] = (int) ($result['id'] ?? 0);
+                $createdOpeningSlugs[] = $newSlug;
             }
         } catch (\Throwable $e) {
             try {
@@ -3451,13 +3432,10 @@ final class SetupService
             $errors['accounts'] = __('setup.accounts_at_least_one');
         }
         if ($errors !== []) {
-            // Never leave half-written opening movements/accounts behind.
-            foreach ($createdMovementIds as $movementId) {
-                if ($movementId < 1) {
-                    continue;
-                }
+            // Never leave half-written opening balances/accounts behind.
+            foreach ($createdOpeningSlugs as $openingSlug) {
                 try {
-                    $this->db->query('DELETE FROM treasury_movements WHERE id = :id', ['id' => $movementId]);
+                    $treasury->setAccountOpeningBalance((string) $openingSlug, 0.0, $ip, null);
                 } catch (\Throwable) {
                 }
             }

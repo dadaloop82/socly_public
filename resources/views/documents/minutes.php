@@ -35,6 +35,7 @@
  * @var string $pending_text
  * @var string $budget_text
  * @var array{years:list<int>,default_year:int,budgets:list<array<string,mixed>>} $budget_voices
+ * @var string $default_type preselected wizard model coming from a minutes book card
  * @var array<string,string> $errors
  */
 $minutesErrors = [];
@@ -92,6 +93,11 @@ $agendaYes = $oldArray('agenda_yes');
 $agendaNo = $oldArray('agenda_no');
 $agendaAbstain = $oldArray('agenda_abstain');
 $defaultType = (string) old('minutes_type', (string) ($templates[0]['key'] ?? 'board'));
+// A “Crea verbale” card links here with ?type=<model>: preselect it, but only when it exists.
+$requestedType = trim((string) ($default_type ?? ''));
+if ($requestedType !== '' && in_array($requestedType, array_column($templates, 'key'), true)) {
+    $defaultType = (string) old('minutes_type', $requestedType);
+}
 $typeIcons = [
     'board' => '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M3 21h18"/><path d="M5 21V10M9 21V10M15 21V10M19 21V10"/><path d="m12 3 8 5H4l8-5Z"/></svg>',
     'assembly_ordinary' => '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>',
@@ -169,9 +175,14 @@ $convocationHint = $convocationNoticeDays > 0
     data-msg-convocation-notice="<?= e((string) __('documents.minutes_error_convocation_notice', ['days' => ':days'])) ?>"
     data-msg-convocation-too-old="<?= e((string) __('documents.minutes_error_convocation_too_old')) ?>"
     data-msg-time-order="<?= e((string) __('validation.time_end_before_start')) ?>"
+    data-msg-president-required="<?= e((string) __('documents.minutes_error_president_required')) ?>"
+    data-msg-secretary-required="<?= e((string) __('documents.minutes_error_secretary_required')) ?>"
     data-convocation-notice-days="<?= (int) ($convocation_notice_days ?? 0) ?>"
     <?php if ($minutesErrors !== []): ?>data-minutes-error-step="<?= (int) $minutesErrorStep ?>"<?php endif; ?>
     autocomplete="off"
+    <?php /* The wizard validates every step itself: native validation would block the save with no
+             message when a field inside a hidden step is invalid (“Crea nuovo verbale” dead). */ ?>
+    novalidate
 >
     <?= csrf_field() ?>
     <?php if ($minutesErrors !== []): ?>
@@ -352,6 +363,7 @@ $convocationHint = $convocationNoticeDays > 0
                         'empty_label' => (string) __('documents.minutes_field_choose'),
                         'options' => $people,
                         'context' => 'member',
+                        'hint' => (string) __('documents.minutes_field_leader_hint'),
                     ]) ?>
                     <?= field('text', [
                         'name' => 'president_substitute',
@@ -370,6 +382,7 @@ $convocationHint = $convocationNoticeDays > 0
                         'empty_label' => (string) __('documents.minutes_field_choose'),
                         'options' => $people,
                         'context' => 'member',
+                        'hint' => (string) __('documents.minutes_field_leader_hint'),
                     ]) ?>
                     <?= field('text', [
                         'name' => 'secretary_substitute',

@@ -158,6 +158,8 @@ final class SettingsController extends BaseController
             'treasuryAccounts' => $this->treasury->accountOptions(),
             'treasuryAccountUsage' => $this->treasury->accountUsage(),
             'treasuryAccountBalances' => $this->treasury->accountBalances(),
+            // “Genera ritagli mancanti” lives with the financial accounts (see the add-on summary).
+            'excerpt_repair' => statement_excerpt_gap(),
             'treasuryOpeningBalances' => $this->treasury->openingBalances(),
             'panelUsers' => $this->users->panelUsers(),
             'memberOptions' => $this->users->memberOptions(),

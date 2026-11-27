@@ -155,6 +155,7 @@ document.addEventListener('DOMContentLoaded', () => {
   initDemoBannerCountdown();
   initMembersFilterMobile();
   initMobileNav();
+  initSidebarRail();
   initTopbarScroll();
   initFlashDismiss();
   initAddonPanels();
@@ -3155,6 +3156,9 @@ function isAppPageNavigation(anchor) {
     return false;
   }
   if (url.origin !== window.location.origin) return false;
+  // A file download keeps the current page open: there is no section change to announce
+  // (otherwise “Cambio sezione / Sto aprendo «Scarica file»…” stays until the 30s safety cap).
+  if (url.searchParams.get('download') === '1' || /\/download\/?$/.test(url.pathname)) return false;
 
   const here = window.location;
   const samePath = url.pathname === here.pathname && url.search === here.search;
@@ -13866,6 +13870,59 @@ function initMobileNav() {
   });
 }
 
+function initSidebarRail() {
+  const shell = document.querySelector('[data-app-shell]');
+  const toggle = shell?.querySelector('[data-sidebar-rail-toggle]');
+  if (!shell || !toggle) {
+    return;
+  }
+  const storageKey = 'socly_sidebar_rail';
+  const desktop = window.matchMedia('(min-width: 961px)');
+  const labelCollapse = toggle.getAttribute('data-label-collapse') || '';
+  const labelExpand = toggle.getAttribute('data-label-expand') || '';
+
+  const readStored = () => {
+    try {
+      return window.localStorage.getItem(storageKey) === '1';
+    } catch (err) {
+      return false;
+    }
+  };
+
+  let rail = readStored();
+
+  const paint = () => {
+    const active = rail && desktop.matches;
+    shell.classList.toggle('is-sidebar-rail', active);
+    toggle.setAttribute('aria-expanded', active ? 'false' : 'true');
+    toggle.setAttribute('aria-label', active ? labelExpand : labelCollapse);
+    if (active && labelExpand !== '') {
+      toggle.title = labelExpand;
+    } else if (labelCollapse !== '') {
+      toggle.title = labelCollapse;
+    }
+  };
+
+  toggle.addEventListener('click', () => {
+    rail = !shell.classList.contains('is-sidebar-rail');
+    try {
+      window.localStorage.setItem(storageKey, rail ? '1' : '0');
+    } catch (err) {
+      // Private mode / storage disabled: the rail still works for this page.
+    }
+    paint();
+  });
+
+  // Below 961px the sidebar is a drawer: never keep it as a rail.
+  if (typeof desktop.addEventListener === 'function') {
+    desktop.addEventListener('change', paint);
+  } else if (typeof desktop.addListener === 'function') {
+    desktop.addListener(paint);
+  }
+
+  paint();
+}
+
 function initTopbarScroll() {
   /* Topbar is mobile-only; desktop gear was removed in favour of sidebar Settings. */
 }
@@ -20448,6 +20505,55 @@ function initMinutesWizard(root = document) {
     const total = panels.length;
     let step = 1;
 
+    // Chair and minute-taker: the server accepts the role OR a typed substitute, so the control
+    // cannot be natively required (that would block the substitute-only path). The rule is enforced
+    // on the step that holds them, with the same wording the server would otherwise print only
+    // after the final save on step 5.
+    const templateModes = (() => {
+      const el = form.querySelector('[data-minutes-template-modes]');
+      if (!(el instanceof HTMLScriptElement)) return {};
+      try {
+        return JSON.parse(el.textContent || '{}') || {};
+      } catch (err) {
+        return {};
+      }
+    })();
+    const leaderPairs = [
+      {
+        select: 'president_id',
+        substitute: 'president_substitute',
+        messageKey: 'msgPresidentRequired',
+        needsIt: (mode) => mode !== '' && mode !== 'free',
+      },
+      {
+        select: 'secretary_id',
+        substitute: 'secretary_substitute',
+        messageKey: 'msgSecretaryRequired',
+        // An avviso di convocazione is signed by the chair only.
+        needsIt: (mode, key) => mode !== '' && mode !== 'free' && key !== 'convocation',
+      },
+    ];
+    const syncLeaderRequirements = (forceVisible = false) => {
+      const checked = form.querySelector('input[name="minutes_type"]:checked');
+      const key = checked instanceof HTMLInputElement ? checked.value : '';
+      const mode = String(templateModes[key] || '');
+      leaderPairs.forEach((pair) => {
+        const select = form.querySelector(`[name="${pair.select}"]`);
+        if (!(select instanceof HTMLSelectElement)) return;
+        const substitute = form.querySelector(`[name="${pair.substitute}"]`);
+        const typed = substitute instanceof HTMLInputElement ? substitute.value.trim() : '';
+        const message = String(form.dataset[pair.messageKey] || '');
+        // A control inside a hidden step would let the browser block the submit with no visible
+        // message (“An invalid form control is not focusable”): the requirement lives only while its
+        // panel is on screen — reaching the later steps already proves it was satisfied. The submit
+        // check passes `forceVisible` because it inspects every step before saving.
+        const panel = select.closest('[data-minutes-panel]');
+        const visible = forceVisible || !(panel instanceof HTMLElement) || !panel.hidden;
+        const missing = visible && pair.needsIt(mode, key) && select.value === '' && typed === '';
+        select.setCustomValidity(missing ? message : '');
+      });
+    };
+
     // Closing time: the step proposes “now” (the minute is being closed as we write it) until
     // the operator types a time of their own or a submitted value comes back from the server.
     const closeTimeInput = form.querySelector('[name="minutes_time_close"]');
@@ -20477,6 +20583,8 @@ function initMinutesWizard(root = document) {
         panel.hidden = !active;
         panel.classList.toggle('is-active', active);
       });
+      // The chair/minute-taker requirement follows the visible step (see syncLeaderRequirements).
+      syncLeaderRequirements();
       stepButtons.forEach((btn) => {
         const n = Number(btn.dataset.minutesStep || 0);
         btn.classList.toggle('is-active', n === step);
@@ -20605,7 +20713,17 @@ function initMinutesWizard(root = document) {
       setFieldError(el, `${fieldLabel(el)}: ${message}`.trim());
     };
 
-    const validateStep = () => {
+    /**
+     * Validates the step on screen. `includeHidden` also checks controls inside the panels that are
+     * not shown: a field that went invalid after its step was left used to block the final submit
+     * with no message at all (the browser refuses to focus a hidden invalid control).
+     */
+    const validateStep = (options = {}) => {
+      const includeHidden = options.includeHidden === true;
+      const focusFirst = options.focus === undefined ? !includeHidden : options.focus === true;
+      // Chair / minute-taker depend on the template just chosen: re-evaluate before checking the
+      // step, so “Next” can never move past an unsigned minute.
+      syncLeaderRequirements(includeHidden);
       const panel = panelFor(step);
       if (!panel) return true;
       clearInvalidMarks(panel);
@@ -20616,7 +20734,7 @@ function initMinutesWizard(root = document) {
       panel.querySelectorAll('input, select, textarea').forEach((el) => {
         if (!(el instanceof HTMLInputElement || el instanceof HTMLSelectElement || el instanceof HTMLTextAreaElement)) return;
         if (el.disabled || el.hidden || el.type === 'hidden' || el.type === 'submit' || el.type === 'button') return;
-        if (el.closest('[hidden]')) return;
+        if (!includeHidden && (el.closest('[hidden]') || el.offsetParent === null)) return;
         if (el.type === 'radio') {
           if (seenRadios.has(el.name)) return;
           seenRadios.add(el.name);
@@ -20630,7 +20748,6 @@ function initMinutesWizard(root = document) {
           }
           return;
         }
-        if (el.offsetParent === null) return;
         if (!el.checkValidity() || (el.required && typeof el.value === 'string' && el.value.trim() === '')) {
           ok = false;
           problems.push({ el, label: fieldLabel(el), message: el.validationMessage || '' });
@@ -20651,7 +20768,7 @@ function initMinutesWizard(root = document) {
             : errorDefault;
           errorBox.hidden = false;
         }
-        if (firstInvalid instanceof HTMLElement) {
+        if (focusFirst && firstInvalid instanceof HTMLElement) {
           firstInvalid.reportValidity?.();
           firstInvalid.focus?.({ preventScroll: false });
         }
@@ -20661,6 +20778,28 @@ function initMinutesWizard(root = document) {
       }
       return ok;
     };
+
+    // The chair/minute-taker rule is declared above so showStep() can refresh it on every change.
+    syncLeaderRequirements();
+    leaderPairs.forEach((pair) => {
+      const roleEl = form.querySelector(`[name="${pair.select}"]`);
+      const substituteEl = form.querySelector(`[name="${pair.substitute}"]`);
+      const sync = () => {
+        syncLeaderRequirements();
+        // Either control satisfies the rule: clear the message on both.
+        liveValidate(roleEl);
+        liveValidate(substituteEl);
+      };
+      [roleEl, substituteEl].forEach((el) => {
+        if (!(el instanceof HTMLElement)) return;
+        el.addEventListener('change', sync);
+        el.addEventListener('blur', sync);
+        if (el instanceof HTMLInputElement) el.addEventListener('input', sync);
+      });
+    });
+    form.querySelectorAll('input[name="minutes_type"]').forEach((input) => {
+      input.addEventListener('change', syncLeaderRequirements);
+    });
 
     // Validate while typing: an impossible date or a wrong time range must say so immediately,
     // before the operator tries to move to the next step.
@@ -21204,13 +21343,16 @@ function initMinutesWizard(root = document) {
     form.addEventListener('submit', (event) => {
       if (event.defaultPrevented) return;
       const current = step;
+      // The form is `novalidate`: otherwise the browser refuses to submit — with no message at all —
+      // as soon as one control inside a hidden step is invalid (“Crea nuovo verbale” looked dead).
+      // Every step is checked here and the first failing one is revealed with its banner.
       for (let s = 1; s <= total; s += 1) {
         step = s;
-        if (!validateStep()) {
-          event.preventDefault();
-          showStep(s);
-          return;
-        }
+        if (validateStep({ includeHidden: true, focus: false })) continue;
+        event.preventDefault();
+        showStep(s);
+        validateStep({ includeHidden: true, focus: true });
+        return;
       }
       step = current;
     });

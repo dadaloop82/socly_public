@@ -160,23 +160,111 @@ final class EmailTemplateService
         return $this->db->fetch('SELECT * FROM email_templates WHERE slug = :s', ['s' => $slug]);
     }
 
-    /** @return array<string, string> */
-    public static function placeholderCatalog(): array
+    /**
+     * Every placeholder the workflow can fill, grouped by the area that produces it.
+     *
+     * The runtime map is built in `WorkflowService::auditVars()`: a key that an event does not carry
+     * renders as an empty string, so listing a whole section is safe. Add-on keys are discovered
+     * separately (`WorkflowService::addonPlaceholders()`).
+     *
+     * @return array<string, array<string, string>> group label key => [placeholder => label key]
+     */
+    public static function placeholderGroups(): array
     {
         return [
-            'association_name' => 'email_templates.ph_association_name',
-            'association_email' => 'email_templates.ph_association_email',
-            'member_name' => 'email_templates.ph_member_name',
-            'member_email' => 'email_templates.ph_member_email',
-            'member_card_number' => 'email_templates.ph_member_card_number',
-            'operator_email' => 'email_templates.ph_operator_email',
-            'operator_password' => 'email_templates.ph_operator_password',
-            'login_url' => 'email_templates.ph_login_url',
-            'otp_code' => 'email_templates.ph_otp_code',
-            'payment_amount' => 'email_templates.ph_payment_amount',
-            'membership_period' => 'email_templates.ph_membership_period',
-            'payment_due_date' => 'email_templates.ph_payment_due_date',
+            'email_templates.ph_group_association' => [
+                'association_name' => 'email_templates.ph_association_name',
+                'association_email' => 'email_templates.ph_association_email',
+                'login_url' => 'email_templates.ph_login_url',
+                'lang' => 'email_templates.ph_lang',
+                'ip' => 'email_templates.ph_ip',
+            ],
+            'email_templates.ph_group_event' => [
+                'event' => 'email_templates.ph_event',
+                'event_label' => 'email_templates.ph_event_label',
+                'entity_type' => 'email_templates.ph_entity_type',
+                'entity_id' => 'email_templates.ph_entity_id',
+                'entity_title' => 'email_templates.ph_entity_title',
+                'entity_url' => 'email_templates.ph_entity_url',
+                'entity_date' => 'email_templates.ph_entity_date',
+                'entity_amount' => 'email_templates.ph_entity_amount',
+                'entity_status' => 'email_templates.ph_entity_status',
+            ],
+            'email_templates.ph_group_people' => [
+                'member_name' => 'email_templates.ph_member_name',
+                'member_email' => 'email_templates.ph_member_email',
+                'member_id' => 'email_templates.ph_member_id',
+                'member_number' => 'email_templates.ph_member_number',
+                'member_status' => 'email_templates.ph_member_status',
+                'member_card_number' => 'email_templates.ph_member_card_number',
+                'person_name' => 'email_templates.ph_person_name',
+                'person_email' => 'email_templates.ph_person_email',
+                'user_name' => 'email_templates.ph_user_name',
+                'user_email' => 'email_templates.ph_user_email',
+                'operator_name' => 'email_templates.ph_operator_name',
+                'operator_email' => 'email_templates.ph_operator_email',
+                'operator_password' => 'email_templates.ph_operator_password',
+                'otp_code' => 'email_templates.ph_otp_code',
+                'enrollment_method' => 'email_templates.ph_enrollment_method',
+            ],
+            'email_templates.ph_group_payments' => [
+                'payment_amount' => 'email_templates.ph_payment_amount',
+                'payment_method' => 'email_templates.ph_payment_method',
+                'payment_date' => 'email_templates.ph_payment_date',
+                'payment_type' => 'email_templates.ph_payment_type',
+                'membership_period' => 'email_templates.ph_membership_period',
+                'payment_due_date' => 'email_templates.ph_payment_due_date',
+            ],
+            'email_templates.ph_group_documents' => [
+                'document_title' => 'email_templates.ph_document_title',
+                'document_number' => 'email_templates.ph_document_number',
+                'document_category' => 'email_templates.ph_document_category',
+                'document_date' => 'email_templates.ph_document_date',
+            ],
+            'email_templates.ph_group_deadlines' => [
+                'deadline_title' => 'email_templates.ph_deadline_title',
+                'deadline_due_date' => 'email_templates.ph_deadline_due_date',
+                'deadline_category' => 'email_templates.ph_deadline_category',
+                'deadline_status' => 'email_templates.ph_deadline_status',
+            ],
+            'email_templates.ph_group_treasury' => [
+                'treasury_description' => 'email_templates.ph_treasury_description',
+                'treasury_amount' => 'email_templates.ph_treasury_amount',
+                'treasury_date' => 'email_templates.ph_treasury_date',
+                'treasury_type' => 'email_templates.ph_treasury_type',
+                'treasury_account' => 'email_templates.ph_treasury_account',
+                'treasury_status' => 'email_templates.ph_treasury_status',
+            ],
+            'email_templates.ph_group_budgets' => [
+                'budget_title' => 'email_templates.ph_budget_title',
+                'budget_year' => 'email_templates.ph_budget_year',
+                'budget_status' => 'email_templates.ph_budget_status',
+            ],
+            'email_templates.ph_group_organs' => [
+                'org_role_label' => 'email_templates.ph_org_role_label',
+                'org_role_key' => 'email_templates.ph_org_role_key',
+            ],
+            'email_templates.ph_group_import' => [
+                'import_total' => 'email_templates.ph_import_total',
+                'import_created' => 'email_templates.ph_import_created',
+                'import_updated' => 'email_templates.ph_import_updated',
+                'import_skipped' => 'email_templates.ph_import_skipped',
+                'import_failed' => 'email_templates.ph_import_failed',
+            ],
         ];
+    }
+
+    /** @return array<string, string> every placeholder, flattened (placeholder => label key) */
+    public static function placeholderCatalog(): array
+    {
+        $out = [];
+        foreach (self::placeholderGroups() as $group) {
+            foreach ($group as $key => $labelKey) {
+                $out[$key] = $labelKey;
+            }
+        }
+
+        return $out;
     }
 
     /** @return array<string, string> */
@@ -224,24 +312,50 @@ final class EmailTemplateService
             'event' => 'member.created',
             'event_label' => (string) __('workflow.event_member_created'),
             'entity_type' => 'member',
+            'entity_id' => '42',
             'entity_title' => 'Mario Rossi',
             'entity_url' => url('/members/42'),
+            'entity_date' => date('d/m/Y'),
             'entity_amount' => '€ 25,00',
             'entity_status' => 'active',
+            'lang' => 'it',
+            'ip' => '192.0.2.10',
             'operator_name' => 'Anna Bianchi',
-            'operator_email' => 'anna.bianchi@esempio.it',
+            'member_id' => '42',
             'member_number' => '2025-0042',
+            'member_status' => 'active',
+            'person_name' => 'Mario Rossi',
+            'person_email' => 'mario.rossi@esempio.it',
+            'user_name' => 'Anna Bianchi',
+            'user_email' => 'anna.bianchi@esempio.it',
+            'enrollment_method' => 'online',
             'payment_method' => 'Bonifico',
             'payment_date' => date('d/m/Y'),
+            'payment_type' => 'membership_fee',
             'document_title' => 'Verbale assemblea',
             'document_number' => '2026/0012',
+            'document_category' => 'minutes',
+            'document_date' => date('d/m/Y'),
             'deadline_title' => 'Invio modello EAS',
             'deadline_due_date' => date('d/m/Y', strtotime('+30 days')),
+            'deadline_category' => 'tax',
+            'deadline_status' => 'open',
             'treasury_amount' => '€ 1.250,00',
             'treasury_description' => 'Quota associativa',
+            'treasury_date' => date('d/m/Y'),
+            'treasury_type' => 'income',
+            'treasury_account' => 'bank',
+            'treasury_status' => 'confirmed',
+            'budget_title' => 'Quote associative',
             'budget_year' => (string) (int) date('Y'),
-            'person_name' => 'Mario Rossi',
+            'budget_status' => 'approved',
             'org_role_label' => 'Presidente',
+            'org_role_key' => 'president',
+            'import_total' => '120',
+            'import_created' => '98',
+            'import_updated' => '15',
+            'import_skipped' => '5',
+            'import_failed' => '2',
         ];
         if ($lang === 'en') {
             $base['member_name'] = 'John Smith';

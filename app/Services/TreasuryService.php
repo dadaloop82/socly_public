@@ -753,7 +753,10 @@ final class TreasuryService
              FROM treasury_movements
              WHERE approved_at IS NOT NULL AND superseded_at IS NULL"
         );
-        $balance = (float) ($balanceRow['inc'] ?? 0) - (float) ($balanceRow['exp'] ?? 0);
+        // The wallets' opening balances are money in hand that never was a movement: they belong to
+        // the liquidity shown here, not to the income/expense totals above.
+        $balance = (float) ($balanceRow['inc'] ?? 0) - (float) ($balanceRow['exp'] ?? 0)
+            + array_sum($this->openingBalances());
 
         return [
             'movements' => $movements,
@@ -1104,6 +1107,14 @@ final class TreasuryService
                 $usage[$slug] = ($usage[$slug] ?? 0) + (int) $row['c'];
             }
         }
+        // A wallet holding an opening balance keeps money that is not in the ledger: deleting it
+        // would make that figure disappear from the balances, so it counts as “in use”.
+        $openings = $this->openingBalances();
+        foreach ($openings as $slug => $amount) {
+            if ($slug !== '' && $amount > 0.0) {
+                $usage[$slug] = ($usage[$slug] ?? 0) + 1;
+            }
+        }
         return $usage;
     }
 
@@ -1170,10 +1181,14 @@ final class TreasuryService
         }
 
         $out = [];
+        // The opening balance is a property of the wallet (never a movement): it is part of the
+        // money the account holds, not of the period's income.
+        $openings = $this->openingBalances();
         foreach ($this->accountOptions() as $opt) {
             $key = (string) $opt['key'];
             $sums = $totals[$key] ?? $empty;
             unset($totals[$key]);
+            $opening = round((float) ($openings[$key] ?? 0), 2);
             $out[] = [
                 'key' => $key,
                 'label' => (string) $opt['label'],
@@ -1182,7 +1197,8 @@ final class TreasuryService
                 'expense' => $sums['expense'],
                 'transfer_in' => $sums['transfer_in'],
                 'transfer_out' => $sums['transfer_out'],
-                'balance' => $sums['income'] - $sums['expense'] + $sums['transfer_in'] - $sums['transfer_out'],
+                'opening' => $opening,
+                'balance' => $sums['income'] - $sums['expense'] + $sums['transfer_in'] - $sums['transfer_out'] + $opening,
             ];
         }
         // Legacy rows without a (known) wallet get their own bucket.
@@ -1195,6 +1211,7 @@ final class TreasuryService
                 'expense' => $sums['expense'],
                 'transfer_in' => $sums['transfer_in'],
                 'transfer_out' => $sums['transfer_out'],
+                'opening' => 0.0,
                 'balance' => $sums['income'] - $sums['expense'] + $sums['transfer_in'] - $sums['transfer_out'],
             ];
         }
@@ -1239,7 +1256,8 @@ final class TreasuryService
         return (float) ($row['income'] ?? 0) !== 0.0
             || (float) ($row['expense'] ?? 0) !== 0.0
             || (float) ($row['transfer_in'] ?? 0) !== 0.0
-            || (float) ($row['transfer_out'] ?? 0) !== 0.0;
+            || (float) ($row['transfer_out'] ?? 0) !== 0.0
+            || (float) ($row['opening'] ?? 0) !== 0.0;
     }
 
     /** @return array{ok:bool,id?:int,slug?:string,errors?:array<string,string>} */
@@ -1305,24 +1323,35 @@ final class TreasuryService
             return ['ok' => false, 'errors' => ['account' => __('treasury.account_in_use', ['count' => (string) $usage])]];
         }
         $this->db->query('DELETE FROM treasury_accounts WHERE id = :id', ['id' => $id]);
+        // The wallet is gone: its opening figure must not survive as an orphan.
+        try {
+            $this->db->query(
+                'DELETE FROM treasury_account_openings WHERE account = :account',
+                ['account' => (string) ($row['slug'] ?? '')]
+            );
+        } catch (\Throwable) {
+        }
         $this->accountsCache = null;
         $this->audit->log('treasury.account_deleted', 'treasury', (string) $id, ['slug' => $row['slug'], 'label' => $row['label']], null, $ip, $userId);
         return ['ok' => true];
     }
 
     /**
-     * Opening balances currently stored in the ledger, keyed by wallet slug.
+     * Opening balances (“giacenza iniziale”) per wallet.
+     *
+     * They are a property of the account, not a cash-book movement: they feed the wallet balances
+     * and never the ledger or the income/expense totals.
      *
      * @return array<string,float>
      */
     public function openingBalances(): array
     {
-        $rows = $this->db->fetchAll(
-            'SELECT account, amount FROM treasury_movements
-              WHERE is_opening_balance = 1 AND superseded_at IS NULL
-              ORDER BY id ASC'
-        );
         $out = [];
+        try {
+            $rows = $this->db->fetchAll('SELECT account, amount FROM treasury_account_openings');
+        } catch (\Throwable) {
+            return $out;
+        }
         foreach ($rows as $row) {
             $key = self::normalizeAccount((string) ($row['account'] ?? ''));
             if ($key !== '') {
@@ -1334,20 +1363,11 @@ final class TreasuryService
     }
 
     /**
-     * Flags an already-created movement as the opening balance of its wallet (the setup wizard
-     * writes it through create() and then marks it here).
-     */
-    public function markOpeningBalance(int $id): void
-    {
-        if ($id < 1) {
-            return;
-        }
-        $this->db->update('treasury_movements', ['is_opening_balance' => 1], 'id = :id', ['id' => $id]);
-    }
-
-    /**
-     * Sets (or removes, with 0) the opening balance of a wallet. It is stored as the first income
-     * movement of that account, so every balance, chart and report keeps reading the ledger only.
+     * Sets (or clears, with 0) the opening balance of a wallet.
+     *
+     * Stored in `treasury_account_openings`: it changes the wallet balance only — no ledger row, no
+     * income in Prima cassa and no line in the reports, which is what the operator expects from a
+     * starting figure typed in configuration.
      *
      * @return array{ok:bool,errors?:array<string,string>}
      */
@@ -1355,9 +1375,11 @@ final class TreasuryService
     {
         $account = self::normalizeAccount($account);
         $label = '';
+        $accountId = 0;
         foreach ($this->accountOptions() as $option) {
             if ((string) ($option['key'] ?? '') === $account) {
                 $label = (string) ($option['label'] ?? '');
+                $accountId = (int) ($option['id'] ?? 0);
                 break;
             }
         }
@@ -1368,60 +1390,43 @@ final class TreasuryService
             return ['ok' => false, 'errors' => ['account' => __('setup.accounts_opening_invalid')]];
         }
         $amount = round($amount, 2);
-        $existing = $this->db->fetch(
-            "SELECT id, amount FROM treasury_movements
-              WHERE is_opening_balance = 1 AND account = :account AND superseded_at IS NULL
-              ORDER BY id ASC LIMIT 1",
-            ['account' => $account]
-        );
+        try {
+            $existing = $this->db->fetch(
+                'SELECT amount FROM treasury_account_openings WHERE account = :account',
+                ['account' => $account]
+            );
+        } catch (\Throwable) {
+            return ['ok' => false, 'errors' => ['account' => __('setup.accounts_opening_failed', ['account' => $label])]];
+        }
+        $before = $existing === null ? 0.0 : round((float) ($existing['amount'] ?? 0), 2);
+        $entityId = $accountId > 0 ? $accountId : $account;
         if ($amount <= 0.0) {
             if ($existing === null) {
                 return ['ok' => true];
             }
-            $movementId = (int) $existing['id'];
-            $this->db->query('DELETE FROM treasury_movements WHERE id = :id', ['id' => $movementId]);
-            $this->audit->log('treasury.opening_balance_removed', 'treasury', (string) $movementId, [
+            $this->db->query('DELETE FROM treasury_account_openings WHERE account = :account', ['account' => $account]);
+            $this->audit->log('treasury.opening_balance_removed', 'treasury_account', $entityId, [
                 'account' => $account,
-                'amount' => (float) ($existing['amount'] ?? 0),
+                'amount' => $before,
             ], null, $ip, $userId);
 
             return ['ok' => true];
         }
-        $description = mb_substr(
-            (string) __('setup.accounts_opening_movement', ['account' => $label]),
-            0,
-            500
+        $this->db->query(
+            'INSERT INTO treasury_account_openings (account, amount, updated_at, updated_by)
+             VALUES (:account, :amount, NOW(), :user)
+             ON DUPLICATE KEY UPDATE amount = VALUES(amount), updated_at = VALUES(updated_at), updated_by = VALUES(updated_by)',
+            ['account' => $account, 'amount' => $amount, 'user' => $userId]
         );
-        if ($existing !== null) {
-            $movementId = (int) $existing['id'];
-            $this->db->update('treasury_movements', [
-                'amount' => $amount,
-                'description' => $description,
-                'approved_at' => date('Y-m-d H:i:s'),
-                'approved_by' => $userId,
-            ], 'id = :id', ['id' => $movementId]);
-            $this->audit->log('treasury.opening_balance_updated', 'treasury', (string) $movementId, [
-                'amount' => (float) ($existing['amount'] ?? 0),
-            ], ['amount' => $amount, 'account' => $account], $ip, $userId);
-
-            return ['ok' => true];
-        }
-        $movementId = $this->db->insert('treasury_movements', [
-            'movement_date' => date('Y-m-d'),
-            'direction' => 'income',
-            'category' => 'other',
-            'amount' => $amount,
-            'description' => $description,
-            'payment_method' => $account === 'cash' ? 'cash' : 'bank_transfer',
-            'account' => $account,
-            'approved_at' => date('Y-m-d H:i:s'),
-            'approved_by' => $userId,
-            'is_opening_balance' => 1,
-        ]);
-        $this->audit->log('treasury.opening_balance_set', 'treasury', (string) $movementId, null, [
-            'account' => $account,
-            'amount' => $amount,
-        ], $ip, $userId);
+        $this->audit->log(
+            $existing === null ? 'treasury.opening_balance_set' : 'treasury.opening_balance_updated',
+            'treasury_account',
+            $entityId,
+            $existing === null ? null : ['account' => $account, 'amount' => $before],
+            ['account' => $account, 'amount' => $amount],
+            $ip,
+            $userId
+        );
 
         return ['ok' => true];
     }
@@ -1614,7 +1619,9 @@ final class TreasuryService
              WHERE approved_at IS NOT NULL AND superseded_at IS NULL AND movement_date < :from",
             ['from' => $start->format('Y-m-d')]
         );
-        $running = (float) ($opening['net'] ?? 0);
+        // The wallets may already hold money that never was a movement (opening balances): the trend
+        // of the liquidity must start from it, otherwise the chart would lose that figure.
+        $running = (float) ($opening['net'] ?? 0) + array_sum($this->openingBalances());
         $values = [];
         foreach ($flow['labels'] as $index => $_) {
             $running += (float) ($flow['income'][$index] ?? 0) - (float) ($flow['expense'][$index] ?? 0);

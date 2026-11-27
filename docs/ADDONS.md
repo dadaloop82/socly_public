@@ -249,7 +249,8 @@ narrow OCR pass over the amount columns fills in the numbers, and scanned PDFs f
 full-page OCR. The parser follows movements across page breaks, skips repeated headers/footnotes,
 reconciles the declared totals with the sum of the detected rows and flags duplicates already in the
 ledger. Pairing is not greedy: every statement row is matched with the ledger movement of the same
-direction and amount using **same day → same month and year → same year** (never another year), and
+direction and amount using **same day → same month and year → same year within two weeks** (never
+another year; a recurring amount paid months later is another movement, not a duplicate), and
 all plausible pairs are scored first (tier, date distance, description/counterparty similarity) and
 assigned globally, so an earlier row cannot steal the movement that belongs to a later one. Runs
 created with the old greedy pairing are re-matched once on their next read (`match_version` in
@@ -361,10 +362,10 @@ audit and must run it again. The audit job also stores the parser-cache version 
 started before an update is closed as stale, so old value dates / zero amounts cannot be mixed with
 new rows. The add-on version and parser cache generation are printed in the statements page, the
 audit report and each “Movimento letto dall’estratto conto” card, so a screenshot immediately shows
-whether the installed package is the fixed one. The run stops by itself as soon as the first anomaly
-appears (difference, missing row, cash-book-only movement, reading warning or a PDF that cannot be
-re-read) or when a statement yields at most five readable amounts while some rows stay unread:
-continuing would only repeat the same unusable result for the remaining PDFs. The progress overlay
+whether the installed package is the fixed one. The run stops by itself only when a statement cannot
+be read reliably (a PDF that cannot be re-read, a reading warning, or at most five readable amounts
+while some rows stay unread): differences, missing rows and cash-book-only movements are the audit's
+own output and must never abort the remaining PDFs. The progress overlay
 offers **Interrompi** while the run is active and, after a stop, shows the statement and the anomaly
 with **Copia log**, **Scarica log .txt** and **Apri report**. The audit report keeps the same banner
 (so the reason and the partial results survive a reload) and links the verify cards; a stopped audit

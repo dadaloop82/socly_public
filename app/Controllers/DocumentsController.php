@@ -60,7 +60,7 @@ final class DocumentsController extends BaseController
             'title' => __('documents.title'),
             'documents' => $this->documents->all(5000, $query, $filters),
             'counts' => $this->documents->counts(),
-            'minutes_overview' => $this->documents->minutesOverview(),
+            'minutes_overview' => $this->minutesOverviewWithWizard(),
             'filters' => $filters,
             'categories' => $this->documents->categoryOptions(),
             'category_groups' => $this->documents->categoryGroupedOptions(),
@@ -73,7 +73,6 @@ final class DocumentsController extends BaseController
             'repository_sections' => $sections,
             'repository_years' => $this->files->years(),
             'repository_stats' => $this->files->stats(),
-            'excerpt_repair' => $this->excerptRepairSummary(),
         ]);
     }
 
@@ -87,7 +86,25 @@ final class DocumentsController extends BaseController
     /** “Crea nuovo verbale”: template wizard with data already stored in SOCLY. */
     public function minutesCreate(Request $request): void
     {
-        $this->renderMinutesWizard();
+        // A minutes book card links straight to its model (`?type=board`, `?type=assembly_ordinary`).
+        $this->renderMinutesWizard(null, trim((string) $request->input('type', '')));
+    }
+
+    /**
+     * Minutes books enriched with the wizard model that files into each category, so the
+     * “Crea verbale” action opens the right template instead of the chooser.
+     *
+     * @return list<array<string,mixed>>
+     */
+    private function minutesOverviewWithWizard(): array
+    {
+        $books = $this->documents->minutesOverview();
+        foreach ($books as &$book) {
+            $book['wizard_type'] = MinutesService::wizardTemplateForCategory((string) ($book['key'] ?? ''));
+        }
+        unset($book);
+
+        return $books;
     }
 
     /** Saves the wizard as an archived document with its generated PDF. */
@@ -113,7 +130,7 @@ final class DocumentsController extends BaseController
      *
      * @param array<string,string>|null $errors Null = read the one-shot flash of a rejected save.
      */
-    private function renderMinutesWizard(?array $errors = null): void
+    private function renderMinutesWizard(?array $errors = null, string $defaultType = ''): void
     {
         require_component('documents');
         if ($errors === null) {
@@ -157,6 +174,7 @@ final class DocumentsController extends BaseController
             'budget_text' => $budgetText,
             'budget_voices' => $this->minutes->budgetVoices((int) date('Y')),
             'convocation_notice_days' => $this->minutes->convocationNoticeDays(),
+            'default_type' => $defaultType,
             'errors' => $errors,
         ]);
     }
@@ -631,19 +649,6 @@ final class DocumentsController extends BaseController
     /**
      * @return array{available:bool,missing:int,statements:int}
      */
-    private function excerptRepairSummary(): array
-    {
-        $service = $this->statementImportService();
-        if ($service === null) {
-            return ['available' => false, 'missing' => 0, 'statements' => 0];
-        }
-        try {
-            return $service->missingExcerptsSummary();
-        } catch (\Throwable) {
-            return ['available' => false, 'missing' => 0, 'statements' => 0];
-        }
-    }
-
     private function statementImportService(): ?object
     {
         if (!class_exists(\Socly\Addons\BankStatementImport\StatementImportService::class)) {

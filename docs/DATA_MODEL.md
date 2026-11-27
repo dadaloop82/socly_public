@@ -123,6 +123,14 @@ Treasury categories are the built-in list plus `treasury.custom_categories` in t
 (`[{slug, label}]`). New categories can be created on the fly from movements, documents, deadlines
 and budget lines; the label is shared by every feature that offers the same picker.
 
+### treasury_account_openings
+One row per wallet (`account` = slug, `amount`, `updated_at`, `updated_by`): the “Saldo iniziale”
+typed in Configuration → Financial accounts. It is **money already held in the wallet, not a
+movement**: it is added to the wallet balance and to the liquidity figures, and it never appears in
+the ledger, in the income/expense totals or in the reports. Releases up to 1.14.x stored it as an
+income movement flagged `is_opening_balance`; migration `067` converts those rows here and deletes
+them from the cash book.
+
 ### association_documents / document_links — central file repository
 
 `association_documents` is the **only** registry of uploaded files: every upload of the app and of the

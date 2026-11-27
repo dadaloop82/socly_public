@@ -49,6 +49,9 @@ final class WorkflowService
     /** @var array{groups:array<string,array<string,string>>,audit:array<string,string>}|null */
     private ?array $addonEventsCache = null;
 
+    /** @var array<string, list<string>>|null add-on display name => placeholder keys */
+    private ?array $addonPlaceholdersCache = null;
+
     public function __construct(
         private readonly Database $db,
         private readonly Validator $validator,
@@ -673,6 +676,90 @@ final class WorkflowService
     }
 
     /** @return list<string> */
+    /**
+     * Placeholders the add-ons fill in their own vars when they dispatch a workflow event.
+     *
+     * Add-ons do not have to declare them: the keys are read from the `$vars = [ … ]` blocks in their
+     * sources — the same discovery used for their events — so the template editor can offer
+     * `forum_title`, `topic_title`, … without a new plugin contract.
+     *
+     * @return array<string, list<string>> add-on display name => placeholder keys
+     */
+    public function addonPlaceholders(): array
+    {
+        if ($this->addonPlaceholdersCache !== null) {
+            return $this->addonPlaceholdersCache;
+        }
+        $codePath = defined('SOCLY_CODE_PATH') ? SOCLY_CODE_PATH : dirname(__DIR__, 2);
+        $installRoot = function_exists('storage_path') ? storage_path('addons') : $codePath . '/storage/addons';
+        $coreKeys = EmailTemplateService::placeholderCatalog();
+        $out = [];
+        foreach ($this->availableAddons((string) $installRoot, (string) $codePath) as $candidate) {
+            $real = realpath($candidate['dir']);
+            if ($real === false || !is_dir($real)) {
+                continue;
+            }
+            $name = trim((string) ($candidate['name'] ?? ''));
+            if ($name === '') {
+                continue;
+            }
+            foreach ($this->scanAddonPlaceholders($real) as $key) {
+                if ($key === '' || isset($coreKeys[$key])) {
+                    continue;
+                }
+                $out[$name][$key] = $key;
+            }
+        }
+        $final = [];
+        foreach ($out as $name => $keys) {
+            $list = array_values($keys);
+            sort($list);
+            $final[$name] = $list;
+        }
+
+        return $this->addonPlaceholdersCache = $final;
+    }
+
+    /**
+     * Placeholder keys an add-on passes to `dispatch()` / `dispatchAudit()`.
+     *
+     * @return list<string>
+     */
+    private function scanAddonPlaceholders(string $dir): array
+    {
+        $keys = [];
+        foreach ($this->addonPhpFiles($dir) as $file) {
+            $source = (string) @file_get_contents($file);
+            if ($source === '') {
+                continue;
+            }
+            // Only files that actually send an email carry the vars a template can use: elsewhere a
+            // `$vars = […]` array is a form/render local, not a placeholder (it listed “key”, “label”,
+            // “types”… for add-ons that never dispatch a workflow event).
+            if (!str_contains($source, 'dispatch(') && !str_contains($source, 'renderTemplate(')) {
+                continue;
+            }
+            if (preg_match_all('/\$vars\s*=\s*\[(.*?)\]\s*;/s', $source, $blocks) === 0) {
+                $blocks = [[], []];
+            }
+            // `$vars + ['recipient_name' => …]` merges extra keys at send time.
+            if (preg_match_all('/\+\s*\[(.*?)\]/s', $source, $merged) > 0) {
+                $blocks[1] = array_merge((array) ($blocks[1] ?? []), (array) ($merged[1] ?? []));
+            }
+            foreach ((array) ($blocks[1] ?? []) as $block) {
+                if (preg_match_all("/'([a-z][a-z0-9_]{1,40})'\s*=>/", (string) $block, $matches) > 0) {
+                    foreach ((array) ($matches[1] ?? []) as $key) {
+                        $keys[(string) $key] = true;
+                    }
+                }
+            }
+        }
+        $list = array_keys($keys);
+        sort($list);
+
+        return $list;
+    }
+
     private function addonPhpFiles(string $dir): array
     {
         $files = [];

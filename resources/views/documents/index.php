@@ -167,35 +167,6 @@ foreach ($groups as $groupKey => $groupRows) {
         <?php if ($hasActiveFilters): ?>
             <a class="btn btn-ghost" href="<?= e($filterUrl(['q' => '', 'status' => '', 'category' => '', 'section' => '', 'year' => '', 'uploader' => ''])) ?>"><?= e(__('documents.filter_reset')) ?></a>
         <?php endif; ?>
-        <?php
-        $excerptRepair = is_array($excerpt_repair ?? null) ? $excerpt_repair : [];
-        $excerptMissing = (int) ($excerptRepair['missing'] ?? 0);
-        $excerptAddon = !empty($excerptRepair['available']);
-        ?>
-        <?php if ($canManage): ?>
-            <button
-                type="button"
-                class="btn btn-ghost"
-                data-repair-excerpts
-                data-no-busy
-                data-repair-start="<?= e(url('/documents/repair-excerpts')) ?>"
-                data-repair-tick="<?= e(url('/documents/repair-excerpts/tick')) ?>"
-                data-repair-missing="<?= (int) $excerptMissing ?>"
-                data-repair-addon="<?= $excerptAddon ? '1' : '0' ?>"
-                data-repair-title="<?= e(__('documents.repair_excerpts_title')) ?>"
-                data-repair-starting="<?= e(__('documents.repair_excerpts_starting')) ?>"
-                data-repair-working="<?= e(__('documents.repair_excerpts_working')) ?>"
-                data-repair-eta="<?= e(__('documents.repair_excerpts_eta')) ?>"
-                data-repair-done="<?= e(__('documents.repair_excerpts_done')) ?>"
-                data-repair-failed="<?= e(__('documents.repair_excerpts_failed')) ?>"
-                data-repair-synced="<?= e(__('documents.repair_excerpts_synced')) ?>"
-                data-repair-unavailable="<?= e(__('documents.repair_excerpts_unavailable')) ?>"
-                data-repair-retry="<?= e(__('documents.repair_excerpts_retry')) ?>"
-                title="<?= e($excerptMissing > 0
-                    ? __('documents.repair_excerpts_hint', ['count' => (string) $excerptMissing])
-                    : __('documents.repair_excerpts_synced')) ?>"
-            ><?= e(__('documents.repair_excerpts')) ?></button>
-        <?php endif; ?>
         <?php if ($canManage): ?>
             <a class="btn<?= ($documents === [] && !$hasActiveFilters) ? ' is-first-cta' : '' ?>" href="<?= e(url('/documents/minutes/create')) ?>"><?= e(__('documents.minutes_create')) ?></a>
         <?php endif; ?>
@@ -356,7 +327,18 @@ $repoSizeLabel = $repoSize >= 1048576
                     <span class="documents-minutes-meta muted"><?= e(__('documents.minutes_last', ['date' => format_date($bookLast) ?: $bookLast])) ?></span>
                 <?php endif; ?>
                 <?php if ($canManage): ?>
-                    <a class="btn btn-sm<?= $bookYear === 0 ? '' : ' btn-ghost' ?>" href="<?= e(url('/documents/create?category=' . rawurlencode($bookKey))) ?>"><?= e(__('documents.minutes_add')) ?></a>
+                    <?php
+                    // “Crea verbale” opens the wizard on the matching model; the upload stays for a
+                    // PDF signed elsewhere. No model exists for every book (organo di controllo):
+                    // then the link opens the chooser.
+                    $wizardType = (string) ($book['wizard_type'] ?? '');
+                    $wizardUrl = '/documents/minutes/create'
+                        . ($wizardType !== '' ? '?type=' . rawurlencode($wizardType) : '');
+                    ?>
+                    <div class="documents-minutes-actions">
+                        <a class="btn btn-sm" href="<?= e(url($wizardUrl)) ?>"><?= e(__('documents.minutes_new')) ?></a>
+                        <a class="btn btn-sm btn-ghost" href="<?= e(url('/documents/create?category=' . rawurlencode($bookKey))) ?>"><?= e(__('documents.minutes_add')) ?></a>
+                    </div>
                 <?php endif; ?>
             </article>
         <?php endforeach; ?>

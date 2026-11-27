@@ -32,19 +32,47 @@ $editing = is_array($editingTemplate ?? null) ? $editingTemplate : null;
 $editId = (int) ($editing['id'] ?? 0);
 $tplService = app(\Socly\Services\EmailTemplateService::class);
 $bodyFormat = $tplService->normalizeBodyFormat((string) ($editing['body_format'] ?? 'text'));
-$placeholders = \Socly\Services\EmailTemplateService::placeholderCatalog();
+$placeholderGroups = \Socly\Services\EmailTemplateService::placeholderGroups();
 $conditionals = \Socly\Services\EmailTemplateService::conditionalCatalog();
+// Placeholders an add-on fills in its own vars (forum_title, …), discovered from its sources.
+$addonPlaceholders = [];
+try {
+    $addonPlaceholders = app(\Socly\Services\WorkflowService::class)->addonPlaceholders();
+} catch (\Throwable) {
+    $addonPlaceholders = [];
+}
 $systemSlugs = \Socly\Services\EmailTemplateService::SYSTEM_SLUGS;
 $isSystemSlug = $editing && in_array((string) ($editing['slug'] ?? ''), $systemSlugs, true);
 ?>
 <p class="setup-hint muted"><?= e(__('email_templates.intro')) ?></p>
 <div class="email-template-placeholders">
     <p class="setup-subhead"><?= e(__('email_templates.placeholders')) ?></p>
-    <div class="email-template-ph-list">
-        <?php foreach ($placeholders as $key => $labelKey): ?>
-            <button type="button" class="btn btn-ghost btn-sm" data-insert-ph="<?= e($key) ?>" title="<?= e(__($labelKey)) ?>">{{<?= e($key) ?>}}</button>
+    <p class="muted setup-hint"><?= e(__('email_templates.placeholders_hint')) ?></p>
+    <?php foreach ($placeholderGroups as $groupLabelKey => $group): ?>
+        <div class="email-template-ph-group">
+            <p class="email-template-ph-group-title"><?= e(__($groupLabelKey)) ?></p>
+            <div class="email-template-ph-list">
+                <?php foreach ($group as $key => $labelKey): ?>
+                    <button type="button" class="btn btn-ghost btn-sm" data-insert-ph="<?= e($key) ?>" title="<?= e(__($labelKey)) ?>">{{<?= e($key) ?>}}</button>
+                <?php endforeach; ?>
+            </div>
+        </div>
+    <?php endforeach; ?>
+    <?php if ($addonPlaceholders !== []): ?>
+        <p class="email-template-ph-group-title"><?= e(__('email_templates.ph_group_addons')) ?></p>
+        <?php foreach ($addonPlaceholders as $addonName => $addonKeys): ?>
+            <div class="email-template-ph-group">
+                <p class="email-template-ph-group-title"><?= e($addonName) ?></p>
+                <div class="email-template-ph-list">
+                    <?php foreach ($addonKeys as $key): ?>
+                        <button type="button" class="btn btn-ghost btn-sm" data-insert-ph="<?= e($key) ?>" title="<?= e($key) ?>">{{<?= e($key) ?>}}</button>
+                    <?php endforeach; ?>
+                </div>
+            </div>
         <?php endforeach; ?>
-    </div>
+    <?php endif; ?>
+    <p class="email-template-ph-group-title"><?= e(__('email_templates.ph_group_conditions')) ?></p>
+    <p class="muted setup-hint"><?= e(__('email_templates.cond_hint')) ?></p>
     <div class="email-template-cond-list">
         <?php foreach ($conditionals as $key => $labelKey): ?>
             <code class="email-template-cond" title="<?= e(__($labelKey)) ?>">{{#<?= e($key) ?>}}…{{/<?= e($key) ?>}}</code>

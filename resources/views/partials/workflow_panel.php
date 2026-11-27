@@ -168,7 +168,8 @@ $events = $workflowEvents;
                                         'href' => url('/settings?edit_workflow=' . (int) ($r['id'] ?? 0) . '#workflow'),
                                     ],
                                     [
-                                        'icon' => 'toggle',
+                                        // Knob on the right = active, on the left = switched off.
+                                        'icon' => !empty($r['enabled']) ? 'toggle' : 'toggle_off',
                                         'label' => !empty($r['enabled']) ? __('workflow.deactivate') : __('workflow.activate'),
                                         'form_action' => url('/settings/workflow'),
                                         'hidden' => [

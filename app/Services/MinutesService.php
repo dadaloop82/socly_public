@@ -95,6 +95,22 @@ final class MinutesService
         return self::TEMPLATES[$key] ?? null;
     }
 
+    /**
+     * The wizard model that files a document into this archive category, so a minutes book card can
+     * link straight to the right model. '' when no model exists (the operator picks one).
+     */
+    public static function wizardTemplateForCategory(string $category): string
+    {
+        foreach (self::TEMPLATES as $key => $config) {
+            // The convocation notice shares the assembly category but is not the ordinary minute.
+            if ($key !== 'convocation' && (string) $config['category'] === $category) {
+                return $key;
+            }
+        }
+
+        return '';
+    }
+
     /** Next progressive number of the year, formatted as “04/2026”. */
     public function nextNumber(string $category, ?string $date = null): string
     {

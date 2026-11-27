@@ -35,6 +35,9 @@ Rules for current and future views:
 
 1. **One shell** — authenticated pages use the app shell (sidebar + topbar + main). Do not invent alternate chrome.
 2. **Mobile nav** — below 960px the sidebar is off-canvas; the sticky topbar opens it. Do not stack a full sidebar above content.
+   From 961px the same sidebar can collapse to an **icon rail** (`data-sidebar-rail-toggle`, `.app-shell.is-sidebar-rail`,
+   preference stored in `localStorage`): every entry keeps its icon plus a `title`, and the label stays in the DOM
+   (visually hidden) so the accessible name never disappears.
 3. **Fluid grids** — use `.grid-2`, `.grid-3`, `.stats`, `.charts`, `.detail-grid`. They collapse to one column on small screens.
 4. **Tables** — always wrap in `.table-wrap` so wide tables scroll horizontally without breaking the page.
 5. **Page headers** — `.page-header` with `.titles` + `.actions`; actions wrap / full-width on small screens.
