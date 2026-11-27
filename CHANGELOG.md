@@ -52,6 +52,9 @@ every 100 patches bump the series, and each bump is published to this rep come o
 
 ### Changed
 
+- Gender labels: the Italian UI now reads **“Uomo” / “Donna”** (previously “Maschio” / “Femmina”) in the
+  member and operator forms, minute attendance, statistics, PDFs and the tablet enrolment kiosk. The
+  CSV import keeps accepting the old words (and “male/female”, “Herr/Frau”, …) as synonyms.
 - Documents: bank-statement crops (“Ritagli dell’estratto conto”) are no longer counted as
   documents and stay out of the default archive, so the KPI cards show how many real documents
   exist. They remain reachable by selecting their category or from the treasury movement.

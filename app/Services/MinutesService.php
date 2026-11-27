@@ -151,7 +151,7 @@ final class MinutesService
         return $out;
     }
 
-    /** “Maschio / Femmina / Altro” for the stored M/F/X code; empty when unknown. */
+    /** “Uomo / Donna / Altro” label for the stored M/F/X code; empty when unknown. */
     private function genderLabel(string $gender): string
     {
         return match (strtoupper(trim($gender))) {
