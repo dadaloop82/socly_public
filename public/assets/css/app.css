@@ -1770,6 +1770,120 @@ body.app-embed .page-header {
     display: none;
   }
 }
+/* Desktop only: folds the configuration index to an icon rail. */
+.config-rail-toggle {
+  display: none;
+  position: sticky;
+  top: 0;
+  align-self: flex-end;
+  z-index: 2;
+  width: 2.15rem;
+  height: 2.15rem;
+  padding: 0;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: #fff;
+  color: var(--muted);
+  cursor: pointer;
+  align-items: center;
+  justify-content: center;
+}
+.config-rail-toggle:hover,
+.config-rail-toggle:focus-visible {
+  color: var(--brand-primary-deep);
+  background: color-mix(in srgb, var(--brand-primary) 8%, #fff);
+  border-color: color-mix(in srgb, var(--brand-primary) 38%, var(--line));
+}
+.config-rail-icon {
+  width: 1.05rem;
+  height: 1.05rem;
+  transition: transform 0.2s ease;
+}
+/* —— Configuration icon rail ——
+   Same idea as the app sidebar rail: the macro-areas keep only their icon, the label stays in the
+   DOM (visually hidden) so the accessible name and the `title` tooltip survive, and each group
+   reveals its sections in a flyout panel on hover / keyboard focus. */
+@media (min-width: 901px) {
+  .config-rail-toggle { display: inline-flex; }
+  .config-layout.is-config-rail { grid-template-columns: 84px minmax(0, 1fr); }
+  .config-layout.is-config-rail .config-nav {
+    /* The flyout must escape the sticky column: no clipping, no inner scrolling in the rail. */
+    max-height: none;
+    overflow: visible;
+    padding: 0.35rem 0;
+    border: 1px solid var(--line);
+    border-radius: 18px;
+    background: color-mix(in srgb, var(--brand-primary) 4%, #fff);
+    z-index: 5;
+  }
+  .config-layout.is-config-rail .config-rail-toggle {
+    position: static;
+    align-self: center;
+    margin: 0 auto 0.35rem;
+  }
+  .config-layout.is-config-rail .config-rail-icon { transform: rotate(180deg); }
+  .config-layout.is-config-rail .config-search,
+  .config-layout.is-config-rail .config-nav-chevron { display: none; }
+  .config-layout.is-config-rail .config-nav-text {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+    border: 0;
+  }
+  .config-layout.is-config-rail .config-nav-item {
+    align-items: center;
+    justify-content: center;
+    padding: 0.5rem 0;
+  }
+  .config-layout.is-config-rail .config-nav-group { position: relative; }
+  /* Sections of a macro-area are always in the DOM: the rail shows them as a flyout, so the
+     index stays usable without expanding the column again. */
+  .config-layout.is-config-rail .config-nav-sub,
+  .config-layout.is-config-rail .config-nav-sub[hidden] {
+    display: grid !important;
+    position: absolute;
+    left: 100%;
+    top: 0;
+    z-index: 30;
+    width: 15rem;
+    max-width: min(20rem, 60vw);
+    margin: 0;
+    padding: 0.45rem 0.5rem 0.45rem 0.7rem;
+    border: 1px solid color-mix(in srgb, var(--brand-primary) 22%, var(--line));
+    border-left: 2px solid color-mix(in srgb, var(--brand-primary) 42%, var(--line));
+    border-radius: 0 14px 14px 0;
+    background: #fff;
+    box-shadow: var(--shadow-soft);
+    opacity: 0;
+    visibility: hidden;
+    transform: translateX(-0.2rem);
+    transition: opacity 0.14s ease, transform 0.14s ease, visibility 0.14s ease;
+    pointer-events: none;
+  }
+  /* The rail hides the group label, so the flyout states which macro-area it belongs to. */
+  .config-layout.is-config-rail .config-nav-sub::before {
+    content: attr(data-rail-title);
+    padding: 0 0.5rem 0.3rem;
+    margin-bottom: 0.2rem;
+    border-bottom: 1px dashed var(--line);
+    font-family: var(--font-display);
+    font-size: 0.82rem;
+    font-weight: 700;
+    color: var(--brand-primary-deep);
+  }
+  .config-layout.is-config-rail .config-nav-group:hover .config-nav-sub,
+  .config-layout.is-config-rail .config-nav-group:focus-within .config-nav-sub {
+    opacity: 1;
+    visibility: visible;
+    transform: none;
+    pointer-events: auto;
+  }
+}
 .setup-name-pair {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(7.5rem, 10.5rem);
@@ -3095,10 +3209,61 @@ html.is-busy .update-overlay {
 }
 .pause-game {
   margin: 0 0 1rem;
-  padding: 0.75rem 0.8rem 0.85rem;
-  border-radius: 16px;
-  border: 1px solid color-mix(in srgb, var(--brand-primary) 16%, var(--line, #d7e3df));
-  background: color-mix(in srgb, var(--brand-primary) 4%, #ffffff);
+  padding: 0.8rem 0.8rem 0.9rem;
+  border-radius: 18px;
+  border: 1px solid color-mix(in srgb, var(--brand-primary) 18%, var(--line, #d7e3df));
+  background: linear-gradient(180deg, #ffffff 0%, color-mix(in srgb, var(--brand-primary) 4%, #ffffff) 100%);
+  box-shadow:
+    inset 0 1px 0 #ffffff,
+    0 10px 24px color-mix(in srgb, #0b2b26 10%, transparent);
+}
+/* —— Retro pinball cabinet around the three displays —— */
+.pause-scoreboard {
+  position: relative;
+  isolation: isolate;
+  margin: 0 0 0.6rem;
+  padding: 0.8rem 0.6rem 0.55rem;
+  border-radius: 14px;
+  border: 2px solid #1a2622;
+  background:
+    radial-gradient(120% 80% at 50% -20%, rgba(126, 255, 214, 0.1), transparent 60%),
+    linear-gradient(180deg, #35423d 0%, #1d2925 42%, #101814 100%);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.2),
+    inset 0 -2px 0 rgba(0, 0, 0, 0.6),
+    0 8px 18px rgba(8, 24, 20, 0.3);
+  overflow: hidden;
+}
+/* Bulb strip along the top edge. */
+.pause-scoreboard::before {
+  content: "";
+  position: absolute;
+  top: 5px;
+  left: 8px;
+  right: 8px;
+  height: 6px;
+  border-radius: 999px;
+  background-image: radial-gradient(circle at 4px 50%, #ffe08a 0 2.1px, rgba(255, 224, 138, 0) 2.5px);
+  background-size: 13px 6px;
+  background-repeat: repeat-x;
+  opacity: 0.6;
+  filter: drop-shadow(0 0 3px rgba(255, 214, 120, 0.55));
+  animation: pause-bulbs 1.4s ease-in-out infinite;
+  pointer-events: none;
+  z-index: 2;
+}
+/* Chrome screws in the four corners. */
+.pause-scoreboard::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background-image:
+    radial-gradient(circle at 10px 10px, #e8efec 0 1.4px, #77857f 1.6px 2.6px, transparent 2.9px),
+    radial-gradient(circle at calc(100% - 10px) 10px, #e8efec 0 1.4px, #77857f 1.6px 2.6px, transparent 2.9px),
+    radial-gradient(circle at 10px calc(100% - 10px), #e8efec 0 1.4px, #77857f 1.6px 2.6px, transparent 2.9px),
+    radial-gradient(circle at calc(100% - 10px) calc(100% - 10px), #e8efec 0 1.4px, #77857f 1.6px 2.6px, transparent 2.9px);
+  z-index: 2;
 }
 .pause-game-head {
   display: flex;
@@ -3113,41 +3278,109 @@ html.is-busy .update-overlay {
   letter-spacing: -0.01em;
 }
 .pause-hud {
+  position: relative;
+  z-index: 1;
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 0.45rem;
-  margin: 0 0 0.55rem;
+  gap: 0.4rem;
+  margin: 0;
 }
+/* One glass display per counter: dark pane, scanlines, glowing digits. */
 .pause-stat {
+  position: relative;
   display: flex;
   flex-direction: column;
-  gap: 0.1rem;
-  padding: 0.45rem 0.55rem;
-  border-radius: 12px;
-  border: 1px solid color-mix(in srgb, var(--brand-primary) 14%, #ffffff);
-  background: #ffffff;
+  gap: 0.08rem;
+  min-width: 0;
+  padding: 0.4rem 0.5rem 0.45rem;
+  border-radius: 9px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: linear-gradient(180deg, rgba(9, 18, 15, 0.96), rgba(3, 8, 6, 0.98));
+  box-shadow:
+    inset 0 0 0 1px rgba(0, 0, 0, 0.65),
+    inset 0 8px 16px rgba(0, 0, 0, 0.55),
+    0 1px 0 rgba(255, 255, 255, 0.07);
+  overflow: hidden;
+}
+.pause-stat::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: repeating-linear-gradient(180deg, rgba(255, 255, 255, 0.05) 0 1px, transparent 1px 3px);
+  opacity: 0.5;
 }
 .pause-stat-label {
-  font-size: 0.66rem;
-  font-weight: 700;
-  letter-spacing: 0.04em;
+  position: relative;
+  z-index: 1;
+  font-size: 0.6rem;
+  font-weight: 800;
+  letter-spacing: 0.12em;
   text-transform: uppercase;
-  color: color-mix(in srgb, var(--ink) 60%, transparent);
+  color: #a9c4bb;
+  text-shadow: 0 1px 0 rgba(0, 0, 0, 0.85);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 .pause-stat-value {
-  font-family: var(--font-display);
-  font-size: 1.15rem;
-  line-height: 1.1;
-  color: var(--ink);
+  position: relative;
+  z-index: 1;
+  display: block;
+  font-family: ui-monospace, "SFMono-Regular", Menlo, Consolas, "Liberation Mono", monospace;
+  font-size: 1.5rem;
+  font-weight: 700;
+  line-height: 1.05;
+  letter-spacing: 0.05em;
+  color: #ffcf5c;
   font-variant-numeric: tabular-nums;
+  text-shadow:
+    0 0 6px rgba(255, 190, 70, 0.8),
+    0 0 18px rgba(255, 150, 40, 0.35),
+    0 1px 0 rgba(0, 0, 0, 0.95);
 }
 .pause-stat-meta {
-  font-size: 0.68rem;
-  line-height: 1.25;
-  color: color-mix(in srgb, var(--ink) 55%, transparent);
+  position: relative;
+  z-index: 1;
+  margin-top: auto;
+  padding-top: 0.12rem;
+  font-family: ui-monospace, "SFMono-Regular", Menlo, Consolas, "Liberation Mono", monospace;
+  font-size: 0.6rem;
+  line-height: 1.3;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: #8fa8a0;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
 }
 .pause-stat--record .pause-stat-value {
-  color: var(--brand-primary-ink, var(--brand-primary));
+  color: #7df2c8;
+  text-shadow:
+    0 0 6px rgba(96, 240, 190, 0.85),
+    0 0 20px rgba(46, 210, 160, 0.4),
+    0 1px 0 rgba(0, 0, 0, 0.95);
+}
+.pause-stat--personal .pause-stat-value {
+  color: #9ecbff;
+  text-shadow:
+    0 0 6px rgba(130, 190, 255, 0.8),
+    0 0 20px rgba(70, 140, 255, 0.35),
+    0 1px 0 rgba(0, 0, 0, 0.95);
+}
+/* The score display jumps on every pop. */
+.pause-stat--score.is-bump .pause-stat-value {
+  animation: pause-score-bump 0.3s ease-out;
+}
+@keyframes pause-score-bump {
+  0% { transform: translateY(0) scale(1); }
+  35% { transform: translateY(-2px) scale(1.18); }
+  100% { transform: translateY(0) scale(1); }
+}
+@keyframes pause-bulbs {
+  0%, 100% { opacity: 0.35; }
+  50% { opacity: 0.95; }
 }
 .pause-hud.is-record {
   animation: pause-record 1.2s ease-in-out 2;
@@ -3156,12 +3389,38 @@ html.is-busy .update-overlay {
   0%, 100% { filter: none; }
   50% { filter: drop-shadow(0 0 10px color-mix(in srgb, #e7c46a 70%, transparent)); }
 }
+/* Jackpot: the whole cabinet flashes gold for a moment. */
+.pause-scoreboard.is-jackpot {
+  border-color: #f3c94e;
+  animation: pause-jackpot 0.6s ease-in-out 4;
+}
+.pause-scoreboard.is-jackpot::before {
+  opacity: 1;
+  animation-duration: 0.24s;
+}
+@keyframes pause-jackpot {
+  0%, 100% {
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.2),
+      inset 0 -2px 0 rgba(0, 0, 0, 0.6),
+      0 8px 18px rgba(8, 24, 20, 0.3);
+  }
+  50% {
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.28),
+      inset 0 -2px 0 rgba(0, 0, 0, 0.6),
+      0 0 26px rgba(243, 201, 78, 0.85);
+  }
+}
 @media (max-width: 520px) {
   .pause-hud {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
   .pause-stat--personal {
     grid-column: span 2;
+  }
+  .pause-stat-value {
+    font-size: 1.3rem;
   }
 }
 .pause-game-hint {
@@ -3173,12 +3432,17 @@ html.is-busy .update-overlay {
   position: relative;
   height: 9.5rem;
   overflow: hidden;
-  border-radius: 12px;
+  border-radius: 14px;
+  border: 2px solid #1d2a26;
   background:
-    radial-gradient(120px 80px at 18% 22%, color-mix(in srgb, var(--brand-primary) 12%, transparent), transparent 70%),
-    radial-gradient(140px 90px at 82% 78%, color-mix(in srgb, var(--brand-accent) 12%, transparent), transparent 72%),
-    linear-gradient(180deg, #f8fcfb 0%, #eef6f4 100%);
-  border: 1px solid color-mix(in srgb, var(--brand-primary) 10%, #ffffff);
+    radial-gradient(120px 80px at 18% 22%, color-mix(in srgb, var(--brand-primary) 14%, transparent), transparent 70%),
+    radial-gradient(140px 90px at 82% 78%, color-mix(in srgb, var(--brand-accent) 16%, transparent), transparent 72%),
+    repeating-linear-gradient(115deg, rgba(19, 74, 63, 0.05) 0 2px, transparent 2px 22px),
+    linear-gradient(180deg, #f3fbf8 0%, #dff0eb 100%);
+  box-shadow:
+    inset 0 0 0 3px rgba(255, 255, 255, 0.65),
+    inset 0 14px 26px rgba(11, 43, 38, 0.14),
+    0 2px 0 rgba(0, 0, 0, 0.25);
 }
 .pause-bubble {
   position: absolute;
@@ -3209,15 +3473,53 @@ html.is-busy .update-overlay {
   opacity: 0;
   pointer-events: none;
 }
+/* Arcade pop burst, positioned by the game loop (--bx/--by, px). */
+.pause-pop-spark {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 10px;
+  height: 10px;
+  margin: -5px 0 0 -5px;
+  border-radius: 50%;
+  pointer-events: none;
+  background: radial-gradient(circle, #ffffff 0 18%, rgba(255, 214, 110, 0.95) 42%, rgba(255, 150, 40, 0) 72%);
+  box-shadow: 0 0 14px rgba(255, 200, 80, 0.9);
+  animation: pause-pop-spark 0.42s ease-out forwards;
+}
+@keyframes pause-pop-spark {
+  from {
+    opacity: 1;
+    transform: translate3d(var(--bx, 0px), var(--by, 0px), 0) scale(0.4);
+  }
+  to {
+    opacity: 0;
+    transform: translate3d(var(--bx, 0px), var(--by, 0px), 0) scale(3.2);
+  }
+}
 .pause-record-flash {
-  margin: 0.4rem 0 0;
-  padding: 0.45rem 0.6rem;
-  border-radius: 10px;
-  font-size: 0.82rem;
-  font-weight: 700;
-  color: #0a5a4a;
-  background: color-mix(in srgb, #2f9e8f 14%, #ffffff);
-  border: 1px solid color-mix(in srgb, #2f9e8f 30%, #ffffff);
+  position: relative;
+  z-index: 1;
+  margin: 0.45rem 0 0;
+  padding: 0.4rem 0.6rem;
+  border-radius: 8px;
+  text-align: center;
+  font-family: var(--font-display);
+  font-size: 0.85rem;
+  font-weight: 800;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: #3a2a00;
+  background: linear-gradient(180deg, #ffeaa6 0%, #f5c33f 100%);
+  border: 1px solid #b8860b;
+  box-shadow:
+    0 0 18px rgba(245, 195, 63, 0.45),
+    inset 0 1px 0 #fff4c9;
+  animation: pause-record-blink 0.9s steps(2, end) infinite;
+}
+@keyframes pause-record-blink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.55; }
 }
 .pause-record-flash[hidden] { display: none !important; }
 .pause-actions {
@@ -3240,10 +3542,16 @@ html.is-busy .update-overlay {
 @media (prefers-reduced-motion: reduce) {
   .pause-orb,
   .pause-pulse span,
-  .resource-busy-overlay .pause-card {
+  .resource-busy-overlay .pause-card,
+  .pause-scoreboard::before,
+  .pause-scoreboard.is-jackpot,
+  .pause-hud.is-record,
+  .pause-stat--score.is-bump .pause-stat-value,
+  .pause-record-flash {
     animation: none !important;
   }
-  .pause-bubble { transition: none; }
+  .pause-bubble,
+  .pause-pop-spark { transition: none; }
 }
 .stat::after {
   content: "";

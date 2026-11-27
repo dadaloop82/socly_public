@@ -502,9 +502,10 @@ final class MinutesService
                 'max' => (string) PlausibleDate::maxYear(),
             ])]];
         }
-        // A new minute records a meeting that is happening now or being convened: a past date
-        // belongs to the archived minute book, not to a freshly generated PDF.
-        if ($date < date('Y-m-d')) {
+        // A minute records a sitting that has already taken place: the minute book is written,
+        // often days later, with the date of the meeting — a past date is legitimate. Only an
+        // “avviso di convocazione” looks forward, so a past date there is a typing slip.
+        if ($type === 'convocation' && $date < date('Y-m-d')) {
             return ['ok' => false, 'errors' => ['minutes_date' => __('validation.past_date')]];
         }
         // Protocol number: two minutes of the same book and year cannot share it.

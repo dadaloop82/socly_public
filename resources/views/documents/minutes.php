@@ -260,7 +260,9 @@ $convocationHint = $convocationNoticeDays > 0
                         'label' => (string) __('documents.minutes_field_date'),
                         'value' => (string) ($default_date ?? date('Y-m-d')),
                         'required' => true,
-                        'min' => date('Y-m-d'),
+                        // No `min`: a minute is normally written after the sitting, with the date
+                        // of the meeting. Only an avviso di convocazione must look forward, and the
+                        // service says so with a readable message.
                         'context' => 'member',
                     ]) ?>
                 </div>

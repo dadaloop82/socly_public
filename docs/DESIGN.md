@@ -38,6 +38,9 @@ Rules for current and future views:
    From 961px the same sidebar can collapse to an **icon rail** (`data-sidebar-rail-toggle`, `.app-shell.is-sidebar-rail`,
    preference stored in `localStorage`): every entry keeps its icon plus a `title`, and the label stays in the DOM
    (visually hidden) so the accessible name never disappears.
+   The configuration index follows the same pattern one breakpoint earlier (901px):
+   `data-config-rail-toggle` + `.config-layout.is-config-rail`, with the sections of each macro-area
+   in a flyout.
 3. **Fluid grids** — use `.grid-2`, `.grid-3`, `.stats`, `.charts`, `.detail-grid`. They collapse to one column on small screens.
 4. **Tables** — always wrap in `.table-wrap` so wide tables scroll horizontally without breaking the page.
 5. **Page headers** — `.page-header` with `.titles` + `.actions`; actions wrap / full-width on small screens.

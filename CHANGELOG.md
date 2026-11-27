@@ -57,6 +57,11 @@ every 100 patches bump the series, and each bump is published to this rep come o
 
 ### Changed
 
+- Settings: the configuration index folds to an **icon rail** on desktop (toggle on the index, the
+  preference is remembered, labels stay in the DOM for screen readers) and each macro-area opens its
+  sections in a flyout while the rail is active — the same pattern as the sidebar.
+- Database: a failed statement is logged with its SQL text (placeholders only, never the bound
+  values), so a crash report says which query broke without writing personal data to the log.
 - Gender labels: the Italian UI now reads **“Uomo” / “Donna”** (previously “Maschio” / “Femmina”) in the
   member and operator forms, minute attendance, statistics, PDFs and the tablet enrolment kiosk. The
   CSV import keeps accepting the old words (and “male/female”, “Herr/Frau”, …) as synonyms.
@@ -103,6 +108,12 @@ every 100 patches bump the series, and each bump is published to this rep come o
 
 ### Fixed
 
+- Minutes wizard: the **Data di convocazione** field no longer erases the digits while they are being
+  typed (it used to rewrite its own `min`/`max` on every change and the browser emptied the control);
+  the statutory notice is still enforced, and explained inline under the field.
+- Minutes wizard: the **Data della seduta** may now be in the past — a minute is normally written
+  after the meeting, with the date of the sitting. The “future only” rule stays for an *avviso di
+  convocazione*, where a past meeting date is a typing slip.
 - Minutes wizard: the step error now names the field that blocks the step (and the browser reason)
   instead of a bare “complete the required fields”, and the control is highlighted. The same message
   is shown **inline under the field while it is being filled** (and when the step opens on a value

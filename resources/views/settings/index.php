@@ -37,7 +37,19 @@
 </div>
 
 <div class="config-layout" data-settings-nav data-default-group="assoc">
-    <nav class="config-nav" role="tablist" aria-label="<?= e(__('settings.nav_aria')) ?>">
+    <nav class="config-nav" id="config-nav" role="tablist" aria-label="<?= e(__('settings.nav_aria')) ?>">
+        <?php // Desktop only: folds the index to an icon rail (the labels stay in the DOM). ?>
+        <button
+            type="button"
+            class="config-rail-toggle"
+            data-config-rail-toggle
+            aria-controls="config-nav"
+            aria-expanded="true"
+            aria-label="<?= e(__('nav.collapse_menu')) ?>"
+            title="<?= e(__('nav.collapse_menu')) ?>"
+            data-label-collapse="<?= e(__('nav.collapse_menu')) ?>"
+            data-label-expand="<?= e(__('nav.expand_menu')) ?>"
+        ><?= nav_icon_svg('chevron-left', 'config-rail-icon') ?></button>
         <div class="config-search">
             <input
                 type="search"
@@ -135,6 +147,7 @@
                     aria-selected="<?= $navGroupFirst ? 'true' : 'false' ?>"
                     aria-expanded="<?= $navGroupFirst ? 'true' : 'false' ?>"
                     aria-controls="settings-nav-sub-<?= e($navGroupKey) ?>"
+                    title="<?= e(__($navGroup['title'])) ?>"
                 >
                     <span class="config-nav-icon" aria-hidden="true">
                         <svg width="20" height="20" viewBox="0 0 24 24" focusable="false"><path fill="currentColor" d="<?= e($navGroup['icon']) ?>"/></svg>
@@ -145,7 +158,11 @@
                     </span>
                     <span class="config-nav-chevron" aria-hidden="true"></span>
                 </button>
-                <div class="config-nav-sub" id="settings-nav-sub-<?= e($navGroupKey) ?>"<?= $navGroupFirst ? '' : ' hidden' ?>>
+                <div
+                    class="config-nav-sub"
+                    id="settings-nav-sub-<?= e($navGroupKey) ?>"
+                    data-rail-title="<?= e(__($navGroup['title'])) ?>"<?= $navGroupFirst ? '' : ' hidden' ?>
+                >
                     <?php foreach ($navGroup['items'] as $navPanelId => $navItem): ?>
                         <?php
                         $navItemTitleKey = (string) ($navItem[0] ?? '');

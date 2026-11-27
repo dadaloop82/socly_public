@@ -179,6 +179,7 @@ document.addEventListener('DOMContentLoaded', () => {
   initSettingsAssociationForms();
   initSettingsAutosave();
   initSettingsSearch();
+  initSettingsRail();
   initLegalDocEditors(document);
   initSetupGdprOptions(document);
   initLogoFilePickers(document);
@@ -16618,6 +16619,68 @@ function initSettingsNav() {
   window.addEventListener('hashchange', () => syncFromHash(false));
 }
 
+function initSettingsRail() {
+  const layout = document.querySelector('.config-layout[data-settings-nav]');
+  const toggle = layout?.querySelector('[data-config-rail-toggle]');
+  if (!(layout instanceof HTMLElement) || !(toggle instanceof HTMLElement)) {
+    return;
+  }
+  const storageKey = 'socly_settings_rail';
+  const desktop = window.matchMedia('(min-width: 901px)');
+  const labelCollapse = toggle.getAttribute('data-label-collapse') || '';
+  const labelExpand = toggle.getAttribute('data-label-expand') || '';
+
+  const readStored = () => {
+    try {
+      return window.localStorage.getItem(storageKey) === '1';
+    } catch (err) {
+      return false;
+    }
+  };
+
+  let rail = readStored();
+
+  const paint = () => {
+    const active = rail && desktop.matches;
+    layout.classList.toggle('is-config-rail', active);
+    toggle.setAttribute('aria-expanded', active ? 'false' : 'true');
+    toggle.setAttribute('aria-label', active ? labelExpand : labelCollapse);
+    if (active && labelExpand !== '') {
+      toggle.title = labelExpand;
+    } else if (labelCollapse !== '') {
+      toggle.title = labelCollapse;
+    }
+    // The rail hides the search field: drop a leftover query so the sections are not stuck
+    // in “search” mode (the search module restores the normal view on input).
+    if (active) {
+      const input = layout.querySelector('[data-settings-search]');
+      if (input instanceof HTMLInputElement && input.value !== '') {
+        input.value = '';
+        input.dispatchEvent(new Event('input', { bubbles: true }));
+      }
+    }
+  };
+
+  toggle.addEventListener('click', () => {
+    rail = !layout.classList.contains('is-config-rail');
+    try {
+      window.localStorage.setItem(storageKey, rail ? '1' : '0');
+    } catch (err) {
+      // Private mode / storage disabled: the rail still works for this page.
+    }
+    paint();
+  });
+
+  // Below 901px the index is a horizontal strip: never keep it as a rail.
+  if (typeof desktop.addEventListener === 'function') {
+    desktop.addEventListener('change', paint);
+  } else if (typeof desktop.addListener === 'function') {
+    desktop.addListener(paint);
+  }
+
+  paint();
+}
+
 function initDemoBannerCompact() {
   const banner = document.querySelector('[data-demo-banner]');
   if (!(banner instanceof HTMLElement)) return;
@@ -21247,39 +21310,32 @@ function initMinutesWizard(root = document) {
       const meetingDate = minutesDateInput instanceof HTMLInputElement ? minutesDateInput.value : '';
       const noticeDays = Number(form.dataset.convocationNoticeDays || 0);
       const convoked = convokedInput instanceof HTMLInputElement && convokedInput.checked;
+      const value = convocationInput.value;
       let message = '';
-      if (meetingDate !== '') {
+      if (meetingDate !== '' && value !== '') {
         const shifted = (days) => {
           const date = new Date(`${meetingDate}T00:00:00`);
           date.setDate(date.getDate() + days);
-          const pad = (value) => String(value).padStart(2, '0');
+          const pad = (part) => String(part).padStart(2, '0');
           return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
         };
         // Same window as the server (MinutesService::save): on or before the sitting, at least the
         // statutory notice before it when the convocation is declared regular, never more than a
-        // year older. The previous code set min = meeting − notice, which allowed exactly the dates
-        // the server then rejected.
+        // year older.
         const oldest = shifted(-365);
-        const latest = convoked && noticeDays > 0 ? shifted(-noticeDays) : meetingDate;
-        convocationInput.min = oldest;
-        convocationInput.max = latest;
-        const value = convocationInput.value;
-        if (value !== '') {
-          if (value > meetingDate) {
-            message = form.dataset.msgConvocationAfter || '';
-          } else if (convoked && noticeDays > 0 && value > latest) {
-            message = (form.dataset.msgConvocationNotice || '').replace(':days', String(noticeDays));
-          } else if (value < oldest) {
-            message = form.dataset.msgConvocationTooOld || '';
-          }
+        if (value > meetingDate) {
+          message = form.dataset.msgConvocationAfter || '';
+        } else if (convoked && noticeDays > 0 && value > shifted(-noticeDays)) {
+          message = (form.dataset.msgConvocationNotice || '').replace(':days', String(noticeDays));
+        } else if (value < oldest) {
+          message = form.dataset.msgConvocationTooOld || '';
         }
-      } else {
-        convocationInput.removeAttribute('max');
-        convocationInput.removeAttribute('min');
       }
-      // The message under the field replaces the browser's bare “value must be … or earlier” with
-      // the actual rule (statutory notice), and it is refreshed as soon as the meeting date or the
-      // “duly convened” box changes.
+      // Only the custom validity message carries the rule. Assigning `min`/`max` on a date input
+      // while the operator is typing makes the browser sanitise the control and erase the digits
+      // just entered, so the field is never rewritten: the inline message explains the statutory
+      // notice instead, and it is refreshed as soon as the meeting date or the “duly convened”
+      // box changes.
       convocationInput.setCustomValidity(message);
       if (convokedInput instanceof HTMLInputElement) {
         convocationInput.required = convokedInput.checked;

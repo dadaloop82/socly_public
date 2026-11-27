@@ -118,6 +118,10 @@
     hud.className = 'pause-hud';
     hud.setAttribute('role', 'status');
 
+    // Retro pinball cabinet around the three displays.
+    var board = document.createElement('div');
+    board.className = 'pause-scoreboard';
+
     function stat(text, modifier) {
       var el = document.createElement('div');
       el.className = 'pause-stat ' + modifier;
@@ -154,8 +158,9 @@
 
     box.appendChild(head);
     box.appendChild(hint);
-    box.appendChild(hud);
-    box.appendChild(recordFlash);
+    board.appendChild(hud);
+    board.appendChild(recordFlash);
+    box.appendChild(board);
     box.appendChild(field);
 
 
@@ -166,6 +171,7 @@
     var savedScore = 0;
     var saveTimer = 0;
     var saving = false;
+    var shownScore = -1;
     var slots = [];
     var used = [];
     for (var row = 0; row < 4; row += 1) {
@@ -198,6 +204,15 @@
       var personal = Math.max(personalBest, score);
       scoreStat.value.textContent = String(score);
       personalStat.value.textContent = String(personal);
+      if (score !== shownScore) {
+        shownScore = score;
+        // Arcade “hit” on the score display: restart the CSS bump on every pop, even in a burst.
+        if (score > 0 && !reducedMotion) {
+          scoreStat.el.classList.remove('is-bump');
+          void scoreStat.el.offsetWidth;
+          scoreStat.el.classList.add('is-bump');
+        }
+      }
 
       var bestScore = record && typeof record.score === 'number' ? record.score : 0;
       var holder = record ? String(record.name || '') : '';
@@ -233,9 +248,11 @@
 
     function flashRecord() {
       hud.classList.add('is-record');
+      board.classList.add('is-jackpot');
       recordFlash.hidden = false;
       window.setTimeout(function () {
         hud.classList.remove('is-record');
+        board.classList.remove('is-jackpot');
         recordFlash.hidden = true;
       }, 2600);
     }
@@ -444,6 +461,20 @@
     }
 
 
+    /** Short-lived burst where a bubble popped: pure decoration, never clickable. */
+    function spark(entry) {
+      if (reducedMotion) return;
+      var burst = document.createElement('span');
+      burst.className = 'pause-pop-spark';
+      burst.setAttribute('aria-hidden', 'true');
+      burst.style.setProperty('--bx', (entry.x + entry.size / 2).toFixed(1) + 'px');
+      burst.style.setProperty('--by', (entry.y + entry.size / 2).toFixed(1) + 'px');
+      field.appendChild(burst);
+      window.setTimeout(function () {
+        if (burst.parentNode) burst.parentNode.removeChild(burst);
+      }, 460);
+    }
+
     function pop(entry, slotIndex) {
       if (entry.el.classList.contains('is-popped')) return;
       entry.el.classList.add('is-popped');
@@ -452,6 +483,7 @@
       if (index !== -1) bubbles.splice(index, 1);
       score += 1;
       renderHud();
+      spark(entry);
       scheduleSave();
       // Endless game: the popped bubble is always replaced, so the field never empties.
       window.setTimeout(function () {

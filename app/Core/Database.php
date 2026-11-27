@@ -132,9 +132,38 @@ final class Database
 
     public function query(string $sql, array $params = []): \PDOStatement
     {
-        $stmt = $this->pdo()->prepare($sql);
-        $stmt->execute($params);
-        return $stmt;
+        try {
+            $stmt = $this->pdo()->prepare($sql);
+            $stmt->execute($params);
+            return $stmt;
+        } catch (\PDOException $e) {
+            $this->logFailedStatement($sql, $e);
+            throw $e;
+        }
+    }
+
+    /**
+     * A failed statement is logged with its placeholders only: the bound values may contain
+     * personal data, while the SQL text is what makes a crash report actionable.
+     */
+    private function logFailedStatement(string $sql, \PDOException $e): void
+    {
+        if (!\function_exists('app')) {
+            return;
+        }
+        $flat = (string) preg_replace('/\s+/', ' ', trim($sql));
+        if (\strlen($flat) > 1500) {
+            $flat = substr($flat, 0, 1500) . '…';
+        }
+        try {
+            app('logger')->error('db.query_failed', [
+                'sql' => $flat,
+                'sqlstate' => (string) ($e->errorInfo[0] ?? $e->getCode()),
+                'driver_code' => (int) ($e->errorInfo[1] ?? 0),
+            ]);
+        } catch (\Throwable) {
+            // Logging must never mask the original database error.
+        }
     }
 
     public function fetch(string $sql, array $params = []): ?array
