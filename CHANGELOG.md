@@ -114,6 +114,15 @@ every 100 patches bump the series, and each bump is published to this rep come o
 
 ### Fixed
 
+- Bank-statement “Ignorati (N)”: the panel is **paginated** (100 per page) with the **real total** in the
+  badge and a “Mostrati X–Y di N” hint, so a list longer than 500 is no longer silently truncated;
+  each row now shows **when** it was ignored.
+- Bank-statement “Ripristina”: the confirmation counts **only the rows actually deleted**
+  (`rowCount()`) and logs just those; restoring an id that was never ignored (or already restored in
+  another tab) reports it instead of showing a false “N movements restored”.
+- Bank-statement “Azzera dati add-on”: the three `DELETE`s run in **one transaction** with the real
+  affected counts; a failure rolls back and reports the error instead of a half-done reset with a
+  success message (add-on 1.4.92).
 - Bank-statement audit: movements the operator confirmed with “questo movimento è corretto” are no
   longer reported as differences — the audit honours the same accepted signatures as the verify page
   (and ignores acceptances that point to superseded movements, cleaned once by the add-on migration).
