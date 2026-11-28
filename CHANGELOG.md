@@ -114,6 +114,14 @@ every 100 patches bump the series, and each bump is published to this rep come o
 
 ### Fixed
 
+- Bank-statement “Possibili doppi”: fewer false positives. Pairs without a transaction code are now
+  only reported when they are **one day apart** (the ten-day window flagged recurring 0,50/0,80 €
+  commissions as duplicates); the distance in days is always shown. **“Cancella tutti”** only removes
+  pairs with a real **transaction code** (`bulk_delete`), the wording-only pairs are manual.
+  Pairs where both copies are already decided (accepted/ignored) — or one is protected and the other
+  is the copy linked to the statement — are no longer listed one by one: a single counter summarises
+  them, and no deletion is offered (`delete_id = 0`, `both_linked`) so the audit cannot be left with
+  a “missing” statement row (add-on 1.4.95).
 - Session: an idle tab no longer signs the operator out on its own timer. The client asks the server
   (`/session/ping`) and redirects to the login page **only on a real 401**, so a second tab, a heavy
   job holding the lock or a tab woken after sleep can no longer produce “Sessione scaduta” right
