@@ -114,6 +114,17 @@ every 100 patches bump the series, and each bump is published to this rep come o
 
 ### Fixed
 
+- Session: an idle tab no longer signs the operator out on its own timer. The client asks the server
+  (`/session/ping`) and redirects to the login page **only on a real 401**, so a second tab, a heavy
+  job holding the lock or a tab woken after sleep can no longer produce “Sessione scaduta” right
+  after signing in (the loop where re-login was immediately expired again).
+- Legacy paths from old bookmarks and cached pages (`/admin`, `/assets/app.css`, `/assets/app.js`)
+  now redirect to the canonical page/asset instead of logging an `http.not_found` anomaly on every
+  load.
+- Bank-statement “Possibili doppi”: accepted and ignored movements are **never** offered as the copy
+  to delete; when both copies are protected the pair shows “verifica a mano” and no delete button,
+  the bulk action counts the real victims and the server rejects protected ids even with a forged
+  POST (add-on 1.4.94).
 - Bank-statement “Possibili doppi in Prima cassa”: the pairs are **grouped by transaction** (same code
   or same wording/amount) with one block per group, the copy to delete is marked and can be deleted
   with one click, and a **“Cancella tutti i possibili doppi”** button removes one copy per pair after

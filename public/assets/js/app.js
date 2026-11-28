@@ -3658,6 +3658,7 @@ function initSessionHeartbeat() {
   let lastActivity = Date.now();
   let lastBump = 0;
   let redirecting = false;
+  let verifying = false;
   let forcedKeepAlive = 0;
   let warning = null;
   let warningSeconds = 0;
@@ -3797,11 +3798,48 @@ function initSessionHeartbeat() {
     if (clamped <= 5 && clamped > 0) chime(false);
   };
 
+  /**
+   * The client timer says “idle”, but the session is shared: confirm with the server before the
+   * redirect. 200 → the session is alive (another tab or a heavy job kept it), so treat it as
+   * activity; 401 → really expired. A network error never logs the operator out.
+   */
+  const confirmSessionAlive = () => {
+    if (redirecting || verifying) return;
+    verifying = true;
+    fetch(pingUrl, {
+      method: 'POST',
+      headers: {
+        Accept: 'application/json',
+        'Content-Type': 'application/x-www-form-urlencoded',
+        'X-CSRF-TOKEN': csrf,
+      },
+      body: '_token=' + encodeURIComponent(csrf),
+      credentials: 'same-origin',
+    })
+      .then((res) => {
+        verifying = false;
+        if (res.status === 401) {
+          goExpired();
+          return;
+        }
+        lastActivity = Date.now();
+        lastBump = Date.now();
+        hideWarning();
+      })
+      .catch(() => {
+        // Offline or a proxy hiccup: keep the page, the next request will tell the truth.
+        verifying = false;
+      });
+  };
+
   const bump = (opts = {}) => {
     const force = !!opts.force || isHeavyJob();
     if (!force && document.visibilityState === 'hidden') return;
     if (!force && idleFor() >= IDLE_MS) {
-      goExpired();
+      // Never sign the operator out on a client-side timer alone: the session is shared, so a
+      // second tab (or a heavy job holding the lock) may have kept it alive while this tab was in
+      // the background. Ask the server and redirect only when it answers 401.
+      confirmSessionAlive();
       return;
     }
     const now = Date.now();
@@ -3858,15 +3896,18 @@ function initSessionHeartbeat() {
       if (isHeavyJob()) bump({ force: true });
       return;
     }
-    if (!isHeavyJob() && idleFor() >= IDLE_MS) {
-      goExpired();
-      return;
-    }
+    // Coming back to the tab is activity: let the ping decide whether the session is still alive
+    // (a client-side idle timer must never sign the operator out while another tab kept it open).
     onActivity();
+  });
+  // bfcache restore (Back/Forward or a tab woken after sleep): same rule.
+  window.addEventListener('pageshow', (event) => {
+    if (event.persisted) onActivity();
   });
 
   // Client-side idle watch, 1 s tick so the countdown is smooth: in the last
-  // 30 seconds show the card + chime, then redirect. Heavy jobs never expire.
+  // 30 seconds show the card + chime; when the window is over ask the server
+  // (401 → login page). Heavy jobs never expire.
   setInterval(() => {
     if (redirecting) return;
     if (isHeavyJob()) {
@@ -3878,7 +3919,8 @@ function initSessionHeartbeat() {
     const remaining = IDLE_MS - idleFor();
     if (remaining <= 0) {
       hideWarning();
-      goExpired();
+      // Confirm with the server (throttled): only a real 401 sends the operator to the login page.
+      bump();
       return;
     }
     if (remaining <= WARN_MS && document.visibilityState !== 'hidden') {

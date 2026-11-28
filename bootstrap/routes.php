@@ -86,6 +86,21 @@ $router->get('/', function () {
 $router->get('/install', [InstallController::class, 'index'], null, ['mw.locale', 'mw.install']);
 $router->post('/install', [InstallController::class, 'save'], null, ['mw.locale', 'mw.install', 'mw.csrf']);
 
+// Legacy paths seen in old bookmarks and in pages cached by a previous layout: answer with a
+// redirect instead of a 404 (and an “http.not_found” anomaly) on every load.
+$router->get('/admin', static function (): void {
+    redirect(auth_user() ? '/dashboard' : '/login');
+}, null, ['mw.locale', 'mw.install']);
+$router->get('/admin/', static function (): void {
+    redirect(auth_user() ? '/dashboard' : '/login');
+}, null, ['mw.locale', 'mw.install']);
+$router->get('/assets/app.css', static function (): void {
+    redirect('/assets/css/app.css');
+}, null, ['mw.locale', 'mw.install']);
+$router->get('/assets/app.js', static function (): void {
+    redirect('/assets/js/app.js');
+}, null, ['mw.locale', 'mw.install']);
+
 $router->get('/login', [AuthController::class, 'showLogin'], null, ['mw.locale', 'mw.install', 'mw.guest']);
 $router->post('/login', [AuthController::class, 'login'], null, ['mw.locale', 'mw.install', 'mw.guest', 'mw.csrf']);
 $router->post('/login/greeting', [AuthController::class, 'loginGreeting'], null, ['mw.locale', 'mw.install', 'mw.guest', 'mw.csrf']);
