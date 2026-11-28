@@ -148,6 +148,20 @@ server {
 `public/.user.ini` raises upload limits to 25 MB for PDFs. With Nginx + PHP-FPM also check
 `upload_max_filesize` / `post_max_size` in `php.ini`.
 
+> **Static assets (`/assets/…`)**: the application loads its CSS/JS from `/assets/...`, which lives in
+> `public/assets/`. With `root …/public` (as above) Nginx serves them directly. If the app is mounted
+> under a sub-path — or the vhost root points to the project folder instead of `public/` — add an
+> explicit mapping, otherwise `/assets/js/app.js` returns 404 (layout without style, and the legacy
+> redirect in PHP cannot help because the request never reaches PHP):
+>
+> ```nginx
+> location /assets/ {
+>     alias /var/www/socly/public/assets/;
+>     expires 7d;
+>     access_log off;
+> }
+> ```
+
 ## 5. Guided installation
 
 Open `https://socly.example.org/install` and complete the five steps:

@@ -114,6 +114,17 @@ every 100 patches bump the series, and each bump is published to this rep come o
 
 ### Fixed
 
+- Add-on packages: `socly_addons_publish_path()` now hands the package **and its folders** to the
+  web-server group (`chgrp` + `0775`, group resolved from `SOCLY_WEB_GROUP` or
+  `www-data/apache/nginx/httpd`), like `tools/addons build`. Publishing as the CLI/site user used to
+  leave `root:root 0640` files that the panel could not read for reinstall/rollback.
+- Bank-statement “Possibili doppi”: wording-only pairs now also require the **same counterparty** and
+  skip **recurring labels** (commissione, canone, abbonamento, rata, interessi, competenze, spese,
+  Gebühr): a recurring fee one day apart (month border) is no longer offered as a duplicate. They
+  pair only by transaction code (add-on 1.4.96).
+- Docs: the nginx section explains that `/assets/…` must be served from `public/assets/` (explicit
+  `location /assets/` alias when the app is mounted under a sub-path), otherwise `/assets/js/app.js`
+  returns 404 and the PHP legacy redirect cannot help.
 - Bank-statement “Possibili doppi”: fewer false positives. Pairs without a transaction code are now
   only reported when they are **one day apart** (the ten-day window flagged recurring 0,50/0,80 €
   commissions as duplicates); the distance in days is always shown. **“Cancella tutti”** only removes
