@@ -114,6 +114,12 @@ every 100 patches bump the series, and each bump is published to this rep come o
 
 ### Fixed
 
+- Bank-statement “Possibili doppi in Prima cassa”: the pairs are **grouped by transaction** (same code
+  or same wording/amount) with one block per group, the copy to delete is marked and can be deleted
+  with one click, and a **“Cancella tutti i possibili doppi”** button removes one copy per pair after
+  an explicit confirmation. The copy paired with the statement always stays (otherwise the older
+  one); after the action the page re-runs the analysis on the data already read, so a row that was
+  paired with a deleted copy shows up as missing instead of disappearing (add-on 1.4.93).
 - Bank-statement “Ignorati (N)”: the panel is **paginated** (100 per page) with the **real total** in the
   badge and a “Mostrati X–Y di N” hint, so a list longer than 500 is no longer silently truncated;
   each row now shows **when** it was ignored.
