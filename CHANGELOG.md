@@ -114,6 +114,28 @@ every 100 patches bump the series, and each bump is published to this rep come o
 
 ### Fixed
 
+- Bank-statement audit: movements the operator confirmed with “questo movimento è corretto” are no
+  longer reported as differences — the audit honours the same accepted signatures as the verify page
+  (and ignores acceptances that point to superseded movements, cleaned once by the add-on migration).
+- Bank-statement duplicates: the **transaction key now includes direction and amount**, so a
+  recurring SEPA/disposition code reused for a different amount is not treated as the same
+  transaction (it was pairing/flagging unrelated movements).
+- Bank-statement “Ignorati”: the action is now **reversible**. A dedicated **“Ignorati (N)”** panel
+  (audit report and verify page) lists the excluded movements with multiple selection and
+  **Ripristina** (`POST /treasury/bank-statements/verify/restore`, audit log
+  `treasury.bank_statement_ledger_restored`): the row goes back to “non in estratto conto” on the
+  next load without re-running the audit.
+- Bank-statement add-on data: migrations clean acceptances/ignores of superseded movements, the tables
+  are kept on uninstall on purpose (documented in the add-on README) and a new **“Azzera dati
+  add-on”** action empties accepted/learned/ignored without touching the cash book.
+- Bank-statement audit files: retention now **compresses** older runs (newest 2 plain, older ones
+  `.json.gz`, up to 20 jobs → 13+ checks retained at ~10% of the disk) instead of only raising the
+  number of runs; `.gz` files are read transparently.
+- Bank-statement add-on: every `lib/*.php` class is now guarded with `class_exists(..., false)`
+  (two package versions in the same request during an update), the add-on README documents tables,
+  audit JSON format and retention, and `tests/run.php` provides offline regression checks for the
+  transaction key, the declared year, the row-position notes and the one-row-one-movement rule
+  (add-on 1.4.91).
 - Bank-statement audit: the **“Movimenti a libro non presenti in estratto”** list is rebuilt from the
   stored statement pairings (`matched_id` per parsed row) instead of the bare `used_existing` id set.
   Movements whose pairing was never stored (matched rows are dropped from `verify_movements`) are
